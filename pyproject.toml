@@ -1,0 +1,136 @@
+[project]
+name = "ddeutil-pipe"
+description = "Data Developer & Engineer Pipeline Utility Objects"
+readme = {file = "README.md", content-type = "text/markdown"}
+license = {text = "MIT"}
+authors = [{ name = "ddeutils", email = "korawich.anu@gmail.com" }]
+keywords = ['data', 'pipline', 'utility']
+classifiers = [
+    "Topic :: Utilities",
+    "Natural Language :: English",
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+requires-python = ">=3.9.13"
+dependencies = [
+    "ddeutil",
+    "ddeutil-io",
+    "ddeutil-model",
+    "fmtutil",
+]
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://github.com/korawica/ddeutil-pipe/"
+"Source Code" = "https://github.com/korawica/ddeutil-pipe/"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.dynamic]
+version = {attr = "ddeutil.pipe.__about__.__version__"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.shelf.version]
+version = "./src/ddeutil/pip/__about__.py"
+changelog = "CHANGELOG.md"
+
+[tool.coverage.run]
+branch = true
+concurrency = ["thread", "multiprocessing"]
+source = ["ddeutil", "tests"]
+omit = ["scripts/"]
+relative_files = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "raise NotImplementedError"
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+console_output_style = "count"
+addopts = [
+    "--strict-config",
+    "--strict-markers",
+]
+filterwarnings = ["error"]
+
+[tool.mypy]
+python_version = "3.9"
+files = ["ddeutil"]
+show_error_codes = true
+pretty = true
+strict = true
+local_partial_types = true
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+module = "ddeutil.pip"
+warn_unused_ignores = false
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+ignore_missing_imports = true
+check_untyped_defs = true
+
+[tool.black]
+line-length = 80
+preview = true
+target-version = ['py39']
+exclude = """
+/(
+    \\.git
+    | \\.__pycache__
+    | \\.idea
+    | \\.ruff_cache
+    | \\.mypy_cache
+    | \\.pytest_cache
+    | \\.venv
+    | _build
+    | buck-out
+    | build
+    | dist
+)/
+"""
+
+[tool.ruff]
+line-length = 80
+exclude = [
+    ".git",
+    ".mypy_cache",
+    ".ruff_cache",
+    "__pypackages__",
+    "build",
+    "dist",
+    "venv",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "C",  # flake8-comprehensions
+    "B",  # flake8-bugbear
+]
+ignore = [
+    "E501",  # line too long, handled by black
+    "B008",  # do not perform function calls in argument defaults
+    "C901",  # too complex
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]

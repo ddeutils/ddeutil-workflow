@@ -1,0 +1,56 @@
+base:
+    show:
+        # .tables : show all table that exists in database
+        tables: "select name from sqlite_master where type='table'"
+        # .schema <table-name> : show schema of a table name
+        columns: "
+            select  cid                             as order_id
+            ,       name                            as column_name
+            ,       type                            as data_type
+            ,       case when \"notnull\" = '1'
+                         then 'False'
+                         else 'True'
+                    end                             as nullable
+            ,       dflt_value                      as \"default\"
+            from    pragma_table_info('{table}')    as pragma
+        "
+    create:
+        table: "
+            create table if not exists {table} (
+                {columns}
+            )
+        "
+        index: "
+            create {unique} index if not exists {index}
+            on {table} ( {column} ) {condition}
+        "
+    drop:
+        table: "
+            drop table if exists {table}
+        "
+        index: "
+            drop index if exists {index};
+        "
+    exists:
+        table: "
+            select case when exists(
+                select from sqlite_master
+                where  type  =  'table'
+                and    name  =  '{table}'
+            ) then 'True' else 'False' end as check_exists;
+            "
+    alter:
+        table:
+            rename: "
+                alter table {table} rename to {table_new};
+            "
+            column: "
+                alter table {table} add {column} {definition};
+            "
+    setup:
+        pragma: "
+            pragma {key}={value};
+        "
+#usecase:
+#    rename_table: "
+#        "

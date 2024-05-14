@@ -1,0 +1,56 @@
+# Parameter Configuration file with YAML format.
+# :structure:
+#
+#     config_environment: true, false
+#           - Environment option set be true for use environment name with stage
+#               format.
+#
+#     config_domain: true, false
+#     config_connection: '<connection-url>'
+#     config_metadata: '<connection-url>'
+#     config_logging: '<connection-url>'
+#     config_object: '<connection-url>'
+# ------------------------------------------------------------------------------
+engine:
+    path:
+        connection: "file://${APP_PATH}/conf"
+        metadata: "sqlite://${APP_PATH}/data"
+        logging: "file://${APP_PATH}/logs/register"
+        object: "src.core.objects"
+        stage_archive: 'file://${APP_PATH}/${ARCHIVE_PATH}'
+    flag:
+        environment: false
+        domain: true
+        stage_archive: true
+        loader_secrets: true
+        loader_function: false
+
+# ------------------------------------------------------------------------------
+# The Stage for configuration data version control
+# :structure:
+#     <stage-name>:
+#          format: "{name:%n}.{compress:%g}"
+#          rules:
+#              timestamp: 4
+#              timestamp_metric: 'months'
+#              version: '0.0.4'
+#              compression: 'gzip'
+#
+# ------------------------------------------------------------------------------
+stages:
+    staging:
+        format: "{naming:%s}.{timestamp:%Y%m%d_%H%M%S}"
+        rules:
+            timestamp: 15
+            timestamp_metric: 'minutes'
+    persisted:
+        format: "{naming:%s}.{version:v%m.%n.%c}"
+        rules:
+            version: '0.3.3'
+    curated:
+        format: "{domain:%s}_{naming:%s}.{compress:%-g}"
+        rules:
+            compress: "gzip"
+#    test:
+#        format: "{timestamp:%Y}_{name}_{timestamp:%m%d}_{name}"
+# ------------------------------------------------------------------------------

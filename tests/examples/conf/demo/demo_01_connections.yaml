@@ -1,0 +1,95 @@
+# The format of connection files
+#
+# <connection-alias-name>:
+#
+#    (format 01)
+#    type: <connection-object-type>
+#    endpoint: `{protocol}://{username}:{password}@{host}:{port}/{database}`
+#
+#    (format 02)
+#    type: <connection-object-type>
+#    host: <host>
+#    port: <port>
+#    username: <username>
+#    password: <password>
+#    database: <database>
+#
+#    (optional)
+#    ssh_tunnel:
+#        ssh_host: <host>
+#        ssh_port: <port>
+#        ssh_user: <username>
+#        ssh_private_key: <private-key-filepath>
+#
+
+
+conn_local_file:
+    type: "connection.LocalFileStorage"
+    endpoint: "file:///${APP_PATH}/tests/examples/dummy"
+
+
+conn_local_file_with_datetime:
+    type: "connection.LocalFileStorage"
+    endpoint: "file:///${APP_PATH}/tests/examples/dummy/%Y%m%d"
+
+
+conn_sftp:
+    type: "connection.SFTPStorage"
+    endpoint: "sftp://${SFTP_USER}:${SFTP_PASSWORD}@${SFTP_HOST}//home/deadmin"
+
+
+conn_local_sqlite_bu01:
+    type: "connection.SQLiteSystem"
+    endpoint: "sqlite:///${APP_PATH}/data/demo/sqlite_bu01.db"
+
+
+conn_local_metadata:
+    type: "connection.SQLiteSystem"
+    endpoint: "sqlite:///${APP_PATH}/data/metadata.db"
+
+
+conn_aws_s3_data_eng:
+    type: "connection.S3System"
+    endpoint: "s3://@secrets{s3_data_eng_bucket}"
+    aws_access_key_id: "@secrets{s3_data_eng_access_key_id}"
+    aws_secret_access_key: "@secrets{s3_data_eng_secret_access_id}"
+    role_arn: "@secrets{s3_data_eng_role_arn}"
+
+
+conn_azure_blob_de_test:
+    type: "connection.AzureBlobSystem"
+    endpoint: "abfs://de-test"
+    account_name: "@secrets{azure_de_test_account_name}"
+    account_key: "@secrets{azure_de_test_account_key}"
+
+
+conn_aws_pg_sandbox:
+    type: "connection.PostgresSystem"
+    username: "@secrets{pg_sandbox_username}"
+    password: "@secrets{pg_sandbox_password}"
+    host: "@secrets{pg_sandbox_host}"
+    port: "5432"
+    database: "@secrets{pg_sandbox_database}"
+
+
+conn_aws_pg_uat:
+    type: "connection.PostgresSystem"
+    username: "@secrets{pg_uat_username}"
+    password: "@secrets{pg_uat_password}"
+    host: "@secrets{pg_uat_host}"
+    port: "5432"
+    database: "@secrets{pg_uat_database}"
+    ssh_tunnel:
+        ssh_host: "@secrets{pg_uat_ssh_host}"
+        ssh_user: "@secrets{pg_uat_ssh_user}"
+        ssh_private_key: "@secrets{pg_uat_ssh_private_key}"
+        ssh_port: "22"
+
+
+conn_azure_sqlserver_dwh_dev:
+    type: "connection.SQLServerSystem"
+    username: "@secrets{sqlserver_dwh_username}"
+    host: "@secrets{sqlserver_dwh_host}"
+    port: "1433"
+    database: "@secrets{sqlserver_dwh_database}"
+#    Driver={ODBC Driver 13 for SQL Server};Server=tcp:,1433;Database=DWHCTRLDEV;Uid={your_user_name};Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;Authentication=ActiveDirectoryIntegrated

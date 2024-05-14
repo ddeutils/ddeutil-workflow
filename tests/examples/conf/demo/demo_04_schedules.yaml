@@ -1,0 +1,12 @@
+# The format of schedule files
+#
+# <schedule-alias-name>:
+#
+#    (format 01)
+#    type: <schedule-object-type>
+#    cron: <cron>
+#
+
+schd_every_5_minute:
+    type: 'schedule.BKKSchedule'
+    cron: "*/5 * * * *"

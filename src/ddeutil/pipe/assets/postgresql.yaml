@@ -1,0 +1,40 @@
+base:
+    show:
+        tables: "select * from information_schema.tables where table_schema='{schema}'"
+        columns: "
+            select	ordinal_position
+            ,		column_name
+            ,		case when data_type = 'character varying' then concat('varchar( ', character_maximum_length, ' )')
+                         when data_type = 'numeric' then concat('numeric( ', numeric_precision, ', ', numeric_scale, ' )')
+                         when data_type = 'integer' then 'int'
+                         when data_type = 'timestamp without time zone' then 'timestamp'
+                         else data_type
+                    end                                                          as data_type
+            ,		case when column_default is not null then 'False'
+                         when lower(is_nullable) = 'no'  then 'False'
+                         else 'True'
+                    end                                                          as nullable
+            from    information_schema.columns
+            where   table_schema  = '{schema}'
+            and     table_name    = '{table}'
+            "
+    exists:
+        table: "
+            select case when exists(
+                select from information_schema.tables
+                where  table_schema  = '{schema}'
+                and    table_name    = '{table}'
+            ) then 'True' else 'False' end as check_exists
+            "
+        function:   "
+            select case when exists(
+                select proname, proargnames, prosrc
+                from pg_proc where proname = '{function}'
+            ) then 'True' else 'False' end as check_exists
+            "
+        schema: "
+            select case when exists(
+                select from {database_name}.information_schema.schemata
+                where schema_name = '{schema}'
+            ) then 'True' else 'False' end as check_exists
+            "

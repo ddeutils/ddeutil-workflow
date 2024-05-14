@@ -1,0 +1,294 @@
+# The format of catalog files
+#
+# <catalog-alias-name>:
+#
+#    (format 01)
+#    type: <catalog-object-type>
+#    connection: <connection-alias-name>
+#    endpoint: `{schema}.{table}`
+#
+#    (format 02)
+#    type: <catalog-object-type>
+#    connection: <connection-alias-name>
+#    endpoint: `{sub-path}/{filename}.{file-extension}`
+#
+#    (optional)
+#    schemas:
+#        <column-name>: {
+#            alias: <source-column-name>::<data-type>,
+#            nullable: boolean,
+#            pk: boolean,
+#            default: <default-value>,
+#            unique: boolean
+#        }
+#        <column-name>: ...
+#
+
+
+catl_customer_csv_type01:
+    type: "catalog.PandasCSVFile"
+    connection: "demo:conn_local_data_landing"
+    endpoint: "customer_csv.type01.csv"
+    schemas:
+        customer_id: {alias: "id::int", nullable: false}
+        customer_name: "name::str"
+        customer_age: "age::str"
+        phone_number: "phone::str"
+        register_date: "datetime64"
+        active_flag: "active::bool"
+    encoding: "utf-8"
+    escapechar: "\\"
+    delimiter: "|"
+    header: 0
+    quoting: 3
+    true_values: ["Yes"]
+    false_values: ["No", "false"]
+
+
+catl_customer_csv_type02:
+    type: "catalog.PandasCSVFile"
+    connection: "demo:conn_local_data_landing"
+    endpoint: "customer_csv.type02.csv"
+    schemas:
+        customer_id: "int"
+        customer_name: "str"
+        customer_age: "str"
+        phone_number: "str"
+        register_date: "str"
+    encoding: "utf-8"
+    header: 0
+    quoting: 2
+    skiprows: 1
+    na_values: "NONE"
+    parse_dates: ['register_date']
+
+
+catl_customer_csv_type03:
+    type: "catalog.PandasCSVFile"
+    connection: "demo:conn_local_data_landing"
+    endpoint: "customer_csv.type03.csv"
+    schemas:
+        customer_id: "int"
+        customer_name: "str"
+        customer_age:  "str"
+        phone_number:  "str"
+    usecols: ['customer_id', 'customer_name', 'phone_number']
+    encoding: "utf-8"
+    quotechar: "'"
+    quoting: 0
+    skipfooter: 1
+    skipinitialspace: true
+    comment: '#'
+
+
+catl_customer_json_type01:
+    type: "catalog.PandasJsonFile"
+    connection: "demo:conn_local_data_landing"
+    endpoint: "customer_json.series.type01.json"
+    encoding: 'utf-8'
+    orient: 'split'
+    typ: 'series'
+
+
+catl_customer_json_type02:
+    type: "catalog.PandasJsonFile"
+    connection: "demo:conn_local_data_landing"
+    endpoint: "customer_json.series.type02.json"
+#    schemas:
+#        product_id: "product_id::str"
+#        product_type: "product_type::str"
+#        high: "attribute.high::str"
+    encoding: 'utf-8'
+    orient: 'columns'
+    typ: 'series'
+
+
+catl_customer_json_type03:
+    type: "catalog.PandasJsonFile"
+    connection: "demo:conn_local_data_landing"
+    endpoint: "customer_json.series.type03.json"
+    encoding: 'utf-8'
+    orient: 'records'
+    typ: 'series'
+
+
+catl_customer_json_type04:
+    type: "catalog.PandasJsonFile"
+    connection: "demo:conn_local_data_landing"
+    endpoint: "customer_json.type04.json"
+    schemas:
+        product_id: "product_id::str"
+        product_type: "product_type::str"
+        high: "attribute.high::str"
+        create_date: "str"
+    encoding: 'utf-8'
+    orient: 'records'
+
+
+catl_customer_json_type05:
+    type: "catalog.PandasJsonFile"
+    connection: "demo:conn_local_data_landing"
+    endpoint: "customer_json.type05.json"
+#    schemas:
+#        product_id: "product_id::str"
+#        product_type: "product_type::str"
+#        high: "attribute.high::str"
+    encoding: 'utf-8'
+    orient: 'split'
+
+
+catl_customer_json_type06:
+    type: "catalog.PandasJsonFile"
+    connection: "demo:conn_local_data_landing"
+    endpoint: "customer_json.type06.json"
+    schemas:
+        product_id: "product_id::str"
+        product_type: "product_type::str"
+        high: "attribute.high::str"
+    encoding: 'utf-8'
+    orient: 'index'
+
+
+catl_customer_json_type07:
+    type: "catalog.PandasJsonFile"
+    connection: "demo:conn_local_data_landing"
+    endpoint: "customer_json.type07.json"
+    schemas:
+        product_id: "product_id::str"
+        product_type: "product_type::str"
+        high: "attribute.high::str"
+    encoding: 'utf-8'
+    orient: 'columns'
+
+
+catl_customer_json_type08:
+    type: "catalog.PandasJsonFile"
+    connection: "demo:conn_local_data_landing"
+    endpoint: "customer_json.type08.json"
+    schemas:
+        product_id: "product_id::str"
+        product_type: "product_type::str"
+        high: "attribute.high::str"
+    encoding: 'utf-8'
+    orient: 'values'
+
+
+catl_customer_json_type09:
+    type: "catalog.PandasJsonFile"
+    connection: "demo:conn_local_data_landing"
+    endpoint: "customer_json.type09.json"
+    schemas:
+        product_id: "product_id::str"
+        product_type: "product_type::str"
+        high: "attribute.high::str"
+    encoding: 'utf-8'
+    orient: 'table'
+
+
+catl_customer_excel_type01:
+    type: "catalog.PandasExcelFile"
+    connection: "demo:conn_local_data_landing"
+    endpoint: "customer_excel.type1.xlsx"
+    schemas:
+        customer_id: "id::str"
+        customer_name: "name::str"
+        sales_value: "sales::float64"
+    sheet_name: "type01"
+    header: 0
+    na_values: "NONE"
+    comment: "#"
+    skipfooter: 1
+
+
+catl_customer_excel_type02:
+    type: "catalog.PandasExcelFile"
+    connection: "demo:conn_local_data_landing"
+    endpoint: "customer_excel.type1.xlsx"
+    schemas:
+        column_name: "column name::str"
+        description: "desc::str"
+        active_flag: "active::bool"
+    sheet_name: "type02"
+    header: 0
+    skiprows: 1
+    true_values: ["y", "yes"]
+    false_values: ["n", "no"]
+
+
+catl_seller_csv_type01:
+    type: "catalog.PandasCSVFile"
+    connection: "demo:conn_local_data_landing"
+    endpoint: "seller_csv.type01.csv"
+    schemas:
+        customer_id: "cust_id::int32"
+        document_date: "document_date::datetime64"
+        product_id: "product::str"
+        sales_qty: "qty::float64"
+        sales_value: "net_value::float64"
+        seller_id: "seller::str"
+        sales_type: "sales_type::str"
+    encoding: "utf-8"
+    header: 0
+    delimiter: "|"
+#    parse_dates: ["document_date"]
+
+
+catl_seller_csv_prepare:
+    type: "catalog.PandasCSVFile"
+    connection: "demo:conn_local_data_landing"
+    endpoint: "seller_prepare_csv.type01.%Y%m%d.csv"
+    schemas:
+        customer_id: 'int'
+        product_id: 'str'
+        order_sales: 'int'
+        value_max: 'float'
+        value_margin: 'float'
+    # For saving process
+    encoding: "utf-8"
+    load:
+        header: 0
+        delimiter: "|"
+    save:
+        header: true
+        delimiter: "|"
+
+
+#catl_s3_customer_csv_type01:
+#    type: "catalog.PandasCSVFile"
+#    connection: "demo:conn_s3_data_eng"
+#    endpoint: "landing_data/customer.csv"
+#    schemas:
+#        customer_id: {alias: "id::int", nullable: false}
+#        customer_name: "name::str"
+#        active_flag: "active::bool"
+#    encoding: "utf-8"
+#    escapechar: "\\"
+#    delimiter: "|"
+#    header: 0
+#    true_values: ["Yes"]
+#    false_values: ["No", "false"]
+
+
+catl_metadata_sqlite:
+    type: "catalog.PandasSQLite"
+    connection: "demo:conn_local_metadata"
+    endpoint: "tbl_metadata"
+    schemas:
+        conf_name: {alias: "varchar(256)", pk: true}
+        conf_data: {alias: "varchar(64)", nullable: false}
+        update_time: {alias: "datetime", nullable: false}
+        register_time: {alias: "datetime", nullable: false}
+    parse_dates:
+        update_time: {"format": "%Y-%m-%d %H:%M:%S"}
+        register_time: {"format": "%Y-%m-%d %H:%M:%S"}
+
+
+catl_customer_sqlite:
+    type: "catalog.PandasSQLite"
+    connection: "demo:conn_local_sqlite_bu01"
+    endpoint: "tbl_customer"
+    schemas:
+        id: "id::int"
+        name: "name::str"
+        age: "age::int"
+        sex: "sex::str"
