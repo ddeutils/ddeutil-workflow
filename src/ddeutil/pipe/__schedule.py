@@ -1,302 +1,31 @@
-# -------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # Copyright (c) 2022 Korawich Anuttra. All rights reserved.
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
-# --------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+from __future__ import annotations
 
 import copy
-import re
 from collections.abc import Iterator
-from datetime import (
-    datetime,
-    timedelta,
-)
-from functools import (
-    partial,
-    total_ordering,
-)
+from datetime import datetime, timedelta
+from functools import partial, total_ordering
 from typing import (
+    Any,
+    Callable,
     Optional,
     Union,
 )
 
 from dateutil import tz
-from ddeutil.core.__base import (
+from ddeutil.core import (
     is_int,
     isinstance_check,
-    merge_dict,
-    must_rsplit,
     must_split,
 )
 from ddeutil.core.dtutils import (
     next_date,
     replace_date,
 )
-
-
-class SchemaFeatures:
-    """ """
-
-    def __init__(
-        self,
-        alias: str,
-        nullable: Optional[bool] = False,
-        pk: Optional = None,
-        default: Optional = None,
-        fk: Optional = None,
-    ): ...
-
-
-class Schemas:
-    """The Schema Converter object that implement converter methods of schema
-    config data like `data_type`, `rename_cols`, etc.
-
-    :usage:
-        >>> schema_obj = Schemas({
-        ...     'conf_data': {'alias': "varchar(64)", 'nullable': False},
-        ...     'update_time': {'alias': "datetime", 'nullable': False},
-        ...     'register_time': {'alias': "datetime", 'nullable': False}
-        ... })
-        >>> schema_obj.features['conf_data']['pk']
-
-        >>> schema_obj.features['conf_data']['alias']
-        'varchar(64)'
-
-    """
-
-    datatype_ptt: str = "::"
-
-    mapping_necessary_keys: dict = {
-        "alias": {
-            "name",
-            "datatype",
-            "type",
-        },
-        "nullable": {
-            "na",
-            "null",
-        },
-        "pk": {
-            "primary_key",
-            "primary",
-        },
-        "unique": {
-            "uq",
-        },
-        "default": {
-            "df",
-            "fill_na",
-        },
-        "fk": {
-            "foreign_key",
-            "foreign",
-        },
-    }
-
-    def __init__(self, schemas: dict):
-        self._schemas: dict = {
-            col: self.prepare(schemas[col]) for col in schemas
-        }
-
-    @property
-    def features(self) -> dict:
-        """Return feature of schemas."""
-        return self._schemas
-
-    @property
-    def pk(self):
-        """Return the primary key columns of this schema data."""
-        return [_ for _ in self._schemas if _["pk"] is not None]
-
-    def prepare(self, value: Union[str, dict]) -> dict:
-        """Return mapping of column properties which included
-        `cls.mapping_necessary_keys`.
-        """
-        if not isinstance(value, (dict, str)):
-            raise AttributeError(
-                f"value of schema mapping data does not support for "
-                f"type: {type(value)}."
-            )
-        _value: dict = value if isinstance(value, dict) else {"alias": value}
-        for key in self.mapping_necessary_keys:
-            for must_change in self.mapping_necessary_keys[key]:
-                if must_change in _value:
-                    _value[key] = _value.pop(must_change)
-            if key not in _value:
-                _value[key] = None
-        return _value
-
-    def data_type(self, style: str = "new") -> dict:
-        """Return the mapping of data type that can switch the column name by
-        old or new style from the configuration data like,
-
-                schemas:
-                    <new-column-name>:
-                        'alias': '<old-column-name><data-type-ptt><data-type>'
-                        ...
-
-        """
-        assert style in {
-            "old",
-            "new",
-        }, "the `style` should equal the only one of 'old' or 'new' value"
-        _result: dict = {}
-        for col, mapping in self._schemas.items():
-            _col_old, _type = must_rsplit(mapping["alias"], "::", maxsplit=1)
-            if style == "old" and _col_old is not None:
-                _result[_col_old]: str = _type
-            else:
-                _result[col]: str = _type
-        return _result
-
-    def rename_cols(self) -> dict:
-        """Return mapping of old and new column name."""
-        _result: dict = {}
-        for col, mapping in self._schemas.items():
-            _col_old, _type = must_rsplit(mapping["alias"], "::", maxsplit=1)
-            _result[_col_old]: str = col
-        return _result
-
-
-class Statement:
-    """The Statement Converter that convert statement mapping to a string value
-    for execute to RDBMS system.
-
-    :usage:
-        >>> statement_obj = Statement(
-        ...     "select {columns} from {{database}}.{schema}.{table} "
-        ...     "where {table}={condition};"
-        ... )
-        >>> statement_obj.parameters
-        ['columns', 'condition', 'schema', 'table']
-    """
-
-    statement_ptt: str = ";"
-
-    @classmethod
-    def load(cls, stm: Union[str, dict, list[str]]):
-        """Dialect load value with not string type of value in mapping
-        statement.
-        """
-        if isinstance(stm, str):
-            stm: dict = {"common": stm}
-        elif isinstance_check(stm, list[str]):
-            stm: dict = {"common": f"{cls.statement_ptt} ".join(stm)}
-        elif isinstance(stm, dict):
-            # Convert if does not match with type: Dict[str, str]
-            ...
-        return cls(stm=stm)
-
-    def __init__(self, stm: dict[str, str], *, sensitive: bool = False):
-        """Main initialize of the statement object.
-
-        :structure:
-
-            statement:
-                common: "<statement-common>"
-
-            statement:
-                with_<temp-table-name>: "<statement-with>"
-                with_exists: "<statement-exists>"
-
-            statement:
-                update:
-                    table: "<table-name>"
-                    from: ""
-                    set:
-                        target-col: from-col
-                        ...
-
-                insert:
-                    into: "<table-name>"
-                    from: "<select-statement>"
-                    mapping:
-                        target-col: from-col
-                        ...
-                    conflict:
-                        set:
-                            target-col: from-col
-                        where: ""
-
-                delete:
-                    into: ""
-                    from: ""
-                    where: ""
-
-                merge:
-                    into: ""
-                    from: ""
-                    not_match: ""
-                    match_by_source: ""
-                    match_by_target: ""
-
-        """
-        # Prepare statement input.
-        for _ in stm:
-            if not isinstance((_value := stm[_]), str):
-                raise NotImplementedError(
-                    f"{self.__class__.__name__} dose not support for not "
-                    f"string type in value of mapping statement."
-                )
-            value: str = " ".join(_value.split())
-            if not sensitive:
-                value: str = value.lower()
-            stm[_] = value
-        self._st_stm: dict[str, str] = stm
-
-    def __str__(self) -> str:
-        return self._st_stm
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__}(stm='{self._st_stm}')>"
-
-    @property
-    def parameters(self) -> list:
-        """Return parameters of format string from the statement."""
-        return sorted(
-            frozenset(
-                re.findall(r"{(\w.*?)}", re.sub(r"({{|}})", "", self._st_stm))
-            )
-        )
-
-    @staticmethod
-    def _check_type(statement: str) -> str:
-        """Return type of SQL statement."""
-        _statement: str = statement.strip()
-        if _statement.startswith("select"):
-            # Data Query Language
-            return "dql"
-        elif _statement.startswith(
-            (
-                "insert into",
-                "update",
-                "delete from",
-                "merge",
-            )
-        ):
-            # Data Manipulation Language
-            return "dml"
-        elif _statement.startswith(
-            (
-                "create",
-                "alter",
-                "drop",
-                "truncate",
-                "rename",
-            )
-        ):
-            # Data Definition Language
-            return "ddl"
-        elif _statement.startswith(
-            (
-                "grant",
-                "revoke",
-            )
-        ):
-            # Data Control Language
-            return "dcl"
-        return "undefined"
-
 
 WEEKDAYS: dict[str, int] = {
     "Sun": 0,
@@ -308,7 +37,7 @@ WEEKDAYS: dict[str, int] = {
     "Sat": 6,
 }
 
-CRON_UNITS: tuple = (
+CRON_UNITS: tuple[dict[str, Any], ...] = (
     {
         "name": "minute",
         "range": partial(range, 0, 60),
@@ -378,14 +107,17 @@ CRON_UNITS_AWS: tuple = CRON_UNITS + (
 class CronPart:
     """Part of Cron object that represent a collection of positive integers."""
 
-    __slots__ = (
+    __slots__: tuple[str, ...] = (
         "unit",
         "options",
         "values",
     )
 
     def __init__(
-        self, unit: dict, values: Union[str, list[int]], options: dict
+        self,
+        unit: dict,
+        values: Union[str, list[int]],
+        options: dict,
     ):
         self.unit: dict = unit
         self.options: dict = options
@@ -453,6 +185,9 @@ class CronPart:
         """Parses a string as a range of positive integers. The string should
         include only `-` and `,` special strings.
 
+        :param value: a string value
+        :type value: str
+
         TODO: support for `L`, `W`, and `#`
         TODO:     if you didn't care what day of the week the 7th was, you
             could enter ? in the Day-of-week field.
@@ -464,34 +199,37 @@ class CronPart:
         TODO: # : 3#2 would be the second Tuesday of the month,
             the 3 refers to Tuesday because it is the third day of each week.
 
-        .. :example:
-            - 0 10 * * ? *
-              Run at 10:00 am (UTC) every day
+        Examples:
+            -   0 10 * * ? *
+                Run at 10:00 am (UTC) every day
 
-            - 15 12 * * ? *
-              Run at 12:15 pm (UTC) every day
+            -   15 12 * * ? *
+                Run at 12:15 pm (UTC) every day
 
-            - 0 18 ? * MON-FRI *
-              Run at 6:00 pm (UTC) every Monday through Friday
+            -   0 18 ? * MON-FRI *
+                Run at 6:00 pm (UTC) every Monday through Friday
 
-            - 0 8 1 * ? *
-              Run at 8:00 am (UTC) every 1st day of the month
+            -   0 8 1 * ? *
+                Run at 8:00 am (UTC) every 1st day of the month
 
-            - 0/15 * * * ? *
-              Run every 15 minutes
+            -   0/15 * * * ? *
+                Run every 15 minutes
 
-            - 0/10 * ? * MON-FRI *
-              Run every 10 minutes Monday through Friday
+            -   0/10 * ? * MON-FRI *
+                Run every 10 minutes Monday through Friday
 
-            - 0/5 8-17 ? * MON-FRI *
-              Run every 5 minutes Monday through Friday between 8:00 am and 5:55 pm (UTC)
+            -   0/5 8-17 ? * MON-FRI *
+                Run every 5 minutes Monday through Friday between 8:00 am and
+                5:55 pm (UTC)
 
-            - 5,35 14 * * ? *
-              Run every day, at 5 and 35 minutes past 2:00 pm (UTC)
+            -   5,35 14 * * ? *
+                Run every day, at 5 and 35 minutes past 2:00 pm (UTC)
 
-            - 15 10 ? * 6L 2002-2005
-              Run at 10:15am UTC on the last Friday of each month during the years 2002 to 2005
+            -   15 10 ? * 6L 2002-2005
+                Run at 10:15am UTC on the last Friday of each month during the
+                years 2002 to 2005
 
+        :rtype: list[int]
         """
         interval_list: list[list[int]] = []
         for _value in self.replace_alternative(value.upper()).split(","):
@@ -509,7 +247,8 @@ class CronPart:
 
             if (value_step and not is_int(value_step)) or value_step == "":
                 raise ValueError(
-                    f'Invalid interval step value {value_step!r} for {self.unit["name"]!r}'
+                    f"Invalid interval step value {value_step!r} for "
+                    f'{self.unit["name"]!r}'
                 )
 
             interval_list.append(self._interval(value_range_list, value_step))
@@ -569,7 +308,8 @@ class CronPart:
             return values
         elif (_step := int(step)) < 1:
             raise ValueError(
-                f'Invalid interval step value {_step!r} for {self.unit["name"]!r}'
+                f"Invalid interval step value {_step!r} for "
+                f'{self.unit["name"]!r}'
             )
         min_value: int = values[0]
         return [
@@ -605,7 +345,11 @@ class CronPart:
         return False
 
     def ranges(self) -> list[Union[int, list[int]]]:
-        """Returns the range as an array of ranges defined as arrays of positive integers."""
+        """Returns the range as an array of ranges defined as arrays of
+        positive integers.
+
+        :rtype: list[Union[int, list[int]]]
+        """
         multi_dim_values = []
         start_number: Optional[int] = None
         for idx, value in enumerate(self.values):
@@ -616,7 +360,9 @@ class CronPart:
             if value != (next_value - 1):
                 # next_value is not the subsequent number
                 if start_number is None:
-                    # The last number of the list "self.values" is not in a range
+                    # NOTE:
+                    #   The last number of the list "self.values" is not in a
+                    #   range.
                     multi_dim_values.append(value)
                 else:
                     multi_dim_values.append([start_number, value])
@@ -652,8 +398,15 @@ class CronPart:
                 cron_range_strings.append(f"{self.filler(cron_range)}")
         return ",".join(cron_range_strings) if cron_range_strings else "?"
 
-    def filler(self, value: int) -> Union[int, str]:
-        """Formats weekday and month names as string when the relevant options are set."""
+    def filler(self, value: int) -> int | str:
+        """Formats weekday and month names as string when the relevant options
+        are set.
+
+        :param value: a int value
+        :type value: int
+
+        :rtype: int | str
+        """
         return (
             self.unit["alt"][value - self.unit["min"]]
             if (
@@ -672,8 +425,8 @@ class CronPart:
 
 @total_ordering
 class CronJob:
-    """The Cron Job Converter object that generate datetime dimension of cron job schedule
-    format,
+    """The Cron Job Converter object that generate datetime dimension of cron
+    job schedule format,
 
             * * * * * <command to execute>
 
@@ -681,12 +434,13 @@ class CronJob:
         (ii)    hour (0 - 23)
         (iii)   day of the month (1 - 31)
         (iv)    month (1 - 12)
-        (v)     day of the week (0 - 6) (Sunday to Saturday; 7 is also Sunday on some systems)
+        (v)     day of the week (0 - 6) (Sunday to Saturday; 7 is also Sunday
+                on some systems)
 
-        This object implement necessary methods and properties for using cron job value with
-    other object like Schedule.
-        Support special value with `/`, `*`, `-`, `,`, and `?` (in day of month and day of week
-    value).
+        This object implement necessary methods and properties for using cron
+    job value with other object like Schedule.
+        Support special value with `/`, `*`, `-`, `,`, and `?` (in day of month
+    and day of week value).
 
     :ref:
         - https://github.com/Sonic0/cron-converter
@@ -695,7 +449,7 @@ class CronJob:
 
     cron_length: int = 5
 
-    options_defaults: dict = {
+    options_defaults: dict[str, bool] = {
         "output_weekday_names": False,
         "output_month_names": False,
         "output_hashes": False,
@@ -708,32 +462,36 @@ class CronJob:
         option: Optional[dict] = None,
     ):
         if isinstance(value, str):
-            value: list = value.strip().split()
+            value: list[str] = value.strip().split()
         elif not isinstance_check(value, list[list[int]]):
             raise TypeError(
-                f"{self.__class__.__name__} cron value does not support type: {type(value)}."
+                f"{self.__class__.__name__} cron value does not support "
+                f"type: {type(value)}."
             )
         if len(value) != self.cron_length:
             raise ValueError(
-                f"Invalid cron value does not have length equal {self.cron_length}: {value}."
+                f"Invalid cron value does not have length equal "
+                f"{self.cron_length}: {value}."
             )
-        self._options: dict[str, bool] = merge_dict(
-            self.options_defaults, (option or {})
-        )
+        self._options: dict[str, bool] = self.options_defaults | (option or {})
         self._parts: list[CronPart] = [
             CronPart(unit, values=item, options=self._options)
             for item, unit in zip(value, CRON_UNITS)
         ]
         if self.day == self.dow == []:
             raise ValueError(
-                "Invalid cron value when set the `?` on day of month and day of week together"
+                "Invalid cron value when set the `?` on day of month and "
+                "day of week together"
             )
 
     def __str__(self):
         return " ".join(str(part) for part in self._parts)
 
     def __repr__(self):
-        return f"<{self.__class__.__name__}(value={self.__str__()!r}, option={self._options})>"
+        return (
+            f"<{self.__class__.__name__}(value={self.__str__()!r}, "
+            f"option={self._options})>"
+        )
 
     def __lt__(self, other) -> bool:
         return any(
@@ -786,7 +544,7 @@ class CronJob:
 
     def schedule(
         self, start_date: Optional[datetime] = None, _tz: Optional[str] = None
-    ) -> "CronRunner":
+    ) -> CronRunner:
         """Returns the time the schedule would run next."""
         return CronRunner(self, start_date, _tz)
 
@@ -796,7 +554,7 @@ class CronRunner:
     cron schedule object value.
     """
 
-    __slots__ = (
+    __slots__: tuple[str, ...] = (
         "tz_info",
         "date",
         "start_time",
@@ -871,14 +629,14 @@ class CronRunner:
 
     def _shift_date(self, mode: str, reverse: bool = False) -> bool:
         """Increments the mode value until matches with the schedule."""
-        switch: dict = {
+        switch: dict[str, str] = {
             "month": "year",
             "day": "month",
             "hour": "day",
             "minute": "hour",
         }
         current_value: int = getattr(self.date, switch[mode])
-        _addition: callable = (
+        _addition: Callable[[], bool] = (
             (
                 lambda: WEEKDAYS.get(self.date.strftime("%a"))
                 not in self.cron.dow.values
@@ -900,57 +658,7 @@ class CronRunner:
         return False
 
 
-__all__ = [
-    "Schemas",
-    "Statement",
+__all__: tuple[str, ...] = (
     "CronJob",
     "CronRunner",
-]
-
-
-def test_cron():
-    cr1 = CronJob("*/5 * * * *")
-    print(cr1)
-    cr2 = CronJob("*/5,3,6 9-17/2 * 1-3 1-5")
-    print(cr2)
-    print(cr1 == cr2)
-    print(cr1 < cr2)
-    cr = CronJob(
-        "*/5,3,6 9-17/2 * 1-3 1-5",
-        option={
-            "output_hashes": True,
-        },
-    )
-    print(cr)
-    cr = CronJob(
-        "*/5 9-17/2 * 1-3,5 1-5",
-        option={
-            "output_weekday_names": True,
-            "output_month_names": True,
-        },
-    )
-    print(cr)
-    cr = CronJob("*/30 */12 23 */3 *")
-    print(cr.to_list())
-    sch = cr.schedule(_tz="Asia/Bangkok")
-    print(sch.next)
-    print(sch.next)
-    print(sch.next)
-    print(sch.next)
-    sch.reset()
-    print("-" * 100)
-    for _ in range(20):
-        print(sch.prev)
-    cr = CronJob("0 */12 1 1 0")
-    print(cr.to_list())
-    cr = CronJob("0 */12 1 ? 0")
-    print(cr)
-
-
-if __name__ == "__main__":
-    # _statement = '{{{data}}} from {table} with {{database}} and value from {{schema}} with {{{{condition}}}}'
-    # print(Statement(_statement))
-    # print(re.sub('({{|}})', '', _statement))
-    # a = [y for x in {'a1', 'b2'} for y in x]
-    # print(a)
-    test_cron()
+)

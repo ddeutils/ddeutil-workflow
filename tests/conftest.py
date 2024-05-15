@@ -1,8 +1,7 @@
 import os
-import pathlib
+from pathlib import Path
 
 import pytest
-
 
 collect_ignore = [
     "vendors",
@@ -13,7 +12,7 @@ collect_ignore = [
 
 @pytest.fixture(scope="class")
 def test_path_to_cls(request):
-    _test_path = pathlib.Path(
+    _test_path: Path = Path(
         os.path.dirname(os.path.abspath(__file__)).replace(os.sep, "/")
     )
     request.cls.test_path = _test_path.parent
