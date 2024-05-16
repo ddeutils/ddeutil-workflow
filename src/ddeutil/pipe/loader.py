@@ -19,18 +19,19 @@ from ddeutil.core import (
 )
 from ddeutil.io import Params, Register
 from ddeutil.io.__base import YamlEnvFl
+from ddeutil.io.exceptions import ConfigNotFound
 from ddeutil.io.utils import map_func_to_str
 from fmtutil import Datetime
 from typing_extensions import Self
 
 from .__types import DictData, TupleStr
-from .exceptions import ConfigArgumentError, ConfigNotFound
+from .exceptions import ConfigArgumentError
 
 YamlEnvQuote = YamlEnvFl
 YamlEnvQuote.prepare = staticmethod(lambda x: urllib.parse.quote_plus(str(x)))
 
 
-class BaseLoader:
+class BaseLoad:
     """Base configuration data loading object for load config data from
     `cls.load_stage` stage. The base loading object contain necessary
     properties and method for type object.
@@ -54,6 +55,7 @@ class BaseLoader:
         cls,
         name: str,
         params: Params,
+        externals: DictData,
     ) -> Self:
         """Catalog load configuration
 
@@ -61,6 +63,7 @@ class BaseLoader:
         :type name: str
         :param params: A params object.
         :type params: Params
+        :param externals: A external parameters
         """
         try:
             _regis: Register = Register(
@@ -79,6 +82,7 @@ class BaseLoader:
             name=_regis.name,
             data=_regis.data().copy(),
             params=params,
+            externals=externals,
         )
 
     def __init__(
@@ -86,6 +90,7 @@ class BaseLoader:
         name: str,
         data: DictData,
         params: Params,
+        externals: DictData | None = None
     ) -> None:
         """Main initialize base config object which get a name of configuration
         and load data by the register object.
@@ -93,6 +98,7 @@ class BaseLoader:
         self.name: str = name
         self.__data: DictData = data
         self.params: Params = params
+        self.externals: DictData = externals or {}
 
         # NOTE: Validate step of base loading object.
         if not any(
@@ -118,7 +124,7 @@ class BaseLoader:
     @cached_property
     def _map_data(self) -> DictData:
         """Return configuration data without key in the excluded key set."""
-        data: DictData = self.__data["data"].copy()
+        data: DictData = self.__data.copy()
         rs: DictData = {k: data[k] for k in data if k not in self.data_excluded}
 
         # Mapping datetime format to string value.
@@ -131,7 +137,7 @@ class BaseLoader:
                     map_func_to_str(
                         getdot(_, rs),
                         Datetime.parse(
-                            value=self.params[self.load_datetime_name],
+                            value=self.externals[self.load_datetime_name],
                             fmt=self.load_datetime_fmt,
                         ).format,
                     ),
@@ -166,7 +172,7 @@ class BaseLoader:
         return import_string(f"ddeutil.pipe.{_typ}")
 
 
-class Conn(BaseLoader):
+class Conn(BaseLoad):
     """Connection loading class.
     YAML file structure for connection object,
 

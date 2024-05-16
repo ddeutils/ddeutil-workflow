@@ -6,14 +6,14 @@ from ddeutil.io.models import Params
 
 
 @pytest.fixture(scope='module')
-def param(test_path: Path, root_path: Path) -> Params:
+def params(conf_path: Path, test_path: Path, root_path: Path) -> Params:
     return Params.model_validate(
         {
             "engine": {
                 "paths": {
-                    "conf": test_path / "examples/conf",
-                    "data": root_path / "data",
-                    "archive": root_path / "/data/.archive",
+                    "conf": conf_path,
+                    "data": test_path / ".cache",
+                    "archive": test_path / ".archive",
                     "root": root_path,
                 },
             },
@@ -25,18 +25,17 @@ def param(test_path: Path, root_path: Path) -> Params:
 
 
 def test_base_loader_init(params):
-    load: ld.BaseLoader = ld.BaseLoader.from_register(
-        name="demo:conn_local_data_landing",
+    load: ld.BaseLoad = ld.BaseLoad.from_register(
+        name="demo:conn_local_file",
         params=params,
-        # params={"audit_date": "2023-12-01 00:00:00"},
+        externals={
+            "audit_date": "2024-01-01 00:12:45",
+        }
     )
     assert (
         {
-            "alias": "conn_local_data_landing",
-            "endpoint": (
-                "file:///D:/korawica/Work/dev02_miniproj/ddeutil-node/"
-                "tests/examples/dummy"
-            ),
+            "alias": "conn_local_file",
+            "endpoint": "file:///null/tests/examples/dummy",
             "type": "connection.LocalFileStorage",
         }
         == load.data
