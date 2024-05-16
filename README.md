@@ -24,14 +24,14 @@ pip install ddeutil-pipe
 
 ```yaml
 connection_local_file_landing:
-    type: "connection.LocalSystem"
+    type: "conn.LocalSystem"
     endpoint: "file:///${APP_PATH}/data/demo/landing"
 ```
 
 ```python
-from ddeutil.pipe.connection import Connection
+from ddeutil.pipe.conn import Conn
 
-with Connection('demo:connection_local_file_landing').connect() as conn:
+with Conn('demo:connection_local_file_landing').connect() as conn:
     conn.glob('*_csv*')
 ```
 

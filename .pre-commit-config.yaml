@@ -19,12 +19,6 @@ repos:
         args: ["--py39-plus", "--keep-runtime-typing"]
         stages: [commit]
 
--   repo: https://github.com/psf/black
-    rev: 24.4.2
-    hooks:
-    -   id: black
-        stages: [commit]
-
 -   repo: https://github.com/astral-sh/ruff-pre-commit
     rev:  v0.4.2
     hooks:

@@ -15,7 +15,6 @@ from typing import (
 
 import numpy as np
 import pandas as pd
-from scipy import stats
 
 from .action import BaseAction
 from .exceptions import NodeArgumentError
@@ -259,6 +258,7 @@ class PandasAction(BaseAction):
             :ref:
                 - https://stackoverflow.com/questions/23199796/detect-and-exclude-outliers-in-a-pandas-dataframe
             """
+            from scypy import stats
             _std_value: int = self.props["options"].get("std_value", 3)
             for col in self.props["columns"]:
                 df[f"{col}_dq_outlier"] = (

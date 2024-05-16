@@ -84,26 +84,6 @@ module = "tests.*"
 ignore_missing_imports = true
 check_untyped_defs = true
 
-[tool.black]
-line-length = 80
-preview = true
-target-version = ['py39']
-exclude = """
-/(
-    \\.git
-    | \\.__pycache__
-    | \\.idea
-    | \\.ruff_cache
-    | \\.mypy_cache
-    | \\.pytest_cache
-    | \\.venv
-    | _build
-    | buck-out
-    | build
-    | dist
-)/
-"""
-
 [tool.ruff]
 line-length = 80
 exclude = [

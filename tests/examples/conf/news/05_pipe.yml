@@ -1,0 +1,56 @@
+version: '0.0.1'
+pipe -> seller_etl:
+  desc: "Pipeline that load data and save to FileSystem"
+  schedule: "* * * 1 5"
+  params:
+    run_date: ${{ utils.receive.datetime }}
+  nodes:
+    - node -> first_node:
+      stages:
+        - name: Starter Node
+          as: start
+          uses: node.PolarsLoadParq
+          with:
+            # NOTE: This line check and return connection id from config.
+            conn: ${{ conn.get('conn_loading_local') }}
+            filter:
+              df = df.filter('start_date >= {{ params.run_date }}')
+        - name: Check Alert
+          as: check
+          if: nodes.start.outputs.records > 0
+          right:
+            uses: node.Polars
+            with:
+              df: nodes.start.outputs.df
+              statement: |
+                import polars as pl
+
+                df = (
+                  df
+                    .withColumn(pl.col('customer_id').alias('id'))
+                    .filter("id != 'dummy'")
+                    .drop('start_date')
+                )
+          left:
+            uses: node.DummyPolars
+            with:
+              schema: |
+                id string not null
+                name string not null
+                attrs string null
+                age int not null check( age >= 0 )
+        - name: Save Data
+          uses: node.PolarsSaveCSV
+          with:
+            to: ./data/target/dummy/{timestamp:%Y%m%d_%H%M%S}.csv
+            df: nodes.check.right.outputs.df
+    - node -> second_node:
+      need: first_node
+      stages:
+        - name: Loading Node
+          as: loading
+          uses: node.PolarsLoadParq
+          with:
+            conn: ${{ conn.get('conn_loading_local') }}
+            filter:
+              df = df.filter('start_date >= {{ params.run_date }}')
