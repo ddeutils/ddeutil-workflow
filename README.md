@@ -38,9 +38,7 @@ The connection for worker able to do any thing.
 
 The thing that worker should to focus on that connection.
 
-### Pipe
-
-The state of doing lists that worker should to do.
+### Stage
 
 ### Scdl
 
@@ -74,6 +72,12 @@ for _ in range(5):
 >>> 2022-01-01 00:20:00
 >>> 2022-01-01 00:25:00
 ```
+
+## Examples
+
+### Pipe
+
+The state of doing lists that worker should to do. It be collection of the stage.
 
 ## License
 

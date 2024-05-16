@@ -1,0 +1,3 @@
+scdl_every_5_minute:
+    type: 'scdl.BKKSchedule'
+    cron: "*/5 * * * *"

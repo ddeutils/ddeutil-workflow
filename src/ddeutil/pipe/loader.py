@@ -66,21 +66,21 @@ class BaseLoad:
         :param externals: A external parameters
         """
         try:
-            _regis: Register = Register(
+            rs: Register = Register(
                 name=name,
                 stage=params.stage_final,
                 params=params,
                 loader=YamlEnvQuote,
             )
         except ConfigNotFound:
-            _regis: Register = Register(
+            rs: Register = Register(
                 name=name,
                 params=params,
                 loader=YamlEnvQuote,
             ).deploy(stop=params.stage_final)
         return cls(
-            name=_regis.name,
-            data=_regis.data().copy(),
+            name=rs.name,
+            data=rs.data().copy(),
             params=params,
             externals=externals,
         )
@@ -116,10 +116,6 @@ class BaseLoad:
     @property
     def updt(self):
         return self.data.get("updt")
-
-    @property
-    def version(self):
-        return self.data.get("version")
 
     @cached_property
     def _map_data(self) -> DictData:
@@ -160,6 +156,7 @@ class BaseLoad:
         return self.from_register(
             name=self.name,
             params=self.params,
+            externals=self.externals,
         )
 
     @cached_property

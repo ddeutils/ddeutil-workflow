@@ -8,5 +8,5 @@
 #
 
 schd_every_5_minute:
-    type: 'schedule.BKKSchedule'
+    type: 'scdl.BKKSchedule'
     cron: "*/5 * * * *"

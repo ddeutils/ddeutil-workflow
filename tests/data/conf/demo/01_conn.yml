@@ -2,7 +2,7 @@ version: '0.0.1'
 
 conn_local_file:
   type: conn.LocalFlSys
-  host: C://user/data
+  host: /C:/user/data
   ?endpoint: dwh
 
 conn_sftp:

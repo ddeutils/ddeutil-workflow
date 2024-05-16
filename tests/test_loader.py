@@ -1,3 +1,5 @@
+import shutil
+from collections.abc import Generator
 from pathlib import Path
 
 import ddeutil.pipe.loader as ld
@@ -6,8 +8,12 @@ from ddeutil.io.models import Params
 
 
 @pytest.fixture(scope='module')
-def params(conf_path: Path, test_path: Path, root_path: Path) -> Params:
-    return Params.model_validate(
+def params(
+    conf_path: Path,
+    test_path: Path,
+    root_path: Path,
+) -> Generator[Params, None, None]:
+    yield Params.model_validate(
         {
             "engine": {
                 "paths": {
@@ -22,9 +28,10 @@ def params(conf_path: Path, test_path: Path, root_path: Path) -> Params:
             },
         }
     )
+    shutil.rmtree(test_path / ".cache")
 
 
-def test_base_loader_init(params):
+def test_base_loader(params):
     load: ld.BaseLoad = ld.BaseLoad.from_register(
         name="demo:conn_local_file",
         params=params,
@@ -35,8 +42,9 @@ def test_base_loader_init(params):
     assert (
         {
             "alias": "conn_local_file",
-            "endpoint": "file:///null/tests/examples/dummy",
-            "type": "connection.LocalFileStorage",
+            "host": "/C:/user/data",
+            "type": "conn.LocalFlSys",
+            "?endpoint": "dwh",
         }
         == load.data
     )
