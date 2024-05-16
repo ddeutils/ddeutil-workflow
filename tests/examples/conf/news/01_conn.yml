@@ -1,5 +1,5 @@
 version: '0.0.1'
-conn -> local_file:
+conn_local_file:
   type: "connection.LocalFileStorage"
   host: ...
   port: ...

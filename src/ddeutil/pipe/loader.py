@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 import copy
-import logging
 import urllib.parse
 from functools import cached_property
 from typing import (
@@ -26,12 +25,6 @@ from ddeutil.io import Params, Register
 from ddeutil.io.__base import YamlEnvFl
 from ddeutil.io.utils import map_func_to_str
 from fmtutil import Datetime
-
-try:
-    import pandas as pd
-except ImportError:
-    pd = None
-    logging.warning("Pandas does not install when to use loader object.")
 
 from .exceptions import ConfigArgumentError, ConfigNotFound
 
@@ -56,42 +49,40 @@ class BaseLoader:
         subclass of loading use.
     """
 
-    load_prefixes: tuple[str, ...] = tuple("conn")
+    load_prefixes: tuple[str, ...] = ("conn", )
     load_datetime_name: str = "audit_date"
     load_datetime_fmt: str = "%Y-%m-%d %H:%M:%S"
     data_excluded: tuple[str, ...] = ("version", "updt")
-    option_key: tuple[str, ...] = ("parameters",)
-    datetime_key: tuple[str, ...] = ("endpoint",)
+    option_key: tuple[str, ...] = ("parameters", )
+    datetime_key: tuple[str, ...] = ("endpoint", )
 
     @classmethod
     def from_catalog(
         cls,
         name: str,
-        config: Params,
-        *,
-        params: Optional[dict[str, Any]] = None,
+        params: Params,
     ) -> BaseLoader:
         """Catalog load configuration
 
         :param name: A name of config data catalog that can register.
         :type name: str
-        :param config:
-        :type config: Params
+        :param params:
+        :type params: Params
         :param params:
         """
         try:
             _regis: Register = Register(
                 name=name,
-                stage=config.stage_final,
-                params=config,
+                stage=params.stage_final,
+                params=params,
                 loader=YamlEnvQuote,
             )
         except ConfigNotFound:
             _regis: Register = Register(
                 name=name,
-                params=config,
+                params=params,
                 loader=YamlEnvQuote,
-            ).deploy(stop=config.stage_final)
+            ).deploy(stop=params.stage_final)
         return cls(
             data={
                 "name": _regis.name,
@@ -99,28 +90,26 @@ class BaseLoader:
                 "data": _regis.data().copy(),
             },
             params=params,
-            config=config,
         )
 
     def __init__(
         self,
         data: LoaderData,
-        *,
-        params: Optional[dict[str, Any]] = None,
-        config: Optional[Params] = None,
-    ):
+        params: Optional[Params],
+    ) -> None:
         """Main initialize base config object which get a name of configuration
         and load data by the register object.
         """
         self.__data: LoaderData = data
-        self.params: dict[str, Any] = params or {}
-        self.__config = config
+        self.params = params
+
+        # NOTE: Declare necessary data.
         self.name: str = data["name"]
         self.fullname: str = data["fullname"]
         self.updt = data["data"].get("updt")
         self.version = data["data"].get("version")
 
-        # Validate step of base loading object.
+        # NOTE: Validate step of base loading object.
         if not any(
             self.name.startswith(prefix) for prefix in self.load_prefixes
         ):
@@ -128,7 +117,7 @@ class BaseLoader:
                 "prefix",
                 (
                     f"{self.name!r} does not starts with the "
-                    f"{self.__class__.__name__} prefix value "
+                    f"{self.__class__.__name__} prefixes: "
                     f"{self.load_prefixes!r}."
                 ),
             )
