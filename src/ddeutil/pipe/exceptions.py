@@ -17,15 +17,15 @@ class BaseError(Exception):
     """
 
 
-class NodeBaseError(BaseError):
+class PipeBaseError(BaseError):
     """Core Base Error object"""
 
 
-class ConfigNotFound(NodeBaseError):
+class ConfigNotFound(PipeBaseError):
     """Error raise for a method not found the config file or data."""
 
 
-class ConfigArgumentError(NodeBaseError):
+class ConfigArgumentError(PipeBaseError):
     """Error raise for a wrong configuration argument."""
 
     def __init__(self, argument: Union[str, tuple], message: str):
@@ -53,11 +53,11 @@ class ConfigArgumentError(NodeBaseError):
         super().__init__(_message)
 
 
-class ConnectionArgumentError(ConfigArgumentError):
+class ConnArgumentError(ConfigArgumentError):
     """Error raise for wrong connection argument when loading or parsing"""
 
 
-class CatalogArgumentError(ConfigArgumentError):
+class DsArgumentError(ConfigArgumentError):
     """Error raise for wrong catalog argument when loading or parsing"""
 
 
@@ -65,9 +65,9 @@ class NodeArgumentError(ConfigArgumentError):
     """Error raise for wrong node argument when loading or parsing"""
 
 
-class ScheduleArgumentError(ConfigArgumentError):
+class ScdlArgumentError(ConfigArgumentError):
     """Error raise for wrong schedule argument when loading or parsing"""
 
 
-class PipelineArgumentError(ConfigArgumentError):
+class PipeArgumentError(ConfigArgumentError):
     """Error raise for wrong pipeline argument when loading or parsing"""

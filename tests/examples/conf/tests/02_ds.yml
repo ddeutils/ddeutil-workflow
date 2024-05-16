@@ -1,0 +1,15 @@
+version: '0.0.1'
+
+ds_postgres_dwh:
+  type: dataset.Postgres
+  conn: conn_postgres
+  endpoint: dwh
+  ?schema: curated
+  ?table: ...
+
+ds_local_json_file:
+  type: dataset.JsonFlSys
+  conn: conn_local_file
+  endpoint: dwh/raw/
+  ?path: sales_transaction
+  ?filename: sales_{datetime:%Y%m%d_%H%M%S}.json

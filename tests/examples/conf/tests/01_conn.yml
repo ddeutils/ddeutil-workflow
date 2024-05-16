@@ -1,0 +1,24 @@
+version: '0.0.1'
+
+conn_local_file:
+  type: conn.LocalFlSys
+  host: C://user/data
+  ?endpoint: dwh
+
+conn_sftp:
+  type: conn.SshFlSys
+  host: ~/usr/data
+  ?endpoint: dwh
+  ?options:
+    ssh_host: ...
+    ssh_port: ...
+    ssh_user: ...
+    ssh_private_key: ...
+
+conn_postgres:
+  type: conn.Postgres
+  host: ...
+  port: ...
+  user: ...
+  pwd: pwd
+  endpoint: database

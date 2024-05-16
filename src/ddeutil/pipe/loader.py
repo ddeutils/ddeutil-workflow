@@ -1,18 +1,14 @@
-# -------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # Copyright (c) 2022 Korawich Anuttra. All rights reserved.
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
-# --------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 from __future__ import annotations
 
 import copy
 import urllib.parse
 from functools import cached_property
-from typing import (
-    Any,
-    Optional,
-    TypedDict,
-)
+from typing import Any
 
 from ddeutil.core import (
     clear_cache,
@@ -25,17 +21,13 @@ from ddeutil.io import Params, Register
 from ddeutil.io.__base import YamlEnvFl
 from ddeutil.io.utils import map_func_to_str
 from fmtutil import Datetime
+from typing_extensions import Self
 
+from .__types import DictData, TupleStr
 from .exceptions import ConfigArgumentError, ConfigNotFound
 
 YamlEnvQuote = YamlEnvFl
 YamlEnvQuote.prepare = staticmethod(lambda x: urllib.parse.quote_plus(str(x)))
-
-
-class LoaderData(TypedDict):
-    name: str
-    fullname: str
-    data: dict[str, Any]
 
 
 class BaseLoader:
@@ -49,26 +41,26 @@ class BaseLoader:
         subclass of loading use.
     """
 
-    load_prefixes: tuple[str, ...] = ("conn", )
+    load_prefixes: TupleStr = ("conn", )
     load_datetime_name: str = "audit_date"
     load_datetime_fmt: str = "%Y-%m-%d %H:%M:%S"
-    data_excluded: tuple[str, ...] = ("version", "updt")
-    option_key: tuple[str, ...] = ("parameters", )
-    datetime_key: tuple[str, ...] = ("endpoint", )
+
+    data_excluded: TupleStr = ("version", "updt")
+    option_key: TupleStr = ("parameters", )
+    datetime_key: TupleStr = ("endpoint", )
 
     @classmethod
-    def from_catalog(
+    def from_register(
         cls,
         name: str,
         params: Params,
-    ) -> BaseLoader:
+    ) -> Self:
         """Catalog load configuration
 
         :param name: A name of config data catalog that can register.
         :type name: str
-        :param params:
+        :param params: A params object.
         :type params: Params
-        :param params:
         """
         try:
             _regis: Register = Register(
@@ -84,30 +76,23 @@ class BaseLoader:
                 loader=YamlEnvQuote,
             ).deploy(stop=params.stage_final)
         return cls(
-            data={
-                "name": _regis.name,
-                "fullname": _regis.fullname,
-                "data": _regis.data().copy(),
-            },
+            name=_regis.name,
+            data=_regis.data().copy(),
             params=params,
         )
 
     def __init__(
         self,
-        data: LoaderData,
-        params: Optional[Params],
+        name: str,
+        data: DictData,
+        params: Params,
     ) -> None:
         """Main initialize base config object which get a name of configuration
         and load data by the register object.
         """
-        self.__data: LoaderData = data
-        self.params = params
-
-        # NOTE: Declare necessary data.
-        self.name: str = data["name"]
-        self.fullname: str = data["fullname"]
-        self.updt = data["data"].get("updt")
-        self.version = data["data"].get("version")
+        self.name: str = name
+        self.__data: DictData = data
+        self.params: Params = params
 
         # NOTE: Validate step of base loading object.
         if not any(
@@ -122,50 +107,53 @@ class BaseLoader:
                 ),
             )
 
+    @property
+    def updt(self):
+        return self.data.get("updt")
+
+    @property
+    def version(self):
+        return self.data.get("version")
+
     @cached_property
-    def __map_data(self) -> dict[str, Any]:
+    def _map_data(self) -> DictData:
         """Return configuration data without key in the excluded key set."""
-        _data: dict[str, Any] = self.__data["data"].copy()
-        _results: dict[str, Any] = {
-            k: _data[k] for k in _data if k not in self.data_excluded
-        }
+        data: DictData = self.__data["data"].copy()
+        rs: DictData = {k: data[k] for k in data if k not in self.data_excluded}
+
         # Mapping datetime format to string value.
         for _ in self.datetime_key:
-            if hasdot(_, _results):
+            if hasdot(_, rs):
                 # Fill format datetime object to any type value.
-                _get: Any = getdot(_, _results)
-                _results: dict = setdot(
+                rs: DictData = setdot(
                     _,
-                    _results,
+                    rs,
                     map_func_to_str(
-                        _get,
+                        getdot(_, rs),
                         Datetime.parse(
                             value=self.params[self.load_datetime_name],
                             fmt=self.load_datetime_fmt,
                         ).format,
                     ),
                 )
-        return _results
+        return rs
 
     @property
-    def data(self) -> dict[str, Any]:
-        """Return deep copy of configuration data."""
-        return copy.deepcopy(self.__map_data)
+    def data(self) -> DictData:
+        """Return deep copy of the input data.
+
+        :rtype: DictData
+        """
+        return copy.deepcopy(self._map_data)
 
     @clear_cache(attrs=("type", "_map_data"))
-    def refresh(self) -> BaseLoader:
+    def refresh(self) -> Self:
         """Refresh configuration data. This process will use `deploy` method
         of the register object.
         """
-        if self.__config:
-            return self.__class__.from_catalog(
-                name=self.fullname,
-                params=self.params,
-                config=self.__config,
-            )
-        raise NotImplementedError(
-            f"This {self.__class__.__name__} object does not pass data from "
-            f"catalog that support refresh method."
+        return self.from_register(
+            name=self.name,
+            params=self.params,
         )
 
     @cached_property
@@ -175,8 +163,7 @@ class BaseLoader:
             raise ValueError(
                 f"the 'type' value: {_typ} does not exists in config data."
             )
-        _obj_prefix: str = "ddeutil.node"
-        return import_string(f"{_obj_prefix}.{_typ}")
+        return import_string(f"ddeutil.pipe.{_typ}")
 
 
 class Conn(BaseLoader):

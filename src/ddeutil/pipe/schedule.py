@@ -15,16 +15,16 @@ from zoneinfo import ZoneInfo
 from typing_extensions import Self
 
 from .__schedule import CronJob, CronRunner
-from .exceptions import ScheduleArgumentError
+from .exceptions import ScdlArgumentError
 
 
-class BaseSchedule:
+class BaseScdl:
     timezone: str = "UTC"
 
     @classmethod
     def from_data(cls, data: dict[str, Any]) -> Self:
         if (_cron := data.pop("cron", None)) is None:
-            raise ScheduleArgumentError(
+            raise ScdlArgumentError(
                 "cron", "this necessary key does not exists in data."
             )
         return cls(cron=_cron, props=data)
@@ -46,8 +46,11 @@ class BaseSchedule:
         return self.cron.schedule(start_date=_datetime)
 
 
-class BKKSchedule(BaseSchedule):
+class Scdl(BaseScdl): ...
+
+
+class BKKScdl(BaseScdl):
     timezone: str = "Asia/Bangkok"
 
 
-class AWSSchedule(BaseSchedule): ...
+class AWSScdl(BaseScdl): ...

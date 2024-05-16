@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 import pytest
@@ -10,10 +9,20 @@ collect_ignore = [
 ]
 
 
-@pytest.fixture(scope="class")
-def test_path_to_cls(request):
-    _test_path: Path = Path(
-        os.path.dirname(os.path.abspath(__file__)).replace(os.sep, "/")
-    )
-    request.cls.test_path = _test_path.parent
-    request.cls.root_path = _test_path.parent.parent
+@pytest.fixture(scope="session")
+def test_path() -> Path:
+    return Path(__file__).parent
+
+
+def root_path(test_path: Path) -> Path:
+    return test_path.parent
+
+
+@pytest.fixture(scope="session")
+def example_path(test_path: Path) -> Path:
+    return test_path / "examples" / "conf"
+
+
+@pytest.fixture(scope="session")
+def conf_path(example_path: Path) -> Path:
+    return example_path / "conf"

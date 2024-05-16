@@ -1,0 +1,29 @@
+version: '0.0.1'
+pipe_sql_ingest:
+  type: "pipe.Pipeline"
+  desc: "Pipeline that load data from RDBMS"
+  params:
+    run_date: ${{ utils.receive.datetime }}
+    connection: ${{ utils.selection.conn }}
+    table_name: ${{ utils.receive.str }}
+  pipes:
+    - extraction:
+      stages:
+        - name: Extract data from RDBMS
+          as: extract
+          uses: node.CopyActivity
+          with:
+            source:
+              dataset: {{ params.connection }}
+              query: |
+                select customer_id, name, age, update_date
+                from {{ params.table_name }}
+                where update_date = {{ params.run_date.fmt('%Y%m%d') }}
+            sink:
+              dataset: conn_deltalake_az_st
+              mode: overwrite
+    - transform:
+      wait: extract
+      stages:
+        - name: Aggregate data on Lake
+          as: transform

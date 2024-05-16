@@ -5,8 +5,8 @@ pipe_seller_etl:
   schedule: "* * * 1 5"
   params:
     run_date: ${{ utils.receive.datetime }}
-  nodes:
-    - node -> first_node:
+  pipes:
+    - first_node:
       stages:
         - name: Starter Node
           as: start
@@ -45,7 +45,7 @@ pipe_seller_etl:
           with:
             to: ./data/target/dummy/{timestamp:%Y%m%d_%H%M%S}.csv
             df: nodes.check.right.outputs.df
-    - node -> second_node:
+    - second_node:
       need: first_node
       stages:
         - name: Loading Node
