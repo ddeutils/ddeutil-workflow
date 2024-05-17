@@ -1,0 +1,16 @@
+run_python_local:
+  version: 1
+  type: workflow.Workflow
+  params:
+    run_date: ${{ ... }}
+  jobs:
+    - demo_run:
+        stages:
+          - name: Run Hello World
+            run: |
+              print(f'Hello {x}')
+          - name: Run Sequence and use var from Above
+            run: |
+              print(f'Receive x from above with {x}')
+              # Change x value
+              x: int = 1

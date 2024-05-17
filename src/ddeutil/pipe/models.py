@@ -3,6 +3,8 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
+from __future__ import annotations
+
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field

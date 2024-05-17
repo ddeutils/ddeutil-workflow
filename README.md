@@ -1,5 +1,9 @@
 # Data Utility: _Pipeline_
 
+[![test](https://github.com/korawica/ddeutil-pipe/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/korawica/ddeutil-pipe/actions/workflows/tests.yml)
+[![python support version](https://img.shields.io/pypi/pyversions/ddeutil-pipe)](https://pypi.org/project/ddeutil-pipe/)
+[![size](https://img.shields.io/github/languages/code-size/korawica/ddeutil-pipe)](https://github.com/korawica/ddeutil-pipe)
+
 **Table of Contents**:
 
 - [Installation](#installation)
@@ -49,10 +53,10 @@ schd_for_node:
 ```
 
 ```python
-from ddeutil.pipe.schedule import Scdl
+from ddeutil.pipe.scdl import Scdl
 
-schedule = Scdl('schd_for_node')
-schedule.cron
+scdl = Scdl('schd_for_node')
+scdl.cron
 ```
 
 ```text
@@ -60,7 +64,7 @@ schedule.cron
 ```
 
 ```python
-cron_iterate = schedule.generate('2022-01-01 00:00:00')
+cron_iterate = scdl.generate('2022-01-01 00:00:00')
 for _ in range(5):
    cron_iterate.next.strftime('%Y-%m-%d %H:%M:%S')
 ```

@@ -1,0 +1,35 @@
+# Case:
+#   Extract data from a Source Database to Azure Data Lake.
+#
+#   * The source table should dynamic picking with schema and table names
+#   * Incremental loading with ``run_date`` parameter
+ingest_postgres_to_adls:
+  version: '1'
+  type: workflow.Workflow
+  desc: Extract and download data from Postgres to Azure Data Lake
+  params:
+    run_date: ${{ ... }}
+    source: ${{ }}
+    target: ${{ }}
+  jobs:
+    - extract_data:
+        run-on: Postgres
+        stages:
+          - name: Filter Data
+            with:
+              query: |
+                select *
+                from  {{ params.source.schema }}.{{ param.source.table }}
+                where update_date = '{{ param.run_date.fmt('%Y%m%d') }}'
+          - name: Schema Conversion
+            with:
+              schema: |
+                customer_id -> id
+                customer_name -> name
+                customer_register_date -> register_date
+                customer_revenue -> revenue
+          - name: Save to Azure Data Lake
+            with:
+              conn: ${{ target.conn }}
+              endpoint: /persisted/${{ target.schema }}/${{ target.path }}
+              format: parquet
