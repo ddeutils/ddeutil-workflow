@@ -30,7 +30,7 @@ def conf_path(data_path: Path) -> Path:
     return data_path / "conf"
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope="session")
 def params(
     conf_path: Path,
     test_path: Path,
@@ -53,7 +53,7 @@ def params(
                     "format": "{domain:%s}_{naming:%s}.{compress:%-g}",
                     "rules": {
                         "compress": "gzip",
-                    }
+                    },
                 },
             },
         }

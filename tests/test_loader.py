@@ -8,7 +8,7 @@ from ddeutil.io.param import Params
 from ddeutil.pipe.workflow import Workflow
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def params(
     conf_path: Path,
     test_path: Path,
@@ -39,17 +39,14 @@ def test_loader(params: Params):
         params=params,
         externals={
             "audit_date": "2024-01-01 00:12:45",
-        }
+        },
     )
-    assert (
-        {
-            "alias": "conn_local_file",
-            "host": "/C:/user/data",
-            "type": "conn.LocalFlSys",
-            "?endpoint": "dwh",
-        }
-        == load.data
-    )
+    assert {
+        "alias": "conn_local_file",
+        "host": "/C:/user/data",
+        "type": "conn.LocalFlSys",
+        "?endpoint": "dwh",
+    } == load.data
 
 
 def test_simple_loader(params: Params):
@@ -59,28 +56,28 @@ def test_simple_loader(params: Params):
         externals={},
     )
     assert {
-        'type': 'connection.LocalFileStorage',
-        'endpoint': 'file:///null/tests/examples/dummy'
+        "type": "connection.LocalFileStorage",
+        "endpoint": "file:///null/tests/examples/dummy",
     } == load.data
 
 
 def test_simple_loader_workflow_run_py(params: Params):
     load = ld.SimLoad(
-        name='run_python_local',
+        name="run_python_local",
         params=params,
         externals={},
     )
     assert load.type == Workflow
-    param: str = 'Parameter'
-    g = {'x': param}
+    param: str = "Parameter"
+    g = {"x": param}
     exec(
-        load.data.get('jobs')[0].get('demo_run').get('stages')[0].get('run'),
+        load.data.get("jobs")[0].get("demo_run").get("stages")[0].get("run"),
         g,
     )
 
     exec(
-        load.data.get('jobs')[0].get('demo_run').get('stages')[1].get('run'),
+        load.data.get("jobs")[0].get("demo_run").get("stages")[1].get("run"),
         g,
     )
 
-    assert 1 == g['x']
+    assert 1 == g["x"]

@@ -25,7 +25,8 @@ class BaseScdl:
     def from_data(cls, data: dict[str, Any]) -> Self:
         if (_cron := data.pop("cron", None)) is None:
             raise ScdlArgumentError(
-                "cron", "this necessary key does not exists in data.",
+                "cron",
+                "this necessary key does not exists in data.",
             )
         return cls(cron=_cron, props=data)
 

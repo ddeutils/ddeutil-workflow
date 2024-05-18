@@ -270,8 +270,7 @@ class CronPart:
         return list(values)
 
     def out_of_range(self, values: list[int]) -> list[int]:
-        """Return an integer is a value out of range was found, otherwise None.
-        """
+        """Return an integer is a value out of range was found, otherwise None."""
         if values:
             if (first := values[0]) < self.unit["min"]:
                 raise ValueError(

@@ -65,24 +65,26 @@ addopts = [
 ]
 filterwarnings = ["error"]
 
-[tool.mypy]
-python_version = "3.9"
-files = ["ddeutil"]
-show_error_codes = true
-pretty = true
-strict = true
-local_partial_types = true
-warn_unreachable = true
-
-[[tool.mypy.overrides]]
-module = "ddeutil.pip"
-warn_unused_ignores = false
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "tests.*"
-ignore_missing_imports = true
-check_untyped_defs = true
+[tool.black]
+line-length = 80
+target-version = ['py39']
+exclude = """
+(
+    /(
+        \\.git
+        | \\.eggs
+        | \\.__pycache__
+        | \\.idea
+        | \\.ruff_cache
+        | \\.mypy_cache
+        | \\.pytest_cache
+        | \\.venv
+        | build
+        | dist
+        | venv
+    )/
+)
+"""
 
 [tool.ruff]
 line-length = 80
@@ -106,6 +108,7 @@ select = [
     "B",  # flake8-bugbear
 ]
 ignore = [
+    "E501",  # line too long, handled by black
     "B008",  # do not perform function calls in argument defaults
     "C901",  # too complex
 ]

@@ -7,6 +7,6 @@ def test_conn_init(params):
         params=params,
         externals={
             "audit_date": "2024-01-01 00:12:45",
-        }
+        },
     )
     print(load.data)

@@ -48,14 +48,14 @@ class BaseLoad:
     """
 
     # NOTE: Set loading config for inherit
-    load_prefixes: TupleStr = ("conn", )
+    load_prefixes: TupleStr = ("conn",)
     load_datetime_name: str = "audit_date"
     load_datetime_fmt: str = "%Y-%m-%d %H:%M:%S"
 
     # NOTE: Set preparing config for inherit
     data_excluded: TupleStr = (UPDATE_KEY, VERSION_KEY)
-    option_key: TupleStr = ("parameters", )
-    datetime_key: TupleStr = ("endpoint", )
+    option_key: TupleStr = ("parameters",)
+    datetime_key: TupleStr = ("endpoint",)
 
     @classmethod
     def from_register(
@@ -98,7 +98,7 @@ class BaseLoad:
         name: str,
         data: DictData,
         params: Params,
-        externals: DictData | None = None
+        externals: DictData | None = None,
     ) -> None:
         """Main initialize base config object which get a name of configuration
         and load data by the register object.
@@ -182,9 +182,8 @@ class SimLoad:
     def __init__(self, name: str, params: Params, externals: DictData):
         self.data = {}
         for file in PathSearch(params.engine.paths.conf).files:
-            if (
-                any(file.suffix.endswith(s) for s in ('yml', 'yaml'))
-                and (data := YamlEnvQuote(file).read().get(name, {}))
+            if any(file.suffix.endswith(s) for s in ("yml", "yaml")) and (
+                data := YamlEnvQuote(file).read().get(name, {})
             ):
                 self.data = data
         if not self.data:
