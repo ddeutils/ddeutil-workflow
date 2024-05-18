@@ -15,3 +15,13 @@ run_python_local:
               print(f'Receive x from above with {x}')
               # Change x value
               x: int = 1
+    - next_run:
+        stages:
+          - name: Set variable and function
+            run: |
+              var_inside: str = 'Inside'
+              def echo() -> None:
+                print(f"Echo {var_inside}"
+          - name: Call that variable
+            run: |
+              echo()

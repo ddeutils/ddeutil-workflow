@@ -161,6 +161,8 @@ class BaseLoad:
     def refresh(self) -> Self:
         """Refresh configuration data. This process will use `deploy` method
         of the register object.
+
+        :rtype: Self
         """
         return self.from_register(
             name=self.name,
@@ -169,7 +171,7 @@ class BaseLoad:
         )
 
     @cached_property
-    def type(self):
+    def type(self) -> Any:
         """Return object type which implement in `config_object` key."""
         if not (_typ := self.data.get("type")):
             raise ValueError(
@@ -179,9 +181,19 @@ class BaseLoad:
 
 
 class SimLoad:
+    """Simple Load Object that will search config data by name.
+
+    :param name:
+    :param params:
+    :param externals:
+
+    Note:
+        The config data should have ``type`` key for engine can know what is
+    config should to do next.
+    """
 
     def __init__(self, name: str, params: Params, externals: DictData):
-        self.data = {}
+        self.data: DictData = {}
         for file in PathSearch(params.engine.paths.conf).files:
             if any(file.suffix.endswith(s) for s in ("yml", "yaml")) and (
                 data := YamlEnvQuote(file).read().get(name, {})
@@ -189,8 +201,12 @@ class SimLoad:
                 self.data = data
         if not self.data:
             raise ConfigNotFound(f"Config {name!r} does not found on conf path")
-        self.__conf_params = params
-        self.externals = externals
+        self.__conf_params: Params = params
+        self.externals: DictData = externals
+
+    @property
+    def conf_params(self) -> Params:
+        return self.__conf_params
 
     @cached_property
     def type(self):
@@ -206,8 +222,10 @@ class SimLoad:
             return import_string(f"{_typ}")
 
     def params(self, param: dict[str, Any]) -> dict[str, Any]:
+        """Return parameter that want to catch before workflow running."""
         if not (p := self.data.get("params", {})):
             return p
+
         try:
             return {
                 i: import_string(f"ddeutil.workflow.{p[i]}")(param[i])
@@ -222,14 +240,3 @@ class SimLoad:
         except ValueError as err:
             logging.error("Value that passing to params does not valid")
             raise err
-
-
-class Conn(BaseLoad):
-
-    @cached_property
-    def type(self) -> Any:
-        return super().type
-
-    def link(self):
-        """Return the connection instance."""
-        return self.type.from_dict(self.data)

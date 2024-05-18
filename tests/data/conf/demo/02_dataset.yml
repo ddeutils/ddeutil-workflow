@@ -1,0 +1,29 @@
+ds_postgres_dwh:
+  version: '1'
+  type: dataset.PostgresTbl
+  conn: conn_postgres
+  endpoint: postgres
+  ?schema: curated
+  ?table: order_inbound
+
+ds_json_local_file:
+  type: dataset.JsonFl
+  conn: conn_local_file
+  ?endpoint: C:/home/warehouse/raw/
+  ?path: sales_transaction/sales_{datetime:%Y%m%d}.json
+
+ds_csv_local_file:
+  type: dataset.CsvFl
+  conn: conn_local_file
+  ?endpoint: C:/home/warehouse/raw/
+  ?path: customer_master/customer_{datetime:%Y%m%d}.csv
+  extras:
+    encoding: "utf-8"
+    escape_char: "\\"
+    delimiter: "|"
+    header: true
+
+ds_sqlite_metadata:
+  type: dataset.SqliteTbl
+  conn: conn_sqlite_url
+  ?endpoint: metadata_table

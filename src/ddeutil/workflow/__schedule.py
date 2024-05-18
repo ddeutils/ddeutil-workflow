@@ -459,7 +459,7 @@ class CronJob:
         self,
         value: Union[list[list[int]], str],
         *,
-        option: Optional[dict] = None,
+        option: Optional[dict[str, bool]] = None,
     ):
         if isinstance(value, str):
             value: list[str] = value.strip().split()

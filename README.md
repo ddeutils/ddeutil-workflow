@@ -9,8 +9,7 @@
 - [Installation](#installation)
 - [Getting Started](#getting-started)
   - [Conn](#conn)
-  - [Ds](#ds)
-  - [Pipe](#pipe)
+  - [Dataset](#dataset)
   - [Scdl](#scdl)
 - [Examples](#examples)
 
@@ -39,43 +38,31 @@ that want to transfer.
 
 The connection for worker able to do any thing.
 
-### DS
+### Dataset
 
 The thing that worker should to focus on that connection.
 
-### Stage
 
 ### Scdl
 
 ```yaml
 schd_for_node:
-    type: 'schedule.BaseSchedule'
+    type: 'scdl.Scdl'
     cron: "*/5 * * * *"
 ```
 
 ```python
 from ddeutil.workflow.scdl import Scdl
 
-scdl = Scdl('schd_for_node')
-scdl.cron
-```
+scdl = Scdl.from_loader(name='schd_for_node', ...)
+assert '*/5 * * * *' == str(scdl.cronjob)
 
-```text
->>> '*/5 * * * *'
-```
-
-```python
 cron_iterate = scdl.generate('2022-01-01 00:00:00')
-for _ in range(5):
-   cron_iterate.next.strftime('%Y-%m-%d %H:%M:%S')
-```
-
-```text
->>> 2022-01-01 00:05:00
->>> 2022-01-01 00:10:00
->>> 2022-01-01 00:15:00
->>> 2022-01-01 00:20:00
->>> 2022-01-01 00:25:00
+assert '2022-01-01 00:05:00' f"{cron_iterate.next:%Y-%m-%d %H:%M:%S}"
+assert '2022-01-01 00:10:00' f"{cron_iterate.next:%Y-%m-%d %H:%M:%S}"
+assert '2022-01-01 00:15:00' f"{cron_iterate.next:%Y-%m-%d %H:%M:%S}"
+assert '2022-01-01 00:20:00' f"{cron_iterate.next:%Y-%m-%d %H:%M:%S}"
+assert '2022-01-01 00:25:00' f"{cron_iterate.next:%Y-%m-%d %H:%M:%S}"
 ```
 
 ## Examples

@@ -7,6 +7,7 @@ import ddeutil.workflow.loader as ld
 import pytest
 from ddeutil.io.param import Params
 from ddeutil.workflow.pipe import Pipeline
+from ddeutil.workflow.scdl import BkkScdl
 
 
 @pytest.fixture(scope="module")
@@ -21,7 +22,6 @@ def params(
                 "paths": {
                     "conf": conf_path,
                     "data": test_path / ".cache",
-                    "archive": test_path / ".archive",
                     "root": root_path,
                 },
             },
@@ -44,9 +44,8 @@ def test_loader(params: Params):
     )
     assert {
         "alias": "conn_local_file",
-        "host": "/C:/user/data",
-        "type": "conn.LocalFlSys",
-        "?endpoint": "dwh",
+        "endpoint": "C:/user/data",
+        "type": "conn.LocalFl",
     } == load.data
 
 
@@ -57,8 +56,8 @@ def test_simple_loader(params: Params):
         externals={},
     )
     assert {
-        "type": "connection.LocalFileStorage",
-        "endpoint": "file:///null/tests/examples/dummy",
+        "type": "conn.LocalFl",
+        "endpoint": "C:/user/data",
     } == load.data
 
 
@@ -69,19 +68,19 @@ def test_simple_loader_workflow_run_py(params: Params):
         externals={},
     )
     assert load.type == Pipeline
+
+    x: str = "Init"
     param: str = "Parameter"
     g = {"x": param}
-    exec(
-        load.data.get("jobs")[0].get("demo_run").get("stages")[0].get("run"),
-        g,
-    )
+    for stage in load.data.get("jobs")[0].get("demo_run").get("stages"):
+        exec(stage.get("run"), g)
 
-    exec(
-        load.data.get("jobs")[0].get("demo_run").get("stages")[1].get("run"),
-        g,
-    )
-
+    # NOTE: the `x` variable will change because the stage.
     assert 1 == g["x"]
+
+    # NOTE: Make sore that `x` on this local does not change.
+    assert "Init" == x
+
     assert {
         "run_date": datetime(2024, 1, 1, 0),
         "name": "Parameter",
@@ -91,3 +90,17 @@ def test_simple_loader_workflow_run_py(params: Params):
             "name": "Parameter",
         }
     )
+
+
+def test_simple_loader_schedule(params: Params):
+    load = ld.SimLoad(
+        name="scdl_bkk_every_5_minute",
+        params=params,
+        externals={},
+    )
+    assert BkkScdl == load.type
+
+    scd: BkkScdl = load.type(cronjob=load.data["cron"])
+    cronjob_iter = scd.generate("2024-01-01 00:00:00")
+    assert "2024-01-01 00:00:00" == f"{cronjob_iter.next:%Y-%m-%d %H:%M:%S}"
+    assert "2024-01-01 00:05:00" == f"{cronjob_iter.next:%Y-%m-%d %H:%M:%S}"

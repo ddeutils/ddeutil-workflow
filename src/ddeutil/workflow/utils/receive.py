@@ -11,16 +11,23 @@ def datetime(value: Any) -> dt.datetime:
         return dt.datetime.now(dt.timezone.utc)
     elif not isinstance(value, str):
         raise ValueError(
-            "Value that want to convert to datetime does not support for type: "
-            f"{type(value)}"
+            f"Value that want to convert to datetime does not support for "
+            f"type: {type(value)}"
         )
     return dt.datetime.fromisoformat(value)
 
 
 def string(value: Any) -> str:
-    if not isinstance(value, str):
-        raise ValueError(
-            "Value that want to convert to string does not support for type: "
-            f"{type(value)}"
-        )
+    return str(value)
+
+
+def integer(value: Any) -> int:
+    if not isinstance(value, int):
+        try:
+            return int(str(value))
+        except TypeError as err:
+            raise ValueError(
+                f"Value that want to convert to integer does not support for "
+                f"type: {type(value)}"
+            ) from err
     return value

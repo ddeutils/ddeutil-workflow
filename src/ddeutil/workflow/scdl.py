@@ -6,53 +6,67 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import (
-    Any,
-    Optional,
-)
+from typing import Annotated
 from zoneinfo import ZoneInfo
 
+from ddeutil.io import Params
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic.functional_validators import field_validator
 from typing_extensions import Self
 
 from .__schedule import CronJob, CronRunner
+from .__types import DictData
 from .exceptions import ScdlArgumentError
+from .loader import SimLoad
 
 
-class BaseScdl:
-    timezone: str = "UTC"
+class BaseScdl(BaseModel):
+    """Base Scdl (Schedule) Model"""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    # NOTE: This is fields
+    cronjob: Annotated[CronJob, Field(description="Cron job of this schedule")]
+    tz: Annotated[str, Field(description="Timezone")] = "UTC"
+    extras: Annotated[
+        DictData,
+        Field(default_factory=dict, description="Extras mapping of parameters"),
+    ]
 
     @classmethod
-    def from_data(cls, data: dict[str, Any]) -> Self:
-        if (_cron := data.pop("cron", None)) is None:
-            raise ScdlArgumentError(
-                "cron",
-                "this necessary key does not exists in data.",
-            )
-        return cls(cron=_cron, props=data)
+    def from_loader(
+        cls,
+        name: str,
+        params: Params,
+        externals: DictData,
+    ) -> Self:
+        loader: SimLoad = SimLoad(name, params=params, externals=externals)
+        if "cron" not in loader.data:
+            raise ScdlArgumentError("cron", "Config does not set ``cron``")
+        return cls(cron=loader.data["cron"], extras=externals)
 
-    def __init__(
-        self,
-        cron: str,
-        *,
-        props: Optional[dict[str, Any]] = None,
-    ) -> None:
-        self.cron: CronJob = CronJob(value=cron)
-        self.props = props or {}
+    @field_validator("cronjob", mode="before")
+    def __prepare_cronjob(cls, value: str | CronJob) -> CronJob:
+        return CronJob(value) if isinstance(value, str) else value
 
-    def schedule(self, start: str) -> CronRunner:
+    def generate(self, start: str) -> CronRunner:
         """Return Cron runner object."""
-        _datetime: datetime = datetime.fromisoformat(start).astimezone(
-            ZoneInfo(self.timezone)
+        return self.cronjob.schedule(
+            start_date=(
+                datetime.fromisoformat(start).astimezone(ZoneInfo(self.tz))
+            )
         )
-        return self.cron.schedule(start_date=_datetime)
 
 
-class Scdl(BaseScdl): ...
+class Scdl(BaseScdl):
+    """Scdl (Schedule) Model"""
 
 
-class BKKScdl(BaseScdl):
-    timezone: str = "Asia/Bangkok"
+class BkkScdl(BaseScdl):
+    """Asia Bangkok Scdl (Schedule) timezone Model"""
+
+    tz: str = "Asia/Bangkok"
 
 
-class AWSScdl(BaseScdl):
+class AwsScdl(BaseScdl):
     """Implement Schedule for AWS Service."""
