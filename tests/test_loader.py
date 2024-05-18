@@ -1,5 +1,6 @@
 import shutil
 from collections.abc import Generator
+from datetime import datetime
 from pathlib import Path
 
 import ddeutil.workflow.loader as ld
@@ -81,3 +82,12 @@ def test_simple_loader_workflow_run_py(params: Params):
     )
 
     assert 1 == g["x"]
+    assert {
+        "run_date": datetime(2024, 1, 1, 0),
+        "name": "Parameter",
+    } == load.params(
+        param={
+            "run_date": "2024-01-01",
+            "name": "Parameter",
+        }
+    )

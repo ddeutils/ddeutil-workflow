@@ -2,7 +2,8 @@ run_python_local:
   version: 1
   type: ddeutil.workflow.pipe.Pipeline
   params:
-    run_date: ${{ ... }}
+    run_date: utils.receive.datetime
+    name: utils.receive.string
   jobs:
     - demo_run:
         stages:

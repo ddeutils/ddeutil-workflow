@@ -3,9 +3,9 @@ pipe_sql_ingest:
   version: '1'
   desc: "Pipeline that load data from RDBMS"
   params:
-    run_date: ${{ utils.receive.datetime }}
-    connection: ${{ utils.selection.conn }}
-    table_name: ${{ utils.receive.str }}
+    run_date: utils.receive.datetime
+    connection: utils.selection.conn
+    table_name: utils.receive.string
   pipes:
     - extraction:
         stages:

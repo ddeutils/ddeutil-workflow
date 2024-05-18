@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import copy
+import logging
 import urllib.parse
 from functools import cached_property
 from typing import Any
@@ -188,7 +189,7 @@ class SimLoad:
                 self.data = data
         if not self.data:
             raise ConfigNotFound(f"Config {name!r} does not found on conf path")
-        self.params = params
+        self.__conf_params = params
         self.externals = externals
 
     @cached_property
@@ -203,6 +204,24 @@ class SimLoad:
             return import_string(f"ddeutil.workflow.{_typ}")
         except ModuleNotFoundError:
             return import_string(f"{_typ}")
+
+    def params(self, param: dict[str, Any]) -> dict[str, Any]:
+        if not (p := self.data.get("params", {})):
+            return p
+        try:
+            return {
+                i: import_string(f"ddeutil.workflow.{p[i]}")(param[i])
+                for i in p
+            }
+        except ModuleNotFoundError as err:
+            logging.error(err)
+            raise err
+        except KeyError as err:
+            logging.error(f"Parameter: {err} does not exists from passing")
+            raise err
+        except ValueError as err:
+            logging.error("Value that passing to params does not valid")
+            raise err
 
 
 class Conn(BaseLoad):
