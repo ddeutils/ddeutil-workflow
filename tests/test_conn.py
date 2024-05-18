@@ -1,4 +1,4 @@
-import ddeutil.pipe.loader as ld
+import ddeutil.workflow.loader as ld
 
 
 def test_conn_init(params):

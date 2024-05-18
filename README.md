@@ -1,7 +1,7 @@
-# Data Utility: _Pipeline_
+# Data Utility: _Workflow_
 
 [![test](https://github.com/korawica/ddeutil-pipe/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/korawica/ddeutil-pipe/actions/workflows/tests.yml)
-[![python support version](https://img.shields.io/pypi/pyversions/ddeutil-pipe)](https://pypi.org/project/ddeutil-pipe/)
+[![python support version](https://img.shields.io/pypi/pyversions/ddeutil-workflow)](https://pypi.org/project/ddeutil-workflow/)
 [![size](https://img.shields.io/github/languages/code-size/korawica/ddeutil-pipe)](https://github.com/korawica/ddeutil-pipe)
 
 **Table of Contents**:
@@ -12,21 +12,22 @@
   - [Ds](#ds)
   - [Pipe](#pipe)
   - [Scdl](#scdl)
+- [Examples](#examples)
 
-This **Utility Pipeline** object was created for easy to make a simple metadata
+This **Utility Workflow** objects was created for easy to make a simple metadata
 driven pipeline that able to **ETL, T, EL, or ELT** by `.yaml` file.
 
 I think we should not create the multiple pipeline per use-case if we able to write
 some engines that just change input parameters per use-case instead.
 
 > [!NOTE]
-> I inspire the dynamic statement from GitHub action file and all of config file
-> from several data orchestration framework.
+> I inspire the dynamic statement from GitHub action `.yml` files and all of config
+> file from several data orchestration framework.
 
 ## Installation
 
 ```shell
-pip install ddeutil-pipe
+pip install ddeutil-workflow
 ```
 
 ## Getting Started
@@ -53,7 +54,7 @@ schd_for_node:
 ```
 
 ```python
-from ddeutil.pipe.scdl import Scdl
+from ddeutil.workflow.scdl import Scdl
 
 scdl = Scdl('schd_for_node')
 scdl.cron
@@ -82,6 +83,10 @@ for _ in range(5):
 ### Pipe
 
 The state of doing lists that worker should to do. It be collection of the stage.
+
+```yaml
+
+```
 
 ## License
 

@@ -1,5 +1,3 @@
-version: '0.0.1'
-
 conn_local_file:
   type: conn.LocalFlSys
   host: /C:/user/data

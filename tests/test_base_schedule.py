@@ -1,4 +1,4 @@
-import ddeutil.pipe.__schedule as schedule
+import ddeutil.workflow.__schedule as schedule
 
 
 def test_schedule_cronjob():

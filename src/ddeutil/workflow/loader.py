@@ -198,7 +198,11 @@ class SimLoad:
             raise ValueError(
                 f"the 'type' value: {_typ} does not exists in config data."
             )
-        return import_string(f"ddeutil.pipe.{_typ}")
+        try:
+            # NOTE: Auto adding module prefix if it does not set
+            return import_string(f"ddeutil.workflow.{_typ}")
+        except ModuleNotFoundError:
+            return import_string(f"{_typ}")
 
 
 class Conn(BaseLoad):

@@ -1,4 +1,4 @@
-from ddeutil.pipe.__regex import RegexConf
+from ddeutil.workflow.__regex import RegexConf
 
 
 def test_regex_caller():

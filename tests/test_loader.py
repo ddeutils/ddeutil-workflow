@@ -2,10 +2,10 @@ import shutil
 from collections.abc import Generator
 from pathlib import Path
 
-import ddeutil.pipe.loader as ld
+import ddeutil.workflow.loader as ld
 import pytest
 from ddeutil.io.param import Params
-from ddeutil.pipe.workflow import Workflow
+from ddeutil.workflow.pipe import Pipeline
 
 
 @pytest.fixture(scope="module")
@@ -67,7 +67,7 @@ def test_simple_loader_workflow_run_py(params: Params):
         params=params,
         externals={},
     )
-    assert load.type == Workflow
+    assert load.type == Pipeline
     param: str = "Parameter"
     g = {"x": param}
     exec(

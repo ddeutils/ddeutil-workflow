@@ -1,6 +1,6 @@
-version: '0.0.1'
 pipe_sql_ingest:
-  type: "pipe.Pipeline"
+  type: pipe.Pipeline
+  version: '1'
   desc: "Pipeline that load data from RDBMS"
   params:
     run_date: ${{ utils.receive.datetime }}

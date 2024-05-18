@@ -1,10 +1,14 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
 [project]
-name = "ddeutil-pipe"
-description = "Data Developer & Engineer Pipeline Utility Objects"
+name = "ddeutil-workflow"
+description = "Data Developer & Engineer Workflow Utility Objects"
 readme = {file = "README.md", content-type = "text/markdown"}
 license = {text = "MIT"}
 authors = [{ name = "ddeutils", email = "korawich.anu@gmail.com" }]
-keywords = ['data', 'pipline', 'utility']
+keywords = ['data', 'workflow', 'utility', 'pipeline']
 classifiers = [
     "Topic :: Utilities",
     "Natural Language :: English",
@@ -27,12 +31,8 @@ dependencies = [
 dynamic = ["version"]
 
 [project.urls]
-Homepage = "https://github.com/korawica/ddeutil-pipe/"
-"Source Code" = "https://github.com/korawica/ddeutil-pipe/"
-
-[build-system]
-requires = ["setuptools>=68.0"]
-build-backend = "setuptools.build_meta"
+Homepage = "https://github.com/korawica/ddeutil-workflow/"
+"Source Code" = "https://github.com/korawica/ddeutil-workflow/"
 
 [tool.setuptools.dynamic]
 version = {attr = "ddeutil.pipe.__about__.__version__"}
@@ -46,15 +46,13 @@ changelog = "CHANGELOG.md"
 
 [tool.coverage.run]
 branch = true
+relative_files = true
 concurrency = ["thread", "multiprocessing"]
 source = ["ddeutil", "tests"]
 omit = ["scripts/"]
-relative_files = true
 
 [tool.coverage.report]
-exclude_lines = [
-    "raise NotImplementedError"
-]
+exclude_lines = ["raise NotImplementedError"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
@@ -92,6 +90,7 @@ exclude = [
     ".git",
     ".mypy_cache",
     ".ruff_cache",
+    ".venv",
     "__pypackages__",
     "build",
     "dist",

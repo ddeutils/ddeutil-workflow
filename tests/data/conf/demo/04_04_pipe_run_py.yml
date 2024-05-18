@@ -1,6 +1,6 @@
 run_python_local:
   version: 1
-  type: workflow.Workflow
+  type: ddeutil.workflow.pipe.Pipeline
   params:
     run_date: ${{ ... }}
   jobs:

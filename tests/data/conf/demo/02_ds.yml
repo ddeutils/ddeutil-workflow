@@ -1,6 +1,5 @@
-version: '0.0.1'
-
 ds_postgres_dwh:
+  version: '1'
   type: dataset.Postgres
   conn: conn_postgres
   endpoint: dwh
