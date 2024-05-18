@@ -8,10 +8,11 @@
 
 - [Installation](#installation)
 - [Getting Started](#getting-started)
-  - [Conn](#conn)
+  - [Connection](#conn)
   - [Dataset](#dataset)
-  - [Scdl](#scdl)
+  - [Schedule](#schedule)
 - [Examples](#examples)
+  - [Workflow](#workflow)
 
 This **Utility Workflow** objects was created for easy to make a simple metadata
 driven pipeline that able to **ETL, T, EL, or ELT** by `.yaml` file.
@@ -34,7 +35,7 @@ pip install ddeutil-workflow
 The first step, you should start create the connections for in and out of you data
 that want to transfer.
 
-### Conn
+### Connection
 
 The connection for worker able to do any thing.
 
@@ -43,7 +44,7 @@ The connection for worker able to do any thing.
 The thing that worker should to focus on that connection.
 
 
-### Scdl
+### Schedule
 
 ```yaml
 schd_for_node:
@@ -67,12 +68,46 @@ assert '2022-01-01 00:25:00' f"{cron_iterate.next:%Y-%m-%d %H:%M:%S}"
 
 ## Examples
 
-### Pipe
+### Workflow
 
 The state of doing lists that worker should to do. It be collection of the stage.
 
 ```yaml
+run_python_local:
+  version: 1
+  type: ddeutil.workflow.pipe.Pipeline
+  params:
+    run_date: utils.receive.datetime
+    name: utils.receive.string
+  jobs:
+    - demo_run:
+        stages:
+          - name: Run Hello World
+            run: |
+              print(f'Hello {x}')
+          - name: Run Sequence and use var from Above
+            run: |
+              print(f'Receive x from above with {x}')
 
+              # NOTE: Change x value
+              x: int = 1
+    - next_run:
+        stages:
+          - name: Set variable and function
+            run: |
+              var_inside: str = 'Inside'
+              def echo() -> None:
+                print(f"Echo {var_inside}")
+          - name: Call that variable
+            run: |
+              echo()
+```
+
+```python
+from ddeutil.workflow.pipe import Pipeline
+
+pipe = Pipeline.from_loader(name='run_python_local', ...)
+pipe.execute(params={"run_date": "2023-01-01", "name": "foo"})
 ```
 
 ## License

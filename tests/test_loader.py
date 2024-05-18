@@ -7,7 +7,7 @@ import ddeutil.workflow.loader as ld
 import pytest
 from ddeutil.io.param import Params
 from ddeutil.workflow.pipe import Pipeline
-from ddeutil.workflow.scdl import BkkScdl
+from ddeutil.workflow.schedule import ScdlBkk
 
 
 @pytest.fixture(scope="module")
@@ -72,7 +72,8 @@ def test_simple_loader_workflow_run_py(params: Params):
     x: str = "Init"
     param: str = "Parameter"
     g = {"x": param}
-    for stage in load.data.get("jobs")[0].get("demo_run").get("stages"):
+    print(load.data)
+    for stage in load.data.get("jobs").get("demo-run").get("stages"):
         exec(stage.get("run"), g)
 
     # NOTE: the `x` variable will change because the stage.
@@ -98,9 +99,9 @@ def test_simple_loader_schedule(params: Params):
         params=params,
         externals={},
     )
-    assert BkkScdl == load.type
+    assert ScdlBkk == load.type
 
-    scd: BkkScdl = load.type(cronjob=load.data["cron"])
+    scd: ScdlBkk = load.type(cronjob=load.data["cronjob"])
     cronjob_iter = scd.generate("2024-01-01 00:00:00")
     assert "2024-01-01 00:00:00" == f"{cronjob_iter.next:%Y-%m-%d %H:%M:%S}"
     assert "2024-01-01 00:05:00" == f"{cronjob_iter.next:%Y-%m-%d %H:%M:%S}"

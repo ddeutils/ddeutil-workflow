@@ -5,23 +5,23 @@ run_python_local:
     run_date: utils.receive.datetime
     name: utils.receive.string
   jobs:
-    - demo_run:
-        stages:
-          - name: Run Hello World
-            run: |
-              print(f'Hello {x}')
-          - name: Run Sequence and use var from Above
-            run: |
-              print(f'Receive x from above with {x}')
-              # Change x value
-              x: int = 1
-    - next_run:
-        stages:
-          - name: Set variable and function
-            run: |
-              var_inside: str = 'Inside'
-              def echo() -> None:
-                print(f"Echo {var_inside}"
-          - name: Call that variable
-            run: |
-              echo()
+    demo-run:
+      stages:
+        - name: Run Hello World
+          run: |
+            print(f'Hello {x}')
+        - name: Run Sequence and use var from Above
+          run: |
+            print(f'Receive x from above with {x}')
+            # Change x value
+            x: int = 1
+    next-run:
+      stages:
+        - name: Set variable and function
+          run: |
+            var_inside: str = 'Inside'
+            def echo() -> None:
+              print(f"Echo {var_inside}"
+        - name: Call that variable
+          run: |
+            echo()

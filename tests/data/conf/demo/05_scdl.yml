@@ -1,3 +1,3 @@
 scdl_bkk_every_5_minute:
-    type: scdl.BkkScdl
-    cron: "*/5 * * * *"
+    type: schedule.ScdlBkk
+    cronjob: "*/5 * * * *"

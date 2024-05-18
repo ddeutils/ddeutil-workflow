@@ -41,9 +41,11 @@ class BaseScdl(BaseModel):
         externals: DictData,
     ) -> Self:
         loader: SimLoad = SimLoad(name, params=params, externals=externals)
-        if "cron" not in loader.data:
-            raise ScdlArgumentError("cron", "Config does not set ``cron``")
-        return cls(cron=loader.data["cron"], extras=externals)
+        if "cronjob" not in loader.data:
+            raise ScdlArgumentError(
+                "cronjob", "Config does not set ``cronjob``"
+            )
+        return cls(cronjob=loader.data["cronjob"], extras=externals)
 
     @field_validator("cronjob", mode="before")
     def __prepare_cronjob(cls, value: str | CronJob) -> CronJob:
@@ -62,7 +64,7 @@ class Scdl(BaseScdl):
     """Scdl (Schedule) Model"""
 
 
-class BkkScdl(BaseScdl):
+class ScdlBkk(BaseScdl):
     """Asia Bangkok Scdl (Schedule) timezone Model"""
 
     tz: str = "Asia/Bangkok"

@@ -270,7 +270,10 @@ class CronPart:
         return list(values)
 
     def out_of_range(self, values: list[int]) -> list[int]:
-        """Return an integer is a value out of range was found, otherwise None."""
+        """Return an integer is a value out of range was found, otherwise None.
+
+        :param values: A list of int value
+        """
         if values:
             if (first := values[0]) < self.unit["min"]:
                 raise ValueError(
@@ -484,13 +487,13 @@ class CronJob:
                 "day of week together"
             )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return " ".join(str(part) for part in self._parts)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
-            f"<{self.__class__.__name__}(value={self.__str__()!r}, "
-            f"option={self._options})>"
+            f"{self.__class__.__name__}(value={self.__str__()!r}, "
+            f"option={self._options})"
         )
 
     def __lt__(self, other) -> bool:

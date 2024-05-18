@@ -18,7 +18,6 @@ def params(
                 "paths": {
                     "conf": conf_path,
                     "data": test_path / ".cache",
-                    "archive": test_path / ".archive",
                     "root": root_path,
                 },
             },

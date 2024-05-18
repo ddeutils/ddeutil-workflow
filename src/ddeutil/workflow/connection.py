@@ -232,26 +232,6 @@ class SFTPStorage(BaseFileStorage):
     def download(self, *args, **kwargs) -> Any: ...
 
 
-class FTPStorage(BaseFileStorage):
-    protocol: tuple[str, ...] = ("ftp",)
-    ...
-
-
-class S3Storage(BaseFileStorage):
-    protocol: tuple[str, ...] = ("s3",)
-    ...
-
-
-class ADLSStorage(BaseFileStorage):
-    protocol: tuple[str, ...] = ("abfs",)
-    ...
-
-
-class GCSStorage(BaseFileStorage):
-    protocol: tuple[str, ...] = ("gcs",)
-    ...
-
-
 class BaseDB(BaseConnABC, abc.ABC):
     """The Base Database connection system that use the sqlalchemy for engine
     creation. This object will design necessary properties and methods for
@@ -447,39 +427,3 @@ class SQLiteDB(BaseDB):
             )
             result = rows.fetchone()
         return bool(result[0])
-
-
-class PostgresDB(BaseDB):
-    protocol: tuple[str, ...] = ("postgresql",)
-    ...
-
-
-class MSSQLServerDB(BaseDB):
-    protocol: tuple[str, ...] = ("mssql",)
-    ...
-
-
-class MySQLDB(BaseDB):
-    protocol: tuple[str, ...] = ("mysql",)
-    ...
-
-
-class BigQuery: ...
-
-
-class RedShift: ...
-
-
-class SynapseAnalytic: ...
-
-
-class MangoDB: ...
-
-
-class DynamoDB: ...
-
-
-class RedisDB: ...
-
-
-class CosmosDB: ...
