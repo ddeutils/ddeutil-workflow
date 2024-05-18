@@ -53,7 +53,7 @@ schd_for_node:
 ```
 
 ```python
-from ddeutil.workflow.scdl import Scdl
+from ddeutil.workflow.schedule import Scdl
 
 scdl = Scdl.from_loader(name='schd_for_node', ...)
 assert '*/5 * * * *' == str(scdl.cronjob)

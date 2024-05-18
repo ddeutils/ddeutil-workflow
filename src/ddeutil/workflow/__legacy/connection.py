@@ -19,6 +19,7 @@ except ImportError:
     boto3 = None
 import sqlalchemy
 from ddeutil.core import merge_dict
+from ddeutil.workflow.exceptions import ConfigArgumentError
 from sqlalchemy import (
     URL,
     Engine,
@@ -27,8 +28,6 @@ from sqlalchemy import (
     text,
 )
 from sshtunnel import SSHTunnelForwarder
-
-from .exceptions import ConfigArgumentError
 
 
 class BaseConnABC(abc.ABC):

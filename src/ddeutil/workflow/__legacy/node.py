@@ -15,9 +15,8 @@ from typing import (
 
 import numpy as np
 import pandas as pd
-
-from .action import BaseAction
-from .exceptions import NodeArgumentError
+from ddeutil.workflow.__legacy.action import BaseAction
+from ddeutil.workflow.exceptions import NodeArgumentError
 
 logger = logging.getLogger(__name__)
 
