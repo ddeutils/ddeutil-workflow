@@ -1,3 +1,0 @@
-scdl_bkk_every_5_minute:
-    type: schedule.ScdlBkk
-    cronjob: "*/5 * * * *"

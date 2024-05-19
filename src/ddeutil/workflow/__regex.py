@@ -14,6 +14,9 @@ from re import (
 
 
 class RegexConf:
+    """Regular expression config."""
+
+    # NOTE: Search caller
     __re_caller: str = r"""
         \$
         {{

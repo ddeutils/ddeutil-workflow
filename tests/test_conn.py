@@ -1,9 +1,9 @@
 from collections.abc import Generator
 from pathlib import Path
 
+import ddeutil.workflow.conn as conn
 import pytest
 from ddeutil.io.param import Params
-from ddeutil.workflow.conn import Conn
 
 
 @pytest.fixture(scope="module")
@@ -29,18 +29,28 @@ def params(
 
 
 def test_connection_file(params: Params):
-    load = Conn.from_loader(
+    connection = conn.FlConn.from_loader(
         name="conn_local_file",
         params=params,
         externals={},
     )
-    print(load.extras)
+    print(connection)
+    # assert connection.ping()
+
+
+def test_connection_file_url_relative(params: Params):
+    connection = conn.FlConn.from_loader(
+        name="conn_local_file_url_relative",
+        params=params,
+        externals={},
+    )
+    print(connection)
 
 
 def test_connection_sftp(params: Params):
-    load = Conn.from_loader(
+    connection = conn.Conn.from_loader(
         name="conn_sftp",
         params=params,
         externals={},
     )
-    print(load.extras)
+    print(connection.extras)

@@ -25,3 +25,9 @@ run_python:
           run: |
             echo()
         - name: Final of Next running job
+    shell-run:
+      run-on: subprocess
+      stages:
+        - name: Echo hello world
+          run: |
+            echo 'Hello World'

@@ -1,11 +1,5 @@
-ds_postgres_dwh:
-  version: '1'
-  type: dataset.PostgresTbl
-  conn: conn_postgres
-  endpoint: postgres
-  ?schema: curated
-  ?table: order_inbound
-
+# File Dataset
+# ---
 ds_json_local_file:
   type: dataset.JsonFl
   conn: conn_local_file
@@ -22,6 +16,16 @@ ds_csv_local_file:
     escape_char: "\\"
     delimiter: "|"
     header: true
+
+# Database Object Dataset
+# ---
+ds_postgres_dwh:
+  version: '1'
+  type: dataset.PostgresTbl
+  conn: conn_postgres
+  endpoint: postgres
+  ?schema: curated
+  ?table: order_inbound
 
 ds_sqlite_metadata:
   type: dataset.SqliteTbl

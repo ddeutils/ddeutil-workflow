@@ -1,43 +1,67 @@
+# File System Connection
+# ---
+#   For file system connection, I will define relative and absolute path as the
+# same pattern with the SQLtie connection from SQLAlchemy connection string.
+#
+#   * relative path:
+#     * fs:///relative/foo
+#     * file:///../tmp/path/foo
+#   * absolute path:
+#     * fs:////absolute/path/to/foo
+#
 conn_local_file:
   type: conn.LocalFl
-  endpoint: C:/user/data
-
-conn_sftp:
-  type: conn.SFTP
-  host: 127.0.0.1
-  port: 22
-  user: ssh_user
-  pwd: P@ssW0rd
-  endpoint: ~/user/data/dwh
-  extras:
-    ssh_private_key: ./conf/.ssh/key_ssh_gen.pem
-
-conn_postgres:
-  type: conn.Postgres
-  host: 127.0.0.1
-  port: 5432
-  user: postgres
-  pwd: P@ssW0rd
-  endpoint: postgres
+  endpoint: "data/examples/"
 
 conn_local_file_url:
   type: conn.LocalFl
   # Absolute path.
   url: "fs:///C:/usr/tests/examples/dummy"
 
+conn_local_file_url_relative:
+  type: conn.LocalFl
+  url: "fs:////data/examples/"
+
 conn_local_file_url_datetime:
   type: conn.LocalFl
   url: "fs:///C:/usr/tests/examples/dummy/01_testing_{timestamp:%Y%m%d}.json"
+
+# SFTP & FTP Connection
+# ---
+conn_sftp:
+  type: conn.SFTP
+  host: 127.0.0.1
+  port: 22
+  user: ssh_user
+  pwd: P@ssW0rd
+  endpoint: "~/user/data/dwh"
+  extras:
+    ssh_private_key: ./conf/.ssh/key_ssh_gen.pem
 
 conn_sftp_url:
   type: conn.SFTP
   url: "sftp://bastion:P@ssW0rd@127.0.0.1:22/home/bastion/data"
 
+# SQLite Connection
+# ---
+#   For the SQLite connection config, I will reference path with SQLAlchemy.
+#
+#   * relative path:
+#     * sqlite:///relative/foo.db
+#     * sqlite:///../tmp/path/foo.db
+#   * absolute path:
+#     * sqlite:////absolute/path/to/foo.db
+#   * memory
+#     * sqlite://
+#
 conn_sqlite_url:
   type: conn.SQLite
   # Relative path.
   url: "sqlite:///demo/sqlite_demo.db"
 
+# AWS S3 Connection
+# ---
+#
 conn_s3_url:
   type: conn.S3
   url: "s3://@secrets{s3_data_eng_bucket}"
@@ -45,14 +69,13 @@ conn_s3_url:
   aws_access_secret_key: "${AWS_ACCESS_SECRET_KEY}"
   role_arn: "@secrets{s3_data_eng_role_arn}"
 
-
 conn_azure_blob_de_test:
   type: "conn.AzureBlobSystem"
   endpoint: "abfs://de-test"
   account_name: "@secrets{azure_de_test_account_name}"
   account_key: "@secrets{azure_de_test_account_key}"
 
-
+# Postgres Connection
 conn_aws_pg_sandbox:
   type: "conn.PostgresSystem"
   username: "@secrets{pg_sandbox_username}"
@@ -61,6 +84,13 @@ conn_aws_pg_sandbox:
   port: "5432"
   database: "@secrets{pg_sandbox_database}"
 
+conn_postgres:
+  type: conn.Postgres
+  host: 127.0.0.1
+  port: 5432
+  user: postgres
+  pwd: P@ssW0rd
+  endpoint: postgres
 
 conn_aws_pg_uat:
   type: conn.Postgres
@@ -75,14 +105,16 @@ conn_aws_pg_uat:
     ssh_private_key: "./secrets/ec2-user.key"
     ssh_port: "22"
 
-
+# MS SQL Server Connection
+# ---
 conn_azure_sqlserver_dwh_dev:
   type: conn.ODBC
   username: "@secrets{sqlserver_dwh_username}"
   host: "@secrets{sqlserver_dwh_host}"
   port: "1433"
   database: "@secrets{sqlserver_dwh_database}"
-  driver: "{ODBC Driver 17 for SQL Server}"
-  encrypt: true
-  trust_server_certificate: false
-  connection_timeout: 30
+  extras:
+    driver: "{ODBC Driver 17 for SQL Server}"
+    encrypt: true
+    trust_server_certificate: false
+    connection_timeout: 30

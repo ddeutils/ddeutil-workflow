@@ -5,6 +5,7 @@
 # ------------------------------------------------------------------------------
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Annotated, Optional
 
 from ddeutil.io import Params
@@ -16,7 +17,10 @@ from typing_extensions import Self
 from .__types import DictData, TupleStr
 from .loader import SimLoad
 
-EXCLUDED_EXTRAS: TupleStr = ("type",)
+EXCLUDED_EXTRAS: TupleStr = (
+    "type",
+    "url",
+)
 
 
 class BaseConn(BaseModel):
@@ -54,14 +58,19 @@ class BaseConn(BaseModel):
             for k in loader.data.copy()
             if k not in cls.model_fields and k not in EXCLUDED_EXTRAS
         }
+        print(loader.data)
         if "url" in loader.data:
             url: ConnModel = ConnModel.from_url(loader.data.pop("url"))
+            print(url)
             return cls(
                 host=url.host,
                 port=url.port,
                 user=url.user,
                 pwd=url.pwd,
-                endpoint=url.port,
+                # NOTE:
+                #   I will replace None endpoint with memory value for SQLite
+                #   connection string.
+                endpoint=url.endpoint or "memory",
                 # NOTE: This order will show that externals this the top level.
                 extras=(url.options | filter_data | externals),
             )
@@ -102,3 +111,11 @@ class AZServPrinCred(BaseModel):
 
 class GoogleCred(BaseModel):
     google_json_path: str
+
+
+class FlConn(Conn):
+
+    def ping(self) -> bool:
+        p = Path(self.endpoint)
+        print(self.endpoint, "to", p.resolve())
+        return p.exists()
