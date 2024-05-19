@@ -59,6 +59,7 @@ def test_scdl_next_previous():
     )
     t = sch.next
     assert t.tzinfo == str2dt("2024-01-23 00:00:00").tzinfo
+    assert f"{t:%Y%m%d%H%M%S}" == "20240123000000"
     assert t == str2dt("2024-01-23 00:00:00")
     assert sch.next == str2dt("2024-01-23 00:30:00")
     assert sch.next == str2dt("2024-01-23 12:00:00")

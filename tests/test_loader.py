@@ -107,5 +107,6 @@ def test_simple_loader_schedule(params: Params):
     cronjob_iter = scdl.generate("2024-01-01 00:00:00")
     t = cronjob_iter.next
     assert str2dt("2024-01-01 00:00:00").tzinfo == t.tzinfo
+    assert f"{t:%Y%m%d%H%M%S}" == "20240101000000"
     assert str2dt("2024-01-01 00:00:00") == t
     assert str2dt("2024-01-01 00:05:00") == cronjob_iter.next

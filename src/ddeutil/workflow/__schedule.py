@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Iterator
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import partial, total_ordering
 from typing import (
     Any,
@@ -15,8 +15,8 @@ from typing import (
     Optional,
     Union,
 )
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from dateutil import tz
 from ddeutil.core import (
     is_int,
     isinstance_check,
@@ -558,9 +558,9 @@ class CronRunner:
     """
 
     __slots__: tuple[str, ...] = (
-        "tz_info",
+        "tz",
         "date",
-        "start_time",
+        "__start_date",
         "cron",
         "reset_flag",
     )
@@ -572,31 +572,33 @@ class CronRunner:
         *,
         tz_str: Optional[str] = None,
     ) -> None:
-        self.tz_info = tz.tzutc()
+        # NOTE: Prepare date and tz_info
+        self.tz = timezone.utc
         if tz_str:
-            if not (_tz := tz.gettz(tz_str)):
-                raise ValueError(f"Invalid timezone: {tz_str}")
-            self.tz_info = _tz
+            try:
+                self.tz = ZoneInfo(tz_str)
+            except ZoneInfoNotFoundError as err:
+                raise ValueError(f"Invalid timezone: {tz_str}") from err
         if start_date:
             if not isinstance(start_date, datetime):
                 raise ValueError(
                     "Input schedule start time is not a valid datetime object."
                 )
-            self.tz_info = start_date.tzinfo
+            self.tz = start_date.tzinfo
             self.date: datetime = start_date
         else:
-            self.date: datetime = datetime.now(self.tz_info)
+            self.date: datetime = datetime.now(tz=self.tz)
 
         if self.date.second > 0:
             self.date: datetime = self.date + timedelta(minutes=+1)
 
-        self.start_time: datetime = self.date
+        self.__start_date: datetime = self.date
         self.cron: CronJob = cron
         self.reset_flag: bool = True
 
     def reset(self) -> None:
         """Resets the iterator to start time."""
-        self.date: datetime = self.start_time
+        self.date: datetime = self.__start_date
         self.reset_flag: bool = True
 
     @property
