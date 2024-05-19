@@ -23,4 +23,6 @@ def dotenv_setting():
 
 
 def str2dt(value):
-    return datetime.fromisoformat(value).astimezone(ZoneInfo("Asia/Bangkok"))
+    return datetime.fromisoformat(value).replace(
+        tzinfo=ZoneInfo("Asia/Bangkok")
+    )

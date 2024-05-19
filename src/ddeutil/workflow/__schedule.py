@@ -620,18 +620,13 @@ class CronRunner:
         self.reset_flag: bool = False
         for _ in range(25):
             if all(
-                not self._shift_date(mode, reverse)
-                for mode in (
-                    "month",
-                    "day",
-                    "hour",
-                    "minute",
-                )
+                not self.__shift_date(mode, reverse)
+                for mode in ("month", "day", "hour", "minute")
             ):
                 return copy.deepcopy(self.date.replace(second=0, microsecond=0))
         raise RecursionError("Unable to find execution time for schedule")
 
-    def _shift_date(self, mode: str, reverse: bool = False) -> bool:
+    def __shift_date(self, mode: str, reverse: bool = False) -> bool:
         """Increments the mode value until matches with the schedule."""
         switch: dict[str, str] = {
             "month": "year",
