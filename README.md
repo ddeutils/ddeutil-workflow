@@ -1,8 +1,8 @@
 # Data Utility: _Workflow_
 
-[![test](https://github.com/korawica/ddeutil-pipe/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/korawica/ddeutil-pipe/actions/workflows/tests.yml)
+[![test](https://github.com/korawica/ddeutil-workflow/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/korawica/ddeutil-workflow/actions/workflows/tests.yml)
 [![python support version](https://img.shields.io/pypi/pyversions/ddeutil-workflow)](https://pypi.org/project/ddeutil-workflow/)
-[![size](https://img.shields.io/github/languages/code-size/korawica/ddeutil-pipe)](https://github.com/korawica/ddeutil-pipe)
+[![size](https://img.shields.io/github/languages/code-size/korawica/ddeutil-workflow)](https://github.com/korawica/ddeutil-workflow)
 
 **Table of Contents**:
 
