@@ -4,10 +4,14 @@ from pathlib import Path
 import pytest
 from ddeutil.io.param import Params
 
+from .utils import dotenv_setting
+
 collect_ignore = [
     "vendors",
     "test_conn.py",
 ]
+
+dotenv_setting()
 
 
 @pytest.fixture(scope="session")

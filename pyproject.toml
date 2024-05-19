@@ -27,6 +27,7 @@ dependencies = [
     "fmtutil",
     "ddeutil-io",
     "ddeutil-model",
+    "python-dotenv",
 ]
 dynamic = ["version"]
 

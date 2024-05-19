@@ -39,10 +39,17 @@ that want to transfer.
 
 The connection for worker able to do any thing.
 
+```yaml
+conn_
+```
+
 ### Dataset
 
 The thing that worker should to focus on that connection.
 
+```yaml
+ds_
+```
 
 ### Schedule
 

@@ -30,4 +30,8 @@ def test_pipe_model():
         },
     }
     p = Pipeline(jobs=data)
-    print(p)
+    assert "Run Hello World" == p.jobs.get("demo-run").stages[0].name
+    assert (
+        "Run Sequence and use var from Above"
+        == p.jobs.get("demo-run").stages[1].name
+    )
