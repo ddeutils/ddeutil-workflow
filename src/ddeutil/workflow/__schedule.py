@@ -122,9 +122,7 @@ class CronPart:
         self.unit: dict = unit
         self.options: dict = options
         if isinstance(values, str):
-            values: list[int] = (
-                self.from_string(values) if values != "?" else []
-            )
+            values: list[int] = self.from_str(values) if values != "?" else []
         elif isinstance_check(values, list[int]):
             values: list[int] = self.replace_weekday(values)
         else:
@@ -135,12 +133,13 @@ class CronPart:
         self.values: list[int] = unique_values
 
     def __str__(self) -> str:
-        return self.to_string()
+        """Return str that use output to ``self.to_str()`` method."""
+        return self.to_str()
 
     def __repr__(self):
         return (
             f"<{self.__class__.__name__}"
-            f"(unit={self.unit}, values={self.to_string()!r})>"
+            f"(unit={self.unit}, values={self.to_str()!r})>"
         )
 
     def __lt__(self, other) -> bool:
@@ -181,7 +180,7 @@ class CronPart:
             self.unit.get("max") - self.unit.get("min") + 1
         )
 
-    def from_string(self, value: str) -> list[int]:
+    def from_str(self, value: str) -> tuple[int, ...]:
         """Parses a string as a range of positive integers. The string should
         include only `-` and `,` special strings.
 
@@ -229,7 +228,7 @@ class CronPart:
                 Run at 10:15am UTC on the last Friday of each month during the
                 years 2002 to 2005
 
-        :rtype: list[int]
+        :rtype: tuple[int, ...]
         """
         interval_list: list[list[int]] = []
         for _value in self.replace_alternative(value.upper()).split(","):
@@ -252,7 +251,7 @@ class CronPart:
                 )
 
             interval_list.append(self._interval(value_range_list, value_step))
-        return [item for sublist in interval_list for item in sublist]
+        return tuple(item for sublist in interval_list for item in sublist)
 
     def replace_alternative(self, value: str) -> str:
         """Replaces the alternative representations of numbers in a string."""
@@ -374,7 +373,7 @@ class CronPart:
                 start_number: Optional[int] = value
         return multi_dim_values
 
-    def to_string(self) -> str:
+    def to_str(self) -> str:
         """Returns the range as a string."""
         _hash: str = "H" if self.options.get("output_hashes") else "*"
 

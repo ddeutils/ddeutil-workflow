@@ -1,5 +1,4 @@
 from collections.abc import Generator
-from datetime import datetime
 from pathlib import Path
 
 import ddeutil.workflow.loader as ld
@@ -47,7 +46,7 @@ def test_simple_loader(params: Params):
 
 def test_simple_loader_workflow_run_py(params: Params):
     load = ld.SimLoad(
-        name="run_python_local",
+        name="run_python",
         params=params,
         externals={},
     )
@@ -55,8 +54,7 @@ def test_simple_loader_workflow_run_py(params: Params):
 
     x: str = "Init"
     param: str = "Parameter"
-    g = {"x": param}
-    print(load.data)
+    g: dict[str, str] = {"x": param}
     for stage in load.data.get("jobs").get("demo-run").get("stages"):
         exec(stage.get("run"), g)
 
@@ -66,10 +64,7 @@ def test_simple_loader_workflow_run_py(params: Params):
     # NOTE: Make sore that `x` on this local does not change.
     assert "Init" == x
 
-    assert {
-        "run_date": datetime(2024, 1, 1, 0),
-        "name": "Parameter",
-    } == load.validate_params(
+    assert {"name": "Parameter"} == load.validate_params(
         param={
             "run_date": "2024-01-01",
             "name": "Parameter",

@@ -1,4 +1,4 @@
-from ddeutil.workflow.pipeline import Pipeline
+from ddeutil.workflow.pipeline import Job, Pipeline
 
 
 def test_pipe_model():
@@ -35,3 +35,14 @@ def test_pipe_model():
         "Run Sequence and use var from Above"
         == p.jobs.get("demo-run").stages[1].name
     )
+
+
+def test_pipe_run_py(params_simple):
+    pipeline = Pipeline.from_loader(
+        name="run_python", params=params_simple, externals={}
+    )
+    demo_job: Job = pipeline.job("demo-run")
+    print(demo_job.stages)
+
+    next_run: Job = pipeline.job("next-run")
+    print(next_run)

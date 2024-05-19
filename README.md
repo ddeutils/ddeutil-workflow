@@ -12,7 +12,11 @@
   - [Dataset](#dataset)
   - [Schedule](#schedule)
 - [Examples](#examples)
-  - [Workflow](#workflow)
+  - [Python](#python)
+  - [EL](#el)
+  - [E](#e)
+  - [ETL](#etl)
+  - [ELT](#elt)
 
 This **Utility Workflow** objects was created for easy to make a simple metadata
 driven pipeline that able to **ETL, T, EL, or ELT** by `.yaml` file.
@@ -93,7 +97,7 @@ assert '2022-01-01 00:25:00' f"{cron_iterate.next:%Y-%m-%d %H:%M:%S}"
 
 This is examples that use workflow file for running common use-case.
 
-### Running Python Script
+### Python
 
 The state of doing lists that worker should to do. It be collection of the stage.
 

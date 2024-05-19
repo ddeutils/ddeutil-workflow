@@ -1,8 +1,7 @@
-run_python_local:
+run_python:
   version: 1
   type: ddeutil.workflow.pipeline.Pipeline
   params:
-    run_date: utils.receive.datetime
     name: utils.receive.string
   jobs:
     demo-run:
@@ -25,3 +24,4 @@ run_python_local:
         - name: Call that variable
           run: |
             echo()
+        - name: Final of Next running job

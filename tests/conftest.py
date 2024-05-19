@@ -1,3 +1,4 @@
+import shutil
 from collections.abc import Generator
 from pathlib import Path
 
@@ -36,7 +37,7 @@ def conf_path(data_path: Path) -> Path:
 
 
 @pytest.fixture(scope="session")
-def params(
+def params_session(
     conf_path: Path,
     test_path: Path,
     root_path: Path,
@@ -62,5 +63,22 @@ def params(
             },
         }
     )
-    # if (test_path / ".cache").exists():
-    #     shutil.rmtree(test_path / ".cache")
+    if (test_path / ".cache").exists():
+        shutil.rmtree(test_path / ".cache")
+
+
+@pytest.fixture(scope="module")
+def params_simple(
+    conf_path: Path,
+    root_path: Path,
+) -> Generator[Params, None, None]:
+    yield Params.model_validate(
+        {
+            "engine": {
+                "paths": {
+                    "conf": conf_path,
+                    "root": root_path,
+                },
+            },
+        }
+    )

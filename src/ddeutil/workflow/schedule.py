@@ -67,11 +67,18 @@ class BaseScdl(BaseModel):
 
 
 class Scdl(BaseScdl):
-    """Scdl (Schedule) Model"""
+    """Scdl (Schedule) Model.
+
+    See Also:
+        * ``generate()`` is the main usecase of this schedule object.
+    """
 
 
-class ScdlBkk(BaseScdl):
-    """Asia Bangkok Scdl (Schedule) timezone Model"""
+class ScdlBkk(Scdl):
+    """Asia Bangkok Scdl (Schedule) timezone Model.
+
+    This model use for change timezone from utc to Asia/Bangkok
+    """
 
     tz: Annotated[str, Field(description="Timezone")] = "Asia/Bangkok"
 
