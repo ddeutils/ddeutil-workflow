@@ -3,7 +3,7 @@ from zoneinfo import ZoneInfo
 
 import ddeutil.workflow.__schedule as schedule
 
-from .utils import tz2str
+from .utils import str2dt
 
 
 def test_scdl_cronjob():
@@ -57,17 +57,19 @@ def test_scdl_next_previous():
         start_date=datetime(2024, 1, 1, 12, tzinfo=ZoneInfo("Asia/Bangkok")),
         _tz="Asia/Bangkok",
     )
-    assert f"{sch.next:%Y-%m-%d %H:%M:%S}" == tz2str("2024-01-23 00:00:00")
-    assert f"{sch.next:%Y-%m-%d %H:%M:%S}" == tz2str("2024-01-23 00:30:00")
-    assert f"{sch.next:%Y-%m-%d %H:%M:%S}" == tz2str("2024-01-23 12:00:00")
-    assert f"{sch.next:%Y-%m-%d %H:%M:%S}" == tz2str("2024-01-23 12:30:00")
+    t = sch.next
+    assert t.tzinfo == str2dt("2024-01-23 00:00:00").tzinfo
+    assert t == str2dt("2024-01-23 00:00:00")
+    assert sch.next == str2dt("2024-01-23 00:30:00")
+    assert sch.next == str2dt("2024-01-23 12:00:00")
+    assert sch.next == str2dt("2024-01-23 12:30:00")
 
     sch.reset()
 
-    assert f"{sch.prev:%Y-%m-%d %H:%M:%S}" == tz2str("2023-10-23 12:30:00")
-    assert f"{sch.prev:%Y-%m-%d %H:%M:%S}" == tz2str("2023-10-23 12:00:00")
-    assert f"{sch.prev:%Y-%m-%d %H:%M:%S}" == tz2str("2023-10-23 00:30:00")
-    assert f"{sch.prev:%Y-%m-%d %H:%M:%S}" == tz2str("2023-10-23 00:00:00")
-    assert f"{sch.prev:%Y-%m-%d %H:%M:%S}" == tz2str("2023-07-23 12:30:00")
-    assert f"{sch.prev:%Y-%m-%d %H:%M:%S}" == tz2str("2023-07-23 12:00:00")
-    assert f"{sch.prev:%Y-%m-%d %H:%M:%S}" == tz2str("2023-07-23 00:30:00")
+    assert sch.prev == str2dt("2023-10-23 12:30:00")
+    assert sch.prev == str2dt("2023-10-23 12:00:00")
+    assert sch.prev == str2dt("2023-10-23 00:30:00")
+    assert sch.prev == str2dt("2023-10-23 00:00:00")
+    assert sch.prev == str2dt("2023-07-23 12:30:00")
+    assert sch.prev == str2dt("2023-07-23 12:00:00")
+    assert sch.prev == str2dt("2023-07-23 00:30:00")

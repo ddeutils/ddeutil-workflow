@@ -22,9 +22,5 @@ def dotenv_setting():
     load_dotenv("../.env")
 
 
-def tz2str(value):
-    return (
-        datetime.fromisoformat(value)
-        .astimezone(ZoneInfo("Asia/Bangkok"))
-        .strftime("%Y-%m-%d %H:%M:%S")
-    )
+def str2dt(value):
+    return datetime.fromisoformat(value).astimezone(ZoneInfo("Asia/Bangkok"))

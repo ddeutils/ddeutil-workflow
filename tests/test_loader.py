@@ -9,7 +9,7 @@ from ddeutil.io.param import Params
 from ddeutil.workflow.pipeline import Pipeline
 from ddeutil.workflow.schedule import ScdlBkk
 
-from .utils import tz2str
+from .utils import str2dt
 
 
 @pytest.fixture(scope="module")
@@ -105,11 +105,7 @@ def test_simple_loader_schedule(params: Params):
 
     scdl: ScdlBkk = load.type(cronjob=load.data["cronjob"])
     cronjob_iter = scdl.generate("2024-01-01 00:00:00")
-    assert (
-        tz2str("2024-01-01 00:00:00")
-        == f"{cronjob_iter.next:%Y-%m-%d %H:%M:%S}"
-    )
-    assert (
-        tz2str("2024-01-01 00:05:00")
-        == f"{cronjob_iter.next:%Y-%m-%d %H:%M:%S}"
-    )
+    t = cronjob_iter.next
+    assert str2dt("2024-01-01 00:00:00").tzinfo == t.tzinfo
+    assert str2dt("2024-01-01 00:00:00") == t
+    assert str2dt("2024-01-01 00:05:00") == cronjob_iter.next
