@@ -549,7 +549,7 @@ class CronJob:
         self, start_date: Optional[datetime] = None, _tz: Optional[str] = None
     ) -> CronRunner:
         """Returns the time the schedule would run next."""
-        return CronRunner(self, start_date, _tz)
+        return CronRunner(self, start_date, tz_str=_tz)
 
 
 class CronRunner:
@@ -569,8 +569,9 @@ class CronRunner:
         self,
         cron: CronJob,
         start_date: Optional[datetime] = None,
+        *,
         tz_str: Optional[str] = None,
-    ):
+    ) -> None:
         self.tz_info = tz.tzutc()
         if tz_str:
             if not (_tz := tz.gettz(tz_str)):
