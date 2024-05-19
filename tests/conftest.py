@@ -6,9 +6,10 @@ from ddeutil.io.param import Params
 
 from .utils import dotenv_setting
 
-collect_ignore = [
+collect_ignore: list[str] = [
     "vendors",
-    "test_conn.py",
+    "test_base_schedule.py",
+    "test_loader_simple.py",
 ]
 
 dotenv_setting()

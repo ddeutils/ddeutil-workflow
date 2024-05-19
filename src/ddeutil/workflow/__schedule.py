@@ -546,10 +546,10 @@ class CronJob:
         return [part.values for part in self._parts]
 
     def schedule(
-        self, start_date: Optional[datetime] = None, _tz: Optional[str] = None
+        self, date: Optional[datetime] = None, _tz: Optional[str] = None
     ) -> CronRunner:
         """Returns the time the schedule would run next."""
-        return CronRunner(self, start_date, tz_str=_tz)
+        return CronRunner(self, date, tz_str=_tz)
 
 
 class CronRunner:
@@ -558,17 +558,17 @@ class CronRunner:
     """
 
     __slots__: tuple[str, ...] = (
-        "tz",
-        "date",
         "__start_date",
         "cron",
+        "date",
         "reset_flag",
+        "tz",
     )
 
     def __init__(
         self,
         cron: CronJob,
-        start_date: Optional[datetime] = None,
+        date: Optional[datetime] = None,
         *,
         tz_str: Optional[str] = None,
     ) -> None:
@@ -579,13 +579,13 @@ class CronRunner:
                 self.tz = ZoneInfo(tz_str)
             except ZoneInfoNotFoundError as err:
                 raise ValueError(f"Invalid timezone: {tz_str}") from err
-        if start_date:
-            if not isinstance(start_date, datetime):
+        if date:
+            if not isinstance(date, datetime):
                 raise ValueError(
                     "Input schedule start time is not a valid datetime object."
                 )
-            self.tz = start_date.tzinfo
-            self.date: datetime = start_date
+            self.tz = date.tzinfo
+            self.date: datetime = date
         else:
             self.date: datetime = datetime.now(tz=self.tz)
 

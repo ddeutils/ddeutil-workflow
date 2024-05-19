@@ -54,8 +54,7 @@ def test_scdl_next_previous():
     ]
 
     sch = cr.schedule(
-        start_date=datetime(2024, 1, 1, 12, tzinfo=ZoneInfo("Asia/Bangkok")),
-        _tz="Asia/Bangkok",
+        date=datetime(2024, 1, 1, 12, tzinfo=ZoneInfo("Asia/Bangkok")),
     )
     t = sch.next
     assert t.tzinfo == str2dt("2024-01-23 00:00:00").tzinfo

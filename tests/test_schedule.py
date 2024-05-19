@@ -1,5 +1,7 @@
+import datetime
 from collections.abc import Generator
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 from ddeutil.io.param import Params
@@ -29,9 +31,15 @@ def params(
 
 
 def test_schedule(params: Params):
-    load = ScdlBkk.from_loader(
+    schedule = ScdlBkk.from_loader(
         name="scdl_bkk_every_5_minute",
         params=params,
         externals={},
     )
-    print(load)
+    assert "Asia/Bangkok" == schedule.tz
+    assert "*/5 * * * *" == str(schedule.cronjob)
+
+    start_date: datetime.datetime = datetime.datetime(2024, 1, 1, 12)
+    cron_runner = schedule.generate(start=start_date)
+    assert cron_runner.date.tzinfo == ZoneInfo(schedule.tz)
+    assert cron_runner.date == start_date.astimezone(ZoneInfo(schedule.tz))
