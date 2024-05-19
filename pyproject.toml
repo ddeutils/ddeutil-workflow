@@ -27,6 +27,7 @@ classifiers = [
 requires-python = ">=3.9.13"
 dependencies = [
     "fmtutil",
+    "ddeutil",
     "ddeutil-io",
     "ddeutil-model",
     "python-dotenv",
