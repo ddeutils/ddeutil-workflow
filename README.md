@@ -13,10 +13,9 @@
   - [Schedule](#schedule)
 - [Examples](#examples)
   - [Python](#python)
-  - [EL](#el)
-  - [E](#e)
-  - [ETL](#etl)
-  - [ELT](#elt)
+  - [Extract & Load](#extract--load)
+  - [Transform](#transform)
+  - [ETL](#extract--transfrom--load)
 
 This **Utility Workflow** objects was created for easy to make a simple metadata
 driven pipeline that able to **ETL, T, EL, or ELT** by `.yaml` file.
@@ -58,6 +57,13 @@ conn_postgres_data:
   url: 'postgres+pysyncopg//...'
 ```
 
+```python
+from ddeutil.workflow.conn import Conn
+
+conn = Conn.from_loader(name='conn_postgres_data', ...)
+assert conn.ping()
+```
+
 ### Dataset
 
 The dataset is define any objects on the connection.
@@ -69,6 +75,13 @@ ds_postgres_customer_tbl:
   features:
     id: serial primary key
     name: varchar( 100 ) not null
+```
+
+```python
+from ddeutil.workflow.dataset import PostgresTbl
+
+dataset = PostgresTbl.from_loader(name='ds_postgres_customer_tbl', ...)
+assert dataset.exists()
 ```
 
 ### Schedule
@@ -137,30 +150,98 @@ from ddeutil.workflow.pipeline import Pipeline
 
 pipe = Pipeline.from_loader(name='run_python_local', ...)
 pipe.execute(params={"run_date": "2023-01-01", "name": "foo"})
+assert {} == pipe.output
 ```
 
-### EL
+### Extract & Load
 
 ```yaml
-
+pipe_el_pg_to_lake:
+  version: 1
+  type: ddeutil.workflow.pipe.Pipeline
+  params:
+    run_date: utils.receive.datetime
+    name: utils.receive.string
+  jobs:
+    extract-load:
+      stages:
+        - name: Extract Load from Postgres to Lake
+          id: extract
+          uses: PostgresToDelta
+          with:
+            source:
+              conn: conn_postgres_url
+              query: |
+                select * from ${{ params.name }}
+                where update_date = '${{ params.datetime }}'
+            sink:
+              conn: conn_az_lake
+              endpoint: /${{ params.name }}/
 ```
 
-### E
+### Transform
 
 ```yaml
-
+pipe_hook_mssql_proc:
+  version: 1
+  type: ddeutil.workflow.pipe.Pipeline
+  params:
+    run_date: utils.receive.datetime
+    sp_name: utils.receive.string
+    source_name: utils.receive.string
+    target_name: utils.receive.string
+  jobs:
+    transform:
+      stages:
+        - name: Transform Data in MS SQL Server
+          hook: MssqlProcHook
+          with:
+            exec: ${{ params.sp_name }}
+            params:
+              run_mode: T
+              run_date: ${{ params.run_date }}
+              source: ${{ params.source_name }}
+              target: ${{ params.target_name }}
 ```
 
-### ETL
+### Extract & Transform & Load
 
 ```yaml
+pipe_etl_postgres:
+  version: 1
+  type: ddeutil.workflow.pipe.Pipeline
+  params:
+    run_date: utils.receive.datetime
+    sp_name: utils.receive.string
+    source_name: utils.receive.string
+    target_name: utils.receive.string
+  jobs:
+    etl:
+      run-on: IR-Name
+      stages:
+        - name: Extract to Polars
+          uses: PolarsDb
+          id: extract
+          with:
+            conn: conn_postgres_url
+            query: |
+              select ...
+        - name: Transform
+          env:
+            df: stages.extract.output.df
+          run: |
+            import polars as pl
 
-```
-
-### ELT
-
-```yaml
-
+            df = (
+              df.withColumn('')
+                .withC
+                .withC
+                .drop(...)
+            )
+        - name: Load
+          users: PolarParq
+          with:
+            conn: ...
 ```
 
 ## License

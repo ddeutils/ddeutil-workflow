@@ -138,8 +138,8 @@ class CronPart:
 
     def __repr__(self):
         return (
-            f"<{self.__class__.__name__}"
-            f"(unit={self.unit}, values={self.to_str()!r})>"
+            f"{self.__class__.__name__}"
+            f"(unit={self.unit}, values={self.to_str()!r})"
         )
 
     def __lt__(self, other) -> bool:
@@ -272,6 +272,9 @@ class CronPart:
         """Return an integer is a value out of range was found, otherwise None.
 
         :param values: A list of int value
+        :type values: list[int]
+
+        :rtype: list[int]
         """
         if values:
             if (first := values[0]) < self.unit["min"]:
@@ -352,7 +355,7 @@ class CronPart:
 
         :rtype: list[Union[int, list[int]]]
         """
-        multi_dim_values = []
+        multi_dim_values: list[Union[int, list[int]]] = []
         start_number: Optional[int] = None
         for idx, value in enumerate(self.values):
             try:
@@ -360,10 +363,10 @@ class CronPart:
             except IndexError:
                 next_value: int = -1
             if value != (next_value - 1):
-                # next_value is not the subsequent number
+                # NOTE: ``next_value`` is not the subsequent number
                 if start_number is None:
                     # NOTE:
-                    #   The last number of the list "self.values" is not in a
+                    #   The last number of the list ``self.values`` is not in a
                     #   range.
                     multi_dim_values.append(value)
                 else:
@@ -374,7 +377,7 @@ class CronPart:
         return multi_dim_values
 
     def to_str(self) -> str:
-        """Returns the range as a string."""
+        """Returns the cron range as a string value."""
         _hash: str = "H" if self.options.get("output_hashes") else "*"
 
         if self.is_full:
