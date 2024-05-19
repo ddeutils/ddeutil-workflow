@@ -2,6 +2,8 @@ from datetime import datetime
 
 import ddeutil.workflow.__schedule as schedule
 
+from .utils import tz2str
+
 
 def test_scdl_cronjob():
     cr1 = schedule.CronJob("*/5 * * * *")
@@ -54,17 +56,18 @@ def test_scdl_next_previous():
         start_date=datetime(2024, 1, 1, 12),
         _tz="Asia/Bangkok",
     )
-    assert str(sch.next) == "2024-01-23 00:00:00"
-    assert str(sch.next) == "2024-01-23 00:30:00"
-    assert str(sch.next) == "2024-01-23 12:00:00"
-    assert str(sch.next) == "2024-01-23 12:30:00"
+
+    assert str(sch.next) == tz2str("2024-01-23 00:00:00")
+    assert str(sch.next) == tz2str("2024-01-23 00:30:00")
+    assert str(sch.next) == tz2str("2024-01-23 12:00:00")
+    assert str(sch.next) == tz2str("2024-01-23 12:30:00")
 
     sch.reset()
 
-    assert str(sch.prev) == "2023-10-23 12:30:00"
-    assert str(sch.prev) == "2023-10-23 12:00:00"
-    assert str(sch.prev) == "2023-10-23 00:30:00"
-    assert str(sch.prev) == "2023-10-23 00:00:00"
-    assert str(sch.prev) == "2023-07-23 12:30:00"
-    assert str(sch.prev) == "2023-07-23 12:00:00"
-    assert str(sch.prev) == "2023-07-23 00:30:00"
+    assert str(sch.prev) == tz2str("2023-10-23 12:30:00")
+    assert str(sch.prev) == tz2str("2023-10-23 12:00:00")
+    assert str(sch.prev) == tz2str("2023-10-23 00:30:00")
+    assert str(sch.prev) == tz2str("2023-10-23 00:00:00")
+    assert str(sch.prev) == tz2str("2023-07-23 12:30:00")
+    assert str(sch.prev) == tz2str("2023-07-23 12:00:00")
+    assert str(sch.prev) == tz2str("2023-07-23 00:30:00")

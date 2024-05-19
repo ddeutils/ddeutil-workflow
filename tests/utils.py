@@ -1,5 +1,7 @@
+from datetime import datetime
 from pathlib import Path
 from textwrap import dedent
+from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 
@@ -18,3 +20,11 @@ def dotenv_setting():
         ).strip()
         de.write_text(env_str)
     load_dotenv("../.env")
+
+
+def tz2str(value):
+    return (
+        datetime.fromisoformat(value)
+        .astimezone(ZoneInfo("Asia/Bangkok"))
+        .strftime("%Y-%m-%d %H:%M:%S")
+    )
