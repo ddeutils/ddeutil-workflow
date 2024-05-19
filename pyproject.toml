@@ -27,7 +27,6 @@ classifiers = [
 requires-python = ">=3.9.13"
 dependencies = [
     "fmtutil",
-    "ddeutil",
     "ddeutil-io",
     "ddeutil-model",
     "python-dotenv",
@@ -35,17 +34,17 @@ dependencies = [
 dynamic = ["version"]
 
 [project.urls]
-Homepage = "https://github.com/korawica/ddeutil-workflow/"
-"Source Code" = "https://github.com/korawica/ddeutil-workflow/"
+Homepage = "https://github.com/ddeutils/ddeutil-workflow/"
+"Source Code" = "https://github.com/ddeutils/ddeutil-workflow/"
 
 [tool.setuptools.dynamic]
-version = {attr = "ddeutil.pipe.__about__.__version__"}
+version = {attr = "ddeutil.workflow.__about__.__version__"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.shelf.version]
-version = "./src/ddeutil/pip/__about__.py"
+version = "./src/ddeutil/workflow/__about__.py"
 changelog = "CHANGELOG.md"
 
 [tool.coverage.run]
@@ -91,11 +90,11 @@ exclude = """
 [tool.ruff]
 line-length = 80
 exclude = [
+    "__pypackages__",
     ".git",
     ".mypy_cache",
     ".ruff_cache",
     ".venv",
-    "__pypackages__",
     "build",
     "dist",
     "venv",
