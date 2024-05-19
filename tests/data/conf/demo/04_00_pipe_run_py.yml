@@ -1,6 +1,6 @@
 run_python_local:
   version: 1
-  type: ddeutil.workflow.pipe.Pipeline
+  type: ddeutil.workflow.pipeline.Pipeline
   params:
     run_date: utils.receive.datetime
     name: utils.receive.string

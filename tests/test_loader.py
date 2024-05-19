@@ -6,7 +6,7 @@ from pathlib import Path
 import ddeutil.workflow.loader as ld
 import pytest
 from ddeutil.io.param import Params
-from ddeutil.workflow.pipe import Pipeline
+from ddeutil.workflow.pipeline import Pipeline
 from ddeutil.workflow.schedule import ScdlBkk
 
 
@@ -85,7 +85,7 @@ def test_simple_loader_workflow_run_py(params: Params):
     assert {
         "run_date": datetime(2024, 1, 1, 0),
         "name": "Parameter",
-    } == load.params(
+    } == load.validate_params(
         param={
             "run_date": "2024-01-01",
             "name": "Parameter",
@@ -101,7 +101,7 @@ def test_simple_loader_schedule(params: Params):
     )
     assert ScdlBkk == load.type
 
-    scd: ScdlBkk = load.type(cronjob=load.data["cronjob"])
-    cronjob_iter = scd.generate("2024-01-01 00:00:00")
+    scdl: ScdlBkk = load.type(cronjob=load.data["cronjob"])
+    cronjob_iter = scdl.generate("2024-01-01 00:00:00")
     assert "2024-01-01 00:00:00" == f"{cronjob_iter.next:%Y-%m-%d %H:%M:%S}"
     assert "2024-01-01 00:05:00" == f"{cronjob_iter.next:%Y-%m-%d %H:%M:%S}"

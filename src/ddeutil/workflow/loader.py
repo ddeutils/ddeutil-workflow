@@ -9,7 +9,7 @@ import copy
 import logging
 import urllib.parse
 from functools import cached_property
-from typing import Any
+from typing import Any, Callable
 
 from ddeutil.core import (
     clear_cache,
@@ -192,6 +192,8 @@ class SimLoad:
     config should to do next.
     """
 
+    import_prefix: str = "ddeutil.workflow."
+
     def __init__(self, name: str, params: Params, externals: DictData):
         self.data: DictData = {}
         for file in PathSearch(params.engine.paths.conf).files:
@@ -221,19 +223,20 @@ class SimLoad:
         except ModuleNotFoundError:
             return import_string(f"{_typ}")
 
-    def params(self, param: dict[str, Any]) -> dict[str, Any]:
-        """Return parameter that want to catch before workflow running."""
+    def params(self) -> dict[str, Callable[[Any], Any]]:
         if not (p := self.data.get("params", {})):
             return p
 
         try:
-            return {
-                i: import_string(f"ddeutil.workflow.{p[i]}")(param[i])
-                for i in p
-            }
+            return {i: import_string(f"{self.import_prefix}{p[i]}") for i in p}
         except ModuleNotFoundError as err:
             logging.error(err)
             raise err
+
+    def validate_params(self, param: dict[str, Any]) -> dict[str, Any]:
+        """Return parameter that want to catch before workflow running."""
+        try:
+            return {i: caller(param[i]) for i, caller in self.params().items()}
         except KeyError as err:
             logging.error(f"Parameter: {err} does not exists from passing")
             raise err

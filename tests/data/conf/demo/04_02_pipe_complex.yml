@@ -1,5 +1,5 @@
 pipe_sql_ingest:
-  type: pipe.Pipeline
+  type: pipeline.Pipeline
   version: '1'
   desc: "Pipeline that load data from RDBMS"
   params:

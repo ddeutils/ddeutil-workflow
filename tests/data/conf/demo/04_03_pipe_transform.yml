@@ -1,6 +1,6 @@
 pipe_seller_etl:
   version: '1'
-  type: pipe.Pipeline
+  type: pipeline.Pipeline
   desc: "Pipeline that load data and save to FileSystem"
   schedule: "* * * 1 5"
   params:

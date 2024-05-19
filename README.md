@@ -17,8 +17,14 @@
 This **Utility Workflow** objects was created for easy to make a simple metadata
 driven pipeline that able to **ETL, T, EL, or ELT** by `.yaml` file.
 
-I think we should not create the multiple pipeline per use-case if we able to write
-some engines that just change input parameters per use-case instead.
+I think we should not create the multiple pipeline per use-case if we able to
+write some dynamic pipeline that just change the input parameters per use-case
+instead. This way we can handle a lot of pipelines in our orgs with metadata only.
+It called **Metadata Driven**.
+
+Next, we should get some monitoring tools for manage logging that return from
+pipeline running. Because it not show us what is a use-case that running data
+pipeline.
 
 > [!NOTE]
 > I inspire the dynamic statement from GitHub action `.yml` files and all of config
@@ -32,31 +38,38 @@ pip install ddeutil-workflow
 
 ## Getting Started
 
-The first step, you should start create the connections for in and out of you data
-that want to transfer.
+The first step, you should start create the connections and datasets for in and
+out of you data that want to use in pipeline of workflow.
 
 ### Connection
 
 The connection for worker able to do any thing.
 
 ```yaml
-conn_
+conn_postgres_data:
+  type: conn.Postgres
+  url: 'postgres+pysyncopg//...'
 ```
 
 ### Dataset
 
-The thing that worker should to focus on that connection.
+The dataset is define any objects on the connection.
 
 ```yaml
-ds_
+ds_postgres_customer_tbl:
+  type: dataset.PostgresTbl
+  conn: 'conn_postgres_data'
+  features:
+    id: serial primary key
+    name: varchar( 100 ) not null
 ```
 
 ### Schedule
 
 ```yaml
 schd_for_node:
-    type: 'scdl.Scdl'
-    cron: "*/5 * * * *"
+  type: schedule.Scdl
+  cron: "*/5 * * * *"
 ```
 
 ```python
@@ -75,7 +88,9 @@ assert '2022-01-01 00:25:00' f"{cron_iterate.next:%Y-%m-%d %H:%M:%S}"
 
 ## Examples
 
-### Workflow
+This is examples that use workflow file for running common use-case.
+
+### Running Python Script
 
 The state of doing lists that worker should to do. It be collection of the stage.
 
@@ -111,10 +126,34 @@ run_python_local:
 ```
 
 ```python
-from ddeutil.workflow.pipe import Pipeline
+from ddeutil.workflow.pipeline import Pipeline
 
 pipe = Pipeline.from_loader(name='run_python_local', ...)
 pipe.execute(params={"run_date": "2023-01-01", "name": "foo"})
+```
+
+### EL
+
+```yaml
+
+```
+
+### E
+
+```yaml
+
+```
+
+### ETL
+
+```yaml
+
+```
+
+### ELT
+
+```yaml
+
 ```
 
 ## License
