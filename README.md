@@ -1,8 +1,8 @@
 # Data Utility: _Workflow_
 
-[![test](https://github.com/korawica/ddeutil-workflow/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/korawica/ddeutil-workflow/actions/workflows/tests.yml)
+[![test](https://github.com/ddeutils/ddeutil-workflow/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/ddeutils/ddeutil-workflow/actions/workflows/tests.yml)
 [![python support version](https://img.shields.io/pypi/pyversions/ddeutil-workflow)](https://pypi.org/project/ddeutil-workflow/)
-[![size](https://img.shields.io/github/languages/code-size/korawica/ddeutil-workflow)](https://github.com/korawica/ddeutil-workflow)
+[![size](https://img.shields.io/github/languages/code-size/ddeutils/ddeutil-workflow)](https://github.com/ddeutils/ddeutil-workflow)
 
 **Table of Contents**:
 
@@ -35,6 +35,9 @@ pipeline.
 ```shell
 pip install ddeutil-workflow
 ```
+
+This project should include `ddeutil-io`, `ddeutil-model` extension namespace
+packages.
 
 ## Getting Started
 
