@@ -6,6 +6,7 @@
 #   * relative path:
 #     * fs:///relative/foo
 #     * file:///../tmp/path/foo
+#
 #   * absolute path:
 #     * fs:////absolute/path/to/foo
 #
@@ -15,16 +16,21 @@ conn_local_file:
 
 conn_local_file_url:
   type: conn.LocalFl
-  # Absolute path.
-  url: "fs:///C:/usr/tests/examples/dummy"
+  # Absolute Window path: file:///C:/usr/absolute/path/sub-path/
+  url: "fs:///${ROOT_PATH}/tests/data/examples"
+
+conn_local_file_url_ubuntu:
+  type: conn.LocalFl
+  # Absolute Ubuntu path.
+  url: "fs:////absolute/path/to/foo"
 
 conn_local_file_url_relative:
   type: conn.LocalFl
-  url: "fs:////data/examples/"
+  url: "fs:///data/examples/"
 
-conn_local_file_url_datetime:
+conn_local_file_url_ubuntu_relative:
   type: conn.LocalFl
-  url: "fs:///C:/usr/tests/examples/dummy/01_testing_{timestamp:%Y%m%d}.json"
+  url: "fs:///relative/path/to/foo"
 
 # SFTP & FTP Connection
 # ---
@@ -34,13 +40,14 @@ conn_sftp:
   port: 22
   user: ssh_user
   pwd: P@ssW0rd
-  endpoint: "~/user/data/dwh"
+  endpoint: "user/data/dwh"
   extras:
     ssh_private_key: ./conf/.ssh/key_ssh_gen.pem
 
 conn_sftp_url:
   type: conn.SFTP
   url: "sftp://bastion:P@ssW0rd@127.0.0.1:22/home/bastion/data"
+
 
 # SQLite Connection
 # ---
@@ -57,7 +64,12 @@ conn_sftp_url:
 conn_sqlite_url:
   type: conn.SQLite
   # Relative path.
-  url: "sqlite:///demo/sqlite_demo.db"
+  url: "sqlite:///${ROOT_PATH}/tests/data/examples1/demo_sqlite.db"
+
+conn_sqlite_url_failed:
+  type: conn.SQLite
+  # Relative path.
+  url: "sqlite:///${ROOT_PATH}/tests/data/examples1/demo_sqlite.db"
 
 # AWS S3 Connection
 # ---
@@ -74,6 +86,7 @@ conn_azure_blob_de_test:
   endpoint: "abfs://de-test"
   account_name: "@secrets{azure_de_test_account_name}"
   account_key: "@secrets{azure_de_test_account_key}"
+
 
 # Postgres Connection
 conn_aws_pg_sandbox:
@@ -104,6 +117,7 @@ conn_aws_pg_uat:
     ssh_user: "ec2-user"
     ssh_private_key: "./secrets/ec2-user.key"
     ssh_port: "22"
+
 
 # MS SQL Server Connection
 # ---

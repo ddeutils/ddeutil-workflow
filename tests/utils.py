@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from pathlib import Path
 from textwrap import dedent
@@ -5,11 +6,16 @@ from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 
+OUTSIDE_PATH: Path = Path(__file__).parent.parent
 
-def dotenv_setting():
-    if not (de := Path("../.env")).exists():
+
+def dotenv_setting() -> None:
+    env_path: Path = OUTSIDE_PATH / ".env"
+    if not env_path.exists():
+        logging.warning("Dot env file does not exists")
         env_str: str = dedent(
-            """
+            f"""
+            ROOT_PATH={Path('../')}
             SFTP_HOST='50.100.200.123'
             SFTP_USER='bastion'
             SFTP_PASSWORD='P@ssW0rd'
@@ -18,9 +24,17 @@ def dotenv_setting():
             AWS_ACCESS_SECRET_KEY='dummy_access_secret_key'
             """
         ).strip()
-        de.write_text(env_str)
-    load_dotenv("../.env")
+        env_path.write_text(env_str)
+    load_dotenv(env_path)
 
 
-def str2dt(value):
+def initial_sqlite() -> None:
+    import sqlite3
+
+    example_path: Path = OUTSIDE_PATH / "tests/data/examples"
+    if not (db := (example_path / "demo_sqlite.db")).exists():
+        sqlite3.connect(db, timeout=20, isolation_level=None)
+
+
+def str2dt(value: str) -> datetime:
     return datetime.fromisoformat(value).astimezone(ZoneInfo("Asia/Bangkok"))

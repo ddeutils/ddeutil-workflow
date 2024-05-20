@@ -5,12 +5,15 @@
 # ------------------------------------------------------------------------------
 from __future__ import annotations
 
+import logging
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated, Any, Optional
 
 from ddeutil.io import Params
 from ddeutil.model.conn import Conn as ConnModel
 from pydantic import BaseModel, ConfigDict, Field
+from pydantic.functional_validators import field_validator
 from pydantic.types import SecretStr
 from typing_extensions import Self
 
@@ -29,10 +32,11 @@ class BaseConn(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     # NOTE: This is fields
+    dialect: str = "conn"
     host: Optional[str] = None
     port: Optional[int] = None
     user: Optional[str] = None
-    pwd: Optional[str] = None
+    pwd: Optional[SecretStr] = None
     endpoint: str
     extras: Annotated[
         DictData,
@@ -58,11 +62,10 @@ class BaseConn(BaseModel):
             for k in loader.data.copy()
             if k not in cls.model_fields and k not in EXCLUDED_EXTRAS
         }
-        print(loader.data)
         if "url" in loader.data:
             url: ConnModel = ConnModel.from_url(loader.data.pop("url"))
-            print(url)
             return cls(
+                dialect=url.dialect,
                 host=url.host,
                 port=url.port,
                 user=url.user,
@@ -81,9 +84,22 @@ class BaseConn(BaseModel):
             }
         )
 
+    @field_validator("endpoint")
+    def __prepare_slash(cls, value: str) -> str:
+        if value.startswith("/"):
+            return value[1:]
+        return value
+
 
 class Conn(BaseConn):
     """Conn (Connection) Model"""
+
+    def ping(self) -> bool:
+        raise NotImplementedError("Ping does not implement")
+
+    def glob(self, pattern: str) -> Iterator[Any]:
+        """Return a list of object from the endpoint of this connection."""
+        raise NotImplementedError("Glob does not implement")
 
 
 class SSHCred(BaseModel):
@@ -91,6 +107,7 @@ class SSHCred(BaseModel):
     ssh_user: str
     ssh_password: Optional[SecretStr] = Field(default=None)
     ssh_private_key: Optional[str] = Field(default=None)
+    ssh_private_key_pwd: Optional[SecretStr] = Field(default=None)
     ssh_port: int = Field(default=22)
 
 
@@ -114,8 +131,51 @@ class GoogleCred(BaseModel):
 
 
 class FlConn(Conn):
+    """File System Connection"""
 
     def ping(self) -> bool:
-        p = Path(self.endpoint)
-        print(self.endpoint, "to", p.resolve())
-        return p.exists()
+        return Path(self.endpoint).exists()
+
+    def glob(self, pattern: str) -> Iterator[Path]:
+        yield from Path(self.endpoint).rglob(pattern=pattern)
+
+
+class DbConn(Conn):
+    """RDBMS System Connection"""
+
+    def ping(self) -> bool:
+        from sqlalchemy import create_engine
+        from sqlalchemy.engine import URL, Engine
+        from sqlalchemy.exc import OperationalError
+
+        engine: Engine = create_engine(
+            url=URL.create(
+                self.dialect,
+                username=self.user,
+                password=self.pwd.get_secret_value() if self.pwd else None,
+                host=self.host,
+                port=self.port,
+                database=self.endpoint,
+                query={},
+            ),
+            execution_options={},
+        )
+        try:
+            return engine.connect()
+        except OperationalError as err:
+            logging.warning(str(err))
+            return False
+
+
+class SqliteConn(DbConn):
+    @field_validator("dialect")
+    def __validate_dialect(cls, value):
+        if value.split("+")[0] not in ("sqlite",):
+            raise ValueError(
+                f"{cls.__name__} does not support dialect {value!r}"
+            )
+        return value
+
+
+class DocConn(Conn):
+    """No SQL System Connection"""

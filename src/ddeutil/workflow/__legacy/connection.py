@@ -153,30 +153,6 @@ class BaseFileStorage(BaseConnABC, abc.ABC):
             )
 
 
-class LocalFileStorage(BaseFileStorage):
-    protocol: tuple[str, ...] = (
-        "file",
-        "local",
-    )
-
-    def list_objects(
-        self,
-        pattern: Optional[str] = None,
-    ) -> Iterator[Path]:
-        """Return all objects that exists in this endpoint."""
-        _p: str = pattern or "*"
-        return Path(self.url.database).rglob(_p)
-
-    def exists(self, path: Union[str, Path]) -> bool:
-        return (Path(self.url.database) / path).exists()
-
-    def remove(self, *args, **kwargs) -> NoReturn: ...
-
-    def upload(self, *args, **kwargs) -> NoReturn: ...
-
-    def download(self, *args, **kwargs) -> Any: ...
-
-
 class SFTPStorage(BaseFileStorage):
     """SFTP Storage object.
 

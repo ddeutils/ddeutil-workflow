@@ -1,10 +1,12 @@
-from typing import (
-    Any,
-    Optional,
-)
+from typing import Any, Optional
 
-import boto3
-import botocore.exceptions
+try:
+    import boto3
+    import botocore.exceptions
+except ImportError:
+    raise ImportError(
+        "Please install boto3 package if want to use boto wrapped object."
+    ) from None
 
 
 class WrapBoto3Client:
@@ -33,7 +35,7 @@ class WrapBoto3Client:
     def __init__(
         self,
         access_key_id: str,
-        secret_access_key: str,
+        access_secret_key: str,
         region_name: Optional[str] = None,
         *,
         role_session_name: Optional[str] = None,
@@ -41,7 +43,7 @@ class WrapBoto3Client:
         mfa_serial: Optional[str] = None,
     ):
         self.access_key_id = access_key_id
-        self.secret_access_key = secret_access_key
+        self.access_secret_key = access_secret_key
         self.region_name: str = region_name or "ap-southeast-1"
 
         # Optional for session.
@@ -56,7 +58,7 @@ class WrapBoto3Client:
         if self.role_arn is None:
             return {
                 "AccessKeyId": self.access_key_id,
-                "SecretAccessKey": self.secret_access_key,
+                "SecretAccessKey": self.access_secret_key,
             }
         # A low-level client representing AWS Security Token Service (STS)
         # sess = boto3.session.Session(
@@ -68,7 +70,7 @@ class WrapBoto3Client:
             service_name="sts",
             region_name=self.region_name,
             aws_access_key_id=self.access_key_id,
-            aws_secret_access_key=self.secret_access_key,
+            aws_secret_access_key=self.access_secret_key,
         )
         mfa_optional: dict[str, str] = {}
         if self.mfa_serial:
@@ -171,18 +173,6 @@ class WrapBoto3Client:
         #         'StartingToken': marker
         #     }
         # )
-
-    # s3 = boto3.resource(
-    #     service_name='s3',
-    #     region_name='us-east-2',
-    #     aws_access_key_id='mykey',
-    #     aws_secret_access_key='mysecretkey'
-    # )
-    # obj = s3.Bucket('cheez-willikers').Object('foo.csv').get()
-    # foo = pd.read_csv(obj['Body'], index_col=0)
-    # s3.Bucket('cheez-willikers').download_file(Key='foo.csv',
-    #                                            Filename='foo2.csv')
-    # pd.read_csv('foo2.csv', index_col=0)
 
     def exists(self, bucket: str, prefix: str) -> bool:
         try:

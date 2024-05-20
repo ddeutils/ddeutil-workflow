@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from ddeutil.io.param import Params
 
-from .utils import dotenv_setting
+from .utils import dotenv_setting, initial_sqlite
 
 collect_ignore: list[str] = [
     "vendors",
@@ -14,6 +14,7 @@ collect_ignore: list[str] = [
 ]
 
 dotenv_setting()
+initial_sqlite()
 
 
 @pytest.fixture(scope="session")

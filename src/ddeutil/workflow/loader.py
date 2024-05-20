@@ -33,8 +33,12 @@ from typing_extensions import Self
 from .__types import DictData, TupleStr
 from .exceptions import ConfigArgumentError
 
-YamlEnvQuote = YamlEnvFl
-YamlEnvQuote.prepare = staticmethod(lambda x: urllib.parse.quote_plus(str(x)))
+
+class YamlEnvQuote(YamlEnvFl):
+
+    @staticmethod
+    def prepare(x: str) -> str:
+        return urllib.parse.quote_plus(str(x))
 
 
 class BaseLoad:
@@ -198,7 +202,7 @@ class SimLoad:
         self.data: DictData = {}
         for file in PathSearch(params.engine.paths.conf).files:
             if any(file.suffix.endswith(s) for s in ("yml", "yaml")) and (
-                data := YamlEnvQuote(file).read().get(name, {})
+                data := YamlEnvFl(file).read().get(name, {})
             ):
                 self.data = data
         if not self.data:
