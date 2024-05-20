@@ -30,8 +30,9 @@ pipeline running. Because it not show us what is a use-case that running data
 pipeline.
 
 > [!NOTE]
-> I inspire the dynamic statement from GitHub action `.yml` files and all of config
-> file from several data orchestration framework.
+> _Disclaimer_: I inspire the dynamic statement from the GitHub Action `.yml` files
+> and all of config file from several data orchestration framework tools from my
+> experience on Data Engineer.
 
 ## Installation
 
@@ -39,13 +40,13 @@ pipeline.
 pip install ddeutil-workflow
 ```
 
-This project should include `ddeutil-io`, `ddeutil-model` extension namespace
-packages.
+This project need `ddeutil-io`, `ddeutil-model` extension namespace packages.
 
 ## Getting Started
 
-The first step, you should start create the connections and datasets for in and
-out of you data that want to use in pipeline of workflow.
+The first step, you should start create the connections and datasets for In and
+Out of you data that want to use in pipeline of workflow. Some of this component
+is similar component of the **Airflow** because I like it concepts.
 
 ### Connection
 
@@ -108,7 +109,8 @@ assert '2022-01-01 00:25:00' f"{cron_iterate.next:%Y-%m-%d %H:%M:%S}"
 
 ## Examples
 
-This is examples that use workflow file for running common use-case.
+This is examples that use workflow file for running common Data Engineering
+use-case.
 
 ### Python
 

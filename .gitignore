@@ -138,3 +138,6 @@ cython_debug/
 
 # Examples data for testing
 demo_sqlite.db
+
+# Mount Volumn Docker
+/mnt

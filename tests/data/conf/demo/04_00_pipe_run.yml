@@ -1,14 +1,16 @@
 run_python:
   version: 1
   type: ddeutil.workflow.pipeline.Pipeline
+  on:
+    schedule: schedule-name
   params:
     name: utils.receive.string
   jobs:
     demo-run:
       stages:
         - name: Run Hello World
-          run: |
-            print(f'Hello {x}')
+          run: print(f'Hello {x}')
+
         - name: Run Sequence and use var from Above
           run: |
             print(f'Receive x from above with {x}')
@@ -21,9 +23,10 @@ run_python:
             var_inside: str = 'Inside'
             def echo() -> None:
               print(f"Echo {var_inside}"
+
         - name: Call that variable
-          run: |
-            echo()
+          run: echo()
+
         - name: Final of Next running job
     shell-run:
       run-on: subprocess

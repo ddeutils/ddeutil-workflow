@@ -9,27 +9,26 @@ ingest_postgres_to_adls:
   desc: Extract and download data from Postgres to Azure Data Lake
   params:
     run_date: ${{ ... }}
-    source: ${{ }}
-    target: ${{ }}
+    source: ${{ ... }}
+    target: ${{ ... }}
   jobs:
-    - extract_data:
-        run-on: Postgres
-        stages:
-          - name: Filter Data
-            with:
+    extract-load:
+      stages:
+        - name: Extract & Load
+          uses: tasks.copy.Polarspostgres-delta
+          with:
+            source:
+              conn: ${{ source.conn }}
               query: |
                 select *
                 from  {{ params.source.schema }}.{{ param.source.table }}
                 where update_date = '{{ param.run_date.fmt('%Y%m%d') }}'
-          - name: Schema Conversion
-            with:
-              schema: |
-                customer_id -> id
-                customer_name -> name
-                customer_register_date -> register_date
-                customer_revenue -> revenue
-          - name: Save to Azure Data Lake
-            with:
+            conversion:
+              customer_id -> id
+              customer_name -> name
+              customer_register_date -> register_date
+              customer_revenue -> revenue
+            sink:
               conn: ${{ target.conn }}
               endpoint: /persisted/${{ target.schema }}/${{ target.path }}
               format: parquet

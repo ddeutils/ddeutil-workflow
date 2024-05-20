@@ -5,25 +5,16 @@ pipe_sql_ingest:
   params:
     run_date: utils.receive.datetime
     connection: utils.selection.conn
-    table_name: utils.receive.string
-  pipes:
-    - extraction:
-        stages:
-          - name: Extract data from RDBMS
-            as: extract
-            uses: node.CopyActivity
-            with:
-              source:
-                dataset: ${{ params.connection }}
-                query: |
-                  select customer_id, name, age, update_date
-                  from ${{ params.table_name }}
-                  where update_date = ${{ params.run_date.fmt('%Y%m%d') }}
-              sink:
-                dataset: conn_deltalake_az_st
-                mode: overwrite
-    - transform:
-        wait: extract
-        stages:
-          - name: Aggregate data on Lake
-            as: transform
+    procedure: utils.receive.string
+  jobs:
+    transform:
+      stages:
+        - name: Transform Data on Target RDBMS
+          hook: hooks.MssqlHook
+          with:
+            conn: ${{ params.connection }}
+            exec: ${{ params.procedure }}
+            params:
+              source: ${{ params.source }}
+              target: ${{ params.target }}
+              run_date: ${{ params.run_date }}

@@ -1,6 +1,6 @@
 import os
 
-from ddeutil.workflow.__legacy.vendors.sftp import WrapSFTPClient
+from ddeutil.workflow.__legacy.vendors._sftp import WrapSFTPClient
 
 
 def test_sftp():
