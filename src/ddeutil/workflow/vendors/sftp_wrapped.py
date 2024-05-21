@@ -16,7 +16,7 @@ except ImportError:
     ) from None
 
 
-class WrapFTPClient:
+class WrapFTP:
     """Wrapped FTP Client.
 
         FTP (File Transfer Protocol) is the standard for transferring files
