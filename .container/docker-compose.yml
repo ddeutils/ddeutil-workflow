@@ -2,49 +2,50 @@ version: "3"
 services:
     sftp:
         container_name: sftp
-        # docs: https://hub.docker.com/r/atmoz/sftp/
+        # NOTE: read more docs, https://hub.docker.com/r/atmoz/sftp/
         image: atmoz/sftp:alpine
         volumes:
+            # Providing your own SSH host key
+            - ../mnt/home/ssh_host_rsa_key.pub:/etc/ssh/ssh_host_rsa_key.pub:ro
+            - ../mnt/home/ssh_host_ed25519_key.pub:/etc/ssh/ssh_host_ed25519_key.pub:ro
             - ../mnt/home/${DATA_STORE}:/home/${SFTP_USER}/${DATA_STORE}
-#            - ../mnt/home/ssh_host_rsa_key.pub:/home/${SFTP_USER}/.ssh/ssh_host_rsa_key.pub:ro
-#            - ../mnt/home/ssh_host_ed25519_key.pub:/home/${SFTP_USER}/.ssh/ssh_host_ed25519_key.pub:ro
-            - ../scripts/init.sh:/etc/sftp.d/init.sh:ro
+            # Execute custom scripts or applications
+            - ../scripts/sftp_init.sh:/etc/sftp.d/init.sh:ro
         ports:
             - "2222:22"
-        # restart: always
+        environment:
+            - SFTP_USERS=${SFTP_USER}:${SFTP_PASS}:1001::${DATA_STORE}
+        restart: always
         # NOTE: syntax: user:password[:e][:uid[:gid[:dir1[,dir2]...]]]
-        command: |
-            ${SFTP_USER}:${SFTP_PASS}:1001::${DATA_STORE}
-
-#    postgres:
-#        container_name: postgres
-#        image: postgres:13-alpine
-#        environment:
-#            - POSTGRES_USER=${POSTGRES_USER}
-#            - POSTGRES_PASS=${POSTGRES_PASS}
-#            - POSTGRES_DB=postgres
-#            # - POSTGRES_INITDB_ARGS
-#        ports:
-#            - "5432:5432"
-#        # Enable
-#        # 1) CREATE EXTENSION pg_stat_statements;
-#        # 2) ALTER SYSTEM SET shared_preload_libraries='pg_stat_statements';
-#        # 3) Restart Database
 #        command: |
-#            postgres
-#                -c shared_preload_libraries='pg_stat_statements'
-#                -c pg_stat_statements.track=all
-#                -c max_connections=200
-#
-#        # Use a persistent volume to store data. As mentioned above,
-#        # without a persistent volume, you’ll lose data if the
-#        # container restarts.
-#        volumes:
-#            - ./data/postgres-data:/var/lib/postgresql/data
-#            - ./scripts/postgres-extensions:/docker-entrypoint-initdb.d
-#            # - ./data/initial/db/init.sql:/docker-entrypoint-initdb.d/create_tables.sql
-#        healthcheck:
-#            test: [ "CMD-SHELL", "sh -c 'pg_isready -U postgres -d postgres'"]
-#            interval: 10s
-#            timeout: 5s
-#            retries: 5
+#            ${SFTP_USER}:${SFTP_PASS}:1001::${DATA_STORE}
+
+    postgres:
+        container_name: postgres
+        image: postgres:13-alpine
+        environment:
+            - POSTGRES_USER=${POSTGRES_USER}
+            - POSTGRES_PASS=${POSTGRES_PASS}
+            - POSTGRES_DB=${POSTGRES_DB}
+        ports:
+            - "5432:5432"
+        # Use a persistent volume to store data. As mentioned above,
+        # without a persistent volume, you’ll lose data if the
+        # container restarts.
+        volumes:
+            - ./mnt/postgres-data:/var/lib/postgresql/data
+            - ./scripts/pg-extensions:/docker-entrypoint-initdb.d
+        # Enable
+        # 1) CREATE EXTENSION pg_stat_statements;
+        # 2) ALTER SYSTEM SET shared_preload_libraries='pg_stat_statements';
+        # 3) Restart Database
+        command: |
+            postgres
+                -c shared_preload_libraries='pg_stat_statements'
+                -c pg_stat_statements.track=all
+                -c max_connections=200
+        healthcheck:
+            test: [ "CMD-SHELL", "sh -c 'pg_isready -U postgres -d postgres'"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
