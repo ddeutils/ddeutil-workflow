@@ -39,8 +39,7 @@ run_python:
         - name: Final of Next running job
 
     shell-run:
-      run-on: subprocess
       stages:
         - name: Echo hello world
-          run: |
+          shell: |
             echo 'Hello World'

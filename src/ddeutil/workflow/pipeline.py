@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import subprocess
+from subprocess import CompletedProcess
 from typing import Any, Optional, Union
 
 from ddeutil.io import Params
@@ -43,15 +44,22 @@ class ShellStage(EmptyStage):
         ``subprocess`` package.
         """
         try:
-            rs = subprocess.run(
-                self.shell.split("\n"), capture_output=True, text=True
+            rs: CompletedProcess = subprocess.run(
+                self.shell,
+                capture_output=True,
+                text=True,
+                shell=True,
             )
-            params |= {"outputs": rs.stdout}
+            __rs = {(self.id or self.name): rs.stdout}
         except Exception as err:
             raise ShellException(
                 f"{err.__class__.__name__}: {err}\nRunning Statement:\n"
                 f"{self.shell}"
             ) from None
+        if self.id:
+            if "stages" not in params:
+                params["stages"] = {}
+            params["stages"][self.id] = __rs
         return params
 
 
@@ -75,7 +83,11 @@ class PyStage(EmptyStage):
                 f"{err.__class__.__name__}: {err}\nRunning Statement:\n"
                 f"{self.run}"
             ) from None
-        return {k: _globals[k] for k in _globals if k in params}
+        if self.id:
+            if "stages" not in params:
+                params["stages"] = {}
+            params["stages"][self.id] = {}
+        return params | {k: _globals[k] for k in params if k in _globals}
 
 
 class TaskStage(EmptyStage):
@@ -111,6 +123,18 @@ class Job(BaseModel):
         raise ValueError(f"Stage ID {stage_id} does not exists")
 
 
+class Strategy(BaseModel):
+    matrix: list[str]
+    include: list[str]
+    exclude: list[str]
+
+
+class JobStrategy(Job):
+    """Strategy job"""
+
+    strategy: Strategy
+
+
 class Pipeline(BaseModel):
     """Pipeline Model"""
 
@@ -133,7 +157,20 @@ class Pipeline(BaseModel):
         )
 
     def execute(self, params: dict[str, Any] | None = None):
-        """Execute pipeline with passing dynamic parameters."""
+        """Execute pipeline with passing dynamic parameters.
+
+        See Also:
+
+            The result of execution process for each jobs and stages on this
+        pipeline will keeping in dict which able to catch out with all jobs and
+        stages by dot annotation.
+
+            For example, when I want to use the output from previous stage, I
+        can access it with syntax:
+
+            ... "<job-name>.stages.<stage-id>.outputs.<key>"
+
+        """
         params: dict[str, Any] = params or {}
         check_key = tuple(k for k in self.params if k not in params)
         if check_key:
@@ -144,6 +181,7 @@ class Pipeline(BaseModel):
         return params
 
     def job(self, name: str) -> Job:
+        """Return Job model that exists on this pipeline."""
         if name not in self.jobs:
             raise ValueError(f"Job {name} does not exists")
         return self.jobs[name]
