@@ -15,7 +15,7 @@ def dotenv_setting() -> None:
         logging.warning("Dot env file does not exists")
         env_str: str = dedent(
             f"""
-            ROOT_PATH={Path('../')}
+            ROOT_PATH={OUTSIDE_PATH.resolve()}
             SFTP_HOST='50.100.200.123'
             SFTP_USER='bastion'
             SFTP_PASSWORD='P@ssW0rd'

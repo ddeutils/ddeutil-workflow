@@ -37,7 +37,7 @@ def test_pipe_model():
     )
 
 
-def test_pipe_run_py(params_simple):
+def test_pipe_load_run_py(params_simple):
     pipeline = Pipeline.from_loader(
         name="run_python", params=params_simple, externals={}
     )

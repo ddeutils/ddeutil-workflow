@@ -5,7 +5,8 @@
 # ------------------------------------------------------------------------------
 from __future__ import annotations
 
-from typing import Any, Union
+import subprocess
+from typing import Any, Optional, Union
 
 from ddeutil.io import Params
 from pydantic import BaseModel, Field
@@ -16,12 +17,65 @@ from .exceptions import PipeArgumentError
 from .loader import SimLoad
 
 
+class PyException(Exception): ...
+
+
+class ShellException(Exception): ...
+
+
 class EmptyStage(BaseModel):
+    """Empty stage that is doing nothing and logging the name of stage only."""
+
+    id: Optional[str] = None
     name: str
+
+    def execute(self, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        return params
+
+
+class ShellStage(EmptyStage):
+    """Shell statement stage."""
+
+    shell: str
+
+    def execute(self, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Execute the Shell & Powershell statement with the Python build-in
+        ``subprocess`` package.
+        """
+        try:
+            rs = subprocess.run(
+                self.shell.split("\n"), capture_output=True, text=True
+            )
+            params |= {"outputs": rs.stdout}
+        except Exception as err:
+            raise ShellException(
+                f"{err.__class__.__name__}: {err}\nRunning Statement:\n"
+                f"{self.shell}"
+            ) from None
+        return params
 
 
 class PyStage(EmptyStage):
+    """Python statement stage."""
+
     run: str
+
+    def execute(self, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Execute the Python statement that pass all globals and input params
+        to globals argument on ``exec`` build-in function.
+
+        :param params: A parameter that want to pass before run any statement.
+        :type params: dict[str, Any]
+        """
+        _globals: dict[str, Any] = globals() | (params or {})
+        try:
+            exec(self.run, _globals)
+        except Exception as err:
+            raise PyException(
+                f"{err.__class__.__name__}: {err}\nRunning Statement:\n"
+                f"{self.run}"
+            ) from None
+        return {k: _globals[k] for k in _globals if k in params}
 
 
 class TaskStage(EmptyStage):
@@ -32,11 +86,29 @@ class HookStage(EmptyStage):
     hook: str
 
 
-Stage = Union[EmptyStage, PyStage, TaskStage, HookStage]
+# NOTE: Order of parsing stage data
+Stage = Union[
+    PyStage,
+    ShellStage,
+    TaskStage,
+    HookStage,
+    EmptyStage,
+]
 
 
 class Job(BaseModel):
     stages: list[Stage] = Field(default_factory=list)
+
+    def execute(self, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        for stage in self.stages:
+            params |= stage.execute(params=params)
+        return params
+
+    def stage(self, stage_id: str) -> Stage:
+        for stage in self.stages:
+            if stage_id == (stage.id or ""):
+                return stage
+        raise ValueError(f"Stage ID {stage_id} does not exists")
 
 
 class Pipeline(BaseModel):

@@ -15,7 +15,7 @@ ingest_postgres_to_adls:
     extract-load:
       stages:
         - name: Extract & Load
-          uses: tasks.copy.Polarspostgres-delta
+          uses: tasks.copy.Polars:postgres-delta
           with:
             source:
               conn: ${{ source.conn }}

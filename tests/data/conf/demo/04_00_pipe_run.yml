@@ -1,8 +1,8 @@
+# Run Python script
 run_python:
   version: 1
   type: ddeutil.workflow.pipeline.Pipeline
-  on:
-    schedule: schedule-name
+  schedule: schedule-name
   params:
     name: utils.receive.string
   jobs:
@@ -12,10 +12,19 @@ run_python:
           run: print(f'Hello {x}')
 
         - name: Run Sequence and use var from Above
+          vars:
+            x: ${{ params.name }}
           run: |
             print(f'Receive x from above with {x}')
             # Change x value
             x: int = 1
+
+    raise-run:
+      stages:
+        - name: Raise Error Inside
+          id: raise-error
+          run: raise ValueError('Testing raise error inside PyStage!!!')
+
     next-run:
       stages:
         - name: Set variable and function
@@ -28,6 +37,7 @@ run_python:
           run: echo()
 
         - name: Final of Next running job
+
     shell-run:
       run-on: subprocess
       stages:
