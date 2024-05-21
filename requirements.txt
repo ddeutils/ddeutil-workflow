@@ -1,1 +1,5 @@
 sqlalchemy==2.0.30
+
+# SFTP warpper
+paramiko==3.4.0
+sshtunnel==0.4.0

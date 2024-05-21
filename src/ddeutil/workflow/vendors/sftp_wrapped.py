@@ -1,17 +1,18 @@
 import contextlib
 from collections import deque
-from collections.abc import Iterator
+from collections.abc import Generator, Iterator
 from ftplib import FTP
 from stat import S_ISDIR, S_ISREG
 from typing import Optional
 
 try:
     import paramiko
-    from paramiko.sftp_attr import SFTPAttributes
+    from paramiko import SFTPAttributes, SFTPClient
     from sshtunnel import BaseSSHTunnelForwarderError, SSHTunnelForwarder
 except ImportError:
     raise ImportError(
-        "Please install paramiko and sshtunnel packages before using"
+        "Please install paramiko and sshtunnel packages before using,\n\t\t"
+        "$ pip install paramiko sshtunnel"
     ) from None
 
 
@@ -46,7 +47,7 @@ class WrapFTPClient:
         )
 
 
-class WrapSFTPClient:
+class WrapSFTP:
     """Wrapped SFTP Client.
 
         SFTP (Secure File Transfer Protocol) it is a standard that helps
@@ -56,6 +57,11 @@ class WrapSFTPClient:
 
         It cannot be accessed by third parties or if the information is
     obtained, it is encrypted and cannot be read.
+
+    See-Also:
+
+        This object will wrap the [Paramiko](https://www.paramiko.org/) package
+    with my connection interface.
     """
 
     def __init__(
@@ -67,7 +73,7 @@ class WrapSFTPClient:
         pwd: Optional[str] = None,
         private_key: Optional[str] = None,
         private_key_password: Optional[str] = None,
-    ):
+    ) -> None:
         self.host: str = host
         self.user: str = user or ""
         self.port: int = port or 22
@@ -80,12 +86,20 @@ class WrapSFTPClient:
         self.private_key_pwd = private_key_password
 
     def get(self, remote_path, local_path):
-        with self.ssh_tunnel() as sftp:
+        with self.transport_client() as sftp:
             sftp.get(remote_path, local_path)
 
     def put(self, remote_path, local_path):
-        with self.ssh_tunnel() as sftp:
+        with self.transport_client() as sftp:
             sftp.put(remote_path, local_path)
+
+    def rm(self, remote_path: str):
+        with self.transport_client() as sftp:
+            sftp.remove(remote_path)
+
+    def mkdir(self, remote_path: str):
+        with self.transport_client() as sftp:
+            sftp.mkdir(remote_path)
 
     @contextlib.contextmanager
     def ssh_tunnel(self) -> Iterator:
@@ -96,15 +110,21 @@ class WrapSFTPClient:
                 ssh_password=self.pwd,
                 ssh_pkey=self.private_key,
                 ssh_private_key_password=self.private_key_pwd,
-                local_bind_address=("0.0.0.0", 5000),
-                # Use a suitable remote_bind_address
-                remote_bind_address=("127.0.0.1", 22),
+                local_bind_address=("0.0.0.0", 22),
+                # Use a suitable remote_bind_address that able to be DB host on
+                # that SSH Server.
+                remote_bind_address=("127.0.0.1", self.port),
             ) as tunnel:
                 tunnel.check_tunnels()
                 client = paramiko.SSHClient()
                 if self.private_key:
                     client.load_system_host_keys()
-                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                # NOTE: Add SSH key to known_hosts file.
+                client.set_missing_host_key_policy(
+                    paramiko.MissingHostKeyPolicy()
+                )
+
+                # NOTE: Start connect to SSH Server
                 client.connect(
                     "127.0.0.1",
                     port=tunnel.local_bind_port,
@@ -114,6 +134,7 @@ class WrapSFTPClient:
                             "password": self.pwd,
                             "allow_agent": False,
                             "look_for_keys": False,
+                            "banner_timeout": 20,
                         }
                         if self.pwd
                         else {}
@@ -127,29 +148,57 @@ class WrapSFTPClient:
                 "This config data does not connect to the Server"
             ) from err
 
-    def glob(self, pattern: str) -> Iterator[str]:
-        with self.ssh_tunnel() as sftp:
-            # NOTE: List files matching the pattern on the SFTP server
-            f: SFTPAttributes
-            for f in sftp.listdir_attr(pattern):
-                yield pattern + f.filename
+    @contextlib.contextmanager
+    def transport_client(self) -> Generator[SFTPClient, None, None]:
+        with paramiko.Transport(sock=(self.host, self.port)) as transport:
+            transport.connect(
+                hostkey=None,
+                username=self.user,
+                password=self.pwd,
+            )
+            with paramiko.SFTPClient.from_transport(transport) as sftp:
+                yield sftp
 
-    def walk(
-        self,
-        path: str,
-    ):
-        dirs_to_explore = deque([path])
-        list_of_files = deque([])
-        with self.ssh_tunnel() as sftp:
-            while len(dirs_to_explore) > 0:
-                current_dir = dirs_to_explore.popleft()
-                for entry in sftp.listdir_attr(current_dir):
-                    current_file_or_dir = current_dir + "/" + entry.filename
-                    if S_ISDIR(entry.st_mode):
-                        dirs_to_explore.append(current_file_or_dir)
-                    elif S_ISREG(entry.st_mode):
-                        list_of_files.append(current_file_or_dir)
-        return list(list_of_files)
+    @contextlib.contextmanager
+    def simple_client(self) -> Generator[SFTPClient, None, None]:
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.MissingHostKeyPolicy())
+        client.connect(
+            hostname=self.host,
+            port=self.port,
+            username=self.user,
+            password=self.pwd,
+        )
+        with client.open_sftp() as sftp:
+            yield sftp
+        client.close()
+
+    def glob(self, pattern: str) -> Iterator[str]:
+        with self.transport_client() as sftp:
+            try:
+                # NOTE: List files matching the pattern on the SFTP server
+                f: SFTPAttributes
+                for f in sftp.listdir_attr(pattern):
+                    yield pattern + f.filename
+            except FileNotFoundError:
+                raise FileNotFoundError(
+                    f"Pattern {pattern!r} does not found on SFTP server"
+                ) from None
+
+    def walk(self, path: str) -> list[str]:
+        dirs: deque = deque([path])
+        files: deque = deque([])
+        with self.transport_client() as sftp:
+            while len(dirs) > 0:
+                d: str = dirs.popleft()
+                f: SFTPAttributes
+                for f in sftp.listdir_attr(d):
+                    current_file_or_dir: str = d + "/" + f.filename
+                    if S_ISDIR(f.st_mode):
+                        dirs.append(current_file_or_dir)
+                    elif S_ISREG(f.st_mode):
+                        files.append(current_file_or_dir)
+        return list(files)
 
     @staticmethod
     def isdir(path: SFTPAttributes):

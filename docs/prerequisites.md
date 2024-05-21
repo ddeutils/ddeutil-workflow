@@ -25,7 +25,7 @@ docker compose -f .\.container\docker-compose.yml --env-file .\.env down
 > [!WARNING]
 > This **SFTP** image does not support to login with ssh yet. I will solve this
 > problem soon.
-> `ssh -i .\mnt\home\ssh_host_ed25519_key -p 2222 ${SFTP_USER}@127.0.0.1`
+> `ssh -i .\mnt\home\ssh_host_ed25519_key -p 2222 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${SFTP_USER}@127.0.0.1`
 
 ```shell
 sftp -i .\mnt\home\ssh_host_rsa_key -P 2222 bastion@localhost

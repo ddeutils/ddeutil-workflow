@@ -1,16 +1,25 @@
 import os
 
-from ddeutil.workflow.__legacy.vendors._sftp import WrapSFTPClient
+from ddeutil.workflow.vendors.sftp_wrapped import WrapSFTP
 
 
 def test_sftp():
-    sftp_storage = WrapSFTPClient(
-        host=os.environ["SFTP_HOST"],
-        port=22,
-        user=os.environ["SFTP_USER"],
-        pwd=os.environ["SFTP_PASSWORD"],
+    sftp = WrapSFTP(
+        host=os.getenv("SFTP_HOST"),
+        port=int(os.getenv("SFTP_PORT", "22")),
+        user=os.getenv("SFTP_USER"),
+        pwd=os.getenv("SFTP_PASS"),
     )
-    # for f in sftp_storage.glob('/home/deadmin'):
-    #     print(f.st_mtime, f.filename)
-    for _ in sftp_storage.walk("home/deadmin"):
-        print(_)
+    for f in sftp.glob("/"):
+        print(f)
+
+
+def test_client():
+    sftp = WrapSFTP(
+        host=os.getenv("SFTP_HOST"),
+        port=int(os.getenv("SFTP_PORT", "22")),
+        user=os.getenv("SFTP_USER"),
+        pwd=os.getenv("SFTP_PASS"),
+    )
+    with sftp.simple_client() as c:
+        print(c)
