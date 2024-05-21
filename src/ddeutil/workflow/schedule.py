@@ -10,11 +10,11 @@ from typing import Annotated
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from ddeutil.io import Params
+from ddeutil.workflow.vendors.__schedule import CronJob, CronRunner
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.functional_validators import field_validator
 from typing_extensions import Self
 
-from .__schedule import CronJob, CronRunner
 from .__types import DictData
 from .exceptions import ScdlArgumentError
 from .loader import SimLoad

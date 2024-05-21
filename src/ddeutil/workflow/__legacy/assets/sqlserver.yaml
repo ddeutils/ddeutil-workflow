@@ -1,6 +1,0 @@
-base:
-    create:
-        user:
-            az: "
-                create user [{username}] from external provider with default_schema = [{schema}]
-            "

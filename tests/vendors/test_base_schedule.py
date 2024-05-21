@@ -1,9 +1,9 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-import ddeutil.workflow.__schedule as schedule
+import workflow.vendors.__schedule as schedule
 
-from .utils import str2dt
+from tests.utils import str2dt
 
 
 def test_scdl_cronjob():
