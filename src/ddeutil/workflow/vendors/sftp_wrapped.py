@@ -185,20 +185,20 @@ class WrapSFTP:
                     f"Pattern {pattern!r} does not found on SFTP server"
                 ) from None
 
-    def walk(self, path: str) -> list[str]:
-        dirs: deque = deque([path])
-        files: deque = deque([])
+    def walk(self, pattern: str) -> Iterator[str]:
+        dirs: deque = deque([pattern])
         with self.transport_client() as sftp:
             while len(dirs) > 0:
                 d: str = dirs.popleft()
                 f: SFTPAttributes
                 for f in sftp.listdir_attr(d):
-                    current_file_or_dir: str = d + "/" + f.filename
+                    rs: str = (
+                        (d + f.filename) if d == "/" else (d + "/" + f.filename)
+                    )
                     if S_ISDIR(f.st_mode):
-                        dirs.append(current_file_or_dir)
+                        dirs.append(rs)
                     elif S_ISREG(f.st_mode):
-                        files.append(current_file_or_dir)
-        return list(files)
+                        yield rs
 
     @staticmethod
     def isdir(path: SFTPAttributes):

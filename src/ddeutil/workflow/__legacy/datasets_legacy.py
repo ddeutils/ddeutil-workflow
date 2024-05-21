@@ -12,10 +12,6 @@ from typing import (
 
 import pandas as pd
 import polars as pl
-from ddeutil.core.base.merge import merge_dict
-from ddeutil.io.__base.pathutils import join_path
-from ddeutil.node.base.converter import Schemas
-from ddeutil.node.exceptions import CatalogArgumentError
 
 
 class BaseCatalog:
@@ -35,13 +31,13 @@ class BaseCatalog:
     def from_data(cls, data: dict):
         """Return Base Catalog object from parsing by configuration data."""
         if not (_endpoint := data.pop("endpoint", None)):
-            raise CatalogArgumentError(
+            raise Exception(
                 "endpoint",
                 f"does not set in data for parsing to {cls.__name__}.",
             )
         elif not (_conn := data.pop("connection", None)):
             if cls.conn_ptt not in _endpoint:
-                raise CatalogArgumentError(
+                raise Exception(
                     "connection",
                     f"does not set in data for parsing tot {cls.__name__}.",
                 )
@@ -104,7 +100,7 @@ class BaseCatalog:
     def option(self, key, value):
         """Set attribute of the catalog object."""
         if key not in self.option_key or not hasattr(self, key):
-            raise CatalogArgumentError(
+            raise Exception(
                 f"option:{key!r}",
                 f"the option method of {self.__class__.__name__!r} object does not support",
             )

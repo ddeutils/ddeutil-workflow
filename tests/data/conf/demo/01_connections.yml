@@ -4,43 +4,51 @@
 # same pattern with the SQLtie connection from SQLAlchemy connection string.
 #
 #   * relative path:
-#     * fs:///relative/foo
-#     * file:///../tmp/path/foo
+#     * local:///relative/foo
+#     * local:///../tmp/path/foo
 #
 #   * absolute path:
-#     * fs:////absolute/path/to/foo
+#     * local:////absolute/path/to/foo
 #
 conn_local_file:
-  type: conn.LocalFl
+  type: conn.FlSys
   endpoint: "data/examples/"
 
 conn_local_file_url:
-  type: conn.LocalFl
+  type: conn.FlSys
   # Absolute Window path: file:///C:/usr/absolute/path/sub-path/
-  url: "fs:///${ROOT_PATH}/tests/data/examples"
+  url: "local:///${ROOT_PATH}/tests/data/examples"
 
 conn_local_file_url_ubuntu:
-  type: conn.LocalFl
+  type: conn.FlSys
   # Absolute Ubuntu path.
-  url: "fs:////absolute/path/to/foo"
+  url: "local:////absolute/path/to/foo"
 
 conn_local_file_url_relative:
-  type: conn.LocalFl
-  url: "fs:///data/examples/"
+  type: conn.FlSys
+  url: "local:///data/examples/"
 
 conn_local_file_url_ubuntu_relative:
-  type: conn.LocalFl
-  url: "fs:///relative/path/to/foo"
+  type: conn.FlSys
+  url: "local:///relative/path/to/foo"
 
 # SFTP & FTP Connection
 # ---
 conn_sftp:
   type: conn.SFTP
-  host: 127.0.0.1
-  port: 22
-  user: ssh_user
-  pwd: P@ssW0rd
-  endpoint: "user/data/dwh"
+  host: ${SFTP_HOST}
+  port: ${SFTP_PORT}
+  user: ${SFTP_USER}
+  pwd: ${SFTP_PASS}
+  endpoint: "data"
+
+conn_sftp_ssh_key:
+  type: conn.SFTP
+  host: ${SFTP_HOST}
+  port: ${SFTP_PORT}
+  user: ${SFTP_USER}
+  pwd: ${SFTP_PASS}
+  endpoint: "data"
   extras:
     ssh_private_key: ./conf/.ssh/key_ssh_gen.pem
 

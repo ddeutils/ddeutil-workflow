@@ -42,5 +42,5 @@ def test_loader(params: Params):
     assert {
         "alias": "conn_local_file",
         "endpoint": "data/examples/",
-        "type": "conn.LocalFl",
+        "type": "conn.FlSys",
     } == load.data

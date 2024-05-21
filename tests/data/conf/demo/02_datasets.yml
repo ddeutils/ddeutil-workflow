@@ -1,16 +1,16 @@
 # File Dataset
 # ---
 ds_json_local_file:
-  type: dataset.JsonFl
+  type: dataset.PolarsJson
   conn: conn_local_file
-  ?endpoint: C:/home/warehouse/raw/
-  ?path: sales_transaction/sales_{datetime:%Y%m%d}.json
+  endpoint: C:/home/warehouse/raw/
+  object: sales_transaction/sales_{datetime:%Y%m%d}.json
 
 ds_csv_local_file:
-  type: dataset.CsvFl
-  conn: conn_local_file
-  ?endpoint: C:/home/warehouse/raw/
-  ?path: customer_master/customer_{datetime:%Y%m%d}.csv
+  type: dataset.PolarsCSV
+  conn: "conn_local_file"
+  endpoint: "${ROOT_PATH}/tests/data/examples"
+  object: demo_customer.csv
   extras:
     encoding: "utf-8"
     escape_char: "\\"
@@ -20,14 +20,12 @@ ds_csv_local_file:
 # Database Object Dataset
 # ---
 ds_postgres_dwh:
-  version: '1'
   type: dataset.PostgresTbl
   conn: conn_postgres
   endpoint: postgres
-  ?schema: curated
-  ?table: order_inbound
+  object: curated.order_inbound
 
 ds_sqlite_metadata:
   type: dataset.SqliteTbl
   conn: conn_sqlite_url
-  ?endpoint: metadata_table
+  endpoint: metadata_table

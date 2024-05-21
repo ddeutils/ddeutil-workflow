@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any, Literal, Optional
 
 from ddeutil.io import Params
 from ddeutil.model.conn import Conn as ConnModel
@@ -32,7 +32,7 @@ class BaseConn(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     # NOTE: This is fields
-    dialect: str = "conn"
+    dialect: str
     host: Optional[str] = None
     port: Optional[int] = None
     user: Optional[str] = None
@@ -57,7 +57,7 @@ class BaseConn(BaseModel):
         :param externals:
         """
         loader: SimLoad = SimLoad(name, params=params, externals=externals)
-        filter_data = {
+        filter_data: DictData = {
             k: loader.data.pop(k)
             for k in loader.data.copy()
             if k not in cls.model_fields and k not in EXCLUDED_EXTRAS
@@ -79,7 +79,9 @@ class BaseConn(BaseModel):
             )
         return cls.model_validate(
             obj={
-                "extras": externals,
+                "extras": (
+                    loader.data.pop("extras", {}) | filter_data | externals
+                ),
                 **loader.data,
             }
         )
@@ -113,7 +115,7 @@ class SSHCred(BaseModel):
 
 class S3Cred(BaseModel):
     aws_access_key: str
-    aws_access_secret_key: SecretStr
+    aws_secret_access_key: SecretStr
     region: str = Field(default="ap-southeast-1")
     role_arn: Optional[str] = Field(default=None)
     role_name: Optional[str] = Field(default=None)
@@ -130,8 +132,10 @@ class GoogleCred(BaseModel):
     google_json_path: str
 
 
-class FlConn(Conn):
+class FlSys(Conn):
     """File System Connection"""
+
+    dialect: Literal["local"] = "local"
 
     def ping(self) -> bool:
         return Path(self.endpoint).exists()
@@ -139,8 +143,32 @@ class FlConn(Conn):
     def glob(self, pattern: str) -> Iterator[Path]:
         yield from Path(self.endpoint).rglob(pattern=pattern)
 
+    def get_spec(self) -> str:
+        return f"{self.dialect}:///{self.endpoint}"
 
-class DbConn(Conn):
+
+class SFTP(Conn):
+    dialect: Literal["sftp"] = "sftp"
+
+    def __client(self):
+        from .vendors.sftp_wrapped import WrapSFTP
+
+        return WrapSFTP(
+            host=self.host,
+            port=self.port,
+            user=self.user,
+            pwd=self.pwd.get_secret_value(),
+        )
+
+    def ping(self) -> bool:
+        with self.__client().simple_client():
+            return True
+
+    def glob(self, pattern: str) -> Iterator[str]:
+        yield from self.__client().walk(pattern=pattern)
+
+
+class Db(Conn):
     """RDBMS System Connection"""
 
     def ping(self) -> bool:
@@ -167,14 +195,8 @@ class DbConn(Conn):
             return False
 
 
-class SqliteConn(DbConn):
-    @field_validator("dialect")
-    def __validate_dialect(cls, value):
-        if value.split("+")[0] not in ("sqlite",):
-            raise ValueError(
-                f"{cls.__name__} does not support dialect {value!r}"
-            )
-        return value
+class SqliteConn(Db):
+    dialect: Literal["sqlite"]
 
 
 class DocConn(Conn):

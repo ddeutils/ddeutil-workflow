@@ -36,7 +36,7 @@ class WrapBoto3:
     def __init__(
         self,
         access_key_id: str,
-        access_secret_key: str,
+        secret_access_key: str,
         region_name: Optional[str] = None,
         *,
         role_session_name: Optional[str] = None,
@@ -44,7 +44,7 @@ class WrapBoto3:
         mfa_serial: Optional[str] = None,
     ):
         self.access_key_id = access_key_id
-        self.access_secret_key = access_secret_key
+        self.secret_access_key = secret_access_key
         self.region_name: str = region_name or "ap-southeast-1"
 
         # Optional for session.
@@ -59,7 +59,7 @@ class WrapBoto3:
         if self.role_arn is None:
             return {
                 "AccessKeyId": self.access_key_id,
-                "SecretAccessKey": self.access_secret_key,
+                "SecretAccessKey": self.secret_access_key,
             }
         # NOTE: A low-level client representing AWS Security Token Service (STS)
         # >>> sess = boto3.session.Session(
@@ -71,7 +71,7 @@ class WrapBoto3:
             service_name="sts",
             region_name=self.region_name,
             aws_access_key_id=self.access_key_id,
-            aws_secret_access_key=self.access_secret_key,
+            aws_secret_access_key=self.secret_access_key,
         )
         mfa_optional: dict[str, str] = {}
         if self.mfa_serial:
