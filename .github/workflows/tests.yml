@@ -57,7 +57,7 @@ jobs:
           curl -LsSf https://astral.sh/uv/install.sh | sh
           uv venv
           uv pip install -U pip
-          uv pip install -e .
+          uv pip install -e .[test]
           uv pip install pytest
 
       - name: Use Python virtual environment
