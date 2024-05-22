@@ -18,7 +18,7 @@ def test_pipe_py_job(params_simple):
     )
     demo_job: pipe.Job = pipeline.job("demo-run")
     rs = demo_job.execute(params={"x": "Foo"})
-    assert {"x": 1} == rs
+    assert {"x": "Foo"} == rs
 
 
 def test_pipe_shell_job(params_simple):
@@ -31,15 +31,15 @@ def test_pipe_shell_job(params_simple):
 
 
 def test_pipe_params_py(params_simple):
-    _ = pipe.Pipeline.from_loader(
+    pipeline = pipe.Pipeline.from_loader(
         name="run_python_with_params",
         params=params_simple,
         externals={},
     )
-    # rs = pipeline.execute(
-    #     params={
-    #         'author-run': 'Local Workflow',
-    #         'run-date': '2024-01-01',
-    #     }
-    # )
-    # print(rs)
+    rs = pipeline.execute(
+        params={
+            "author-run": "Local Workflow",
+            "run-date": "2024-01-01",
+        }
+    )
+    print(rs)

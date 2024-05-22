@@ -8,11 +8,13 @@ run_python_with_params:
     first-job:
       stages:
         - name: Printing Information
+          id: printing
           run: |
             x = '${{ params.author-run }}'
             print(f'Hello {x}')
 
         - name: Run Sequence and use var from Above
+          id: setting-x
           var:
             x: ${{ params.author-run }}
           run: |
@@ -23,11 +25,14 @@ run_python_with_params:
     second-job:
       stages:
         - name: Set variable and function
+          id: create-func
           run: |
             var_inside: str = 'Inside'
             def echo() -> None:
               print(f"Echo {var_inside}")
 #        - name: Call that variable
+#          var:
+#            echo: ${{ stages.create-func.var.echo }}
 #          run: echo()
         - name: Final of Next running job
 

@@ -188,9 +188,9 @@ class BaseLoad:
 class SimLoad:
     """Simple Load Object that will search config data by name.
 
-    :param name:
-    :param params:
-    :param externals:
+    :param name: A name of config data that will read by Yaml Loader object.
+    :param params: A Params model object.
+    :param externals: An external parameters
 
     Note:
         The config data should have ``type`` key for engine can know what is
@@ -199,7 +199,12 @@ class SimLoad:
 
     import_prefix: str = "ddeutil.workflow."
 
-    def __init__(self, name: str, params: Params, externals: DictData):
+    def __init__(
+        self,
+        name: str,
+        params: Params,
+        externals: DictData,
+    ) -> None:
         self.data: DictData = {}
         for file in PathSearch(params.engine.paths.conf).files:
             if any(file.suffix.endswith(s) for s in ("yml", "yaml")) and (
@@ -229,6 +234,7 @@ class SimLoad:
             return import_string(f"{_typ}")
 
     def params(self) -> dict[str, Callable[[Any], Any]]:
+        """Return a mapping of key from params and imported value on params."""
         if not (p := self.data.get("params", {})):
             return p
 
@@ -256,6 +262,11 @@ def map_caller(value: str, params: dict[str, Any]) -> str:
         return value
     # NOTE: get caller value that setting inside; ``${{ <caller-value> }}``
     caller = found.group("caller")
+    if caller == "stages.create-func.var.echo":
+        print(params)
     if not hasdot(caller, params):
         raise ValueError(f"params does not set caller: {caller}")
-    return value.replace(found.group(0), getdot(caller, params))
+    getter = getdot(caller, params)
+    if isinstance(getter, str):
+        return value.replace(found.group(0), getdot(caller, params))
+    raise TypeError(f"Map caller does not support get type: {type(getter)}")

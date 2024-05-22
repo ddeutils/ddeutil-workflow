@@ -24,6 +24,15 @@ class PyException(Exception): ...
 class ShellException(Exception): ...
 
 
+class StageResult(BaseModel): ...
+
+
+class JobResult(BaseModel): ...
+
+
+class PipeResult(BaseModel): ...
+
+
 class EmptyStage(BaseModel):
     """Empty stage that is doing nothing and logging the name of stage only."""
 
@@ -84,8 +93,9 @@ class PyStage(EmptyStage):
         :type params: dict[str, Any]
         """
         _globals: dict[str, Any] = globals() | (self.get_var(params) or {})
+        _locals: dict[str, Any] = {}
         try:
-            exec(map_caller(self.run, params), _globals)
+            exec(map_caller(self.run, params), _globals, _locals)
         except Exception as err:
             raise PyException(
                 f"{err.__class__.__name__}: {err}\nRunning Statement:\n"
@@ -94,16 +104,20 @@ class PyStage(EmptyStage):
         if self.id:
             if "stages" not in params:
                 params["stages"] = {}
-            params["stages"][self.id] = {}
+            params["stages"][self.id] = {
+                "var": _locals,
+            }
         return params | {k: _globals[k] for k in params if k in _globals}
 
 
 class TaskStage(EmptyStage):
-    uses: str
+    task: str
+    args: dict[str, Any]
 
 
 class HookStage(EmptyStage):
     hook: str
+    args: dict[str, Any]
 
 
 # NOTE: Order of parsing stage data
@@ -128,7 +142,12 @@ class Job(BaseModel):
 
     def execute(self, params: dict[str, Any] | None = None) -> dict[str, Any]:
         for stage in self.stages:
-            params |= stage.execute(params=params)
+            # NOTE:
+            #       I do not use below syntax because `params` dict be the
+            #   reference memory pointer and it was changed when I action
+            #   anything like update or re-construct this.
+            #       ... params |= stage.execute(params=params)
+            stage.execute(params=params)
         return params
 
 
@@ -204,7 +223,7 @@ class Pipeline(BaseModel):
             )
         }
         for job_id in self.jobs:
-            print(f"... Start execute the job: {job_id!r}")
+            print(f"[PIPELINE]: Start execute the job: {job_id!r}")
             job = self.jobs[job_id]
             # TODO: Condition on ``needs`` of this job was set
             job.execute(params=params)
