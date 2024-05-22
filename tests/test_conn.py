@@ -76,14 +76,14 @@ def test_connection_sftp(params_simple: Params):
 
 
 def test_connection_sqlite(params_simple: Params):
-    connection = conn.SqliteConn.from_loader(
+    connection = conn.SQLite.from_loader(
         name="conn_sqlite_url", params=params_simple, externals={}
     )
     connection.ping()
 
 
 def test_connection_sqlite_failed(params_simple: Params):
-    connection = conn.SqliteConn.from_loader(
+    connection = conn.SQLite.from_loader(
         name="conn_sqlite_url_failed", params=params_simple, externals={}
     )
     assert not connection.ping()

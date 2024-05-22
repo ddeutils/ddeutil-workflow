@@ -1,0 +1,38 @@
+# Run Python script
+run_python_with_params:
+  type: ddeutil.workflow.pipeline.Pipeline
+  params:
+    author-run: utils.receive.string
+    run-date: utils.receive.datetime
+  jobs:
+    first-job:
+      stages:
+        - name: Printing Information
+          run: |
+            x = '${{ params.author-run }}'
+            print(f'Hello {x}')
+
+        - name: Run Sequence and use var from Above
+          var:
+            x: ${{ params.author-run }}
+          run: |
+            print(f'Receive x from above with {x}')
+            # Change x value
+            x: int = 1
+
+    second-job:
+      stages:
+        - name: Set variable and function
+          run: |
+            var_inside: str = 'Inside'
+            def echo() -> None:
+              print(f"Echo {var_inside}")
+#        - name: Call that variable
+#          run: echo()
+        - name: Final of Next running job
+
+    final-job:
+      stages:
+        - name: Echo hello world
+          shell: |
+            echo 'Hello World'

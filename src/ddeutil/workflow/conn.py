@@ -57,6 +57,8 @@ class BaseConn(BaseModel):
         :param externals:
         """
         loader: SimLoad = SimLoad(name, params=params, externals=externals)
+        if loader.type != cls:
+            raise ValueError(f"Type {loader.type} does not match")
         filter_data: DictData = {
             k: loader.data.pop(k)
             for k in loader.data.copy()
@@ -195,9 +197,15 @@ class Db(Conn):
             return False
 
 
-class SqliteConn(Db):
+class SQLite(Db):
     dialect: Literal["sqlite"]
 
 
-class DocConn(Conn):
+class ODBC(Conn): ...
+
+
+class Doc(Conn):
     """No SQL System Connection"""
+
+
+class Mongo(Doc): ...

@@ -20,7 +20,9 @@ class RegexConf:
     __re_caller: str = r"""
         \$
         {{
-            \s*(?P<caller>.*?)\s*
+            \s*(?P<caller>
+                [a-zA-Z0-9_.\s'\"\[\]\(\)\-\{}]+?
+            )\s*
         }}
     """
     RE_CALLER: Pattern = re.compile(

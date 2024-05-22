@@ -8,7 +8,7 @@
 
 - [Installation](#installation)
 - [Getting Started](#getting-started)
-  - [Connection](#conn)
+  - [Connection](#connection)
   - [Dataset](#dataset)
   - [Schedule](#schedule)
 - [Examples](#examples)
@@ -55,13 +55,13 @@ The connection for worker able to do any thing.
 ```yaml
 conn_postgres_data:
   type: conn.Postgres
-  url: 'postgres+pysyncopg//...'
+  url: 'postgres//username:${ENV_PASS}@hostname:port/database?echo=True&time_out=10'
 ```
 
 ```python
 from ddeutil.workflow.conn import Conn
 
-conn = Conn.from_loader(name='conn_postgres_data', ...)
+conn = Conn.from_loader(name='conn_postgres_data', params=params, externals={})
 assert conn.ping()
 ```
 
@@ -81,7 +81,7 @@ ds_postgres_customer_tbl:
 ```python
 from ddeutil.workflow.dataset import PostgresTbl
 
-dataset = PostgresTbl.from_loader(name='ds_postgres_customer_tbl', ...)
+dataset = PostgresTbl.from_loader(name='ds_postgres_customer_tbl', params=params, externals={})
 assert dataset.exists()
 ```
 
@@ -96,7 +96,7 @@ schd_for_node:
 ```python
 from ddeutil.workflow.schedule import Scdl
 
-scdl = Scdl.from_loader(name='schd_for_node', ...)
+scdl = Scdl.from_loader(name='schd_for_node', params=params, externals={})
 assert '*/5 * * * *' == str(scdl.cronjob)
 
 cron_iterate = scdl.generate('2022-01-01 00:00:00')

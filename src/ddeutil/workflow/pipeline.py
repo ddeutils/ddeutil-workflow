@@ -15,7 +15,7 @@ from typing_extensions import Self
 
 from .__types import DictData
 from .exceptions import PipeArgumentError
-from .loader import SimLoad
+from .loader import SimLoad, map_caller
 
 
 class PyException(Exception): ...
@@ -38,6 +38,7 @@ class ShellStage(EmptyStage):
     """Shell statement stage."""
 
     shell: str
+    env: dict[str, str] = Field(default_factory=dict)
 
     def execute(self, params: dict[str, Any] | None = None) -> dict[str, Any]:
         """Execute the Shell & Powershell statement with the Python build-in
@@ -67,6 +68,13 @@ class PyStage(EmptyStage):
     """Python statement stage."""
 
     run: str
+    var: dict[str, str] = Field(default_factory=dict)
+
+    def get_var(self, params: dict[str, Any]) -> dict[str, Any]:
+        rs = self.var.copy()
+        for p, v in self.var.items():
+            rs[p] = map_caller(v, params)
+        return params | rs
 
     def execute(self, params: dict[str, Any] | None = None) -> dict[str, Any]:
         """Execute the Python statement that pass all globals and input params
@@ -75,9 +83,9 @@ class PyStage(EmptyStage):
         :param params: A parameter that want to pass before run any statement.
         :type params: dict[str, Any]
         """
-        _globals: dict[str, Any] = globals() | (params or {})
+        _globals: dict[str, Any] = globals() | (self.get_var(params) or {})
         try:
-            exec(self.run, _globals)
+            exec(map_caller(self.run, params), _globals)
         except Exception as err:
             raise PyException(
                 f"{err.__class__.__name__}: {err}\nRunning Statement:\n"
@@ -110,17 +118,18 @@ Stage = Union[
 
 class Job(BaseModel):
     stages: list[Stage] = Field(default_factory=list)
-
-    def execute(self, params: dict[str, Any] | None = None) -> dict[str, Any]:
-        for stage in self.stages:
-            params |= stage.execute(params=params)
-        return params
+    needs: list[str] = Field(default_factory=list)
 
     def stage(self, stage_id: str) -> Stage:
         for stage in self.stages:
             if stage_id == (stage.id or ""):
                 return stage
         raise ValueError(f"Stage ID {stage_id} does not exists")
+
+    def execute(self, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        for stage in self.stages:
+            params |= stage.execute(params=params)
+        return params
 
 
 class Strategy(BaseModel):
@@ -153,8 +162,14 @@ class Pipeline(BaseModel):
             raise PipeArgumentError("jobs", "Config does not set ``jobs``")
         return cls(
             jobs=loader.data["jobs"],
-            params=loader.data.get("params", {}),
+            params=loader.params(),
         )
+
+    def job(self, name: str) -> Job:
+        """Return Job model that exists on this pipeline."""
+        if name not in self.jobs:
+            raise ValueError(f"Job {name} does not exists")
+        return self.jobs[name]
 
     def execute(self, params: dict[str, Any] | None = None):
         """Execute pipeline with passing dynamic parameters.
@@ -172,16 +187,25 @@ class Pipeline(BaseModel):
 
         """
         params: dict[str, Any] = params or {}
-        check_key = tuple(k for k in self.params if k not in params)
+        check_key = tuple(f"{k!r}" for k in self.params if k not in params)
         if check_key:
             raise ValueError(
                 f"Parameters that needed on pipeline does not pass: "
                 f"{', '.join(check_key)}."
             )
+        params: dict[str, Any] = {
+            "params": (
+                params
+                | {
+                    k: self.params[k](params[k])
+                    for k in params
+                    if k in self.params
+                }
+            )
+        }
+        for job_id in self.jobs:
+            print(f"... Start execute the job: {job_id!r}")
+            job = self.jobs[job_id]
+            # TODO: Condition on ``needs`` of this job was set
+            job.execute(params=params)
         return params
-
-    def job(self, name: str) -> Job:
-        """Return Job model that exists on this pipeline."""
-        if name not in self.jobs:
-            raise ValueError(f"Job {name} does not exists")
-        return self.jobs[name]

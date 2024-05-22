@@ -24,10 +24,10 @@ ingest_postgres_to_adls:
                 from  {{ params.source.schema }}.{{ param.source.table }}
                 where update_date = '{{ param.run_date.fmt('%Y%m%d') }}'
             conversion:
-              customer_id -> id
-              customer_name -> name
-              customer_register_date -> register_date
-              customer_revenue -> revenue
+              customer_id: id
+              customer_name: name
+              customer_register_date: register_date
+              customer_revenue: revenue
             sink:
               conn: ${{ target.conn }}
               endpoint: /persisted/${{ target.schema }}/${{ target.path }}

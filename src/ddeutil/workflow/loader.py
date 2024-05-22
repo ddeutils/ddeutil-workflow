@@ -30,6 +30,7 @@ from ddeutil.io.__conf import UPDATE_KEY, VERSION_KEY
 from fmtutil import Datetime
 from typing_extensions import Self
 
+from .__regex import RegexConf
 from .__types import DictData, TupleStr
 from .exceptions import ConfigArgumentError
 
@@ -247,3 +248,14 @@ class SimLoad:
         except ValueError as err:
             logging.error("Value that passing to params does not valid")
             raise err
+
+
+def map_caller(value: str, params: dict[str, Any]) -> str:
+    """Map caller value that found from ``RE_CALLER`` regex."""
+    if not (found := RegexConf.RE_CALLER.search(value)):
+        return value
+    # NOTE: get caller value that setting inside; ``${{ <caller-value> }}``
+    caller = found.group("caller")
+    if not hasdot(caller, params):
+        raise ValueError(f"params does not set caller: {caller}")
+    return value.replace(found.group(0), getdot(caller, params))

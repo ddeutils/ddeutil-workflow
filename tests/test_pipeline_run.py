@@ -27,4 +27,19 @@ def test_pipe_shell_job(params_simple):
     )
     shell_run: pipe.Job = pipeline.job("shell-run")
     rs = shell_run.execute({})
-    print(rs)
+    assert rs == {}
+
+
+def test_pipe_params_py(params_simple):
+    _ = pipe.Pipeline.from_loader(
+        name="run_python_with_params",
+        params=params_simple,
+        externals={},
+    )
+    # rs = pipeline.execute(
+    #     params={
+    #         'author-run': 'Local Workflow',
+    #         'run-date': '2024-01-01',
+    #     }
+    # )
+    # print(rs)
