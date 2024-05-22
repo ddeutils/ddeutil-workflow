@@ -77,13 +77,31 @@ class PyStage(EmptyStage):
     """Python statement stage."""
 
     run: str
-    var: dict[str, str] = Field(default_factory=dict)
+    vars: dict[str, Any] = Field(default_factory=dict)
 
     def get_var(self, params: dict[str, Any]) -> dict[str, Any]:
-        rs = self.var.copy()
-        for p, v in self.var.items():
+        """Return variables"""
+        rs = self.vars.copy()
+        for p, v in self.vars.items():
             rs[p] = map_caller(v, params)
-        return params | rs
+        return rs
+
+    def set_outputs(
+        self, lc: dict[str, Any], params: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Set outputs to params"""
+        # NOTE: skipping set outputs of stage execution when id does not set.
+        if self.id is None:
+            return params
+
+        if "stages" not in params:
+            params["stages"] = {}
+
+        params["stages"][self.id] = {
+            # NOTE: The output will fileter unnecessary keys from ``_locals``.
+            "outputs": {k: lc[k] for k in lc if k != "__annotations__"},
+        }
+        return params
 
     def execute(self, params: dict[str, Any] | None = None) -> dict[str, Any]:
         """Execute the Python statement that pass all globals and input params
@@ -91,8 +109,12 @@ class PyStage(EmptyStage):
 
         :param params: A parameter that want to pass before run any statement.
         :type params: dict[str, Any]
+
+        :rtype: dict[str, Any]
+        :returns: A parameters from an input that was mapped output if the stage
+            ID was set.
         """
-        _globals: dict[str, Any] = globals() | (self.get_var(params) or {})
+        _globals: dict[str, Any] = globals() | params | self.get_var(params)
         _locals: dict[str, Any] = {}
         try:
             exec(map_caller(self.run, params), _globals, _locals)
@@ -101,12 +123,9 @@ class PyStage(EmptyStage):
                 f"{err.__class__.__name__}: {err}\nRunning Statement:\n"
                 f"{self.run}"
             ) from None
-        if self.id:
-            if "stages" not in params:
-                params["stages"] = {}
-            params["stages"][self.id] = {
-                "var": _locals,
-            }
+
+        # NOTE: set outputs from ``_locals`` value from ``exec``.
+        self.set_outputs(_locals, params)
         return params | {k: _globals[k] for k in params if k in _globals}
 
 

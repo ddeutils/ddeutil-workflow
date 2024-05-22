@@ -256,17 +256,23 @@ class SimLoad:
             raise err
 
 
-def map_caller(value: str, params: dict[str, Any]) -> str:
+def map_caller(value: str, params: dict[str, Any]) -> Any:
     """Map caller value that found from ``RE_CALLER`` regex."""
     if not (found := RegexConf.RE_CALLER.search(value)):
         return value
     # NOTE: get caller value that setting inside; ``${{ <caller-value> }}``
     caller = found.group("caller")
-    if caller == "stages.create-func.var.echo":
-        print(params)
     if not hasdot(caller, params):
-        raise ValueError(f"params does not set caller: {caller}")
+        raise ValueError(f"params does not set caller: {caller!r}")
     getter = getdot(caller, params)
-    if isinstance(getter, str):
-        return value.replace(found.group(0), getdot(caller, params))
+
+    # NOTE: check type of vars
+    if isinstance(getter, (str, int)):
+        return value.replace(found.group(0), str(getter))
+    elif callable(getter):
+        if value.replace(found.group(0), "") != "":
+            raise ValueError(
+                "Callable variable should not pass other outside ${{ ... }}"
+            )
+        return getter
     raise TypeError(f"Map caller does not support get type: {type(getter)}")

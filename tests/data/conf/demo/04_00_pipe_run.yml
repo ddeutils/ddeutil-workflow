@@ -9,11 +9,17 @@ run_python:
     demo-run:
       stages:
         - name: Run Hello World
-          run: print(f'Hello {x}')
-
-        - name: Run Sequence and use var from Above
+          id: hello-world
           vars:
             x: ${{ params.name }}
+          run: |
+            print(f'Hello {x}')
+            x: str = 'New Name'
+
+        - name: Run Sequence and use var from Above
+          id: run-var
+          vars:
+            x: ${{ stages.hello-world.outputs.x }}
           run: |
             print(f'Receive x from above with {x}')
             # Change x value
