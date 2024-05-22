@@ -50,10 +50,10 @@ run_python:
         - name: Echo hello world
           id: echo-env
           shell: |
-            echo "Hello World";
+            echo "Hello World"
 
-            # $Env:USER_SH = 'World';
+            # $Env:USER_SH = 'World'
 
-            echo "Hello $Env:USER_SH";
+            echo "Hello $Env:USER_SH"
 
-            # Remove-Item Env:\\FOO;
+            # Remove-Item Env:\\FOO

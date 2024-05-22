@@ -79,7 +79,7 @@ def test_pipe_stage_shell(params_simple):
             "echo-env": {
                 "outputs": {
                     "return_code": 0,
-                    "stdout": '"Hello World";\n',
+                    "stdout": '"Hello World"\n',
                     "stderr": "",
                 },
             },
