@@ -117,53 +117,48 @@ use-case.
 The state of doing lists that worker should to do. It be collection of the stage.
 
 ```yaml
-run_python_local:
-  version: 1
+run_py_local:
   type: ddeutil.workflow.pipe.Pipeline
   params:
-    run_date: utils.receive.datetime
-    name: utils.receive.string
+    author-run: utils.receive.string
+    run-date: utils.receive.datetime
   jobs:
-    - demo_run:
-        stages:
-          - name: Run Hello World
-            run: |
-              print(f'Hello {x}')
-          - name: Run Sequence and use var from Above
-            run: |
-              print(f'Receive x from above with {x}')
+    first-job:
+      stages:
+        - name: Printing Information
+          run: |
+            x = '${{ params.author-run }}'
+            print(f'Hello {x}')
 
-              # NOTE: Change x value
-              x: int = 1
-    - next_run:
-        stages:
-          - name: Set variable and function
-            run: |
-              var_inside: str = 'Inside'
-              def echo() -> None:
-                print(f"Echo {var_inside}")
-          - name: Call that variable
-            run: |
-              echo()
+        - name: Run Sequence and use var from Above
+          var:
+            x: ${{ params.author-run }}
+          run: |
+            print(f'Receive x from above with {x}')
+            # Change x value
+            x: int = 1
 ```
 
 ```python
 from ddeutil.workflow.pipeline import Pipeline
 
-pipe = Pipeline.from_loader(name='run_python_local', ...)
-pipe.execute(params={"run_date": "2023-01-01", "name": "foo"})
-assert {} == pipe.output
+pipe = Pipeline.from_loader(name='run_py_local', params=params, externals={})
+pipe.execute(params={'author-run': 'Local Workflow', 'run-date': '2024-01-01'})
+```
+
+```shell
+> Hello Local Workflow
+> Receive x from above with Local Workflow
 ```
 
 ### Extract & Load
 
 ```yaml
 pipe_el_pg_to_lake:
-  version: 1
   type: ddeutil.workflow.pipe.Pipeline
   params:
-    run_date: utils.receive.datetime
-    name: utils.receive.string
+    run-date: utils.receive.datetime
+    author-email: utils.receive.string
   jobs:
     extract-load:
       stages:
@@ -185,7 +180,6 @@ pipe_el_pg_to_lake:
 
 ```yaml
 pipe_hook_mssql_proc:
-  version: 1
   type: ddeutil.workflow.pipe.Pipeline
   params:
     run_date: utils.receive.datetime
@@ -210,7 +204,6 @@ pipe_hook_mssql_proc:
 
 ```yaml
 pipe_etl_postgres:
-  version: 1
   type: ddeutil.workflow.pipe.Pipeline
   params:
     run_date: utils.receive.datetime
