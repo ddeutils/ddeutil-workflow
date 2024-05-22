@@ -22,6 +22,7 @@ run_python:
             x: ${{ stages.hello-world.outputs.x }}
           run: |
             print(f'Receive x from above with {x}')
+
             # Change x value
             x: int = 1
 
@@ -47,5 +48,12 @@ run_python:
     shell-run:
       stages:
         - name: Echo hello world
+          id: echo-env
           shell: |
-            echo 'Hello World'
+            echo "Hello World";
+
+            # $Env:USER_SH = 'World';
+
+            echo "Hello $Env:USER_SH";
+
+            # Remove-Item Env:\\FOO;

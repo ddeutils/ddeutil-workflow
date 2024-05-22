@@ -39,7 +39,7 @@ class EmptyStage(BaseModel):
     id: Optional[str] = None
     name: str
 
-    def execute(self, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         return params
 
 
@@ -49,27 +49,45 @@ class ShellStage(EmptyStage):
     shell: str
     env: dict[str, str] = Field(default_factory=dict)
 
-    def execute(self, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    def set_outputs(
+        self, rs: CompletedProcess, params: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Set outputs to params"""
+        # NOTE: skipping set outputs of stage execution when id does not set.
+        if self.id is None:
+            return params
+
+        if "stages" not in params:
+            params["stages"] = {}
+
+        params["stages"][self.id] = {
+            # NOTE: The output will fileter unnecessary keys from ``_locals``.
+            "outputs": {
+                "return_code": rs.returncode,
+                "stdout": rs.stdout,
+                "stderr": rs.stderr,
+            },
+        }
+        return params
+
+    def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         """Execute the Shell & Powershell statement with the Python build-in
         ``subprocess`` package.
         """
-        try:
-            rs: CompletedProcess = subprocess.run(
-                self.shell,
-                capture_output=True,
-                text=True,
-                shell=True,
-            )
-            __rs = {(self.id or self.name): rs.stdout}
-        except Exception as err:
-            raise ShellException(
-                f"{err.__class__.__name__}: {err}\nRunning Statement:\n"
-                f"{self.shell}"
-            ) from None
-        if self.id:
-            if "stages" not in params:
-                params["stages"] = {}
-            params["stages"][self.id] = __rs
+        rs: CompletedProcess = subprocess.run(
+            self.shell,
+            capture_output=True,
+            text=True,
+            shell=True,
+        )
+        if rs.returncode > 0:
+            print(f"{rs.stderr}\nRunning Statement:\n---\n{self.shell}")
+            # FIXME: raise err for this execution.
+            # raise ShellException(
+            #     f"{rs.stderr}\nRunning Statement:\n---\n"
+            #     f"{self.shell}"
+            # )
+        self.set_outputs(rs, params)
         return params
 
 
@@ -103,7 +121,7 @@ class PyStage(EmptyStage):
         }
         return params
 
-    def execute(self, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         """Execute the Python statement that pass all globals and input params
         to globals argument on ``exec`` build-in function.
 
@@ -120,7 +138,7 @@ class PyStage(EmptyStage):
             exec(map_caller(self.run, params), _globals, _locals)
         except Exception as err:
             raise PyException(
-                f"{err.__class__.__name__}: {err}\nRunning Statement:\n"
+                f"{err.__class__.__name__}: {err}\nRunning Statement:\n---\n"
                 f"{self.run}"
             ) from None
 

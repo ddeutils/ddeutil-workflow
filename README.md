@@ -126,17 +126,27 @@ run_py_local:
     first-job:
       stages:
         - name: Printing Information
+          id: define-func
           run: |
             x = '${{ params.author-run }}'
             print(f'Hello {x}')
 
+            def echo(name: str):
+              print(f'Hello {name}')
+
         - name: Run Sequence and use var from Above
-          var:
+          vars:
             x: ${{ params.author-run }}
           run: |
             print(f'Receive x from above with {x}')
             # Change x value
             x: int = 1
+
+        - name: Call Function
+          vars:
+            echo: ${{ stages.define-func.outputs.echo }}
+          run: |
+            echo('Caller')
 ```
 
 ```python
@@ -149,6 +159,7 @@ pipe.execute(params={'author-run': 'Local Workflow', 'run-date': '2024-01-01'})
 ```shell
 > Hello Local Workflow
 > Receive x from above with Local Workflow
+> Hello Caller
 ```
 
 ### Extract & Load

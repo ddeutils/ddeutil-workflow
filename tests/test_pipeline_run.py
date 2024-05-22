@@ -68,13 +68,36 @@ def test_pipe_job_py(params_simple):
     } == rs
 
 
-def test_pipe_job_shell(params_simple):
+def test_pipe_stage_shell(params_simple):
     pipeline = pipe.Pipeline.from_loader(
         name="run_python", params=params_simple, externals={}
     )
-    shell_run: pipe.Job = pipeline.job("shell-run")
-    rs = shell_run.execute({})
-    assert rs == {}
+    echo_env: pipe.Job = pipeline.job("shell-run").stage("echo-env")
+    rs = echo_env.execute({})
+    assert {
+        "stages": {
+            "echo-env": {
+                "outputs": {
+                    "return_code": 0,
+                    "stdout": '"Hello World";\n',
+                    "stderr": "",
+                },
+            },
+        },
+    } == rs
+
+
+def test_subprocess_shell():
+    import subprocess
+
+    rs = subprocess.run(
+        """echo \"Hello $Env:USER_SH\"""",
+        capture_output=True,
+        text=True,
+        shell=True,
+        env={"USER_SH": "FOO"},
+    )
+    print(rs)
 
 
 def test_pipe_params_py(params_simple):
