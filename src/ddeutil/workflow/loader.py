@@ -257,7 +257,10 @@ class SimLoad:
 
 
 def map_caller(value: str, params: dict[str, Any]) -> Any:
-    """Map caller value that found from ``RE_CALLER`` regex."""
+    """Map caller value that found from ``RE_CALLER`` regex.
+
+    :returns: Any value that getter of caller receive from the params.
+    """
     if not (found := RegexConf.RE_CALLER.search(value)):
         return value
     # NOTE: get caller value that setting inside; ``${{ <caller-value> }}``
@@ -269,10 +272,12 @@ def map_caller(value: str, params: dict[str, Any]) -> Any:
     # NOTE: check type of vars
     if isinstance(getter, (str, int)):
         return value.replace(found.group(0), str(getter))
-    elif callable(getter):
-        if value.replace(found.group(0), "") != "":
-            raise ValueError(
-                "Callable variable should not pass other outside ${{ ... }}"
-            )
-        return getter
-    raise TypeError(f"Map caller does not support get type: {type(getter)}")
+
+    # NOTE:
+    #   If type of getter caller does not formatting, it will return origin
+    #   value.
+    if value.replace(found.group(0), "") != "":
+        raise ValueError(
+            "Callable variable should not pass other outside ${{ ... }}"
+        )
+    return getter

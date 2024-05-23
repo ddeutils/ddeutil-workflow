@@ -49,6 +49,11 @@ class ShellStage(EmptyStage):
     shell: str
     env: dict[str, str] = Field(default_factory=dict)
 
+    @staticmethod
+    def __prepare_shell(shell: str):
+        """Prepare shell statement string that include newline"""
+        return shell.replace("\n", ";")
+
     def set_outputs(
         self, rs: CompletedProcess, params: dict[str, Any]
     ) -> dict[str, Any]:
@@ -75,7 +80,7 @@ class ShellStage(EmptyStage):
         ``subprocess`` package.
         """
         rs: CompletedProcess = subprocess.run(
-            self.shell,
+            self.__prepare_shell(self.shell),
             capture_output=True,
             text=True,
             shell=True,
@@ -92,7 +97,9 @@ class ShellStage(EmptyStage):
 
 
 class PyStage(EmptyStage):
-    """Python statement stage."""
+    """Python executor stage that running the Python statement that receive
+    globals nad additional variables.
+    """
 
     run: str
     vars: dict[str, Any] = Field(default_factory=dict)
@@ -151,9 +158,18 @@ class TaskStage(EmptyStage):
     task: str
     args: dict[str, Any]
 
+    def execute(self, params: dict[str, Any]) -> dict[str, Any]: ...
+
 
 class HookStage(EmptyStage):
     hook: str
+    args: dict[str, Any]
+
+    def execute(self, params: dict[str, Any]) -> dict[str, Any]: ...
+
+
+class SensorStage(EmptyStage):
+    sensor: str
     args: dict[str, Any]
 
 

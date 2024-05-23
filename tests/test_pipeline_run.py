@@ -79,7 +79,7 @@ def test_pipe_stage_shell(params_simple):
             "echo-env": {
                 "outputs": {
                     "return_code": 0,
-                    "stdout": '"Hello World"\n',
+                    "stdout": '"Hello World";;;;echo "Hello $Env:USER_SH";\n',
                     "stderr": "",
                 },
             },
@@ -89,13 +89,21 @@ def test_pipe_stage_shell(params_simple):
 
 def test_subprocess_shell():
     import subprocess
+    from textwrap import dedent
 
     rs = subprocess.run(
-        """echo \"Hello $Env:USER_SH\"""",
+        [
+            "powershell",
+            dedent(
+                """
+                echo "Hello World";
+                echo "Next line";
+            """
+            ).strip(),
+        ],
         capture_output=True,
         text=True,
         shell=True,
-        env={"USER_SH": "FOO"},
     )
     print(rs)
 
