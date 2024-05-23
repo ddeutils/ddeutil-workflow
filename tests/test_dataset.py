@@ -1,6 +1,8 @@
 import os
+from pathlib import Path
 
 import ddeutil.workflow.dataset as ds
+import polars as pl
 
 
 def test_polars_csv(params_simple):
@@ -19,7 +21,17 @@ def test_polars_csv(params_simple):
         == dataset.conn.get_spec()
     )
     assert dataset.exists()
-    print(dataset.extras)
     df = dataset.load()
-    print(df)
-    print(df.count().to_dict(as_series=False))
+    assert [
+        "CustomerID",
+        "CustomerName",
+        "CustomerOrgs",
+        "CustomerRevenue",
+        "CustomerAge",
+        "CreateDate",
+    ] == df.columns
+    assert 2 == df.select(pl.len()).item()
+    dataset.save(df, _object="demo_customer_writer.csv")
+    Path(
+        f"{os.getenv('ROOT_PATH')}/tests/data/examples/demo_customer_writer.csv"
+    ).unlink(missing_ok=True)

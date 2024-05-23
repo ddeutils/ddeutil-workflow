@@ -14,14 +14,8 @@ from pydantic import BaseModel, Field
 from typing_extensions import Self
 
 from .__types import DictData
-from .exceptions import PipeArgumentError
+from .exceptions import PipeArgumentError, PyException
 from .loader import SimLoad, map_caller
-
-
-class PyException(Exception): ...
-
-
-class ShellException(Exception): ...
 
 
 class StageResult(BaseModel): ...
@@ -166,11 +160,6 @@ class HookStage(EmptyStage):
     args: dict[str, Any]
 
     def execute(self, params: dict[str, Any]) -> dict[str, Any]: ...
-
-
-class SensorStage(EmptyStage):
-    sensor: str
-    args: dict[str, Any]
 
 
 # NOTE: Order of parsing stage data

@@ -26,8 +26,11 @@ EXCLUDED_EXTRAS: TupleStr = ("type",)
 
 
 def get_simple_conn(
-    name: str, params: str, externals: dict[str, Any]
+    name: str,
+    params: str,
+    externals: dict[str, Any],
 ) -> SubclassConn:
+    """Get Connection config with Simple Loader object."""
     loader: SimLoad = SimLoad(name, params=params, externals=externals)
     return loader.type.model_validate(loader.data)
 
@@ -125,7 +128,7 @@ class PolarsCSVOptions(BaseModel):
     docs: [RFC4180](https://datatracker.ietf.org/doc/html/rfc4180)
     """
 
-    has_header: bool = True
+    header: bool = True
     separator: str = ","
     skip_rows: int = 0
     encoding: str = "utf-8"
@@ -137,25 +140,42 @@ class PolarsCSV(DfDataset):
     def exists(self) -> bool:
         return self.conn.find_object(self.object)
 
+    def load_options(self) -> dict[str, Any]:
+        return {
+            "has_header": self.extras.header,
+            "separator": self.extras.separator,
+            "skip_rows": self.extras.skip_rows,
+            "encoding": self.extras.encoding,
+        }
+
     def load(
         self,
+        _object: str | None = None,
         options: dict[str, Any] | None = None,
     ) -> pl.DataFrame:
         """Load CSV file to Polars Dataframe with ``read_csv`` method."""
         return pl.read_csv(
-            f"{self.conn.get_spec()}/{self.object}",
-            **(self.extras.model_dump() | (options or {})),
+            f"{self.conn.get_spec()}/{_object or self.object}",
+            **(self.load_options() | (options or {})),
         )
+
+    def save_options(self) -> dict[str, Any]:
+        return {
+            "include_header": self.extras.header,
+            "separator": self.extras.separator,
+        }
 
     def save(
         self,
         df: pl.DataFrame,
+        _object: str | None = None,
         options: dict[str, Any] | None = None,
     ) -> None:
         """Save Polars Dataframe to CSV file with ``write_csv`` method."""
+        # FIXME: Save CSV does not support for the fsspec file url.
         return df.write_csv(
-            f"{self.conn.get_spec()}/{self.object}",
-            **(self.extras.model_dump() | (options or {})),
+            f"{self.conn.endpoint}/{_object or self.object}",
+            **(self.save_options() | (options or {})),
         )
 
 

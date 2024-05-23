@@ -3,6 +3,12 @@ from typing import Any
 from ddeutil.model.datasets.col import Col
 from pydantic import BaseModel, Field
 
+registries: dict[str, Any] = {
+    "polars": {
+        "csv-to-csv": ...,
+    },
+}
+
 
 class Source(BaseModel):
     conn: str

@@ -17,15 +17,15 @@ class BaseError(Exception):
     """
 
 
-class PipeBaseError(BaseError):
+class WorkflowBaseError(BaseError):
     """Core Base Error object"""
 
 
-class ConfigNotFound(PipeBaseError):
+class ConfigNotFound(WorkflowBaseError):
     """Error raise for a method not found the config file or data."""
 
 
-class ConfigArgumentError(PipeBaseError):
+class ConfigArgumentError(WorkflowBaseError):
     """Error raise for a wrong configuration argument."""
 
     def __init__(self, argument: Union[str, tuple], message: str):
@@ -71,3 +71,9 @@ class ScdlArgumentError(ConfigArgumentError):
 
 class PipeArgumentError(ConfigArgumentError):
     """Error raise for wrong pipeline argument when loading or parsing"""
+
+
+class PyException(Exception): ...
+
+
+class ShellException(Exception): ...
