@@ -25,16 +25,17 @@ from .loader import SimLoad
 EXCLUDED_EXTRAS: TupleStr = ("type",)
 
 
-def get_simple_conn(name: str, params: str, externals: dict[str, Any]):
+def get_simple_conn(
+    name: str, params: str, externals: dict[str, Any]
+) -> SubclassConn:
     loader: SimLoad = SimLoad(name, params=params, externals=externals)
-    print(loader.data)
-    return loader.type().model_validate(loader.data)
+    return loader.type.model_validate(loader.data)
 
 
 class BaseDataset(BaseModel):
     """Base Dataset Model."""
 
-    conn: SubclassConn
+    conn: Annotated[SubclassConn, Field(description="Connection Model")]
     endpoint: Annotated[
         Optional[str],
         Field(description="Endpoint of connection"),
@@ -73,11 +74,11 @@ class BaseDataset(BaseModel):
             externals=externals,
         )
 
+        # Note: Override ``endpoint`` value to getter connection data
         if "endpoint" in loader.data:
             conn_loader.data["endpoint"] = loader.data["endpoint"]
         else:
             loader.data.update({"endpoint": conn_loader.data["endpoint"]})
-
         return cls.model_validate(
             obj={
                 "extras": (
@@ -89,10 +90,16 @@ class BaseDataset(BaseModel):
         )
 
 
-class DfDataset(BaseDataset): ...
+class Dataset(BaseDataset):
+
+    def exists(self) -> bool:
+        raise NotImplementedError("Object exists does not implement")
 
 
-class TblDataset(BaseDataset):
+class DfDataset(Dataset): ...
+
+
+class TblDataset(Dataset):
 
     def exists(self) -> bool: ...
 
@@ -112,10 +119,44 @@ class PandasDb: ...
 class PandasExcel: ...
 
 
-class PolarsCSV(DfDataset):
+class PolarsCSVOptions(BaseModel):
+    """CSV file should use format rfc4180 as CSV standard format.
 
-    def load(self) -> pl.DataFrame:
-        return pl.read_csv(f"local:///{self.endpoint}/{self.object}")
+    docs: [RFC4180](https://datatracker.ietf.org/doc/html/rfc4180)
+    """
+
+    has_header: bool = True
+    separator: str = ","
+    skip_rows: int = 0
+    encoding: str = "utf-8"
+
+
+class PolarsCSV(DfDataset):
+    extras: PolarsCSVOptions
+
+    def exists(self) -> bool:
+        return self.conn.find_object(self.object)
+
+    def load(
+        self,
+        options: dict[str, Any] | None = None,
+    ) -> pl.DataFrame:
+        """Load CSV file to Polars Dataframe with ``read_csv`` method."""
+        return pl.read_csv(
+            f"{self.conn.get_spec()}/{self.object}",
+            **(self.extras.model_dump() | (options or {})),
+        )
+
+    def save(
+        self,
+        df: pl.DataFrame,
+        options: dict[str, Any] | None = None,
+    ) -> None:
+        """Save Polars Dataframe to CSV file with ``write_csv`` method."""
+        return df.write_csv(
+            f"{self.conn.get_spec()}/{self.object}",
+            **(self.extras.model_dump() | (options or {})),
+        )
 
 
 class PolarsParq: ...

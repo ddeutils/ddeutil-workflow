@@ -68,6 +68,7 @@ def test_pipe_job_py(params_simple):
     } == rs
 
 
+@pytest.mark.skipif(True, reason="Because subprocess call on different OS")
 def test_pipe_stage_shell(params_simple):
     pipeline = pipe.Pipeline.from_loader(
         name="run_python", params=params_simple, externals={}

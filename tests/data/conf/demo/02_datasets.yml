@@ -14,8 +14,8 @@ ds_csv_local_file:
   extras:
     encoding: "utf-8"
     escape_char: "\\"
-    delimiter: "|"
-    header: true
+    separator: "|"
+    has_header: true
 
 # Database Object Dataset
 # ---

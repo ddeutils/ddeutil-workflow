@@ -14,17 +14,12 @@ def test_polars_csv(params_simple):
         f"{os.getenv('ROOT_PATH')}/tests/data/examples" == dataset.conn.endpoint
     )
     assert "demo_customer.csv" == dataset.object
-    print(dataset)
-    # df = dataset.load()
-    # print(df.count().to_dict(as_series=False))
-
-
-def test_polars_csv_conn(params_simple):
-    dataset = ds.PolarsCSV.from_loader(
-        "ds_csv_local_file",
-        params=params_simple,
-        externals={},
+    assert (
+        f"local:///{os.getenv('ROOT_PATH')}/tests/data/examples"
+        == dataset.conn.get_spec()
     )
-    print(dataset)
-    # connection = ds.get_simple_conn(dataset.conn, params_simple, {})
-    # print(connection)
+    assert dataset.exists()
+    print(dataset.extras)
+    df = dataset.load()
+    print(df)
+    print(df.count().to_dict(as_series=False))

@@ -100,6 +100,15 @@ class Conn(BaseConn):
     should be the base for abstraction to any connection model object.
     """
 
+    def get_spec(self) -> str:
+        """Return full connection url that construct from all fields."""
+        return (
+            f"{self.dialect}://{self.user or ''}"
+            f"{f':{self.pwd}' if self.pwd else ''}"
+            f"{self.host or ''}{f':{self.port}' if self.port else ''}"
+            f"/{self.endpoint}"
+        )
+
     def ping(self) -> bool:
         """Ping the connection that able to use with this field value."""
         raise NotImplementedError("Ping does not implement")
@@ -108,9 +117,8 @@ class Conn(BaseConn):
         """Return a list of object from the endpoint of this connection."""
         raise NotImplementedError("Glob does not implement")
 
-    def get_spec(self) -> str:
-        """Return full connection url that construct from all fields."""
-        return f"{self.dialect}:///{self.endpoint}"
+    def find_object(self, _object: str):
+        raise NotImplementedError("Glob does not implement")
 
 
 class FlSys(Conn):
@@ -123,6 +131,9 @@ class FlSys(Conn):
 
     def glob(self, pattern: str) -> Iterator[Path]:
         yield from Path(self.endpoint).rglob(pattern=pattern)
+
+    def find_object(self, _object: str) -> bool:
+        return (Path(self.endpoint) / _object).exists()
 
 
 class SFTP(Conn):
