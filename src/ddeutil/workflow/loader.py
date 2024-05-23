@@ -9,7 +9,7 @@ import copy
 import logging
 import urllib.parse
 from functools import cached_property
-from typing import Any, Callable
+from typing import Any, Callable, TypeVar
 
 from ddeutil.core import (
     clear_cache,
@@ -28,11 +28,14 @@ from ddeutil.io import (
 )
 from ddeutil.io.__conf import UPDATE_KEY, VERSION_KEY
 from fmtutil import Datetime
+from pydantic import BaseModel
 from typing_extensions import Self
 
 from .__regex import RegexConf
 from .__types import DictData, TupleStr
 from .exceptions import ConfigArgumentError
+
+AnyModel = TypeVar("AnyModel", bound=BaseModel)
 
 
 class YamlEnvQuote(YamlEnvFl):
@@ -221,7 +224,7 @@ class SimLoad:
         return self.__conf_params
 
     @cached_property
-    def type(self):
+    def type(self) -> AnyModel:
         """Return object type which implement in `config_object` key."""
         if not (_typ := self.data.get("type")):
             raise ValueError(

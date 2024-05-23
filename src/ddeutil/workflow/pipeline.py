@@ -278,6 +278,7 @@ class Pipeline(BaseModel):
         for job_id in self.jobs:
             print(f"[PIPELINE]: Start execute the job: {job_id!r}")
             job = self.jobs[job_id]
-            # TODO: Condition on ``needs`` of this job was set
+            # TODO: Condition on ``needs`` of this job was set. It should create
+            #   multithreading process on this step.
             job.execute(params=params)
         return params

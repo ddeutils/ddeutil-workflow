@@ -3,20 +3,21 @@
 #
 #   * The source table should dynamic picking with schema and table names
 #   * Incremental loading with ``run_date`` parameter
-ingest_postgres_to_adls:
-  version: '1'
+# ---
+ingest_postgres_to_minio:
   type: pipeline.Pipeline
   desc: Extract and download data from Postgres to Azure Data Lake
   params:
-    run_date: ${{ ... }}
-    source: ${{ ... }}
-    target: ${{ ... }}
+    run-date: utils.receive.datetime
+    source: utils.receive.string
+    target: utils.receive.string
   jobs:
     extract-load:
       stages:
         - name: Extract & Load
-          uses: tasks.copy.Polars:postgres-delta
-          with:
+          id: extract-load
+          task: tasks.el.PostgresToDelta
+          args:
             source:
               conn: ${{ source.conn }}
               query: |
@@ -31,4 +32,24 @@ ingest_postgres_to_adls:
             sink:
               conn: ${{ target.conn }}
               endpoint: /persisted/${{ target.schema }}/${{ target.path }}
-              format: parquet
+
+
+ingest_local_to_local:
+  type: pipeline.Pipeline
+  params:
+    run-date: utils.receive.datetime
+    source: utils.receive.string
+    target: utils.receive.string
+  jobs:
+    extract-load:
+      stages:
+        - name: Extract & Load Local System
+          id: extract-load
+          task: tasks/extract-loadl@polars
+          args:
+            source:
+              dataset: ...
+            conversion:
+              ...
+            sink:
+              dataset: ...

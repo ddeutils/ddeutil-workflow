@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Annotated, Any, Literal, Optional
+from typing import Annotated, Any, Literal, Optional, TypeVar
 
 from ddeutil.io import Params
 from ddeutil.model.conn import Conn as ConnModel
@@ -96,46 +96,25 @@ class BaseConn(BaseModel):
 
 
 class Conn(BaseConn):
-    """Conn (Connection) Model"""
+    """Conn (Connection) Model that implement any necessary methods. This object
+    should be the base for abstraction to any connection model object.
+    """
 
     def ping(self) -> bool:
+        """Ping the connection that able to use with this field value."""
         raise NotImplementedError("Ping does not implement")
 
     def glob(self, pattern: str) -> Iterator[Any]:
         """Return a list of object from the endpoint of this connection."""
         raise NotImplementedError("Glob does not implement")
 
-
-class SSHCred(BaseModel):
-    ssh_host: str
-    ssh_user: str
-    ssh_password: Optional[SecretStr] = Field(default=None)
-    ssh_private_key: Optional[str] = Field(default=None)
-    ssh_private_key_pwd: Optional[SecretStr] = Field(default=None)
-    ssh_port: int = Field(default=22)
-
-
-class S3Cred(BaseModel):
-    aws_access_key: str
-    aws_secret_access_key: SecretStr
-    region: str = Field(default="ap-southeast-1")
-    role_arn: Optional[str] = Field(default=None)
-    role_name: Optional[str] = Field(default=None)
-    mfa_serial: Optional[str] = Field(default=None)
-
-
-class AZServPrinCred(BaseModel):
-    tenant: str
-    client_id: str
-    secret_id: SecretStr
-
-
-class GoogleCred(BaseModel):
-    google_json_path: str
+    def get_spec(self) -> str:
+        """Return full connection url that construct from all fields."""
+        return f"{self.dialect}:///{self.endpoint}"
 
 
 class FlSys(Conn):
-    """File System Connection"""
+    """File System Connection."""
 
     dialect: Literal["local"] = "local"
 
@@ -145,11 +124,10 @@ class FlSys(Conn):
     def glob(self, pattern: str) -> Iterator[Path]:
         yield from Path(self.endpoint).rglob(pattern=pattern)
 
-    def get_spec(self) -> str:
-        return f"{self.dialect}:///{self.endpoint}"
-
 
 class SFTP(Conn):
+    """SFTP Server Connection."""
+
     dialect: Literal["sftp"] = "sftp"
 
     def __client(self):
@@ -209,3 +187,34 @@ class Doc(Conn):
 
 
 class Mongo(Doc): ...
+
+
+class SSHCred(BaseModel):
+    ssh_host: str
+    ssh_user: str
+    ssh_password: Optional[SecretStr] = Field(default=None)
+    ssh_private_key: Optional[str] = Field(default=None)
+    ssh_private_key_pwd: Optional[SecretStr] = Field(default=None)
+    ssh_port: int = Field(default=22)
+
+
+class S3Cred(BaseModel):
+    aws_access_key: str
+    aws_secret_access_key: SecretStr
+    region: str = Field(default="ap-southeast-1")
+    role_arn: Optional[str] = Field(default=None)
+    role_name: Optional[str] = Field(default=None)
+    mfa_serial: Optional[str] = Field(default=None)
+
+
+class AZServPrinCred(BaseModel):
+    tenant: str
+    client_id: str
+    secret_id: SecretStr
+
+
+class GoogleCred(BaseModel):
+    google_json_path: str
+
+
+SubclassConn = TypeVar("SubclassConn", bound=Conn)

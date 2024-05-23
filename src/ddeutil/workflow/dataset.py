@@ -19,6 +19,7 @@ except ImportError:
     ) from None
 
 from .__types import DictData, TupleStr
+from .conn import SubclassConn
 from .loader import SimLoad
 
 EXCLUDED_EXTRAS: TupleStr = ("type",)
@@ -31,7 +32,9 @@ def get_simple_conn(name: str, params: str, externals: dict[str, Any]):
 
 
 class BaseDataset(BaseModel):
-    conn: str
+    """Base Dataset Model."""
+
+    conn: SubclassConn
     endpoint: Annotated[
         Optional[str],
         Field(description="Endpoint of connection"),
@@ -49,9 +52,9 @@ class BaseDataset(BaseModel):
     ) -> Self:
         """Construct Connection with Loader object with specific config name.
 
-        :param name:
-        :param params:
-        :param externals:
+        :param name: A name of dataset that want to load from config file.
+        :param params: A params instance that use with the Loader object.
+        :param externals: An external parameters.
         """
         loader: SimLoad = SimLoad(name, params=params, externals=externals)
         filter_data: DictData = {
@@ -59,11 +62,28 @@ class BaseDataset(BaseModel):
             for k in loader.data.copy()
             if k not in cls.model_fields and k not in EXCLUDED_EXTRAS
         }
+
+        if "conn" not in loader.data:
+            raise ValueError("Dataset config does not set ``conn`` value")
+
+        # NOTE: Start loading connection config
+        conn_loader: SimLoad = SimLoad(
+            loader.data.pop("conn"),
+            params=params,
+            externals=externals,
+        )
+
+        if "endpoint" in loader.data:
+            conn_loader.data["endpoint"] = loader.data["endpoint"]
+        else:
+            loader.data.update({"endpoint": conn_loader.data["endpoint"]})
+
         return cls.model_validate(
             obj={
                 "extras": (
                     loader.data.pop("extras", {}) | filter_data | externals
                 ),
+                "conn": conn_loader.type.model_validate(obj=conn_loader.data),
                 **loader.data,
             }
         )
