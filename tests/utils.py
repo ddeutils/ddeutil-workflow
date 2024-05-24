@@ -13,6 +13,9 @@ def dotenv_setting() -> None:
     env_path: Path = OUTSIDE_PATH / ".env"
     if not env_path.exists():
         logging.warning("Dot env file does not exists")
+        # ROOT_PATH:
+        #   * Windows: D:\user\path\...
+        #   * Ubuntu: ...
         env_str: str = dedent(
             f"""
             ROOT_PATH={OUTSIDE_PATH.resolve()}
