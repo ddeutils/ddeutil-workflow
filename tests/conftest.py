@@ -68,7 +68,7 @@ def params_session(
         shutil.rmtree(test_path / ".cache")
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="session")
 def params_simple(
     conf_path: Path,
     root_path: Path,

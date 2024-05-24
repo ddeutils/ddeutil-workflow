@@ -2,12 +2,12 @@
 # ---
 ds_json_local_file:
   type: dataset.PolarsJson
-  conn: conn_local_file
-  endpoint: C:/home/warehouse/raw/
-  object: sales_transaction/sales_{datetime:%Y%m%d}.json
+  conn: "conn_local_file"
+  endpoint: "${ROOT_PATH}/tests/data/examples"
+  object: demo_iot.json
 
 ds_csv_local_file:
-  type: dataset.PolarsCSV
+  type: dataset.PolarsCsv
   conn: "conn_local_file"
   endpoint: "${ROOT_PATH}/tests/data/examples"
   object: demo_customer.csv
@@ -20,11 +20,11 @@ ds_csv_local_file:
 # ---
 ds_postgres_dwh:
   type: dataset.PostgresTbl
-  conn: conn_postgres
-  endpoint: postgres
+  conn: "conn_postgres"
+  endpoint: "postgres"
   object: curated.order_inbound
 
 ds_sqlite_metadata:
   type: dataset.SqliteTbl
-  conn: conn_sqlite_url
+  conn: "conn_sqlite_url"
   endpoint: metadata_table

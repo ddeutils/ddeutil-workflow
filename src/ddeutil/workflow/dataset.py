@@ -61,6 +61,11 @@ class BaseDataset(BaseModel):
         :param externals: An external parameters.
         """
         loader: SimLoad = SimLoad(name, params=params, externals=externals)
+
+        # NOTE: Validate the config type match with current dataset model
+        if loader.type != cls:
+            raise ValueError(f"Type {loader.type} does not match with {cls}")
+
         filter_data: DictData = {
             k: loader.data.pop(k)
             for k in loader.data.copy()
@@ -99,12 +104,16 @@ class Dataset(BaseDataset):
         raise NotImplementedError("Object exists does not implement")
 
 
-class DfDataset(Dataset): ...
+class DfDataset(Dataset):
+
+    def exists(self) -> bool:
+        return self.conn.find_object(self.object)
 
 
 class TblDataset(Dataset):
 
-    def exists(self) -> bool: ...
+    def exists(self) -> bool:
+        return self.conn.find_object(self.object)
 
 
 class PandasCSV: ...
@@ -122,7 +131,7 @@ class PandasDb: ...
 class PandasExcel: ...
 
 
-class PolarsCSVOptions(BaseModel):
+class PolarsCsvArgs(BaseModel):
     """CSV file should use format rfc4180 as CSV standard format.
 
     docs: [RFC4180](https://datatracker.ietf.org/doc/html/rfc4180)
@@ -134,11 +143,8 @@ class PolarsCSVOptions(BaseModel):
     encoding: str = "utf-8"
 
 
-class PolarsCSV(DfDataset):
-    extras: PolarsCSVOptions
-
-    def exists(self) -> bool:
-        return self.conn.find_object(self.object)
+class PolarsCsv(DfDataset):
+    extras: PolarsCsvArgs
 
     def load_options(self) -> dict[str, Any]:
         return {
@@ -172,14 +178,32 @@ class PolarsCSV(DfDataset):
         options: dict[str, Any] | None = None,
     ) -> None:
         """Save Polars Dataframe to CSV file with ``write_csv`` method."""
-        # FIXME: Save CSV does not support for the fsspec file url.
+        # FIXME: Save Csv does not support for the fsspec file url.
         return df.write_csv(
             f"{self.conn.endpoint}/{_object or self.object}",
             **(self.save_options() | (options or {})),
         )
 
 
-class PolarsParq: ...
+class PolarsJson(DfDataset):
+
+    def load(
+        self,
+        _object: str | None = None,
+        options: dict[str, Any] | None = None,
+    ):
+        """Load Json file to Polars Dataframe with ``read_json`` method."""
+        # FIXME: Load Json does not support for the fsspec file url.
+        return pl.read_json(
+            f"{self.conn.endpoint}/{_object or self.object}",
+            **(options or {}),
+        )
+
+
+class PolarsNdJson(DfDataset): ...
+
+
+class PolarsParq(DfDataset): ...
 
 
 class PostgresTbl(TblDataset): ...

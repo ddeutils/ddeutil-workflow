@@ -1,0 +1,28 @@
+[
+  {
+    "device": "A",
+    "data": [
+      {
+        "sensor": "F01",
+        "value": 13.001
+      },
+      {
+        "sensor": "F02",
+        "value": 100.01
+      }
+    ]
+  },
+  {
+    "device": "B",
+    "data": [
+      {
+        "sensor": "F01",
+        "value": 1.2
+      },
+      {
+        "sensor": "F02",
+        "value": 285
+      }
+    ]
+  }
+]

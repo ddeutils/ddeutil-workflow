@@ -57,8 +57,9 @@ class BaseConn(BaseModel):
         :param externals:
         """
         loader: SimLoad = SimLoad(name, params=params, externals=externals)
+        # NOTE: Validate the config type match with current connection model
         if loader.type != cls:
-            raise ValueError(f"Type {loader.type} does not match")
+            raise ValueError(f"Type {loader.type} does not match with {cls}")
         filter_data: DictData = {
             k: loader.data.pop(k)
             for k in loader.data.copy()
