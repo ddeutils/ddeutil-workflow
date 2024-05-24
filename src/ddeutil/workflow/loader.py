@@ -200,7 +200,7 @@ class SimLoad:
     config should to do next.
     """
 
-    import_prefix: str = "ddeutil.workflow."
+    import_prefix: str = "ddeutil.workflow"
 
     def __init__(
         self,
@@ -242,7 +242,7 @@ class SimLoad:
             return p
 
         try:
-            return {i: import_string(f"{self.import_prefix}{p[i]}") for i in p}
+            return {i: import_string(f"{self.import_prefix}.{p[i]}") for i in p}
         except ModuleNotFoundError as err:
             logging.error(err)
             raise err
@@ -257,6 +257,30 @@ class SimLoad:
         except ValueError as err:
             logging.error("Value that passing to params does not valid")
             raise err
+
+
+class Loader(SimLoad):
+    """Main Loader Object."""
+
+    def __init__(
+        self,
+        name: str,
+        externals: DictData,
+        *,
+        path: str | None = None,
+    ) -> None:
+        self.data: DictData = {}
+
+        # NOTE: import params object from specific config file
+        params: Params = self.config(path)
+
+        super().__init__(name, params, externals)
+
+    @classmethod
+    def config(cls, path: str | None = None) -> Params:
+        return Params.model_validate(
+            YamlEnvFl(path or "./workflows-conf.yaml").read()
+        )
 
 
 def map_caller(value: str, params: dict[str, Any]) -> Any:

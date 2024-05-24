@@ -8,7 +8,6 @@ from ddeutil.io.param import Params
 def test_connection_file(params_simple: Params):
     connection = conn.FlSys.from_loader(
         name="conn_local_file",
-        params=params_simple,
         externals={},
     )
     assert connection.host is None
@@ -21,7 +20,6 @@ def test_connection_file(params_simple: Params):
 def test_connection_file_url(params_simple: Params):
     connection = conn.FlSys.from_loader(
         name="conn_local_file_url",
-        params=params_simple,
         externals={},
     )
     assert (
@@ -39,7 +37,6 @@ def test_connection_file_url(params_simple: Params):
 def test_connection_file_url_ubuntu(params_simple: Params):
     connection = conn.FlSys.from_loader(
         name="conn_local_file_url_ubuntu",
-        params=params_simple,
         externals={},
     )
     assert connection.host is None
@@ -52,7 +49,6 @@ def test_connection_file_url_ubuntu(params_simple: Params):
 def test_connection_file_url_relative(params_simple: Params):
     connection = conn.FlSys.from_loader(
         name="conn_local_file_url_relative",
-        params=params_simple,
         externals={},
     )
     assert connection.host is None
@@ -66,7 +62,6 @@ def test_connection_file_url_relative(params_simple: Params):
 def test_connection_sftp(params_simple: Params):
     connection = conn.SFTP.from_loader(
         name="conn_sftp",
-        params=params_simple,
         externals={},
     )
     assert "data" == connection.endpoint
@@ -76,14 +71,12 @@ def test_connection_sftp(params_simple: Params):
 
 
 def test_connection_sqlite(params_simple: Params):
-    connection = conn.SQLite.from_loader(
-        name="conn_sqlite_url", params=params_simple, externals={}
-    )
+    connection = conn.SQLite.from_loader(name="conn_sqlite_url", externals={})
     connection.ping()
 
 
 def test_connection_sqlite_failed(params_simple: Params):
     connection = conn.SQLite.from_loader(
-        name="conn_sqlite_url_failed", params=params_simple, externals={}
+        name="conn_sqlite_url_failed", externals={}
     )
     assert not connection.ping()

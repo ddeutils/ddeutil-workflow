@@ -1,4 +1,4 @@
 engine:
   paths:
-    conf: "${ROOT_PATH}/tests/data/conf"
-    root: "${ROOT_PATH}"
+    conf: "${ROOT_PATH:.}/tests/data/conf"
+    root: "${ROOT_PATH:.}"

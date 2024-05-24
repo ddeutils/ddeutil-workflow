@@ -20,7 +20,7 @@ except ImportError:
 
 from .__types import DictData, TupleStr
 from .conn import SubclassConn
-from .loader import SimLoad
+from .loader import Loader, SimLoad
 
 EXCLUDED_EXTRAS: TupleStr = ("type",)
 
@@ -76,9 +76,8 @@ class BaseDataset(BaseModel):
             raise ValueError("Dataset config does not set ``conn`` value")
 
         # NOTE: Start loading connection config
-        conn_loader: SimLoad = SimLoad(
+        conn_loader: Loader = Loader(
             loader.data.pop("conn"),
-            params=params,
             externals=externals,
         )
 

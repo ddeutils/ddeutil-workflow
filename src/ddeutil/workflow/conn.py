@@ -10,7 +10,6 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Annotated, Any, Literal, Optional, TypeVar
 
-from ddeutil.io import Params
 from ddeutil.model.conn import Conn as ConnModel
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.functional_validators import field_validator
@@ -18,7 +17,7 @@ from pydantic.types import SecretStr
 from typing_extensions import Self
 
 from .__types import DictData, TupleStr
-from .loader import SimLoad
+from .loader import Loader
 
 EXCLUDED_EXTRAS: TupleStr = (
     "type",
@@ -47,16 +46,14 @@ class BaseConn(BaseModel):
     def from_loader(
         cls,
         name: str,
-        params: Params,
         externals: DictData,
     ) -> Self:
         """Construct Connection with Loader object with specific config name.
 
         :param name:
-        :param params:
         :param externals:
         """
-        loader: SimLoad = SimLoad(name, params=params, externals=externals)
+        loader: Loader = Loader(name, externals=externals)
         # NOTE: Validate the config type match with current connection model
         if loader.type != cls:
             raise ValueError(f"Type {loader.type} does not match with {cls}")

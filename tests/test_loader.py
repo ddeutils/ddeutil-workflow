@@ -31,7 +31,7 @@ def params(
         shutil.rmtree(test_path / ".cache")
 
 
-def test_loader(params: Params):
+def test_base_loader(params: Params):
     load: ld.BaseLoad = ld.BaseLoad.from_register(
         name="demo:conn_local_file",
         params=params,
@@ -44,3 +44,8 @@ def test_loader(params: Params):
         "endpoint": "data/examples/",
         "type": "conn.FlSys",
     } == load.data
+
+
+def test_loader(conf_path):
+    loader = ld.Loader.config()
+    assert conf_path == loader.engine.paths.conf
