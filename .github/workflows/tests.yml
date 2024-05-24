@@ -42,7 +42,7 @@ jobs:
         id: cache
         with:
           path: .venv
-          key: ${{ runner.os }}-python-${{ steps.setup_python.outputs.python-version }}-${{ hashFiles('pyproject.toml') }}-test
+          key: ${{ runner.os }}-python-${{ steps.setup_python.outputs.python-version }}-${{ hashFiles('pyproject.toml') }}-test-01
 
       - name: Install Python Dependencies
         if: steps.cache.outputs.cache-hit != 'true'
