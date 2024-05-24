@@ -204,7 +204,7 @@ class TaskStage(EmptyStage):
         try:
             rs = task_caller(**self.args)
         except Exception as err:
-            raise TaskException(f"{err.__class__.__name__}: {err}") from None
+            raise TaskException(f"{err.__class__.__name__}: {err}") from err
         return {"output": rs}
 
 

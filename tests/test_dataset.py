@@ -5,10 +5,9 @@ import ddeutil.workflow.dataset as ds
 import polars as pl
 
 
-def test_polars_csv(params_simple):
+def test_polars_csv():
     dataset = ds.PolarsCsv.from_loader(
         "ds_csv_local_file",
-        params=params_simple,
         externals={},
     )
     assert f"{os.getenv('ROOT_PATH')}/tests/data/examples" == dataset.endpoint
@@ -54,10 +53,9 @@ def test_polars_csv(params_simple):
     ).unlink(missing_ok=True)
 
 
-def test_polars_json_nested(params_simple):
+def test_polars_json_nested():
     dataset = ds.PolarsJson.from_loader(
         "ds_json_local_file",
-        params=params_simple,
         externals={},
     )
     assert f"{os.getenv('ROOT_PATH')}/tests/data/examples" == dataset.endpoint

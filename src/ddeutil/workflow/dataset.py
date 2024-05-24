@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Optional
 
-from ddeutil.io import Params
 from pydantic import BaseModel, Field
 from typing_extensions import Self
 
@@ -20,18 +19,17 @@ except ImportError:
 
 from .__types import DictData, TupleStr
 from .conn import SubclassConn
-from .loader import Loader, SimLoad
+from .loader import Loader
 
 EXCLUDED_EXTRAS: TupleStr = ("type",)
 
 
 def get_simple_conn(
     name: str,
-    params: str,
     externals: dict[str, Any],
 ) -> SubclassConn:
     """Get Connection config with Simple Loader object."""
-    loader: SimLoad = SimLoad(name, params=params, externals=externals)
+    loader: Loader = Loader(name, externals=externals)
     return loader.type.model_validate(loader.data)
 
 
@@ -51,7 +49,6 @@ class BaseDataset(BaseModel):
     def from_loader(
         cls,
         name: str,
-        params: Params,
         externals: DictData,
     ) -> Self:
         """Construct Connection with Loader object with specific config name.
@@ -60,7 +57,7 @@ class BaseDataset(BaseModel):
         :param params: A params instance that use with the Loader object.
         :param externals: An external parameters.
         """
-        loader: SimLoad = SimLoad(name, params=params, externals=externals)
+        loader: Loader = Loader(name, externals=externals)
 
         # NOTE: Validate the config type match with current dataset model
         if loader.type != cls:

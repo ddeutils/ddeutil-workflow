@@ -47,5 +47,5 @@ ingest_local_to_local:
           id: extract-load
           task: tasks/el-csv-to-parquet@polars
           args:
-            source: "..."
-            sink: "..."
+            source: "ds_csv_local_file"
+            sink: "ds_parquet_local_file"
