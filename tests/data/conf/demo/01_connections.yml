@@ -24,6 +24,11 @@ conn_local_file_url_ubuntu:
   # Absolute Ubuntu path.
   url: "local:////home/runner/work/foo"
 
+conn_local_file_ubuntu:
+  type: conn.FlSys
+  # Absolute Ubuntu path.
+  endpoint: "/home/runner/work/foo"
+
 conn_local_file_url_relative:
   type: conn.FlSys
   url: "local:///data/examples/"

@@ -46,6 +46,18 @@ def test_connection_file_url_ubuntu(params_simple: Params):
     assert connection.pwd is None
 
 
+def test_connection_file_ubuntu(params_simple: Params):
+    connection = conn.FlSys.from_loader(
+        name="conn_local_file_ubuntu",
+        externals={},
+    )
+    assert "/home/runner/work/foo" == connection.endpoint
+    assert connection.host is None
+    assert connection.port is None
+    assert connection.user is None
+    assert connection.pwd is None
+
+
 def test_connection_file_url_relative(params_simple: Params):
     connection = conn.FlSys.from_loader(
         name="conn_local_file_url_relative",

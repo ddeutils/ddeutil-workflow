@@ -73,7 +73,7 @@ class BaseConn(BaseModel):
                 # NOTE:
                 #   I will replace None endpoint with memory value for SQLite
                 #   connection string.
-                endpoint=url.endpoint or "memory",
+                endpoint=cls.__prepare_slash_from_url(url.endpoint or "memory"),
                 # NOTE: This order will show that externals this the top level.
                 extras=(url.options | filter_data | externals),
             )
@@ -86,9 +86,15 @@ class BaseConn(BaseModel):
             }
         )
 
+    @classmethod
+    def __prepare_slash_from_url(cls, value: str) -> str:
+        if value.startswith("/"):
+            return value[1:]
+        return value
+
     @field_validator("endpoint")
     def __prepare_slash(cls, value: str) -> str:
-        if value.startswith("/"):
+        if value.startswith("//"):
             return value[1:]
         return value
 
