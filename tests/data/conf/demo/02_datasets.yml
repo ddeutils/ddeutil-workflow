@@ -6,6 +6,12 @@ ds_json_local_file:
   endpoint: "${ROOT_PATH}/tests/data/examples"
   object: demo_iot.json
 
+ds_json_local_file_ubuntu:
+  type: dataset.PolarsJson
+  conn: "conn_local_file_url_ubuntu"
+  endpoint: "/home/runner/work/examples"
+  object: demo_iot.json
+
 ds_csv_local_file:
   type: dataset.PolarsCsv
   conn: "conn_local_file"

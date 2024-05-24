@@ -54,7 +54,6 @@ class BaseDataset(BaseModel):
         """Construct Connection with Loader object with specific config name.
 
         :param name: A name of dataset that want to load from config file.
-        :param params: A params instance that use with the Loader object.
         :param externals: An external parameters.
         """
         loader: Loader = Loader(name, externals=externals)
@@ -73,22 +72,23 @@ class BaseDataset(BaseModel):
             raise ValueError("Dataset config does not set ``conn`` value")
 
         # NOTE: Start loading connection config
-        conn_loader: Loader = Loader(
-            loader.data.pop("conn"),
-            externals=externals,
+        conn_name: str = loader.data.pop("conn")
+        conn_loader: Loader = Loader(conn_name, externals=externals)
+        conn_model: SubclassConn = conn_loader.type.from_loader(
+            name=conn_name, externals=externals
         )
 
         # Note: Override ``endpoint`` value to getter connection data
         if "endpoint" in loader.data:
-            conn_loader.data["endpoint"] = loader.data["endpoint"]
+            conn_model.__dict__["endpoint"] = loader.data["endpoint"]
         else:
-            loader.data.update({"endpoint": conn_loader.data["endpoint"]})
+            loader.data.update({"endpoint": conn_model.endpoint})
         return cls.model_validate(
             obj={
                 "extras": (
                     loader.data.pop("extras", {}) | filter_data | externals
                 ),
-                "conn": conn_loader.type.model_validate(obj=conn_loader.data),
+                "conn": conn_model,
                 **loader.data,
             }
         )

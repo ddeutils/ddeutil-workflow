@@ -55,3 +55,11 @@ def test_polars_json_nested():
     print(df)
     df = df.explode("sensor")
     print(df.schema)
+
+
+def test_polars_json_nested_ubuntu():
+    dataset = ds.PolarsJson.from_loader(
+        "ds_json_local_file_ubuntu", externals={}
+    )
+    assert "/home/runner/work/examples" == dataset.endpoint
+    assert "/home/runner/work/examples" == dataset.conn.endpoint

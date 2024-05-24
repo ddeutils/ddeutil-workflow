@@ -39,11 +39,11 @@ def test_connection_file_url_ubuntu(params_simple: Params):
         name="conn_local_file_url_ubuntu",
         externals={},
     )
+    assert "/home/runner/work/foo" == connection.endpoint
     assert connection.host is None
     assert connection.port is None
     assert connection.user is None
     assert connection.pwd is None
-    assert "/absolute/path/to/foo" == connection.endpoint
 
 
 def test_connection_file_url_relative(params_simple: Params):

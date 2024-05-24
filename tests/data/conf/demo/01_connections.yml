@@ -22,7 +22,7 @@ conn_local_file_url:
 conn_local_file_url_ubuntu:
   type: conn.FlSys
   # Absolute Ubuntu path.
-  url: "local:////absolute/path/to/foo"
+  url: "local:////home/runner/work/foo"
 
 conn_local_file_url_relative:
   type: conn.FlSys
