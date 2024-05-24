@@ -14,7 +14,7 @@ def dotenv_setting() -> None:
     if not env_path.exists():
         logging.warning("Dot env file does not exists")
         # ROOT_PATH:
-        #   * Windows: D:\user\path\...
+        #   * Windows: D:\user\path\...\ddeutil-workflow
         #   * Ubuntu: /home/runner/work/ddeutil-workflow/ddeutil-workflow
         env_str: str = dedent(
             f"""

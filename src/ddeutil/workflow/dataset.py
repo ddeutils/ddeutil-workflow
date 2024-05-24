@@ -78,8 +78,9 @@ class BaseDataset(BaseModel):
             name=conn_name, externals=externals
         )
 
-        # Note: Override ``endpoint`` value to getter connection data
+        # NOTE: Override ``endpoint`` value to getter connection data.
         if "endpoint" in loader.data:
+            # NOTE: Update endpoint path without Pydantic validator.
             conn_model.__dict__["endpoint"] = loader.data["endpoint"]
         else:
             loader.data.update({"endpoint": conn_model.endpoint})

@@ -34,7 +34,7 @@ services:
             - MINIO_ROOT_PASSWORD=${MINIO_PASS}
             - MINIO_DEFAULT_BUCKETS=${MINIO_BUCKET}
         volumes:
-            - ./mnt/minio_data:/bitnami/minio/data
+            - ../mnt/minio_data:/bitnami/minio/data
 
 #    postgres:
 #        container_name: postgres

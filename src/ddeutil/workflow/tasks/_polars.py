@@ -7,14 +7,23 @@ from __future__ import annotations
 
 from typing import Any
 
-from ddeutil.workflow.dataset import PolarsCsv
+import ddeutil.workflow.dataset as ds
 
 
 def csv_to_parquet(
-    source: str, sink: str, conversion: dict[str, Any] | None = None
+    source: str,
+    sink: str,
+    conversion: dict[str, Any] | None = None,
 ):
-    source = PolarsCsv.from_loader(name=source, externals={})
+    # STEP 01: Read the source data to Polars.
+    source = ds.PolarsCsv.from_loader(name=source, externals={})
     print(source)
-    print(sink)
+
+    # STEP 02: Schema conversion on Polars DataFrame.
+    conversion: dict[str, Any] = conversion or {}
     print(conversion)
+
+    # STEP 03: Write data to parquet file format.
+    sink = ds.PolarsParq.from_loader(name=sink, externals={})
+    print(sink)
     return "Success CSV to Parquet with Polars engine"
