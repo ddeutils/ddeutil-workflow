@@ -5,8 +5,11 @@
 # ------------------------------------------------------------------------------
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Annotated, Any, Optional
 
+from fmtutil import Datetime, FormatterGroupType, make_group
+from fmtutil.utils import escape_fmt_group
 from pydantic import BaseModel, Field
 from typing_extensions import Self
 
@@ -22,19 +25,15 @@ from .conn import SubclassConn
 from .loader import Loader
 
 EXCLUDED_EXTRAS: TupleStr = ("type",)
-
-
-def get_simple_conn(
-    name: str,
-    externals: dict[str, Any],
-) -> SubclassConn:
-    """Get Connection config with Simple Loader object."""
-    loader: Loader = Loader(name, externals=externals)
-    return loader.type.model_validate(loader.data)
+OBJ_FMTS: FormatterGroupType = make_group(
+    {
+        "datetime": Datetime,
+    }
+)
 
 
 class BaseDataset(BaseModel):
-    """Base Dataset Model."""
+    """Base Dataset Model. This model implement only loading constructor."""
 
     conn: Annotated[SubclassConn, Field(description="Connection Model")]
     endpoint: Annotated[
@@ -100,8 +99,25 @@ class Dataset(BaseDataset):
     def exists(self) -> bool:
         raise NotImplementedError("Object exists does not implement")
 
+    def format_object(
+        self,
+        _object: str | None = None,
+        dt: str | datetime | None = None,
+    ) -> str:
+        """Format the object value that implement datetime"""
+        if dt is None:
+            dt = datetime.now()
+        dt: datetime = (
+            dt if isinstance(dt, datetime) else datetime.fromisoformat(dt)
+        )
+        return (
+            OBJ_FMTS({"datetime": dt})
+            .format(escape_fmt_group(_object or self.object))
+            .replace("\\", "")
+        )
 
-class DfDataset(Dataset):
+
+class FlDataset(Dataset):
 
     def exists(self) -> bool:
         return self.conn.find_object(self.object)
@@ -111,6 +127,15 @@ class TblDataset(Dataset):
 
     def exists(self) -> bool:
         return self.conn.find_object(self.object)
+
+
+class FlDataFrame(Dataset):
+
+    def exists(self) -> bool:
+        return self.conn.find_object(self.object)
+
+
+class TblDataFrame(Dataset): ...
 
 
 class PandasCSV: ...
@@ -140,7 +165,7 @@ class PolarsCsvArgs(BaseModel):
     encoding: str = "utf-8"
 
 
-class PolarsCsv(DfDataset):
+class PolarsCsv(FlDataFrame):
     extras: PolarsCsvArgs
 
     def load_options(self) -> dict[str, Any]:
@@ -213,17 +238,20 @@ class PolarsCsv(DfDataset):
         )
 
 
-class PolarsJson(DfDataset):
+class PolarsJson(FlDataFrame):
 
     def load(
         self,
         _object: str | None = None,
         options: dict[str, Any] | None = None,
+        *,
+        dt: str | datetime | None = None,
     ):
         """Load Json file to Polars Dataframe with ``read_json`` method."""
         # FIXME: Load Json does not support for the fsspec file url.
         return pl.read_json(
-            f"{self.conn.endpoint}/{_object or self.object}",
+            f"{self.conn.endpoint}/"
+            f"{self.format_object(_object or self.object, dt=dt)}",
             **(options or {}),
         )
 
@@ -235,10 +263,10 @@ class PolarsJson(DfDataset):
     ): ...
 
 
-class PolarsNdJson(DfDataset): ...
+class PolarsNdJson(FlDataFrame): ...
 
 
-class PolarsParq(DfDataset):
+class PolarsParq(FlDataFrame):
 
     def save(
         self,
@@ -246,10 +274,15 @@ class PolarsParq(DfDataset):
         _object: str | None = None,
         options: dict[str, Any] | None = None,
     ):
-        return df.write_parquet(...)
+        return df.write_parquet(
+            f"{self.conn.endpoint}/{_object or self.object}"
+        )
 
 
 class PostgresTbl(TblDataset): ...
 
 
 class SqliteTbl(TblDataset): ...
+
+
+class PolarsPostgres(TblDataFrame): ...

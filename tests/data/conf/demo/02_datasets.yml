@@ -42,4 +42,4 @@ ds_postgres_dwh:
 ds_sqlite_metadata:
   type: dataset.SqliteTbl
   conn: "conn_sqlite_url"
-  endpoint: metadata_table
+  object: metadata_table

@@ -56,6 +56,16 @@ def test_polars_json_nested():
     df = df.explode("sensor")
     print(df.schema)
 
+    print(
+        dataset.format_object("demo_iot_{datetime:%Y%m%d}.json", "2024-01-01")
+    )
+    df = dataset.load(
+        _object="demo_iot_{datetime:%Y%m%d}.json",
+        options={},
+        dt="2024-01-01",
+    )
+    print(df)
+
 
 def test_polars_json_nested_ubuntu():
     dataset = ds.PolarsJson.from_loader(
