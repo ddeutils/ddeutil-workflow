@@ -12,9 +12,18 @@ ds_csv_local_file:
   endpoint: "${ROOT_PATH}/tests/data/examples"
   object: demo_customer.csv
   extras:
-    encoding: "utf-8"
+    encoding: "utf8"  # 'utf8-lossy'
     separator: "|"
     header: true
+
+ds_parquet_local_file:
+  type: dataset.PolarsParq
+  conn: "conn_local_file"
+  object: "demo_parquet"
+  extras:
+    use_pyarrow: true
+    pyarrow_options:
+      partition_cols: ["..."]
 
 # Database Object Dataset
 # ---

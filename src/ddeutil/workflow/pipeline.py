@@ -13,6 +13,7 @@ from ddeutil.io import Params
 from pydantic import BaseModel, Field
 from typing_extensions import Self
 
+from .__regex import RegexConf
 from .__types import DictData
 from .exceptions import PipeArgumentError, PyException
 from .loader import SimLoad, map_caller
@@ -152,7 +153,14 @@ class TaskStage(EmptyStage):
     task: str
     args: dict[str, Any]
 
-    def execute(self, params: dict[str, Any]) -> dict[str, Any]: ...
+    @staticmethod
+    def extract_task(task: str):
+        if found := RegexConf.RE_TASK_FMT.search(task):
+            print(found.groupdict())
+        return task
+
+    def execute(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Execute the Task function."""
 
 
 class HookStage(EmptyStage):

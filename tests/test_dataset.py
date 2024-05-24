@@ -38,8 +38,23 @@ def test_polars_csv(params_simple):
         f"{os.getenv('ROOT_PATH')}/tests/data/examples/demo_customer_writer.csv"
     ).unlink(missing_ok=True)
 
+    df: pl.LazyFrame = dataset.scan()
+    assert [
+        "CustomerID",
+        "CustomerName",
+        "CustomerOrgs",
+        "CustomerRevenue",
+        "CustomerAge",
+        "CreateDate",
+    ] == df.columns
+    dataset.sink(df, _object="demo_customer_sink.csv")
+    # NOTE: Teardown and remove file that create from ``sink`` method.
+    Path(
+        f"{os.getenv('ROOT_PATH')}/tests/data/examples/demo_customer_sink.csv"
+    ).unlink(missing_ok=True)
 
-def test_polars_json(params_simple):
+
+def test_polars_json_nested(params_simple):
     dataset = ds.PolarsJson.from_loader(
         "ds_json_local_file",
         params=params_simple,
@@ -49,12 +64,7 @@ def test_polars_json(params_simple):
     assert "demo_iot.json" == dataset.object
     df = dataset.load(options={})
     print(df)
-    # df = (
-    #     df.select(
-    #         pl.all().exclude(["data"]),
-    #         pl.col("data").list.explode())
-    # )
-    # print(df)
-    df = df.explode("data")
+    df = df.unnest("data")
     print(df)
-    # print(df.unnest('data'))
+    df = df.explode("sensor")
+    print(df.schema)

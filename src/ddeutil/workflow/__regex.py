@@ -28,3 +28,17 @@ class RegexConf:
     RE_CALLER: Pattern = re.compile(
         __re_caller, MULTILINE | IGNORECASE | UNICODE | VERBOSE
     )
+
+    # NOTE: Search task
+    __re_task_fmt: str = r"""
+        ^
+            (?P<path>[^/@]+)
+            /
+            (?P<func>[^@]+)
+            @
+            (?P<tag>.+)
+        $
+    """
+    RE_TASK_FMT: Pattern = re.compile(
+        __re_task_fmt, MULTILINE | IGNORECASE | UNICODE | VERBOSE
+    )

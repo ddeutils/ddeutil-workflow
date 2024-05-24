@@ -158,10 +158,28 @@ class PolarsCsv(DfDataset):
         self,
         _object: str | None = None,
         options: dict[str, Any] | None = None,
+        *,
+        override: bool = False,
     ) -> pl.DataFrame:
-        """Load CSV file to Polars Dataframe with ``read_csv`` method."""
+        """Load CSV file to Polars DataFrame with ``read_csv`` method."""
         return pl.read_csv(
             f"{self.conn.get_spec()}/{_object or self.object}",
+            **(
+                (options or {})
+                if override
+                else (self.load_options() | (options or {}))
+            ),
+        )
+
+    def scan(
+        self,
+        _object: str | None = None,
+        options: dict[str, Any] | None = None,
+    ) -> pl.LazyFrame:
+        """Load CSV file to Polars LazyFrame with ``scan_csv`` method."""
+        # FIXME: Save Csv does not support for the fsspec file url.
+        return pl.scan_csv(
+            f"{self.conn.endpoint}/{_object or self.object}",
             **(self.load_options() | (options or {})),
         )
 
@@ -184,6 +202,19 @@ class PolarsCsv(DfDataset):
             **(self.save_options() | (options or {})),
         )
 
+    def sink(
+        self,
+        df: pl.LazyFrame,
+        _object: str | None = None,
+        options: dict[str, Any] | None = None,
+    ) -> None:
+        """Save Polars Dataframe to CSV file with ``sink_csv`` method."""
+        # FIXME: Save Csv does not support for the fsspec file url.
+        return df.sink_csv(
+            f"{self.conn.endpoint}/{_object or self.object}",
+            **(self.save_options() | (options or {})),
+        )
+
 
 class PolarsJson(DfDataset):
 
@@ -199,11 +230,26 @@ class PolarsJson(DfDataset):
             **(options or {}),
         )
 
+    def save(
+        self,
+        df: pl.DataFrame,
+        _object: str | None = None,
+        options: dict[str, Any] | None = None,
+    ): ...
+
 
 class PolarsNdJson(DfDataset): ...
 
 
-class PolarsParq(DfDataset): ...
+class PolarsParq(DfDataset):
+
+    def save(
+        self,
+        df: pl.DataFrame,
+        _object: str | None = None,
+        options: dict[str, Any] | None = None,
+    ):
+        return df.write_parquet(...)
 
 
 class PostgresTbl(TblDataset): ...

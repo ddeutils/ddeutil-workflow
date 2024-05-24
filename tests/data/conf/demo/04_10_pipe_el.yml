@@ -43,13 +43,11 @@ ingest_local_to_local:
   jobs:
     extract-load:
       stages:
-        - name: Extract & Load Local System
+        - name: "Extract & Load Local System"
           id: extract-load
-          task: tasks/polars-postgres-to-delta
+          task: tasks/el-csv-to-parquet@polars
           args:
             source:
-              dataset: ...
-            conversion:
-              ...
+              dataset: "..."
             sink:
-              dataset: ...
+              dataset: "..."

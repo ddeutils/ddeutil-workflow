@@ -1,8 +1,10 @@
+import pytest
 from ddeutil.workflow.__regex import RegexConf
 
 
-def test_regex_caller():
-    for tc, respec in (
+@pytest.mark.parametrize(
+    "value,expected",
+    (
         (
             "test data ${{ utils.params.data('test') }}",
             "utils.params.data('test')",
@@ -19,6 +21,26 @@ def test_regex_caller():
             "github.event.action",
         ),
         ("${{ value.split('{').split('}') }}", "value.split('{').split('}')"),
-    ):
-        rs = RegexConf.RE_CALLER.search(tc)
-        assert respec == rs.group("caller")
+    ),
+)
+def test_regex_caller(value, expected):
+    rs = RegexConf.RE_CALLER.search(value)
+    assert expected == rs.group("caller")
+
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        (
+            "tasks/el-csv-to-parquet@polars",
+            ("tasks", "el-csv-to-parquet", "polars"),
+        ),
+        (
+            "tasks.el/csv-to-parquet@pandas",
+            ("tasks.el", "csv-to-parquet", "pandas"),
+        ),
+    ],
+)
+def test_regex_task_format(value, expected):
+    rs = RegexConf.RE_TASK_FMT.search(value)
+    assert expected == tuple(rs.groupdict().values())
