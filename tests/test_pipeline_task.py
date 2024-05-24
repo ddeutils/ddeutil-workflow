@@ -10,4 +10,4 @@ def test_pipe_stage_task(params_simple):
 
     stage = pipeline.job("extract-load").stage("extract-load")
     print(stage)
-    print(stage.extract_task(stage.task))
+    stage.execute(params={})

@@ -5,9 +5,11 @@
 # ------------------------------------------------------------------------------
 from __future__ import annotations
 
+import inspect
 import subprocess
+from inspect import Parameter
 from subprocess import CompletedProcess
-from typing import Any, Optional, Union
+from typing import Any, Callable, Optional, Union
 
 from ddeutil.io import Params
 from pydantic import BaseModel, Field
@@ -15,7 +17,7 @@ from typing_extensions import Self
 
 from .__regex import RegexConf
 from .__types import DictData
-from .exceptions import PipeArgumentError, PyException
+from .exceptions import PipeArgumentError, PyException, TaskException
 from .loader import SimLoad, map_caller
 
 
@@ -149,18 +151,61 @@ class PyStage(EmptyStage):
         return params | {k: _globals[k] for k in params if k in _globals}
 
 
+class TaskSearch(BaseModel):
+    path: str
+    func: str
+    tag: str
+
+
 class TaskStage(EmptyStage):
     task: str
     args: dict[str, Any]
 
     @staticmethod
-    def extract_task(task: str):
+    def extract_task(task: str) -> Callable[[], Callable[[Any], Any]]:
+        """Extract Task string value to task function."""
         if found := RegexConf.RE_TASK_FMT.search(task):
-            print(found.groupdict())
-        return task
+            tasks = TaskSearch(**found.groupdict())
+
+            from ddeutil.core import import_string
+
+            rgt = import_string(f"ddeutil.workflow.{tasks.path}.registries")
+            if tasks.func not in rgt:
+                raise NotImplementedError(
+                    f"ddeutil.workflow.{tasks.path}.registries does not "
+                    f"implement registry: {tasks.func}."
+                )
+            if tasks.tag not in rgt[tasks.func]:
+                raise NotImplementedError(
+                    f"tag: {tasks.tag} does not found on registry func: "
+                    f"ddeutil.workflow.{tasks.path}.registries."
+                    f"{tasks.func}"
+                )
+            return rgt[tasks.func][tasks.tag]
+        raise ValueError("Task does not match with task format regex.")
 
     def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         """Execute the Task function."""
+        task_caller = self.extract_task(self.task)()
+        if not callable(task_caller):
+            raise ImportError("Task caller function does not callable.")
+
+        # NOTE: check task caller parameters
+        ips = inspect.signature(task_caller)
+        if any(
+            k not in self.args
+            for k in ips.parameters
+            if ips.parameters[k].default == Parameter.empty
+        ):
+            raise ValueError(
+                f"necessary parameters, ({', '.join(ips.parameters.keys())}), "
+                f"does not set to args"
+            )
+        try:
+            rs = task_caller(**self.args)
+        except Exception as err:
+            raise TaskException(f"{err.__class__.__name__}: {err}") from None
+        return {"output": rs}
 
 
 class HookStage(EmptyStage):
