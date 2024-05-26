@@ -3,9 +3,7 @@ import pytest
 
 
 def test_pipe_stage_py_raise(params_simple):
-    pipeline = pipe.Pipeline.from_loader(
-        name="run_python", params=params_simple, externals={}
-    )
+    pipeline = pipe.Pipeline.from_loader(name="run_python", externals={})
     stage = pipeline.job("raise-run").stage(stage_id="raise-error")
     assert stage.id == "raise-error"
     with pytest.raises(pipe.PyException):
@@ -14,9 +12,7 @@ def test_pipe_stage_py_raise(params_simple):
 
 def test_pipe_stage_py(params_simple):
     # NOTE: Get stage from the specific pipeline.
-    pipeline = pipe.Pipeline.from_loader(
-        name="run_python", params=params_simple, externals={}
-    )
+    pipeline = pipe.Pipeline.from_loader(name="run_python", externals={})
     stage: pipe.PyStage = pipeline.job("demo-run").stage(stage_id="run-var")
     assert stage.id == "run-var"
 
@@ -38,7 +34,7 @@ def test_pipe_stage_py(params_simple):
 
 def test_pipe_stage_py_func(params_simple):
     pipeline = pipe.Pipeline.from_loader(
-        name="run_python_with_params", params=params_simple, externals={}
+        name="run_python_with_params", externals={}
     )
     stage: pipe.PyStage = pipeline.job("second-job").stage(
         stage_id="create-func"
@@ -52,9 +48,7 @@ def test_pipe_stage_py_func(params_simple):
 
 
 def test_pipe_job_py(params_simple):
-    pipeline = pipe.Pipeline.from_loader(
-        name="run_python", params=params_simple, externals={}
-    )
+    pipeline = pipe.Pipeline.from_loader(name="run_python", externals={})
     demo_job: pipe.Job = pipeline.job("demo-run")
 
     # NOTE: Job params will change schema structure with {"params": { ... }}
@@ -70,9 +64,7 @@ def test_pipe_job_py(params_simple):
 
 @pytest.mark.skipif(True, reason="Because subprocess call on different OS")
 def test_pipe_stage_shell(params_simple):
-    pipeline = pipe.Pipeline.from_loader(
-        name="run_python", params=params_simple, externals={}
-    )
+    pipeline = pipe.Pipeline.from_loader(name="run_python", externals={})
     echo_env: pipe.Job = pipeline.job("shell-run").stage("echo-env")
     rs = echo_env.execute({})
     assert {
@@ -112,7 +104,6 @@ def test_subprocess_shell():
 def test_pipe_params_py(params_simple):
     pipeline = pipe.Pipeline.from_loader(
         name="run_python_with_params",
-        params=params_simple,
         externals={},
     )
     rs = pipeline.execute(
