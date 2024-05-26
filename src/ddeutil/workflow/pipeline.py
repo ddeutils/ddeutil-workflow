@@ -164,25 +164,39 @@ class TaskStage(EmptyStage):
     @staticmethod
     def extract_task(task: str) -> Callable[[], Callable[[Any], Any]]:
         """Extract Task string value to task function."""
-        if found := RegexConf.RE_TASK_FMT.search(task):
-            tasks = TaskSearch(**found.groupdict())
+        if not (found := RegexConf.RE_TASK_FMT.search(task)):
+            raise ValueError("Task does not match with task format regex.")
+        tasks = TaskSearch(**found.groupdict())
 
-            from ddeutil.core import import_string
+        from ddeutil.core import import_string
 
+        try:
             rgt = import_string(f"ddeutil.workflow.{tasks.path}.registries")
             if tasks.func not in rgt:
                 raise NotImplementedError(
                     f"ddeutil.workflow.{tasks.path}.registries does not "
                     f"implement registry: {tasks.func}."
                 )
-            if tasks.tag not in rgt[tasks.func]:
-                raise NotImplementedError(
-                    f"tag: {tasks.tag} does not found on registry func: "
-                    f"ddeutil.workflow.{tasks.path}.registries."
-                    f"{tasks.func}"
+        except ImportError:
+
+            # NOTE: Try to import this task function fom target module.
+            try:
+                return import_string(
+                    f"ddeutil.workflow.{tasks.path}.{tasks.func}"
                 )
-            return rgt[tasks.func][tasks.tag]
-        raise ValueError("Task does not match with task format regex.")
+            except ImportError:
+                raise NotImplementedError(
+                    f"ddeutil.workflow.{tasks.path} does not implement "
+                    f"registries or {tasks.func}."
+                ) from None
+
+        if tasks.tag not in rgt[tasks.func]:
+            raise NotImplementedError(
+                f"tag: {tasks.tag} does not found on registry func: "
+                f"ddeutil.workflow.{tasks.path}.registries."
+                f"{tasks.func}"
+            )
+        return rgt[tasks.func][tasks.tag]
 
     def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         """Execute the Task function."""

@@ -14,9 +14,9 @@ ingest_postgres_to_minio:
   jobs:
     extract-load:
       stages:
-        - name: Extract & Load
+        - name: "Extract & Load Postgres to Delta"
           id: extract-load
-          task: tasks.el.PostgresToDelta
+          task: tasks/el-postgres-to-delta@polars
           args:
             source:
               conn: ${{ source.conn }}
@@ -34,7 +34,7 @@ ingest_postgres_to_minio:
               endpoint: /persisted/${{ target.schema }}/${{ target.path }}
 
 
-ingest_local_to_local:
+ingest_csv_to_parquet:
   type: pipeline.Pipeline
   params:
     run-date: utils.receive.datetime
@@ -45,7 +45,7 @@ ingest_local_to_local:
       stages:
         - name: "Extract & Load Local System"
           id: extract-load
-          task: tasks/el-csv-to-parquet@polars
+          task: tasks/el-csv-to-parquet@polars-dir
           args:
             source: "ds_csv_local_file"
-            sink: "ds_parquet_local_file"
+            sink: "ds_parquet_local_file_dir"

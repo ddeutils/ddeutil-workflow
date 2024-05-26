@@ -25,11 +25,29 @@ ds_csv_local_file:
 ds_parquet_local_file:
   type: dataset.PolarsParq
   conn: "conn_local_file"
-  object: "demo_parquet"
+  endpoint: "${ROOT_PATH}/tests/data/examples"
+  object: "demo_parquet.snappy.parquet"
   extras:
+    compression: 'snappy'
+
+ds_parquet_local_file_partition:
+  type: dataset.PolarsParq
+  conn: "conn_local_file"
+  endpoint: "${ROOT_PATH}/tests/data/examples"
+  object: "demo_parquet_partition"
+  extras:
+    compression: 'snappy'
     use_pyarrow: true
     pyarrow_options:
-      partition_cols: ["..."]
+      partition_cols: ["CustomerID"]
+
+ds_parquet_local_file_dir:
+  type: dataset.PolarsParq
+  conn: "conn_local_file"
+  endpoint: "${ROOT_PATH}/tests/data/examples"
+  object: "demo_parquet"
+  extras:
+    compression: 'snappy'
 
 # Database Object Dataset
 # ---

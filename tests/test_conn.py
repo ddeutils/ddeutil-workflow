@@ -14,7 +14,7 @@ def test_connection_file(params_simple: Params):
     assert connection.port is None
     assert connection.user is None
     assert connection.pwd is None
-    assert "data/examples/" == connection.endpoint
+    assert "data/examples" == connection.endpoint
 
 
 def test_connection_file_url(params_simple: Params):

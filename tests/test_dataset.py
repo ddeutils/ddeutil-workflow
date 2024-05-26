@@ -73,3 +73,16 @@ def test_polars_json_nested_ubuntu():
     )
     assert "/home/runner/work/examples" == dataset.endpoint
     assert "/home/runner/work/examples" == dataset.conn.endpoint
+
+
+def test_polars_parquet_save(test_path):
+    df = pl.read_csv(
+        test_path / "data/examples/demo_customer.csv", separator="|"
+    )
+    print(df)
+    dataset = ds.PolarsParq.from_loader("ds_parquet_local_file", externals={})
+    print(dataset.save(df))
+    df = pl.read_parquet(
+        test_path / "data/examples/demo_parquet.snappy.parquet"
+    )
+    print(df)

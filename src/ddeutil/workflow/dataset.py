@@ -266,7 +266,20 @@ class PolarsJson(FlDataFrame):
 class PolarsNdJson(FlDataFrame): ...
 
 
+class PolarsParqArgs(BaseModel):
+    compression: Optional[str] = None
+    use_pyarrow: bool = False
+    pyarrow_options: dict[str, Any] = Field(default_factory=dict)
+
+
 class PolarsParq(FlDataFrame):
+    extras: PolarsParqArgs
+
+    def save_options(self):
+        excluded: list[str] = []
+        if not self.extras.pyarrow_options:
+            excluded.append("pyarrow_options")
+        return self.extras.model_dump(exclude=excluded)
 
     def save(
         self,
@@ -274,8 +287,13 @@ class PolarsParq(FlDataFrame):
         _object: str | None = None,
         options: dict[str, Any] | None = None,
     ):
-        return df.write_parquet(
+        print(
+            f"Start write parquet to "
             f"{self.conn.endpoint}/{_object or self.object}"
+        )
+        return df.write_parquet(
+            f"{self.conn.endpoint}/{_object or self.object}",
+            **(self.save_options() | (options or {})),
         )
 
 

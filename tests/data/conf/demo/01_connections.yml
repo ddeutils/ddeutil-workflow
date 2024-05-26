@@ -12,7 +12,7 @@
 #
 conn_local_file:
   type: conn.FlSys
-  endpoint: "data/examples/"
+  endpoint: "data/examples"
 
 conn_local_file_url:
   type: conn.FlSys

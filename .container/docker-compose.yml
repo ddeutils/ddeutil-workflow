@@ -13,7 +13,7 @@ services:
             # Mount data path
             - ../mnt/home/${DATA_STORE}:/home/${SFTP_USER}/${DATA_STORE}
             # Execute custom scripts or applications
-            - ../scripts/sftp_init.sh:/etc/sftp.d/init.sh:ro
+            - ./scripts/sftp_init.sh:/etc/sftp.d/init.sh:ro
         ports:
             - "2222:22"
         environment:
