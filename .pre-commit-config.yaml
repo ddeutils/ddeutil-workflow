@@ -52,13 +52,13 @@ repos:
     hooks:
     -   id: shelf-commit-msg
 
-#-   repo: local
-#    hooks:
-#    -   id: pytest-check
-#        name: PyTest Runner
-#        stages: [push]
-#        types: [python]
-#        entry: venv/Scripts/pytest.exe -v
-#        language: system
-#        pass_filenames: false
-#        always_run: true
+-   repo: local
+    hooks:
+    -   id: pytest-check
+        name: PyTest Runner
+        stages: [push]
+        types: [python]
+        entry: venv/Scripts/pytest.exe -v
+        language: system
+        pass_filenames: false
+        always_run: true
