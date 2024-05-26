@@ -11,14 +11,13 @@ from inspect import Parameter
 from subprocess import CompletedProcess
 from typing import Any, Callable, Optional, Union
 
-from ddeutil.io import Params
 from pydantic import BaseModel, Field
 from typing_extensions import Self
 
 from .__regex import RegexConf
 from .__types import DictData
 from .exceptions import PipeArgumentError, PyException, TaskException
-from .loader import SimLoad, map_caller
+from .loader import Loader, map_caller
 
 
 class StageResult(BaseModel): ...
@@ -282,10 +281,9 @@ class Pipeline(BaseModel):
     def from_loader(
         cls,
         name: str,
-        params: Params,
         externals: DictData,
     ) -> Self:
-        loader: SimLoad = SimLoad(name, params=params, externals=externals)
+        loader: Loader = Loader(name, externals=externals)
         if "jobs" not in loader.data:
             raise PipeArgumentError("jobs", "Config does not set ``jobs``")
         return cls(

@@ -13,9 +13,8 @@
   - [Schedule](#schedule)
 - [Examples](#examples)
   - [Python](#python)
-  - [Extract & Load](#extract--load)
-  - [Transform](#transform)
-  - [ETL](#extract--transfrom--load)
+  - [Tasks (EL)](#tasks-extract--load)
+  - [Hooks (T)](#hooks-transform)
 
 This **Utility Workflow** objects was created for easy to make a simple metadata
 driven pipeline that able to **ETL, T, EL, or ELT** by `.yaml` file.
@@ -61,7 +60,7 @@ conn_postgres_data:
 ```python
 from ddeutil.workflow.conn import Conn
 
-conn = Conn.from_loader(name='conn_postgres_data', params=params, externals={})
+conn = Conn.from_loader(name='conn_postgres_data', externals={})
 assert conn.ping()
 ```
 
@@ -81,7 +80,7 @@ ds_postgres_customer_tbl:
 ```python
 from ddeutil.workflow.dataset import PostgresTbl
 
-dataset = PostgresTbl.from_loader(name='ds_postgres_customer_tbl', params=params, externals={})
+dataset = PostgresTbl.from_loader(name='ds_postgres_customer_tbl', externals={})
 assert dataset.exists()
 ```
 
@@ -96,7 +95,7 @@ schd_for_node:
 ```python
 from ddeutil.workflow.schedule import Scdl
 
-scdl = Scdl.from_loader(name='schd_for_node', params=params, externals={})
+scdl = Scdl.from_loader(name='schd_for_node', externals={})
 assert '*/5 * * * *' == str(scdl.cronjob)
 
 cron_iterate = scdl.generate('2022-01-01 00:00:00')
@@ -152,7 +151,7 @@ run_py_local:
 ```python
 from ddeutil.workflow.pipeline import Pipeline
 
-pipe = Pipeline.from_loader(name='run_py_local', params=params, externals={})
+pipe = Pipeline.from_loader(name='run_py_local', externals={})
 pipe.execute(params={'author-run': 'Local Workflow', 'run-date': '2024-01-01'})
 ```
 
@@ -162,7 +161,7 @@ pipe.execute(params={'author-run': 'Local Workflow', 'run-date': '2024-01-01'})
 > Hello Caller
 ```
 
-### Extract & Load
+### Tasks (Extract & Load)
 
 ```yaml
 pipe_el_pg_to_lake:
@@ -173,9 +172,9 @@ pipe_el_pg_to_lake:
   jobs:
     extract-load:
       stages:
-        - name: Extract Load from Postgres to Lake
+        - name: "Extract Load from Postgres to Lake"
           id: extract
-          uses: PostgresToDelta
+          task: tasks/postgres-to-delta@polars
           with:
             source:
               conn: conn_postgres_url
@@ -184,10 +183,10 @@ pipe_el_pg_to_lake:
                 where update_date = '${{ params.datetime }}'
             sink:
               conn: conn_az_lake
-              endpoint: /${{ params.name }}/
+              endpoint: "/${{ params.name }}"
 ```
 
-### Transform
+### Hooks (Transform)
 
 ```yaml
 pipe_hook_mssql_proc:
@@ -200,54 +199,15 @@ pipe_hook_mssql_proc:
   jobs:
     transform:
       stages:
-        - name: Transform Data in MS SQL Server
-          hook: MssqlProcHook
+        - name: "Transform Data in MS SQL Server"
+          hook: hooks/mssql-proc@odbc
           with:
             exec: ${{ params.sp_name }}
             params:
-              run_mode: T
+              run_mode: "T"
               run_date: ${{ params.run_date }}
               source: ${{ params.source_name }}
               target: ${{ params.target_name }}
-```
-
-### Extract & Transform & Load
-
-```yaml
-pipe_etl_postgres:
-  type: ddeutil.workflow.pipe.Pipeline
-  params:
-    run_date: utils.receive.datetime
-    sp_name: utils.receive.string
-    source_name: utils.receive.string
-    target_name: utils.receive.string
-  jobs:
-    etl:
-      run-on: IR-Name
-      stages:
-        - name: Extract to Polars
-          uses: PolarsDb
-          id: extract
-          with:
-            conn: conn_postgres_url
-            query: |
-              select ...
-        - name: Transform
-          env:
-            df: stages.extract.output.df
-          run: |
-            import polars as pl
-
-            df = (
-              df.withColumn('')
-                .withC
-                .withC
-                .drop(...)
-            )
-        - name: Load
-          users: PolarParq
-          with:
-            conn: ...
 ```
 
 ## License
