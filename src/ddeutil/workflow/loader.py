@@ -35,6 +35,7 @@ from .__regex import RegexConf
 from .__types import DictData, TupleStr
 from .exceptions import ConfigArgumentError
 
+T = TypeVar("T")
 AnyModel = TypeVar("AnyModel", bound=BaseModel)
 
 
@@ -283,18 +284,27 @@ class Loader(SimLoad):
         )
 
 
-def map_caller(value: str, params: dict[str, Any]) -> Any:
+def map_params(value: Any, params: dict[str, Any]) -> Any:
     """Map caller value that found from ``RE_CALLER`` regex.
 
-    :returns: Any value that getter of caller receive from the params.
+    :rtype: Any
+    :returns: An any getter value from the params input.
     """
+    if isinstance(value, dict):
+        return {k: map_params(value[k], params) for k in value}
+    elif isinstance(value, (list, tuple)):
+        return type(value)([map_params(i, params) for i in value])
+    elif not isinstance(value, str):
+        return value
+
     if not (found := RegexConf.RE_CALLER.search(value)):
         return value
+
     # NOTE: get caller value that setting inside; ``${{ <caller-value> }}``
-    caller = found.group("caller")
+    caller: str = found.group("caller")
     if not hasdot(caller, params):
         raise ValueError(f"params does not set caller: {caller!r}")
-    getter = getdot(caller, params)
+    getter: Any = getdot(caller, params)
 
     # NOTE: check type of vars
     if isinstance(getter, (str, int)):

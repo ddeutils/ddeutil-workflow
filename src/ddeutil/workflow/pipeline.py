@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import inspect
+import logging
 import subprocess
 from inspect import Parameter
 from subprocess import CompletedProcess
@@ -17,7 +18,7 @@ from typing_extensions import Self
 from .__regex import RegexConf
 from .__types import DictData
 from .exceptions import PipeArgumentError, PyException, TaskException
-from .loader import Loader, map_caller
+from .loader import Loader, map_params
 from .utils import make_registry
 
 
@@ -37,6 +38,7 @@ class EmptyStage(BaseModel):
     name: str
 
     def execute(self, params: dict[str, Any]) -> dict[str, Any]:
+        logging.info(f"Execute: {self.name!r}")
         return params
 
 
@@ -105,7 +107,7 @@ class PyStage(EmptyStage):
         """Return variables"""
         rs = self.vars.copy()
         for p, v in self.vars.items():
-            rs[p] = map_caller(v, params)
+            rs[p] = map_params(v, params)
         return rs
 
     def set_outputs(
@@ -139,7 +141,7 @@ class PyStage(EmptyStage):
         _globals: dict[str, Any] = globals() | params | self.get_var(params)
         _locals: dict[str, Any] = {}
         try:
-            exec(map_caller(self.run, params), _globals, _locals)
+            exec(map_params(self.run, params), _globals, _locals)
         except Exception as err:
             raise PyException(
                 f"{err.__class__.__name__}: {err}\nRunning Statement:\n---\n"
@@ -168,6 +170,9 @@ class TaskStage(EmptyStage):
             raise ValueError("Task does not match with task format regex.")
         tasks = TaskSearch(**found.groupdict())
 
+        # NOTE: Registry object should implement on this package only.
+        # TODO: This prefix value to search registry should dynamic with
+        #   config file.
         rgt = make_registry(f"ddeutil.workflow.{tasks.path}")
         if tasks.func not in rgt:
             raise NotImplementedError(
@@ -201,7 +206,7 @@ class TaskStage(EmptyStage):
                 f"does not set to args"
             )
         try:
-            rs = task_caller(**self.args)
+            rs = task_caller(**map_params(self.args, params))
         except Exception as err:
             raise TaskException(f"{err.__class__.__name__}: {err}") from err
         return {"output": rs}
@@ -216,9 +221,18 @@ Stage = Union[
 ]
 
 
+class Strategy(BaseModel):
+    matrix: list[str] = Field(default_factory=list)
+    include: list[str] = Field(default_factory=list)
+    exclude: list[str] = Field(default_factory=list)
+
+
 class Job(BaseModel):
+    """Job Model"""
+
     stages: list[Stage] = Field(default_factory=list)
     needs: list[str] = Field(default_factory=list)
+    strategy: Strategy = Field(default_factory=Strategy)
 
     def stage(self, stage_id: str) -> Stage:
         for stage in self.stages:
@@ -227,6 +241,7 @@ class Job(BaseModel):
         raise ValueError(f"Stage ID {stage_id} does not exists")
 
     def execute(self, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Execute job with passing dynamic parameters from the pipeline."""
         for stage in self.stages:
             # NOTE:
             #       I do not use below syntax because `params` dict be the
@@ -235,18 +250,6 @@ class Job(BaseModel):
             #       ... params |= stage.execute(params=params)
             stage.execute(params=params)
         return params
-
-
-class Strategy(BaseModel):
-    matrix: list[str]
-    include: list[str]
-    exclude: list[str]
-
-
-class JobStrategy(Job):
-    """Strategy job"""
-
-    strategy: Strategy
 
 
 class Pipeline(BaseModel):
@@ -270,12 +273,15 @@ class Pipeline(BaseModel):
         )
 
     def job(self, name: str) -> Job:
-        """Return Job model that exists on this pipeline."""
+        """Return Job model that exists on this pipeline.
+
+        :rtype: Job
+        """
         if name not in self.jobs:
             raise ValueError(f"Job {name} does not exists")
         return self.jobs[name]
 
-    def execute(self, params: dict[str, Any] | None = None):
+    def execute(self, params: dict[str, Any] | None = None) -> dict[str, Any]:
         """Execute pipeline with passing dynamic parameters.
 
         See Also:

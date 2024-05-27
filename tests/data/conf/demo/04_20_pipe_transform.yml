@@ -10,7 +10,7 @@ pipe_sql_ingest:
     transform:
       stages:
         - name: Transform Data on Target RDBMS
-          hook: hooks/postgres-proc@pysycopg
+          task: tasks/postgres-proc@pysycopg
           with:
             conn: ${{ params.connection }}
             exec: ${{ params.procedure }}

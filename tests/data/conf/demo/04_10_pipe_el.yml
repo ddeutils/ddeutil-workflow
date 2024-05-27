@@ -22,8 +22,8 @@ ingest_postgres_to_minio:
               conn: ${{ source.conn }}
               query: |
                 select *
-                from  {{ params.source.schema }}.{{ param.source.table }}
-                where update_date = '{{ param.run_date.fmt('%Y%m%d') }}'
+                from  ${{ params.source.schema }}.${{ param.source.table }}
+                where update_date = '${{ param.run_date.fmt('%Y%m%d') }}'
             conversion:
               customer_id: id
               customer_name: name
@@ -39,7 +39,7 @@ ingest_csv_to_parquet:
   params:
     run-date: utils.receive.datetime
     source: utils.receive.string
-    target: utils.receive.string
+    sink: utils.receive.string
   jobs:
     extract-load:
       stages:
@@ -47,5 +47,5 @@ ingest_csv_to_parquet:
           id: extract-load
           task: tasks/el-csv-to-parquet@polars-dir
           args:
-            source: "ds_csv_local_file"
-            sink: "ds_parquet_local_file_dir"
+            source: ${{ params.source }}
+            sink: ${{ params.sink }}

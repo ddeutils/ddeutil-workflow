@@ -47,6 +47,9 @@ The first step, you should start create the connections and datasets for In and
 Out of you data that want to use in pipeline of workflow. Some of this component
 is similar component of the **Airflow** because I like it concepts.
 
+The main feature of this project is the `Pipeline` object that can call any
+registried function.
+
 ### Connection
 
 The connection for worker able to do any thing.
