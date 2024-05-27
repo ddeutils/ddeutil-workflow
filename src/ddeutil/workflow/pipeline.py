@@ -8,6 +8,7 @@ from __future__ import annotations
 import inspect
 import logging
 import subprocess
+from abc import ABC, abstractmethod
 from inspect import Parameter
 from subprocess import CompletedProcess
 from typing import Any, Callable, Optional, Union
@@ -22,27 +23,36 @@ from .loader import Loader, map_params
 from .utils import make_registry
 
 
-class StageResult(BaseModel): ...
-
-
-class JobResult(BaseModel): ...
-
-
-class PipeResult(BaseModel): ...
-
-
-class EmptyStage(BaseModel):
-    """Empty stage that is doing nothing and logging the name of stage only."""
-
+class BaseStage(BaseModel, ABC):
     id: Optional[str] = None
     name: str
 
-    def execute(self, params: dict[str, Any]) -> dict[str, Any]:
+    @abstractmethod
+    def execute(self, params: DictData) -> DictData:
+        raise NotImplementedError("Stage should implement ``execute`` method.")
+
+    def set_outputs(self, rs: DictData, params: DictData) -> DictData:
+        """Set outputs to params"""
+        if self.id is None:
+            return params
+
+        if "stages" not in params:
+            params["stages"] = {}
+
+        params["stages"][self.id] = {"outputs": rs}
+        return params
+
+
+class EmptyStage(BaseStage):
+    """Empty stage that is doing nothing and logging the name of stage only."""
+
+    def execute(self, params: DictData) -> DictData:
+        """Execute for the Empty stage that do only logging out."""
         logging.info(f"Execute: {self.name!r}")
         return params
 
 
-class ShellStage(EmptyStage):
+class ShellStage(BaseStage):
     """Shell statement stage."""
 
     shell: str
@@ -53,9 +63,7 @@ class ShellStage(EmptyStage):
         """Prepare shell statement string that include newline"""
         return shell.replace("\n", ";")
 
-    def set_outputs(
-        self, rs: CompletedProcess, params: dict[str, Any]
-    ) -> dict[str, Any]:
+    def set_outputs(self, rs: CompletedProcess, params: DictData) -> DictData:
         """Set outputs to params"""
         # NOTE: skipping set outputs of stage execution when id does not set.
         if self.id is None:
@@ -74,7 +82,7 @@ class ShellStage(EmptyStage):
         }
         return params
 
-    def execute(self, params: dict[str, Any]) -> dict[str, Any]:
+    def execute(self, params: DictData) -> DictData:
         """Execute the Shell & Powershell statement with the Python build-in
         ``subprocess`` package.
         """
@@ -95,24 +103,22 @@ class ShellStage(EmptyStage):
         return params
 
 
-class PyStage(EmptyStage):
+class PyStage(BaseStage):
     """Python executor stage that running the Python statement that receive
     globals nad additional variables.
     """
 
     run: str
-    vars: dict[str, Any] = Field(default_factory=dict)
+    vars: DictData = Field(default_factory=dict)
 
-    def get_var(self, params: dict[str, Any]) -> dict[str, Any]:
+    def get_var(self, params: DictData) -> DictData:
         """Return variables"""
         rs = self.vars.copy()
         for p, v in self.vars.items():
             rs[p] = map_params(v, params)
         return rs
 
-    def set_outputs(
-        self, lc: dict[str, Any], params: dict[str, Any]
-    ) -> dict[str, Any]:
+    def set_outputs(self, rs: DictData, params: DictData) -> DictData:
         """Set outputs to params"""
         # NOTE: skipping set outputs of stage execution when id does not set.
         if self.id is None:
@@ -123,23 +129,23 @@ class PyStage(EmptyStage):
 
         params["stages"][self.id] = {
             # NOTE: The output will fileter unnecessary keys from ``_locals``.
-            "outputs": {k: lc[k] for k in lc if k != "__annotations__"},
+            "outputs": {k: rs[k] for k in rs if k != "__annotations__"},
         }
         return params
 
-    def execute(self, params: dict[str, Any]) -> dict[str, Any]:
+    def execute(self, params: DictData) -> DictData:
         """Execute the Python statement that pass all globals and input params
         to globals argument on ``exec`` build-in function.
 
         :param params: A parameter that want to pass before run any statement.
-        :type params: dict[str, Any]
+        :type params: DictData
 
-        :rtype: dict[str, Any]
+        :rtype: DictData
         :returns: A parameters from an input that was mapped output if the stage
             ID was set.
         """
-        _globals: dict[str, Any] = globals() | params | self.get_var(params)
-        _locals: dict[str, Any] = {}
+        _globals: DictData = globals() | params | self.get_var(params)
+        _locals: DictData = {}
         try:
             exec(map_params(self.run, params), _globals, _locals)
         except Exception as err:
@@ -159,9 +165,11 @@ class TaskSearch(BaseModel):
     tag: str
 
 
-class TaskStage(EmptyStage):
+class TaskStage(BaseStage):
+    """Task executor stage that running the Python function."""
+
     task: str
-    args: dict[str, Any]
+    args: DictData
 
     @staticmethod
     def extract_task(task: str) -> Callable[[], Callable[[Any], Any]]:
@@ -188,7 +196,7 @@ class TaskStage(EmptyStage):
             )
         return rgt[tasks.func][tasks.tag]
 
-    def execute(self, params: dict[str, Any]) -> dict[str, Any]:
+    def execute(self, params: DictData) -> DictData:
         """Execute the Task function."""
         task_caller = self.extract_task(self.task)()
         if not callable(task_caller):
@@ -240,7 +248,7 @@ class Job(BaseModel):
                 return stage
         raise ValueError(f"Stage ID {stage_id} does not exists")
 
-    def execute(self, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    def execute(self, params: DictData | None = None) -> DictData:
         """Execute job with passing dynamic parameters from the pipeline."""
         for stage in self.stages:
             # NOTE:
@@ -255,7 +263,7 @@ class Job(BaseModel):
 class Pipeline(BaseModel):
     """Pipeline Model"""
 
-    params: dict[str, Any] = Field(default_factory=dict)
+    params: DictData = Field(default_factory=dict)
     jobs: dict[str, Job]
 
     @classmethod
@@ -275,13 +283,16 @@ class Pipeline(BaseModel):
     def job(self, name: str) -> Job:
         """Return Job model that exists on this pipeline.
 
+        :param name: A job name that want to get from a mapping of job models.
+        :type name: str
+
         :rtype: Job
         """
         if name not in self.jobs:
             raise ValueError(f"Job {name} does not exists")
         return self.jobs[name]
 
-    def execute(self, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    def execute(self, params: DictData | None = None) -> DictData:
         """Execute pipeline with passing dynamic parameters.
 
         See Also:
@@ -296,14 +307,14 @@ class Pipeline(BaseModel):
             ... "<job-name>.stages.<stage-id>.outputs.<key>"
 
         """
-        params: dict[str, Any] = params or {}
+        params: DictData = params or {}
         check_key = tuple(f"{k!r}" for k in self.params if k not in params)
         if check_key:
             raise ValueError(
                 f"Parameters that needed on pipeline does not pass: "
                 f"{', '.join(check_key)}."
             )
-        params: dict[str, Any] = {
+        params: DictData = {
             "params": (
                 params
                 | {

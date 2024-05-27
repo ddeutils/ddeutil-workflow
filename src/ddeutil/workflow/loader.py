@@ -292,7 +292,7 @@ def map_params(value: Any, params: dict[str, Any]) -> Any:
     """
     if isinstance(value, dict):
         return {k: map_params(value[k], params) for k in value}
-    elif isinstance(value, (list, tuple)):
+    elif isinstance(value, (list, tuple, set)):
         return type(value)([map_params(i, params) for i in value])
     elif not isinstance(value, str):
         return value

@@ -1,7 +1,7 @@
 import ddeutil.workflow.pipeline as pipe
 
 
-def test_pipe_stage_task(params_simple):
+def test_pipe_stage_task():
     pipeline = pipe.Pipeline.from_loader(
         name="ingest_csv_to_parquet",
         externals={},
@@ -17,3 +17,6 @@ def test_pipe_stage_task(params_simple):
         }
     )
     assert {"output": {"records": 2}} == rs
+
+
+def test_pipe_job_task(): ...
