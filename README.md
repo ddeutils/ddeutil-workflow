@@ -173,7 +173,7 @@ pipe_el_pg_to_lake:
     extract-load:
       stages:
         - name: "Extract Load from Postgres to Lake"
-          id: extract
+          id: extract-load
           task: tasks/postgres-to-delta@polars
           with:
             source:
@@ -186,7 +186,7 @@ pipe_el_pg_to_lake:
               endpoint: "/${{ params.name }}"
 ```
 
-### Hooks (Transform)
+### Tasks (Transform)
 
 ```yaml
 pipe_hook_mssql_proc:
@@ -200,7 +200,8 @@ pipe_hook_mssql_proc:
     transform:
       stages:
         - name: "Transform Data in MS SQL Server"
-          hook: hooks/mssql-proc@odbc
+          id: transform
+          task: tasks/mssql-proc@odbc
           with:
             exec: ${{ params.sp_name }}
             params:

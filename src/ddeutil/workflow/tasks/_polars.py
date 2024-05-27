@@ -11,8 +11,10 @@ from uuid import uuid4
 import polars as pl
 import pyarrow.parquet as pq
 from ddeutil.workflow.dataset import PolarsCsv, PolarsParq
+from ddeutil.workflow.utils import tag
 
 
+@tag("polars-dir", ref_name="el-csv-to-parquet")
 def csv_to_parquet_dir(
     source: str,
     sink: str,

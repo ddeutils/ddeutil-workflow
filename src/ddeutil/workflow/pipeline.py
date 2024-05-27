@@ -18,6 +18,7 @@ from .__regex import RegexConf
 from .__types import DictData
 from .exceptions import PipeArgumentError, PyException, TaskException
 from .loader import Loader, map_caller
+from .utils import make_registry
 
 
 class StageResult(BaseModel): ...
@@ -167,27 +168,12 @@ class TaskStage(EmptyStage):
             raise ValueError("Task does not match with task format regex.")
         tasks = TaskSearch(**found.groupdict())
 
-        from ddeutil.core import import_string
-
-        try:
-            rgt = import_string(f"ddeutil.workflow.{tasks.path}.registries")
-            if tasks.func not in rgt:
-                raise NotImplementedError(
-                    f"ddeutil.workflow.{tasks.path}.registries does not "
-                    f"implement registry: {tasks.func}."
-                )
-        except ImportError:
-
-            # NOTE: Try to import this task function fom target module.
-            try:
-                return import_string(
-                    f"ddeutil.workflow.{tasks.path}.{tasks.func}"
-                )
-            except ImportError:
-                raise NotImplementedError(
-                    f"ddeutil.workflow.{tasks.path} does not implement "
-                    f"registries or {tasks.func}."
-                ) from None
+        rgt = make_registry(f"ddeutil.workflow.{tasks.path}")
+        if tasks.func not in rgt:
+            raise NotImplementedError(
+                f"ddeutil.workflow.{tasks.path}.registries does not "
+                f"implement registry: {tasks.func}."
+            )
 
         if tasks.tag not in rgt[tasks.func]:
             raise NotImplementedError(
@@ -221,19 +207,11 @@ class TaskStage(EmptyStage):
         return {"output": rs}
 
 
-class HookStage(EmptyStage):
-    hook: str
-    args: dict[str, Any]
-
-    def execute(self, params: dict[str, Any]) -> dict[str, Any]: ...
-
-
 # NOTE: Order of parsing stage data
 Stage = Union[
     PyStage,
     ShellStage,
     TaskStage,
-    HookStage,
     EmptyStage,
 ]
 
