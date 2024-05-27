@@ -2,8 +2,10 @@
 run_python_with_params:
   type: ddeutil.workflow.pipeline.Pipeline
   params:
-    author-run: utils.receive.string
-    run-date: utils.receive.datetime
+    author-run:
+      type: str
+    run-date:
+      type: datetime
   jobs:
     first-job:
       stages:

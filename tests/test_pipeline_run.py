@@ -2,7 +2,7 @@ import ddeutil.workflow.pipeline as pipe
 import pytest
 
 
-def test_pipe_stage_py_raise(params_simple):
+def test_pipe_stage_py_raise():
     pipeline = pipe.Pipeline.from_loader(name="run_python", externals={})
     stage = pipeline.job("raise-run").stage(stage_id="raise-error")
     assert stage.id == "raise-error"
@@ -10,7 +10,7 @@ def test_pipe_stage_py_raise(params_simple):
         stage.execute(params={"x": "Foo"})
 
 
-def test_pipe_stage_py(params_simple):
+def test_pipe_stage_py():
     # NOTE: Get stage from the specific pipeline.
     pipeline = pipe.Pipeline.from_loader(name="run_python", externals={})
     stage: pipe.PyStage = pipeline.job("demo-run").stage(stage_id="run-var")
@@ -32,7 +32,7 @@ def test_pipe_stage_py(params_simple):
     } == rs
 
 
-def test_pipe_stage_py_func(params_simple):
+def test_pipe_stage_py_func():
     pipeline = pipe.Pipeline.from_loader(
         name="run_python_with_params", externals={}
     )
@@ -47,7 +47,7 @@ def test_pipe_stage_py_func(params_simple):
     )
 
 
-def test_pipe_job_py(params_simple):
+def test_pipe_job_py():
     pipeline = pipe.Pipeline.from_loader(name="run_python", externals={})
     demo_job: pipe.Job = pipeline.job("demo-run")
 
@@ -63,7 +63,7 @@ def test_pipe_job_py(params_simple):
 
 
 @pytest.mark.skipif(True, reason="Because subprocess call on different OS")
-def test_pipe_stage_shell(params_simple):
+def test_pipe_stage_shell():
     pipeline = pipe.Pipeline.from_loader(name="run_python", externals={})
     echo_env: pipe.Job = pipeline.job("shell-run").stage("echo-env")
     rs = echo_env.execute({})
@@ -101,7 +101,7 @@ def test_subprocess_shell():
     print(rs)
 
 
-def test_pipe_params_py(params_simple):
+def test_pipe_params_py():
     pipeline = pipe.Pipeline.from_loader(
         name="run_python_with_params",
         externals={},

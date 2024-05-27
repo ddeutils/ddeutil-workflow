@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import ddeutil.workflow.pipeline as pipe
 
 
@@ -10,13 +12,10 @@ def test_pipe_stage_task():
     rs = stage.execute(
         params={
             "params": {
-                "run-date": "",
+                "run-date": datetime(2024, 1, 1),
                 "source": "ds_csv_local_file",
                 "sink": "ds_parquet_local_file_dir",
             },
         }
     )
-    assert {"output": {"records": 2}} == rs
-
-
-def test_pipe_job_task(): ...
+    assert {"extract-load": {"outputs": {"records": 2}}} == rs["stages"]

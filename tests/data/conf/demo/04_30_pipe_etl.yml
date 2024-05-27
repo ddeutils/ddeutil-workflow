@@ -4,7 +4,8 @@ pipe_seller_etl:
   desc: "Pipeline that load data and save to FileSystem"
   schedule: "* * * 1 5"
   params:
-    run_date: ${{ utils.receive.datetime }}
+    run-date:
+      type: datetime
   pipes:
     first-node:
       stages:
@@ -15,7 +16,7 @@ pipe_seller_etl:
             # NOTE: This line check and return connection id from config.
             conn: ${{ conn.get('conn_loading_local') }}
             filter:
-              df = df.filter('start_date >= {{ params.run_date }}')
+              df = df.filter('start_date >= {{ params.run-date }}')
         - name: Check Alert
           as: check
           if: nodes.start.outputs.records > 0
@@ -53,4 +54,4 @@ pipe_seller_etl:
           with:
             conn: ${{ conn.get('conn_loading_local') }}
             filter: |
-              df = df.filter('start_date >= {{ params.run_date }}')
+              df = df.filter('start_date >= {{ params.run-date }}')

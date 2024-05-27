@@ -9,11 +9,14 @@ import inspect
 import logging
 import subprocess
 from abc import ABC, abstractmethod
+from datetime import date, datetime
 from inspect import Parameter
 from subprocess import CompletedProcess
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Literal, Optional, Union
 
+from ddeutil.model.lineage import dt_now
 from pydantic import BaseModel, Field
+from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
 from .__regex import RegexConf
@@ -160,6 +163,8 @@ class PyStage(BaseStage):
 
 
 class TaskSearch(BaseModel):
+    """Task Search Model"""
+
     path: str
     func: str
     tag: str
@@ -217,7 +222,8 @@ class TaskStage(BaseStage):
             rs = task_caller(**map_params(self.args, params))
         except Exception as err:
             raise TaskException(f"{err.__class__.__name__}: {err}") from err
-        return {"output": rs}
+        self.set_outputs(rs, params)
+        return params
 
 
 # NOTE: Order of parsing stage data
@@ -230,6 +236,8 @@ Stage = Union[
 
 
 class Strategy(BaseModel):
+    """Strategy Model"""
+
     matrix: list[str] = Field(default_factory=list)
     include: list[str] = Field(default_factory=list)
     exclude: list[str] = Field(default_factory=list)
@@ -260,24 +268,106 @@ class Job(BaseModel):
         return params
 
 
+class BaseParams(BaseModel, ABC):
+    """Base Parameter that use to make Params Model."""
+
+    desc: Optional[str] = None
+    required: bool = True
+    default: Optional[str] = None
+    type: str
+
+    @abstractmethod
+    def receive(self, value: Optional[Any] = None) -> Any:
+        raise ValueError(
+            "Receive value and validate typing before return valid value."
+        )
+
+    @model_validator(mode="after")
+    def check_default(self):
+        if not self.required and self.default is None:
+            raise ValueError(
+                "Default should set when this parameter does not required."
+            )
+        return self
+
+
+class DatetimeParams(BaseParams):
+    type: Literal["datetime"] = "datetime"
+    required: bool = False
+    default: datetime = Field(default_factory=dt_now)
+
+    def receive(self, value: str | datetime | date | None = None) -> datetime:
+        if value is None:
+            return self.default
+
+        if isinstance(value, datetime):
+            return value
+        elif isinstance(value, date):
+            return datetime(value.year, value.month, value.day)
+        elif not isinstance(value, str):
+            raise ValueError(
+                f"Value that want to convert to datetime does not support for "
+                f"type: {type(value)}"
+            )
+        return datetime.fromisoformat(value)
+
+
+class StrParams(BaseParams):
+    type: Literal["str"] = "str"
+
+    def receive(self, value: Optional[str] = None) -> str | None:
+        if value is None:
+            return self.default
+        return str(value)
+
+
+class IntParams(BaseParams):
+    type: Literal["int"] = "int"
+
+    def receive(self, value: Optional[int] = None) -> int | None:
+        if value is None:
+            return self.default
+        if not isinstance(value, int):
+            try:
+                return int(str(value))
+            except TypeError as err:
+                raise ValueError(
+                    f"Value that want to convert to integer does not support "
+                    f"for type: {type(value)}"
+                ) from err
+        return value
+
+
+class ChoiceParams(BaseParams):
+    type: Literal["choice"] = "choice"
+    options: list[str]
+
+
+Params = Union[
+    ChoiceParams,
+    DatetimeParams,
+    StrParams,
+]
+
+
 class Pipeline(BaseModel):
     """Pipeline Model"""
 
-    params: DictData = Field(default_factory=dict)
+    params: dict[str, Params] = Field(default_factory=dict)
     jobs: dict[str, Job]
 
     @classmethod
     def from_loader(
         cls,
         name: str,
-        externals: DictData,
+        externals: Optional[DictData] = None,
     ) -> Self:
-        loader: Loader = Loader(name, externals=externals)
+        loader: Loader = Loader(name, externals=(externals or {}))
         if "jobs" not in loader.data:
             raise PipeArgumentError("jobs", "Config does not set ``jobs``")
         return cls(
             jobs=loader.data["jobs"],
-            params=loader.params(),
+            params=loader.data["params"],
         )
 
     def job(self, name: str) -> Job:
@@ -314,11 +404,15 @@ class Pipeline(BaseModel):
                 f"Parameters that needed on pipeline does not pass: "
                 f"{', '.join(check_key)}."
             )
+
+        if any(p not in params for p in self.params if self.params[p].required):
+            raise ValueError("Required parameter does not pass")
+
         params: DictData = {
             "params": (
                 params
                 | {
-                    k: self.params[k](params[k])
+                    k: self.params[k].receive(params[k])
                     for k in params
                     if k in self.params
                 }
@@ -326,7 +420,7 @@ class Pipeline(BaseModel):
         }
         for job_id in self.jobs:
             print(f"[PIPELINE]: Start execute the job: {job_id!r}")
-            job = self.jobs[job_id]
+            job: Job = self.jobs[job_id]
             # TODO: Condition on ``needs`` of this job was set. It should create
             #   multithreading process on this step.
             job.execute(params=params)

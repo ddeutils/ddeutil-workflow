@@ -4,7 +4,8 @@ run_python:
   type: ddeutil.workflow.pipeline.Pipeline
   schedule: schedule-name
   params:
-    name: utils.receive.string
+    name:
+      type: str
   jobs:
     demo-run:
       stages:

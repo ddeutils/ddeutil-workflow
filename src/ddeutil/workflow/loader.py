@@ -6,10 +6,9 @@
 from __future__ import annotations
 
 import copy
-import logging
 import urllib.parse
 from functools import cached_property
-from typing import Any, Callable, TypeVar
+from typing import Any, TypeVar
 
 from ddeutil.core import (
     clear_cache,
@@ -237,28 +236,6 @@ class SimLoad:
         except ModuleNotFoundError:
             return import_string(f"{_typ}")
 
-    def params(self) -> dict[str, Callable[[Any], Any]]:
-        """Return a mapping of key from params and imported value on params."""
-        if not (p := self.data.get("params", {})):
-            return p
-
-        try:
-            return {i: import_string(f"{self.import_prefix}.{p[i]}") for i in p}
-        except ModuleNotFoundError as err:
-            logging.error(err)
-            raise err
-
-    def validate_params(self, param: dict[str, Any]) -> dict[str, Any]:
-        """Return parameter that want to catch before workflow running."""
-        try:
-            return {i: caller(param[i]) for i, caller in self.params().items()}
-        except KeyError as err:
-            logging.error(f"Parameter: {err} does not exists from passing")
-            raise err
-        except ValueError as err:
-            logging.error("Value that passing to params does not valid")
-            raise err
-
 
 class Loader(SimLoad):
     """Main Loader Object."""
@@ -279,6 +256,7 @@ class Loader(SimLoad):
 
     @classmethod
     def config(cls, path: str | None = None) -> Params:
+        """Load Config data from ``workflows-conf.yaml`` file."""
         return Params.model_validate(
             YamlEnvFl(path or "./workflows-conf.yaml").read()
         )
