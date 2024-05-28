@@ -64,13 +64,6 @@ def test_simple_loader_workflow_run_py(params: Params):
     # NOTE: Make sore that `x` on this local does not change.
     assert "Init" == x
 
-    assert {"name": "Parameter"} == load.validate_params(
-        param={
-            "run_date": "2024-01-01",
-            "name": "Parameter",
-        }
-    )
-
 
 def test_simple_loader_schedule(params: Params):
     load = ld.SimLoad(
@@ -80,7 +73,9 @@ def test_simple_loader_schedule(params: Params):
     )
     assert ScdlBkk == load.type
 
-    scdl: ScdlBkk = load.type(cronjob=load.data["cronjob"])
+    scdl: ScdlBkk = load.type.model_validate(
+        obj={"cronjob": load.data["cronjob"]}
+    )
     cronjob_iter = scdl.generate("2024-01-01 00:00:00")
     t = cronjob_iter.next
     assert str2dt("2024-01-01 00:00:00").tzinfo == t.tzinfo

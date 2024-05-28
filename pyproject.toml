@@ -40,10 +40,10 @@ Homepage = "https://github.com/ddeutils/ddeutil-workflow/"
 [project.optional-dependencies]
 test = [
     "sqlalchemy==2.0.30",
-    # SFTP warpper
+    # SFTP
     "paramiko==3.4.0",
     "sshtunnel==0.4.0",
-    # AWS
+    # AWS Client
     "boto3==1.34.109",
     # Open files
     "fsspec==2024.5.0",

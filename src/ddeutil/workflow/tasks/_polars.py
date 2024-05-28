@@ -19,7 +19,13 @@ def csv_to_parquet_dir(
     source: str,
     sink: str,
     conversion: dict[str, Any] | None = None,
-):
+) -> dict[str, int]:
+    """Extract Load data from CSV to Parquet file.
+
+    :param source:
+    :param sink:
+    :param conversion:
+    """
     print("Start EL for CSV to Parquet with Polars Engine")
     print("---")
     # STEP 01: Read the source data to Polars.
@@ -41,3 +47,11 @@ def csv_to_parquet_dir(
         basename_template=f"{sink.object}-{uuid4().hex}-{{i}}.snappy.parquet",
     )
     return {"records": src_df.select(pl.len()).item()}
+
+
+@tag("polars-dir-scan", name="el-csv-to-parquet")
+def csv_to_parquet_dir_scan(
+    source: str,
+    sink: str,
+    conversion: dict[str, Any] | None = None,
+) -> dict[str, int]: ...

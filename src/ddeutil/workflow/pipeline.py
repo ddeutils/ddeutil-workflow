@@ -21,12 +21,14 @@ from typing_extensions import Self
 
 from .__regex import RegexConf
 from .__types import DictData
-from .exceptions import PipeArgumentError, PyException, TaskException
+from .exceptions import PyException, TaskException
 from .loader import Loader, map_params
 from .utils import make_registry
 
 
 class BaseStage(BaseModel, ABC):
+    """Base Stage Model."""
+
     id: Optional[str] = None
     name: str
 
@@ -273,7 +275,6 @@ class BaseParams(BaseModel, ABC):
 
     desc: Optional[str] = None
     required: bool = True
-    default: Optional[str] = None
     type: str
 
     @abstractmethod
@@ -282,8 +283,20 @@ class BaseParams(BaseModel, ABC):
             "Receive value and validate typing before return valid value."
         )
 
+
+class DefaultParams(BaseParams):
+    """Default Parameter that will check default if it required"""
+
+    default: Optional[str] = None
+
+    @abstractmethod
+    def receive(self, value: Optional[Any] = None) -> Any:
+        raise ValueError(
+            "Receive value and validate typing before return valid value."
+        )
+
     @model_validator(mode="after")
-    def check_default(self):
+    def check_default(self) -> Self:
         if not self.required and self.default is None:
             raise ValueError(
                 "Default should set when this parameter does not required."
@@ -291,7 +304,9 @@ class BaseParams(BaseModel, ABC):
         return self
 
 
-class DatetimeParams(BaseParams):
+class DatetimeParams(DefaultParams):
+    """Datetime parameter."""
+
     type: Literal["datetime"] = "datetime"
     required: bool = False
     default: datetime = Field(default_factory=dt_now)
@@ -312,7 +327,9 @@ class DatetimeParams(BaseParams):
         return datetime.fromisoformat(value)
 
 
-class StrParams(BaseParams):
+class StrParams(DefaultParams):
+    """String parameter."""
+
     type: Literal["str"] = "str"
 
     def receive(self, value: Optional[str] = None) -> str | None:
@@ -321,7 +338,9 @@ class StrParams(BaseParams):
         return str(value)
 
 
-class IntParams(BaseParams):
+class IntParams(DefaultParams):
+    """Integer parameter."""
+
     type: Literal["int"] = "int"
 
     def receive(self, value: Optional[int] = None) -> int | None:
@@ -341,6 +360,16 @@ class IntParams(BaseParams):
 class ChoiceParams(BaseParams):
     type: Literal["choice"] = "choice"
     options: list[str]
+
+    def receive(self, value: Optional[str] = None) -> str:
+        """Receive value that match with options."""
+        # NOTE:
+        #   Return the first value in options if does not pass any input value
+        if value is None:
+            return self.options[0]
+        if any(value not in self.options):
+            raise ValueError(f"{value} does not match any value in options")
+        return value
 
 
 Params = Union[
@@ -364,7 +393,7 @@ class Pipeline(BaseModel):
     ) -> Self:
         loader: Loader = Loader(name, externals=(externals or {}))
         if "jobs" not in loader.data:
-            raise PipeArgumentError("jobs", "Config does not set ``jobs``")
+            raise ValueError("Config does not set ``jobs`` value")
         return cls(
             jobs=loader.data["jobs"],
             params=loader.data["params"],

@@ -14,6 +14,8 @@ from ddeutil.core import lazy
 
 
 class TagFunc(Protocol):
+    """Tag Function Model"""
+
     name: str
     tag: str
 

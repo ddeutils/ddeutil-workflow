@@ -122,8 +122,10 @@ The state of doing lists that worker should to do. It be collection of the stage
 run_py_local:
   type: ddeutil.workflow.pipe.Pipeline
   params:
-    author-run: utils.receive.string
-    run-date: utils.receive.datetime
+    author-run:
+      type: str
+    run-date:
+      type: datetime
   jobs:
     first-job:
       stages:
@@ -170,8 +172,10 @@ pipe.execute(params={'author-run': 'Local Workflow', 'run-date': '2024-01-01'})
 pipe_el_pg_to_lake:
   type: ddeutil.workflow.pipe.Pipeline
   params:
-    run-date: utils.receive.datetime
-    author-email: utils.receive.string
+    run-date:
+      type: datetime
+    author-email:
+      type: str
   jobs:
     extract-load:
       stages:
@@ -195,10 +199,14 @@ pipe_el_pg_to_lake:
 pipe_hook_mssql_proc:
   type: ddeutil.workflow.pipe.Pipeline
   params:
-    run_date: utils.receive.datetime
-    sp_name: utils.receive.string
-    source_name: utils.receive.string
-    target_name: utils.receive.string
+    run_date:
+      type: datetime
+    sp_name:
+      type: str
+    source_name:
+      type: str
+    target_name:
+      type: str
   jobs:
     transform:
       stages:

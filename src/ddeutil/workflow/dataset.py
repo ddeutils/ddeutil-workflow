@@ -25,11 +25,7 @@ from .conn import SubclassConn
 from .loader import Loader
 
 EXCLUDED_EXTRAS: TupleStr = ("type",)
-OBJ_FMTS: FormatterGroupType = make_group(
-    {
-        "datetime": Datetime,
-    }
-)
+OBJ_FMTS: FormatterGroupType = make_group({"datetime": Datetime})
 
 
 class BaseDataset(BaseModel):

@@ -16,7 +16,6 @@ from pydantic.functional_validators import field_validator
 from typing_extensions import Self
 
 from .__types import DictData
-from .exceptions import ScdlArgumentError
 from .loader import SimLoad
 
 
@@ -42,9 +41,7 @@ class BaseScdl(BaseModel):
     ) -> Self:
         loader: SimLoad = SimLoad(name, params=params, externals=externals)
         if "cronjob" not in loader.data:
-            raise ScdlArgumentError(
-                "cronjob", "Config does not set ``cronjob``"
-            )
+            raise ValueError("Config does not set ``cronjob`` value")
         return cls(cronjob=loader.data["cronjob"], extras=externals)
 
     @field_validator("tz")
