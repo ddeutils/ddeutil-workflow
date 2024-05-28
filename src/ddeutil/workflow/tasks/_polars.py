@@ -14,6 +14,13 @@ from ddeutil.workflow.dataset import PolarsCsv, PolarsParq
 from ddeutil.workflow.utils import tag
 
 
+def polars_dtype():
+    return {
+        "str": pl.Utf8,
+        "int": pl.Int32,
+    }
+
+
 @tag("polars-dir", name="el-csv-to-parquet")
 def csv_to_parquet_dir(
     source: str,
@@ -30,12 +37,15 @@ def csv_to_parquet_dir(
     print("---")
     # STEP 01: Read the source data to Polars.
     src_dataset: PolarsCsv = PolarsCsv.from_loader(name=source, externals={})
-    src_df = src_dataset.load()
+    src_df: pl.DataFrame = src_dataset.load()
     print(src_df)
 
     # STEP 02: Schema conversion on Polars DataFrame.
     conversion: dict[str, Any] = conversion or {}
     if conversion:
+        src_df = src_df.with_columns(
+            *[pl.col(c).cast(col.type).alias(col.name) for c, col in conversion]
+        )
         print("Start Schema Conversion ...")
 
     # STEP 03: Write data to parquet file format.
@@ -54,4 +64,21 @@ def csv_to_parquet_dir_scan(
     source: str,
     sink: str,
     conversion: dict[str, Any] | None = None,
-) -> dict[str, int]: ...
+) -> dict[str, int]:
+    print("Start EL for CSV to Parquet with Polars Engine")
+    print("---")
+    # STEP 01: Read the source data to Polars.
+    src_dataset: PolarsCsv = PolarsCsv.from_loader(name=source, externals={})
+    src_df: pl.LazyFrame = src_dataset.scan()
+
+    if conversion:
+        ...
+
+    sink = PolarsParq.from_loader(name=sink, externals={})
+    pq.write_to_dataset(
+        table=src_df.collect().to_arrow(),
+        root_path=f"{sink.conn.endpoint}/{sink.object}",
+        compression="snappy",
+        basename_template=f"{sink.object}-{uuid4().hex}-{{i}}.snappy.parquet",
+    )
+    return {"records": src_df.select(pl.len()).collect().item()}
