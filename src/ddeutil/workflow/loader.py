@@ -25,6 +25,7 @@ from .__regex import RegexConf
 from .__types import DictData
 
 T = TypeVar("T")
+BaseModelType = type[BaseModel]
 AnyModel = TypeVar("AnyModel", bound=BaseModel)
 
 
@@ -64,7 +65,7 @@ class SimLoad:
         return self.__conf_params
 
     @cached_property
-    def type(self) -> AnyModel:
+    def type(self) -> BaseModelType:
         """Return object type which implement in `config_object` key."""
         if not (_typ := self.data.get("type")):
             raise ValueError(
@@ -76,9 +77,16 @@ class SimLoad:
         except ModuleNotFoundError:
             return import_string(f"{_typ}")
 
+    def load(self) -> AnyModel:
+        return self.type.model_validate(self.data)
+
 
 class Loader(SimLoad):
-    """Main Loader Object."""
+    """Main Loader Object.
+
+    :param name: A name of config data that will read by Yaml Loader object.
+    :param externals: An external parameters
+    """
 
     def __init__(
         self,

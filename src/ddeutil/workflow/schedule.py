@@ -9,14 +9,13 @@ from datetime import datetime
 from typing import Annotated
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from ddeutil.io import Params
 from ddeutil.workflow.vendors.__schedule import CronJob, CronRunner
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.functional_validators import field_validator
 from typing_extensions import Self
 
 from .__types import DictData
-from .loader import SimLoad
+from .loader import Loader
 
 
 class BaseScdl(BaseModel):
@@ -36,10 +35,9 @@ class BaseScdl(BaseModel):
     def from_loader(
         cls,
         name: str,
-        params: Params,
         externals: DictData,
     ) -> Self:
-        loader: SimLoad = SimLoad(name, params=params, externals=externals)
+        loader: Loader = Loader(name, externals=externals)
         if "cronjob" not in loader.data:
             raise ValueError("Config does not set ``cronjob`` value")
         return cls(cronjob=loader.data["cronjob"], extras=externals)

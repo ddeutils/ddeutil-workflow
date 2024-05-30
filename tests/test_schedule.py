@@ -1,39 +1,12 @@
-from collections.abc import Generator
 from datetime import datetime, timedelta
-from pathlib import Path
 from zoneinfo import ZoneInfo
 
-import pytest
-from ddeutil.io.param import Params
 from ddeutil.workflow.schedule import ScdlBkk
 
 
-@pytest.fixture(scope="module")
-def params(
-    conf_path: Path,
-    test_path: Path,
-    root_path: Path,
-) -> Generator[Params, None, None]:
-    yield Params.model_validate(
-        {
-            "engine": {
-                "paths": {
-                    "conf": conf_path,
-                    "data": test_path / ".cache",
-                    "root": root_path,
-                },
-            },
-            "stages": {
-                "raw": {"format": "{naming:%s}.{timestamp:%Y%m%d_%H%M%S}"},
-            },
-        }
-    )
-
-
-def test_schedule(params: Params):
+def test_schedule():
     schedule = ScdlBkk.from_loader(
-        name="scdl_bkk_every_5_minute",
-        params=params,
+        name="bkk_every_5_minute",
         externals={},
     )
     assert "Asia/Bangkok" == schedule.tz

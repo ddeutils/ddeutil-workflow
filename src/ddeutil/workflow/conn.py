@@ -43,6 +43,36 @@ class BaseConn(BaseModel):
     ]
 
     @classmethod
+    def from_dict(cls, values: DictData):
+        """Construct Connection with dict of data"""
+        filter_data: DictData = {
+            k: values.pop(k)
+            for k in values.copy()
+            if k not in cls.model_fields and k not in EXCLUDED_EXTRAS
+        }
+        if "url" in values:
+            url: ConnModel = ConnModel.from_url(values.pop("url"))
+            return cls(
+                dialect=url.dialect,
+                host=url.host,
+                port=url.port,
+                user=url.user,
+                pwd=url.pwd,
+                # NOTE:
+                #   I will replace None endpoint with memory value for SQLite
+                #   connection string.
+                endpoint=cls.__prepare_slash_from_url(url.endpoint or "memory"),
+                # NOTE: This order will show that externals this the top level.
+                extras=(url.options | filter_data),
+            )
+        return cls.model_validate(
+            obj={
+                "extras": (values.pop("extras", {}) | filter_data),
+                **values,
+            }
+        )
+
+    @classmethod
     def from_loader(
         cls,
         name: str,
@@ -57,31 +87,9 @@ class BaseConn(BaseModel):
         # NOTE: Validate the config type match with current connection model
         if loader.type != cls:
             raise ValueError(f"Type {loader.type} does not match with {cls}")
-        filter_data: DictData = {
-            k: loader.data.pop(k)
-            for k in loader.data.copy()
-            if k not in cls.model_fields and k not in EXCLUDED_EXTRAS
-        }
-        if "url" in loader.data:
-            url: ConnModel = ConnModel.from_url(loader.data.pop("url"))
-            return cls(
-                dialect=url.dialect,
-                host=url.host,
-                port=url.port,
-                user=url.user,
-                pwd=url.pwd,
-                # NOTE:
-                #   I will replace None endpoint with memory value for SQLite
-                #   connection string.
-                endpoint=cls.__prepare_slash_from_url(url.endpoint or "memory"),
-                # NOTE: This order will show that externals this the top level.
-                extras=(url.options | filter_data | externals),
-            )
-        return cls.model_validate(
-            obj={
-                "extras": (
-                    loader.data.pop("extras", {}) | filter_data | externals
-                ),
+        return cls.from_dict(
+            {
+                "extras": (loader.data.pop("extras", {}) | externals),
                 **loader.data,
             }
         )
