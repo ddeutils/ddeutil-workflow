@@ -14,7 +14,7 @@ from ddeutil.core import lazy
 
 
 class TagFunc(Protocol):
-    """Tag Function Model"""
+    """Tag Function Protocol"""
 
     name: str
     tag: str
@@ -23,8 +23,11 @@ class TagFunc(Protocol):
 
 
 def tag(tag_value: str, name: str | None = None):
-    """Tag decorator function that set function attributes, tag and name for
-    make registries object.
+    """Tag decorator function that set function attributes, ``tag`` and ``name``
+    for making registries variable.
+
+    :param: tag_value: A tag value for make different use-case of a function.
+    :param: name: A name that keeping in registries.
     """
 
     def func_internal(func: TagFunc):

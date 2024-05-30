@@ -2,7 +2,7 @@
 run_python:
   version: 1
   type: ddeutil.workflow.pipeline.Pipeline
-  schedule: schedule-name
+  schedule: bkk_every_5_minute
   params:
     name:
       type: str

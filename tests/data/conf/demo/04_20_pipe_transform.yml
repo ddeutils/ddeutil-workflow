@@ -1,25 +1,19 @@
 transform_proc_mssql:
-  type: pipeline.PipelineParams
-  version: '1'
   desc: "Pipeline that load data from RDBMS"
+  type: pipeline.Pipeline
   params:
     run-date:
-      desc: 'Run datetime'
       type: datetime
     connection:
-      desc: "Connection name"
-      required: true
       type: str
     procedure:
-      desc: "Procedure"
-      required: true
       type: str
   jobs:
     transform:
       stages:
         - name: Transform Data on Target RDBMS
           task: tasks/postgres-proc@pysycopg
-          with:
+          args:
             conn: ${{ params.connection }}
             exec: ${{ params.procedure }}
             params:
