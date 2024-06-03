@@ -2,6 +2,29 @@
 
 ## Latest Changes
 
+## 0.0.2
+
+### :sparkles: Features
+
+- :dart: feat: add from_dict cls method to connection. (_2024-05-30_)
+- :dart: feat: add spark docker compose for test pyspark dataframew. (_2024-05-29_)
+- :dart: feat: add scan for getting lazy frame on polars tasks. (_2024-05-28_)
+- :dart: feat: add Params model on pipeline for validate context. (_2024-05-27_)
+- :dart: feat: change name of map_caller to map_params. (_2024-05-27_)
+- :dart: feat: remove manual registry and use tag decorator function instead. (_2024-05-27_)
+
+### :black_nib: Code Changes
+
+- :construction: refactored: 📦 bump polars from 0.20.26 to 0.20.31 (_2024-06-03_)
+- :construction: refactored: 📦 bump boto3 from 1.34.109 to 1.34.117 (_2024-06-01_)
+- :construction: refactored: change key name and some values on example yml file. (_2024-05-30_)
+- :construction: refactored: clear unuse function from loader from register. (_2024-05-28_)
+- :construction: refactored: change type hint and add BaseStage model. (_2024-05-27_)
+
+### :postbox: Dependencies
+
+- :pushpin: deps: update ddeutil-io package version that merge models. (_2024-06-03_)
+
 ## 0.0.1
 
 ### :sparkles: Features
