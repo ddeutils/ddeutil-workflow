@@ -28,7 +28,6 @@ requires-python = ">=3.9.13"
 dependencies = [
     "fmtutil",
     "ddeutil-io",
-    "ddeutil-model",
     "python-dotenv",
 ]
 dynamic = ["version"]

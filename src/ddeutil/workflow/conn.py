@@ -10,7 +10,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Annotated, Any, Literal, Optional, TypeVar
 
-from ddeutil.model.conn import Conn as ConnModel
+from ddeutil.io.models.conn import Conn as ConnModel
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.functional_validators import field_validator
 from pydantic.types import SecretStr
@@ -61,7 +61,7 @@ class BaseConn(BaseModel):
                 # NOTE:
                 #   I will replace None endpoint with memory value for SQLite
                 #   connection string.
-                endpoint=cls.__prepare_slash_from_url(url.endpoint or "memory"),
+                endpoint=(url.endpoint or "memory"),
                 # NOTE: This order will show that externals this the top level.
                 extras=(url.options | filter_data),
             )
@@ -93,12 +93,6 @@ class BaseConn(BaseModel):
                 **loader.data,
             }
         )
-
-    @classmethod
-    def __prepare_slash_from_url(cls, value: str) -> str:
-        if value.startswith("/"):
-            return value[1:]
-        return value
 
     @field_validator("endpoint")
     def __prepare_slash(cls, value: str) -> str:

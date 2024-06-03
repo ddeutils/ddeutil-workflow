@@ -14,7 +14,7 @@ from inspect import Parameter
 from subprocess import CompletedProcess
 from typing import Any, Callable, Literal, Optional, Union
 
-from ddeutil.model.lineage import dt_now
+from ddeutil.io.models.lineage import dt_now
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
