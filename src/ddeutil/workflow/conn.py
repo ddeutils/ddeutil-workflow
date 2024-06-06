@@ -43,7 +43,7 @@ class BaseConn(BaseModel):
     ]
 
     @classmethod
-    def from_dict(cls, values: DictData):
+    def from_dict(cls, values: DictData) -> Self:
         """Construct Connection with dict of data"""
         filter_data: DictData = {
             k: values.pop(k)
@@ -73,15 +73,11 @@ class BaseConn(BaseModel):
         )
 
     @classmethod
-    def from_loader(
-        cls,
-        name: str,
-        externals: DictData,
-    ) -> Self:
+    def from_loader(cls, name: str, externals: DictData) -> Self:
         """Construct Connection with Loader object with specific config name.
 
-        :param name:
-        :param externals:
+        :param name: A config name.
+        :param externals: A external data that want to adding to extras.
         """
         loader: Loader = Loader(name, externals=externals)
         # NOTE: Validate the config type match with current connection model
@@ -96,6 +92,7 @@ class BaseConn(BaseModel):
 
     @field_validator("endpoint")
     def __prepare_slash(cls, value: str) -> str:
+        """Prepare slash character that map double form URL model loading."""
         if value.startswith("//"):
             return value[1:]
         return value

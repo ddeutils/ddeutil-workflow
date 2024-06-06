@@ -97,7 +97,6 @@ exclude = """
         | build
         | dist
         | venv
-        | __legacy
     )/
 )
 """
@@ -113,7 +112,6 @@ exclude = [
     "build",
     "dist",
     "venv",
-    "__legacy",
 ]
 
 [tool.ruff.lint]
