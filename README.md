@@ -91,14 +91,14 @@ assert dataset.exists()
 
 ```yaml
 schd_for_node:
-  type: schedule.Scdl
+  type: schedule.Schedule
   cron: "*/5 * * * *"
 ```
 
 ```python
-from ddeutil.workflow.schedule import Scdl
+from ddeutil.workflow.schedule import Schedule
 
-scdl = Scdl.from_loader(name='schd_for_node', externals={})
+scdl = Schedule.from_loader(name='schd_for_node', externals={})
 assert '*/5 * * * *' == str(scdl.cronjob)
 
 cron_iterate = scdl.generate('2022-01-01 00:00:00')

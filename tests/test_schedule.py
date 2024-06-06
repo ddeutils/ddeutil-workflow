@@ -1,11 +1,11 @@
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from ddeutil.workflow.schedule import ScdlBkk
+from ddeutil.workflow.schedule import ScheduleBkk
 
 
 def test_schedule():
-    schedule = ScdlBkk.from_loader(
+    schedule = ScheduleBkk.from_loader(
         name="bkk_every_5_minute",
         externals={},
     )

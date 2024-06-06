@@ -1,14 +1,14 @@
 # Cronjob Schedule
 # ---
 bkk_every_5_minute:
-  type: schedule.ScdlBkk
+  type: schedule.ScheduleBkk
   cronjob: "*/5 * * * *"
 
 # Key-word Schedule
 # ---
 #   This pattern reference from dependabot yaml format file on GitHub.
 scdl_every_day:
-  type: schedule.Scd
+  type: schedule.Schedule
   schedule:
     interval: "monthly"
     day: "monday"

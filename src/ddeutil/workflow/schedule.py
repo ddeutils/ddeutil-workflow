@@ -18,8 +18,8 @@ from .__types import DictData
 from .loader import Loader
 
 
-class BaseScdl(BaseModel):
-    """Base Scdl (Schedule) Model"""
+class BaseSchedule(BaseModel):
+    """Base Schedule (Schedule) Model"""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -61,16 +61,16 @@ class BaseScdl(BaseModel):
         return self.cronjob.schedule(date=(start.astimezone(ZoneInfo(self.tz))))
 
 
-class Scdl(BaseScdl):
-    """Scdl (Schedule) Model.
+class Schedule(BaseSchedule):
+    """Schedule (Schedule) Model.
 
     See Also:
         * ``generate()`` is the main usecase of this schedule object.
     """
 
 
-class ScdlBkk(Scdl):
-    """Asia Bangkok Scdl (Schedule) timezone Model.
+class ScheduleBkk(Schedule):
+    """Asia Bangkok Schedule (Schedule) timezone Model.
 
     This model use for change timezone from utc to Asia/Bangkok
     """
@@ -78,5 +78,5 @@ class ScdlBkk(Scdl):
     tz: Annotated[str, Field(description="Timezone")] = "Asia/Bangkok"
 
 
-class AwsScdl(BaseScdl):
+class AwsSchedule(BaseSchedule):
     """Implement Schedule for AWS Service."""

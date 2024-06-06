@@ -5,7 +5,7 @@ import ddeutil.workflow.loader as ld
 import pytest
 from ddeutil.io.param import Params
 from ddeutil.workflow.pipeline import Pipeline
-from ddeutil.workflow.schedule import ScdlBkk
+from ddeutil.workflow.schedule import ScheduleBkk
 
 from .utils import str2dt
 
@@ -71,9 +71,9 @@ def test_simple_loader_schedule(params: Params):
         params=params,
         externals={},
     )
-    assert ScdlBkk == load.type
+    assert ScheduleBkk == load.type
 
-    scdl: ScdlBkk = load.type.model_validate(
+    scdl: ScheduleBkk = load.type.model_validate(
         obj={"cronjob": load.data["cronjob"]}
     )
     cronjob_iter = scdl.generate("2024-01-01 00:00:00")
