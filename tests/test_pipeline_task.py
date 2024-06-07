@@ -37,6 +37,7 @@ def test_pipe_job_task():
         }
     )
     assert {
+        "matrix": {},
         "params": {
             "run-date": datetime(2024, 1, 1, 0, 0),
             "source": "ds_csv_local_file",

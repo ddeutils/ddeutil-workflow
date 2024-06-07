@@ -54,6 +54,7 @@ def test_pipe_job_py():
     # NOTE: Job params will change schema structure with {"params": { ... }}
     rs = demo_job.execute(params={"params": {"name": "Foo"}})
     assert {
+        "matrix": {},
         "params": {"name": "Foo"},
         "stages": {
             "hello-world": {"outputs": {"x": "New Name"}},

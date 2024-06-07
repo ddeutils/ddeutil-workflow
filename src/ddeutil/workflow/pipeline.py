@@ -6,15 +6,14 @@
 from __future__ import annotations
 
 import inspect
+import itertools
 import logging
 import subprocess
 from abc import ABC, abstractmethod
-from datetime import date, datetime
 from inspect import Parameter
 from subprocess import CompletedProcess
-from typing import Any, Callable, Literal, Optional, Union
+from typing import Any, Callable, Optional, Union
 
-from ddeutil.io.models.lineage import dt_now
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
@@ -23,7 +22,7 @@ from .__regex import RegexConf
 from .__types import DictData
 from .exceptions import PyException, TaskException
 from .loader import Loader, map_params
-from .utils import make_registry
+from .utils import Params, make_registry
 
 
 class BaseStage(BaseModel, ABC):
@@ -238,11 +237,23 @@ Stage = Union[
 
 
 class Strategy(BaseModel):
-    """Strategy Model"""
+    """Strategy Model that will combine a matrix together for running the
+    special job.
+    """
 
-    matrix: list[str] = Field(default_factory=list)
-    include: list[str] = Field(default_factory=list)
-    exclude: list[str] = Field(default_factory=list)
+    fail_fast: bool = Field(default=False)
+    max_parallel: int = Field(default=-1)
+    matrix: dict[str, Union[list[str], list[int]]] = Field(default_factory=dict)
+    include: list[dict[str, Union[str, int]]] = Field(default_factory=list)
+    exclude: list[dict[str, Union[str, int]]] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    def __prepare_keys(cls, values: DictData) -> DictData:
+        if "max-parallel" in values:
+            values["max_parallel"] = values.pop("max-parallel")
+        if "fail-fast" in values:
+            values["fail_fast"] = values.pop("fail-fast")
+        return values
 
 
 class Job(BaseModel):
@@ -258,125 +269,28 @@ class Job(BaseModel):
                 return stage
         raise ValueError(f"Stage ID {stage_id} does not exists")
 
+    def make_strategy(self) -> list[dict[str, str]]:
+        if not (mt := self.strategy.matrix):
+            return [{}]
+        return [
+            {_k: _v for e in mapped for _k, _v in e.items()}
+            for mapped in itertools.product(
+                *[[{k: v} for v in vs] for k, vs in mt.items()]
+            )
+        ]
+
     def execute(self, params: DictData | None = None) -> DictData:
         """Execute job with passing dynamic parameters from the pipeline."""
-        for stage in self.stages:
-            # NOTE:
-            #       I do not use below syntax because `params` dict be the
-            #   reference memory pointer and it was changed when I action
-            #   anything like update or re-construct this.
-            #       ... params |= stage.execute(params=params)
-            stage.execute(params=params)
+        for strategy in self.make_strategy():
+            params.update({"matrix": strategy})
+            for stage in self.stages:
+                # NOTE:
+                #       I do not use below syntax because `params` dict be the
+                #   reference memory pointer and it was changed when I action
+                #   anything like update or re-construct this.
+                #       ... params |= stage.execute(params=params)
+                stage.execute(params=params)
         return params
-
-
-class BaseParams(BaseModel, ABC):
-    """Base Parameter that use to make Params Model."""
-
-    desc: Optional[str] = None
-    required: bool = True
-    type: str
-
-    @abstractmethod
-    def receive(self, value: Optional[Any] = None) -> Any:
-        raise ValueError(
-            "Receive value and validate typing before return valid value."
-        )
-
-
-class DefaultParams(BaseParams):
-    """Default Parameter that will check default if it required"""
-
-    default: Optional[str] = None
-
-    @abstractmethod
-    def receive(self, value: Optional[Any] = None) -> Any:
-        raise ValueError(
-            "Receive value and validate typing before return valid value."
-        )
-
-    @model_validator(mode="after")
-    def check_default(self) -> Self:
-        if not self.required and self.default is None:
-            raise ValueError(
-                "Default should set when this parameter does not required."
-            )
-        return self
-
-
-class DatetimeParams(DefaultParams):
-    """Datetime parameter."""
-
-    type: Literal["datetime"] = "datetime"
-    required: bool = False
-    default: datetime = Field(default_factory=dt_now)
-
-    def receive(self, value: str | datetime | date | None = None) -> datetime:
-        if value is None:
-            return self.default
-
-        if isinstance(value, datetime):
-            return value
-        elif isinstance(value, date):
-            return datetime(value.year, value.month, value.day)
-        elif not isinstance(value, str):
-            raise ValueError(
-                f"Value that want to convert to datetime does not support for "
-                f"type: {type(value)}"
-            )
-        return datetime.fromisoformat(value)
-
-
-class StrParams(DefaultParams):
-    """String parameter."""
-
-    type: Literal["str"] = "str"
-
-    def receive(self, value: Optional[str] = None) -> str | None:
-        if value is None:
-            return self.default
-        return str(value)
-
-
-class IntParams(DefaultParams):
-    """Integer parameter."""
-
-    type: Literal["int"] = "int"
-
-    def receive(self, value: Optional[int] = None) -> int | None:
-        if value is None:
-            return self.default
-        if not isinstance(value, int):
-            try:
-                return int(str(value))
-            except TypeError as err:
-                raise ValueError(
-                    f"Value that want to convert to integer does not support "
-                    f"for type: {type(value)}"
-                ) from err
-        return value
-
-
-class ChoiceParams(BaseParams):
-    type: Literal["choice"] = "choice"
-    options: list[str]
-
-    def receive(self, value: Optional[str] = None) -> str:
-        """Receive value that match with options."""
-        # NOTE:
-        #   Return the first value in options if does not pass any input value
-        if value is None:
-            return self.options[0]
-        if any(value not in self.options):
-            raise ValueError(f"{value} does not match any value in options")
-        return value
-
-
-Params = Union[
-    ChoiceParams,
-    DatetimeParams,
-    StrParams,
-]
 
 
 class Pipeline(BaseModel):

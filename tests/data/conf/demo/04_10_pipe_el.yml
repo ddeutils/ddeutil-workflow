@@ -22,7 +22,7 @@ ingest_postgres_to_minio:
           task: tasks/el-postgres-to-delta@polars
           args:
             source:
-              conn: ${{ source.conn }}
+              conn: ${{ params.source }}
               query: |
                 select *
                 from  ${{ params.source.schema }}.${{ param.source.table }}
@@ -55,3 +55,33 @@ ingest_csv_to_parquet:
           args:
             source: ${{ params.source }}
             sink: ${{ params.sink }}
+
+
+ingest_multiple_system:
+  type: pipeline.Pipeline
+  params:
+    source:
+      type: str
+  jobs:
+    multiple-system:
+      strategy:
+        matrix:
+          table: ['customer', 'sales']
+          system: ['csv']
+          partition: [1, 2, 3]
+        exclude:
+          - table: customer
+            system: csv
+            partition: 1
+          - table: sales
+            partition: 3
+      stages:
+        - name: Extract & Load Multi-System
+          task: tasks/el-${{ matrix.system }}-to-delta@polars
+          args:
+            source:
+              conn: ${{ params.source }}
+              table: ${{ matrix.table }}
+            sink:
+              conn: ${{ params.target }}
+              endpoint: /raw/${{ matrix.table }}_${{ matrix.system }}
