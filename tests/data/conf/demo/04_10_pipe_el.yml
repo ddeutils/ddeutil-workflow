@@ -75,6 +75,10 @@ ingest_multiple_system:
             partition: 1
           - table: sales
             partition: 3
+        include:
+          - table: customer
+            system: csv
+            partition: 4
       stages:
         - name: Extract & Load Multi-System
           task: tasks/el-${{ matrix.system }}-to-delta@polars

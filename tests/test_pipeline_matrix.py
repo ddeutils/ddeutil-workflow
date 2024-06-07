@@ -13,16 +13,17 @@ def test_pipe_job_matrix():
         "partition": [1, 2, 3],
     } == multi_sys.strategy.matrix
     assert -1 == multi_sys.strategy.max_parallel
-    assert [] == multi_sys.strategy.include
+    assert [
+        {"partition": 4, "system": "csv", "table": "customer"},
+    ] == multi_sys.strategy.include
     assert [
         {"table": "customer", "system": "csv", "partition": 1},
         {"table": "sales", "partition": 3},
     ] == multi_sys.strategy.exclude
     assert [
-        {"partition": 1, "system": "csv", "table": "customer"},
         {"partition": 1, "system": "csv", "table": "sales"},
         {"partition": 2, "system": "csv", "table": "customer"},
         {"partition": 2, "system": "csv", "table": "sales"},
         {"partition": 3, "system": "csv", "table": "customer"},
-        {"partition": 3, "system": "csv", "table": "sales"},
+        {"partition": 4, "system": "csv", "table": "customer"},
     ] == list(multi_sys.make_strategy())

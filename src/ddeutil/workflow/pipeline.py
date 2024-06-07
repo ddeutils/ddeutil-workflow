@@ -272,12 +272,30 @@ class Job(BaseModel):
     def make_strategy(self) -> list[dict[str, str]]:
         if not (mt := self.strategy.matrix):
             return [{}]
-        return [
+        final: list[dict[str, str]] = []
+        for r in [
             {_k: _v for e in mapped for _k, _v in e.items()}
             for mapped in itertools.product(
                 *[[{k: v} for v in vs] for k, vs in mt.items()]
             )
-        ]
+        ]:
+            if any(
+                all(r[k] == v for k, v in exclude.items())
+                for exclude in self.strategy.exclude
+            ):
+                continue
+            final.append(r)
+
+        if not final:
+            return [{}]
+
+        for include in self.strategy.include:
+            if include.keys() != final[0].keys():
+                raise ValueError("Include should have the keys equal to matrix")
+            if any(all(include[k] == v for k, v in f.items()) for f in final):
+                continue
+            final.append(include)
+        return final
 
     def execute(self, params: DictData | None = None) -> DictData:
         """Execute job with passing dynamic parameters from the pipeline."""
