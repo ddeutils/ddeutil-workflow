@@ -5,10 +5,18 @@
 # ------------------------------------------------------------------------------
 from __future__ import annotations
 
+import logging
 from typing import Any
 from uuid import uuid4
 
-import polars as pl
+try:
+    import polars as pl
+
+    logging.debug(f"Polars version: {pl.__version__}")
+except ImportError:
+    raise ImportError(
+        "Please install polars if you want to use any relate task"
+    ) from None
 import pyarrow.parquet as pq
 from ddeutil.workflow.dataset import PolarsCsv, PolarsParq
 from ddeutil.workflow.utils import tag

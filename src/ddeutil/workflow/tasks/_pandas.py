@@ -4,7 +4,7 @@ import math
 try:
     import pandas as pd
 
-    logging.debug(f"Polars version: {pd.__version__}")
+    logging.debug(f"Pandas version: {pd.__version__}")
 except ImportError as err:
     raise ImportError(
         "``split_iterable`` function want to use pandas package that does"
