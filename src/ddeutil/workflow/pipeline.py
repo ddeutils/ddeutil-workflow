@@ -307,6 +307,10 @@ class Job(BaseModel):
                 #   reference memory pointer and it was changed when I action
                 #   anything like update or re-construct this.
                 #       ... params |= stage.execute(params=params)
+                logging.info(
+                    f"[JOB]: Start execute the stage: "
+                    f"{(stage.id if stage.id else stage.name)!r}"
+                )
                 stage.execute(params=params)
         return params
 
@@ -380,7 +384,7 @@ class Pipeline(BaseModel):
             )
         }
         for job_id in self.jobs:
-            print(f"[PIPELINE]: Start execute the job: {job_id!r}")
+            logging.info(f"[PIPELINE]: Start execute the job: {job_id!r}")
             job: Job = self.jobs[job_id]
             # TODO: Condition on ``needs`` of this job was set. It should create
             #   multithreading process on this step.
