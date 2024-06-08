@@ -34,7 +34,7 @@ def test_pipe_job_task():
                 "source": "ds_csv_local_file",
                 "sink": "ds_parquet_local_file_dir",
             },
-        }
+        },
     )
     assert {
         "matrix": {},
@@ -45,5 +45,36 @@ def test_pipe_job_task():
         },
         "stages": {
             "extract-load": {"outputs": {"records": 2}},
+        },
+    } == rs
+
+
+def test_pipe_task():
+    pipeline = pipe.Pipeline.from_loader(
+        name="ingest_csv_to_parquet",
+        externals={},
+    )
+    rs = pipeline.execute(
+        params={
+            "run-date": datetime(2024, 1, 1),
+            "source": "ds_csv_local_file",
+            "sink": "ds_parquet_local_file_dir",
+        },
+    )
+    assert {
+        "params": {
+            "run-date": datetime(2024, 1, 1),
+            "source": "ds_csv_local_file",
+            "sink": "ds_parquet_local_file_dir",
+        },
+        "jobs": {
+            "extract-load": {
+                "stages": {
+                    "extract-load": {
+                        "outputs": {"records": 2},
+                    },
+                },
+                "matrix": {},
+            },
         },
     } == rs

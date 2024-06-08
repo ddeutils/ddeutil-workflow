@@ -26,7 +26,7 @@ from .utils import Params, make_registry
 
 
 class BaseStage(BaseModel, ABC):
-    """Base Stage Model."""
+    """Base Stage Model that keep only id and name fields."""
 
     id: Optional[str] = None
     name: str
@@ -239,6 +239,16 @@ Stage = Union[
 class Strategy(BaseModel):
     """Strategy Model that will combine a matrix together for running the
     special job.
+
+    Examples:
+        >>> strategy = {
+        ...     'matrix': {
+        ...         'first': [1, 2, 3],
+        ...         'second': ['foo', 'bar']
+        ...     },
+        ...     'include': [{'first': 4, 'second': 'foo'}],
+        ...     'exclude': [{'first': 1, 'second': 'bar'}],
+        ... }
     """
 
     fail_fast: bool = Field(default=False)
@@ -270,6 +280,7 @@ class Job(BaseModel):
         raise ValueError(f"Stage ID {stage_id} does not exists")
 
     def make_strategy(self) -> list[dict[str, str]]:
+        """Return List of combination of matrix values"""
         if not (mt := self.strategy.matrix):
             return [{}]
         final: list[dict[str, str]] = []
@@ -301,17 +312,21 @@ class Job(BaseModel):
         """Execute job with passing dynamic parameters from the pipeline."""
         for strategy in self.make_strategy():
             params.update({"matrix": strategy})
+
+            # IMPORTANT: The stage execution only run sequentially one-by-one.
             for stage in self.stages:
+                logging.info(
+                    f"[JOB]: Start execute the stage: "
+                    f"{(stage.id if stage.id else stage.name)!r}"
+                )
+
                 # NOTE:
                 #       I do not use below syntax because `params` dict be the
                 #   reference memory pointer and it was changed when I action
                 #   anything like update or re-construct this.
                 #       ... params |= stage.execute(params=params)
-                logging.info(
-                    f"[JOB]: Start execute the stage: "
-                    f"{(stage.id if stage.id else stage.name)!r}"
-                )
                 stage.execute(params=params)
+        # TODO: We should not return matrix key to outside
         return params
 
 
@@ -348,7 +363,8 @@ class Pipeline(BaseModel):
         return self.jobs[name]
 
     def execute(self, params: DictData | None = None) -> DictData:
-        """Execute pipeline with passing dynamic parameters.
+        """Execute pipeline with passing dynamic parameters to any jobs that
+        included in the pipeline.
 
         See Also:
 
@@ -381,12 +397,19 @@ class Pipeline(BaseModel):
                     for k in params
                     if k in self.params
                 }
-            )
+            ),
+            "jobs": {},
         }
+
+        # IMPORTANT: The job execution can run parallel and waiting by needed.
         for job_id in self.jobs:
             logging.info(f"[PIPELINE]: Start execute the job: {job_id!r}")
             job: Job = self.jobs[job_id]
             # TODO: Condition on ``needs`` of this job was set. It should create
             #   multithreading process on this step.
             job.execute(params=params)
+            params["jobs"][job_id] = {
+                "stages": params.pop("stages", {}),
+                "matrix": params.pop("matrix", {}),
+            }
         return params

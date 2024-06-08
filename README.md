@@ -48,7 +48,13 @@ Out of you data that want to use in pipeline of workflow. Some of this component
 is similar component of the **Airflow** because I like it concepts.
 
 The main feature of this project is the `Pipeline` object that can call any
-registried function.
+registries function. The pipeline can handle everything that you want to do, it
+will passing parameters and catching the output for re-use it to next step.
+
+> [!IMPORTANT]
+> In the future of this project, I will drop the connection and dataset to
+> dynamic registries instead of main features because it have a lot of maintain
+> vendor codes and deps. (I do not have time to handle this features)
 
 ### Connection
 

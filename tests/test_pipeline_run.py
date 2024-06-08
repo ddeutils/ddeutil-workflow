@@ -113,6 +113,7 @@ def test_pipe_params_py():
             "run-date": "2024-01-01",
         }
     )
-    assert ("printing", "setting-x", "create-func", "call-func") == tuple(
-        rs["stages"].keys()
+    assert ("final-job", "first-job", "second-job") == tuple(rs["jobs"].keys())
+    assert ("printing", "setting-x") == tuple(
+        rs["jobs"]["first-job"]["stages"].keys()
     )
