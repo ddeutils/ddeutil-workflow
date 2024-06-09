@@ -6,7 +6,6 @@ from .utils import dotenv_setting, initial_sqlite
 
 collect_ignore: list[str] = [
     "vendors",
-    "test_loader_simple.py",
 ]
 
 dotenv_setting()

@@ -207,14 +207,10 @@ pipe_el_pg_to_lake:
 pipe_hook_mssql_proc:
   type: ddeutil.workflow.pipe.Pipeline
   params:
-    run_date:
-      type: datetime
-    sp_name:
-      type: str
-    source_name:
-      type: str
-    target_name:
-      type: str
+    run_date: datetime
+    sp_name: str
+    source_name: str
+    target_name: str
   jobs:
     transform:
       stages:

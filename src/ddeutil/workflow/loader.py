@@ -137,6 +137,10 @@ class Loader(SimLoad):
 def map_params(value: Any, params: dict[str, Any]) -> Any:
     """Map caller value that found from ``RE_CALLER`` regular expression.
 
+    :param value: A value that want to mapped with an params
+    :param params: A parameter value that getting with matched regular
+        expression.
+
     :rtype: Any
     :returns: An any getter value from the params input.
     """

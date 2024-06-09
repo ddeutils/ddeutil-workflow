@@ -42,12 +42,9 @@ ingest_postgres_to_minio:
 ingest_csv_to_parquet:
   type: pipeline.Pipeline
   params:
-    run-date:
-      type: datetime
-    source:
-      type: str
-    sink:
-      type: str
+    run-date: datetime
+    source: str
+    sink: str
   jobs:
     extract-load:
       stages:

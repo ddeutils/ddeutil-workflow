@@ -366,6 +366,19 @@ class Pipeline(BaseModel):
     params: dict[str, Params] = Field(default_factory=dict)
     jobs: dict[str, Job]
 
+    @model_validator(mode="before")
+    def __prepare_params(cls, values: DictData) -> DictData:
+        if params := values.pop("params", {}):
+            values["params"] = {
+                p: (
+                    {"type": params[p]}
+                    if isinstance(params[p], str)
+                    else params[p]
+                )
+                for p in params
+            }
+        return values
+
     @classmethod
     def from_loader(
         cls,
