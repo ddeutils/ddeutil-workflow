@@ -2,10 +2,9 @@ import os
 
 import ddeutil.workflow.conn as conn
 import pytest
-from ddeutil.io.param import Params
 
 
-def test_connection_file(params_simple: Params):
+def test_connection_file():
     connection = conn.FlSys.from_loader(
         name="conn_local_file",
         externals={},
@@ -17,7 +16,7 @@ def test_connection_file(params_simple: Params):
     assert "data/examples" == connection.endpoint
 
 
-def test_connection_file_url(params_simple: Params):
+def test_connection_file_url():
     connection = conn.FlSys.from_loader(
         name="conn_local_file_url",
         externals={},
@@ -34,7 +33,7 @@ def test_connection_file_url(params_simple: Params):
         assert p.name == "demo_sqlite.db"
 
 
-def test_connection_file_url_ubuntu(params_simple: Params):
+def test_connection_file_url_ubuntu():
     connection = conn.FlSys.from_loader(
         name="conn_local_file_url_ubuntu",
         externals={},
@@ -46,7 +45,7 @@ def test_connection_file_url_ubuntu(params_simple: Params):
     assert connection.pwd is None
 
 
-def test_connection_file_ubuntu(params_simple: Params):
+def test_connection_file_ubuntu():
     connection = conn.FlSys.from_loader(
         name="conn_local_file_ubuntu",
         externals={},
@@ -58,7 +57,7 @@ def test_connection_file_ubuntu(params_simple: Params):
     assert connection.pwd is None
 
 
-def test_connection_file_url_relative(params_simple: Params):
+def test_connection_file_url_relative():
     connection = conn.FlSys.from_loader(
         name="conn_local_file_url_relative",
         externals={},
@@ -71,7 +70,7 @@ def test_connection_file_url_relative(params_simple: Params):
 
 
 @pytest.mark.skipif(True, reason="Because SFTP server does not provisioning")
-def test_connection_sftp(params_simple: Params):
+def test_connection_sftp():
     connection = conn.SFTP.from_loader(
         name="conn_sftp",
         externals={},
@@ -82,12 +81,12 @@ def test_connection_sftp(params_simple: Params):
         print(f)
 
 
-def test_connection_sqlite(params_simple: Params):
+def test_connection_sqlite():
     connection = conn.SQLite.from_loader(name="conn_sqlite_url", externals={})
     connection.ping()
 
 
-def test_connection_sqlite_failed(params_simple: Params):
+def test_connection_sqlite_failed():
     connection = conn.SQLite.from_loader(
         name="conn_sqlite_url_failed", externals={}
     )

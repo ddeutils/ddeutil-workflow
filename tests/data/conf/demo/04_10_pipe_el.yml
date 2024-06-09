@@ -37,6 +37,8 @@ ingest_postgres_to_minio:
               endpoint: /persisted/${{ target.schema }}/${{ target.path }}
 
 
+# Case:
+#   Extract data on the Local File System from CSV to Parquet.
 ingest_csv_to_parquet:
   type: pipeline.Pipeline
   params:

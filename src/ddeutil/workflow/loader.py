@@ -15,11 +15,11 @@ from ddeutil.core import (
 )
 from ddeutil.io import (
     ConfigNotFound,
-    Params,
+    PathData,
     PathSearch,
     YamlEnvFl,
 )
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .__regex import RegexConf
 from .__types import DictData
@@ -27,6 +27,15 @@ from .__types import DictData
 T = TypeVar("T")
 BaseModelType = type[BaseModel]
 AnyModel = TypeVar("AnyModel", bound=BaseModel)
+
+
+class Engine(BaseModel):
+    paths: PathData = Field(default_factory=PathData)
+    registry: str = Field(default="ddeutil.workflow")
+
+
+class Params(BaseModel):
+    engine: Engine = Field(default_factory=Engine)
 
 
 class SimLoad:

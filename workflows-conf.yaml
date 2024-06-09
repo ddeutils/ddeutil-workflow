@@ -1,4 +1,5 @@
 engine:
+  registry: "ddeutil.workflow"
   paths:
     conf: "${ROOT_PATH:.}/tests/data/conf"
     root: "${ROOT_PATH:.}"
