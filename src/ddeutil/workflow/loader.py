@@ -20,6 +20,7 @@ from ddeutil.io import (
     YamlEnvFl,
 )
 from pydantic import BaseModel, Field
+from pydantic.functional_validators import model_validator
 
 from .__regex import RegexConf
 from .__types import DictData
@@ -31,7 +32,13 @@ AnyModel = TypeVar("AnyModel", bound=BaseModel)
 
 class Engine(BaseModel):
     paths: PathData = Field(default_factory=PathData)
-    registry: str = Field(default="ddeutil.workflow")
+    registry: list[str] = Field(default_factory=lambda: ["ddeutil.workflow"])
+
+    @model_validator(mode="before")
+    def __prepare_registry(cls, values: DictData) -> DictData:
+        if (_regis := values.get("registry")) and isinstance(_regis, str):
+            values["registry"] = [_regis]
+        return values
 
 
 class Params(BaseModel):
@@ -84,6 +91,11 @@ class SimLoad:
             # NOTE: Auto adding module prefix if it does not set
             return import_string(f"ddeutil.workflow.{_typ}")
         except ModuleNotFoundError:
+            for registry in self.conf_params.engine.registry:
+                try:
+                    return import_string(f"{registry}.{_typ}")
+                except ModuleNotFoundError:
+                    continue
             return import_string(f"{_typ}")
 
     def load(self) -> AnyModel:

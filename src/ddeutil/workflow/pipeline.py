@@ -9,8 +9,10 @@ import inspect
 import itertools
 import logging
 import subprocess
+import time
 from abc import ABC, abstractmethod
 from inspect import Parameter
+from queue import Queue
 from subprocess import CompletedProcess
 from typing import Any, Callable, Optional, Union
 
@@ -339,7 +341,10 @@ class Job(BaseModel):
 
 
 class Pipeline(BaseModel):
-    """Pipeline Model"""
+    """Pipeline Model this is the main feature of this project because it use to
+    be workflow data for running everywhere that you want. It use lightweight
+    coding line to execute it.
+    """
 
     params: dict[str, Params] = Field(default_factory=dict)
     jobs: dict[str, Job]
@@ -358,6 +363,10 @@ class Pipeline(BaseModel):
             params=loader.data["params"],
         )
 
+    @model_validator(mode="after")
+    def job_checking_needs(self):
+        return self
+
     def job(self, name: str) -> Job:
         """Return Job model that exists on this pipeline.
 
@@ -365,14 +374,23 @@ class Pipeline(BaseModel):
         :type name: str
 
         :rtype: Job
+        :returns: A job model that exists on this pipeline by input name.
         """
         if name not in self.jobs:
-            raise ValueError(f"Job {name} does not exists")
+            raise ValueError(f"Job {name!r} does not exists")
         return self.jobs[name]
 
-    def execute(self, params: DictData | None = None) -> DictData:
+    def execute(
+        self,
+        params: DictData | None = None,
+        time_out: int = 60,
+    ) -> DictData:
         """Execute pipeline with passing dynamic parameters to any jobs that
         included in the pipeline.
+
+        :param params: An input parameters that use on pipeline execution.
+        :param time_out: A time out second value for limit time of this
+            execution.
 
         See Also:
 
@@ -387,8 +405,7 @@ class Pipeline(BaseModel):
 
         """
         params: DictData = params or {}
-        check_key = tuple(f"{k!r}" for k in self.params if k not in params)
-        if check_key:
+        if check_key := tuple(f"{k!r}" for k in self.params if k not in params):
             raise ValueError(
                 f"Parameters that needed on pipeline does not pass: "
                 f"{', '.join(check_key)}."
@@ -409,15 +426,31 @@ class Pipeline(BaseModel):
             "jobs": {},
         }
 
-        # IMPORTANT: The job execution can run parallel and waiting by needed.
+        jq = Queue()
         for job_id in self.jobs:
+            jq.put(job_id)
+
+        ts: float = time.monotonic()
+        not_time_out_flag = True
+
+        # IMPORTANT: The job execution can run parallel and waiting by needed.
+        while not jq.empty() and (
+            not_time_out_flag := ((time.monotonic() - ts) < time_out)
+        ):
+            job_id: str = jq.get()
             logging.info(f"[PIPELINE]: Start execute the job: {job_id!r}")
             job: Job = self.jobs[job_id]
             # TODO: Condition on ``needs`` of this job was set. It should create
             #   multithreading process on this step.
+            #   But, I don't know how to handle changes params between each job
+            #   execution while its use them together.
+            if any(params["jobs"].get(need) for need in job.needs):
+                jq.put(job_id)
             job.execute(params=params)
             params["jobs"][job_id] = {
                 "stages": params.pop("stages", {}),
                 "matrix": params.pop("matrix", {}),
             }
+        if not not_time_out_flag:
+            raise RuntimeError("Execution of pipeline was time out")
         return params
