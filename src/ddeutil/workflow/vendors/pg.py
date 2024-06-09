@@ -5,8 +5,7 @@
 # ------------------------------------------------------------------------------
 from __future__ import annotations
 
-from typing import Any
+from .__dataset import TblDataset
 
-TupleStr = tuple[str, ...]
-DictData = dict[str, Any]
-DictStr = dict[str, str]
+
+class PostgresTbl(TblDataset): ...

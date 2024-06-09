@@ -67,7 +67,7 @@ conn_postgres_data:
 ```
 
 ```python
-from ddeutil.workflow.conn import Conn
+from ddeutil.workflow.vendors.conn import Conn
 
 conn = Conn.from_loader(name='conn_postgres_data', externals={})
 assert conn.ping()
@@ -87,7 +87,7 @@ ds_postgres_customer_tbl:
 ```
 
 ```python
-from ddeutil.workflow.dataset import PostgresTbl
+from ddeutil.workflow.vendors.pg import PostgresTbl
 
 dataset = PostgresTbl.from_loader(name='ds_postgres_customer_tbl', externals={})
 assert dataset.exists()

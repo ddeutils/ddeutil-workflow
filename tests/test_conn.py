@@ -1,6 +1,6 @@
 import os
 
-import ddeutil.workflow.vendors.conn as conn
+import ddeutil.workflow.conn as conn
 import pytest
 from ddeutil.io.param import Params
 

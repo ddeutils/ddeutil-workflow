@@ -19,7 +19,7 @@ from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
 from .__regex import RegexConf
-from .__types import DictData
+from .__types import DictData, DictStr
 from .exceptions import PyException, TaskException
 from .loader import Loader, map_params
 from .utils import Params, make_registry
@@ -60,7 +60,7 @@ class ShellStage(BaseStage):
     """Shell statement stage."""
 
     shell: str
-    env: dict[str, str] = Field(default_factory=dict)
+    env: DictStr = Field(default_factory=dict)
 
     @staticmethod
     def __prepare_shell(shell: str):
@@ -269,21 +269,29 @@ class Strategy(BaseModel):
 class Job(BaseModel):
     """Job Model"""
 
+    runs_on: Optional[str] = Field(default=None)
     stages: list[Stage] = Field(default_factory=list)
     needs: list[str] = Field(default_factory=list)
     strategy: Strategy = Field(default_factory=Strategy)
 
+    @model_validator(mode="before")
+    def __prepare_keys(cls, values: DictData) -> DictData:
+        if "runs-on" in values:
+            values["runs_on"] = values.pop("runs-on")
+        return values
+
     def stage(self, stage_id: str) -> Stage:
+        """Return stage model that match with an input stage ID."""
         for stage in self.stages:
             if stage_id == (stage.id or ""):
                 return stage
         raise ValueError(f"Stage ID {stage_id} does not exists")
 
-    def make_strategy(self) -> list[dict[str, str]]:
+    def make_strategy(self) -> list[DictStr]:
         """Return List of combination of matrix values"""
         if not (mt := self.strategy.matrix):
             return [{}]
-        final: list[dict[str, str]] = []
+        final: list[DictStr] = []
         for r in [
             {_k: _v for e in mapped for _k, _v in e.items()}
             for mapped in itertools.product(

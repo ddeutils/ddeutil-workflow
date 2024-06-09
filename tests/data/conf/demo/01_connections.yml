@@ -11,36 +11,36 @@
 #     * local:////absolute/path/to/foo
 #
 conn_local_file:
-  type: vendors.conn.FlSys
+  type: conn.FlSys
   endpoint: "data/examples"
 
 conn_local_file_url:
-  type: vendors.conn.FlSys
+  type: conn.FlSys
   # Absolute Window path: file:///C:/usr/absolute/path/sub-path/
   url: "local:///${ROOT_PATH}/tests/data/examples"
 
 conn_local_file_url_ubuntu:
-  type: vendors.conn.FlSys
+  type: conn.FlSys
   # Absolute Ubuntu path.
   url: "local:////home/runner/work/foo"
 
 conn_local_file_ubuntu:
-  type: vendors.conn.FlSys
+  type: conn.FlSys
   # Absolute Ubuntu path.
   endpoint: "/home/runner/work/foo"
 
 conn_local_file_url_relative:
-  type: vendors.conn.FlSys
+  type: conn.FlSys
   url: "local:///data/examples/"
 
 conn_local_file_url_ubuntu_relative:
-  type: vendors.conn.FlSys
+  type: conn.FlSys
   url: "local:///relative/path/to/foo"
 
 # SFTP & FTP Connection
 # ---
 conn_sftp:
-  type: vendors.conn.SFTP
+  type: conn.SFTP
   host: ${SFTP_HOST}
   port: ${SFTP_PORT}
   user: ${SFTP_USER}
@@ -48,7 +48,7 @@ conn_sftp:
   endpoint: "data"
 
 conn_sftp_ssh_key:
-  type: vendors.conn.SFTP
+  type: conn.SFTP
   host: ${SFTP_HOST}
   port: ${SFTP_PORT}
   user: ${SFTP_USER}
@@ -58,7 +58,7 @@ conn_sftp_ssh_key:
     ssh_private_key: ./conf/.ssh/key_ssh_gen.pem
 
 conn_sftp_url:
-  type: vendors.conn.SFTP
+  type: conn.SFTP
   url: "sftp://bastion:P@ssW0rd@127.0.0.1:22/home/bastion/data"
 
 
@@ -75,12 +75,12 @@ conn_sftp_url:
 #     * sqlite://
 #
 conn_sqlite_url:
-  type: vendors.conn.SQLite
+  type: conn.SQLite
   # Relative path.
   url: "sqlite:///${ROOT_PATH}/tests/data/examples1/demo_sqlite.db"
 
 conn_sqlite_url_failed:
-  type: vendors.conn.SQLite
+  type: conn.SQLite
   # Relative path.
   url: "sqlite:///${ROOT_PATH}/tests/data/examples1/demo_sqlite.db"
 
@@ -88,14 +88,14 @@ conn_sqlite_url_failed:
 # ---
 #
 conn_s3_url:
-  type: vendors.conn.S3
+  type: conn.S3
   url: "s3://@secrets{s3_data_eng_bucket}"
   aws_access_key_id: "${AWS_ACCESS_ID}"
   aws_access_secret_key: "${AWS_ACCESS_SECRET_KEY}"
   role_arn: "@secrets{s3_data_eng_role_arn}"
 
 conn_azure_blob_de_test:
-  type: "vendors.conn.AzureBlobSystem"
+  type: "conn.AzureBlobSystem"
   endpoint: "abfs://de-test"
   account_name: "@secrets{azure_de_test_account_name}"
   account_key: "@secrets{azure_de_test_account_key}"
@@ -103,7 +103,7 @@ conn_azure_blob_de_test:
 
 # Postgres Connection
 conn_aws_pg_sandbox:
-  type: "vendors.conn.PostgresSystem"
+  type: "conn.PostgresSystem"
   username: "@secrets{pg_sandbox_username}"
   password: "@secrets{pg_sandbox_password}"
   host: "@secrets{pg_sandbox_host}"
@@ -111,7 +111,7 @@ conn_aws_pg_sandbox:
   database: "@secrets{pg_sandbox_database}"
 
 conn_postgres:
-  type: vendors.conn.Postgres
+  type: conn.Postgres
   host: 127.0.0.1
   port: 5432
   user: postgres
@@ -119,7 +119,7 @@ conn_postgres:
   endpoint: postgres
 
 conn_aws_pg_uat:
-  type: vendors.conn.Postgres
+  type: conn.Postgres
   username: "postgres"
   password: "P@ssW0rd"
   host: "50.234.123.10"
@@ -135,7 +135,7 @@ conn_aws_pg_uat:
 # MS SQL Server Connection
 # ---
 conn_azure_sqlserver_dwh_dev:
-  type: vendors.conn.ODBC
+  type: conn.ODBC
   username: "@secrets{sqlserver_dwh_username}"
   host: "@secrets{sqlserver_dwh_host}"
   port: "1433"
