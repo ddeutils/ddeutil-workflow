@@ -16,13 +16,14 @@ from queue import Queue
 from subprocess import CompletedProcess
 from typing import Any, Callable, Optional, Union
 
+import msgspec as spec
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
 from .__regex import RegexConf
 from .__types import DictData, DictStr
-from .exceptions import PyException, TaskException
+from .exceptions import TaskException
 from .loader import Loader, map_params
 from .utils import Params, make_registry
 
@@ -30,15 +31,27 @@ from .utils import Params, make_registry
 class BaseStage(BaseModel, ABC):
     """Base Stage Model that keep only id and name fields."""
 
-    id: Optional[str] = None
-    name: str
+    id: Optional[str] = Field(
+        default=None,
+        description=(
+            "The stage ID that use to keep execution output or getting by job "
+            "owner."
+        ),
+    )
+    name: str = Field(
+        description="The stage name that want to logging when start execution."
+    )
 
     @abstractmethod
     def execute(self, params: DictData) -> DictData:
+        """Execute abstraction method that action something by sub-model class.
+
+        :param params: A parameter data that want to use in this execution.
+        """
         raise NotImplementedError("Stage should implement ``execute`` method.")
 
     def set_outputs(self, rs: DictData, params: DictData) -> DictData:
-        """Set outputs to params"""
+        """Set an outputs from execution process to an input params."""
         if self.id is None:
             return params
 
@@ -101,7 +114,7 @@ class ShellStage(BaseStage):
         if rs.returncode > 0:
             print(f"{rs.stderr}\nRunning Statement:\n---\n{self.shell}")
             # FIXME: raise err for this execution.
-            # raise ShellException(
+            # raise TaskException(
             #     f"{rs.stderr}\nRunning Statement:\n---\n"
             #     f"{self.shell}"
             # )
@@ -117,7 +130,7 @@ class PyStage(BaseStage):
     run: str
     vars: DictData = Field(default_factory=dict)
 
-    def get_var(self, params: DictData) -> DictData:
+    def get_vars(self, params: DictData) -> DictData:
         """Return variables"""
         rs = self.vars.copy()
         for p, v in self.vars.items():
@@ -150,12 +163,12 @@ class PyStage(BaseStage):
         :returns: A parameters from an input that was mapped output if the stage
             ID was set.
         """
-        _globals: DictData = globals() | params | self.get_var(params)
+        _globals: DictData = globals() | params | self.get_vars(params)
         _locals: DictData = {}
         try:
             exec(map_params(self.run, params), _globals, _locals)
         except Exception as err:
-            raise PyException(
+            raise TaskException(
                 f"{err.__class__.__name__}: {err}\nRunning Statement:\n---\n"
                 f"{self.run}"
             ) from None
@@ -165,12 +178,16 @@ class PyStage(BaseStage):
         return params | {k: _globals[k] for k in params if k in _globals}
 
 
-class TaskSearch(BaseModel):
-    """Task Search Model"""
+class TaskSearch(spec.Struct, kw_only=True, tag="task"):
+    """Task Search Struct that use the `msgspec` for the best performance."""
 
     path: str
     func: str
     tag: str
+
+    def to_dict(self) -> DictData:
+        """Return dict data from struct fields."""
+        return {f: getattr(self, f) for f in self.__struct_fields__}
 
 
 class TaskStage(BaseStage):
@@ -184,7 +201,7 @@ class TaskStage(BaseStage):
         """Extract Task string value to task function."""
         if not (found := RegexConf.RE_TASK_FMT.search(task)):
             raise ValueError("Task does not match with task format regex.")
-        tasks = TaskSearch(**found.groupdict())
+        tasks: TaskSearch = TaskSearch(**found.groupdict())
 
         # NOTE: Registry object should implement on this package only.
         # TODO: This prefix value to search registry should dynamic with

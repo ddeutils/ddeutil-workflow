@@ -14,7 +14,6 @@ from ddeutil.core import (
     import_string,
 )
 from ddeutil.io import (
-    ConfigNotFound,
     PathData,
     PathSearch,
     YamlEnvFl,
@@ -31,6 +30,8 @@ AnyModel = TypeVar("AnyModel", bound=BaseModel)
 
 
 class Engine(BaseModel):
+    """Engine Model"""
+
     paths: PathData = Field(default_factory=PathData)
     registry: list[str] = Field(default_factory=lambda: ["ddeutil.workflow"])
 
@@ -42,6 +43,8 @@ class Engine(BaseModel):
 
 
 class Params(BaseModel):
+    """Params Model"""
+
     engine: Engine = Field(default_factory=Engine)
 
 
@@ -52,12 +55,10 @@ class SimLoad:
     :param params: A Params model object.
     :param externals: An external parameters
 
-    Note:
+    Noted:
         The config data should have ``type`` key for engine can know what is
     config should to do next.
     """
-
-    import_prefix: ClassVar[str] = "ddeutil.workflow"
 
     def __init__(
         self,
@@ -72,7 +73,7 @@ class SimLoad:
             ):
                 self.data = data
         if not self.data:
-            raise ConfigNotFound(f"Config {name!r} does not found on conf path")
+            raise ValueError(f"Config {name!r} does not found on conf path")
         self.__conf_params: Params = params
         self.externals: DictData = externals
 
@@ -134,7 +135,7 @@ class Loader(SimLoad):
 
 
 def map_params(value: Any, params: dict[str, Any]) -> Any:
-    """Map caller value that found from ``RE_CALLER`` regex.
+    """Map caller value that found from ``RE_CALLER`` regular expression.
 
     :rtype: Any
     :returns: An any getter value from the params input.

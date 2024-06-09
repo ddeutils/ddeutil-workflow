@@ -67,7 +67,7 @@ conn_postgres_data:
 ```
 
 ```python
-from ddeutil.workflow.vendors.conn import Conn
+from ddeutil.workflow.conn import Conn
 
 conn = Conn.from_loader(name='conn_postgres_data', externals={})
 assert conn.ping()
@@ -75,7 +75,9 @@ assert conn.ping()
 
 ### Dataset
 
-The dataset is define any objects on the connection.
+The dataset is define any objects on the connection. This feature was implemented
+on `/vendors` because it has a lot of tools that can interact with any data systems
+in the data tool stacks.
 
 ```yaml
 ds_postgres_customer_tbl:
