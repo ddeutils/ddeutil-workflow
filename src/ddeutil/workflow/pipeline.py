@@ -444,6 +444,10 @@ class Pipeline(BaseModel):
             #   multithreading process on this step.
             #   But, I don't know how to handle changes params between each job
             #   execution while its use them together.
+            #   ---
+            #   >>> import multiprocessing
+            #   >>> with multiprocessing.Pool(processes=3) as pool:
+            #   ...     results = pool.starmap(merge_names, ('', '', ...))
             if any(params["jobs"].get(need) for need in job.needs):
                 jq.put(job_id)
             job.execute(params=params)
