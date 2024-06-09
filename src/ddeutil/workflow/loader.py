@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from functools import cached_property
-from typing import Any, TypeVar
+from typing import Any, ClassVar, TypeVar
 
 from ddeutil.core import (
     getdot,
@@ -41,7 +41,7 @@ class SimLoad:
     config should to do next.
     """
 
-    import_prefix: str = "ddeutil.workflow"
+    import_prefix: ClassVar[str] = "ddeutil.workflow"
 
     def __init__(
         self,
@@ -82,11 +82,13 @@ class SimLoad:
 
 
 class Loader(SimLoad):
-    """Main Loader Object.
+    """Main Loader Object that get the config `yaml` file from current path.
 
     :param name: A name of config data that will read by Yaml Loader object.
     :param externals: An external parameters
     """
+
+    conf_name: ClassVar[str] = "workflows-conf"
 
     def __init__(
         self,
@@ -106,7 +108,7 @@ class Loader(SimLoad):
     def config(cls, path: str | None = None) -> Params:
         """Load Config data from ``workflows-conf.yaml`` file."""
         return Params.model_validate(
-            YamlEnvFl(path or "./workflows-conf.yaml").read()
+            YamlEnvFl(path or f"./{cls.conf_name}.yaml").read()
         )
 
 

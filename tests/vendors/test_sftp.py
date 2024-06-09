@@ -1,6 +1,6 @@
 import os
 
-from ddeutil.workflow.vendors.sftp_wrapped import WrapSFTP
+from ddeutil.workflow.vendors.wf_sftp import WrapSFTP
 
 
 def test_sftp():

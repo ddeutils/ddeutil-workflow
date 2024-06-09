@@ -18,8 +18,8 @@ except ImportError:
         "Please install polars if you want to use any relate task"
     ) from None
 import pyarrow.parquet as pq
-from ddeutil.workflow.dataset import PolarsCsv, PolarsParq
 from ddeutil.workflow.utils import tag
+from ddeutil.workflow.vendors.pl import PolarsCsv, PolarsParq
 
 
 def polars_dtype():

@@ -1,12 +1,12 @@
 import os
 from pathlib import Path
 
-import ddeutil.workflow.dataset as ds
+import ddeutil.workflow.vendors.pl as pl_ds
 import polars as pl
 
 
 def test_polars_csv():
-    dataset = ds.PolarsCsv.from_loader(
+    dataset = pl_ds.PolarsCsv.from_loader(
         "ds_csv_local_file",
         externals={},
     )
@@ -43,7 +43,7 @@ def test_polars_csv():
 
 
 def test_polars_json_nested():
-    dataset = ds.PolarsJson.from_loader(
+    dataset = pl_ds.PolarsJson.from_loader(
         "ds_json_local_file",
         externals={},
     )
@@ -68,7 +68,7 @@ def test_polars_json_nested():
 
 
 def test_polars_json_nested_ubuntu():
-    dataset = ds.PolarsJson.from_loader(
+    dataset = pl_ds.PolarsJson.from_loader(
         "ds_json_local_file_ubuntu", externals={}
     )
     assert "/home/runner/work/examples" == dataset.endpoint
@@ -80,7 +80,9 @@ def test_polars_parquet_save(test_path):
         test_path / "data/examples/demo_customer.csv", separator="|"
     )
     print(df)
-    dataset = ds.PolarsParq.from_loader("ds_parquet_local_file", externals={})
+    dataset = pl_ds.PolarsParq.from_loader(
+        "ds_parquet_local_file", externals={}
+    )
     print(dataset.save(df))
     df = pl.read_parquet(
         test_path / "data/examples/demo_parquet.snappy.parquet"
