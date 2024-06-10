@@ -5,6 +5,7 @@
 # ------------------------------------------------------------------------------
 from __future__ import annotations
 
+import contextlib
 import inspect
 import itertools
 import logging
@@ -12,9 +13,11 @@ import re
 import subprocess
 import sys
 import time
+import uuid
 from abc import ABC, abstractmethod
 from functools import partial
 from inspect import Parameter
+from pathlib import Path
 from queue import Queue
 from subprocess import CompletedProcess
 from typing import Any, Callable, Optional, Union
@@ -81,8 +84,19 @@ class ShellStage(BaseStage):
     env: DictStr = Field(default_factory=dict)
 
     @staticmethod
-    def __prepare_shell(shell: str):
+    @contextlib.contextmanager
+    def __prepare_shell(shell: str, write_file: bool = True):
         """Prepare shell string statement that include newline"""
+        if write_file:
+            f_name: str = f"./{uuid.uuid4()}.sh"
+            with open(f_name, mode="w") as f:
+                f.write("#!/bin/bash\n")
+                f.write(shell)
+
+            yield ["bash", f_name]
+
+            Path(f_name).unlink()
+            return
         for prepare in (
             partial(re.sub, r"(\s|^)#.*", ""),
             partial(re.sub, r"(\r\n)+", "\r\n"),
@@ -92,8 +106,9 @@ class ShellStage(BaseStage):
         ):
             shell: str = prepare(shell)
         if sys.platform.startswith("win"):
-            return ["powershell", "-c", shell]
-        return [shell]
+            yield ["powershell", "-c", shell]
+        else:
+            yield [shell]
 
     def set_outputs(self, rs: CompletedProcess, params: DictData) -> DictData:
         """Set outputs to params"""
@@ -108,7 +123,7 @@ class ShellStage(BaseStage):
             # NOTE: The output will fileter unnecessary keys from ``_locals``.
             "outputs": {
                 "return_code": rs.returncode,
-                "stdout": rs.stdout,
+                "stdout": rs.stdout.rstrip("\n"),
                 "stderr": rs.stderr,
             },
         }
@@ -118,12 +133,13 @@ class ShellStage(BaseStage):
         """Execute the Shell & Powershell statement with the Python build-in
         ``subprocess`` package.
         """
-        rs: CompletedProcess = subprocess.run(
-            self.__prepare_shell(self.shell),
-            capture_output=True,
-            text=True,
-            shell=True,
-        )
+        with self.__prepare_shell(self.shell) as sh:
+            rs: CompletedProcess = subprocess.run(
+                sh,
+                capture_output=True,
+                text=True,
+                shell=True,
+            )
         if rs.returncode > 0:
             print(f"{rs.stderr}\nRunning Statement:\n---\n{self.shell}")
             # FIXME: raise err for this execution.
