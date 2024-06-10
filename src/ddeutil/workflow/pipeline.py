@@ -80,7 +80,8 @@ class ShellStage(BaseStage):
     @staticmethod
     def __prepare_shell(shell: str):
         """Prepare shell statement string that include newline"""
-        return shell.replace("\n", ";")
+        _shell: str = shell.replace("\n", "&").replace('"', '""')
+        return ["bash", "-c", f'"{_shell}"']
 
     def set_outputs(self, rs: CompletedProcess, params: DictData) -> DictData:
         """Set outputs to params"""

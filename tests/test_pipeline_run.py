@@ -63,7 +63,7 @@ def test_pipe_job_py():
     } == rs
 
 
-@pytest.mark.skipif(True, reason="Because subprocess call on different OS")
+# @pytest.mark.skipif(True, reason="Because subprocess call on different OS")
 def test_pipe_stage_shell():
     pipeline = pipe.Pipeline.from_loader(name="run_python", externals={})
     echo_env: pipe.Job = pipeline.job("shell-run").stage("echo-env")
@@ -88,12 +88,24 @@ def test_subprocess_shell():
     rs = subprocess.run(
         [
             "powershell",
+            "-Command",
             dedent(
                 """
-                echo "Hello World";
-                echo "Next line";
+                "echo 'Hello World'; echo 'Next line'";
             """
             ).strip(),
+        ],
+        capture_output=True,
+        text=True,
+        shell=True,
+    )
+    print(rs)
+
+    rs = subprocess.run(
+        [
+            "bash",
+            "-c",
+            "echo 'Hello World' & echo 'Next line'",
         ],
         capture_output=True,
         text=True,
