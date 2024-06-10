@@ -52,9 +52,5 @@ run_python:
           id: echo-env
           shell: |
             echo "Hello World"
-
-            # $Env:USER_SH = 'World'
-
-            echo "Hello $Env:USER_SH"
-
-            # Remove-Item Env:\\FOO
+            $VAR = 'Foo'
+            echo "Variable $VAR"

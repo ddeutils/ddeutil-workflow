@@ -63,7 +63,6 @@ def test_pipe_job_py():
     } == rs
 
 
-# @pytest.mark.skipif(True, reason="Because subprocess call on different OS")
 def test_pipe_stage_shell():
     pipeline = pipe.Pipeline.from_loader(name="run_python", externals={})
     echo_env: pipe.Job = pipeline.job("shell-run").stage("echo-env")
@@ -73,7 +72,7 @@ def test_pipe_stage_shell():
             "echo-env": {
                 "outputs": {
                     "return_code": 0,
-                    "stdout": '"Hello World";;;;echo "Hello $Env:USER_SH";\n',
+                    "stdout": "Hello World\nVariable Foo\n",
                     "stderr": "",
                 },
             },
@@ -81,19 +80,19 @@ def test_pipe_stage_shell():
     } == rs
 
 
+@pytest.mark.skipif(True, reason="Because subprocess call on different OS")
 def test_subprocess_shell():
     import subprocess
-    from textwrap import dedent
 
     rs = subprocess.run(
         [
             "powershell",
-            "-Command",
-            dedent(
-                """
-                "echo 'Hello World'; echo 'Next line'";
-            """
-            ).strip(),
+            "-c",
+            (
+                '$Env:VAR = "World"; echo "Hello $Env:VAR"; '
+                'echo "Next line";'
+                '$MFA="True"; echo "MFA: $MFA";'
+            ),
         ],
         capture_output=True,
         text=True,
@@ -105,7 +104,11 @@ def test_subprocess_shell():
         [
             "bash",
             "-c",
-            "echo 'Hello World' & echo 'Next line'",
+            (
+                'VAR=World; echo "Hello `$VAR" ; echo "Next line";'
+                "echo $VAR; echo %VAR%;"
+                'F=\\"123\\"; echo \\$F;'
+            ),
         ],
         capture_output=True,
         text=True,

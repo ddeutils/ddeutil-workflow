@@ -8,9 +8,12 @@ from __future__ import annotations
 import inspect
 import itertools
 import logging
+import re
 import subprocess
+import sys
 import time
 from abc import ABC, abstractmethod
+from functools import partial
 from inspect import Parameter
 from queue import Queue
 from subprocess import CompletedProcess
@@ -79,9 +82,18 @@ class ShellStage(BaseStage):
 
     @staticmethod
     def __prepare_shell(shell: str):
-        """Prepare shell statement string that include newline"""
-        _shell: str = shell.replace("\n", "&").replace('"', '""')
-        return ["bash", "-c", f'"{_shell}"']
+        """Prepare shell string statement that include newline"""
+        for prepare in (
+            partial(re.sub, r"(\s|^)#.*", ""),
+            partial(re.sub, r"(\r\n)+", "\r\n"),
+            partial(re.sub, r"(\n)+", "\n"),
+            lambda x: x.strip("\r\n").strip("\n"),
+            lambda x: x.replace("\n", " ; "),
+        ):
+            shell: str = prepare(shell)
+        if sys.platform.startswith("win"):
+            return ["powershell", "-c", shell]
+        return [shell]
 
     def set_outputs(self, rs: CompletedProcess, params: DictData) -> DictData:
         """Set outputs to params"""
