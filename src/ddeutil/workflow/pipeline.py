@@ -307,7 +307,9 @@ class Job(BaseModel):
         raise ValueError(f"Stage ID {stage_id} does not exists")
 
     def make_strategy(self) -> list[DictStr]:
-        """Return List of combination of matrix values"""
+        """Return List of combination of matrix values that already filter with
+        exclude and add include values.
+        """
         if not (mt := self.strategy.matrix):
             return [{}]
         final: list[DictStr] = []

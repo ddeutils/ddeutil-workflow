@@ -44,7 +44,13 @@ class BaseConn(BaseModel):
 
     @classmethod
     def from_dict(cls, values: DictData) -> Self:
-        """Construct Connection with dict of data"""
+        """Construct Connection Model from dict data. This construct is
+        different with ``.model_validate()`` because it will prepare the values
+        before using it if the data dose not have 'url'.
+
+        :param values: A dict data that use to construct this model.
+        """
+        # NOTE: filter out the fields of this model.
         filter_data: DictData = {
             k: values.pop(k)
             for k in values.copy()

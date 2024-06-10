@@ -22,14 +22,14 @@ OBJ_FMTS: FormatterGroupType = make_group({"datetime": Datetime})
 
 
 class BaseDataset(BaseModel):
-    """Base Dataset Model. This model implement only loading constructor."""
+    """Base Dataset Model. This model implement only loading construction."""
 
     conn: Annotated[SubclassConn, Field(description="Connection Model")]
     endpoint: Annotated[
         Optional[str],
         Field(description="Endpoint of connection"),
     ] = None
-    object: str
+    object: str = Field(description="Dataset object that want to contract")
     features: list = Field(default_factory=list)
     extras: dict[str, Any] = Field(default_factory=dict)
 
