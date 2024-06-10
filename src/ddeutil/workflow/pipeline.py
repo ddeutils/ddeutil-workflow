@@ -9,13 +9,10 @@ import contextlib
 import inspect
 import itertools
 import logging
-import re
 import subprocess
-import sys
 import time
 import uuid
 from abc import ABC, abstractmethod
-from functools import partial
 from inspect import Parameter
 from pathlib import Path
 from queue import Queue
@@ -85,30 +82,16 @@ class ShellStage(BaseStage):
 
     @staticmethod
     @contextlib.contextmanager
-    def __prepare_shell(shell: str, write_file: bool = True):
+    def __prepare_shell(shell: str):
         """Prepare shell string statement that include newline"""
-        if write_file:
-            f_name: str = f"./{uuid.uuid4()}.sh"
-            with open(f_name, mode="w") as f:
-                f.write("#!/bin/bash\n")
-                f.write(shell)
+        f_name: str = f"{uuid.uuid4()}.sh"
+        with open(f"./{f_name}", mode="w") as f:
+            f.write("#!/bin/bash\n")
+            f.write(shell)
 
-            yield ["bash", f_name]
+        yield ["bash", f_name]
 
-            Path(f_name).unlink()
-            return
-        for prepare in (
-            partial(re.sub, r"(\s|^)#.*", ""),
-            partial(re.sub, r"(\r\n)+", "\r\n"),
-            partial(re.sub, r"(\n)+", "\n"),
-            lambda x: x.strip("\r\n").strip("\n"),
-            lambda x: x.replace("\n", " ; "),
-        ):
-            shell: str = prepare(shell)
-        if sys.platform.startswith("win"):
-            yield ["powershell", "-c", shell]
-        else:
-            yield [shell]
+        Path(f_name).unlink()
 
     def set_outputs(self, rs: CompletedProcess, params: DictData) -> DictData:
         """Set outputs to params"""
@@ -124,7 +107,6 @@ class ShellStage(BaseStage):
             "outputs": {
                 "return_code": rs.returncode,
                 "stdout": rs.stdout.rstrip("\n"),
-                "stderr": rs.stderr,
             },
         }
         return params
@@ -134,6 +116,9 @@ class ShellStage(BaseStage):
         ``subprocess`` package.
         """
         with self.__prepare_shell(self.shell) as sh:
+            with open(sh[-1]) as f:
+                logging.debug(f.read())
+            logging.info(f"Shell-Execute: {sh}")
             rs: CompletedProcess = subprocess.run(
                 sh,
                 capture_output=True,
@@ -141,12 +126,10 @@ class ShellStage(BaseStage):
                 shell=True,
             )
         if rs.returncode > 0:
-            print(f"{rs.stderr}\nRunning Statement:\n---\n{self.shell}")
-            # FIXME: raise err for this execution.
-            # raise TaskException(
-            #     f"{rs.stderr}\nRunning Statement:\n---\n"
-            #     f"{self.shell}"
-            # )
+            logging.error(f"{rs.stderr}\nRunning Statement:\n---\n{self.shell}")
+            raise TaskException(
+                f"{rs.stderr}\nRunning Statement:\n---\n{self.shell}"
+            )
         self.set_outputs(rs, params)
         return params
 

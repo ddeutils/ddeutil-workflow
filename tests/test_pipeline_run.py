@@ -67,14 +67,12 @@ def test_pipe_stage_shell():
     pipeline = pipe.Pipeline.from_loader(name="run_python", externals={})
     echo_env: pipe.Job = pipeline.job("shell-run").stage("echo-env")
     rs = echo_env.execute({})
-    print(rs.__repr__())
     assert {
         "stages": {
             "echo-env": {
                 "outputs": {
                     "return_code": 0,
                     "stdout": "Hello World\nVariable Foo",
-                    "stderr": "",
                 },
             },
         },
