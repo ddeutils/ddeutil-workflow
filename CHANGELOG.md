@@ -2,6 +2,35 @@
 
 ## Latest Changes
 
+## 0.0.3
+
+### :sparkles: Features
+
+- :dart: feat: add prepare params before passing to pipeline. (_2024-06-09_)
+- :dart: feat: change some model obj from pydantic to msgspec. (_2024-06-09_)
+- :dart: feat: add queue for handle needs job if before that do not run. (_2024-06-09_)
+- :dart: feat: add exclude and include logic to matrix feat. (_2024-06-08_)
+- :dart: feat: add matrix value on job model. (_2024-06-07_)
+- :dart: feat: rename scdl to schedule. (_2024-06-06_)
+
+### :black_nib: Code Changes
+
+- :construction: refactored: move connection and dataset to vendors. (_2024-06-09_)
+- :construction: refactored: change noted docs and prepare params output. (_2024-06-08_)
+- :art: style: change print statement to logging and add pytest conf. (_2024-06-08_)
+
+### :card_file_box: Documents
+
+- :page_facing_up: docs: update docs-string on pipeline model objs. (_2024-06-10_)
+- :page_facing_up: docs: add noted docs on needs job process. (_2024-06-09_)
+- :page_facing_up: docs: add try-except for checking polars deps. (_2024-06-08_)
+
+### :bug: Fix Bugs
+
+- :gear: fixed: remove Params from ddeutil-io and use own params instead. (_2024-06-09_)
+- :gear: fixed: revert moving connection to vendors. (_2024-06-09_)
+- :gear: fixed: remove legacy dir on pyproject. (_2024-06-06_)
+
 ## 0.0.2
 
 ### :sparkles: Features
