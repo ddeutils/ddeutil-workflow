@@ -29,7 +29,7 @@ from .__regex import RegexConf
 from .__types import DictData, DictStr
 from .exceptions import TaskException
 from .loader import Loader, map_params
-from .utils import Params, make_registry
+from .utils import Params, make_exec, make_registry
 
 
 class BaseStage(BaseModel, ABC):
@@ -91,14 +91,17 @@ class ShellStage(BaseStage):
         :param shell: A shell statement that want to prepare.
         """
         f_name: str = f"{uuid.uuid4()}.sh"
-        with open(f"./{f_name}", mode="w") as f:
-            # f.write("#!/bin/bash\n")
+        f_shebang: str = "bash" if sys.platform.startswith("win") else "sh"
+        with open(
+            f"./{f_name}",
+            mode="w",
+        ) as f:
+            f.write(f"#!/bin/{f_shebang}\n")
             f.write(shell)
 
-        if sys.platform.startswith("win"):
-            yield ["bash", f_name]
-        else:
-            yield ["sh", f_name]
+        make_exec(f"./{f_name}")
+
+        yield [f_shebang, f_name]
 
         Path(f_name).unlink()
 

@@ -6,10 +6,12 @@
 from __future__ import annotations
 
 import inspect
+import stat
 from abc import ABC, abstractmethod
 from datetime import date, datetime
 from functools import wraps
 from importlib import import_module
+from pathlib import Path
 from typing import Any, Callable, Literal, Optional, Protocol, Union
 
 from ddeutil.core import lazy
@@ -178,3 +180,8 @@ Params = Union[
     DatetimeParams,
     StrParams,
 ]
+
+
+def make_exec(path: str | Path):
+    f: Path = Path(path) if isinstance(path, str) else path
+    f.chmod(f.stat().st_mode | stat.S_IEXEC)
