@@ -433,7 +433,7 @@ class CronJob:
     """The Cron Job Converter object that generate datetime dimension of cron
     job schedule format,
 
-            * * * * * <command to execute>
+            ... * * * * * <command to execute>
 
         (i)     minute (0 - 59)
         (ii)    hour (0 - 23)
@@ -447,7 +447,7 @@ class CronJob:
         Support special value with `/`, `*`, `-`, `,`, and `?` (in day of month
     and day of week value).
 
-    :ref:
+    References:
         - https://github.com/Sonic0/cron-converter
         - https://pypi.org/project/python-crontab/
     """
@@ -661,7 +661,8 @@ class CronRunner:
         return False
 
 
-__all__: tuple[str, ...] = (
+__all__ = (
     "CronJob",
     "CronRunner",
+    "WEEKDAYS",
 )

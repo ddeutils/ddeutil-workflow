@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from ddeutil.workflow.vendors.__schedule import CronJob, CronRunner
@@ -16,6 +16,20 @@ from typing_extensions import Self
 
 from .__types import DictData
 from .loader import Loader
+from .vendors.__schedule import WEEKDAYS
+
+
+def crontab_convert(
+    interval: Literal["daily", "weekly", "monthly"],
+    day: str = "monday",
+    time: str = "00:00",
+) -> str:
+    if interval == "weekly" and day is None:
+        raise ValueError("Weekly interval should pass day for fix it")
+    h, m = time.split(":", maxsplit=1)
+    return (
+        f"{h.lstrip('0')} {m.lstrip('0')} " f"* * {WEEKDAYS[day[:3].title()]}"
+    )
 
 
 class BaseSchedule(BaseModel):

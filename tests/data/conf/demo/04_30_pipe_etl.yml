@@ -1,11 +1,10 @@
 pipe_seller_etl:
-  version: '1'
   type: pipeline.Pipeline
   desc: "Pipeline that load data and save to FileSystem"
-  schedule: "* * * 1 5"
+  on:
+    schedule: "* * * 1 5"
   params:
-    run-date:
-      type: datetime
+    run-date: datetime
   pipes:
     first-node:
       stages:

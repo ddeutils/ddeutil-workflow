@@ -389,7 +389,9 @@ class Pipeline(BaseModel):
     coding line to execute it.
     """
 
+    desc: Optional[str] = Field(default=None)
     params: dict[str, Params] = Field(default_factory=dict)
+    on: dict[str, DictStr] = Field(default_factory=dict)
     jobs: dict[str, Job]
 
     @model_validator(mode="before")
