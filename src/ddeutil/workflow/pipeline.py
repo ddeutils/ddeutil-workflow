@@ -10,6 +10,7 @@ import inspect
 import itertools
 import logging
 import subprocess
+import sys
 import time
 import uuid
 from abc import ABC, abstractmethod
@@ -83,13 +84,21 @@ class ShellStage(BaseStage):
     @staticmethod
     @contextlib.contextmanager
     def __prepare_shell(shell: str):
-        """Prepare shell string statement that include newline"""
+        """Return context of prepared shell statement that want to execute. This
+        step will write the `.sh` file before giving this file name to context.
+        After that, it will auto delete this file automatic.
+
+        :param shell: A shell statement that want to prepare.
+        """
         f_name: str = f"{uuid.uuid4()}.sh"
         with open(f"./{f_name}", mode="w") as f:
-            f.write("#!/bin/bash\n")
+            # f.write("#!/bin/bash\n")
             f.write(shell)
 
-        yield ["bash", f_name]
+        if sys.platform.startswith("win"):
+            yield ["bash", f_name]
+        else:
+            yield ["sh", f_name]
 
         Path(f_name).unlink()
 
