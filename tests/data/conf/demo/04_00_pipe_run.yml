@@ -4,8 +4,7 @@ run_python:
   type: ddeutil.workflow.pipeline.Pipeline
   schedule: bkk_every_5_minute
   params:
-    name:
-      type: str
+    name: str
   jobs:
     demo-run:
       stages:
@@ -51,6 +50,6 @@ run_python:
         - name: Echo hello world
           id: echo-env
           shell: |
-            echo "Hello World"
-            VAR='Foo'
-            echo "Variable $VAR"
+            echo "Hello World";
+            VAR='Foo';
+            echo "Variable $VAR";

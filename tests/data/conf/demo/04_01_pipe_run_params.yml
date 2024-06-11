@@ -2,10 +2,8 @@
 run_python_with_params:
   type: ddeutil.workflow.pipeline.Pipeline
   params:
-    author-run:
-      type: str
-    run-date:
-      type: datetime
+    author-run: str
+    run-date: datetime
   jobs:
     first-job:
       stages:
@@ -48,4 +46,4 @@ run_python_with_params:
       stages:
         - name: Echo hello world
           shell: |
-            echo 'Hello World'
+            echo 'Hello World';

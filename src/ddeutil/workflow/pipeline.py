@@ -92,16 +92,26 @@ class ShellStage(BaseStage):
         """
         f_name: str = f"{uuid.uuid4()}.sh"
         f_shebang: str = "bash" if sys.platform.startswith("win") else "sh"
-        with open(
-            f"./{f_name}",
-            mode="w",
-        ) as f:
+        with open(f"./{f_name}", mode="w", newline="\n") as f:
             f.write(f"#!/bin/{f_shebang}\n")
-            f.write(shell)
+            f.write(shell.replace("\r\n", "\n"))
 
         make_exec(f"./{f_name}")
 
         yield [f_shebang, f_name]
+
+        # TODO: Remove this lines
+        rs = subprocess.run(
+            [f_shebang, f_name], shell=False, capture_output=True, text=True
+        )
+        logging.debug(rs)
+        rs = subprocess.run(
+            [f_shebang, "-c", "ls -al"],
+            shell=True,
+            capture_output=True,
+            text=True,
+        )
+        logging.debug(rs.stdout)
 
         Path(f_name).unlink()
 
@@ -133,9 +143,9 @@ class ShellStage(BaseStage):
             logging.info(f"Shell-Execute: {sh}")
             rs: CompletedProcess = subprocess.run(
                 sh,
+                shell=False,
                 capture_output=True,
                 text=True,
-                shell=True,
             )
         if rs.returncode > 0:
             logging.error(f"{rs.stderr}\nRunning Statement:\n---\n{self.shell}")
