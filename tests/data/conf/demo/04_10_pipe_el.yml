@@ -55,12 +55,13 @@ ingest_csv_to_parquet:
             source: ${{ params.source }}
             sink: ${{ params.sink }}
 
-
+# Case:
+#   Extract data on the Local File System from CSV to Target.
 ingest_multiple_system:
   type: pipeline.Pipeline
   params:
-    source:
-      type: str
+    source: str
+    target: str
   jobs:
     multiple-system:
       strategy:

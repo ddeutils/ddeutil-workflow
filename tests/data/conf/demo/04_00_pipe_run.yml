@@ -1,4 +1,5 @@
-# Run Python script
+# Case:
+#   Run Python statement from config value.
 run_python:
   version: 1
   type: ddeutil.workflow.pipeline.Pipeline
@@ -54,6 +55,11 @@ run_python:
             VAR='Foo';
             echo "Variable $VAR";
 
+    # WARNING:
+    #   The limitation of the shell running statement is it cannot use env var
+    #   calling with brace, ${ ... }, because this file was read from
+    #   replacement env variable first. if you want to use it, you should escape
+    #   the '$' char with '$$'.
     shell-run-env:
       stages:
         - name: Echo hello world
@@ -65,3 +71,55 @@ run_python:
             VAR='Foo';
             echo "Variable $VAR";
             echo "ENV $PASSING";
+
+
+# Case:
+#   Run Python statement from config value with parameters.
+run_python_with_params:
+  type: ddeutil.workflow.pipeline.Pipeline
+  params:
+    author-run: str
+    run-date: datetime
+  jobs:
+    first-job:
+      stages:
+        - name: Printing Information
+          id: printing
+          run: |
+            x = '${{ params.author-run }}'
+            print(f'Hello {x}')
+
+        - name: Run Sequence and use var from Above
+          id: setting-x
+          vars:
+            x: ${{ params.author-run }}
+          run: |
+            print(f'Receive x from above with {x}')
+            # Change x value
+            x: int = 1
+
+    second-job:
+      stages:
+        - name: Set variable and function
+          id: create-func
+          run: |
+            var_inside: str = 'Create Function Inside'
+            def echo(var: str) -> None:
+              print(f"Echo {var}")
+            echo(var_inside)
+
+        - name: Call that variable
+          id: call-func
+          vars:
+            echo: ${{ stages.create-func.outputs.echo }}
+          run: |
+            print("Call function that create from above stage")
+            echo("Call Function Outside")
+
+        - name: Final of Next running job
+
+    final-job:
+      stages:
+        - name: Echo hello world
+          shell: |
+            echo 'Hello World';

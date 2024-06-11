@@ -1,13 +1,12 @@
+# Case:
+#   Transform data on the Microsoft SQL Server with the Store Procedure object.
 transform_proc_mssql:
   desc: "Pipeline that load data from RDBMS"
   type: pipeline.Pipeline
   params:
-    run-date:
-      type: datetime
-    connection:
-      type: str
-    procedure:
-      type: str
+    run-date: datetime
+    connection: str
+    sp_name: str
   jobs:
     transform:
       stages:
@@ -15,7 +14,7 @@ transform_proc_mssql:
           task: tasks/postgres-proc@pysycopg
           args:
             conn: ${{ params.connection }}
-            exec: ${{ params.procedure }}
+            exec: ${{ params.sp_name }}
             params:
               source: ${{ params.source }}
               target: ${{ params.target }}
