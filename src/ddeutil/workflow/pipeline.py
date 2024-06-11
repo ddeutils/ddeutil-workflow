@@ -94,24 +94,13 @@ class ShellStage(BaseStage):
         f_shebang: str = "bash" if sys.platform.startswith("win") else "sh"
         with open(f"./{f_name}", mode="w", newline="\n") as f:
             f.write(f"#!/bin/{f_shebang}\n")
+
+            # NOTE: make sure that shell script file does not have `\r` char.
             f.write(shell.replace("\r\n", "\n"))
 
         make_exec(f"./{f_name}")
 
         yield [f_shebang, f_name]
-
-        # TODO: Remove this lines
-        rs = subprocess.run(
-            [f_shebang, f_name], shell=False, capture_output=True, text=True
-        )
-        logging.debug(rs)
-        rs = subprocess.run(
-            [f_shebang, "-c", "ls -al"],
-            shell=True,
-            capture_output=True,
-            text=True,
-        )
-        logging.debug(rs.stdout)
 
         Path(f_name).unlink()
 
@@ -506,6 +495,7 @@ class Pipeline(BaseModel):
             job_id: str = jq.get()
             logging.info(f"[PIPELINE]: Start execute the job: {job_id!r}")
             job: Job = self.jobs[job_id]
+
             # TODO: Condition on ``needs`` of this job was set. It should create
             #   multithreading process on this step.
             #   But, I don't know how to handle changes params between each job
@@ -514,6 +504,7 @@ class Pipeline(BaseModel):
             #   >>> import multiprocessing
             #   >>> with multiprocessing.Pool(processes=3) as pool:
             #   ...     results = pool.starmap(merge_names, ('', '', ...))
+            #
             if any(params["jobs"].get(need) for need in job.needs):
                 jq.put(job_id)
             job.execute(params=params)

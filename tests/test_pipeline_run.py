@@ -79,43 +79,6 @@ def test_pipe_stage_shell():
     } == rs
 
 
-@pytest.mark.skipif(True, reason="Because subprocess call on different OS")
-def test_subprocess_shell():
-    import subprocess
-
-    rs = subprocess.run(
-        [
-            "powershell",
-            "-c",
-            (
-                '$Env:VAR = "World"; echo "Hello $Env:VAR"; '
-                'echo "Next line";'
-                '$MFA="True"; echo "MFA: $MFA";'
-            ),
-        ],
-        capture_output=True,
-        text=True,
-        shell=True,
-    )
-    print(rs)
-
-    rs = subprocess.run(
-        [
-            "bash",
-            "-c",
-            (
-                'VAR=World; echo "Hello `$VAR" ; echo "Next line";'
-                "echo $VAR; echo %VAR%;"
-                'F=\\"123\\"; echo \\$F;'
-            ),
-        ],
-        capture_output=True,
-        text=True,
-        shell=True,
-    )
-    print(rs)
-
-
 def test_pipe_params_py():
     pipeline = pipe.Pipeline.from_loader(
         name="run_python_with_params",
