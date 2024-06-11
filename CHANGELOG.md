@@ -2,6 +2,25 @@
 
 ## Latest Changes
 
+## 0.0.4
+
+### :sparkles: Features
+
+- :dart: feat: add executable function for shell file. (_2024-06-11_)
+- :dart: feat: add prepare shell script on the shell stage. (_2024-06-10_)
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: add logging on test-case. (_2024-06-10_)
+- :test_tube: tests: add test-case for shell script execution. (_2024-06-10_)
+
+### :bug: Fix Bugs
+
+- :gear: fixed: change shell flag on subprocess for shell stage. (_2024-06-11_)
+- :gear: fixed: add debug logging for test shell stage executor. (_2024-06-11_)
+- :gear: fixed: remove shabang and dynamic cmd. (_2024-06-11_)
+- :gear: fixed: shell stage does not return the same result. (_2024-06-10_)
+
 ## 0.0.3
 
 ### :sparkles: Features
