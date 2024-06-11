@@ -12,7 +12,7 @@
   - [Dataset](#dataset)
   - [Schedule](#schedule)
 - [Examples](#examples)
-  - [Python](#python)
+  - [Python & Shell](#python--shell)
   - [Tasks (EL)](#tasks-extract--load)
   - [Hooks (T)](#hooks-transform)
 
@@ -122,7 +122,7 @@ assert '2022-01-01 00:25:00' f"{cron_iterate.next:%Y-%m-%d %H:%M:%S}"
 This is examples that use workflow file for running common Data Engineering
 use-case.
 
-### Python
+### Python & Shell
 
 The state of doing lists that worker should to do. It be collection of the stage.
 
@@ -159,6 +159,12 @@ run_py_local:
             echo: ${{ stages.define-func.outputs.echo }}
           run: |
             echo('Caller')
+    second-job:
+      stages:
+        - name: Echo Shell Script
+          id: shell-echo
+          shell: |
+            echo "Hello World from Shell"
 ```
 
 ```python
@@ -172,6 +178,7 @@ pipe.execute(params={'author-run': 'Local Workflow', 'run-date': '2024-01-01'})
 > Hello Local Workflow
 > Receive x from above with Local Workflow
 > Hello Caller
+> Hello World from Shell
 ```
 
 ### Tasks (Extract & Load)

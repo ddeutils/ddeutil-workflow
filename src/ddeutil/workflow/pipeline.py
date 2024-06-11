@@ -71,7 +71,7 @@ class EmptyStage(BaseStage):
 
     def execute(self, params: DictData) -> DictData:
         """Execute for the Empty stage that do only logging out."""
-        logging.info(f"Execute: {self.name!r}")
+        logging.info(f"[STAGE]: Empty-Execute: {self.name!r}")
         return params
 
 
@@ -81,22 +81,22 @@ class ShellStage(BaseStage):
     shell: str
     env: DictStr = Field(default_factory=dict)
 
-    @staticmethod
     @contextlib.contextmanager
-    def __prepare_shell(shell: str):
+    def __prepare_shell(self):
         """Return context of prepared shell statement that want to execute. This
         step will write the `.sh` file before giving this file name to context.
         After that, it will auto delete this file automatic.
-
-        :param shell: A shell statement that want to prepare.
         """
         f_name: str = f"{uuid.uuid4()}.sh"
         f_shebang: str = "bash" if sys.platform.startswith("win") else "sh"
         with open(f"./{f_name}", mode="w", newline="\n") as f:
             f.write(f"#!/bin/{f_shebang}\n")
 
+            for k in self.env:
+                f.write(f"{k}='{self.env[k]}';\n")
+
             # NOTE: make sure that shell script file does not have `\r` char.
-            f.write(shell.replace("\r\n", "\n"))
+            f.write(self.shell.replace("\r\n", "\n"))
 
         make_exec(f"./{f_name}")
 
@@ -126,10 +126,8 @@ class ShellStage(BaseStage):
         """Execute the Shell & Powershell statement with the Python build-in
         ``subprocess`` package.
         """
-        with self.__prepare_shell(self.shell) as sh:
-            with open(sh[-1]) as f:
-                logging.debug(f.read())
-            logging.info(f"Shell-Execute: {sh}")
+        with self.__prepare_shell() as sh:
+            logging.info(f"[STAGE]: Shell-Execute: {sh}")
             rs: CompletedProcess = subprocess.run(
                 sh,
                 shell=False,
@@ -137,10 +135,13 @@ class ShellStage(BaseStage):
                 text=True,
             )
         if rs.returncode > 0:
-            logging.error(f"{rs.stderr}\nRunning Statement:\n---\n{self.shell}")
-            raise TaskException(
-                f"{rs.stderr}\nRunning Statement:\n---\n{self.shell}"
+            err: str = (
+                rs.stderr.encode("utf-8").decode("utf-16")
+                if "\\x00" in rs.stderr
+                else rs.stderr
             )
+            logging.error(f"{err}\nRunning Statement:\n---\n{self.shell}")
+            raise TaskException(f"{err}\nRunning Statement:\n---\n{self.shell}")
         self.set_outputs(rs, params)
         return params
 

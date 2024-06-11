@@ -48,8 +48,20 @@ run_python:
     shell-run:
       stages:
         - name: Echo hello world
-          id: echo-env
+          id: echo
           shell: |
             echo "Hello World";
             VAR='Foo';
             echo "Variable $VAR";
+
+    shell-run-env:
+      stages:
+        - name: Echo hello world
+          id: echo-env
+          env:
+            PASSING: 'Bar'
+          shell: |
+            echo "Hello World";
+            VAR='Foo';
+            echo "Variable $VAR";
+            echo "ENV $PASSING";

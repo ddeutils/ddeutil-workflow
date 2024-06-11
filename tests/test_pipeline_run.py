@@ -65,14 +65,30 @@ def test_pipe_job_py():
 
 def test_pipe_stage_shell():
     pipeline = pipe.Pipeline.from_loader(name="run_python", externals={})
-    echo_env: pipe.Job = pipeline.job("shell-run").stage("echo-env")
+    echo_env: pipe.Job = pipeline.job("shell-run").stage("echo")
+    rs = echo_env.execute({})
+    assert {
+        "stages": {
+            "echo": {
+                "outputs": {
+                    "return_code": 0,
+                    "stdout": "Hello World\nVariable Foo",
+                },
+            },
+        },
+    } == rs
+
+
+def test_pipe_stage_shell_env():
+    pipeline = pipe.Pipeline.from_loader(name="run_python", externals={})
+    echo_env: pipe.Job = pipeline.job("shell-run-env").stage("echo-env")
     rs = echo_env.execute({})
     assert {
         "stages": {
             "echo-env": {
                 "outputs": {
                     "return_code": 0,
-                    "stdout": "Hello World\nVariable Foo",
+                    "stdout": "Hello World\nVariable Foo\nENV Bar",
                 },
             },
         },
