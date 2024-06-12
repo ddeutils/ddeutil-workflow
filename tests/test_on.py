@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from ddeutil.workflow.schedule import ScheduleBkk
+from ddeutil.workflow.on import ScheduleBkk
 
 
 def test_schedule():

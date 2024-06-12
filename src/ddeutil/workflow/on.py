@@ -14,21 +14,41 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic.functional_validators import field_validator
 from typing_extensions import Self
 
-from .__types import DictData
-from .loader import Loader
-from .vendors.__schedule import WEEKDAYS
+try:
+    from .__types import DictData
+    from .loader import Loader
+    from .vendors.__schedule import WEEKDAYS
+except ImportError:
+    from ddeutil.workflow.__types import DictData
+    from ddeutil.workflow.loader import Loader
+    from ddeutil.workflow.vendors.__schedule import WEEKDAYS
 
 
-def crontab_convert(
+def crontab_generate(
     interval: Literal["daily", "weekly", "monthly"],
     day: str = "monday",
     time: str = "00:00",
 ) -> str:
-    if interval == "weekly" and day is None:
-        raise ValueError("Weekly interval should pass day for fix it")
+    """Return the crontab string that was generated from specific values.
+
+    :param interval: A interval value that is one of 'daily', 'weekly', or
+        'monthly'.
+    :param day: A day value that will be day of week.
+    :param time: A time value that passing with format '%H:%M'.
+
+    Examples:
+        >>> crontab_generate(interval='daily', time='01:30')
+        '1 30 * * *'
+        >>> crontab_generate(interval='weekly', day='friday', time='18:30')
+        '18 30 * * 5'
+        >>> crontab_generate(interval='monthly', time='00:00')
+        '0 0 1 * *'
+    """
     h, m = time.split(":", maxsplit=1)
     return (
-        f"{h.lstrip('0')} {m.lstrip('0')} " f"* * {WEEKDAYS[day[:3].title()]}"
+        f"{h.lstrip('0')} {m.lstrip('0')} "
+        f"{'1' if interval == 'monthly' else '*'} * "
+        f"{'*' if interval == 'daily' else WEEKDAYS[day[:3].title()]}"
     )
 
 
@@ -37,7 +57,7 @@ class BaseSchedule(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    # NOTE: This is fields
+    # NOTE: This is fields of the base schedule.
     cronjob: Annotated[CronJob, Field(description="Cron job of this schedule")]
     tz: Annotated[str, Field(description="Timezone")] = "utc"
     extras: Annotated[
@@ -46,11 +66,35 @@ class BaseSchedule(BaseModel):
     ]
 
     @classmethod
+    def from_value(
+        cls,
+        value: dict[str, str],
+        externals: DictData,
+    ) -> Self:
+        """Constructor from values that will generate crontab by function.
+
+        :param value: A mapping value that will generate crontab before create
+            schedule model.
+        :param externals: A extras external parameter that will keep in extras.
+        """
+        passing: dict[str, str] = {}
+        if "timezone" in value:
+            passing["tz"] = value.pop("timezone")
+        passing["cronjob"] = crontab_generate(**value)
+        return cls(extras=externals, **passing)
+
+    @classmethod
     def from_loader(
         cls,
         name: str,
         externals: DictData,
     ) -> Self:
+        """Constructor from the name of config that will use loader object for
+        getting the data.
+
+        :param name: A name of config that will getting from loader.
+        :param externals: A extras external parameter that will keep in extras.
+        """
         loader: Loader = Loader(name, externals=externals)
         if "cronjob" not in loader.data:
             raise ValueError("Config does not set ``cronjob`` value")
@@ -58,6 +102,8 @@ class BaseSchedule(BaseModel):
 
     @field_validator("tz")
     def __validate_tz(cls, value: str):
+        """Validate timezone value that able to initialize with ZoneInfo after
+        it passing to this model in before mode."""
         try:
             _ = ZoneInfo(value)
             return value
@@ -66,6 +112,7 @@ class BaseSchedule(BaseModel):
 
     @field_validator("cronjob", mode="before")
     def __prepare_cronjob(cls, value: str | CronJob) -> CronJob:
+        """Prepare crontab value that able to receive with string type."""
         return CronJob(value) if isinstance(value, str) else value
 
     def generate(self, start: str | datetime) -> CronRunner:

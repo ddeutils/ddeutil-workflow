@@ -396,6 +396,7 @@ class Pipeline(BaseModel):
 
     @model_validator(mode="before")
     def __prepare_params(cls, values: DictData) -> DictData:
+        # NOTE: Prepare params type if it passing with only type value.
         if params := values.pop("params", {}):
             values["params"] = {
                 p: (
