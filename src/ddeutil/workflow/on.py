@@ -44,11 +44,12 @@ def crontab_generate(
         >>> crontab_generate(interval='monthly', time='00:00')
         '0 0 1 * *'
     """
-    h, m = time.split(":", maxsplit=1)
+    h, m = tuple(
+        i.lstrip("0") if i != "00" else "0" for i in time.split(":", maxsplit=1)
+    )
     return (
-        f"{h.lstrip('0')} {m.lstrip('0')} "
-        f"{'1' if interval == 'monthly' else '*'} * "
-        f"{'*' if interval == 'daily' else WEEKDAYS[day[:3].title()]}"
+        f"{h} {m} {'1' if interval == 'monthly' else '*'} * "
+        f"{WEEKDAYS[day[:3].title()] if interval == 'weekly' else '*'}"
     )
 
 
@@ -80,7 +81,9 @@ class BaseSchedule(BaseModel):
         passing: dict[str, str] = {}
         if "timezone" in value:
             passing["tz"] = value.pop("timezone")
-        passing["cronjob"] = crontab_generate(**value)
+        passing["cronjob"] = crontab_generate(
+            **{v: value[v] for v in value if v in ("interval", "day", "time")}
+        )
         return cls(extras=externals, **passing)
 
     @classmethod
@@ -96,6 +99,12 @@ class BaseSchedule(BaseModel):
         :param externals: A extras external parameter that will keep in extras.
         """
         loader: Loader = Loader(name, externals=externals)
+        # NOTE: Validate the config type match with current connection model
+        if loader.type != cls:
+            raise ValueError(f"Type {loader.type} does not match with {cls}")
+
+        if "interval" in loader.data:
+            return cls.from_value(loader.data, externals=externals)
         if "cronjob" not in loader.data:
             raise ValueError("Config does not set ``cronjob`` value")
         return cls(cronjob=loader.data["cronjob"], extras=externals)

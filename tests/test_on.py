@@ -1,10 +1,10 @@
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from ddeutil.workflow.on import ScheduleBkk
+from ddeutil.workflow.on import Schedule, ScheduleBkk
 
 
-def test_schedule():
+def test_on():
     schedule = ScheduleBkk.from_loader(
         name="bkk_every_5_minute",
         externals={},
@@ -26,3 +26,11 @@ def test_schedule():
 
     assert cron_runner.date == start_date_bkk
     assert cron_runner.prev == start_date_bkk - timedelta(minutes=5)
+
+
+def test_on_value():
+    schedule = Schedule.from_loader(
+        name="every_day_noon",
+        externals={},
+    )
+    assert "12 0 1 * *" == str(schedule.cronjob)

@@ -7,10 +7,9 @@ bkk_every_5_minute:
 # Key-word Schedule
 # ---
 #   This pattern reference from dependabot yaml format file on GitHub.
-scdl_every_day:
+every_day_noon:
   type: on.Schedule
-  schedule:
-    interval: "monthly"
-    day: "monday"
-    time: "12:00"
-    timezone: "Etc/UTC"
+  interval: "monthly"
+  day: "monday"
+  time: "12:00"
+  timezone: "Etc/UTC"
