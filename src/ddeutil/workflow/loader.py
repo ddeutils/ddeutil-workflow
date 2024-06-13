@@ -37,6 +37,9 @@ class Engine(BaseModel):
 
     @model_validator(mode="before")
     def __prepare_registry(cls, values: DictData) -> DictData:
+        """Prepare registry value that passing with string type. It convert the
+        string type to list of string.
+        """
         if (_regis := values.get("registry")) and isinstance(_regis, str):
             values["registry"] = [_regis]
         return values
@@ -83,7 +86,9 @@ class SimLoad:
 
     @cached_property
     def type(self) -> BaseModelType:
-        """Return object type which implement in `config_object` key."""
+        """Return object of string type which implement on any registry. The
+        object type
+        """
         if not (_typ := self.data.get("type")):
             raise ValueError(
                 f"the 'type' value: {_typ} does not exists in config data."
@@ -100,6 +105,9 @@ class SimLoad:
             return import_string(f"{_typ}")
 
     def load(self) -> AnyModel:
+        """Parsing config data to the object type for initialize with model
+        validate method.
+        """
         return self.type.model_validate(self.data)
 
 

@@ -1,8 +1,10 @@
 # Cronjob Schedule
 # ---
 bkk_every_5_minute:
-  type: on.ScheduleBkk
+  type: on.Schedule
   cronjob: "*/5 * * * *"
+  timezone: "Asia/Bangkok"
+
 
 # Key-word Schedule
 # ---

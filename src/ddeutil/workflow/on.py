@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from ddeutil.workflow.vendors.__schedule import CronJob, CronRunner
+from ddeutil.workflow.vendors.scheduler import CronJob, CronRunner
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.functional_validators import field_validator
 from typing_extensions import Self
@@ -21,7 +21,7 @@ try:
 except ImportError:
     from ddeutil.workflow.__types import DictData
     from ddeutil.workflow.loader import Loader
-    from ddeutil.workflow.vendors.__schedule import WEEKDAYS
+    from ddeutil.workflow.vendors.scheduler import WEEKDAYS
 
 
 def crontab_generate(
@@ -53,14 +53,18 @@ def crontab_generate(
     )
 
 
-class BaseSchedule(BaseModel):
-    """Base Schedule (Schedule) Model"""
+class Schedule(BaseModel):
+    """Base Schedule (Schedule) Model
+
+    See Also:
+        * ``generate()`` is the main usecase of this schedule object.
+    """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     # NOTE: This is fields of the base schedule.
     cronjob: Annotated[CronJob, Field(description="Cron job of this schedule")]
-    tz: Annotated[str, Field(description="Timezone")] = "utc"
+    tz: Annotated[str, Field(description="Timezone")] = "Etc/UTC"
     extras: Annotated[
         DictData,
         Field(default_factory=dict, description="Extras mapping of parameters"),
@@ -107,6 +111,12 @@ class BaseSchedule(BaseModel):
             return cls.from_value(loader.data, externals=externals)
         if "cronjob" not in loader.data:
             raise ValueError("Config does not set ``cronjob`` value")
+        if "timezone" in loader.data:
+            return cls(
+                cronjob=loader.data["cronjob"],
+                tz=loader.data["timezone"],
+                extras=externals,
+            )
         return cls(cronjob=loader.data["cronjob"], extras=externals)
 
     @field_validator("tz")
@@ -131,22 +141,5 @@ class BaseSchedule(BaseModel):
         return self.cronjob.schedule(date=(start.astimezone(ZoneInfo(self.tz))))
 
 
-class Schedule(BaseSchedule):
-    """Schedule (Schedule) Model.
-
-    See Also:
-        * ``generate()`` is the main usecase of this schedule object.
-    """
-
-
-class ScheduleBkk(Schedule):
-    """Asia Bangkok Schedule (Schedule) timezone Model.
-
-    This model use for change timezone from utc to Asia/Bangkok
-    """
-
-    tz: Annotated[str, Field(description="Timezone")] = "Asia/Bangkok"
-
-
-class AwsSchedule(BaseSchedule):
+class AwsSchedule(Schedule):
     """Implement Schedule for AWS Service."""
