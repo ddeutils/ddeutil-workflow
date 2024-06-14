@@ -115,31 +115,54 @@ class CronPart:
 
     def __init__(
         self,
-        unit: dict,
-        values: Union[str, list[int]],
-        options: dict,
-    ):
-        self.unit: dict = unit
-        self.options: dict = options
+        unit: dict[str, Any],
+        values: str | list[int],
+        options: dict[str, Any],
+    ) -> None:
+        self.unit: dict[str, Any] = unit
+        self.options: dict[str, Any] = options
+
         if isinstance(values, str):
             values: list[int] = self.from_str(values) if values != "?" else []
         elif isinstance_check(values, list[int]):
             values: list[int] = self.replace_weekday(values)
         else:
             raise TypeError(f"Invalid type of value in cron part: {values}.")
-        unique_values: list[int] = self.out_of_range(
+        self.values: list[int] = self.out_of_range(
             sorted(dict.fromkeys(values))
         )
-        self.values: list[int] = unique_values
 
     def __str__(self) -> str:
-        """Return str that use output to ``self.to_str()`` method."""
-        return self.to_str()
+        """Generate String value from part of cronjob."""
+        _hash: str = "H" if self.options.get("output_hashes") else "*"
 
-    def __repr__(self):
+        if self.is_full:
+            return _hash
+
+        if self.is_interval:
+            if self.is_full_interval:
+                return f"{_hash}/{self.step}"
+            _hash: str = (
+                f"H({self.filler(self.min)}-{self.filler(self.max)})"
+                if _hash == "H"
+                else f"{self.filler(self.min)}-{self.filler(self.max)}"
+            )
+            return f"{_hash}/{self.step}"
+
+        cron_range_strings: list[str] = []
+        for cron_range in self.ranges():
+            if isinstance(cron_range, list):
+                cron_range_strings.append(
+                    f"{self.filler(cron_range[0])}-{self.filler(cron_range[1])}"
+                )
+            else:
+                cron_range_strings.append(f"{self.filler(cron_range)}")
+        return ",".join(cron_range_strings) if cron_range_strings else "?"
+
+    def __repr__(self) -> str:
         return (
             f"{self.__class__.__name__}"
-            f"(unit={self.unit}, values={self.to_str()!r})"
+            f"(unit={self.unit}, values={self.__str__()!r})"
         )
 
     def __lt__(self, other) -> bool:
@@ -150,6 +173,7 @@ class CronPart:
 
     @property
     def is_weekday(self) -> bool:
+        """Return true if the unit's name is weekday"""
         return self.unit["name"] == "weekday"
 
     @property
@@ -184,7 +208,7 @@ class CronPart:
         """Parses a string as a range of positive integers. The string should
         include only `-` and `,` special strings.
 
-        :param value: a string value
+        :param value: A string value
         :type value: str
 
         TODO: support for `L`, `W`, and `#`
@@ -376,33 +400,6 @@ class CronPart:
                 start_number: Optional[int] = value
         return multi_dim_values
 
-    def to_str(self) -> str:
-        """Returns the cron range as a string value."""
-        _hash: str = "H" if self.options.get("output_hashes") else "*"
-
-        if self.is_full:
-            return _hash
-
-        if self.is_interval:
-            if self.is_full_interval:
-                return f"{_hash}/{self.step}"
-            _hash: str = (
-                f"H({self.filler(self.min)}-{self.filler(self.max)})"
-                if _hash == "H"
-                else f"{self.filler(self.min)}-{self.filler(self.max)}"
-            )
-            return f"{_hash}/{self.step}"
-
-        cron_range_strings: list[str] = []
-        for cron_range in self.ranges():
-            if isinstance(cron_range, list):
-                cron_range_strings.append(
-                    f"{self.filler(cron_range[0])}-{self.filler(cron_range[1])}"
-                )
-            else:
-                cron_range_strings.append(f"{self.filler(cron_range)}")
-        return ",".join(cron_range_strings) if cron_range_strings else "?"
-
     def filler(self, value: int) -> int | str:
         """Formats weekday and month names as string when the relevant options
         are set.
@@ -473,16 +470,22 @@ class CronJob:
                 f"{self.__class__.__name__} cron value does not support "
                 f"type: {type(value)}."
             )
+
+        # NOTE: Validate length of crontab of this class.
         if len(value) != self.cron_length:
             raise ValueError(
                 f"Invalid cron value does not have length equal "
                 f"{self.cron_length}: {value}."
             )
-        self._options: dict[str, bool] = self.options_defaults | (option or {})
-        self._parts: list[CronPart] = [
-            CronPart(unit, values=item, options=self._options)
+        self.options: dict[str, bool] = self.options_defaults | (option or {})
+
+        # NOTE: Start initial crontab for each part
+        self.parts: list[CronPart] = [
+            CronPart(unit, values=item, options=self.options)
             for item, unit in zip(value, CRON_UNITS)
         ]
+
+        # NOTE: Validate values of `day` and `dow` from parts.
         if self.day == self.dow == []:
             raise ValueError(
                 "Invalid cron value when set the `?` on day of month and "
@@ -490,12 +493,12 @@ class CronJob:
             )
 
     def __str__(self) -> str:
-        return " ".join(str(part) for part in self._parts)
+        return " ".join(str(part) for part in self.parts)
 
     def __repr__(self) -> str:
         return (
             f"{self.__class__.__name__}(value={self.__str__()!r}, "
-            f"option={self._options})"
+            f"option={self.options})"
         )
 
     def __lt__(self, other) -> bool:
@@ -511,41 +514,37 @@ class CronJob:
         )
 
     @property
-    def parts(self) -> list[CronPart]:
-        return self._parts
-
-    @property
     def parts_order(self) -> Iterator[CronPart]:
         return reversed(self.parts[:3] + [self.parts[4], self.parts[3]])
 
     @property
     def minute(self):
         """Return part of minute."""
-        return self._parts[0]
+        return self.parts[0]
 
     @property
     def hour(self):
         """Return part of hour."""
-        return self._parts[1]
+        return self.parts[1]
 
     @property
     def day(self):
         """Return part of day."""
-        return self._parts[2]
+        return self.parts[2]
 
     @property
     def month(self):
         """Return part of month."""
-        return self._parts[3]
+        return self.parts[3]
 
     @property
     def dow(self):
         """Return part of day of month."""
-        return self._parts[4]
+        return self.parts[4]
 
     def to_list(self) -> list[list[int]]:
         """Returns the cron schedule as a 2-dimensional list of integers."""
-        return [part.values for part in self._parts]
+        return [part.values for part in self.parts]
 
     def schedule(
         self, date: Optional[datetime] = None, _tz: Optional[str] = None
