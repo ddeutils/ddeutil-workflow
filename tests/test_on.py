@@ -33,4 +33,5 @@ def test_on_value():
         name="every_day_noon",
         externals={},
     )
+    assert "Etc/UTC" == schedule.tz
     assert "12 0 1 * *" == str(schedule.cronjob)
