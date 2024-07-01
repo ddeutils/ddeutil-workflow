@@ -44,7 +44,7 @@ test = [
     "paramiko==3.4.0",
     "sshtunnel==0.4.0",
     # AWS Client
-    "boto3==1.34.117",
+    "boto3==1.34.136",
     # Open files
     "fsspec==2024.6.1",
     # Polars
