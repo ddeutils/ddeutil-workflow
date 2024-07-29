@@ -75,6 +75,8 @@ conn = Conn.from_loader(name='conn_postgres_data', externals={})
 assert conn.ping()
 ```
 
+---
+
 ### Dataset
 
 The dataset is define any objects on the connection. This feature was implemented
@@ -96,6 +98,8 @@ from ddeutil.workflow.vendors.pg import PostgresTbl
 dataset = PostgresTbl.from_loader(name='ds_postgres_customer_tbl', externals={})
 assert dataset.exists()
 ```
+
+---
 
 ### Schedule
 
@@ -183,6 +187,8 @@ pipe.execute(params={'author-run': 'Local Workflow', 'run-date': '2024-01-01'})
 > Hello World from Shell
 ```
 
+---
+
 ### Tasks (Extract & Load)
 
 ```yaml
@@ -210,7 +216,11 @@ pipe_el_pg_to_lake:
               endpoint: "/${{ params.name }}"
 ```
 
+---
+
 ### Tasks (Transform)
+
+I recommend you to use task for all actions that you want to do.
 
 ```yaml
 pipe_hook_mssql_proc:
@@ -234,6 +244,10 @@ pipe_hook_mssql_proc:
               source: ${{ params.source_name }}
               target: ${{ params.target_name }}
 ```
+
+> [!NOTE]
+> The above parameter use short declarative statement. You can pass a parameter
+> type to the key of a parameter name.
 
 ## License
 
