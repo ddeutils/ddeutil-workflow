@@ -48,7 +48,7 @@ test = [
     # Open files
     "fsspec==2024.6.1",
     # Polars
-    "polars==0.20.31",
+    "polars==1.4.1",
     "pyarrow==17.0.0",
 ]
 
