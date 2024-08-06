@@ -25,7 +25,7 @@ def g():
 def test_exec():
     statement: str = dedent(
         """
-    import polars as pl
+    import dotenv
     import ddeutil.workflow as wf
 
     # NOTE: this assert will pass because `a` exists on `g`
@@ -44,7 +44,7 @@ def test_exec():
 def test_exec_global(g):
     statement: str = dedent(
         """
-    import polars as pl
+    import dotenv
     import ddeutil.workflow as wf
 
     # NOTE: this assert will pass because `a` exists on `g`
@@ -79,7 +79,7 @@ def test_exec_global_and_locals(g):
     lc = locals()
     statement: str = dedent(
         """
-    import polars as pl
+    import dotenv
     import ddeutil.workflow as wf
 
     assert a == 'main global'
@@ -100,7 +100,7 @@ def test_exec_global_and_locals(g):
     assert 1 == lc["x"]
     assert "bar" == lc["foo"]()
     assert {"a": str, "x": int} == lc["__annotations__"]
-    assert ("g", "__annotations__", "pl", "wf", "a", "x", "foo") == tuple(
+    assert ("g", "__annotations__", "dotenv", "wf", "a", "x", "foo") == tuple(
         lc.keys()
     )
 
