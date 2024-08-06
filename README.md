@@ -5,15 +5,13 @@
 [![size](https://img.shields.io/github/languages/code-size/ddeutils/ddeutil-workflow)](https://github.com/ddeutils/ddeutil-workflow)
 [![gh license](https://img.shields.io/github/license/ddeutils/ddeutil-workflow)](https://github.com/ddeutils/ddeutil-workflow/blob/main/LICENSE)
 
-
 **Table of Contents**:
 
 - [Installation](#installation)
 - [Getting Started](#getting-started)
-  - [Connection](#connection)
-  - [Dataset](#dataset)
   - [Schedule](#schedule)
-- [Pipeline Examples](#examples)
+  - [Pipeline](#pipeline)
+- [Examples](#examples)
   - [Python & Shell](#python--shell)
   - [Tasks (EL)](#tasks-extract--load)
   - [Hooks (T)](#tasks-transform)
@@ -42,7 +40,7 @@ pipeline.
 pip install ddeutil-workflow
 ```
 
-This project need `ddeutil-io`, `ddeutil-model` extension namespace packages.
+This project need `ddeutil-io` extension namespace packages.
 
 ## Getting Started
 
