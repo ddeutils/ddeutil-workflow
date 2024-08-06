@@ -66,6 +66,10 @@ jobs:
           git --version
           git config --list
 
+      - uses: MathRobin/timezone-action@v1.1
+        with:
+          timezoneLinux: "Asia/Bangkok"
+
       - name: Test with Pytest
         run: |
           pytest -vv
