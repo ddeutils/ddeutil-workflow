@@ -226,10 +226,22 @@ pipe_hook_mssql_proc:
 
 ## Configuration
 
-```text
+the `workflows-conf.yaml` file:
 
+```yaml
+engine:
+  registry:
+    - "ddeutil.workflow"
+    - "tests.utils"
+  paths:
+    conf: "${ROOT_PATH:.}/tests/data/conf"
+    root: "${ROOT_PATH:.}"
 ```
 
-## License
+**Environment variables**:
 
-This project was licensed under the terms of the [MIT license](LICENSE).
+```text
+DDE_WORKFLOW_ENGIN_REGISTRY=ddeutil.workflow,tests.utils
+DDE_WORKFLOW_ENGIN_PATH_CONF=
+DDE_WORKFLOW_ENGIN_PATH_ROOT=
+```
