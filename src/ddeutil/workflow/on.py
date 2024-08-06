@@ -15,16 +15,16 @@ from pydantic.functional_validators import field_validator
 from typing_extensions import Self
 
 try:
-    from .__types import DictData
+    from .__types import DictData, DictStr
     from .loader import Loader
     from .vendors.__schedule import WEEKDAYS
 except ImportError:
-    from ddeutil.workflow.__types import DictData
+    from ddeutil.workflow.__types import DictData, DictStr
     from ddeutil.workflow.loader import Loader
     from ddeutil.workflow.vendors.scheduler import WEEKDAYS
 
 
-def crontab_generate(
+def interval2crontab(
     interval: Literal["daily", "weekly", "monthly"],
     day: str = "monday",
     time: str = "00:00",
@@ -37,11 +37,11 @@ def crontab_generate(
     :param time: A time value that passing with format '%H:%M'.
 
     Examples:
-        >>> crontab_generate(interval='daily', time='01:30')
+        >>> interval2crontab(interval='daily', time='01:30')
         '1 30 * * *'
-        >>> crontab_generate(interval='weekly', day='friday', time='18:30')
+        >>> interval2crontab(interval='weekly', day='friday', time='18:30')
         '18 30 * * 5'
-        >>> crontab_generate(interval='monthly', time='00:00')
+        >>> interval2crontab(interval='monthly', time='00:00')
         '0 0 1 * *'
     """
     h, m = tuple(
@@ -54,7 +54,7 @@ def crontab_generate(
 
 
 class Schedule(BaseModel):
-    """Base Schedule (Schedule) Model
+    """Schedule Model
 
     See Also:
         * ``generate()`` is the main usecase of this schedule object.
@@ -64,28 +64,27 @@ class Schedule(BaseModel):
 
     # NOTE: This is fields of the base schedule.
     cronjob: Annotated[CronJob, Field(description="Cron job of this schedule")]
-    tz: Annotated[str, Field(description="Timezone")] = "Etc/UTC"
+    tz: Annotated[str, Field(description="A timezone string value")] = "Etc/UTC"
     extras: Annotated[
         DictData,
-        Field(default_factory=dict, description="Extras mapping of parameters"),
+        Field(
+            default_factory=dict,
+            description="An extras mapping parameters",
+        ),
     ]
 
     @classmethod
-    def from_value(
-        cls,
-        value: dict[str, str],
-        externals: DictData,
-    ) -> Self:
+    def from_value(cls, value: DictStr, externals: DictData) -> Self:
         """Constructor from values that will generate crontab by function.
 
         :param value: A mapping value that will generate crontab before create
             schedule model.
         :param externals: A extras external parameter that will keep in extras.
         """
-        passing: dict[str, str] = {}
+        passing: DictStr = {}
         if "timezone" in value:
             passing["tz"] = value.pop("timezone")
-        passing["cronjob"] = crontab_generate(
+        passing["cronjob"] = interval2crontab(
             **{v: value[v] for v in value if v in ("interval", "day", "time")}
         )
         return cls(extras=externals, **passing)

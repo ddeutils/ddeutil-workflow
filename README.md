@@ -13,10 +13,11 @@
   - [Connection](#connection)
   - [Dataset](#dataset)
   - [Schedule](#schedule)
-- [Examples](#examples)
+- [Pipeline Examples](#pipeline-examples)
   - [Python & Shell](#python--shell)
   - [Tasks (EL)](#tasks-extract--load)
   - [Hooks (T)](#hooks-transform)
+- [Configuration](#configuration)
 
 This **Utility Workflow** objects was created for easy to make a simple metadata
 driven pipeline that able to **ETL, T, EL, or ELT** by `.yaml` file.
@@ -47,7 +48,7 @@ This project need `ddeutil-io`, `ddeutil-model` extension namespace packages.
 
 The first step, you should start create the connections and datasets for In and
 Out of you data that want to use in pipeline of workflow. Some of this component
-is similar component of the **Airflow** because I like it concepts.
+is similar component of the **Airflow** because I like it orchestration concepts.
 
 The main feature of this project is the `Pipeline` object that can call any
 registries function. The pipeline can handle everything that you want to do, it
@@ -57,6 +58,8 @@ will passing parameters and catching the output for re-use it to next step.
 > In the future of this project, I will drop the connection and dataset to
 > dynamic registries instead of main features because it have a lot of maintain
 > vendor codes and deps. (I do not have time to handle this features)
+
+---
 
 ### Connection
 
@@ -110,7 +113,7 @@ schd_for_node:
 ```
 
 ```python
-from ddeutil.workflow.schedule import Schedule
+from ddeutil.workflow.on import Schedule
 
 scdl = Schedule.from_loader(name='schd_for_node', externals={})
 assert '*/5 * * * *' == str(scdl.cronjob)
@@ -123,7 +126,7 @@ assert '2022-01-01 00:20:00' f"{cron_iterate.next:%Y-%m-%d %H:%M:%S}"
 assert '2022-01-01 00:25:00' f"{cron_iterate.next:%Y-%m-%d %H:%M:%S}"
 ```
 
-## Examples
+## Pipeline Examples
 
 This is examples that use workflow file for running common Data Engineering
 use-case.
@@ -134,7 +137,7 @@ The state of doing lists that worker should to do. It be collection of the stage
 
 ```yaml
 run_py_local:
-  type: ddeutil.workflow.pipe.Pipeline
+  type: ddeutil.workflow.pipeline.Pipeline
   params:
     author-run:
       type: str
@@ -193,7 +196,7 @@ pipe.execute(params={'author-run': 'Local Workflow', 'run-date': '2024-01-01'})
 
 ```yaml
 pipe_el_pg_to_lake:
-  type: ddeutil.workflow.pipe.Pipeline
+  type: ddeutil.workflow.pipeline.Pipeline
   params:
     run-date:
       type: datetime
@@ -220,11 +223,11 @@ pipe_el_pg_to_lake:
 
 ### Tasks (Transform)
 
-I recommend you to use task for all actions that you want to do.
+> I recommend you to use task for all actions that you want to do.
 
 ```yaml
 pipe_hook_mssql_proc:
-  type: ddeutil.workflow.pipe.Pipeline
+  type: ddeutil.workflow.pipeline.Pipeline
   params:
     run_date: datetime
     sp_name: str
@@ -248,6 +251,12 @@ pipe_hook_mssql_proc:
 > [!NOTE]
 > The above parameter use short declarative statement. You can pass a parameter
 > type to the key of a parameter name.
+
+## Configuration
+
+```text
+
+```
 
 ## License
 

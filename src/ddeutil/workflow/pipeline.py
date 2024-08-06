@@ -20,7 +20,6 @@ from queue import Queue
 from subprocess import CompletedProcess
 from typing import Any, Callable, Optional, Union
 
-import msgspec as spec
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
@@ -29,11 +28,14 @@ from .__regex import RegexConf
 from .__types import DictData, DictStr
 from .exceptions import TaskException
 from .loader import Loader, map_params
-from .utils import Params, make_exec, make_registry
+from .utils import Params, TaskSearch, make_exec, make_registry
 
 
 class BaseStage(BaseModel, ABC):
-    """Base Stage Model that keep only id and name fields."""
+    """Base Stage Model that keep only id and name fields for the stage
+    metadata. If you want to implement any custom stage, you can use this class
+    to parent and implement ``self.execute()`` method only.
+    """
 
     id: Optional[str] = Field(
         default=None,
@@ -49,13 +51,20 @@ class BaseStage(BaseModel, ABC):
     @abstractmethod
     def execute(self, params: DictData) -> DictData:
         """Execute abstraction method that action something by sub-model class.
+        This is important method that make this class is able to be the stage.
 
         :param params: A parameter data that want to use in this execution.
+        :rtype: DictData
         """
         raise NotImplementedError("Stage should implement ``execute`` method.")
 
     def set_outputs(self, rs: DictData, params: DictData) -> DictData:
-        """Set an outputs from execution process to an input params."""
+        """Set an outputs from execution process to an input params.
+
+        :param rs: A result data that want to extract to an output key.
+        :param params: A context data that want to add output result.
+        :rtype: DictData
+        """
         if self.id is None:
             return params
 
@@ -67,19 +76,34 @@ class BaseStage(BaseModel, ABC):
 
 
 class EmptyStage(BaseStage):
-    """Empty stage that is doing nothing and logging the name of stage only."""
+    """Empty stage that do nothing (context equal empty stage) and logging the
+    name of stage only to stdout.
+    """
 
     def execute(self, params: DictData) -> DictData:
-        """Execute for the Empty stage that do only logging out."""
+        """Execution method for the Empty stage that do only logging out to
+        stdout.
+
+        :param params: A context data that want to add output result. But this
+            stage does not pass any output.
+        """
         logging.info(f"[STAGE]: Empty-Execute: {self.name!r}")
         return params
 
 
 class ShellStage(BaseStage):
-    """Shell statement stage."""
+    """Shell stage that execute bash script on the current OS. That mean if your
+    current OS is Windows, it will running bash in the WSL.
+    """
 
-    shell: str
-    env: DictStr = Field(default_factory=dict)
+    shell: str = Field(description="A shell statement that want to execute.")
+    env: DictStr = Field(
+        default_factory=dict,
+        description=(
+            "An environment variable mapping that want to set before execute "
+            "this shell statement."
+        ),
+    )
 
     @contextlib.contextmanager
     def __prepare_shell(self):
@@ -162,7 +186,12 @@ class PyStage(BaseStage):
         return rs
 
     def set_outputs(self, rs: DictData, params: DictData) -> DictData:
-        """Set outputs to params"""
+        """Set an outputs from execution process to an input params.
+
+        :param rs: A result data that want to extract to an output key.
+        :param params: A context data that want to add output result.
+        :rtype: DictData
+        """
         # NOTE: skipping set outputs of stage execution when id does not set.
         if self.id is None:
             return params
@@ -200,18 +229,6 @@ class PyStage(BaseStage):
         # NOTE: set outputs from ``_locals`` value from ``exec``.
         self.set_outputs(_locals, params)
         return params | {k: _globals[k] for k in params if k in _globals}
-
-
-class TaskSearch(spec.Struct, kw_only=True, tag="task"):
-    """Task Search Struct that use the `msgspec` for the best performance."""
-
-    path: str
-    func: str
-    tag: str
-
-    def to_dict(self) -> DictData:
-        """Return dict data from struct fields."""
-        return {f: getattr(self, f) for f in self.__struct_fields__}
 
 
 class TaskStage(BaseStage):
@@ -310,11 +327,14 @@ class Strategy(BaseModel):
 
 
 class Job(BaseModel):
-    """Job Model"""
+    """Job Model that is able to call a group of stages."""
 
     runs_on: Optional[str] = Field(default=None)
     stages: list[Stage] = Field(default_factory=list)
-    needs: list[str] = Field(default_factory=list)
+    needs: list[str] = Field(
+        default_factory=list,
+        description="A list of the job ID that want to run before this job.",
+    )
     strategy: Strategy = Field(default_factory=Strategy)
 
     @model_validator(mode="before")
@@ -412,8 +432,9 @@ class Pipeline(BaseModel):
     def from_loader(
         cls,
         name: str,
-        externals: Optional[DictData] = None,
+        externals: DictData | None = None,
     ) -> Self:
+        """Create Pipeline instance from the Loader object."""
         loader: Loader = Loader(name, externals=(externals or {}))
         if "jobs" not in loader.data:
             raise ValueError("Config does not set ``jobs`` value")
@@ -448,8 +469,10 @@ class Pipeline(BaseModel):
         included in the pipeline.
 
         :param params: An input parameters that use on pipeline execution.
-        :param time_out: A time out second value for limit time of this
-            execution.
+        :param time_out: A time out in second unit that use for limit time of
+            this pipeline execution.
+
+        ---
 
         See Also:
 
@@ -473,6 +496,7 @@ class Pipeline(BaseModel):
         if any(p not in params for p in self.params if self.params[p].required):
             raise ValueError("Required parameter does not pass")
 
+        # NOTE: mapping type of param before adding it to params variable.
         params: DictData = {
             "params": (
                 params
@@ -485,6 +509,8 @@ class Pipeline(BaseModel):
             "jobs": {},
         }
 
+        # NOTE: create a job queue that keep the job that want to running after
+        #   it dependency condition.
         jq = Queue()
         for job_id in self.jobs:
             jq.put(job_id)
@@ -511,6 +537,7 @@ class Pipeline(BaseModel):
             #
             if any(params["jobs"].get(need) for need in job.needs):
                 jq.put(job_id)
+
             job.execute(params=params)
             params["jobs"][job_id] = {
                 "stages": params.pop("stages", {}),

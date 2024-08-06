@@ -46,7 +46,7 @@ class Unit:
     max: int
     alt: list[str] = field(default_factory=list)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             f"{self.__class__}(name={self.name!r}, range={self.range},"
             f"min={self.min}, max={self.max}"

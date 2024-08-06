@@ -14,11 +14,14 @@ from importlib import import_module
 from pathlib import Path
 from typing import Any, Callable, Literal, Optional, Protocol, Union
 
+import msgspec as spec
 from ddeutil.core import lazy
 from ddeutil.io.models.lineage import dt_now
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
+
+from .__types import DictData
 
 
 class TagFunc(Protocol):
@@ -30,16 +33,16 @@ class TagFunc(Protocol):
     def __call__(self, *args, **kwargs): ...
 
 
-def tag(tag_value: str, name: str | None = None):
+def tag(value: str, name: str | None = None):
     """Tag decorator function that set function attributes, ``tag`` and ``name``
     for making registries variable.
 
-    :param: tag_value: A tag value for make different use-case of a function.
+    :param: value: A tag value for make different use-case of a function.
     :param: name: A name that keeping in registries.
     """
 
-    def func_internal(func: TagFunc):
-        func.tag = tag_value
+    def func_internal(func: callable) -> TagFunc:
+        func.tag = value
         func.name = name or func.__name__.replace("_", "-")
 
         @wraps(func)
@@ -52,7 +55,10 @@ def tag(tag_value: str, name: str | None = None):
 
 
 def make_registry(module: str) -> dict[str, dict[str, Callable[[], TagFunc]]]:
-    """Return registries of all functions that able to called with task."""
+    """Return registries of all functions that able to called with task.
+
+    :param module: A module prefix that want to import registry.
+    """
     rs: dict[str, dict[str, Callable[[], Callable]]] = {}
     for fstr, func in inspect.getmembers(
         import_module(module), inspect.isfunction
@@ -183,5 +189,20 @@ Params = Union[
 
 
 def make_exec(path: str | Path):
+    """Change mode of file to be executable file."""
     f: Path = Path(path) if isinstance(path, str) else path
     f.chmod(f.stat().st_mode | stat.S_IEXEC)
+
+
+class TaskSearch(spec.Struct, kw_only=True, tag="task"):
+    """Task Search Struct that use the `msgspec` for the best performance data
+    serialize.
+    """
+
+    path: str
+    func: str
+    tag: str
+
+    def to_dict(self) -> DictData:
+        """Return dict data from struct fields."""
+        return {f: getattr(self, f) for f in self.__struct_fields__}
