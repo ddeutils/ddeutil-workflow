@@ -3,4 +3,4 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-from ._polars import *
+from .dummy import *

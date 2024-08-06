@@ -13,10 +13,10 @@
   - [Connection](#connection)
   - [Dataset](#dataset)
   - [Schedule](#schedule)
-- [Pipeline Examples](#pipeline-examples)
+- [Pipeline Examples](#examples)
   - [Python & Shell](#python--shell)
   - [Tasks (EL)](#tasks-extract--load)
-  - [Hooks (T)](#hooks-transform)
+  - [Hooks (T)](#tasks-transform)
 - [Configuration](#configuration)
 
 This **Utility Workflow** objects was created for easy to make a simple metadata
@@ -61,49 +61,6 @@ will passing parameters and catching the output for re-use it to next step.
 
 ---
 
-### Connection
-
-The connection for worker able to do any thing.
-
-```yaml
-conn_postgres_data:
-  type: conn.Postgres
-  url: 'postgres//username:${ENV_PASS}@hostname:port/database?echo=True&time_out=10'
-```
-
-```python
-from ddeutil.workflow.conn import Conn
-
-conn = Conn.from_loader(name='conn_postgres_data', externals={})
-assert conn.ping()
-```
-
----
-
-### Dataset
-
-The dataset is define any objects on the connection. This feature was implemented
-on `/vendors` because it has a lot of tools that can interact with any data systems
-in the data tool stacks.
-
-```yaml
-ds_postgres_customer_tbl:
-  type: dataset.PostgresTbl
-  conn: 'conn_postgres_data'
-  features:
-    id: serial primary key
-    name: varchar( 100 ) not null
-```
-
-```python
-from ddeutil.workflow.vendors.pg import PostgresTbl
-
-dataset = PostgresTbl.from_loader(name='ds_postgres_customer_tbl', externals={})
-assert dataset.exists()
-```
-
----
-
 ### Schedule
 
 ```yaml
@@ -126,7 +83,24 @@ assert '2022-01-01 00:20:00' f"{cron_iterate.next:%Y-%m-%d %H:%M:%S}"
 assert '2022-01-01 00:25:00' f"{cron_iterate.next:%Y-%m-%d %H:%M:%S}"
 ```
 
-## Pipeline Examples
+---
+
+### Pipeline
+
+```yaml
+run_py_local:
+  type: ddeutil.workflow.pipeline.Pipeline
+  ...
+```
+
+```python
+from ddeutil.workflow.pipeline import Pipeline
+
+pipe = Pipeline.from_loader(name='run_py_local', externals={})
+pipe.execute(params={'author-run': 'Local Workflow', 'run-date': '2024-01-01'})
+```
+
+## Examples
 
 This is examples that use workflow file for running common Data Engineering
 use-case.

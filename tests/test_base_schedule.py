@@ -1,7 +1,7 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-import ddeutil.workflow.vendors.__schedule as schedule
+import ddeutil.workflow.__scheduler as schedule
 
 from tests.utils import str2dt
 

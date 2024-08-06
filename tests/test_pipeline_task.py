@@ -18,7 +18,7 @@ def test_pipe_stage_task():
             },
         }
     )
-    assert {"extract-load": {"outputs": {"records": 2}}} == rs["stages"]
+    assert {"extract-load": {"outputs": {"records": 1}}} == rs["stages"]
 
 
 def test_pipe_job_task():
@@ -44,7 +44,7 @@ def test_pipe_job_task():
             "sink": "ds_parquet_local_file_dir",
         },
         "stages": {
-            "extract-load": {"outputs": {"records": 2}},
+            "extract-load": {"outputs": {"records": 1}},
         },
     } == rs
 
@@ -71,7 +71,7 @@ def test_pipe_task():
             "extract-load": {
                 "stages": {
                     "extract-load": {
-                        "outputs": {"records": 2},
+                        "outputs": {"records": 1},
                     },
                 },
                 "matrix": {},

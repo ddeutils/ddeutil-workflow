@@ -9,19 +9,18 @@ from datetime import datetime
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from ddeutil.workflow.vendors.scheduler import CronJob, CronRunner
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.functional_validators import field_validator
 from typing_extensions import Self
 
 try:
+    from .__schedule import WEEKDAYS
     from .__types import DictData, DictStr
-    from .loader import Loader
-    from .vendors.__schedule import WEEKDAYS
+    from .loader import CronJob, CronRunner, Loader
 except ImportError:
+    from ddeutil.workflow.__scheduler import WEEKDAYS, CronJob, CronRunner
     from ddeutil.workflow.__types import DictData, DictStr
     from ddeutil.workflow.loader import Loader
-    from ddeutil.workflow.vendors.scheduler import WEEKDAYS
 
 
 def interval2crontab(

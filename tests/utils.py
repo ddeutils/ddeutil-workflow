@@ -35,6 +35,7 @@ def initial_sqlite() -> None:
     import sqlite3
 
     example_path: Path = OUTSIDE_PATH / "tests/data/examples"
+    example_path.mkdir(parents=True, exist_ok=True)
     if not (db := (example_path / "demo_sqlite.db")).exists():
         sqlite3.connect(db, timeout=20, isolation_level=None)
 
