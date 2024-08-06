@@ -2,6 +2,42 @@
 
 ## Latest Changes
 
+## 0.0.5
+
+### :sparkles: Features
+
+- :dart: feat: add unit dataclass on scheduler. (_2024-06-15_)
+- :dart: feat: add on and desc fields on pipeline model. (_2024-06-12_)
+- :dart: feat: add env variables for shell stage executor. (_2024-06-11_)
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: update testcase that was remove polars package. (_2024-08-06_)
+- :construction: refactored: 📦 bump pyarrow from 16.1.0 to 17.0.0 (_2024-08-01_)
+- :construction: refactored: 📦 bump boto3 from 1.34.136 to 1.34.151 (_2024-08-01_)
+- :construction: refactored: ⬆ bump pypa/gh-action-pypi-publish from 1.8.14 to 1.9.0 (_2024-07-01_)
+- :construction: refactored: 📦 bump boto3 from 1.34.117 to 1.34.136 (_2024-07-01_)
+- :construction: refactored: 📦 bump fsspec from 2024.5.0 to 2024.6.1 (_2024-07-01_)
+- :construction: refactored: 📦 bump sqlalchemy from 2.0.30 to 2.0.31 (_2024-07-01_)
+- :construction: refactored: __schedule module to scheduler. (_2024-06-14_)
+- :construction: refactored: merge run example conf file together. (_2024-06-11_)
+
+### :card_file_box: Documents
+
+- :page_facing_up: docs: update docs string on workflow objects. (_2024-08-06_)
+- :page_facing_up: docs: update readme for little detail. (_2024-07-29_)
+- :page_facing_up: docs: add license shield on readme. (_2024-06-15_)
+- :page_facing_up: docs: add docs-string on loader add merge schedule object. (_2024-06-13_)
+
+### :bug: Fix Bugs
+
+- :gear: fixed: remove all vendors to ddeutil-vendors project. (_2024-08-06_)
+- :gear: fixed: fix generate crontab value use dow when interval is monthly. (_2024-06-12_)
+
+### :postbox: Dependencies
+
+- :pushpin: deps: add schedule deps and rename schedule to on. (_2024-06-12_)
+
 ## 0.0.4
 
 ### :sparkles: Features
