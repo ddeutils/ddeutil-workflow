@@ -27,7 +27,7 @@ from typing_extensions import Self
 from .__types import DictData, DictStr, Re
 from .exceptions import TaskException
 from .loader import Loader, map_params
-from .utils import Params, TaskSearch, make_exec, make_registry
+from .utils import Params, Registry, TaskSearch, make_exec, make_registry
 
 
 class BaseStage(BaseModel, ABC):
@@ -233,36 +233,53 @@ class PyStage(BaseStage):
 class TaskStage(BaseStage):
     """Task executor stage that running the Python function."""
 
-    task: str
+    task: str = Field(description="...")
     args: DictData
 
     @staticmethod
-    def extract_task(task: str) -> Callable[[], Callable[[Any], Any]]:
-        """Extract Task string value to task function."""
+    def extract_task(
+        task: str,
+        prefix_module: str = "ddeutil.workflow",
+    ) -> Callable[[], Callable[[Any], Any]]:
+        """Extract Task string value to task function.
+
+        :param task: A task string value that able to search with Task regex.
+        :param prefix_module: A prefix module string.
+        """
         if not (found := Re.RE_TASK_FMT.search(task)):
             raise ValueError("Task does not match with task format regex.")
-        tasks: TaskSearch = TaskSearch(**found.groupdict())
+
+        # NOTE: Pass the searching task string to path, func, tag.
+        task: TaskSearch = TaskSearch(**found.groupdict())
 
         # NOTE: Registry object should implement on this package only.
         # TODO: This prefix value to search registry should dynamic with
         #   config file.
-        rgt = make_registry(f"ddeutil.workflow.{tasks.path}")
-        if tasks.func not in rgt:
+        rgt: dict[str, Registry] = make_registry(f"{prefix_module}.{task.path}")
+        if task.func not in rgt:
             raise NotImplementedError(
-                f"ddeutil.workflow.{tasks.path}.registries does not "
-                f"implement registry: {tasks.func}."
+                f"{prefix_module}.{task.path}.registries does not "
+                f"implement registry: {task.func}."
             )
 
-        if tasks.tag not in rgt[tasks.func]:
+        if task.tag not in rgt[task.func]:
             raise NotImplementedError(
-                f"tag: {tasks.tag} does not found on registry func: "
-                f"ddeutil.workflow.{tasks.path}.registries."
-                f"{tasks.func}"
+                f"tag: {task.tag} does not found on registry func: "
+                f"ddeutil.workflow.{task.path}.registries."
+                f"{task.func}"
             )
-        return rgt[tasks.func][tasks.tag]
+        return rgt[task.func][task.tag]
 
     def execute(self, params: DictData) -> DictData:
-        """Execute the Task function."""
+        """Execute the Task that already mark registry.
+
+        :param params: A parameter that want to pass before run any statement.
+        :type params: DictData
+
+        :rtype: DictData
+        :returns: A parameters from an input that was mapped output if the stage
+            ID was set.
+        """
         task_caller = self.extract_task(self.task)()
         if not callable(task_caller):
             raise ImportError("Task caller function does not callable.")

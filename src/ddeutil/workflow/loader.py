@@ -33,7 +33,11 @@ class Engine(BaseModel):
     """Engine Model"""
 
     paths: PathData = Field(default_factory=PathData)
-    registry: list[str] = Field(default_factory=lambda: ["ddeutil.workflow"])
+    registry: list[str] = Field(
+        default_factory=lambda: [
+            "ddeutil.workflow",
+        ],
+    )
 
     @model_validator(mode="before")
     def __prepare_registry(cls, values: DictData) -> DictData:
@@ -48,7 +52,10 @@ class Engine(BaseModel):
 class Params(BaseModel):
     """Params Model"""
 
-    engine: Engine = Field(default_factory=Engine)
+    engine: Engine = Field(
+        default_factory=Engine,
+        description="A engine mapping values.",
+    )
 
 
 class SimLoad:
@@ -77,12 +84,8 @@ class SimLoad:
                 self.data = data
         if not self.data:
             raise ValueError(f"Config {name!r} does not found on conf path")
-        self.__conf_params: Params = params
+        self.conf_params: Params = params
         self.externals: DictData = externals
-
-    @property
-    def conf_params(self) -> Params:
-        return self.__conf_params
 
     @cached_property
     def type(self) -> BaseModelType:
@@ -124,25 +127,39 @@ class Loader(SimLoad):
         self,
         name: str,
         externals: DictData,
-        *,
-        path: str | None = None,
     ) -> None:
         self.data: DictData = {}
 
         # NOTE: import params object from specific config file
-        params: Params = self.config(path)
+        params: Params = self.config()
 
         super().__init__(name, params, externals)
 
     @classmethod
-    def config(cls, path: str | None = None) -> Params:
+    def config(cls) -> Params:
         """Load Config data from ``workflows-conf.yaml`` file."""
-        conf_file_loc: str = (
-            file_loc
-            if (file_loc := os.getenv("WORKFLOW_CONF_FILE_LOCATION"))
-            else f"./{cls.conf_filename}.yaml"
+        root_path: str = os.getenv("WORKFLOW_ROOT_PATH", ".")
+
+        regis: list[str] = []
+        if regis_env := os.getenv("WORKFLOW_CORE_REGISTRY"):
+            regis = [r.strip() for r in regis_env.split(",")]
+
+        conf_path: str = (
+            f"{root_path}/{conf_env}"
+            if (conf_env := os.getenv("WORKFLOW_CORE_PATH_CONF"))
+            else None
         )
-        return Params.model_validate(YamlEnvFl(path or conf_file_loc).read())
+        return Params.model_validate(
+            {
+                "engine": {
+                    "registry": regis,
+                    "paths": {
+                        "root": root_path,
+                        "conf": conf_path,
+                    },
+                },
+            }
+        )
 
 
 def map_params(value: Any, params: dict[str, Any]) -> Any:

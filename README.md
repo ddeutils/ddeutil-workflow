@@ -9,7 +9,7 @@
 
 - [Installation](#installation)
 - [Getting Started](#getting-started)
-  - [Schedule](#schedule)
+  - [On](#on)
   - [Pipeline](#pipeline)
 - [Examples](#examples)
   - [Python & Shell](#python--shell)
@@ -59,7 +59,7 @@ will passing parameters and catching the output for re-use it to next step.
 
 ---
 
-### Schedule
+### On
 
 ```yaml
 schd_for_node:
@@ -68,17 +68,17 @@ schd_for_node:
 ```
 
 ```python
-from ddeutil.workflow.on import Schedule
+from ddeutil.workflow.on import On
 
-scdl = Schedule.from_loader(name='schd_for_node', externals={})
+scdl = On.from_loader(name='schd_for_node', externals={})
 assert '*/5 * * * *' == str(scdl.cronjob)
 
-cron_iterate = scdl.generate('2022-01-01 00:00:00')
-assert '2022-01-01 00:05:00' f"{cron_iterate.next:%Y-%m-%d %H:%M:%S}"
-assert '2022-01-01 00:10:00' f"{cron_iterate.next:%Y-%m-%d %H:%M:%S}"
-assert '2022-01-01 00:15:00' f"{cron_iterate.next:%Y-%m-%d %H:%M:%S}"
-assert '2022-01-01 00:20:00' f"{cron_iterate.next:%Y-%m-%d %H:%M:%S}"
-assert '2022-01-01 00:25:00' f"{cron_iterate.next:%Y-%m-%d %H:%M:%S}"
+cron_iter = scdl.generate('2022-01-01 00:00:00')
+assert '2022-01-01 00:05:00' f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
+assert '2022-01-01 00:10:00' f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
+assert '2022-01-01 00:15:00' f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
+assert '2022-01-01 00:20:00' f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
+assert '2022-01-01 00:25:00' f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
 ```
 
 ---
@@ -88,7 +88,11 @@ assert '2022-01-01 00:25:00' f"{cron_iterate.next:%Y-%m-%d %H:%M:%S}"
 ```yaml
 run_py_local:
   type: ddeutil.workflow.pipeline.Pipeline
-  ...
+  params:
+    author-run:
+      type: str
+    run-date:
+      type: datetime
 ```
 
 ```python
@@ -97,6 +101,15 @@ from ddeutil.workflow.pipeline import Pipeline
 pipe = Pipeline.from_loader(name='run_py_local', externals={})
 pipe.execute(params={'author-run': 'Local Workflow', 'run-date': '2024-01-01'})
 ```
+
+> [!NOTE]
+> The above parameter use short declarative statement. You can pass a parameter
+> type to the key of a parameter name.
+> ```yaml
+> params:
+>   author-run: str
+>   run-date: datetime
+> ```
 
 ## Examples
 
@@ -220,29 +233,10 @@ pipe_hook_mssql_proc:
               target: ${{ params.target_name }}
 ```
 
-> [!NOTE]
-> The above parameter use short declarative statement. You can pass a parameter
-> type to the key of a parameter name.
-
 ## Configuration
 
-the `workflows-conf.yaml` file:
-
-```yaml
-engine:
-  registry:
-    - "ddeutil.workflow"
-    - "tests.utils"
-  paths:
-    conf: "${ROOT_PATH:.}/tests/data/conf"
-    root: "${ROOT_PATH:.}"
-```
-
-**Environment variables**:
-
-```text
-WORKFLOW_CONF_FILE_LOCATION='./workflows-conf.yaml'
-WORKFLOW_CORE_REGISTRY=ddeutil.workflow,tests.utils
-WORKFLOW_CORE_PATH_CONF=
-WORKFLOW_CORE_PATH_ROOT=
+```bash
+export WORKFLOW_ROOT_PATH=.
+export WORKFLOW_CORE_REGISTRY=ddeutil.workflow,tests.utils
+export WORKFLOW_CORE_PATH_CONF=conf
 ```

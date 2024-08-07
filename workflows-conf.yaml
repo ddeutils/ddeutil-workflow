@@ -1,7 +1,0 @@
-engine:
-  registry:
-    - "ddeutil.workflow"
-    - "tests.utils"
-  paths:
-    conf: "${ROOT_PATH:.}/tests/data/conf"
-    root: "${ROOT_PATH:.}"

@@ -54,28 +54,35 @@ def tag(value: str, name: str | None = None):
     return func_internal
 
 
-def make_registry(module: str) -> dict[str, dict[str, Callable[[], TagFunc]]]:
+Registry = dict[str, Callable[[], TagFunc]]
+
+
+def make_registry(module: str) -> dict[str, Registry]:
     """Return registries of all functions that able to called with task.
 
     :param module: A module prefix that want to import registry.
     """
-    rs: dict[str, dict[str, Callable[[], Callable]]] = {}
+    rs: dict[str, Registry] = {}
     for fstr, func in inspect.getmembers(
         import_module(module), inspect.isfunction
     ):
+        # NOTE: check function attribute that already set tag by ``utils.tag``
+        #   decorator.
         if not hasattr(func, "tag"):
             continue
 
-        if func.name in rs:
-            if func.tag in rs[func.name]:
-                raise ValueError(
-                    f"The tag {func.tag!r} already exists on module {module}"
-                )
-            rs[func.name][func.tag] = lazy(f"{module}.{fstr}")
+        # NOTE: Create new register name if it not exists
+        if func.name not in rs:
+            rs[func.name] = {func.tag: lazy(f"{module}.{fstr}")}
             continue
 
-        # NOTE: Create new register name if it not exists
-        rs[func.name] = {func.tag: lazy(f"{module}.{fstr}")}
+        if func.tag in rs[func.name]:
+            raise ValueError(
+                f"The tag {func.tag!r} already exists on {module}, you "
+                f"should change this tag name or change it func name."
+            )
+        rs[func.name][func.tag] = lazy(f"{module}.{fstr}")
+
     return rs
 
 

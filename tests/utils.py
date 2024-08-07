@@ -18,7 +18,10 @@ def dotenv_setting() -> None:
         #   * Ubuntu: /home/runner/work/ddeutil-workflow/ddeutil-workflow
         env_str: str = dedent(
             f"""
-            ROOT_PATH={OUTSIDE_PATH.resolve()}
+            WORKFLOW_ROOT_PATH={OUTSIDE_PATH.resolve()}
+            WORKFLOW_CORE_REGISTRY="ddeutil.workflow,tests.utils"
+            WORKFLOW_CORE_PATH_CONF=tests/data/conf
+
             SFTP_HOST='50.100.200.123'
             SFTP_USER='bastion'
             SFTP_PASSWORD='P@ssW0rd'
