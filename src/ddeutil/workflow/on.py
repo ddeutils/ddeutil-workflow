@@ -14,13 +14,13 @@ from pydantic.functional_validators import field_validator
 from typing_extensions import Self
 
 try:
-    from .__schedule import WEEKDAYS
     from .__types import DictData, DictStr
-    from .loader import CronJob, CronRunner, Loader
+    from .loader import Loader
+    from .scheduler import WEEKDAYS, CronJob, CronRunner
 except ImportError:
-    from ddeutil.workflow.__scheduler import WEEKDAYS, CronJob, CronRunner
     from ddeutil.workflow.__types import DictData, DictStr
     from ddeutil.workflow.loader import Loader
+    from ddeutil.workflow.scheduler import WEEKDAYS, CronJob, CronRunner
 
 
 def interval2crontab(
@@ -52,8 +52,8 @@ def interval2crontab(
     )
 
 
-class Schedule(BaseModel):
-    """Schedule Model
+class On(BaseModel):
+    """On Model (Schedule)
 
     See Also:
         * ``generate()`` is the main usecase of this schedule object.
@@ -139,5 +139,5 @@ class Schedule(BaseModel):
         return self.cronjob.schedule(date=(start.astimezone(ZoneInfo(self.tz))))
 
 
-class AwsSchedule(Schedule):
-    """Implement Schedule for AWS Service."""
+class AwsOn(On):
+    """Implement On AWS Schedule for AWS Service like AWS Glue."""

@@ -5,6 +5,7 @@
 # ------------------------------------------------------------------------------
 from __future__ import annotations
 
+import os
 from functools import cached_property
 from typing import Any, ClassVar, TypeVar
 
@@ -21,8 +22,7 @@ from ddeutil.io import (
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
 
-from .__regex import RegexConf
-from .__types import DictData
+from .__types import DictData, Re
 
 T = TypeVar("T")
 BaseModelType = type[BaseModel]
@@ -118,7 +118,7 @@ class Loader(SimLoad):
     :param externals: An external parameters
     """
 
-    conf_name: ClassVar[str] = "workflows-conf"
+    conf_filename: ClassVar[str] = "workflows-conf"
 
     def __init__(
         self,
@@ -137,9 +137,12 @@ class Loader(SimLoad):
     @classmethod
     def config(cls, path: str | None = None) -> Params:
         """Load Config data from ``workflows-conf.yaml`` file."""
-        return Params.model_validate(
-            YamlEnvFl(path or f"./{cls.conf_name}.yaml").read()
+        conf_file_loc: str = (
+            file_loc
+            if (file_loc := os.getenv("WORKFLOW_CONF_FILE_LOCATION"))
+            else f"./{cls.conf_filename}.yaml"
         )
+        return Params.model_validate(YamlEnvFl(path or conf_file_loc).read())
 
 
 def map_params(value: Any, params: dict[str, Any]) -> Any:
@@ -159,7 +162,7 @@ def map_params(value: Any, params: dict[str, Any]) -> Any:
     elif not isinstance(value, str):
         return value
 
-    if not (found := RegexConf.RE_CALLER.search(value)):
+    if not (found := Re.RE_CALLER.search(value)):
         return value
 
     # NOTE: get caller value that setting inside; ``${{ <caller-value> }}``

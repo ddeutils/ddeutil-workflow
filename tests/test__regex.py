@@ -1,5 +1,5 @@
 import pytest
-from ddeutil.workflow.__regex import RegexConf
+from ddeutil.workflow.__types import Re
 
 
 @pytest.mark.parametrize(
@@ -24,7 +24,7 @@ from ddeutil.workflow.__regex import RegexConf
     ),
 )
 def test_regex_caller(value, expected):
-    rs = RegexConf.RE_CALLER.search(value)
+    rs = Re.RE_CALLER.search(value)
     assert expected == rs.group("caller")
 
 
@@ -42,5 +42,5 @@ def test_regex_caller(value, expected):
     ],
 )
 def test_regex_task_format(value, expected):
-    rs = RegexConf.RE_TASK_FMT.search(value)
+    rs = Re.RE_TASK_FMT.search(value)
     assert expected == tuple(rs.groupdict().values())

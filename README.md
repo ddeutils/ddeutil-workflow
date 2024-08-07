@@ -241,7 +241,8 @@ engine:
 **Environment variables**:
 
 ```text
-DDE_WORKFLOW_ENGIN_REGISTRY=ddeutil.workflow,tests.utils
-DDE_WORKFLOW_ENGIN_PATH_CONF=
-DDE_WORKFLOW_ENGIN_PATH_ROOT=
+WORKFLOW_CONF_FILE_LOCATION='./workflows-conf.yaml'
+WORKFLOW_CORE_REGISTRY=ddeutil.workflow,tests.utils
+WORKFLOW_CORE_PATH_CONF=
+WORKFLOW_CORE_PATH_ROOT=
 ```

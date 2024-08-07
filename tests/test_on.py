@@ -1,11 +1,11 @@
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from ddeutil.workflow.on import Schedule
+from ddeutil.workflow.on import On
 
 
 def test_on():
-    schedule = Schedule.from_loader(
+    schedule = On.from_loader(
         name="bkk_every_5_minute",
         externals={},
     )
@@ -29,7 +29,7 @@ def test_on():
 
 
 def test_on_value():
-    schedule = Schedule.from_loader(
+    schedule = On.from_loader(
         name="every_day_noon",
         externals={},
     )

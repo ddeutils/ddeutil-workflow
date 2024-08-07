@@ -2,15 +2,13 @@ from pathlib import Path
 
 import pytest
 
-from .utils import dotenv_setting, initial_sqlite
+from .utils import dotenv_setting
 
 collect_ignore: list[str] = [
     "vendors",
-    # "test_base_schedule.py",
 ]
 
 dotenv_setting()
-initial_sqlite()
 
 
 @pytest.fixture(scope="session")

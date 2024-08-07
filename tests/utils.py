@@ -31,14 +31,5 @@ def dotenv_setting() -> None:
     load_dotenv(env_path)
 
 
-def initial_sqlite() -> None:
-    import sqlite3
-
-    example_path: Path = OUTSIDE_PATH / "tests/data/examples"
-    example_path.mkdir(parents=True, exist_ok=True)
-    if not (db := (example_path / "demo_sqlite.db")).exists():
-        sqlite3.connect(db, timeout=20, isolation_level=None)
-
-
 def str2dt(value: str) -> datetime:
     return datetime.fromisoformat(value).astimezone(ZoneInfo("Asia/Bangkok"))

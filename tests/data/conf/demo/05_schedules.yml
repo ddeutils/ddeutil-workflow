@@ -1,7 +1,7 @@
 # Cronjob Schedule
 # ---
 bkk_every_5_minute:
-  type: on.Schedule
+  type: on.On
   cronjob: "*/5 * * * *"
   timezone: "Asia/Bangkok"
 
@@ -10,7 +10,7 @@ bkk_every_5_minute:
 # ---
 #   This pattern reference from dependabot yaml format file on GitHub.
 every_day_noon:
-  type: on.Schedule
+  type: on.On
   interval: "monthly"
   day: "monday"
   time: "12:00"

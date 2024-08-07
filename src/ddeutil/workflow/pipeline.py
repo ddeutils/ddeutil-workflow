@@ -24,8 +24,7 @@ from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
-from .__regex import RegexConf
-from .__types import DictData, DictStr
+from .__types import DictData, DictStr, Re
 from .exceptions import TaskException
 from .loader import Loader, map_params
 from .utils import Params, TaskSearch, make_exec, make_registry
@@ -240,7 +239,7 @@ class TaskStage(BaseStage):
     @staticmethod
     def extract_task(task: str) -> Callable[[], Callable[[Any], Any]]:
         """Extract Task string value to task function."""
-        if not (found := RegexConf.RE_TASK_FMT.search(task)):
+        if not (found := Re.RE_TASK_FMT.search(task)):
             raise ValueError("Task does not match with task format regex.")
         tasks: TaskSearch = TaskSearch(**found.groupdict())
 
@@ -412,7 +411,9 @@ class Pipeline(BaseModel):
     desc: Optional[str] = Field(default=None)
     params: dict[str, Params] = Field(default_factory=dict)
     on: dict[str, DictStr] = Field(default_factory=dict)
-    jobs: dict[str, Job]
+    jobs: dict[str, Job] = Field(
+        description="A mapping of job ID and job model that already loaded.",
+    )
 
     @model_validator(mode="before")
     def __prepare_params(cls, values: DictData) -> DictData:
@@ -444,7 +445,8 @@ class Pipeline(BaseModel):
         )
 
     @model_validator(mode="after")
-    def job_checking_needs(self):
+    def __job_checking_needs(self):
+        """"""
         return self
 
     def job(self, name: str) -> Job:
