@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import inspect
+import os
 import stat
 from abc import ABC, abstractmethod
 from datetime import date, datetime
@@ -14,14 +15,69 @@ from importlib import import_module
 from pathlib import Path
 from typing import Any, Callable, Literal, Optional, Protocol, Union
 
-import msgspec as spec
 from ddeutil.core import lazy
+from ddeutil.io import PathData
 from ddeutil.io.models.lineage import dt_now
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
 from .__types import DictData
+
+
+class Engine(BaseModel):
+    """Engine Model"""
+
+    paths: PathData = Field(default_factory=PathData)
+    registry: list[str] = Field(
+        default_factory=lambda: [
+            "ddeutil.workflow",
+        ],
+    )
+
+    @model_validator(mode="before")
+    def __prepare_registry(cls, values: DictData) -> DictData:
+        """Prepare registry value that passing with string type. It convert the
+        string type to list of string.
+        """
+        if (_regis := values.get("registry")) and isinstance(_regis, str):
+            values["registry"] = [_regis]
+        return values
+
+
+class ConfParams(BaseModel):
+    """Params Model"""
+
+    engine: Engine = Field(
+        default_factory=Engine,
+        description="A engine mapping values.",
+    )
+
+
+def config() -> ConfParams:
+    """Load Config data from ``workflows-conf.yaml`` file."""
+    root_path: str = os.getenv("WORKFLOW_ROOT_PATH", ".")
+
+    regis: list[str] = []
+    if regis_env := os.getenv("WORKFLOW_CORE_REGISTRY"):
+        regis = [r.strip() for r in regis_env.split(",")]
+
+    conf_path: str = (
+        f"{root_path}/{conf_env}"
+        if (conf_env := os.getenv("WORKFLOW_CORE_PATH_CONF"))
+        else None
+    )
+    return ConfParams.model_validate(
+        obj={
+            "engine": {
+                "registry": regis,
+                "paths": {
+                    "root": root_path,
+                    "conf": conf_path,
+                },
+            },
+        }
+    )
 
 
 class TagFunc(Protocol):
@@ -57,31 +113,37 @@ def tag(value: str, name: str | None = None):
 Registry = dict[str, Callable[[], TagFunc]]
 
 
-def make_registry(module: str) -> dict[str, Registry]:
+def make_registry(submodule: str) -> dict[str, Registry]:
     """Return registries of all functions that able to called with task.
 
-    :param module: A module prefix that want to import registry.
+    :param submodule: A module prefix that want to import registry.
     """
     rs: dict[str, Registry] = {}
-    for fstr, func in inspect.getmembers(
-        import_module(module), inspect.isfunction
-    ):
-        # NOTE: check function attribute that already set tag by ``utils.tag``
-        #   decorator.
-        if not hasattr(func, "tag"):
+    for module in config().engine.registry:
+        # NOTE: try to sequential import task functions
+        try:
+            importer = import_module(f"{module}.{submodule}")
+        except ModuleNotFoundError:
             continue
 
-        # NOTE: Create new register name if it not exists
-        if func.name not in rs:
-            rs[func.name] = {func.tag: lazy(f"{module}.{fstr}")}
-            continue
+        for fstr, func in inspect.getmembers(importer, inspect.isfunction):
+            # NOTE: check function attribute that already set tag by
+            #   ``utils.tag`` decorator.
+            if not hasattr(func, "tag"):
+                continue
 
-        if func.tag in rs[func.name]:
-            raise ValueError(
-                f"The tag {func.tag!r} already exists on {module}, you "
-                f"should change this tag name or change it func name."
-            )
-        rs[func.name][func.tag] = lazy(f"{module}.{fstr}")
+            # NOTE: Create new register name if it not exists
+            if func.name not in rs:
+                rs[func.name] = {func.tag: lazy(f"{module}.{submodule}.{fstr}")}
+                continue
+
+            if func.tag in rs[func.name]:
+                raise ValueError(
+                    f"The tag {func.tag!r} already exists on "
+                    f"{module}.{submodule}, you should change this tag name or "
+                    f"change it func name."
+                )
+            rs[func.name][func.tag] = lazy(f"{module}.{submodule}.{fstr}")
 
     return rs
 
@@ -199,17 +261,3 @@ def make_exec(path: str | Path):
     """Change mode of file to be executable file."""
     f: Path = Path(path) if isinstance(path, str) else path
     f.chmod(f.stat().st_mode | stat.S_IEXEC)
-
-
-class TaskSearch(spec.Struct, kw_only=True, tag="task"):
-    """Task Search Struct that use the `msgspec` for the best performance data
-    serialize.
-    """
-
-    path: str
-    func: str
-    tag: str
-
-    def to_dict(self) -> DictData:
-        """Return dict data from struct fields."""
-        return {f: getattr(self, f) for f in self.__struct_fields__}

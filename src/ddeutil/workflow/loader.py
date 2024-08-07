@@ -5,7 +5,6 @@
 # ------------------------------------------------------------------------------
 from __future__ import annotations
 
-import os
 from functools import cached_property
 from typing import Any, ClassVar, TypeVar
 
@@ -15,47 +14,17 @@ from ddeutil.core import (
     import_string,
 )
 from ddeutil.io import (
-    PathData,
     PathSearch,
     YamlEnvFl,
 )
-from pydantic import BaseModel, Field
-from pydantic.functional_validators import model_validator
+from pydantic import BaseModel
 
 from .__types import DictData, Re
+from .utils import ConfParams, config
 
 T = TypeVar("T")
 BaseModelType = type[BaseModel]
 AnyModel = TypeVar("AnyModel", bound=BaseModel)
-
-
-class Engine(BaseModel):
-    """Engine Model"""
-
-    paths: PathData = Field(default_factory=PathData)
-    registry: list[str] = Field(
-        default_factory=lambda: [
-            "ddeutil.workflow",
-        ],
-    )
-
-    @model_validator(mode="before")
-    def __prepare_registry(cls, values: DictData) -> DictData:
-        """Prepare registry value that passing with string type. It convert the
-        string type to list of string.
-        """
-        if (_regis := values.get("registry")) and isinstance(_regis, str):
-            values["registry"] = [_regis]
-        return values
-
-
-class Params(BaseModel):
-    """Params Model"""
-
-    engine: Engine = Field(
-        default_factory=Engine,
-        description="A engine mapping values.",
-    )
 
 
 class SimLoad:
@@ -73,7 +42,7 @@ class SimLoad:
     def __init__(
         self,
         name: str,
-        params: Params,
+        params: ConfParams,
         externals: DictData,
     ) -> None:
         self.data: DictData = {}
@@ -84,7 +53,7 @@ class SimLoad:
                 self.data = data
         if not self.data:
             raise ValueError(f"Config {name!r} does not found on conf path")
-        self.conf_params: Params = params
+        self.conf_params: ConfParams = params
         self.externals: DictData = externals
 
     @cached_property
@@ -129,37 +98,7 @@ class Loader(SimLoad):
         externals: DictData,
     ) -> None:
         self.data: DictData = {}
-
-        # NOTE: import params object from specific config file
-        params: Params = self.config()
-
-        super().__init__(name, params, externals)
-
-    @classmethod
-    def config(cls) -> Params:
-        """Load Config data from ``workflows-conf.yaml`` file."""
-        root_path: str = os.getenv("WORKFLOW_ROOT_PATH", ".")
-
-        regis: list[str] = []
-        if regis_env := os.getenv("WORKFLOW_CORE_REGISTRY"):
-            regis = [r.strip() for r in regis_env.split(",")]
-
-        conf_path: str = (
-            f"{root_path}/{conf_env}"
-            if (conf_env := os.getenv("WORKFLOW_CORE_PATH_CONF"))
-            else None
-        )
-        return Params.model_validate(
-            {
-                "engine": {
-                    "registry": regis,
-                    "paths": {
-                        "root": root_path,
-                        "conf": conf_path,
-                    },
-                },
-            }
-        )
+        super().__init__(name, config(), externals)
 
 
 def map_params(value: Any, params: dict[str, Any]) -> Any:

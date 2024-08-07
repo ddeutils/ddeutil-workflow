@@ -1,4 +1,5 @@
 import ddeutil.workflow.pipeline as pipe
+import ddeutil.workflow.stage as st
 import pytest
 
 
@@ -6,14 +7,14 @@ def test_pipe_stage_py_raise():
     pipeline = pipe.Pipeline.from_loader(name="run_python", externals={})
     stage = pipeline.job("raise-run").stage(stage_id="raise-error")
     assert stage.id == "raise-error"
-    with pytest.raises(pipe.TaskException):
+    with pytest.raises(st.TaskException):
         stage.execute(params={"x": "Foo"})
 
 
 def test_pipe_stage_py():
     # NOTE: Get stage from the specific pipeline.
     pipeline = pipe.Pipeline.from_loader(name="run_python", externals={})
-    stage: pipe.PyStage = pipeline.job("demo-run").stage(stage_id="run-var")
+    stage: st.PyStage = pipeline.job("demo-run").stage(stage_id="run-var")
     assert stage.id == "run-var"
 
     # NOTE: Start execute with manual stage parameters.
@@ -36,9 +37,7 @@ def test_pipe_stage_py_func():
     pipeline = pipe.Pipeline.from_loader(
         name="run_python_with_params", externals={}
     )
-    stage: pipe.PyStage = pipeline.job("second-job").stage(
-        stage_id="create-func"
-    )
+    stage: st.PyStage = pipeline.job("second-job").stage(stage_id="create-func")
     assert stage.id == "create-func"
     # NOTE: Start execute with manual stage parameters.
     rs = stage.execute(params={})

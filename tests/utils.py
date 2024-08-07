@@ -19,7 +19,7 @@ def dotenv_setting() -> None:
         env_str: str = dedent(
             f"""
             WORKFLOW_ROOT_PATH={OUTSIDE_PATH.resolve()}
-            WORKFLOW_CORE_REGISTRY="ddeutil.workflow,tests.utils"
+            WORKFLOW_CORE_REGISTRY="ddeutil.workflow,tests"
             WORKFLOW_CORE_PATH_CONF=tests/data/conf
 
             SFTP_HOST='50.100.200.123'
