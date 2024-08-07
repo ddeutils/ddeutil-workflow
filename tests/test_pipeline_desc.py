@@ -6,7 +6,6 @@ def test_pipe_desc():
         name="run_python",
         externals={},
     )
-    print(pipeline.on)
     assert pipeline.desc == (
         "## Run Python Workflow\n\nThis is a running python workflow\n"
     )

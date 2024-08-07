@@ -62,7 +62,7 @@ will passing parameters and catching the output for re-use it to next step.
 ### On
 
 ```yaml
-schd_for_node:
+on_every_5_min:
   type: schedule.Schedule
   cron: "*/5 * * * *"
 ```
@@ -70,10 +70,10 @@ schd_for_node:
 ```python
 from ddeutil.workflow.on import On
 
-scdl = On.from_loader(name='schd_for_node', externals={})
-assert '*/5 * * * *' == str(scdl.cronjob)
+schedule = On.from_loader(name='on_every_5_min', externals={})
+assert '*/5 * * * *' == str(schedule.cronjob)
 
-cron_iter = scdl.generate('2022-01-01 00:00:00')
+cron_iter = schedule.generate('2022-01-01 00:00:00')
 assert '2022-01-01 00:05:00' f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
 assert '2022-01-01 00:10:00' f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
 assert '2022-01-01 00:15:00' f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
@@ -88,6 +88,7 @@ assert '2022-01-01 00:25:00' f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
 ```yaml
 run_py_local:
   type: ddeutil.workflow.pipeline.Pipeline
+  on: '*/5 * * * *'
   params:
     author-run:
       type: str

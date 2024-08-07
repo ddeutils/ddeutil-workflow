@@ -139,7 +139,7 @@ class Pipeline(BaseModel):
     params: dict[str, Params] = Field(default_factory=dict)
     on: list[On] = Field(
         default_factory=list,
-        description="A schedule value for this pipeline.",
+        description="A list of On instance for this pipeline schedule.",
     )
     jobs: dict[str, Job] = Field(
         description="A mapping of job ID and job model that already loaded.",
@@ -173,6 +173,7 @@ class Pipeline(BaseModel):
 
     @model_validator(mode="before")
     def __prepare_params(cls, values: DictData) -> DictData:
+        """Prepare the params key."""
         # NOTE: Prepare params type if it passing with only type value.
         if params := values.pop("params", {}):
             values["params"] = {

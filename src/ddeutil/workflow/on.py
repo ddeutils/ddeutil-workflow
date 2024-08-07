@@ -10,7 +10,7 @@ from typing import Annotated, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field
-from pydantic.functional_validators import field_validator
+from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
 try:
@@ -108,7 +108,7 @@ class On(BaseModel):
         if "interval" in loader.data:
             return cls.from_value(loader.data, externals=externals)
         if "cronjob" not in loader.data:
-            raise ValueError("Config does not set ``cronjob`` value")
+            raise ValueError("Config does not set ``cronjob`` key")
         if "timezone" in loader.data:
             return cls(
                 cronjob=loader.data["cronjob"],
@@ -116,6 +116,12 @@ class On(BaseModel):
                 extras=externals,
             )
         return cls(cronjob=loader.data["cronjob"], extras=externals)
+
+    @model_validator(mode="before")
+    def __prepare_values(cls, values):
+        if tz := values.pop("tz", None):
+            values["timezone"] = tz
+        return values
 
     @field_validator("tz")
     def __validate_tz(cls, value: str):

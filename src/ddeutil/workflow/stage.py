@@ -306,10 +306,21 @@ class TaskStage(BaseStage):
         return params
 
 
+class TriggerStage(BaseStage):
+    """Trigger Stage (Just POC)"""
+
+    trigger: str
+    params: DictData = Field(default_factory=dict)
+
+    def execute(self, params: DictData) -> DictData:
+        return params
+
+
 # NOTE: Order of parsing stage data
 Stage = Union[
     PyStage,
     ShellStage,
     TaskStage,
     EmptyStage,
+    # TriggerStage,
 ]

@@ -1,0 +1,12 @@
+pipe_trigger:
+  type: pipeline.Pipeline
+  on: 'every_5_minute_bkk'
+  jobs:
+    main-job:
+      stages:
+        - name: "Run something ..."
+          run: |
+            print("Run Success")
+        - trigger: pipe-name
+          params:
+            ...

@@ -5,7 +5,7 @@ pipe_seller_etl:
     schedule: "* * * 1 5"
   params:
     run-date: datetime
-  pipes:
+  jobs:
     first-node:
       stages:
         - name: Starter Node
