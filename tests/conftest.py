@@ -22,10 +22,5 @@ def test_path(root_path) -> Path:
 
 
 @pytest.fixture(scope="session")
-def data_path(test_path: Path) -> Path:
-    return test_path / "data"
-
-
-@pytest.fixture(scope="session")
-def conf_path(data_path: Path) -> Path:
-    return data_path / "conf"
+def conf_path(test_path: Path) -> Path:
+    return test_path / "conf"
