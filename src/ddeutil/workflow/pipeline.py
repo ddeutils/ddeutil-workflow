@@ -17,6 +17,7 @@ from typing_extensions import Self
 
 from .__types import DictData, DictStr
 from .loader import Loader
+from .on import On
 from .stage import Stage
 from .utils import Params
 
@@ -136,10 +137,39 @@ class Pipeline(BaseModel):
 
     desc: Optional[str] = Field(default=None)
     params: dict[str, Params] = Field(default_factory=dict)
-    on: dict[str, DictStr] = Field(default_factory=dict)
+    on: list[On] = Field(
+        default_factory=list,
+        description="A schedule value for this pipeline.",
+    )
     jobs: dict[str, Job] = Field(
         description="A mapping of job ID and job model that already loaded.",
     )
+
+    @classmethod
+    def from_loader(
+        cls,
+        name: str,
+        externals: DictData | None = None,
+    ) -> Self:
+        """Create Pipeline instance from the Loader object."""
+        loader: Loader = Loader(name, externals=(externals or {}))
+        loader_data: DictData = loader.data.copy()
+        if "jobs" not in loader_data:
+            raise ValueError("Config does not set ``jobs`` value")
+        if on := loader_data.pop("on", []):
+            if isinstance(on, str):
+                on = [on]
+            if any(not isinstance(i, (dict, str)) for i in on):
+                raise TypeError("The ``on`` key should be list of str or dict")
+            loader_data["on"] = [
+                (
+                    Loader(n, externals=(externals or {})).data
+                    if isinstance(n, str)
+                    else n
+                )
+                for n in on
+            ]
+        return cls.model_validate(loader_data)
 
     @model_validator(mode="before")
     def __prepare_params(cls, values: DictData) -> DictData:
@@ -154,26 +184,6 @@ class Pipeline(BaseModel):
                 for p in params
             }
         return values
-
-    @classmethod
-    def from_loader(
-        cls,
-        name: str,
-        externals: DictData | None = None,
-    ) -> Self:
-        """Create Pipeline instance from the Loader object."""
-        loader: Loader = Loader(name, externals=(externals or {}))
-        if "jobs" not in loader.data:
-            raise ValueError("Config does not set ``jobs`` value")
-        return cls(
-            jobs=loader.data["jobs"],
-            params=loader.data["params"],
-        )
-
-    @model_validator(mode="after")
-    def __job_checking_needs(self):
-        """"""
-        return self
 
     def job(self, name: str) -> Job:
         """Return Job model that exists on this pipeline.

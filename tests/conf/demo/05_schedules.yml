@@ -1,6 +1,6 @@
 # Cronjob Schedule
 # ---
-bkk_every_5_minute:
+every_5_minute_bkk:
   type: on.On
   cronjob: "*/5 * * * *"
   timezone: "Asia/Bangkok"

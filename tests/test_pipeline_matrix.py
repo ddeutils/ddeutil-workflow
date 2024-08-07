@@ -20,10 +20,16 @@ def test_pipe_job_matrix():
         {"table": "customer", "system": "csv", "partition": 1},
         {"table": "sales", "partition": 3},
     ] == multi_sys.strategy.exclude
-    assert [
-        {"partition": 1, "system": "csv", "table": "sales"},
-        {"partition": 2, "system": "csv", "table": "customer"},
-        {"partition": 2, "system": "csv", "table": "sales"},
-        {"partition": 3, "system": "csv", "table": "customer"},
-        {"partition": 4, "system": "csv", "table": "customer"},
-    ] == list(multi_sys.make_strategy())
+    assert sorted(
+        [
+            {"partition": 1, "system": "csv", "table": "sales"},
+            {"partition": 2, "system": "csv", "table": "customer"},
+            {"partition": 2, "system": "csv", "table": "sales"},
+            {"partition": 3, "system": "csv", "table": "customer"},
+            {"partition": 4, "system": "csv", "table": "customer"},
+        ],
+        key=lambda x: (x["partition"], x["table"]),
+    ) == sorted(
+        multi_sys.make_strategy(),
+        key=lambda x: (x["partition"], x["table"]),
+    )

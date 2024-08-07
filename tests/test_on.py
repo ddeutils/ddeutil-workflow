@@ -6,7 +6,7 @@ from ddeutil.workflow.on import On
 
 def test_on():
     schedule = On.from_loader(
-        name="bkk_every_5_minute",
+        name="every_5_minute_bkk",
         externals={},
     )
     assert "Asia/Bangkok" == schedule.tz

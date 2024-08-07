@@ -15,7 +15,7 @@ from ddeutil.core import (
 )
 from ddeutil.io import (
     PathSearch,
-    YamlEnvFl,
+    YamlFlResolve,
 )
 from pydantic import BaseModel
 
@@ -48,7 +48,7 @@ class SimLoad:
         self.data: DictData = {}
         for file in PathSearch(params.engine.paths.conf).files:
             if any(file.suffix.endswith(s) for s in ("yml", "yaml")) and (
-                data := YamlEnvFl(file).read().get(name, {})
+                data := YamlFlResolve(file).read().get(name, {})
             ):
                 self.data = data
         if not self.data:
