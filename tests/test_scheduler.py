@@ -6,7 +6,7 @@ import ddeutil.workflow.scheduler as schedule
 from tests.utils import str2dt
 
 
-def test_scdl_cronjob():
+def test_scheduler_cronjob():
     cr1 = schedule.CronJob("*/5 * * * *")
     cr2 = schedule.CronJob("*/5,3,6 9-17/2 * 1-3 1-5")
 
@@ -21,8 +21,14 @@ def test_scdl_cronjob():
     cr = schedule.CronJob("0 */12 1 ? 0")
     assert str(cr) == "0 0,12 1 ? 0"
 
+    cr = schedule.CronJob("*/4 0 1 * 1")
+    assert str(cr) == "*/4 0 1 * 1"
 
-def test_scdl_option():
+    cr = schedule.CronJob("*/4 */3 1 * 1")
+    assert str(cr) == "*/4 */3 1 * 1"
+
+
+def test_scheduler_option():
     cr = schedule.CronJob(
         "*/5,3,6 9-17/2 * 1-3 1-5",
         option={
@@ -32,9 +38,6 @@ def test_scdl_option():
     assert (
         str(cr) == "0,3,5-6,10,15,20,25,30,35,40,45,50,55 H(9-17)/2 H 1-3 1-5"
     )
-
-
-def test_scdl_next_previous():
     cr = schedule.CronJob(
         "*/5 9-17/2 * 1-3,5 1-5",
         option={
@@ -53,7 +56,9 @@ def test_scdl_next_previous():
         [0, 1, 2, 3, 4, 5, 6],
     ]
 
-    sch = cr.schedule(
+
+def test_scheduler_next_previous():
+    sch = schedule.CronJob("*/30 */12 23 */3 *").schedule(
         date=datetime(2024, 1, 1, 12, tzinfo=ZoneInfo("Asia/Bangkok")),
     )
     t = sch.next
@@ -73,3 +78,8 @@ def test_scdl_next_previous():
     assert sch.prev == str2dt("2023-07-23 12:30:00")
     assert sch.prev == str2dt("2023-07-23 12:00:00")
     assert sch.prev == str2dt("2023-07-23 00:30:00")
+
+    sch.reset()
+
+    assert sch.next == str2dt("2024-01-23 00:00:00")
+    assert sch.next == str2dt("2024-01-23 00:30:00")

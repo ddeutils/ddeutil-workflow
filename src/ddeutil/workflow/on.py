@@ -25,14 +25,15 @@ except ImportError:
 
 def interval2crontab(
     interval: Literal["daily", "weekly", "monthly"],
-    day: str = "monday",
+    day: str | None = None,
     time: str = "00:00",
 ) -> str:
     """Return the crontab string that was generated from specific values.
 
     :param interval: A interval value that is one of 'daily', 'weekly', or
         'monthly'.
-    :param day: A day value that will be day of week.
+    :param day: A day value that will be day of week. The default value is
+        monday if it be weekly interval.
     :param time: A time value that passing with format '%H:%M'.
 
     Examples:
@@ -42,14 +43,19 @@ def interval2crontab(
         '18 30 * * 5'
         >>> interval2crontab(interval='monthly', time='00:00')
         '0 0 1 * *'
+        >>> interval2crontab(interval='monthly', day='tuesday', time='12:00')
+        '12 0 1 * 2'
     """
+    d: str = "*"
+    if interval == "weekly":
+        d = WEEKDAYS[(day or "monday")[:3].title()]
+    elif interval == "monthly" and day:
+        d = WEEKDAYS[day[:3].title()]
+
     h, m = tuple(
         i.lstrip("0") if i != "00" else "0" for i in time.split(":", maxsplit=1)
     )
-    return (
-        f"{h} {m} {'1' if interval == 'monthly' else '*'} * "
-        f"{WEEKDAYS[day[:3].title()] if interval == 'weekly' else '*'}"
-    )
+    return f"{h} {m} {'1' if interval == 'monthly' else '*'} * {d}"
 
 
 class On(BaseModel):
@@ -62,8 +68,17 @@ class On(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     # NOTE: This is fields of the base schedule.
-    cronjob: Annotated[CronJob, Field(description="Cron job of this schedule")]
-    tz: Annotated[str, Field(description="A timezone string value")] = "Etc/UTC"
+    cronjob: Annotated[
+        CronJob,
+        Field(description="Cron job of this schedule"),
+    ]
+    tz: Annotated[
+        str,
+        Field(
+            description="A timezone string value",
+            alias="timezone",
+        ),
+    ] = "Etc/UTC"
     extras: Annotated[
         DictData,
         Field(
@@ -86,6 +101,7 @@ class On(BaseModel):
         passing["cronjob"] = interval2crontab(
             **{v: value[v] for v in value if v in ("interval", "day", "time")}
         )
+        print("Passing:", passing)
         return cls(extras=externals, **passing)
 
     @classmethod

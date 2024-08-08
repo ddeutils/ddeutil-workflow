@@ -10,11 +10,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from functools import partial, total_ordering
-from typing import (
-    Callable,
-    Optional,
-    Union,
-)
+from typing import Callable, Optional, Union
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from ddeutil.core import (
@@ -117,7 +113,7 @@ CRON_UNITS: tuple[Unit, ...] = (
     ),
 )
 
-CRON_UNITS_AWS: tuple[Unit, ...] = CRON_UNITS + (
+CRON_UNITS_YEAR: tuple[Unit, ...] = CRON_UNITS + (
     Unit(
         name="year",
         range=partial(range, 1990, 2101),
@@ -190,10 +186,16 @@ class CronPart:
         )
 
     def __lt__(self, other) -> bool:
-        return self.values < other.values
+        if isinstance(other, CronPart):
+            return self.values < other.values
+        elif isinstance(other, list):
+            return self.values < other
 
     def __eq__(self, other) -> bool:
-        return self.values == other.values
+        if isinstance(other, CronPart):
+            return self.values == other.values
+        elif isinstance(other, list):
+            return self.values == other
 
     @property
     def min(self) -> int:
@@ -225,7 +227,7 @@ class CronPart:
         """Parses a string as a range of positive integers. The string should
         include only `-` and `,` special strings.
 
-        :param value: A string value
+        :param value: A string value that want to parse
         :type value: str
 
         TODO: support for `L`, `W`, and `#`
@@ -239,7 +241,7 @@ class CronPart:
         TODO: # : 3#2 would be the second Tuesday of the month,
             the 3 refers to Tuesday because it is the third day of each week.
 
-        Examples:
+        Noted:
             -   0 10 * * ? *
                 Run at 10:00 am (UTC) every day
 
@@ -531,27 +533,27 @@ class CronJob:
         return reversed(self.parts[:3] + [self.parts[4], self.parts[3]])
 
     @property
-    def minute(self):
+    def minute(self) -> CronPart:
         """Return part of minute."""
         return self.parts[0]
 
     @property
-    def hour(self):
+    def hour(self) -> CronPart:
         """Return part of hour."""
         return self.parts[1]
 
     @property
-    def day(self):
+    def day(self) -> CronPart:
         """Return part of day."""
         return self.parts[2]
 
     @property
-    def month(self):
+    def month(self) -> CronPart:
         """Return part of month."""
         return self.parts[3]
 
     @property
-    def dow(self):
+    def dow(self) -> CronPart:
         """Return part of day of month."""
         return self.parts[4]
 
@@ -560,15 +562,20 @@ class CronJob:
         return [part.values for part in self.parts]
 
     def schedule(
-        self, date: Optional[datetime] = None, _tz: Optional[str] = None
+        self, date: datetime | None = None, _tz: str | None = None
     ) -> CronRunner:
         """Returns the time the schedule would run next."""
-        return CronRunner(self, date, tz_str=_tz)
+        return CronRunner(self, date, tz=_tz)
 
 
-class CronJobAWS(CronJob):
+class CronJobYear(CronJob):
     cron_length = 6
-    cron_units = CRON_UNITS_AWS
+    cron_units = CRON_UNITS_YEAR
+
+    @property
+    def year(self) -> CronPart:
+        """Return part of year."""
+        return self.parts[5]
 
 
 class CronRunner:
@@ -586,18 +593,20 @@ class CronRunner:
 
     def __init__(
         self,
-        cron: CronJob,
-        date: Optional[datetime] = None,
+        cron: CronJob | CronJobYear,
+        date: datetime | None = None,
         *,
-        tz_str: Optional[str] = None,
+        tz: str | None = None,
     ) -> None:
-        # NOTE: Prepare date and tz_info
+        # NOTE: Prepare timezone if this value does not set, it will use UTC.
         self.tz = timezone.utc
-        if tz_str:
+        if tz:
             try:
-                self.tz = ZoneInfo(tz_str)
+                self.tz = ZoneInfo(tz)
             except ZoneInfoNotFoundError as err:
-                raise ValueError(f"Invalid timezone: {tz_str}") from err
+                raise ValueError(f"Invalid timezone: {tz}") from err
+
+        # NOTE: Prepare date
         if date:
             if not isinstance(date, datetime):
                 raise ValueError(
@@ -608,11 +617,12 @@ class CronRunner:
         else:
             self.date: datetime = datetime.now(tz=self.tz)
 
+        # NOTE: Add one minute if the second value more than 0.
         if self.date.second > 0:
-            self.date: datetime = self.date + timedelta(minutes=+1)
+            self.date: datetime = self.date + timedelta(minutes=1)
 
         self.__start_date: datetime = self.date
-        self.cron: CronJob = cron
+        self.cron: CronJob | CronJobYear = cron
         self.reset_flag: bool = True
 
     def reset(self) -> None:
@@ -637,7 +647,11 @@ class CronRunner:
         return self.find_date(reverse=True)
 
     def find_date(self, reverse: bool = False) -> datetime:
-        """Returns the time the schedule would run by `next` or `prev`."""
+        """Returns the time the schedule would run by `next` or `prev`.
+
+        :param reverse: A reverse flag.
+        """
+        # NOTE: Set reset flag to false if start any action.
         self.reset_flag: bool = False
         for _ in range(25):
             if all(
@@ -656,7 +670,7 @@ class CronRunner:
             "minute": "hour",
         }
         current_value: int = getattr(self.date, switch[mode])
-        _addition: Callable[[], bool] = (
+        _addition_condition: Callable[[], bool] = (
             (
                 lambda: WEEKDAYS.get(self.date.strftime("%a"))
                 not in self.cron.dow.values
@@ -666,13 +680,9 @@ class CronRunner:
         )
         while (
             getattr(self.date, mode) not in getattr(self.cron, mode).values
-        ) or _addition():
-            self.date: datetime = next_date(
-                self.date, mode=mode, reverse=reverse
-            )
-            self.date: datetime = replace_date(
-                self.date, mode=mode, reverse=reverse
-            )
+        ) or _addition_condition():
+            self.date: datetime = next_date(self.date, mode, reverse=reverse)
+            self.date: datetime = replace_date(self.date, mode, reverse=reverse)
             if current_value != getattr(self.date, switch[mode]):
                 return mode != "month"
         return False
@@ -680,6 +690,7 @@ class CronRunner:
 
 __all__ = (
     "CronJob",
+    "CronJobYear",
     "CronRunner",
     "WEEKDAYS",
 )
