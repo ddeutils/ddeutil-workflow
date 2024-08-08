@@ -61,7 +61,10 @@ class Job(BaseModel):
         default_factory=list,
         description="A list of the job ID that want to run before this job.",
     )
-    strategy: Strategy = Field(default_factory=Strategy)
+    strategy: Strategy = Field(
+        default_factory=Strategy,
+        description="A strategy model.",
+    )
 
     @model_validator(mode="before")
     def __prepare_keys(cls, values: DictData) -> DictData:
@@ -77,8 +80,10 @@ class Job(BaseModel):
         raise ValueError(f"Stage ID {stage_id} does not exists")
 
     def make_strategy(self) -> list[DictStr]:
-        """Return List of combination of matrix values that already filter with
-        exclude and add include values.
+        """Return List of product of matrix values that already filter with
+        exclude and add include.
+
+        :rtype: list[DictStr]
         """
         if not (mt := self.strategy.matrix):
             return [{}]
