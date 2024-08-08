@@ -71,9 +71,9 @@ jobs:
       # TODO: I should seeing this is necessary task on GitHub action, right?
       #   Because it does not depend on OS level when you pass tz to schedule
       #   object or not, and it will use UTC for default.
-#      - uses: MathRobin/timezone-action@v1.1
-#        with:
-#          timezoneLinux: "Asia/Bangkok"
+      - uses: MathRobin/timezone-action@v1.1
+        with:
+          timezoneLinux: "Asia/Bangkok"
 
       - name: Test with Pytest
         run: |
