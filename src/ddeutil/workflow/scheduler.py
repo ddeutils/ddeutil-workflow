@@ -148,6 +148,7 @@ class CronPart:
             values: list[int] = self.replace_weekday(values)
         else:
             raise TypeError(f"Invalid type of value in cron part: {values}.")
+
         self.values: list[int] = self.out_of_range(
             sorted(dict.fromkeys(values))
         )
@@ -231,7 +232,7 @@ class CronPart:
         :type value: str
 
         TODO: support for `L`, `W`, and `#`
-        TODO:     if you didn't care what day of the week the 7th was, you
+        TODO: if you didn't care what day of the week the 7th was, you
             could enter ? in the Day-of-week field.
         TODO: L : the Day-of-month or Day-of-week fields specifies the last day
             of the month or week.
@@ -304,9 +305,14 @@ class CronPart:
         return value
 
     def replace_weekday(self, values: list[int] | Iterator[int]) -> list[int]:
-        """Replaces all 7 with 0 as Sunday can be represented by both."""
+        """Replaces all 7 with 0 as Sunday can be represented by both.
+
+        :param values: list or iter of int that want to mode by 7
+        :rtype: list[int]
+        """
         if self.unit.name == "weekday":
-            return [0 if value == 7 else value for value in values]
+            # NOTE: change weekday value in range 0-6 (div-mod by 7).
+            return [value % 7 for value in values]
         return list(values)
 
     def out_of_range(self, values: list[int]) -> list[int]:
@@ -562,10 +568,20 @@ class CronJob:
         return [part.values for part in self.parts]
 
     def schedule(
-        self, date: datetime | None = None, _tz: str | None = None
+        self,
+        date: datetime | None = None,
+        *,
+        tz: str | None = None,
     ) -> CronRunner:
-        """Returns the time the schedule would run next."""
-        return CronRunner(self, date, tz=_tz)
+        """Returns the schedule datetime runner with this cronjob. It would run
+        ``next``, ``prev``, or ``reset`` to generate running date that you want.
+
+        :param date: An initial date that want to mark as the start point.
+        :param tz: A string timezone that want to change on runner.
+        :rtype: CronRunner
+        """
+        print("CronRunner:", date, tz)
+        return CronRunner(self, date, tz=tz)
 
 
 class CronJobYear(CronJob):
@@ -598,6 +614,7 @@ class CronRunner:
         *,
         tz: str | None = None,
     ) -> None:
+        print("CronRunner Init:", date, tz)
         # NOTE: Prepare timezone if this value does not set, it will use UTC.
         self.tz = timezone.utc
         if tz:
@@ -612,8 +629,9 @@ class CronRunner:
                 raise ValueError(
                     "Input schedule start time is not a valid datetime object."
                 )
-            self.tz = date.tzinfo
-            self.date: datetime = date
+            if tz is None:
+                self.tz = date.tzinfo
+            self.date: datetime = date.astimezone(self.tz)
         else:
             self.date: datetime = datetime.now(tz=self.tz)
 
@@ -678,6 +696,7 @@ class CronRunner:
             if mode == "day"
             else lambda: False
         )
+        # NOTE: Start while-loop for checking this date include in this cronjob.
         while (
             getattr(self.date, mode) not in getattr(self.cron, mode).values
         ) or _addition_condition():

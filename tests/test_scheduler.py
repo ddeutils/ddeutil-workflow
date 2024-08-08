@@ -15,9 +15,6 @@ def test_scheduler_cronjob():
     assert cr1 != cr2
     assert cr1 < cr2
 
-    cr = schedule.CronJob("0 */12 1 1 0")
-    assert cr.to_list() == [[0], [0, 12], [1], [1], [0]]
-
     cr = schedule.CronJob("0 */12 1 ? 0")
     assert str(cr) == "0 0,12 1 ? 0"
 
@@ -26,6 +23,29 @@ def test_scheduler_cronjob():
 
     cr = schedule.CronJob("*/4 */3 1 * 1")
     assert str(cr) == "*/4 */3 1 * 1"
+
+
+def test_scheduler_cronjob_to_list():
+    cr = schedule.CronJob("0 */12 1 1 0")
+    assert cr.to_list() == [[0], [0, 12], [1], [1], [0]]
+
+    cr = schedule.CronJob("*/4 */3 1 * 1")
+    assert cr.to_list() == [
+        [0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56],
+        [0, 3, 6, 9, 12, 15, 18, 21],
+        [1],
+        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+        [1],
+    ]
+
+    cr = schedule.CronJob("*/30 */12 23 */3 *")
+    assert cr.to_list() == [
+        [0, 30],
+        [0, 12],
+        [23],
+        [1, 4, 7, 10],
+        [0, 1, 2, 3, 4, 5, 6],
+    ]
 
 
 def test_scheduler_option():
@@ -46,15 +66,6 @@ def test_scheduler_option():
         },
     )
     assert str(cr) == "*/5 9-17/2 * JAN-MAR,MAY MON-FRI"
-
-    cr = schedule.CronJob("*/30 */12 23 */3 *")
-    assert cr.to_list() == [
-        [0, 30],
-        [0, 12],
-        [23],
-        [1, 4, 7, 10],
-        [0, 1, 2, 3, 4, 5, 6],
-    ]
 
 
 def test_scheduler_next_previous():
@@ -83,3 +94,11 @@ def test_scheduler_next_previous():
 
     assert sch.next == str2dt("2024-01-23 00:00:00")
     assert sch.next == str2dt("2024-01-23 00:30:00")
+
+
+def test_scheduler_cronjob_year():
+    cr = schedule.CronJobYear("*/5 * * * * */8,1999")
+    assert str(cr) == (
+        "*/5 * * * * 1990,1998-1999,2006,2014,2022,2030,2038,2046,2054,2062,"
+        "2070,2078,2086,2094"
+    )

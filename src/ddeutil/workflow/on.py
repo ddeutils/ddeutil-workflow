@@ -16,11 +16,16 @@ from typing_extensions import Self
 try:
     from .__types import DictData, DictStr
     from .loader import Loader
-    from .scheduler import WEEKDAYS, CronJob, CronRunner
+    from .scheduler import WEEKDAYS, CronJob, CronJobYear, CronRunner
 except ImportError:
     from ddeutil.workflow.__types import DictData, DictStr
     from ddeutil.workflow.loader import Loader
-    from ddeutil.workflow.scheduler import WEEKDAYS, CronJob, CronRunner
+    from ddeutil.workflow.scheduler import (
+        WEEKDAYS,
+        CronJob,
+        CronJobYear,
+        CronRunner,
+    )
 
 
 def interval2crontab(
@@ -126,6 +131,7 @@ class On(BaseModel):
         if "cronjob" not in loader.data:
             raise ValueError("Config does not set ``cronjob`` key")
         if "timezone" in loader.data:
+            print("Test Loader:", loader.data)
             return cls(
                 cronjob=loader.data["cronjob"],
                 tz=loader.data["timezone"],
@@ -158,8 +164,21 @@ class On(BaseModel):
         """Return Cron runner object."""
         if not isinstance(start, datetime):
             start: datetime = datetime.fromisoformat(start)
-        return self.cronjob.schedule(date=(start.astimezone(ZoneInfo(self.tz))))
+        return self.cronjob.schedule(date=start, tz=self.tz)
 
 
 class AwsOn(On):
     """Implement On AWS Schedule for AWS Service like AWS Glue."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    # NOTE: This is fields of the base schedule.
+    cronjob: Annotated[
+        CronJobYear,
+        Field(description="Cron job of this schedule"),
+    ]
+
+    @field_validator("cronjob", mode="before")
+    def __prepare_cronjob(cls, value: str | CronJobYear) -> CronJobYear:
+        """Prepare crontab value that able to receive with string type."""
+        return CronJobYear(value) if isinstance(value, str) else value

@@ -16,6 +16,7 @@ def test_on():
     start_date_bkk: datetime = start_date.astimezone(ZoneInfo(schedule.tz))
     cron_runner = schedule.generate(start=start_date)
     assert cron_runner.date.tzinfo == ZoneInfo(schedule.tz)
+
     assert cron_runner.date == start_date_bkk
     assert cron_runner.next == start_date_bkk
     assert cron_runner.next == start_date_bkk + timedelta(minutes=5)
