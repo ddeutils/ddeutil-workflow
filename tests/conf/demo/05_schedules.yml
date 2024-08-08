@@ -15,3 +15,9 @@ every_day_noon:
   day: "monday"
   time: "12:00"
   timezone: "Etc/UTC"
+
+
+aws_every_5_minute_bkk:
+  type: on.AwsOn
+  cronjob: "*/5 * * * * 2024"
+  timezone: "Asia/Bangkok"

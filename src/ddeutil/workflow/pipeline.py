@@ -26,7 +26,7 @@ class Strategy(BaseModel):
     """Strategy Model that will combine a matrix together for running the
     special job.
 
-    Examples:
+    Data Validate:
         >>> strategy = {
         ...     'matrix': {
         ...         'first': [1, 2, 3],
@@ -135,6 +135,7 @@ class Pipeline(BaseModel):
     coding line to execute it.
     """
 
+    name: str = Field(description="A pipeline name.")
     desc: Optional[str] = Field(default=None)
     params: dict[str, Params] = Field(default_factory=dict)
     on: list[On] = Field(
@@ -151,17 +152,34 @@ class Pipeline(BaseModel):
         name: str,
         externals: DictData | None = None,
     ) -> Self:
-        """Create Pipeline instance from the Loader object."""
+        """Create Pipeline instance from the Loader object.
+
+        :param name: A pipeline name that want to pass to Loader object.
+        :param externals: An external parameters that want to pass to Loader
+            object.
+        """
         loader: Loader = Loader(name, externals=(externals or {}))
         loader_data: DictData = loader.data.copy()
+
+        # NOTE: Add name to loader data
+        loader_data["name"] = name.replace(" ", "_")
+
         if "jobs" not in loader_data:
             raise ValueError("Config does not set ``jobs`` value")
-        if on := loader_data.pop("on", []):
+
+        # NOTE: Prepare `on` data
+        cls.__bypass_on(loader_data)
+        return cls.model_validate(loader_data)
+
+    @classmethod
+    def __bypass_on(cls, data: DictData, externals: DictData | None = None):
+        """Bypass the on data to loaded config data."""
+        if on := data.pop("on", []):
             if isinstance(on, str):
                 on = [on]
             if any(not isinstance(i, (dict, str)) for i in on):
                 raise TypeError("The ``on`` key should be list of str or dict")
-            loader_data["on"] = [
+            data["on"] = [
                 (
                     Loader(n, externals=(externals or {})).data
                     if isinstance(n, str)
@@ -169,7 +187,7 @@ class Pipeline(BaseModel):
                 )
                 for n in on
             ]
-        return cls.model_validate(loader_data)
+        return data
 
     @model_validator(mode="before")
     def __prepare_params(cls, values: DictData) -> DictData:
@@ -202,14 +220,16 @@ class Pipeline(BaseModel):
     def execute(
         self,
         params: DictData | None = None,
-        time_out: int = 60,
+        *,
+        timeout: int = 60,
     ) -> DictData:
         """Execute pipeline with passing dynamic parameters to any jobs that
         included in the pipeline.
 
         :param params: An input parameters that use on pipeline execution.
-        :param time_out: A time out in second unit that use for limit time of
+        :param timeout: A time out in second unit that use for limit time of
             this pipeline execution.
+        :rtype: DictData
 
         ---
 
@@ -226,14 +246,16 @@ class Pipeline(BaseModel):
 
         """
         params: DictData = params or {}
-        if check_key := tuple(f"{k!r}" for k in self.params if k not in params):
+        # VALIDATE: Incoming params should have keys that set on this pipeline.
+        if check_key := tuple(
+            f"{k!r}"
+            for k in self.params
+            if (k not in params and self.params[k].required)
+        ):
             raise ValueError(
-                f"Parameters that needed on pipeline does not pass: "
+                f"Required Params on this pipeline setting does not set: "
                 f"{', '.join(check_key)}."
             )
-
-        if any(p not in params for p in self.params if self.params[p].required):
-            raise ValueError("Required parameter does not pass")
 
         # NOTE: mapping type of param before adding it to params variable.
         params: DictData = {
@@ -259,7 +281,7 @@ class Pipeline(BaseModel):
 
         # IMPORTANT: The job execution can run parallel and waiting by needed.
         while not jq.empty() and (
-            not_time_out_flag := ((time.monotonic() - ts) < time_out)
+            not_time_out_flag := ((time.monotonic() - ts) < timeout)
         ):
             job_id: str = jq.get()
             logging.info(f"[PIPELINE]: Start execute the job: {job_id!r}")

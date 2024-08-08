@@ -257,6 +257,11 @@ Params = Union[
 ]
 
 
+class Result(BaseModel):
+    status: int = Field(default=2)
+    data: DictData = Field(default_factory=dict)
+
+
 def make_exec(path: str | Path):
     """Change mode of file to be executable file."""
     f: Path = Path(path) if isinstance(path, str) else path

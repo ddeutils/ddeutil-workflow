@@ -29,18 +29,12 @@ def test_pipe_model():
             ]
         },
     }
-    p = Pipeline(jobs=data)
+    p = Pipeline(name="manual-pipeline", jobs=data)
     assert "Run Hello World" == p.jobs.get("demo-run").stages[0].name
     assert (
         "Run Sequence and use var from Above"
         == p.jobs.get("demo-run").stages[1].name
     )
 
-
-def test_pipe_load_run_py():
-    pipeline = Pipeline.from_loader(name="run_python", externals={})
-    demo_job: Job = pipeline.job("demo-run")
-    print(demo_job.stages)
-
-    next_run: Job = pipeline.job("next-run")
-    print(next_run)
+    demo_job: Job = p.job("demo-run")
+    assert [{}] == demo_job.make_strategy()

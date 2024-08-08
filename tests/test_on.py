@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from ddeutil.workflow.on import On
+from ddeutil.workflow.on import AwsOn, On
 
 
 def test_on():
@@ -36,3 +36,11 @@ def test_on_value():
     )
     assert "Etc/UTC" == schedule.tz
     assert "12 0 1 * 1" == str(schedule.cronjob)
+
+
+def test_on_aws():
+    schedule = AwsOn.from_loader(
+        name="aws_every_5_minute_bkk",
+        externals={},
+    )
+    assert "Asia/Bangkok" == schedule.tz

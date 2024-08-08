@@ -89,6 +89,15 @@ class EmptyStage(BaseStage):
 class ShellStage(BaseStage):
     """Shell stage that execute bash script on the current OS. That mean if your
     current OS is Windows, it will running bash in the WSL.
+
+    Data Validate:
+        >>> stage = {
+        ...     "name": "Shell stage execution",
+        ...     "shell": 'echo "Hello $FOO"',
+        ...     "env": {
+        ...         "FOO": "BAR",
+        ...     },
+        ... }
     """
 
     shell: str = Field(description="A shell statement that want to execute.")
