@@ -9,6 +9,7 @@
 
 - [Installation](#installation)
 - [Getting Started](#getting-started)
+- [Core Features](#core-features)
   - [On](#on)
   - [Pipeline](#pipeline)
 - [Examples](#examples)
@@ -56,6 +57,8 @@ will passing parameters and catching the output for re-use it to next step.
 > In the future of this project, I will drop the connection and dataset to
 > dynamic registries instead of main features because it have a lot of maintain
 > vendor codes and deps. (I do not have time to handle this features)
+
+## Core Features
 
 ---
 
@@ -209,6 +212,7 @@ pipe_el_pg_to_lake:
 
 ### Tasks (Transform)
 
+> [!IMPORTANT]
 > I recommend you to use task for all actions that you want to do.
 
 ```yaml
