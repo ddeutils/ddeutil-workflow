@@ -23,7 +23,7 @@ from .__types import DictData, DictStr
 from .loader import Loader
 from .on import On
 from .stage import Stage
-from .utils import Param
+from .utils import Param, dash2underscore
 
 
 class Strategy(BaseModel):
@@ -49,10 +49,8 @@ class Strategy(BaseModel):
 
     @model_validator(mode="before")
     def __prepare_keys(cls, values: DictData) -> DictData:
-        if "max-parallel" in values:
-            values["max_parallel"] = values.pop("max-parallel")
-        if "fail-fast" in values:
-            values["fail_fast"] = values.pop("fail-fast")
+        dash2underscore("max-parallel", values)
+        dash2underscore("fail-fast", values)
         return values
 
     def make(self) -> list[DictStr]:

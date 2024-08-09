@@ -35,12 +35,12 @@ class BaseStage(BaseModel, ABC):
     id: Optional[str] = Field(
         default=None,
         description=(
-            "The stage ID that use to keep execution output or getting by job "
+            "A stage ID that use to keep execution output or getting by job "
             "owner."
         ),
     )
     name: str = Field(
-        description="The stage name that want to logging when start execution."
+        description="A stage name that want to logging when start execution."
     )
 
     @abstractmethod

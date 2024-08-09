@@ -309,3 +309,15 @@ def param2template(value: Any, params: dict[str, Any]) -> Any:
             "Callable variable should not pass other outside ${{ ... }}"
         )
     return getter
+
+
+def dash2underscore(
+    key: str,
+    values: DictData,
+    *,
+    fixed: str | None = None,
+) -> DictData:
+    """Change key name that has dash to underscore."""
+    if key in values:
+        values[(fixed or key.replace("-", "_"))] = values.pop(key)
+    return values

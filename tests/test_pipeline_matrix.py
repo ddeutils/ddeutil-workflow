@@ -1,6 +1,49 @@
 import ddeutil.workflow.pipeline as pipe
 
 
+def test_pipe_strategy_model():
+    strategy = pipe.Strategy.model_validate(
+        obj={
+            "matrix": {
+                "table": ["customer", "sales"],
+                "system": ["csv"],
+                "partition": [1, 2, 3],
+            },
+            "exclude": [
+                {
+                    "table": "customer",
+                    "system": "csv",
+                    "partition": 1,
+                },
+                {
+                    "table": "sales",
+                    "partition": 3,
+                },
+            ],
+            "include": [
+                {
+                    "table": "customer",
+                    "system": "csv",
+                    "partition": 4,
+                }
+            ],
+        }
+    )
+    assert sorted(
+        [
+            {"partition": 1, "system": "csv", "table": "sales"},
+            {"partition": 2, "system": "csv", "table": "customer"},
+            {"partition": 2, "system": "csv", "table": "sales"},
+            {"partition": 3, "system": "csv", "table": "customer"},
+            {"partition": 4, "system": "csv", "table": "customer"},
+        ],
+        key=lambda x: (x["partition"], x["table"]),
+    ) == sorted(
+        strategy.make(),
+        key=lambda x: (x["partition"], x["table"]),
+    )
+
+
 def test_pipe_job_matrix():
     pipeline = pipe.Pipeline.from_loader(
         name="ingest_multiple_system",

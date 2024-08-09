@@ -15,7 +15,6 @@ from pydantic import BaseModel
 from .__types import DictData
 from .utils import ConfParams, config
 
-T = TypeVar("T")
 AnyModel = TypeVar("AnyModel", bound=BaseModel)
 AnyModelType = type[AnyModel]
 
