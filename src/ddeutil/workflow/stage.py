@@ -153,6 +153,9 @@ class ShellStage(BaseStage):
     def execute(self, params: DictData) -> DictData:
         """Execute the Shell & Powershell statement with the Python build-in
         ``subprocess`` package.
+
+        :param params: A parameter data that want to use in this execution.
+        :rtype: DictData
         """
         with self.__prepare_shell() as sh:
             logging.info(f"[STAGE]: Shell-Execute: {sh}")
@@ -322,6 +325,10 @@ class TriggerStage(BaseStage):
     params: DictData = Field(default_factory=dict)
 
     def execute(self, params: DictData) -> DictData:
+        """
+        :param params: A parameter data that want to use in this execution.
+        :rtype: DictData
+        """
         return params
 
 

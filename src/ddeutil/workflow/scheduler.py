@@ -614,7 +614,6 @@ class CronRunner:
         *,
         tz: str | None = None,
     ) -> None:
-        print("CronRunner Init:", date, tz)
         # NOTE: Prepare timezone if this value does not set, it will use UTC.
         self.tz = timezone.utc
         if tz:

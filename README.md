@@ -15,7 +15,7 @@
 - [Examples](#examples)
   - [Python & Shell](#python--shell)
   - [Tasks (EL)](#tasks-extract--load)
-  - [Hooks (T)](#tasks-transform)
+  - [Tasks (T)](#tasks-transform)
 - [Configuration](#configuration)
 
 This **Utility Workflow** objects was created for easy to make a simple metadata
@@ -60,9 +60,9 @@ will passing parameters and catching the output for re-use it to next step.
 
 ## Core Features
 
----
-
 ### On
+
+The **On** is schedule object.
 
 ```yaml
 on_every_5_min:
@@ -84,9 +84,9 @@ assert '2022-01-01 00:20:00' f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
 assert '2022-01-01 00:25:00' f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
 ```
 
----
-
 ### Pipeline
+
+The **Pipeline** object that is the core feature of this project.
 
 ```yaml
 run_py_local:
@@ -119,6 +119,10 @@ pipe.execute(params={'author-run': 'Local Workflow', 'run-date': '2024-01-01'})
 
 This is examples that use workflow file for running common Data Engineering
 use-case.
+
+> [!IMPORTANT]
+> I recommend you to use `task` stage for all actions that you want to do with
+> pipeline object.
 
 ### Python & Shell
 
@@ -211,9 +215,6 @@ pipe_el_pg_to_lake:
 ---
 
 ### Tasks (Transform)
-
-> [!IMPORTANT]
-> I recommend you to use task for all actions that you want to do.
 
 ```yaml
 pipe_hook_mssql_proc:

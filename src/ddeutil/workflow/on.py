@@ -106,7 +106,6 @@ class On(BaseModel):
         passing["cronjob"] = interval2crontab(
             **{v: value[v] for v in value if v in ("interval", "day", "time")}
         )
-        print("Passing:", passing)
         return cls(extras=externals, **passing)
 
     @classmethod
@@ -126,18 +125,30 @@ class On(BaseModel):
         if loader.type != cls:
             raise ValueError(f"Type {loader.type} does not match with {cls}")
 
-        if "interval" in loader.data:
-            return cls.from_value(loader.data, externals=externals)
-        if "cronjob" not in loader.data:
-            raise ValueError("Config does not set ``cronjob`` key")
-        if "timezone" in loader.data:
-            print("Test Loader:", loader.data)
-            return cls(
-                cronjob=loader.data["cronjob"],
-                tz=loader.data["timezone"],
-                extras=externals,
+        loader_data: DictData = loader.data
+        if "interval" in loader_data:
+            return cls.model_validate(
+                obj=dict(
+                    cronjob=interval2crontab(
+                        **{
+                            v: loader_data[v]
+                            for v in loader_data
+                            if v in ("interval", "day", "time")
+                        }
+                    ),
+                    extras=externals,
+                    **loader_data,
+                )
             )
-        return cls(cronjob=loader.data["cronjob"], extras=externals)
+        if "cronjob" not in loader_data:
+            raise ValueError("Config does not set ``cronjob`` key")
+        return cls.model_validate(
+            obj=dict(
+                cronjob=loader_data.pop("cronjob"),
+                extras=externals,
+                **loader_data,
+            )
+        )
 
     @model_validator(mode="before")
     def __prepare_values(cls, values):
