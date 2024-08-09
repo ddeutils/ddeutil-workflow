@@ -16,12 +16,12 @@ from collections.abc import Iterator
 from inspect import Parameter
 from pathlib import Path
 from subprocess import CompletedProcess
-from typing import Callable, Optional, Union
+from typing import Callable, ClassVar, Optional, Union
 
 import msgspec as spec
 from pydantic import BaseModel, Field
 
-from .__types import DictData, DictStr, Re
+from .__types import DictData, DictStr, Re, TupleStr
 from .exceptions import StageException
 from .utils import Registry, TagFunc, make_exec, make_registry, param2template
 
@@ -31,6 +31,8 @@ class BaseStage(BaseModel, ABC):
     metadata. If you want to implement any custom stage, you can use this class
     to parent and implement ``self.execute()`` method only.
     """
+
+    template: ClassVar[tuple[str, ...]]
 
     id: Optional[str] = Field(
         default=None,
@@ -105,6 +107,8 @@ class ShellStage(BaseStage):
         ... }
     """
 
+    template: ClassVar[tuple[str, ...]] = ("shell", "env")
+
     shell: str = Field(description="A shell statement that want to execute.")
     env: DictStr = Field(
         default_factory=dict,
@@ -115,7 +119,7 @@ class ShellStage(BaseStage):
     )
 
     @contextlib.contextmanager
-    def __prepare_shell(self) -> Iterator[tuple[str, str]]:
+    def __prepare_shell(self, shell: str, env: DictStr) -> Iterator[TupleStr]:
         """Return context of prepared shell statement that want to execute. This
         step will write the `.sh` file before giving this file name to context.
         After that, it will auto delete this file automatic.
@@ -126,17 +130,16 @@ class ShellStage(BaseStage):
             f.write(f"#!/bin/{f_shebang}\n")
 
             # NOTE: add setting environment variable before bash skip statement.
-            for k in self.env:
-                f.write(f"{k}='{self.env[k]}';\n")
+            f.writelines([f"{k}='{env[k]}';\n" for k in env])
 
             # NOTE: make sure that shell script file does not have `\r` char.
-            f.write(self.shell.replace("\r\n", "\n"))
+            f.write(shell.replace("\r\n", "\n"))
 
         make_exec(f"./{f_name}")
 
         yield [f_shebang, f_name]
 
-        Path(f_name).unlink()
+        Path(f"./{f_name}").unlink()
 
     def set_outputs(self, rs: CompletedProcess, params: DictData) -> DictData:
         """Set outputs to params"""
@@ -163,7 +166,10 @@ class ShellStage(BaseStage):
         :param params: A parameter data that want to use in this execution.
         :rtype: DictData
         """
-        with self.__prepare_shell() as sh:
+        shell: str = param2template(self.shell, params)
+        with self.__prepare_shell(
+            shell=shell, env=param2template(self.env, params)
+        ) as sh:
             logging.info(f"[STAGE]: Shell-Execute: {sh}")
             rs: CompletedProcess = subprocess.run(
                 sh,
@@ -177,10 +183,8 @@ class ShellStage(BaseStage):
                 if "\\x00" in rs.stderr
                 else rs.stderr
             )
-            logging.error(f"{err}\nRunning Statement:\n---\n{self.shell}")
-            raise StageException(
-                f"{err}\nRunning Statement:\n---\n{self.shell}"
-            )
+            logging.error(f"{err}\nRunning Statement:\n---\n{shell}")
+            raise StageException(f"{err}\nRunning Statement:\n---\n{shell}")
         self.set_outputs(rs, params)
         return params
 
@@ -190,15 +194,10 @@ class PyStage(BaseStage):
     globals nad additional variables.
     """
 
+    template: ClassVar[tuple[str, ...]] = ("run", "vars")
+
     run: str
     vars: DictData = Field(default_factory=dict)
-
-    def get_vars(self, params: DictData) -> DictData:
-        """Return variables"""
-        rs = self.vars.copy()
-        for p, v in self.vars.items():
-            rs[p] = param2template(v, params)
-        return rs
 
     def set_outputs(self, rs: DictData, params: DictData) -> DictData:
         """Set an outputs from execution process to an input params.
@@ -231,7 +230,9 @@ class PyStage(BaseStage):
         :returns: A parameters from an input that was mapped output if the stage
             ID was set.
         """
-        _globals: DictData = globals() | params | self.get_vars(params)
+        _globals: DictData = (
+            globals() | params | param2template(self.vars, params)
+        )
         _locals: DictData = {}
         try:
             logging.info(f"[STAGE]: Py-Execute: {uuid.uuid4()}")
@@ -280,6 +281,8 @@ class TaskStage(BaseStage):
         ... }
     """
 
+    template: ClassVar[tuple[str, ...]] = ("tasks", "args")
+
     task: str = Field(description="...")
     args: DictData
 
@@ -320,12 +323,12 @@ class TaskStage(BaseStage):
         :returns: A parameters from an input that was mapped output if the stage
             ID was set.
         """
-        task_func: TagFunc = self.extract_task(self.task)()
-        if not callable(task_func):
+        t_func: TagFunc = self.extract_task(param2template(self.task, params))()
+        if not callable(t_func):
             raise ImportError("Task caller function does not callable.")
 
         # NOTE: check task caller parameters
-        ips = inspect.signature(task_func)
+        ips = inspect.signature(t_func)
         if any(
             k not in self.args
             for k in ips.parameters
@@ -336,10 +339,8 @@ class TaskStage(BaseStage):
                 f"does not set to args"
             )
         try:
-            logging.info(
-                f"[STAGE]: Task-Execute: {task_func.name}@{task_func.tag}"
-            )
-            rs = task_func(**param2template(self.args, params))
+            logging.info(f"[STAGE]: Task-Execute: {t_func.name}@{t_func.tag}")
+            rs = t_func(**param2template(self.args, params))
         except Exception as err:
             raise StageException(f"{err.__class__.__name__}: {err}") from err
         self.set_outputs(rs, params)
@@ -348,6 +349,8 @@ class TaskStage(BaseStage):
 
 class TriggerStage(BaseStage):
     """Trigger Pipeline execution stage that execute another pipeline object."""
+
+    template: ClassVar[tuple[str, ...]] = ("trigger", "params")
 
     trigger: str
     params: DictData = Field(default_factory=dict)

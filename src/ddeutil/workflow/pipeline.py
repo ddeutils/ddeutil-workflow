@@ -185,7 +185,8 @@ class Job(BaseModel):
                 #   anything like update or re-construct this.
                 #       ... params |= stage.execute(params=params)
                 stage.execute(params=params)
-        # TODO: We should not return matrix key to outside
+        # TODO: We should not return matrix key to outside and make new output
+        #   that support running different matrix in stage output.
         return params
 
 
@@ -285,6 +286,9 @@ class Pipeline(BaseModel):
         return self.jobs[name]
 
     def gen_run_id(self) -> str:
+        """Generate running pipeline ID for able to tracking that pipeline
+        execution logging.
+        """
         tz: ZoneInfo = ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
         return md5(
             f"{self.name}{datetime.now(tz=tz):%Y%m%d%H%M%S%f}".encode()
