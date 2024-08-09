@@ -8,7 +8,7 @@ from __future__ import annotations
 import copy
 from collections.abc import Iterator
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from functools import partial, total_ordering
 from typing import Callable, Optional, Union
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -615,7 +615,7 @@ class CronRunner:
         tz: str | None = None,
     ) -> None:
         # NOTE: Prepare timezone if this value does not set, it will use UTC.
-        self.tz = timezone.utc
+        self.tz: ZoneInfo = ZoneInfo("UTC")
         if tz:
             try:
                 self.tz = ZoneInfo(tz)

@@ -6,20 +6,13 @@
 from __future__ import annotations
 
 from functools import cached_property
-from typing import Any, ClassVar, TypeVar
+from typing import TypeVar
 
-from ddeutil.core import (
-    getdot,
-    hasdot,
-    import_string,
-)
-from ddeutil.io import (
-    PathSearch,
-    YamlFlResolve,
-)
+from ddeutil.core import import_string
+from ddeutil.io import PathSearch, YamlFlResolve
 from pydantic import BaseModel
 
-from .__types import DictData, Re
+from .__types import DictData
 from .utils import ConfParams, config
 
 T = TypeVar("T")
@@ -84,58 +77,11 @@ class SimLoad:
 
 
 class Loader(SimLoad):
-    """Main Loader Object that get the config `yaml` file from current path.
+    """Loader Object that get the config `yaml` file from current path.
 
     :param name: A name of config data that will read by Yaml Loader object.
     :param externals: An external parameters
     """
 
-    conf_filename: ClassVar[str] = "workflows-conf"
-
-    def __init__(
-        self,
-        name: str,
-        externals: DictData,
-    ) -> None:
-        self.data: DictData = {}
+    def __init__(self, name: str, externals: DictData) -> None:
         super().__init__(name, config(), externals)
-
-
-def map_params(value: Any, params: dict[str, Any]) -> Any:
-    """Map caller value that found from ``RE_CALLER`` regular expression.
-
-    :param value: A value that want to mapped with an params
-    :param params: A parameter value that getting with matched regular
-        expression.
-
-    :rtype: Any
-    :returns: An any getter value from the params input.
-    """
-    if isinstance(value, dict):
-        return {k: map_params(value[k], params) for k in value}
-    elif isinstance(value, (list, tuple, set)):
-        return type(value)([map_params(i, params) for i in value])
-    elif not isinstance(value, str):
-        return value
-
-    if not (found := Re.RE_CALLER.search(value)):
-        return value
-
-    # NOTE: get caller value that setting inside; ``${{ <caller-value> }}``
-    caller: str = found.group("caller")
-    if not hasdot(caller, params):
-        raise ValueError(f"params does not set caller: {caller!r}")
-    getter: Any = getdot(caller, params)
-
-    # NOTE: check type of vars
-    if isinstance(getter, (str, int)):
-        return value.replace(found.group(0), str(getter))
-
-    # NOTE:
-    #   If type of getter caller does not formatting, it will return origin
-    #   value.
-    if value.replace(found.group(0), "") != "":
-        raise ValueError(
-            "Callable variable should not pass other outside ${{ ... }}"
-        )
-    return getter

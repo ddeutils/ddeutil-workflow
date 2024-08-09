@@ -7,7 +7,7 @@ def test_pipe_stage_py_raise():
     pipeline = pipe.Pipeline.from_loader(name="run_python", externals={})
     stage = pipeline.job("raise-run").stage(stage_id="raise-error")
     assert stage.id == "raise-error"
-    with pytest.raises(st.TaskException):
+    with pytest.raises(st.StageException):
         stage.execute(params={"x": "Foo"})
 
 

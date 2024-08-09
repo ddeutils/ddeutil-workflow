@@ -15,14 +15,14 @@ from importlib import import_module
 from pathlib import Path
 from typing import Any, Callable, Literal, Optional, Protocol, Union
 
-from ddeutil.core import lazy
+from ddeutil.core import getdot, hasdot, lazy
 from ddeutil.io import PathData
 from ddeutil.io.models.lineage import dt_now
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
-from .__types import DictData
+from .__types import DictData, Re
 
 
 class Engine(BaseModel):
@@ -105,6 +105,8 @@ def tag(value: str, name: str | None = None):
         def wrapped(*args, **kwargs):
             return func(*args, **kwargs)
 
+        # TODO: pass result from a wrapped to Result model
+        #   >>> return Result.model_validate(obj=wrapped)
         return wrapped
 
     return func_internal
@@ -148,7 +150,7 @@ def make_registry(submodule: str) -> dict[str, Registry]:
     return rs
 
 
-class BaseParams(BaseModel, ABC):
+class BaseParam(BaseModel, ABC):
     """Base Parameter that use to make Params Model."""
 
     desc: Optional[str] = None
@@ -162,7 +164,7 @@ class BaseParams(BaseModel, ABC):
         )
 
 
-class DefaultParams(BaseParams):
+class DefaultParam(BaseParam):
     """Default Parameter that will check default if it required"""
 
     default: Optional[str] = None
@@ -182,7 +184,7 @@ class DefaultParams(BaseParams):
         return self
 
 
-class DatetimeParams(DefaultParams):
+class DatetimeParam(DefaultParam):
     """Datetime parameter."""
 
     type: Literal["datetime"] = "datetime"
@@ -205,7 +207,7 @@ class DatetimeParams(DefaultParams):
         return datetime.fromisoformat(value)
 
 
-class StrParams(DefaultParams):
+class StrParam(DefaultParam):
     """String parameter."""
 
     type: Literal["str"] = "str"
@@ -216,7 +218,7 @@ class StrParams(DefaultParams):
         return str(value)
 
 
-class IntParams(DefaultParams):
+class IntParam(DefaultParam):
     """Integer parameter."""
 
     type: Literal["int"] = "int"
@@ -235,7 +237,7 @@ class IntParams(DefaultParams):
         return value
 
 
-class ChoiceParams(BaseParams):
+class ChoiceParam(BaseParam):
     type: Literal["choice"] = "choice"
     options: list[str]
 
@@ -250,10 +252,10 @@ class ChoiceParams(BaseParams):
         return value
 
 
-Params = Union[
-    ChoiceParams,
-    DatetimeParams,
-    StrParams,
+Param = Union[
+    ChoiceParam,
+    DatetimeParam,
+    StrParam,
 ]
 
 
@@ -266,3 +268,44 @@ def make_exec(path: str | Path):
     """Change mode of file to be executable file."""
     f: Path = Path(path) if isinstance(path, str) else path
     f.chmod(f.stat().st_mode | stat.S_IEXEC)
+
+
+def param2template(value: Any, params: dict[str, Any]) -> Any:
+    """Pass param to template string that can search by ``RE_CALLER`` regular
+    expression.
+
+    :param value: A value that want to mapped with an params
+    :param params: A parameter value that getting with matched regular
+        expression.
+
+    :rtype: Any
+    :returns: An any getter value from the params input.
+    """
+    if isinstance(value, dict):
+        return {k: param2template(value[k], params) for k in value}
+    elif isinstance(value, (list, tuple, set)):
+        return type(value)([param2template(i, params) for i in value])
+    elif not isinstance(value, str):
+        return value
+
+    if not (found := Re.RE_CALLER.search(value)):
+        return value
+
+    # NOTE: get caller value that setting inside; ``${{ <caller-value> }}``
+    caller: str = found.group("caller")
+    if not hasdot(caller, params):
+        raise ValueError(f"params does not set caller: {caller!r}")
+    getter: Any = getdot(caller, params)
+
+    # NOTE: check type of vars
+    if isinstance(getter, (str, int)):
+        return value.replace(found.group(0), str(getter))
+
+    # NOTE:
+    #   If type of getter caller does not formatting, it will return origin
+    #   value.
+    if value.replace(found.group(0), "") != "":
+        raise ValueError(
+            "Callable variable should not pass other outside ${{ ... }}"
+        )
+    return getter

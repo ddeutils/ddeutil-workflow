@@ -2,11 +2,11 @@ pipe_trigger:
   type: pipeline.Pipeline
   on: 'every_5_minute_bkk'
   jobs:
-    main-job:
+    trigger-job:
       stages:
-        - name: "Run something ..."
-          run: |
-            print("Run Success")
-        - trigger: pipe-name
+        - name: "Trigger run_python pipeline"
+          trigger: run_python_with_params
+          id: trigger-stage
           params:
-            ...
+            author-run: Trigger Runner
+            run-date: '2024-08-01'

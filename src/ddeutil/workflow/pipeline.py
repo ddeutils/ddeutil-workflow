@@ -7,9 +7,13 @@ from __future__ import annotations
 
 import itertools
 import logging
+import os
 import time
+from datetime import datetime
+from hashlib import md5
 from queue import Queue
 from typing import Optional, Union
+from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
@@ -19,7 +23,7 @@ from .__types import DictData, DictStr
 from .loader import Loader
 from .on import On
 from .stage import Stage
-from .utils import Params
+from .utils import Param
 
 
 class Strategy(BaseModel):
@@ -53,7 +57,25 @@ class Strategy(BaseModel):
 
 
 class Job(BaseModel):
-    """Job Model that is able to call a group of stages."""
+    """Job Model that is able to call a group of stages.
+
+    Data Validate:
+        >>> job = {
+        ...     "runs-on": None,
+        ...     "strategy": {},
+        ...     "needs": [],
+        ...     "stages": [
+        ...         {
+        ...             "name": "Set variable and function",
+        ...             "run": (
+        ...                 "var_inside: str = 'Inside'\\n"
+        ...                 "def echo() -> None:\\n"
+        ...                 '  print(f"Echo {var_inside}"\\n'
+        ...             ),
+        ...         },
+        ...     ],
+        ... }
+    """
 
     runs_on: Optional[str] = Field(default=None)
     stages: list[Stage] = Field(default_factory=list)
@@ -142,7 +164,7 @@ class Pipeline(BaseModel):
 
     name: str = Field(description="A pipeline name.")
     desc: Optional[str] = Field(default=None)
-    params: dict[str, Params] = Field(default_factory=dict)
+    params: dict[str, Param] = Field(default_factory=dict)
     on: list[On] = Field(
         default_factory=list,
         description="A list of On instance for this pipeline schedule.",
@@ -222,6 +244,12 @@ class Pipeline(BaseModel):
             raise ValueError(f"Job {name!r} does not exists")
         return self.jobs[name]
 
+    def gen_run_id(self) -> str:
+        tz: ZoneInfo = ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
+        return md5(
+            f"{self.name}{datetime.now(tz=tz):%Y%m%d%H%M%S%f}".encode()
+        ).hexdigest()
+
     def execute(
         self,
         params: DictData | None = None,
@@ -247,7 +275,7 @@ class Pipeline(BaseModel):
             For example, when I want to use the output from previous stage, I
         can access it with syntax:
 
-            ... "<job-name>.stages.<stage-id>.outputs.<key>"
+            ... ${job-name}.stages.${stage-id}.outputs.${key}
 
         """
         params: DictData = params or {}
@@ -258,7 +286,7 @@ class Pipeline(BaseModel):
             if (k not in params and self.params[k].required)
         ):
             raise ValueError(
-                f"Required Params on this pipeline setting does not set: "
+                f"Required Param on this pipeline setting does not set: "
                 f"{', '.join(check_key)}."
             )
 

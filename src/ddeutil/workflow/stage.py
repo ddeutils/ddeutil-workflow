@@ -12,18 +12,18 @@ import subprocess
 import sys
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from inspect import Parameter
 from pathlib import Path
 from subprocess import CompletedProcess
-from typing import Any, Callable, Optional, Union
+from typing import Callable, Optional, Union
 
 import msgspec as spec
 from pydantic import BaseModel, Field
 
 from .__types import DictData, DictStr, Re
-from .exceptions import TaskException
-from .loader import map_params
-from .utils import Registry, make_exec, make_registry
+from .exceptions import StageException
+from .utils import Registry, TagFunc, make_exec, make_registry, param2template
 
 
 class BaseStage(BaseModel, ABC):
@@ -110,7 +110,7 @@ class ShellStage(BaseStage):
     )
 
     @contextlib.contextmanager
-    def __prepare_shell(self):
+    def __prepare_shell(self) -> Iterator[tuple[str, str]]:
         """Return context of prepared shell statement that want to execute. This
         step will write the `.sh` file before giving this file name to context.
         After that, it will auto delete this file automatic.
@@ -120,6 +120,7 @@ class ShellStage(BaseStage):
         with open(f"./{f_name}", mode="w", newline="\n") as f:
             f.write(f"#!/bin/{f_shebang}\n")
 
+            # NOTE: add setting environment variable before bash skip statement.
             for k in self.env:
                 f.write(f"{k}='{self.env[k]}';\n")
 
@@ -172,7 +173,9 @@ class ShellStage(BaseStage):
                 else rs.stderr
             )
             logging.error(f"{err}\nRunning Statement:\n---\n{self.shell}")
-            raise TaskException(f"{err}\nRunning Statement:\n---\n{self.shell}")
+            raise StageException(
+                f"{err}\nRunning Statement:\n---\n{self.shell}"
+            )
         self.set_outputs(rs, params)
         return params
 
@@ -189,7 +192,7 @@ class PyStage(BaseStage):
         """Return variables"""
         rs = self.vars.copy()
         for p, v in self.vars.items():
-            rs[p] = map_params(v, params)
+            rs[p] = param2template(v, params)
         return rs
 
     def set_outputs(self, rs: DictData, params: DictData) -> DictData:
@@ -226,9 +229,10 @@ class PyStage(BaseStage):
         _globals: DictData = globals() | params | self.get_vars(params)
         _locals: DictData = {}
         try:
-            exec(map_params(self.run, params), _globals, _locals)
+            logging.info(f"[STAGE]: Py-Execute: {uuid.uuid4()}")
+            exec(param2template(self.run, params), _globals, _locals)
         except Exception as err:
-            raise TaskException(
+            raise StageException(
                 f"{err.__class__.__name__}: {err}\nRunning Statement:\n---\n"
                 f"{self.run}"
             ) from None
@@ -259,7 +263,7 @@ class TaskStage(BaseStage):
     args: DictData
 
     @staticmethod
-    def extract_task(task: str) -> Callable[[], Callable[[Any], Any]]:
+    def extract_task(task: str) -> Callable[[], TagFunc]:
         """Extract Task string value to task function.
 
         :param task: A task string value that able to search with Task regex.
@@ -286,7 +290,7 @@ class TaskStage(BaseStage):
         return rgt[task.func][task.tag]
 
     def execute(self, params: DictData) -> DictData:
-        """Execute the Task that already mark registry.
+        """Execute the Task function that already mark registry.
 
         :param params: A parameter that want to pass before run any statement.
         :type params: DictData
@@ -295,12 +299,12 @@ class TaskStage(BaseStage):
         :returns: A parameters from an input that was mapped output if the stage
             ID was set.
         """
-        task_caller = self.extract_task(self.task)()
-        if not callable(task_caller):
+        task_func: TagFunc = self.extract_task(self.task)()
+        if not callable(task_func):
             raise ImportError("Task caller function does not callable.")
 
         # NOTE: check task caller parameters
-        ips = inspect.signature(task_caller)
+        ips = inspect.signature(task_func)
         if any(
             k not in self.args
             for k in ips.parameters
@@ -311,9 +315,12 @@ class TaskStage(BaseStage):
                 f"does not set to args"
             )
         try:
-            rs = task_caller(**map_params(self.args, params))
+            logging.info(
+                f"[STAGE]: Task-Execute: {task_func.name}@{task_func.tag}"
+            )
+            rs = task_func(**param2template(self.args, params))
         except Exception as err:
-            raise TaskException(f"{err.__class__.__name__}: {err}") from err
+            raise StageException(f"{err.__class__.__name__}: {err}") from err
         self.set_outputs(rs, params)
         return params
 
@@ -329,6 +336,10 @@ class TriggerStage(BaseStage):
         :param params: A parameter data that want to use in this execution.
         :rtype: DictData
         """
+        from .pipeline import Pipeline
+
+        pipe = Pipeline.from_loader(name=self.trigger, externals={})
+        pipe.execute(params=self.params)
         return params
 
 
@@ -337,6 +348,6 @@ Stage = Union[
     PyStage,
     ShellStage,
     TaskStage,
+    TriggerStage,
     EmptyStage,
-    # TriggerStage,
 ]
