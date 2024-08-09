@@ -270,13 +270,20 @@ def make_exec(path: str | Path):
     f.chmod(f.stat().st_mode | stat.S_IEXEC)
 
 
-def param2template(value: Any, params: dict[str, Any]) -> Any:
+def param2template(
+    value: Any,
+    params: dict[str, Any],
+    *,
+    repr_flag: bool = False,
+) -> Any:
     """Pass param to template string that can search by ``RE_CALLER`` regular
     expression.
 
     :param value: A value that want to mapped with an params
     :param params: A parameter value that getting with matched regular
         expression.
+    :param repr_flag: A repr flag for using repr instead of str if it set be
+        true.
 
     :rtype: Any
     :returns: An any getter value from the params input.
@@ -299,7 +306,9 @@ def param2template(value: Any, params: dict[str, Any]) -> Any:
 
     # NOTE: check type of vars
     if isinstance(getter, (str, int)):
-        return value.replace(found.group(0), str(getter))
+        return value.replace(
+            found.group(0), (repr(getter) if repr_flag else str(getter))
+        )
 
     # NOTE:
     #   If type of getter caller does not formatting, it will return origin

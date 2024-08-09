@@ -580,7 +580,6 @@ class CronJob:
         :param tz: A string timezone that want to change on runner.
         :rtype: CronRunner
         """
-        print("CronRunner:", date, tz)
         return CronRunner(self, date, tz=tz)
 
 

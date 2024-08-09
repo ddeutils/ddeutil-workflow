@@ -16,7 +16,7 @@ from collections.abc import Iterator
 from inspect import Parameter
 from pathlib import Path
 from subprocess import CompletedProcess
-from typing import Callable, ClassVar, Optional, Union
+from typing import Callable, Optional, Union
 
 import msgspec as spec
 from pydantic import BaseModel, Field
@@ -32,8 +32,6 @@ class BaseStage(BaseModel, ABC):
     to parent and implement ``self.execute()`` method only.
     """
 
-    template: ClassVar[tuple[str, ...]]
-
     id: Optional[str] = Field(
         default=None,
         description=(
@@ -43,6 +41,10 @@ class BaseStage(BaseModel, ABC):
     )
     name: str = Field(
         description="A stage name that want to logging when start execution."
+    )
+    condition: Optional[str] = Field(
+        default=None,
+        alias="if",
     )
 
     @abstractmethod
@@ -70,6 +72,24 @@ class BaseStage(BaseModel, ABC):
 
         params["stages"][self.id] = {"outputs": rs}
         return params
+
+    def is_skip(self, params: DictData | None = None) -> bool:
+        """Return true if condition of this stage do not correct."""
+        params: DictData = params or {}
+        if self.condition is None:
+            return False
+
+        _g: DictData = globals() | params
+        try:
+            rs: bool = eval(
+                param2template(self.condition, params, repr_flag=True), _g, {}
+            )
+            if not isinstance(rs, bool):
+                raise TypeError("Return type of condition does not be boolean")
+            return not rs
+        except Exception as err:
+            logging.error(str(err))
+            raise StageException(str(err)) from err
 
 
 class EmptyStage(BaseStage):
@@ -106,8 +126,6 @@ class ShellStage(BaseStage):
         ...     },
         ... }
     """
-
-    template: ClassVar[tuple[str, ...]] = ("shell", "env")
 
     shell: str = Field(description="A shell statement that want to execute.")
     env: DictStr = Field(
@@ -194,8 +212,6 @@ class PyStage(BaseStage):
     globals nad additional variables.
     """
 
-    template: ClassVar[tuple[str, ...]] = ("run", "vars")
-
     run: str
     vars: DictData = Field(default_factory=dict)
 
@@ -281,8 +297,6 @@ class TaskStage(BaseStage):
         ... }
     """
 
-    template: ClassVar[tuple[str, ...]] = ("tasks", "args")
-
     task: str = Field(description="...")
     args: DictData
 
@@ -350,21 +364,19 @@ class TaskStage(BaseStage):
 class TriggerStage(BaseStage):
     """Trigger Pipeline execution stage that execute another pipeline object."""
 
-    template: ClassVar[tuple[str, ...]] = ("trigger", "params")
-
     trigger: str
     params: DictData = Field(default_factory=dict)
 
     def execute(self, params: DictData) -> DictData:
-        """
+        """Trigger execution.
+
         :param params: A parameter data that want to use in this execution.
         :rtype: DictData
         """
         from .pipeline import Pipeline
 
         pipe = Pipeline.from_loader(name=self.trigger, externals={})
-        rs = pipe.execute(params=self.params)
-        print(rs)
+        pipe.execute(params=self.params)
         return params
 
 

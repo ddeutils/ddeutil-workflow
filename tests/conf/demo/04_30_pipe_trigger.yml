@@ -10,3 +10,19 @@ pipe_trigger:
           params:
             author-run: Trigger Runner
             run-date: '2024-08-01'
+
+pipe-condition:
+  type: pipeline.Pipeline
+  on: 'every_5_minute_bkk'
+  params:
+    name: str
+  jobs:
+    condition-job:
+      stages:
+        - name: "Test if condition"
+          id: condition-stage
+          if: ${{ params.name }} == "foo"
+          shell: |
+            echo 'Hello World';
+
+        - name: "Empty stage"

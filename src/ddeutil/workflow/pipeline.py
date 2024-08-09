@@ -170,10 +170,13 @@ class Job(BaseModel):
             #   a stage execution to run on background.
             # IMPORTANT: The stage execution only run sequentially one-by-one.
             for stage in self.stages:
-                logging.info(
-                    f"[JOB]: Start execute the stage: "
-                    f"{(stage.id if stage.id else stage.name)!r}"
-                )
+                _st_name: str = stage.id if stage.id else stage.name
+
+                if stage.is_skip(params=params):
+                    logging.info(f"[JOB]: Skip the stage: {_st_name!r}")
+                    continue
+
+                logging.info(f"[JOB]: Start execute the stage: {_st_name!r}")
 
                 # NOTE: Logging a matrix that pass on this stage execution.
                 if strategy:
@@ -294,6 +297,33 @@ class Pipeline(BaseModel):
             f"{self.name}{datetime.now(tz=tz):%Y%m%d%H%M%S%f}".encode()
         ).hexdigest()
 
+    def parameterize(self, params: DictData | None = None) -> DictData:
+        """Prepare parameters before passing to execution process."""
+        params: DictData = params or {}
+        # VALIDATE: Incoming params should have keys that set on this pipeline.
+        if check_key := tuple(
+            f"{k!r}"
+            for k in self.params
+            if (k not in params and self.params[k].required)
+        ):
+            raise ValueError(
+                f"Required Param on this pipeline setting does not set: "
+                f"{', '.join(check_key)}."
+            )
+
+        # NOTE: mapping type of param before adding it to params variable.
+        return {
+            "params": (
+                params
+                | {
+                    k: self.params[k].receive(params[k])
+                    for k in params
+                    if k in self.params
+                }
+            ),
+            "jobs": {},
+        }
+
     def execute(
         self,
         params: DictData | None = None,
@@ -328,39 +358,15 @@ class Pipeline(BaseModel):
             logging.warning("[PIPELINE]: This pipeline does not have any jobs")
             return params
 
-        params: DictData = params or {}
-        # VALIDATE: Incoming params should have keys that set on this pipeline.
-        if check_key := tuple(
-            f"{k!r}"
-            for k in self.params
-            if (k not in params and self.params[k].required)
-        ):
-            raise ValueError(
-                f"Required Param on this pipeline setting does not set: "
-                f"{', '.join(check_key)}."
-            )
-
-        # NOTE: mapping type of param before adding it to params variable.
-        params: DictData = {
-            "params": (
-                params
-                | {
-                    k: self.params[k].receive(params[k])
-                    for k in params
-                    if k in self.params
-                }
-            ),
-            "jobs": {},
-        }
-
         # NOTE: create a job queue that keep the job that want to running after
         #   it dependency condition.
-        jq = Queue()
+        jq: Queue = Queue()
         for job_id in self.jobs:
             jq.put(job_id)
 
         ts: float = time.monotonic()
-        not_time_out_flag = True
+        not_time_out_flag: bool = True
+        params: DictData = self.parameterize(params)
 
         # IMPORTANT: The job execution can run parallel and waiting by needed.
         while not jq.empty() and (
