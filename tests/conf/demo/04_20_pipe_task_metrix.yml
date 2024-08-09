@@ -1,24 +1,23 @@
 pipe_seller_etl:
   type: pipeline.Pipeline
   desc: "Pipeline that load data and save to FileSystem"
-  on:
-    schedule: "* * * 1 5"
+  on: "* * * 1 5"
   params:
     run-date: datetime
   jobs:
     first-node:
       stages:
         - name: Starter Node
-          as: start
-          uses: node.PolarsLoadParq
-          with:
-            # NOTE: This line check and return connection id from config.
+          id: start
+          task: tasks/polars-parquet@polars
+          args:
             conn: ${{ conn.get('conn_loading_local') }}
             filter:
               df = df.filter('start_date >= {{ params.run-date }}')
+
         - name: Check Alert
-          as: check
-          if: nodes.start.outputs.records > 0
+          id: check
+          condition: nodes.start.outputs.records > 0
           right:
             uses: node.Polars
             with:
@@ -39,6 +38,7 @@ pipe_seller_etl:
                 name string not null
                 attrs string null
                 age int not null check( age >= 0 )
+
         - name: Save Data
           uses: node.PolarsSaveCSV
           with:

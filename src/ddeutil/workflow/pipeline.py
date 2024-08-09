@@ -45,10 +45,16 @@ class Strategy(BaseModel):
     max_parallel: int = Field(default=-1)
     matrix: dict[str, Union[list[str], list[int]]] = Field(default_factory=dict)
     include: list[dict[str, Union[str, int]]] = Field(default_factory=list)
-    exclude: list[dict[str, Union[str, int]]] = Field(default_factory=list)
+    exclude: list[dict[str, Union[str, int]]] = Field(
+        default_factory=list,
+        description="A list of exclude matrix that want to filter-out.",
+    )
 
     @model_validator(mode="before")
     def __prepare_keys(cls, values: DictData) -> DictData:
+        """Rename key that use dash to underscore because Python does not
+        support this character exist in any variable name.
+        """
         dash2underscore("max-parallel", values)
         dash2underscore("fail-fast", values)
         return values
@@ -75,20 +81,38 @@ class Strategy(BaseModel):
                 continue
             final.append(r)
 
+        # NOTE: If it is empty matrix, it will return list of empty dict.
         if not final:
             return [{}]
 
+        # NOTE: Add include to generated matrix with exclude list.
+        add: list[DictStr] = []
         for include in self.include:
-            if include.keys() != final[0].keys():
+            # VALIDATE:
+            #   Validate any key in include list should be a subset of some one
+            #   in matrix.
+            if all(not (set(include.keys()) <= set(m.keys())) for m in final):
                 raise ValueError("Include should have the keys equal to matrix")
-            if any(all(include[k] == v for k, v in f.items()) for f in final):
+
+            # VALIDATE:
+            #   Validate value of include does not duplicate with generated
+            #   matrix.
+            if any(
+                all(include.get(k) == v for k, v in m.items())
+                for m in [*final, *add]
+            ):
                 continue
-            final.append(include)
+            add.append(include)
+        final.extend(add)
         return final
 
 
 class Job(BaseModel):
-    """Job Model that is able to call a group of stages.
+    """Job Model (group of stages).
+
+        This job model allow you to use for-loop that call matrix strategy. If
+    you pass matrix mapping and it able to generate, you will see it running
+    with loop of matrix values.
 
     Data Validate:
         >>> job = {
@@ -119,13 +143,15 @@ class Job(BaseModel):
     )
     strategy: Strategy = Field(
         default_factory=Strategy,
-        description="A strategy model.",
+        description="A strategy matrix that want to generate.",
     )
 
     @model_validator(mode="before")
     def __prepare_keys(cls, values: DictData) -> DictData:
-        if "runs-on" in values:
-            values["runs_on"] = values.pop("runs-on")
+        """Rename key that use dash to underscore because Python does not
+        support this character exist in any variable name.
+        """
+        dash2underscore("runs-on", values)
         return values
 
     def stage(self, stage_id: str) -> Stage:
@@ -149,6 +175,10 @@ class Job(BaseModel):
                     f"{(stage.id if stage.id else stage.name)!r}"
                 )
 
+                # NOTE: Logging a matrix that pass on this stage execution.
+                if strategy:
+                    logging.info(f"[...]: Matrix: {strategy}")
+
                 # NOTE:
                 #       I do not use below syntax because `params` dict be the
                 #   reference memory pointer and it was changed when I action
@@ -166,13 +196,20 @@ class Pipeline(BaseModel):
     """
 
     name: str = Field(description="A pipeline name.")
-    desc: Optional[str] = Field(default=None)
-    params: dict[str, Param] = Field(default_factory=dict)
+    desc: Optional[str] = Field(
+        default=None,
+        description="A pipeline description.",
+    )
+    params: dict[str, Param] = Field(
+        default_factory=dict,
+        description="A parameters that want to use on this pipeline.",
+    )
     on: list[On] = Field(
         default_factory=list,
         description="A list of On instance for this pipeline schedule.",
     )
     jobs: dict[str, Job] = Field(
+        default_factory=dict,
         description="A mapping of job ID and job model that already loaded.",
     )
 
@@ -281,6 +318,12 @@ class Pipeline(BaseModel):
             ... ${job-name}.stages.${stage-id}.outputs.${key}
 
         """
+        logging.info(f"[CORE]: Start Pipeline {self.name}:{self.gen_run_id()}")
+        # NOTE: It should not do anything if it does not have job.
+        if not self.jobs:
+            logging.warning("[PIPELINE]: This pipeline does not have any jobs")
+            return params
+
         params: DictData = params or {}
         # VALIDATE: Incoming params should have keys that set on this pipeline.
         if check_key := tuple(

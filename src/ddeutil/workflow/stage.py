@@ -87,8 +87,13 @@ class EmptyStage(BaseStage):
 
 
 class ShellStage(BaseStage):
-    """Shell stage that execute bash script on the current OS. That mean if your
-    current OS is Windows, it will running bash in the WSL.
+    """Shell execution stage that execute bash script on the current OS.
+    That mean if your current OS is Windows, it will running bash in the WSL.
+
+        I get some limitation when I run shell statement with the built-in
+    supprocess package. It does not good enough to use multiline statement.
+    Thus, I add writing ``.sh`` file before execution process for fix this
+    issue.
 
     Data Validate:
         >>> stage = {
@@ -257,7 +262,23 @@ class TaskSearch(spec.Struct, kw_only=True, tag="task"):
 
 
 class TaskStage(BaseStage):
-    """Task executor stage that running the Python function."""
+    """Task executor stage that running the Python function that was registered
+    with tag decorator function in ``utils`` module.
+
+        This stage is different with PyStage because the PyStage is just calling
+    a Python statement with the ``eval`` and pass that locale before eval that
+    statement. So, you can create your function complexly that you can for your
+    propose to invoked by this stage object.
+
+    Data Validate:
+        >>> stage = {
+        ...     "name": "Task stage execution",
+        ...     "task": "tasks/function-name@tag-name",
+        ...     "args": {
+        ...         "FOO": "BAR",
+        ...     },
+        ... }
+    """
 
     task: str = Field(description="...")
     args: DictData
@@ -326,7 +347,7 @@ class TaskStage(BaseStage):
 
 
 class TriggerStage(BaseStage):
-    """Trigger Stage (Just POC)"""
+    """Trigger Pipeline execution stage that execute another pipeline object."""
 
     trigger: str
     params: DictData = Field(default_factory=dict)
@@ -339,7 +360,8 @@ class TriggerStage(BaseStage):
         from .pipeline import Pipeline
 
         pipe = Pipeline.from_loader(name=self.trigger, externals={})
-        pipe.execute(params=self.params)
+        rs = pipe.execute(params=self.params)
+        print(rs)
         return params
 
 
