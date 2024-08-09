@@ -16,8 +16,8 @@ from .__types import DictData
 from .utils import ConfParams, config
 
 T = TypeVar("T")
-BaseModelType = type[BaseModel]
 AnyModel = TypeVar("AnyModel", bound=BaseModel)
+AnyModelType = type[AnyModel]
 
 
 class SimLoad:
@@ -50,7 +50,7 @@ class SimLoad:
         self.externals: DictData = externals
 
     @cached_property
-    def type(self) -> BaseModelType:
+    def type(self) -> AnyModelType:
         """Return object of string type which implement on any registry. The
         object type
         """
@@ -68,12 +68,6 @@ class SimLoad:
                 except ModuleNotFoundError:
                     continue
             return import_string(f"{_typ}")
-
-    def load(self) -> AnyModel:
-        """Parsing config data to the object type for initialize with model
-        validate method.
-        """
-        return self.type.model_validate(self.data)
 
 
 class Loader(SimLoad):

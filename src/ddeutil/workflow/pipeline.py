@@ -55,6 +55,39 @@ class Strategy(BaseModel):
             values["fail_fast"] = values.pop("fail-fast")
         return values
 
+    def make(self) -> list[DictStr]:
+        """Return List of product of matrix values that already filter with
+        exclude and add include.
+
+        :rtype: list[DictStr]
+        """
+        if not (mt := self.matrix):
+            return [{}]
+        final: list[DictStr] = []
+        for r in [
+            {_k: _v for e in mapped for _k, _v in e.items()}
+            for mapped in itertools.product(
+                *[[{k: v} for v in vs] for k, vs in mt.items()]
+            )
+        ]:
+            if any(
+                all(r[k] == v for k, v in exclude.items())
+                for exclude in self.exclude
+            ):
+                continue
+            final.append(r)
+
+        if not final:
+            return [{}]
+
+        for include in self.include:
+            if include.keys() != final[0].keys():
+                raise ValueError("Include should have the keys equal to matrix")
+            if any(all(include[k] == v for k, v in f.items()) for f in final):
+                continue
+            final.append(include)
+        return final
+
 
 class Job(BaseModel):
     """Job Model that is able to call a group of stages.
@@ -78,7 +111,10 @@ class Job(BaseModel):
     """
 
     runs_on: Optional[str] = Field(default=None)
-    stages: list[Stage] = Field(default_factory=list)
+    stages: list[Stage] = Field(
+        default_factory=list,
+        description="A list of Stage of this job.",
+    )
     needs: list[str] = Field(
         default_factory=list,
         description="A list of the job ID that want to run before this job.",
@@ -101,44 +137,13 @@ class Job(BaseModel):
                 return stage
         raise ValueError(f"Stage ID {stage_id} does not exists")
 
-    def make_strategy(self) -> list[DictStr]:
-        """Return List of product of matrix values that already filter with
-        exclude and add include.
-
-        :rtype: list[DictStr]
-        """
-        if not (mt := self.strategy.matrix):
-            return [{}]
-        final: list[DictStr] = []
-        for r in [
-            {_k: _v for e in mapped for _k, _v in e.items()}
-            for mapped in itertools.product(
-                *[[{k: v} for v in vs] for k, vs in mt.items()]
-            )
-        ]:
-            if any(
-                all(r[k] == v for k, v in exclude.items())
-                for exclude in self.strategy.exclude
-            ):
-                continue
-            final.append(r)
-
-        if not final:
-            return [{}]
-
-        for include in self.strategy.include:
-            if include.keys() != final[0].keys():
-                raise ValueError("Include should have the keys equal to matrix")
-            if any(all(include[k] == v for k, v in f.items()) for f in final):
-                continue
-            final.append(include)
-        return final
-
     def execute(self, params: DictData | None = None) -> DictData:
         """Execute job with passing dynamic parameters from the pipeline."""
-        for strategy in self.make_strategy():
+        for strategy in self.strategy.make():
             params.update({"matrix": strategy})
 
+            # TODO: we should add option for ``wait_as_complete`` for release
+            #   a stage execution to run on background.
             # IMPORTANT: The stage execution only run sequentially one-by-one.
             for stage in self.stages:
                 logging.info(

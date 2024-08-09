@@ -30,6 +30,6 @@ def test_pipe_job_matrix():
         ],
         key=lambda x: (x["partition"], x["table"]),
     ) == sorted(
-        multi_sys.make_strategy(),
+        multi_sys.strategy.make(),
         key=lambda x: (x["partition"], x["table"]),
     )

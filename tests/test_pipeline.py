@@ -37,4 +37,4 @@ def test_pipe_model():
     )
 
     demo_job: Job = p.job("demo-run")
-    assert [{}] == demo_job.make_strategy()
+    assert [{}] == demo_job.strategy.make()
