@@ -145,3 +145,6 @@ mnt/
 
 # Diagram file
 *.bkp
+
+# Backup file
+*.bk.py

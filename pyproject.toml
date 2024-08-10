@@ -31,6 +31,12 @@ dependencies = [
 ]
 dynamic = ["version"]
 
+[project.optional-dependencies]
+app = [
+    "fastapi==0.112.0",
+    "apscheduler[sqlalchemy]==3.10.4",
+]
+
 [project.urls]
 Homepage = "https://github.com/ddeutils/ddeutil-workflow/"
 "Source Code" = "https://github.com/ddeutils/ddeutil-workflow/"

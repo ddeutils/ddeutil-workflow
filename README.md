@@ -17,6 +17,7 @@
   - [Tasks (EL)](#tasks-extract--load)
   - [Tasks (T)](#tasks-transform)
 - [Configuration](#configuration)
+- [Deployment](#deployment)
 
 This **Workflow** objects was created for easy to make a simple metadata
 driven pipeline that able to **ETL, T, EL, or ELT** by `.yaml` file.
@@ -66,7 +67,7 @@ The **On** is schedule object.
 
 ```yaml
 on_every_5_min:
-  type: schedule.Schedule
+  type: on.On
   cron: "*/5 * * * *"
 ```
 
@@ -81,7 +82,6 @@ assert '2022-01-01 00:05:00' f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
 assert '2022-01-01 00:10:00' f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
 assert '2022-01-01 00:15:00' f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
 assert '2022-01-01 00:20:00' f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
-assert '2022-01-01 00:25:00' f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
 ```
 
 ### Pipeline
@@ -184,8 +184,6 @@ pipe.execute(params={'author-run': 'Local Workflow', 'run-date': '2024-01-01'})
 > Hello World from Shell
 ```
 
----
-
 ### Tasks (Extract & Load)
 
 ```yaml
@@ -199,7 +197,7 @@ pipe_el_pg_to_lake:
       stages:
         - name: "Extract Load from Postgres to Lake"
           id: extract-load
-          task: tasks/postgres-to-delta@polars
+          uses: tasks/postgres-to-delta@polars
           with:
             source:
               conn: conn_postgres_url
@@ -210,8 +208,6 @@ pipe_el_pg_to_lake:
               conn: conn_az_lake
               endpoint: "/${{ params.name }}"
 ```
-
----
 
 ### Tasks (Transform)
 
@@ -228,8 +224,8 @@ pipe_hook_mssql_proc:
       stages:
         - name: "Transform Data in MS SQL Server"
           id: transform
-          task: tasks/mssql-proc@odbc
-          args:
+          uses: tasks/mssql-proc@odbc
+          with:
             exec: ${{ params.sp_name }}
             params:
               run_mode: "T"
@@ -246,6 +242,13 @@ export WORKFLOW_CORE_REGISTRY=ddeutil.workflow,tests.utils
 export WORKFLOW_CORE_PATH_CONF=conf
 ```
 
+Application config:
+
+```bash
+export WORKFLOW_APP_DB_URL=postgresql+asyncpg://user:pass@localhost:5432/schedule
+export WORKFLOW_APP_INTERVAL=10
+```
+
 ## Deployment
 
 This package able to run as a application service for receive manual trigger
@@ -253,7 +256,7 @@ from the master node via RestAPI.
 
 > [!WARNING]
 > This feature do not start yet because I still research and find the best tool
-> to use it provision an app service, like `fastapi`.
+> to use it provision an app service, like `fastapi`, `apscheduler`.
 
 ```shell
 (venv) $ workflow start -p 7070

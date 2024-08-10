@@ -97,6 +97,11 @@ class EmptyStage(BaseStage):
     name of stage only to stdout.
     """
 
+    echo: Optional[str] = Field(
+        default=None,
+        description="A string statement that want to logging",
+    )
+
     def execute(self, params: DictData) -> DictData:
         """Execution method for the Empty stage that do only logging out to
         stdout.
@@ -212,7 +217,7 @@ class PyStage(BaseStage):
     globals nad additional variables.
     """
 
-    run: str
+    run: str = Field(description="A Python statement that want to run.")
     vars: DictData = Field(default_factory=dict)
 
     def set_outputs(self, rs: DictData, params: DictData) -> DictData:
@@ -264,8 +269,8 @@ class PyStage(BaseStage):
         return params | {k: _globals[k] for k in params if k in _globals}
 
 
-class TaskSearch(spec.Struct, kw_only=True, tag="task"):
-    """Task Search Struct that use the `msgspec` for the best performance data
+class HookSearch(spec.Struct, kw_only=True, tag="task"):
+    """Hook Search Struct that use the `msgspec` for the best performance data
     serialize.
     """
 
@@ -278,9 +283,9 @@ class TaskSearch(spec.Struct, kw_only=True, tag="task"):
         return {f: getattr(self, f) for f in self.__struct_fields__}
 
 
-class TaskStage(BaseStage):
-    """Task executor stage that running the Python function that was registered
-    with tag decorator function in ``utils`` module.
+class HookStage(BaseStage):
+    """Hook executor that hook the Python function from registry with tag
+    decorator function in ``utils`` module and run it with input arguments.
 
         This stage is different with PyStage because the PyStage is just calling
     a Python statement with the ``eval`` and pass that locale before eval that
@@ -297,35 +302,37 @@ class TaskStage(BaseStage):
         ... }
     """
 
-    task: str = Field(description="...")
-    args: DictData
+    uses: str = Field(
+        description="A pointer that want to load function from registry",
+    )
+    args: DictData = Field(alias="with")
 
     @staticmethod
-    def extract_task(task: str) -> Callable[[], TagFunc]:
-        """Extract Task string value to task function.
+    def extract_hook(hook: str) -> Callable[[], TagFunc]:
+        """Extract Hook string value to hook function.
 
-        :param task: A task string value that able to search with Task regex.
+        :param hook: A hook string value that able to search with Task regex.
         """
-        if not (found := Re.RE_TASK_FMT.search(task)):
+        if not (found := Re.RE_TASK_FMT.search(hook)):
             raise ValueError("Task does not match with task format regex.")
 
-        # NOTE: Pass the searching task string to path, func, tag.
-        task: TaskSearch = TaskSearch(**found.groupdict())
+        # NOTE: Pass the searching hook string to `path`, `func`, and `tag`.
+        hook: HookSearch = HookSearch(**found.groupdict())
 
         # NOTE: Registry object should implement on this package only.
-        rgt: dict[str, Registry] = make_registry(f"{task.path}")
-        if task.func not in rgt:
+        rgt: dict[str, Registry] = make_registry(f"{hook.path}")
+        if hook.func not in rgt:
             raise NotImplementedError(
-                f"``REGISTER-MODULES.{task.path}.registries`` does not "
-                f"implement registry: {task.func}."
+                f"``REGISTER-MODULES.{hook.path}.registries`` does not "
+                f"implement registry: {hook.func!r}."
             )
 
-        if task.tag not in rgt[task.func]:
+        if hook.tag not in rgt[hook.func]:
             raise NotImplementedError(
-                f"tag: {task.tag} does not found on registry func: "
-                f"``REGISTER-MODULES.{task.path}.registries.{task.func}``"
+                f"tag: {hook.tag!r} does not found on registry func: "
+                f"``REGISTER-MODULES.{hook.path}.registries.{hook.func}``"
             )
-        return rgt[task.func][task.tag]
+        return rgt[hook.func][hook.tag]
 
     def execute(self, params: DictData) -> DictData:
         """Execute the Task function that already mark registry.
@@ -337,24 +344,27 @@ class TaskStage(BaseStage):
         :returns: A parameters from an input that was mapped output if the stage
             ID was set.
         """
-        t_func: TagFunc = self.extract_task(param2template(self.task, params))()
+        t_func: TagFunc = self.extract_hook(param2template(self.uses, params))()
         if not callable(t_func):
-            raise ImportError("Task caller function does not callable.")
+            raise ImportError("Hook caller function does not callable.")
 
-        # NOTE: check task caller parameters
+        # VALIDATE: check input task caller parameters that exists before
+        #   calling.
+        args: DictData = param2template(self.args, params)
         ips = inspect.signature(t_func)
         if any(
-            k not in self.args
+            k not in args
             for k in ips.parameters
             if ips.parameters[k].default == Parameter.empty
         ):
             raise ValueError(
-                f"necessary parameters, ({', '.join(ips.parameters.keys())}), "
+                f"Necessary params, ({', '.join(ips.parameters.keys())}), "
                 f"does not set to args"
             )
+
         try:
-            logging.info(f"[STAGE]: Task-Execute: {t_func.name}@{t_func.tag}")
-            rs = t_func(**param2template(self.args, params))
+            logging.info(f"[STAGE]: Hook-Execute: {t_func.name}@{t_func.tag}")
+            rs: DictData = t_func(**param2template(args, params))
         except Exception as err:
             raise StageException(f"{err.__class__.__name__}: {err}") from err
         self.set_outputs(rs, params)
@@ -364,7 +374,7 @@ class TaskStage(BaseStage):
 class TriggerStage(BaseStage):
     """Trigger Pipeline execution stage that execute another pipeline object."""
 
-    trigger: str
+    trigger: str = Field(description="A trigger pipeline name.")
     params: DictData = Field(default_factory=dict)
 
     def execute(self, params: DictData) -> DictData:
@@ -375,7 +385,7 @@ class TriggerStage(BaseStage):
         """
         from .pipeline import Pipeline
 
-        pipe = Pipeline.from_loader(name=self.trigger, externals={})
+        pipe: Pipeline = Pipeline.from_loader(name=self.trigger, externals={})
         pipe.execute(params=self.params)
         return params
 
@@ -384,7 +394,7 @@ class TriggerStage(BaseStage):
 Stage = Union[
     PyStage,
     ShellStage,
-    TaskStage,
+    HookStage,
     TriggerStage,
     EmptyStage,
 ]

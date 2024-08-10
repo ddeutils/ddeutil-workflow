@@ -1,56 +1,32 @@
-pipe_seller_etl:
+ingest_multiple_system:
   type: pipeline.Pipeline
-  desc: "Pipeline that load data and save to FileSystem"
-  on: "* * * 1 5"
   params:
-    run-date: datetime
+    source: str
+    target: str
   jobs:
-    first-node:
+    multiple-system:
+      strategy:
+        matrix:
+          table: ['customer', 'sales']
+          system: ['csv']
+          partition: [1, 2, 3]
+        exclude:
+          - table: customer
+            system: csv
+            partition: 1
+          - table: sales
+            partition: 3
+        include:
+          - table: customer
+            system: csv
+            partition: 4
       stages:
-        - name: Starter Node
-          id: start
-          task: tasks/polars-parquet@polars
-          args:
-            conn: ${{ conn.get('conn_loading_local') }}
-            filter:
-              df = df.filter('start_date >= {{ params.run-date }}')
-
-        - name: Check Alert
-          id: check
-          condition: nodes.start.outputs.records > 0
-          right:
-            uses: node.Polars
-            with:
-              df: nodes.start.outputs.df
-              statement: |
-                import polars as pl
-                df = (
-                  df
-                    .withColumn(pl.col('customer_id').alias('id'))
-                    .filter("id != 'dummy'")
-                    .drop('start_date')
-                )
-          left:
-            uses: node.DummyPolars
-            with:
-              schema: |
-                id string not null
-                name string not null
-                attrs string null
-                age int not null check( age >= 0 )
-
-        - name: Save Data
-          uses: node.PolarsSaveCSV
+        - name: Extract & Load Multi-System
+          uses: tasks/el-${{ matrix.system }}-to-parquet@polars-dir
           with:
-            to: ./data/target/dummy/{timestamp:%Y%m%d_%H%M%S}.csv
-            df: nodes.check.right.outputs.df
-    second-node:
-      need: first_node
-      stages:
-        - name: Loading Node
-          as: loading
-          uses: node.PolarsLoadParq
-          with:
-            conn: ${{ conn.get('conn_loading_local') }}
-            filter: |
-              df = df.filter('start_date >= {{ params.run-date }}')
+            source:
+              conn: ${{ params.source }}
+              table: ${{ matrix.table }}
+            sink:
+              conn: ${{ params.target }}
+              endpoint: /raw/${{ matrix.table }}_${{ matrix.system }}

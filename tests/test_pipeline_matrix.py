@@ -76,3 +76,11 @@ def test_pipe_job_matrix():
         multi_sys.strategy.make(),
         key=lambda x: (x["partition"], x["table"]),
     )
+
+
+def test_pipe_matrix():
+    pipeline = pipe.Pipeline.from_loader(
+        name="ingest_multiple_system",
+        externals={},
+    )
+    pipeline.execute(params={"source": "src", "target": "tgt"})

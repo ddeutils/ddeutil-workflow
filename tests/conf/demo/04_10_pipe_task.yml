@@ -19,8 +19,8 @@ ingest_postgres_to_minio:
       stages:
         - name: "Extract & Load Postgres to Delta"
           id: extract-load
-          task: tasks/el-postgres-to-delta@polars
-          args:
+          uses: tasks/el-postgres-to-delta@polars
+          with:
             source:
               conn: ${{ params.source }}
               query: |
@@ -50,42 +50,7 @@ ingest_csv_to_parquet:
       stages:
         - name: "Extract & Load Local System"
           id: extract-load
-          task: tasks/el-csv-to-parquet@polars-dir
-          args:
+          uses: tasks/el-csv-to-parquet@polars-dir
+          with:
             source: ${{ params.source }}
             sink: ${{ params.sink }}
-
-# Case:
-#   Extract data on the Local File System from CSV to Target.
-ingest_multiple_system:
-  type: pipeline.Pipeline
-  params:
-    source: str
-    target: str
-  jobs:
-    multiple-system:
-      strategy:
-        matrix:
-          table: ['customer', 'sales']
-          system: ['csv']
-          partition: [1, 2, 3]
-        exclude:
-          - table: customer
-            system: csv
-            partition: 1
-          - table: sales
-            partition: 3
-        include:
-          - table: customer
-            system: csv
-            partition: 4
-      stages:
-        - name: Extract & Load Multi-System
-          task: tasks/el-${{ matrix.system }}-to-delta@polars
-          args:
-            source:
-              conn: ${{ params.source }}
-              table: ${{ matrix.table }}
-            sink:
-              conn: ${{ params.target }}
-              endpoint: /raw/${{ matrix.table }}_${{ matrix.system }}
