@@ -1,4 +1,4 @@
-# Data Utility: _Workflow_
+# Workflow
 
 [![test](https://github.com/ddeutils/ddeutil-workflow/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/ddeutils/ddeutil-workflow/actions/workflows/tests.yml)
 [![python support version](https://img.shields.io/pypi/pyversions/ddeutil-workflow)](https://pypi.org/project/ddeutil-workflow/)
@@ -18,7 +18,7 @@
   - [Tasks (T)](#tasks-transform)
 - [Configuration](#configuration)
 
-This **Utility Workflow** objects was created for easy to make a simple metadata
+This **Workflow** objects was created for easy to make a simple metadata
 driven pipeline that able to **ETL, T, EL, or ELT** by `.yaml` file.
 
 I think we should not create the multiple pipeline per use-case if we able to
@@ -91,7 +91,7 @@ The **Pipeline** object that is the core feature of this project.
 ```yaml
 run_py_local:
   type: ddeutil.workflow.pipeline.Pipeline
-  on: '*/5 * * * *'
+  on: 'on_every_5_min'
   params:
     author-run:
       type: str
@@ -114,8 +114,11 @@ pipe.execute(params={'author-run': 'Local Workflow', 'run-date': '2024-01-01'})
 >   author-run: str
 >   run-date: datetime
 > ```
+>
+> And for the type, you can remove `ddeutil.workflow` prefix because we can find
+> it by looping search from `WORKFLOW_CORE_REGISTRY` value.
 
-## Examples
+## Usage
 
 This is examples that use workflow file for running common Data Engineering
 use-case.
@@ -130,16 +133,14 @@ The state of doing lists that worker should to do. It be collection of the stage
 
 ```yaml
 run_py_local:
-  type: ddeutil.workflow.pipeline.Pipeline
+  type: pipeline.Pipeline
   params:
-    author-run:
-      type: str
-    run-date:
-      type: datetime
+    author-run: str
+    run-date: datetime
   jobs:
     first-job:
       stages:
-        - name: Printing Information
+        - name: "Printing Information"
           id: define-func
           run: |
             x = '${{ params.author-run }}'
@@ -148,7 +149,7 @@ run_py_local:
             def echo(name: str):
               print(f'Hello {name}')
 
-        - name: Run Sequence and use var from Above
+        - name: "Run Sequence and use var from Above"
           vars:
             x: ${{ params.author-run }}
           run: |
@@ -156,14 +157,14 @@ run_py_local:
             # Change x value
             x: int = 1
 
-        - name: Call Function
+        - name: "Call Function"
           vars:
             echo: ${{ stages.define-func.outputs.echo }}
           run: |
             echo('Caller')
     second-job:
       stages:
-        - name: Echo Shell Script
+        - name: "Echo Shell Script"
           id: shell-echo
           shell: |
             echo "Hello World from Shell"
@@ -189,12 +190,10 @@ pipe.execute(params={'author-run': 'Local Workflow', 'run-date': '2024-01-01'})
 
 ```yaml
 pipe_el_pg_to_lake:
-  type: ddeutil.workflow.pipeline.Pipeline
+  type: pipeline.Pipeline
   params:
-    run-date:
-      type: datetime
-    author-email:
-      type: str
+    run-date: datetime
+    author-email: str
   jobs:
     extract-load:
       stages:
@@ -218,7 +217,7 @@ pipe_el_pg_to_lake:
 
 ```yaml
 pipe_hook_mssql_proc:
-  type: ddeutil.workflow.pipeline.Pipeline
+  type: pipeline.Pipeline
   params:
     run_date: datetime
     sp_name: str
@@ -230,7 +229,7 @@ pipe_hook_mssql_proc:
         - name: "Transform Data in MS SQL Server"
           id: transform
           task: tasks/mssql-proc@odbc
-          with:
+          args:
             exec: ${{ params.sp_name }}
             params:
               run_mode: "T"
@@ -245,4 +244,17 @@ pipe_hook_mssql_proc:
 export WORKFLOW_ROOT_PATH=.
 export WORKFLOW_CORE_REGISTRY=ddeutil.workflow,tests.utils
 export WORKFLOW_CORE_PATH_CONF=conf
+```
+
+## Deployment
+
+This package able to run as a application service for receive manual trigger
+from the master node via RestAPI.
+
+> [!WARNING]
+> This feature do not start yet because I still research and find the best tool
+> to use it provision an app service, like `fastapi`.
+
+```shell
+(venv) $ workflow start -p 7070
 ```
