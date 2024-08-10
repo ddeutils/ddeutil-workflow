@@ -62,9 +62,9 @@ def test_pipe_job_py():
     } == rs
 
 
-def test_pipe_stage_shell():
+def test_pipe_stage_bash():
     pipeline = pipe.Pipeline.from_loader(name="run_python", externals={})
-    echo_env: pipe.Job = pipeline.job("shell-run").stage("echo")
+    echo_env: pipe.Job = pipeline.job("bash-run").stage("echo")
     rs = echo_env.execute({})
     assert {
         "stages": {
@@ -78,9 +78,9 @@ def test_pipe_stage_shell():
     } == rs
 
 
-def test_pipe_stage_shell_env():
+def test_pipe_stage_bash_env():
     pipeline = pipe.Pipeline.from_loader(name="run_python", externals={})
-    echo_env: pipe.Job = pipeline.job("shell-run-env").stage("echo-env")
+    echo_env: pipe.Job = pipeline.job("bash-run-env").stage("echo-env")
     rs = echo_env.execute({})
     assert {
         "stages": {

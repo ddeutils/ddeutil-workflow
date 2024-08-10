@@ -12,10 +12,10 @@
 - [Core Features](#core-features)
   - [On](#on)
   - [Pipeline](#pipeline)
-- [Examples](#examples)
+- [Usage](#usage)
   - [Python & Shell](#python--shell)
-  - [Tasks (EL)](#tasks-extract--load)
-  - [Tasks (T)](#tasks-transform)
+  - [Hook (EL)](#hook-extract--load)
+  - [Hook (T)](#hook-transform)
 - [Configuration](#configuration)
 - [Deployment](#deployment)
 
@@ -164,9 +164,9 @@ run_py_local:
             echo('Caller')
     second-job:
       stages:
-        - name: "Echo Shell Script"
+        - name: "Echo Bash Script"
           id: shell-echo
-          shell: |
+          bash: |
             echo "Hello World from Shell"
 ```
 
@@ -184,7 +184,7 @@ pipe.execute(params={'author-run': 'Local Workflow', 'run-date': '2024-01-01'})
 > Hello World from Shell
 ```
 
-### Tasks (Extract & Load)
+### Hook (Extract & Load)
 
 ```yaml
 pipe_el_pg_to_lake:
@@ -209,10 +209,10 @@ pipe_el_pg_to_lake:
               endpoint: "/${{ params.name }}"
 ```
 
-### Tasks (Transform)
+### Hook (Transform)
 
 ```yaml
-pipe_hook_mssql_proc:
+pipeline_hook_mssql_proc:
   type: pipeline.Pipeline
   params:
     run_date: datetime

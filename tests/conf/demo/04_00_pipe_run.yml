@@ -51,27 +51,27 @@ run_python:
 
         - name: Final of Next running job
 
-    shell-run:
+    bash-run:
       stages:
         - name: Echo hello world
           id: echo
-          shell: |
+          bash: |
             echo "Hello World";
             VAR='Foo';
             echo "Variable $VAR";
 
     # WARNING:
-    #   The limitation of the shell running statement is it cannot use env var
+    #   The limitation of the bash running statement is it cannot use env var
     #   calling with brace, ${ ... }, because this file was read from
     #   replacement env variable first. if you want to use it, you should escape
     #   the '$' char with '$$'.
-    shell-run-env:
+    bash-run-env:
       stages:
         - name: Echo hello world
           id: echo-env
           env:
             PASSING: 'Bar'
-          shell: |
+          bash: |
             echo "Hello World";
             VAR='Foo';
             echo "Variable $VAR";
@@ -126,5 +126,5 @@ run_python_with_params:
     final-job:
       stages:
         - name: Echo hello world
-          shell: |
+          bash: |
             echo 'Hello World';

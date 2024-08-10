@@ -113,8 +113,8 @@ class EmptyStage(BaseStage):
         return params
 
 
-class ShellStage(BaseStage):
-    """Shell execution stage that execute bash script on the current OS.
+class BashStage(BaseStage):
+    """Bash execution stage that execute bash script on the current OS.
     That mean if your current OS is Windows, it will running bash in the WSL.
 
         I get some limitation when I run shell statement with the built-in
@@ -125,14 +125,14 @@ class ShellStage(BaseStage):
     Data Validate:
         >>> stage = {
         ...     "name": "Shell stage execution",
-        ...     "shell": 'echo "Hello $FOO"',
+        ...     "bash": 'echo "Hello $FOO"',
         ...     "env": {
         ...         "FOO": "BAR",
         ...     },
         ... }
     """
 
-    shell: str = Field(description="A shell statement that want to execute.")
+    bash: str = Field(description="A bash statement that want to execute.")
     env: DictStr = Field(
         default_factory=dict,
         description=(
@@ -142,8 +142,8 @@ class ShellStage(BaseStage):
     )
 
     @contextlib.contextmanager
-    def __prepare_shell(self, shell: str, env: DictStr) -> Iterator[TupleStr]:
-        """Return context of prepared shell statement that want to execute. This
+    def __prepare_bash(self, bash: str, env: DictStr) -> Iterator[TupleStr]:
+        """Return context of prepared bash statement that want to execute. This
         step will write the `.sh` file before giving this file name to context.
         After that, it will auto delete this file automatic.
         """
@@ -156,7 +156,7 @@ class ShellStage(BaseStage):
             f.writelines([f"{k}='{env[k]}';\n" for k in env])
 
             # NOTE: make sure that shell script file does not have `\r` char.
-            f.write(shell.replace("\r\n", "\n"))
+            f.write(bash.replace("\r\n", "\n"))
 
         make_exec(f"./{f_name}")
 
@@ -183,15 +183,15 @@ class ShellStage(BaseStage):
         return params
 
     def execute(self, params: DictData) -> DictData:
-        """Execute the Shell & Powershell statement with the Python build-in
-        ``subprocess`` package.
+        """Execute the Bash statement with the Python build-in ``subprocess``
+        package.
 
         :param params: A parameter data that want to use in this execution.
         :rtype: DictData
         """
-        shell: str = param2template(self.shell, params)
-        with self.__prepare_shell(
-            shell=shell, env=param2template(self.env, params)
+        bash: str = param2template(self.bash, params)
+        with self.__prepare_bash(
+            bash=bash, env=param2template(self.env, params)
         ) as sh:
             logging.info(f"[STAGE]: Shell-Execute: {sh}")
             rs: CompletedProcess = subprocess.run(
@@ -206,8 +206,8 @@ class ShellStage(BaseStage):
                 if "\\x00" in rs.stderr
                 else rs.stderr
             )
-            logging.error(f"{err}\nRunning Statement:\n---\n{shell}")
-            raise StageException(f"{err}\nRunning Statement:\n---\n{shell}")
+            logging.error(f"{err}\nRunning Statement:\n---\n{bash}")
+            raise StageException(f"{err}\nRunning Statement:\n---\n{bash}")
         self.set_outputs(rs, params)
         return params
 
@@ -393,7 +393,7 @@ class TriggerStage(BaseStage):
 # NOTE: Order of parsing stage data
 Stage = Union[
     PyStage,
-    ShellStage,
+    BashStage,
     HookStage,
     TriggerStage,
     EmptyStage,
