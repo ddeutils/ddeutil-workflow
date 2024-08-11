@@ -23,7 +23,14 @@ from pydantic import BaseModel, Field
 
 from .__types import DictData, DictStr, Re, TupleStr
 from .exceptions import StageException
-from .utils import Registry, TagFunc, make_exec, make_registry, param2template
+from .utils import (
+    Registry,
+    Result,
+    TagFunc,
+    make_exec,
+    make_registry,
+    param2template,
+)
 
 
 class BaseStage(BaseModel, ABC):
@@ -48,12 +55,12 @@ class BaseStage(BaseModel, ABC):
     )
 
     @abstractmethod
-    def execute(self, params: DictData) -> DictData:
+    def execute(self, params: DictData) -> Result:
         """Execute abstraction method that action something by sub-model class.
         This is important method that make this class is able to be the stage.
 
         :param params: A parameter data that want to use in this execution.
-        :rtype: DictData
+        :rtype: Result
         """
         raise NotImplementedError("Stage should implement ``execute`` method.")
 
@@ -67,6 +74,7 @@ class BaseStage(BaseModel, ABC):
         if self.id is None:
             return params
 
+        # NOTE: Create stages key to receive an output from the stage execution.
         if "stages" not in params:
             params["stages"] = {}
 
@@ -110,7 +118,7 @@ class EmptyStage(BaseStage):
             stage does not pass any output.
         """
         logging.info(f"[STAGE]: Empty-Execute: {self.name!r}")
-        return params
+        return {}
 
 
 class BashStage(BaseStage):
@@ -179,13 +187,7 @@ class BashStage(BaseStage):
         if "stages" not in params:
             params["stages"] = {}
 
-        params["stages"][self.id] = {
-            # NOTE: The output will fileter unnecessary keys from ``_locals``.
-            "outputs": {
-                "return_code": output.returncode,
-                "stdout": output.stdout.rstrip("\n"),
-            },
-        }
+        params["stages"][self.id] = {"outputs": output}
         return params
 
     def execute(self, params: DictData) -> DictData:
@@ -214,8 +216,11 @@ class BashStage(BaseStage):
             )
             logging.error(f"{err}\nRunning Statement:\n---\n{bash}")
             raise StageException(f"{err}\nRunning Statement:\n---\n{bash}")
-        self.set_outputs(rs, params)
-        return params
+        return {
+            "return_code": rs.returncode,
+            "stdout": rs.stdout.rstrip("\n"),
+            "stderr": rs.stderr.rstrip("\n"),
+        }
 
 
 class PyStage(BaseStage):
@@ -247,11 +252,18 @@ class PyStage(BaseStage):
         if "stages" not in params:
             params["stages"] = {}
 
+        _locals: DictData = output["locals"]
+        _globals: DictData = output["globals"]
+
+        # NOTE: The output will fileter unnecessary keys from locals.
         params["stages"][self.id] = {
-            # NOTE: The output will fileter unnecessary keys from ``_locals``.
-            "outputs": {k: output[k] for k in output if k != "__annotations__"},
+            "outputs": {
+                k: _locals[k] for k in _locals if k != "__annotations__"
+            },
         }
-        return params
+
+        # NOTE: Replace value that changing from the globals.
+        return params | {k: _globals[k] for k in params if k in _globals}
 
     def execute(self, params: DictData) -> DictData:
         """Execute the Python statement that pass all globals and input params
@@ -264,6 +276,7 @@ class PyStage(BaseStage):
         :returns: A parameters from an input that was mapped output if the stage
             ID was set.
         """
+        # NOTE: create custom globals value that will pass to exec function.
         _globals: DictData = (
             globals() | params | param2template(self.vars, params)
         )
@@ -276,10 +289,7 @@ class PyStage(BaseStage):
                 f"{err.__class__.__name__}: {err}\nRunning Statement:\n---\n"
                 f"{self.run}"
             ) from None
-
-        # NOTE: set outputs from ``_locals`` value from ``exec``.
-        self.set_outputs(_locals, params)
-        return params | {k: _globals[k] for k in params if k in _globals}
+        return {"locals": _locals, "globals": _globals}
 
 
 @dataclass
@@ -325,7 +335,7 @@ class HookStage(BaseStage):
     def extract_hook(hook: str) -> Callable[[], TagFunc]:
         """Extract Hook string value to hook function.
 
-        :param hook: A hook string value that able to search with Task regex.
+        :param hook: A hook value that able to match with Task regex.
         """
         if not (found := Re.RE_TASK_FMT.search(hook)):
             raise ValueError("Task does not match with task format regex.")
@@ -362,9 +372,9 @@ class HookStage(BaseStage):
         if not callable(t_func):
             raise ImportError("Hook caller function does not callable.")
 
+        args: DictData = param2template(self.args, params)
         # VALIDATE: check input task caller parameters that exists before
         #   calling.
-        args: DictData = param2template(self.args, params)
         ips = inspect.signature(t_func)
         if any(
             k not in args
@@ -381,8 +391,7 @@ class HookStage(BaseStage):
             rs: DictData = t_func(**param2template(args, params))
         except Exception as err:
             raise StageException(f"{err.__class__.__name__}: {err}") from err
-        self.set_outputs(rs, params)
-        return params
+        return rs
 
 
 class TriggerStage(BaseStage):
@@ -400,8 +409,8 @@ class TriggerStage(BaseStage):
         from .pipeline import Pipeline
 
         pipe: Pipeline = Pipeline.from_loader(name=self.trigger, externals={})
-        pipe.execute(params=self.params)
-        return params
+        rs = pipe.execute(params=self.params)
+        return rs
 
 
 # NOTE: Order of parsing stage data

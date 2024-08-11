@@ -18,19 +18,19 @@ def test_pipe_stage_py():
     assert stage.id == "run-var"
 
     # NOTE: Start execute with manual stage parameters.
-    rs = stage.execute(
-        params={
-            "params": {"name": "Author"},
-            "stages": {"hello-world": {"outputs": {"x": "Foo"}}},
-        }
-    )
+    p = {
+        "params": {"name": "Author"},
+        "stages": {"hello-world": {"outputs": {"x": "Foo"}}},
+    }
+    rs = stage.execute(params=p)
+    _prepare_rs = stage.set_outputs(rs, p)
     assert {
         "params": {"name": "Author"},
         "stages": {
             "hello-world": {"outputs": {"x": "Foo"}},
             "run-var": {"outputs": {"x": 1}},
         },
-    } == rs
+    } == _prepare_rs
 
 
 def test_pipe_stage_py_func():
@@ -39,10 +39,12 @@ def test_pipe_stage_py_func():
     )
     stage: st.PyStage = pipeline.job("second-job").stage(stage_id="create-func")
     assert stage.id == "create-func"
+
     # NOTE: Start execute with manual stage parameters.
     rs = stage.execute(params={})
+    _prepare_rs = stage.set_outputs(rs, {})
     assert ("var_inside", "echo") == tuple(
-        rs["stages"]["create-func"]["outputs"].keys()
+        _prepare_rs["stages"]["create-func"]["outputs"].keys()
     )
 
 
@@ -62,35 +64,25 @@ def test_pipe_job_py():
     } == rs
 
 
-def test_pipe_stage_bash():
+def test_stage_bash():
     pipeline = pipe.Pipeline.from_loader(name="run_python", externals={})
-    echo_env: pipe.Job = pipeline.job("bash-run").stage("echo")
-    rs = echo_env.execute({})
+    echo: st.BashStage = pipeline.job("bash-run").stage("echo")
+    rs = echo.execute({})
     assert {
-        "stages": {
-            "echo": {
-                "outputs": {
-                    "return_code": 0,
-                    "stdout": "Hello World\nVariable Foo",
-                },
-            },
-        },
+        "return_code": 0,
+        "stdout": "Hello World\nVariable Foo",
+        "stderr": "",
     } == rs
 
 
-def test_pipe_stage_bash_env():
+def test_stage_bash_env():
     pipeline = pipe.Pipeline.from_loader(name="run_python", externals={})
-    echo_env: pipe.Job = pipeline.job("bash-run-env").stage("echo-env")
+    echo_env: st.BashStage = pipeline.job("bash-run-env").stage("echo-env")
     rs = echo_env.execute({})
     assert {
-        "stages": {
-            "echo-env": {
-                "outputs": {
-                    "return_code": 0,
-                    "stdout": "Hello World\nVariable Foo\nENV Bar",
-                },
-            },
-        },
+        "return_code": 0,
+        "stdout": "Hello World\nVariable Foo\nENV Bar",
+        "stderr": "",
     } == rs
 
 

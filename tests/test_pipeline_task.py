@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import ddeutil.workflow.pipeline as pipe
+import ddeutil.workflow.stage as st
 
 
 def test_pipe_stage_task():
@@ -8,7 +9,7 @@ def test_pipe_stage_task():
         name="ingest_csv_to_parquet",
         externals={},
     )
-    stage = pipeline.job("extract-load").stage("extract-load")
+    stage: st.HookStage = pipeline.job("extract-load").stage("extract-load")
     rs = stage.execute(
         params={
             "params": {
@@ -18,7 +19,7 @@ def test_pipe_stage_task():
             },
         }
     )
-    assert {"extract-load": {"outputs": {"records": 1}}} == rs["stages"]
+    assert {"records": 1} == rs
 
 
 def test_pipe_job_task():

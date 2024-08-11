@@ -193,7 +193,10 @@ class Job(BaseModel):
                 #   reference memory pointer and it was changed when I action
                 #   anything like update or re-construct this.
                 #       ... params |= stage.execute(params=params)
-                stage.execute(params=context)
+                stage.set_outputs(
+                    stage.execute(params=context),
+                    params=context,
+                )
 
             # NOTE: update context back to params that will use on the next
             #   stage. That mean I do not do anything at params until all stages
