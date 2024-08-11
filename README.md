@@ -42,7 +42,12 @@ pipeline.
 pip install ddeutil-workflow
 ```
 
-This project need `ddeutil-io` extension namespace packages.
+This project need `ddeutil-io` extension namespace packages. If you want to install
+this package with application add-ons, you should add `app` in installation;
+
+```shell
+pip install ddeutil-workflow[app]
+```
 
 ## Getting Started
 
@@ -58,8 +63,6 @@ will passing parameters and catching the output for re-use it to next step.
 > In the future of this project, I will drop the connection and dataset to
 > dynamic registries instead of main features because it have a lot of maintain
 > vendor codes and deps. (I do not have time to handle this features)
-
-## Core Features
 
 ### On
 
