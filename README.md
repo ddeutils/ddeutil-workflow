@@ -13,7 +13,7 @@
   - [On](#on)
   - [Pipeline](#pipeline)
 - [Usage](#usage)
-  - [Python & Shell](#python--shell)
+  - [Python & Bash](#python--bash)
   - [Hook (EL)](#hook-extract--load)
   - [Hook (T)](#hook-transform)
 - [Configuration](#configuration)
@@ -127,9 +127,7 @@ use-case.
 > I recommend you to use `task` stage for all actions that you want to do with
 > pipeline object.
 
-### Python & Shell
-
-The state of doing lists that worker should to do. It be collection of the stage.
+### Python & Bash
 
 ```yaml
 run_py_local:

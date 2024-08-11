@@ -9,6 +9,7 @@ import inspect
 import os
 import stat
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from functools import wraps
 from importlib import import_module
@@ -259,9 +260,14 @@ Param = Union[
 ]
 
 
-class Result(BaseModel):
-    status: int = Field(default=2)
-    data: DictData = Field(default_factory=dict)
+@dataclass
+class Result:
+    """Result Dataclass object for passing parameter and receiving output from
+    the pipeline execution.
+    """
+
+    status: int = field(default=2)
+    context: DictData = field(default_factory=dict)
 
 
 def make_exec(path: str | Path):

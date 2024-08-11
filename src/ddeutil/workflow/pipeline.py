@@ -23,7 +23,7 @@ from .__types import DictData, DictStr
 from .loader import Loader
 from .on import On
 from .stage import Stage
-from .utils import Param, dash2underscore
+from .utils import Param, Result, dash2underscore
 
 
 class Strategy(BaseModel):
@@ -121,12 +121,8 @@ class Job(BaseModel):
         ...     "needs": [],
         ...     "stages": [
         ...         {
-        ...             "name": "Set variable and function",
-        ...             "run": (
-        ...                 "var_inside: str = 'Inside'\\n"
-        ...                 "def echo() -> None:\\n"
-        ...                 '  print(f"Echo {var_inside}"\\n'
-        ...             ),
+        ...             "name": "Some stage",
+        ...             "run": "print('Hello World')",
         ...         },
         ...     ],
         ... }
@@ -162,9 +158,19 @@ class Job(BaseModel):
         raise ValueError(f"Stage ID {stage_id} does not exists")
 
     def execute(self, params: DictData | None = None) -> DictData:
-        """Execute job with passing dynamic parameters from the pipeline."""
+        """Job execution with passing dynamic parameters from the pipeline
+        execution. It will generate matrix values at the first step and for-loop
+        any metrix to all stages dependency.
+
+        :param params: An input parameters that use on job execution.
+        :rtype: DictData
+        """
         for strategy in self.strategy.make():
-            params.update({"matrix": strategy})
+
+            # NOTE: update matrix to params
+            context: DictData = {}
+            context.update(params)
+            context.update({"matrix": strategy})
 
             # TODO: we should add option for ``wait_as_complete`` for release
             #   a stage execution to run on background.
@@ -172,7 +178,7 @@ class Job(BaseModel):
             for stage in self.stages:
                 _st_name: str = stage.id if stage.id else stage.name
 
-                if stage.is_skip(params=params):
+                if stage.is_skip(params=context):
                     logging.info(f"[JOB]: Skip the stage: {_st_name!r}")
                     continue
 
@@ -187,7 +193,13 @@ class Job(BaseModel):
                 #   reference memory pointer and it was changed when I action
                 #   anything like update or re-construct this.
                 #       ... params |= stage.execute(params=params)
-                stage.execute(params=params)
+                stage.execute(params=context)
+
+            # NOTE: update context back to params that will use on the next
+            #   stage. That mean I do not do anything at params until all stages
+            #   in this matrix was executed finish.
+            params |= context
+
         # TODO: We should not return matrix key to outside and make new output
         #   that support running different matrix in stage output.
         return params
@@ -202,7 +214,10 @@ class Pipeline(BaseModel):
     name: str = Field(description="A pipeline name.")
     desc: Optional[str] = Field(
         default=None,
-        description="A pipeline description.",
+        description=(
+            "A pipeline description that is able to be string of markdown "
+            "content."
+        ),
     )
     params: dict[str, Param] = Field(
         default_factory=dict,
@@ -290,16 +305,22 @@ class Pipeline(BaseModel):
 
     def gen_run_id(self) -> str:
         """Generate running pipeline ID for able to tracking that pipeline
-        execution logging.
+        execution logging. This generate process use `md5` function.
+
+        :rtype: str
         """
         tz: ZoneInfo = ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
         return md5(
             f"{self.name}{datetime.now(tz=tz):%Y%m%d%H%M%S%f}".encode()
         ).hexdigest()
 
-    def parameterize(self, params: DictData | None = None) -> DictData:
-        """Prepare parameters before passing to execution process."""
-        params: DictData = params or {}
+    def parameterize(self, params: DictData) -> DictData:
+        """Prepare parameters before passing to execution process. This method
+        will create jobs key to params mapping that will keep any result from
+        job execution.
+
+        :param params: A parameter mapping that receive from pipeline execution.
+        """
         # VALIDATE: Incoming params should have keys that set on this pipeline.
         if check_key := tuple(
             f"{k!r}"
@@ -333,10 +354,10 @@ class Pipeline(BaseModel):
         """Execute pipeline with passing dynamic parameters to any jobs that
         included in the pipeline.
 
-        :param params: An input parameters that use on pipeline execution.
+        :param params: An input parameters that use on pipeline execution that
+            will parameterize before using it.
         :param timeout: A time out in second unit that use for limit time of
             this pipeline execution.
-        :rtype: DictData
 
         ---
 
@@ -353,10 +374,12 @@ class Pipeline(BaseModel):
 
         """
         logging.info(f"[CORE]: Start Pipeline {self.name}:{self.gen_run_id()}")
+        params: DictData = params or {}
+
         # NOTE: It should not do anything if it does not have job.
         if not self.jobs:
             logging.warning("[PIPELINE]: This pipeline does not have any jobs")
-            return params
+            return Result(status=0, context=params).context
 
         # NOTE: create a job queue that keep the job that want to running after
         #   it dependency condition.
@@ -366,7 +389,10 @@ class Pipeline(BaseModel):
 
         ts: float = time.monotonic()
         not_time_out_flag: bool = True
-        params: DictData = self.parameterize(params)
+
+        # NOTE: Create result context that will pass this context to any
+        #   execution dependency.
+        rs: Result = Result(context=self.parameterize(params))
 
         # IMPORTANT: The job execution can run parallel and waiting by needed.
         while not jq.empty() and (
@@ -385,14 +411,18 @@ class Pipeline(BaseModel):
             #   >>> with multiprocessing.Pool(processes=3) as pool:
             #   ...     results = pool.starmap(merge_names, ('', '', ...))
             #
-            if any(params["jobs"].get(need) for need in job.needs):
+            if any(rs.context["jobs"].get(need) for need in job.needs):
                 jq.put(job_id)
 
-            job.execute(params=params)
-            params["jobs"][job_id] = {
-                "stages": params.pop("stages", {}),
-                "matrix": params.pop("matrix", {}),
+            job.execute(params=rs.context)
+
+            # NOTE: prepare output of job execution.
+            rs.context["jobs"][job_id] = {
+                "stages": rs.context.pop("stages", {}),
+                "matrix": rs.context.pop("matrix", {}),
             }
         if not not_time_out_flag:
-            raise RuntimeError("Execution of pipeline was time out")
-        return params
+            logging.warning("Execution of pipeline was time out")
+            rs.status = 1
+            return rs.context
+        return rs.context

@@ -13,12 +13,12 @@ import sys
 import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
+from dataclasses import asdict, dataclass
 from inspect import Parameter
 from pathlib import Path
 from subprocess import CompletedProcess
 from typing import Callable, Optional, Union
 
-import msgspec as spec
 from pydantic import BaseModel, Field
 
 from .__types import DictData, DictStr, Re, TupleStr
@@ -57,10 +57,10 @@ class BaseStage(BaseModel, ABC):
         """
         raise NotImplementedError("Stage should implement ``execute`` method.")
 
-    def set_outputs(self, rs: DictData, params: DictData) -> DictData:
+    def set_outputs(self, output: DictData, params: DictData) -> DictData:
         """Set an outputs from execution process to an input params.
 
-        :param rs: A result data that want to extract to an output key.
+        :param output: A output data that want to extract to an output key.
         :param params: A context data that want to add output result.
         :rtype: DictData
         """
@@ -70,7 +70,7 @@ class BaseStage(BaseModel, ABC):
         if "stages" not in params:
             params["stages"] = {}
 
-        params["stages"][self.id] = {"outputs": rs}
+        params["stages"][self.id] = {"outputs": output}
         return params
 
     def is_skip(self, params: DictData | None = None) -> bool:
@@ -164,8 +164,14 @@ class BashStage(BaseStage):
 
         Path(f"./{f_name}").unlink()
 
-    def set_outputs(self, rs: CompletedProcess, params: DictData) -> DictData:
-        """Set outputs to params"""
+    def set_outputs(
+        self,
+        output: CompletedProcess,
+        params: DictData,
+    ) -> DictData:
+        """Override the set outputs method from base stage because this bash
+        stage receive CompletedProcess instance from the subprocess.
+        """
         # NOTE: skipping set outputs of stage execution when id does not set.
         if self.id is None:
             return params
@@ -176,8 +182,8 @@ class BashStage(BaseStage):
         params["stages"][self.id] = {
             # NOTE: The output will fileter unnecessary keys from ``_locals``.
             "outputs": {
-                "return_code": rs.returncode,
-                "stdout": rs.stdout.rstrip("\n"),
+                "return_code": output.returncode,
+                "stdout": output.stdout.rstrip("\n"),
             },
         }
         return params
@@ -217,13 +223,20 @@ class PyStage(BaseStage):
     globals nad additional variables.
     """
 
-    run: str = Field(description="A Python statement that want to run.")
-    vars: DictData = Field(default_factory=dict)
+    run: str = Field(
+        description="A Python string statement that want to run with exec.",
+    )
+    vars: DictData = Field(
+        default_factory=dict,
+        description=(
+            "A mapping to variable that want to pass to globals in exec."
+        ),
+    )
 
-    def set_outputs(self, rs: DictData, params: DictData) -> DictData:
+    def set_outputs(self, output: DictData, params: DictData) -> DictData:
         """Set an outputs from execution process to an input params.
 
-        :param rs: A result data that want to extract to an output key.
+        :param output: A output data that want to extract to an output key.
         :param params: A context data that want to add output result.
         :rtype: DictData
         """
@@ -236,7 +249,7 @@ class PyStage(BaseStage):
 
         params["stages"][self.id] = {
             # NOTE: The output will fileter unnecessary keys from ``_locals``.
-            "outputs": {k: rs[k] for k in rs if k != "__annotations__"},
+            "outputs": {k: output[k] for k in output if k != "__annotations__"},
         }
         return params
 
@@ -269,7 +282,8 @@ class PyStage(BaseStage):
         return params | {k: _globals[k] for k in params if k in _globals}
 
 
-class HookSearch(spec.Struct, kw_only=True, tag="task"):
+@dataclass
+class HookSearch:
     """Hook Search Struct that use the `msgspec` for the best performance data
     serialize.
     """
@@ -280,7 +294,7 @@ class HookSearch(spec.Struct, kw_only=True, tag="task"):
 
     def to_dict(self) -> DictData:
         """Return dict data from struct fields."""
-        return {f: getattr(self, f) for f in self.__struct_fields__}
+        return asdict(self)
 
 
 class HookStage(BaseStage):
