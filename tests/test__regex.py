@@ -28,6 +28,14 @@ def test_regex_caller(value, expected):
     assert expected == rs.group("caller")
 
 
+def test_regex_caller_multiple():
+    for f in Re.RE_CALLER.findall(
+        "${{ matrix.table }}-${{ matrix.partition }}"
+    ):
+        print(type(f))
+        print(f)
+
+
 @pytest.mark.parametrize(
     "value,expected",
     [

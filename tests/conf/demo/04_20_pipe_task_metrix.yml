@@ -23,6 +23,7 @@ ingest_multiple_system:
       stages:
         - name: Extract & Load Multi-System
           uses: tasks/el-${{ matrix.system }}-to-parquet@polars-dir
+          id: ${{ matrix.table }}-${{ matrix.partition }}
           with:
             source:
               conn: ${{ params.source }}

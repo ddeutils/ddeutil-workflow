@@ -16,21 +16,14 @@ def dummy_task_1(
     sink: str,
     conversion: dict[str, Any] | None = None,
 ) -> dict[str, int]:
-    """Extract Load data from CSV to Parquet file.
-
-    :param source:
-    :param sink:
-    :param conversion:
-    """
-    print("Start EL for CSV to Parquet with Polars Engine")
-    print("---")
-    print(f"Reading data from {source}")
+    print("[HOOK]: el-csv-to-parquet@polars-dir")
+    print("... Start EL for CSV to Parquet with Polars Engine")
+    print(f"... Reading data from {source}")
 
     conversion: dict[str, Any] = conversion or {}
     if conversion:
-        print("Start Schema Conversion ...")
-
-    print(f"Writing data to {sink}")
+        print("... Start Schema Conversion ...")
+    print(f"... Writing data to {sink}")
     return {"records": 1}
 
 
@@ -40,13 +33,13 @@ def dummy_task_2(
     sink: str,
     conversion: dict[str, Any] | None = None,
 ) -> dict[str, int]:
-    print("Start EL for CSV to Parquet with Polars Engine")
-    print("---")
-    print(f"Reading data from {source}")
+    print("[HOOK]: el-csv-to-parquet@polars-dir-scan")
+    print("... Start EL for CSV to Parquet with Polars Engine")
+    print("... ---")
+    print(f"... Reading data from {source}")
 
     conversion: dict[str, Any] = conversion or {}
     if conversion:
-        print("Start Schema Conversion ...")
-
-    print(f"Writing data to {sink}")
+        print("... Start Schema Conversion ...")
+    print(f"... Writing data to {sink}")
     return {"records": 1}

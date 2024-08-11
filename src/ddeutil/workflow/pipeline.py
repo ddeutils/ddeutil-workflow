@@ -198,6 +198,9 @@ class Job(BaseModel):
                     params=context,
                 )
 
+            # import json
+            # print(f"Stage Results: {json.dumps(context, indent=2)}")
+
             # NOTE: update context back to params that will use on the next
             #   stage. That mean I do not do anything at params until all stages
             #   in this matrix was executed finish.

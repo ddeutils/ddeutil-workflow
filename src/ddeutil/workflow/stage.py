@@ -13,7 +13,7 @@ import sys
 import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from inspect import Parameter
 from pathlib import Path
 from subprocess import CompletedProcess
@@ -25,7 +25,6 @@ from .__types import DictData, DictStr, Re, TupleStr
 from .exceptions import StageException
 from .utils import (
     Registry,
-    Result,
     TagFunc,
     make_exec,
     make_registry,
@@ -55,12 +54,12 @@ class BaseStage(BaseModel, ABC):
     )
 
     @abstractmethod
-    def execute(self, params: DictData) -> Result:
+    def execute(self, params: DictData) -> DictData:
         """Execute abstraction method that action something by sub-model class.
         This is important method that make this class is able to be the stage.
 
         :param params: A parameter data that want to use in this execution.
-        :rtype: Result
+        :rtype: DictData
         """
         raise NotImplementedError("Stage should implement ``execute`` method.")
 
@@ -78,7 +77,7 @@ class BaseStage(BaseModel, ABC):
         if "stages" not in params:
             params["stages"] = {}
 
-        params["stages"][self.id] = {"outputs": output}
+        params["stages"][param2template(self.id, params)] = {"outputs": output}
         return params
 
     def is_skip(self, params: DictData | None = None) -> bool:
@@ -158,6 +157,7 @@ class BashStage(BaseStage):
         f_name: str = f"{uuid.uuid4()}.sh"
         f_shebang: str = "bash" if sys.platform.startswith("win") else "sh"
         with open(f"./{f_name}", mode="w", newline="\n") as f:
+            # NOTE: write header of `.sh` file
             f.write(f"#!/bin/{f_shebang}\n")
 
             # NOTE: add setting environment variable before bash skip statement.
@@ -174,7 +174,7 @@ class BashStage(BaseStage):
 
     def set_outputs(
         self,
-        output: CompletedProcess,
+        output: DictData,
         params: DictData,
     ) -> DictData:
         """Override the set outputs method from base stage because this bash
@@ -187,7 +187,7 @@ class BashStage(BaseStage):
         if "stages" not in params:
             params["stages"] = {}
 
-        params["stages"][self.id] = {"outputs": output}
+        params["stages"][param2template(self.id, params)] = {"outputs": output}
         return params
 
     def execute(self, params: DictData) -> DictData:
@@ -256,14 +256,15 @@ class PyStage(BaseStage):
         _globals: DictData = output["globals"]
 
         # NOTE: The output will fileter unnecessary keys from locals.
-        params["stages"][self.id] = {
+        params["stages"][param2template(self.id, params)] = {
             "outputs": {
                 k: _locals[k] for k in _locals if k != "__annotations__"
             },
         }
 
         # NOTE: Replace value that changing from the globals.
-        return params | {k: _globals[k] for k in params if k in _globals}
+        params.update({k: _globals[k] for k in params if k in _globals})
+        return params
 
     def execute(self, params: DictData) -> DictData:
         """Execute the Python statement that pass all globals and input params
@@ -294,17 +295,11 @@ class PyStage(BaseStage):
 
 @dataclass
 class HookSearch:
-    """Hook Search Struct that use the `msgspec` for the best performance data
-    serialize.
-    """
+    """Hook Search dataclass."""
 
     path: str
     func: str
     tag: str
-
-    def to_dict(self) -> DictData:
-        """Return dict data from struct fields."""
-        return asdict(self)
 
 
 class HookStage(BaseStage):

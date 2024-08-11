@@ -301,29 +301,34 @@ def param2template(
     elif not isinstance(value, str):
         return value
 
-    if not (found := Re.RE_CALLER.search(value)):
+    if not Re.RE_CALLER.search(value):
         return value
 
-    # NOTE: get caller value that setting inside; ``${{ <caller-value> }}``
-    caller: str = found.group("caller")
-    if not hasdot(caller, params):
-        raise ValueError(f"params does not set caller: {caller!r}")
-    getter: Any = getdot(caller, params)
+    for found in Re.RE_CALLER.finditer(value):
 
-    # NOTE: check type of vars
-    if isinstance(getter, (str, int)):
-        return value.replace(
-            found.group(0), (repr(getter) if repr_flag else str(getter))
-        )
+        # NOTE: get caller value that setting inside; ``${{ <caller-value> }}``
+        caller: str = found.group("caller")
+        if not hasdot(caller, params):
+            raise ValueError(f"params does not set caller: {caller!r}")
 
-    # NOTE:
-    #   If type of getter caller does not formatting, it will return origin
-    #   value.
-    if value.replace(found.group(0), "") != "":
-        raise ValueError(
-            "Callable variable should not pass other outside ${{ ... }}"
-        )
-    return getter
+        getter: Any = getdot(caller, params)
+
+        # NOTE: check type of vars
+        if isinstance(getter, (str, int)):
+            value: str = value.replace(
+                found.group(0), (repr(getter) if repr_flag else str(getter)), 1
+            )
+            continue
+
+        # NOTE:
+        #   If type of getter caller does not formatting, it will return origin
+        #   value from the ``getdot`` function.
+        if value.replace(found.group(0), "", 1) != "":
+            raise ValueError(
+                "Callable variable should not pass other outside ${{ ... }}"
+            )
+        return getter
+    return value
 
 
 def dash2underscore(

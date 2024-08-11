@@ -83,4 +83,5 @@ def test_pipe_matrix():
         name="ingest_multiple_system",
         externals={},
     )
-    pipeline.execute(params={"source": "src", "target": "tgt"})
+    rs = pipeline.execute(params={"source": "src", "target": "tgt"})
+    print(rs)
