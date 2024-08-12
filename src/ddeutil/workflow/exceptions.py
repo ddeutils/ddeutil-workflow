@@ -10,3 +10,6 @@ from __future__ import annotations
 
 
 class StageException(Exception): ...
+
+
+class PipelineException(Exception): ...

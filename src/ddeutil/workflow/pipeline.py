@@ -5,25 +5,21 @@
 # ------------------------------------------------------------------------------
 from __future__ import annotations
 
-import itertools
+import copy
 import logging
-import os
 import time
-from datetime import datetime
-from hashlib import md5
 from queue import Queue
-from typing import Optional, Union
-from zoneinfo import ZoneInfo
+from typing import Optional
 
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
-from .__types import DictData, DictStr
+from .__types import DictData, DictStr, Matrix, MatrixExclude, MatrixInclude
 from .loader import Loader
 from .on import On
 from .stage import Stage
-from .utils import Param, Result, dash2underscore
+from .utils import Param, Result, cross_product, dash2underscore, gen_id
 
 
 class Strategy(BaseModel):
@@ -43,9 +39,12 @@ class Strategy(BaseModel):
 
     fail_fast: bool = Field(default=False)
     max_parallel: int = Field(default=-1)
-    matrix: dict[str, Union[list[str], list[int]]] = Field(default_factory=dict)
-    include: list[dict[str, Union[str, int]]] = Field(default_factory=list)
-    exclude: list[dict[str, Union[str, int]]] = Field(
+    matrix: Matrix = Field(default_factory=dict)
+    include: MatrixInclude = Field(
+        default_factory=list,
+        description="A list of additional matrix that want to adds-in.",
+    )
+    exclude: MatrixExclude = Field(
         default_factory=list,
         description="A list of exclude matrix that want to filter-out.",
     )
@@ -65,15 +64,12 @@ class Strategy(BaseModel):
 
         :rtype: list[DictStr]
         """
+        # NOTE: If it does not set matrix, it will return list of an empty dict.
         if not (mt := self.matrix):
             return [{}]
+
         final: list[DictStr] = []
-        for r in [
-            {_k: _v for e in mapped for _k, _v in e.items()}
-            for mapped in itertools.product(
-                *[[{k: v} for v in vs] for k, vs in mt.items()]
-            )
-        ]:
+        for r in cross_product(matrix=mt):
             if any(
                 all(r[k] == v for k, v in exclude.items())
                 for exclude in self.exclude
@@ -81,8 +77,9 @@ class Strategy(BaseModel):
                 continue
             final.append(r)
 
-        # NOTE: If it is empty matrix, it will return list of empty dict.
-        if not final:
+        # NOTE: If it is empty matrix and include, it will return list of an
+        #   empty dict.
+        if not final and not self.include:
             return [{}]
 
         # NOTE: Add include to generated matrix with exclude list.
@@ -157,6 +154,13 @@ class Job(BaseModel):
                 return stage
         raise ValueError(f"Stage ID {stage_id} does not exists")
 
+    @staticmethod
+    def set_outputs(output: DictData) -> DictData:
+        if len(output) > 1:
+            return {"strategies": output}
+
+        return output[next(iter(output))]
+
     def execute(self, params: DictData | None = None) -> DictData:
         """Job execution with passing dynamic parameters from the pipeline
         execution. It will generate matrix values at the first step and for-loop
@@ -165,15 +169,27 @@ class Job(BaseModel):
         :param params: An input parameters that use on job execution.
         :rtype: DictData
         """
+        strategy_context: DictData = {}
         for strategy in self.strategy.make():
 
-            # NOTE: update matrix to params
+            # NOTE: Create strategy context and update matrix and params to this
+            #   context. So, the context will have structure like;
+            #   ---
+            #   {
+            #       "params": { ... },      <== Current input params
+            #       "jobs": { ... },
+            #       "matrix": { ... }       <== Current strategy value
+            #   }
+            #
             context: DictData = {}
             context.update(params)
             context.update({"matrix": strategy})
 
             # TODO: we should add option for ``wait_as_complete`` for release
-            #   a stage execution to run on background.
+            #   a stage execution to run on background (multi-thread).
+            #   ---
+            #   >>> from concurrency
+            #
             # IMPORTANT: The stage execution only run sequentially one-by-one.
             for stage in self.stages:
                 _st_name: str = stage.id if stage.id else stage.name
@@ -181,7 +197,6 @@ class Job(BaseModel):
                 if stage.is_skip(params=context):
                     logging.info(f"[JOB]: Skip the stage: {_st_name!r}")
                     continue
-
                 logging.info(f"[JOB]: Start execute the stage: {_st_name!r}")
 
                 # NOTE: Logging a matrix that pass on this stage execution.
@@ -192,23 +207,30 @@ class Job(BaseModel):
                 #       I do not use below syntax because `params` dict be the
                 #   reference memory pointer and it was changed when I action
                 #   anything like update or re-construct this.
+                #
                 #       ... params |= stage.execute(params=params)
+                #
+                #   This step will add the stage result to ``stages`` key in
+                #   that stage id. It will have structure like;
+                #   ---
+                #   {
+                #       "params": { ... },
+                #       "jobs": { ... },
+                #       "matrix": { ... },
+                #       "stages": { { "stage-id-1": ... }, ... }
+                #   }
+                #
                 stage.set_outputs(
                     stage.execute(params=context),
                     params=context,
                 )
 
-            # import json
-            # print(f"Stage Results: {json.dumps(context, indent=2)}")
+            strategy_context[gen_id(strategy)] = {
+                "matrix": strategy,
+                "stages": context.pop("stages", {}),
+            }
 
-            # NOTE: update context back to params that will use on the next
-            #   stage. That mean I do not do anything at params until all stages
-            #   in this matrix was executed finish.
-            params |= context
-
-        # TODO: We should not return matrix key to outside and make new output
-        #   that support running different matrix in stage output.
-        return params
+        return strategy_context
 
 
 class Pipeline(BaseModel):
@@ -251,7 +273,7 @@ class Pipeline(BaseModel):
             object.
         """
         loader: Loader = Loader(name, externals=(externals or {}))
-        loader_data: DictData = loader.data.copy()
+        loader_data: DictData = copy.deepcopy(loader.data)
 
         # NOTE: Add name to loader data
         loader_data["name"] = name.replace(" ", "_")
@@ -309,17 +331,6 @@ class Pipeline(BaseModel):
             raise ValueError(f"Job {name!r} does not exists")
         return self.jobs[name]
 
-    def gen_run_id(self) -> str:
-        """Generate running pipeline ID for able to tracking that pipeline
-        execution logging. This generate process use `md5` function.
-
-        :rtype: str
-        """
-        tz: ZoneInfo = ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
-        return md5(
-            f"{self.name}{datetime.now(tz=tz):%Y%m%d%H%M%S%f}".encode()
-        ).hexdigest()
-
     def parameterize(self, params: DictData) -> DictData:
         """Prepare parameters before passing to execution process. This method
         will create jobs key to params mapping that will keep any result from
@@ -362,8 +373,9 @@ class Pipeline(BaseModel):
 
         :param params: An input parameters that use on pipeline execution that
             will parameterize before using it.
-        :param timeout: A time out in second unit that use for limit time of
-            this pipeline execution.
+        :param timeout: A pipeline execution time out in second unit that use
+            for limit time of execution and waiting job dependency.
+        :rtype: DictData
 
         ---
 
@@ -379,7 +391,10 @@ class Pipeline(BaseModel):
             ... ${job-name}.stages.${stage-id}.outputs.${key}
 
         """
-        logging.info(f"[CORE]: Start Pipeline {self.name}:{self.gen_run_id()}")
+        logging.info(
+            f"[CORE]: Start Pipeline {self.name}:"
+            f"{gen_id(self.name, unique=True)}"
+        )
         params: DictData = params or {}
 
         # NOTE: It should not do anything if it does not have job.
@@ -416,17 +431,23 @@ class Pipeline(BaseModel):
             #   >>> import multiprocessing
             #   >>> with multiprocessing.Pool(processes=3) as pool:
             #   ...     results = pool.starmap(merge_names, ('', '', ...))
+            #   ---
+            #   This case we use multi-process because I want to split usage of
+            #   data in this level, that mean the data that push to parallel job
+            #   should not use across another job.
             #
             if any(rs.context["jobs"].get(need) for need in job.needs):
                 jq.put(job_id)
 
-            job.execute(params=rs.context)
+            # NOTE: copy current the result context for reference other job
+            #   context.
+            job_context: DictData = copy.deepcopy(rs.context)
 
-            # NOTE: prepare output of job execution.
-            rs.context["jobs"][job_id] = {
-                "stages": rs.context.pop("stages", {}),
-                "matrix": rs.context.pop("matrix", {}),
-            }
+            # NOTE: Receive output of job execution.
+            rs.context["jobs"][job_id] = job.set_outputs(
+                job.execute(params=job_context)
+            )
+
         if not not_time_out_flag:
             logging.warning("Execution of pipeline was time out")
             rs.status = 1

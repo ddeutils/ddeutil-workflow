@@ -38,14 +38,9 @@ def test_pipe_job_task():
         },
     )
     assert {
-        "matrix": {},
-        "params": {
-            "run-date": datetime(2024, 1, 1, 0, 0),
-            "source": "ds_csv_local_file",
-            "sink": "ds_parquet_local_file_dir",
-        },
-        "stages": {
-            "extract-load": {"outputs": {"records": 1}},
+        "99914b932bd37a50b983c5e7c90ae93b": {
+            "matrix": {},
+            "stages": {"extract-load": {"outputs": {"records": 1}}},
         },
     } == rs
 

@@ -13,11 +13,14 @@ from re import (
     VERBOSE,
     Pattern,
 )
-from typing import Any
+from typing import Any, Union
 
 TupleStr = tuple[str, ...]
 DictData = dict[str, Any]
 DictStr = dict[str, str]
+Matrix = dict[str, Union[list[str], list[int]]]
+MatrixInclude = list[dict[str, Union[str, int]]]
+MatrixExclude = list[dict[str, Union[str, int]]]
 
 
 class Re:

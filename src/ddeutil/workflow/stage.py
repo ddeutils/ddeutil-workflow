@@ -70,6 +70,7 @@ class BaseStage(BaseModel, ABC):
         :param params: A context data that want to add output result.
         :rtype: DictData
         """
+        # TODO: Can we hash stage name and use it instead of empty ID?
         if self.id is None:
             return params
 
@@ -172,24 +173,6 @@ class BashStage(BaseStage):
 
         Path(f"./{f_name}").unlink()
 
-    def set_outputs(
-        self,
-        output: DictData,
-        params: DictData,
-    ) -> DictData:
-        """Override the set outputs method from base stage because this bash
-        stage receive CompletedProcess instance from the subprocess.
-        """
-        # NOTE: skipping set outputs of stage execution when id does not set.
-        if self.id is None:
-            return params
-
-        if "stages" not in params:
-            params["stages"] = {}
-
-        params["stages"][param2template(self.id, params)] = {"outputs": output}
-        return params
-
     def execute(self, params: DictData) -> DictData:
         """Execute the Bash statement with the Python build-in ``subprocess``
         package.
@@ -239,7 +222,7 @@ class PyStage(BaseStage):
     )
 
     def set_outputs(self, output: DictData, params: DictData) -> DictData:
-        """Set an outputs from execution process to an input params.
+        """Set an outputs from the Python execution process to an input params.
 
         :param output: A output data that want to extract to an output key.
         :param params: A context data that want to add output result.

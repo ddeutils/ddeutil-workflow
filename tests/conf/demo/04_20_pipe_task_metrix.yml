@@ -31,3 +31,8 @@ ingest_multiple_system:
             sink:
               conn: ${{ params.target }}
               endpoint: /raw/${{ matrix.table }}_${{ matrix.system }}
+
+        - name: End Stage
+          id: end-stage
+          run: |
+            passing_value: int = 10

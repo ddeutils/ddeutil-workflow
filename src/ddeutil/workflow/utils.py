@@ -9,12 +9,16 @@ import inspect
 import os
 import stat
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from functools import wraps
+from hashlib import md5
 from importlib import import_module
+from itertools import product
 from pathlib import Path
 from typing import Any, Callable, Literal, Optional, Protocol, Union
+from zoneinfo import ZoneInfo
 
 from ddeutil.core import getdot, hasdot, lazy
 from ddeutil.io import PathData
@@ -23,7 +27,7 @@ from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
-from .__types import DictData, Re
+from .__types import DictData, Matrix, Re
 
 
 class Engine(BaseModel):
@@ -79,6 +83,27 @@ def config() -> ConfParams:
             },
         }
     )
+
+
+def gen_id(value: Any, *, sensitive: bool = True, unique: bool = False) -> str:
+    """Generate running ID for able to tracking. This generate process use `md5`
+    function.
+
+    :param value:
+    :param sensitive:
+    :param unique:
+    :rtype: str
+    """
+    if not isinstance(value, str):
+        value: str = str(value)
+
+    tz: ZoneInfo = ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
+    return md5(
+        (
+            f"{(value if sensitive else value.lower())}"
+            + (f"{datetime.now(tz=tz):%Y%m%d%H%M%S%f}" if unique else "")
+        ).encode()
+    ).hexdigest()
 
 
 class TagFunc(Protocol):
@@ -341,3 +366,13 @@ def dash2underscore(
     if key in values:
         values[(fixed or key.replace("-", "_"))] = values.pop(key)
     return values
+
+
+def cross_product(matrix: Matrix) -> Iterator:
+    """Iterator of products value from matrix."""
+    yield from (
+        {_k: _v for e in mapped for _k, _v in e.items()}
+        for mapped in product(
+            *[[{k: v} for v in vs] for k, vs in matrix.items()]
+        )
+    )
