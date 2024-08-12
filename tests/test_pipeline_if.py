@@ -16,5 +16,12 @@ def test_pipe_id():
     rs = pipeline.execute(params={"name": "bar"})
     assert {
         "params": {"name": "bar"},
-        "jobs": {"condition-job": {"stages": {}, "matrix": {}}},
+        "jobs": {
+            "condition-job": {
+                "matrix": {},
+                "stages": {
+                    "ab2214618b003cb11f62e1766d176986": {"outputs": {}},
+                },
+            },
+        },
     } == rs

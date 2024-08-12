@@ -21,13 +21,9 @@ def dotenv_setting() -> None:
             WORKFLOW_ROOT_PATH={OUTSIDE_PATH.resolve()}
             WORKFLOW_CORE_REGISTRY="ddeutil.workflow,tests"
             WORKFLOW_CORE_PATH_CONF=tests/conf
-
-            SFTP_HOST='50.100.200.123'
-            SFTP_USER='bastion'
-            SFTP_PASSWORD='P@ssW0rd'
-
-            AWS_ACCESS_ID='dummy_access_id'
-            AWS_ACCESS_SECRET_KEY='dummy_access_secret_key'
+            WORKFLOW_CORE_PATH_CONF=tests/conf
+            WORKFLOW_CORE_TIMEZONE=Asia/Bangkok
+            WORKFLOW_CORE_DEFAULT_STAGE_ID=true
             """
         ).strip()
         env_path.write_text(env_str)

@@ -8,6 +8,7 @@ from __future__ import annotations
 import contextlib
 import inspect
 import logging
+import os
 import subprocess
 import sys
 import uuid
@@ -19,6 +20,7 @@ from pathlib import Path
 from subprocess import CompletedProcess
 from typing import Callable, Optional, Union
 
+from ddeutil.core import str2bool
 from pydantic import BaseModel, Field
 
 from .__types import DictData, DictStr, Re, TupleStr
@@ -26,6 +28,7 @@ from .exceptions import StageException
 from .utils import (
     Registry,
     TagFunc,
+    gen_id,
     make_exec,
     make_registry,
     param2template,
@@ -70,15 +73,18 @@ class BaseStage(BaseModel, ABC):
         :param params: A context data that want to add output result.
         :rtype: DictData
         """
-        # TODO: Can we hash stage name and use it instead of empty ID?
-        if self.id is None:
+        if self.id:
+            _id: str = param2template(self.id, params)
+        elif str2bool(os.getenv("WORKFLOW_CORE_DEFAULT_STAGE_ID", "false")):
+            _id: str = gen_id(param2template(self.name, params))
+        else:
             return params
 
         # NOTE: Create stages key to receive an output from the stage execution.
         if "stages" not in params:
             params["stages"] = {}
 
-        params["stages"][param2template(self.id, params)] = {"outputs": output}
+        params["stages"][_id] = {"outputs": output}
         return params
 
     def is_skip(self, params: DictData | None = None) -> bool:
@@ -228,24 +234,16 @@ class PyStage(BaseStage):
         :param params: A context data that want to add output result.
         :rtype: DictData
         """
-        # NOTE: skipping set outputs of stage execution when id does not set.
-        if self.id is None:
-            return params
-
-        if "stages" not in params:
-            params["stages"] = {}
-
-        _locals: DictData = output["locals"]
-        _globals: DictData = output["globals"]
-
         # NOTE: The output will fileter unnecessary keys from locals.
-        params["stages"][param2template(self.id, params)] = {
-            "outputs": {
-                k: _locals[k] for k in _locals if k != "__annotations__"
-            },
-        }
+        _locals: DictData = output["locals"]
+        super().set_outputs(
+            {k: _locals[k] for k in _locals if k != "__annotations__"},
+            params=params,
+        )
 
-        # NOTE: Replace value that changing from the globals.
+        # NOTE:
+        #   Override value that changing from the globals that pass via exec.
+        _globals: DictData = output["globals"]
         params.update({k: _globals[k] for k in params if k in _globals})
         return params
 
