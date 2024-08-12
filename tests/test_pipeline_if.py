@@ -1,4 +1,5 @@
 import ddeutil.workflow.pipeline as pipe
+from ddeutil.workflow.utils import Result
 
 
 def test_stage_if():
@@ -13,7 +14,7 @@ def test_stage_if():
 
 def test_pipe_id():
     pipeline = pipe.Pipeline.from_loader(name="pipe-condition", externals={})
-    rs = pipeline.execute(params={"name": "bar"})
+    rs: Result = pipeline.execute(params={"name": "bar"})
     assert {
         "params": {"name": "bar"},
         "jobs": {
@@ -24,4 +25,4 @@ def test_pipe_id():
                 },
             },
         },
-    } == rs
+    } == rs.context

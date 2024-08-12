@@ -85,6 +85,3 @@ def test_pipe_matrix():
     )
     rs = pipeline.execute(params={"source": "src", "target": "tgt"})
     print(rs)
-    import json
-
-    print(json.dumps(rs, indent=4))

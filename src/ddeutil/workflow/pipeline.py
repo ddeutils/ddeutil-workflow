@@ -16,6 +16,7 @@ from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
 from .__types import DictData, DictStr, Matrix, MatrixExclude, MatrixInclude
+from .exceptions import JobException, PipelineException
 from .loader import Loader
 from .on import On
 from .stage import Stage
@@ -125,6 +126,8 @@ class Job(BaseModel):
         ... }
     """
 
+    name: Optional[str] = Field(default=None)
+    desc: Optional[str] = Field(default=None)
     runs_on: Optional[str] = Field(default=None)
     stages: list[Stage] = Field(
         default_factory=list,
@@ -161,13 +164,44 @@ class Job(BaseModel):
 
         return output[next(iter(output))]
 
-    def execute(self, params: DictData | None = None) -> DictData:
+    def strategy_execute(self, strategy: DictData, params: DictData) -> Result:
+        context: DictData = {}
+        context.update(params)
+        context.update({"matrix": strategy})
+
+        for stage in self.stages:
+            _st_name: str = stage.id or stage.name
+
+            if stage.is_skip(params=context):
+                logging.info(f"[JOB]: Skip the stage: {_st_name!r}")
+                continue
+            logging.info(f"[JOB]: Start execute the stage: {_st_name!r}")
+
+            rs: Result = stage.execute(params=context)
+            if rs.status == 0:
+                stage.set_outputs(rs.context, params=context)
+            else:
+                raise JobException(
+                    f"Getting status does not equal zero on stage: "
+                    f"{stage.name}."
+                )
+        return Result(
+            status=0,
+            context={
+                gen_id(strategy): {
+                    "matrix": strategy,
+                    "stages": context.pop("stages", {}),
+                },
+            },
+        )
+
+    def execute(self, params: DictData | None = None) -> Result:
         """Job execution with passing dynamic parameters from the pipeline
         execution. It will generate matrix values at the first step and for-loop
         any metrix to all stages dependency.
 
         :param params: An input parameters that use on job execution.
-        :rtype: DictData
+        :rtype: Result
         """
         strategy_context: DictData = {}
         for strategy in self.strategy.make():
@@ -192,7 +226,7 @@ class Job(BaseModel):
             #
             # IMPORTANT: The stage execution only run sequentially one-by-one.
             for stage in self.stages:
-                _st_name: str = stage.id if stage.id else stage.name
+                _st_name: str = stage.id or stage.name
 
                 if stage.is_skip(params=context):
                     logging.info(f"[JOB]: Skip the stage: {_st_name!r}")
@@ -220,17 +254,21 @@ class Job(BaseModel):
                 #       "stages": { { "stage-id-1": ... }, ... }
                 #   }
                 #
-                stage.set_outputs(
-                    stage.execute(params=context),
-                    params=context,
-                )
+                rs: Result = stage.execute(params=context)
+                if rs.status == 0:
+                    stage.set_outputs(rs.context, params=context)
+                else:
+                    raise JobException(
+                        f"Getting status does not equal zero on stage: "
+                        f"{stage.name}."
+                    )
 
             strategy_context[gen_id(strategy)] = {
                 "matrix": strategy,
                 "stages": context.pop("stages", {}),
             }
 
-        return strategy_context
+        return Result(status=0, context=strategy_context)
 
 
 class Pipeline(BaseModel):
@@ -367,7 +405,7 @@ class Pipeline(BaseModel):
         params: DictData | None = None,
         *,
         timeout: int = 60,
-    ) -> DictData:
+    ) -> Result:
         """Execute pipeline with passing dynamic parameters to any jobs that
         included in the pipeline.
 
@@ -375,7 +413,7 @@ class Pipeline(BaseModel):
             will parameterize before using it.
         :param timeout: A pipeline execution time out in second unit that use
             for limit time of execution and waiting job dependency.
-        :rtype: DictData
+        :rtype: Result
 
         ---
 
@@ -400,7 +438,7 @@ class Pipeline(BaseModel):
         # NOTE: It should not do anything if it does not have job.
         if not self.jobs:
             logging.warning("[PIPELINE]: This pipeline does not have any jobs")
-            return Result(status=0, context=params).context
+            return Result(status=0, context=params)
 
         # NOTE: create a job queue that keep the job that want to running after
         #   it dependency condition.
@@ -442,14 +480,18 @@ class Pipeline(BaseModel):
             # NOTE: copy current the result context for reference other job
             #   context.
             job_context: DictData = copy.deepcopy(rs.context)
-
-            # NOTE: Receive output of job execution.
-            rs.context["jobs"][job_id] = job.set_outputs(
-                job.execute(params=job_context)
-            )
+            job_rs: Result = job.execute(params=job_context)
+            if job_rs.status == 0:
+                # NOTE: Receive output of job execution.
+                rs.context["jobs"][job_id] = job.set_outputs(job_rs.context)
+            else:
+                raise PipelineException(
+                    f"Getting status does not equal zero on job: {job_id}."
+                )
 
         if not not_time_out_flag:
             logging.warning("Execution of pipeline was time out")
             rs.status = 1
-            return rs.context
-        return rs.context
+            return rs
+        rs.status = 0
+        return rs

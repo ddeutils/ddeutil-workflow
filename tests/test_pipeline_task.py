@@ -19,7 +19,8 @@ def test_pipe_stage_task():
             },
         }
     )
-    assert {"records": 1} == rs
+    assert 0 == rs.status
+    assert {"records": 1} == rs.context
 
 
 def test_pipe_job_task():
@@ -42,7 +43,7 @@ def test_pipe_job_task():
             "matrix": {},
             "stages": {"extract-load": {"outputs": {"records": 1}}},
         },
-    } == rs
+    } == rs.context
 
 
 def test_pipe_task():
@@ -57,6 +58,7 @@ def test_pipe_task():
             "sink": "ds_parquet_local_file_dir",
         },
     )
+    assert 0 == rs.status
     assert {
         "params": {
             "run-date": datetime(2024, 1, 1),
@@ -73,4 +75,4 @@ def test_pipe_task():
                 "matrix": {},
             },
         },
-    } == rs
+    } == rs.context

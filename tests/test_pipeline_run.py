@@ -23,7 +23,7 @@ def test_pipe_stage_py():
         "stages": {"hello-world": {"outputs": {"x": "Foo"}}},
     }
     rs = stage.execute(params=p)
-    _prepare_rs = stage.set_outputs(rs, p)
+    _prepare_rs = stage.set_outputs(rs.context, p)
     assert {
         "params": {"name": "Author"},
         "stages": {
@@ -42,7 +42,7 @@ def test_pipe_stage_py_func():
 
     # NOTE: Start execute with manual stage parameters.
     rs = stage.execute(params={})
-    _prepare_rs = stage.set_outputs(rs, {})
+    _prepare_rs = stage.set_outputs(rs.context, {})
     assert ("var_inside", "echo") == tuple(
         _prepare_rs["stages"]["create-func"]["outputs"].keys()
     )
@@ -62,7 +62,7 @@ def test_pipe_job_py():
                 "run-var": {"outputs": {"x": 1}},
             },
         },
-    } == rs
+    } == rs.context
 
 
 def test_stage_bash():
@@ -73,7 +73,7 @@ def test_stage_bash():
         "return_code": 0,
         "stdout": "Hello World\nVariable Foo",
         "stderr": "",
-    } == rs
+    } == rs.context
 
 
 def test_stage_bash_env():
@@ -84,7 +84,7 @@ def test_stage_bash_env():
         "return_code": 0,
         "stdout": "Hello World\nVariable Foo\nENV Bar",
         "stderr": "",
-    } == rs
+    } == rs.context
 
 
 def test_pipe_params_py():
@@ -98,7 +98,10 @@ def test_pipe_params_py():
             "run-date": "2024-01-01",
         }
     )
-    assert {"final-job", "first-job", "second-job"} == set(rs["jobs"].keys())
+    assert 0 == rs.status
+    assert {"final-job", "first-job", "second-job"} == set(
+        rs.context["jobs"].keys()
+    )
     assert {"printing", "setting-x"} == set(
-        rs["jobs"]["first-job"]["stages"].keys()
+        rs.context["jobs"]["first-job"]["stages"].keys()
     )

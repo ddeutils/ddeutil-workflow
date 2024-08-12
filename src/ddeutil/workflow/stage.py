@@ -27,6 +27,7 @@ from .__types import DictData, DictStr, Re, TupleStr
 from .exceptions import StageException
 from .utils import (
     Registry,
+    Result,
     TagFunc,
     gen_id,
     make_exec,
@@ -57,12 +58,12 @@ class BaseStage(BaseModel, ABC):
     )
 
     @abstractmethod
-    def execute(self, params: DictData) -> DictData:
+    def execute(self, params: DictData) -> Result:
         """Execute abstraction method that action something by sub-model class.
         This is important method that make this class is able to be the stage.
 
         :param params: A parameter data that want to use in this execution.
-        :rtype: DictData
+        :rtype: Result
         """
         raise NotImplementedError("Stage should implement ``execute`` method.")
 
@@ -88,7 +89,10 @@ class BaseStage(BaseModel, ABC):
         return params
 
     def is_skip(self, params: DictData | None = None) -> bool:
-        """Return true if condition of this stage do not correct."""
+        """Return true if condition of this stage do not correct.
+
+        :param params: A parameters that want to pass to condition template.
+        """
         params: DictData = params or {}
         if self.condition is None:
             return False
@@ -116,7 +120,7 @@ class EmptyStage(BaseStage):
         description="A string statement that want to logging",
     )
 
-    def execute(self, params: DictData) -> DictData:
+    def execute(self, params: DictData) -> Result:
         """Execution method for the Empty stage that do only logging out to
         stdout.
 
@@ -124,7 +128,7 @@ class EmptyStage(BaseStage):
             stage does not pass any output.
         """
         logging.info(f"[STAGE]: Empty-Execute: {self.name!r}")
-        return {}
+        return Result(status=0, context={})
 
 
 class BashStage(BaseStage):
@@ -179,12 +183,12 @@ class BashStage(BaseStage):
 
         Path(f"./{f_name}").unlink()
 
-    def execute(self, params: DictData) -> DictData:
+    def execute(self, params: DictData) -> Result:
         """Execute the Bash statement with the Python build-in ``subprocess``
         package.
 
         :param params: A parameter data that want to use in this execution.
-        :rtype: DictData
+        :rtype: Result
         """
         bash: str = param2template(self.bash, params)
         with self.__prepare_bash(
@@ -205,11 +209,14 @@ class BashStage(BaseStage):
             )
             logging.error(f"{err}\nRunning Statement:\n---\n{bash}")
             raise StageException(f"{err}\nRunning Statement:\n---\n{bash}")
-        return {
-            "return_code": rs.returncode,
-            "stdout": rs.stdout.rstrip("\n"),
-            "stderr": rs.stderr.rstrip("\n"),
-        }
+        return Result(
+            status=0,
+            context={
+                "return_code": rs.returncode,
+                "stdout": rs.stdout.rstrip("\n"),
+                "stderr": rs.stderr.rstrip("\n"),
+            },
+        )
 
 
 class PyStage(BaseStage):
@@ -247,16 +254,12 @@ class PyStage(BaseStage):
         params.update({k: _globals[k] for k in params if k in _globals})
         return params
 
-    def execute(self, params: DictData) -> DictData:
+    def execute(self, params: DictData) -> Result:
         """Execute the Python statement that pass all globals and input params
         to globals argument on ``exec`` build-in function.
 
         :param params: A parameter that want to pass before run any statement.
-        :type params: DictData
-
-        :rtype: DictData
-        :returns: A parameters from an input that was mapped output if the stage
-            ID was set.
+        :rtype: Result
         """
         # NOTE: create custom globals value that will pass to exec function.
         _globals: DictData = (
@@ -271,7 +274,10 @@ class PyStage(BaseStage):
                 f"{err.__class__.__name__}: {err}\nRunning Statement:\n---\n"
                 f"{self.run}"
             ) from None
-        return {"locals": _locals, "globals": _globals}
+        return Result(
+            status=0,
+            context={"locals": _locals, "globals": _globals},
+        )
 
 
 @dataclass
@@ -334,15 +340,12 @@ class HookStage(BaseStage):
             )
         return rgt[hook.func][hook.tag]
 
-    def execute(self, params: DictData) -> DictData:
+    def execute(self, params: DictData) -> Result:
         """Execute the Task function that already mark registry.
 
         :param params: A parameter that want to pass before run any statement.
         :type params: DictData
-
-        :rtype: DictData
-        :returns: A parameters from an input that was mapped output if the stage
-            ID was set.
+        :rtype: Result
         """
         t_func: TagFunc = self.extract_hook(param2template(self.uses, params))()
         if not callable(t_func):
@@ -367,7 +370,7 @@ class HookStage(BaseStage):
             rs: DictData = t_func(**param2template(args, params))
         except Exception as err:
             raise StageException(f"{err.__class__.__name__}: {err}") from err
-        return rs
+        return Result(status=0, context=rs)
 
 
 class TriggerStage(BaseStage):
@@ -376,17 +379,17 @@ class TriggerStage(BaseStage):
     trigger: str = Field(description="A trigger pipeline name.")
     params: DictData = Field(default_factory=dict)
 
-    def execute(self, params: DictData) -> DictData:
+    def execute(self, params: DictData) -> Result:
         """Trigger execution.
 
         :param params: A parameter data that want to use in this execution.
-        :rtype: DictData
+        :rtype: Result
         """
         from .pipeline import Pipeline
 
         pipe: Pipeline = Pipeline.from_loader(name=self.trigger, externals={})
         rs = pipe.execute(params=self.params)
-        return rs
+        return Result(status=0, context=rs)
 
 
 # NOTE: Order of parsing stage data
