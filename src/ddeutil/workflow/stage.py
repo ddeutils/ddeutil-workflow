@@ -207,8 +207,8 @@ class BashStage(BaseStage):
                 if "\\x00" in rs.stderr
                 else rs.stderr
             )
-            logging.error(f"{err}\nRunning Statement:\n---\n{bash}")
-            raise StageException(f"{err}\nRunning Statement:\n---\n{bash}")
+            logging.error(f"{err}\n\n```bash\n{bash}```")
+            raise StageException(f"{err}\n\n```bash\n{bash}```")
         return Result(
             status=0,
             context={

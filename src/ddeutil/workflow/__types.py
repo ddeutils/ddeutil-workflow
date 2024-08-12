@@ -27,12 +27,21 @@ class Re:
     """Regular expression config."""
 
     # NOTE: Search caller
+    # \${{\s*(?P<caller>[a-zA-Z0-9_.\s'\"\[\]\(\)\-\{}]+?)\s*(?P<post_filters>(?:\|\s*(?:[a-zA-Z0-9_.,-\\%\s'\"[\]()\{}]+)\s*)*)}}
     __re_caller: str = r"""
         \$
         {{
-            \s*(?P<caller>
+            \s*
+            (?P<caller>
                 [a-zA-Z0-9_.\s'\"\[\]\(\)\-\{}]+?
             )\s*
+            (?P<post_filters>
+                (?:
+                    \|\s*
+                    (?:[a-zA-Z0-9_.,-\\%\s'\"[\]()\{}]+)
+                    \s*
+                )*
+            )
         }}
     """
     RE_CALLER: Pattern = re.compile(

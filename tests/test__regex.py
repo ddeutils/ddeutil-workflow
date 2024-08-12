@@ -29,11 +29,46 @@ def test_regex_caller(value, expected):
 
 
 def test_regex_caller_multiple():
-    for f in Re.RE_CALLER.findall(
-        "${{ matrix.table }}-${{ matrix.partition }}"
-    ):
-        print(type(f))
-        print(f)
+    assert [
+        ("matrix.table", ""),
+        ("matrix.partition", ""),
+    ] == Re.RE_CALLER.findall("${{ matrix.table }}-${{ matrix.partition }}")
+
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        (
+            'test-${{ article.pub_date|datetimeformat("%B %Y") }}',
+            {
+                "caller": "article.pub_date",
+                "post_filters": '|datetimeformat("%B %Y") ',
+            },
+        ),
+        (
+            "${{ listx|join(', ') }}",
+            {"caller": "listx", "post_filters": "|join(', ') "},
+        ),
+        (
+            "${{listx | abs | test}}",
+            {"caller": "listx", "post_filters": "| abs | test"},
+        ),
+        (
+            "${{ listx.data }}",
+            {"caller": "listx.data", "post_filters": ""},
+        ),
+    ],
+)
+def test_regex_caller_filter(value, expected):
+    rs = Re.RE_CALLER.search(value)
+    assert expected == rs.groupdict()
+    pfilter = [
+        i.strip()
+        for i in rs.group("post_filters").strip().removeprefix("|").split("|")
+    ]
+    print()
+    print(rs.group("post_filters"))
+    print(pfilter)
 
 
 @pytest.mark.parametrize(

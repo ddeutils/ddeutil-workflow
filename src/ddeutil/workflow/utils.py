@@ -306,9 +306,81 @@ def make_exec(path: str | Path):
     f.chmod(f.stat().st_mode | stat.S_IEXEC)
 
 
+FILTERS: dict[str, callable] = {
+    "abs": abs,
+}
+
+
+def __map_filter(
+    value: Any,
+    post_filter: list[str],
+):
+    for f in post_filter:
+        try:
+            value: Any = FILTERS[f](value)
+        except Exception:
+            raise UtilException(
+                f"The post-filter function: {f} does not fit with "
+                f"{value}({type(value)})."
+            ) from None
+    return value
+
+
+def __param2template(
+    value: str,
+    params: DictData,
+    repr_flag: bool = False,
+) -> Any:
+    for found in Re.RE_CALLER.finditer(value):
+        # NOTE:
+        #   Get caller and filter values that setting inside;
+        #
+        #   ... ``${{ <caller-value> [ | <filter-value>] ... }}``
+        #
+        caller: str = found.group("caller")
+        pfilter: list[str] = [
+            i.strip()
+            for i in (
+                found.group("post_filters").strip().removeprefix("|").split("|")
+            )
+            if i != ""
+        ]
+        if not hasdot(caller, params):
+            raise UtilException(f"The params does not set caller: {caller!r}.")
+
+        if f_not_sup := [f for f in pfilter if f not in FILTERS]:
+            raise UtilException(
+                f"The post-filter: {f_not_sup} does not support yet."
+            )
+
+        # NOTE: from validate step, it guarantee that caller exists in params.
+        getter: Any = getdot(caller, params)
+
+        # NOTE: check type of vars
+        if isinstance(getter, (str, int)):
+
+            # NOTE: map post-filter function.
+            getter: Any = __map_filter(getter, pfilter)
+
+            value: str = value.replace(
+                found.group(0), (repr(getter) if repr_flag else str(getter)), 1
+            )
+            continue
+
+        # NOTE:
+        #   If type of getter caller does not formatting, it will return origin
+        #   value from the ``getdot`` function.
+        if value.replace(found.group(0), "", 1) != "":
+            raise UtilException(
+                "Callable variable should not pass other outside ${{ ... }}"
+            )
+        return __map_filter(getter, pfilter)
+    return value
+
+
 def param2template(
     value: Any,
-    params: dict[str, Any],
+    params: DictData,
     *,
     repr_flag: bool = False,
 ) -> Any:
@@ -330,35 +402,7 @@ def param2template(
         return type(value)([param2template(i, params) for i in value])
     elif not isinstance(value, str):
         return value
-
-    if not Re.RE_CALLER.search(value):
-        return value
-
-    for found in Re.RE_CALLER.finditer(value):
-
-        # NOTE: get caller value that setting inside; ``${{ <caller-value> }}``
-        caller: str = found.group("caller")
-        if not hasdot(caller, params):
-            raise UtilException(f"The params does not set caller: {caller!r}")
-
-        getter: Any = getdot(caller, params)
-
-        # NOTE: check type of vars
-        if isinstance(getter, (str, int)):
-            value: str = value.replace(
-                found.group(0), (repr(getter) if repr_flag else str(getter)), 1
-            )
-            continue
-
-        # NOTE:
-        #   If type of getter caller does not formatting, it will return origin
-        #   value from the ``getdot`` function.
-        if value.replace(found.group(0), "", 1) != "":
-            raise UtilException(
-                "Callable variable should not pass other outside ${{ ... }}"
-            )
-        return getter
-    return value
+    return __param2template(value, params, repr_flag=repr_flag)
 
 
 def dash2underscore(
