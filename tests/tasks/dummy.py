@@ -10,7 +10,7 @@ from typing import Any
 from ddeutil.workflow.utils import tag
 
 
-@tag("polars-dir", name="el-csv-to-parquet")
+@tag("polars-dir", alias="el-csv-to-parquet")
 def dummy_task_1(
     source: str,
     sink: str,
@@ -27,7 +27,7 @@ def dummy_task_1(
     return {"records": 1}
 
 
-@tag("polars-dir-scan", name="el-csv-to-parquet")
+@tag("polars-dir-scan", alias="el-csv-to-parquet")
 def dummy_task_2(
     source: str,
     sink: str,

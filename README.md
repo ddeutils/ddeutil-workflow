@@ -215,7 +215,7 @@ Implement hook:
 ```python
 from ddeutil.workflow.utils import tag
 
-@tag('polars', name='postgres-to-delta')
+@tag('polars', alias='postgres-to-delta')
 def postgres_to_delta(source, sink):
     return {
         "source": source, "sink": sink
@@ -252,7 +252,7 @@ Implement hook:
 ```python
 from ddeutil.workflow.utils import tag
 
-@tag('odbc', name='mssql-proc')
+@tag('odbc', alias='mssql-proc')
 def odbc_mssql_procedure(_exec: str, params: dict):
     return {
         "exec": _exec, "params": params

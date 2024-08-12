@@ -28,6 +28,7 @@ from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
 from .__types import DictData, Matrix, Re
+from .exceptions import ParamValueException, UtilException
 
 
 class Engine(BaseModel):
@@ -115,24 +116,24 @@ class TagFunc(Protocol):
     def __call__(self, *args, **kwargs): ...
 
 
-def tag(value: str, name: str | None = None):
+def tag(name: str, alias: str | None = None):
     """Tag decorator function that set function attributes, ``tag`` and ``name``
     for making registries variable.
 
-    :param: value: A tag value for make different use-case of a function.
-    :param: name: A name that keeping in registries.
+    :param: name: A tag value for make different use-case of a function.
+    :param: alias: A alias function name that keeping in registries. If this
+        value does not supply, it will use original function name from __name__.
     """
 
-    def func_internal(func: callable) -> TagFunc:
-        func.tag = value
-        func.name = name or func.__name__.replace("_", "-")
+    def func_internal(func: Callable[[...], Any]) -> TagFunc:
+        func.tag = name
+        func.name = alias or func.__name__.replace("_", "-")
 
         @wraps(func)
         def wrapped(*args, **kwargs):
+            # NOTE: Able to do anything before calling hook function.
             return func(*args, **kwargs)
 
-        # TODO: pass result from a wrapped to Result model
-        #   >>> return Result.model_validate(obj=wrapped)
         return wrapped
 
     return func_internal
@@ -145,6 +146,7 @@ def make_registry(submodule: str) -> dict[str, Registry]:
     """Return registries of all functions that able to called with task.
 
     :param submodule: A module prefix that want to import registry.
+    :rtype: dict[str, Registry]
     """
     rs: dict[str, Registry] = {}
     for module in config().engine.registry:
@@ -185,7 +187,7 @@ class BaseParam(BaseModel, ABC):
 
     @abstractmethod
     def receive(self, value: Optional[Any] = None) -> Any:
-        raise ValueError(
+        raise ParamValueException(
             "Receive value and validate typing before return valid value."
         )
 
@@ -197,14 +199,14 @@ class DefaultParam(BaseParam):
 
     @abstractmethod
     def receive(self, value: Optional[Any] = None) -> Any:
-        raise ValueError(
+        raise ParamValueException(
             "Receive value and validate typing before return valid value."
         )
 
     @model_validator(mode="after")
     def check_default(self) -> Self:
         if not self.required and self.default is None:
-            raise ValueError(
+            raise ParamValueException(
                 "Default should set when this parameter does not required."
             )
         return self
@@ -226,7 +228,7 @@ class DatetimeParam(DefaultParam):
         elif isinstance(value, date):
             return datetime(value.year, value.month, value.day)
         elif not isinstance(value, str):
-            raise ValueError(
+            raise ParamValueException(
                 f"Value that want to convert to datetime does not support for "
                 f"type: {type(value)}"
             )
@@ -256,7 +258,7 @@ class IntParam(DefaultParam):
             try:
                 return int(str(value))
             except TypeError as err:
-                raise ValueError(
+                raise ParamValueException(
                     f"Value that want to convert to integer does not support "
                     f"for type: {type(value)}"
                 ) from err
@@ -274,7 +276,9 @@ class ChoiceParam(BaseParam):
         if value is None:
             return self.options[0]
         if any(value not in self.options):
-            raise ValueError(f"{value} does not match any value in options")
+            raise ParamValueException(
+                f"{value!r} does not match any value in choice options."
+            )
         return value
 
 
@@ -282,6 +286,7 @@ Param = Union[
     ChoiceParam,
     DatetimeParam,
     StrParam,
+    IntParam,
 ]
 
 
@@ -334,7 +339,7 @@ def param2template(
         # NOTE: get caller value that setting inside; ``${{ <caller-value> }}``
         caller: str = found.group("caller")
         if not hasdot(caller, params):
-            raise ValueError(f"params does not set caller: {caller!r}")
+            raise UtilException(f"The params does not set caller: {caller!r}")
 
         getter: Any = getdot(caller, params)
 
@@ -349,7 +354,7 @@ def param2template(
         #   If type of getter caller does not formatting, it will return origin
         #   value from the ``getdot`` function.
         if value.replace(found.group(0), "", 1) != "":
-            raise ValueError(
+            raise UtilException(
                 "Callable variable should not pass other outside ${{ ... }}"
             )
         return getter
