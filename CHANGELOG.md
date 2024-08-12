@@ -2,6 +2,61 @@
 
 ## Latest Changes
 
+## 0.0.6
+
+### :sparkles: Features
+
+- :dart: feat: change output of any execution from dict to result dataclass. (_2024-08-12_)
+- :dart: feat: add default stage id that was generated from stage name. (_2024-08-12_)
+- :dart: feat: add result context for job execution process. (_2024-08-12_)
+- :dart: feat: add finditer on the param2template util func support multi replace. (_2024-08-11_)
+- :dart: feat: add set output method calling step to job execution process. (_2024-08-11_)
+- :dart: feat: add result context to each execution dependency. (_2024-08-11_)
+- :dart: feat: add is_skip method on stage and parameterize on pipeline. (_2024-08-10_)
+- :dart: feat: add template class variable for dynamic templating params. (_2024-08-09_)
+- :dart: feat: add default empty job and change validate condition of strategy. (_2024-08-09_)
+- :dart: feat: add dash2underscore on utils func. (_2024-08-09_)
+- :dart: feat: add trigger stage to pipeline model. (_2024-08-09_)
+- :dart: feat: add ignore content for diagram backup file. (_2024-08-08_)
+- :dart: feat: add on in pipeline model. (_2024-08-07_)
+- :dart: feat: add dynamic import registry object from list of module path. (_2024-08-07_)
+- :dart: feat: remove workflow config file and use env var instend. (_2024-08-07_)
+
+### :black_nib: Code Changes
+
+- :construction: refactored: change shell stage to bash stage. (_2024-08-10_)
+- :construction: refactored: change task stage to hook stage. (_2024-08-10_)
+- :test_tube: tests: change name of config name that use for test. (_2024-08-09_)
+- :construction: refactored: deprecate make_strategy method from job to strategy model. (_2024-08-09_)
+- :art: style: change code format on the on model. (_2024-08-09_)
+- :construction: refactored: move validate on key in pipeline to classmethod. (_2024-08-08_)
+- :test_tube: tests: add testcase for pipeine on and desc. (_2024-08-07_)
+- :construction: refactored: change schedule object name to On and merge code regex file. (_2024-08-07_)
+- :test_tube: tests: uncomment schedule testcase. (_2024-08-06_)
+
+### :card_file_box: Documents
+
+- :page_facing_up: docs: update readme for installation with app. (_2024-08-11_)
+- :page_facing_up: docs: update readme for deployment topic. (_2024-08-10_)
+- :page_facing_up: docs: delete backup diagram file that already add to repo. (_2024-08-08_)
+- :page_facing_up: docs: update readme for config content and remove license. (_2024-08-07_)
+- :page_facing_up: docs: update readme file for deprecated feature. (_2024-08-07_)
+
+### :bug: Fix Bugs
+
+- :gear: fixed: revert change timezone on github action. (_2024-08-08_)
+- :gear: fixed: change logic of timezone value that pass to cron runner. (_2024-08-08_)
+- :gear: fixed: fix cronjob validate does not valid. (_2024-08-08_)
+- :gear: fixed: move conf path on testcase. (_2024-08-07_)
+
+### :package: Build & Workflow
+
+- :toolbox: build: remove change timezone on tests action. (_2024-08-08_)
+
+### :postbox: Dependencies
+
+- :pushpin: deps: remove schedule package from this project. (_2024-08-07_)
+
 ## 0.0.5
 
 ### :sparkles: Features
