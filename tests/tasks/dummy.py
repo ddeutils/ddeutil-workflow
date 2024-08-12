@@ -5,6 +5,7 @@
 # ------------------------------------------------------------------------------
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from ddeutil.workflow.utils import tag
@@ -16,14 +17,14 @@ def dummy_task_1(
     sink: str,
     conversion: dict[str, Any] | None = None,
 ) -> dict[str, int]:
-    print("[HOOK]: el-csv-to-parquet@polars-dir")
-    print("... Start EL for CSV to Parquet with Polars Engine")
-    print(f"... Reading data from {source}")
+    logging.info("[HOOK]: el-csv-to-parquet@polars-dir")
+    logging.debug("... Start EL for CSV to Parquet with Polars Engine")
+    logging.debug(f"... Reading data from {source}")
 
     conversion: dict[str, Any] = conversion or {}
     if conversion:
-        print("... Start Schema Conversion ...")
-    print(f"... Writing data to {sink}")
+        logging.debug("... Start Schema Conversion ...")
+    logging.debug(f"... Writing data to {sink}")
     return {"records": 1}
 
 
@@ -33,13 +34,13 @@ def dummy_task_2(
     sink: str,
     conversion: dict[str, Any] | None = None,
 ) -> dict[str, int]:
-    print("[HOOK]: el-csv-to-parquet@polars-dir-scan")
-    print("... Start EL for CSV to Parquet with Polars Engine")
-    print("... ---")
-    print(f"... Reading data from {source}")
+    logging.info("[HOOK]: el-csv-to-parquet@polars-dir-scan")
+    logging.debug("... Start EL for CSV to Parquet with Polars Engine")
+    logging.debug("... ---")
+    logging.debug(f"... Reading data from {source}")
 
     conversion: dict[str, Any] = conversion or {}
     if conversion:
-        print("... Start Schema Conversion ...")
-    print(f"... Writing data to {sink}")
+        logging.debug("... Start Schema Conversion ...")
+    logging.debug(f"... Writing data to {sink}")
     return {"records": 1}

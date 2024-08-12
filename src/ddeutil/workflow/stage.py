@@ -351,9 +351,9 @@ class HookStage(BaseStage):
         if not callable(t_func):
             raise ImportError("Hook caller function does not callable.")
 
-        args: DictData = param2template(self.args, params)
         # VALIDATE: check input task caller parameters that exists before
         #   calling.
+        args: DictData = param2template(self.args, params)
         ips = inspect.signature(t_func)
         if any(
             k not in args
@@ -370,6 +370,13 @@ class HookStage(BaseStage):
             rs: DictData = t_func(**param2template(args, params))
         except Exception as err:
             raise StageException(f"{err.__class__.__name__}: {err}") from err
+
+        # VALIDATE: Check the result type from hook function, it should be dict.
+        if not isinstance(rs, dict):
+            raise StageException(
+                f"Return of hook function: {t_func.name}@{t_func.tag} does not "
+                f"serialize to result model, you should fix it to `dict` type."
+            )
         return Result(status=0, context=rs)
 
 
@@ -385,11 +392,23 @@ class TriggerStage(BaseStage):
         :param params: A parameter data that want to use in this execution.
         :rtype: Result
         """
+        from .exceptions import PipelineException
         from .pipeline import Pipeline
 
-        pipe: Pipeline = Pipeline.from_loader(name=self.trigger, externals={})
-        rs = pipe.execute(params=self.params)
-        return Result(status=0, context=rs)
+        try:
+            # NOTE: Loading pipeline object from trigger name.
+            pipe: Pipeline = Pipeline.from_loader(
+                name=self.trigger, externals={}
+            )
+            rs: Result = pipe.execute(
+                params=param2template(self.params, params)
+            )
+        except PipelineException as err:
+            _alias_stage: str = self.id or self.name
+            raise StageException(
+                f"Trigger Stage: {_alias_stage} get trigger pipeline exception."
+            ) from err
+        return rs
 
 
 # NOTE: Order of parsing stage data
