@@ -265,6 +265,8 @@ def odbc_mssql_procedure(_exec: str, params: dict):
 export WORKFLOW_ROOT_PATH=.
 export WORKFLOW_CORE_REGISTRY=ddeutil.workflow,tests.utils
 export WORKFLOW_CORE_PATH_CONF=conf
+export WORKFLOW_CORE_TIMEZONE=Asia/Bangkok
+export WORKFLOW_CORE_DEFAULT_STAGE_ID=true
 ```
 
 Application config:
