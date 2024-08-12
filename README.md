@@ -210,6 +210,18 @@ pipe_el_pg_to_lake:
               endpoint: "/${{ params.name }}"
 ```
 
+Implement hook:
+
+```python
+from ddeutil.workflow.utils import tag
+
+@tag('polars', name='postgres-to-delta')
+def postgres_to_delta(source, sink):
+    return {
+        "source": source, "sink": sink
+    }
+```
+
 ### Hook (Transform)
 
 ```yaml
@@ -233,6 +245,18 @@ pipeline_hook_mssql_proc:
               run_date: ${{ params.run_date }}
               source: ${{ params.source_name }}
               target: ${{ params.target_name }}
+```
+
+Implement hook:
+
+```python
+from ddeutil.workflow.utils import tag
+
+@tag('odbc', name='mssql-proc')
+def odbc_mssql_procedure(_exec: str, params: dict):
+    return {
+        "exec": _exec, "params": params
+    }
 ```
 
 ## Configuration
