@@ -55,8 +55,12 @@ changelog = "CHANGELOG.md"
 branch = true
 relative_files = true
 concurrency = ["thread", "multiprocessing"]
-source = ["ddeutil", "tests"]
-omit = ["scripts/"]
+source = ["ddeutil.workflow", "tests"]
+omit = [
+    "scripts/",
+    "tests/utils.py",
+    "tests/tasks/dummy.py",
+]
 
 [tool.coverage.report]
 exclude_lines = ["raise NotImplementedError"]
@@ -71,8 +75,8 @@ addopts = [
 filterwarnings = ["error"]
 log_cli = true
 log_cli_level = "DEBUG"
-log_cli_format = "%(asctime)s [%(levelname)7s] %(message)s (%(filename)s:%(lineno)s)"
-log_cli_date_format = "%Y-%m-%d %H:%M:%S"
+log_cli_format = "%(asctime)s [%(levelname)-7s] %(message)-75s (%(filename)s:%(lineno)s)"
+log_cli_date_format = "%Y%m%d %H:%M:%S"
 
 [tool.black]
 line-length = 80

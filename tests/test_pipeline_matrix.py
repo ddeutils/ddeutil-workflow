@@ -84,4 +84,67 @@ def test_pipe_matrix():
         externals={},
     )
     rs = pipeline.execute(params={"source": "src", "target": "tgt"})
-    print(rs)
+    assert {
+        "params": {"source": "src", "target": "tgt"},
+        "jobs": {
+            "multiple-system": {
+                "strategies": {
+                    "ee5917b59c2a4f9fd6e6921f9966b400": {
+                        "matrix": {
+                            "table": "customer",
+                            "system": "csv",
+                            "partition": 2,
+                        },
+                        "stages": {
+                            "customer-2": {"outputs": {"records": 1}},
+                            "end-stage": {"outputs": {"passing_value": 10}},
+                        },
+                    },
+                    "cf30d610117956231786c6ed34df2e96": {
+                        "matrix": {
+                            "table": "customer",
+                            "system": "csv",
+                            "partition": 3,
+                        },
+                        "stages": {
+                            "customer-3": {"outputs": {"records": 1}},
+                            "end-stage": {"outputs": {"passing_value": 10}},
+                        },
+                    },
+                    "ec753d2915cdc4f82a2329d1ca51bfe8": {
+                        "matrix": {
+                            "table": "sales",
+                            "system": "csv",
+                            "partition": 1,
+                        },
+                        "stages": {
+                            "sales-1": {"outputs": {"records": 1}},
+                            "end-stage": {"outputs": {"passing_value": 10}},
+                        },
+                    },
+                    "d3a8459afe955fc81fa7a543bd993c58": {
+                        "matrix": {
+                            "table": "sales",
+                            "system": "csv",
+                            "partition": 2,
+                        },
+                        "stages": {
+                            "sales-2": {"outputs": {"records": 1}},
+                            "end-stage": {"outputs": {"passing_value": 10}},
+                        },
+                    },
+                    "2f3fe68ee7a285a18723f000e65c4f05": {
+                        "matrix": {
+                            "table": "customer",
+                            "system": "csv",
+                            "partition": 4,
+                        },
+                        "stages": {
+                            "customer-4": {"outputs": {"records": 1}},
+                            "end-stage": {"outputs": {"passing_value": 10}},
+                        },
+                    },
+                },
+            },
+        },
+    } == rs.context
