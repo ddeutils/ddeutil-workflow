@@ -1,6 +1,12 @@
+from datetime import datetime
+
 import pytest
 from ddeutil.workflow.exceptions import UtilException
-from ddeutil.workflow.utils import param2template
+from ddeutil.workflow.utils import (
+    get_args_const,
+    make_filter_registry,
+    param2template,
+)
 
 
 def test_param2template():
@@ -30,10 +36,31 @@ def test_param2template():
 
 
 def test_param2template_with_filter():
-    value = param2template(
+    value: int = param2template(
         "${{ params.value | abs }}", {"params": {"value": -5}}
     )
     assert 5 == value
 
     with pytest.raises(UtilException):
         param2template("${{ params.value | abs12 }}", {"params": {"value": -5}})
+
+    value: str = param2template(
+        "${{ params.asat-dt | fmt(fmt='%Y%m%d') }}",
+        {"params": {"asat-dt": datetime(2024, 8, 1)}},
+    )
+    assert "20240801" == value
+
+    with pytest.raises(UtilException):
+        param2template(
+            "${{ params.asat-dt | fmt(fmt='%Y%m%d) }}",
+            {"params": {"asat-dt": datetime(2024, 8, 1)}},
+        )
+
+
+def test_make_filter_registry():
+    print(make_filter_registry())
+
+
+def test_get_args_const():
+    func, args, kwargs = get_args_const("fmt('test', fmt='%Y%m%d', _max=2)")
+    print(func, args, kwargs)

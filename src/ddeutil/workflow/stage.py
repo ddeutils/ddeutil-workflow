@@ -111,6 +111,12 @@ class BaseStage(BaseModel, ABC):
 class EmptyStage(BaseStage):
     """Empty stage that do nothing (context equal empty stage) and logging the
     name of stage only to stdout.
+
+    Data Validate:
+        >>> stage = {
+        ...     "name": "Empty stage execution",
+        ...     "echo": "Hello World",
+        ... }
     """
 
     echo: Optional[str] = Field(

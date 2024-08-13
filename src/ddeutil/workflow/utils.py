@@ -10,6 +10,7 @@ import logging
 import os
 import stat
 from abc import ABC, abstractmethod
+from ast import Call, Constant, Expr, Module, Name, parse
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import date, datetime
@@ -21,7 +22,7 @@ from pathlib import Path
 from typing import Any, Callable, Literal, Optional, Protocol, Union
 from zoneinfo import ZoneInfo
 
-from ddeutil.core import getdot, hasdot, lazy
+from ddeutil.core import getdot, hasdot, import_string, lazy
 from ddeutil.io import PathData
 from ddeutil.io.models.lineage import dt_now
 from pydantic import BaseModel, Field
@@ -37,9 +38,10 @@ class Engine(BaseModel):
 
     paths: PathData = Field(default_factory=PathData)
     registry: list[str] = Field(
-        default_factory=lambda: [
-            "ddeutil.workflow",
-        ],
+        default_factory=lambda: ["ddeutil.workflow"],
+    )
+    registry_filter: list[str] = Field(
+        default=lambda: ["ddeutil.workflow.utils"]
     )
 
     @model_validator(mode="before")
@@ -65,9 +67,13 @@ def config() -> ConfParams:
     """Load Config data from ``workflows-conf.yaml`` file."""
     root_path: str = os.getenv("WORKFLOW_ROOT_PATH", ".")
 
-    regis: list[str] = []
+    regis: list[str] = ["ddeutil.workflow"]
     if regis_env := os.getenv("WORKFLOW_CORE_REGISTRY"):
         regis = [r.strip() for r in regis_env.split(",")]
+
+    regis_filter: list[str] = ["ddeutil.workflow.utils"]
+    if regis_filter_env := os.getenv("WORKFLOW_CORE_REGISTRY_FILTER"):
+        regis_filter = [r.strip() for r in regis_filter_env.split(",")]
 
     conf_path: str = (
         f"{root_path}/{conf_env}"
@@ -78,6 +84,7 @@ def config() -> ConfParams:
         obj={
             "engine": {
                 "registry": regis,
+                "registry_filter": regis_filter,
                 "paths": {
                     "root": root_path,
                     "conf": conf_path,
@@ -322,27 +329,137 @@ FILTERS: dict[str, callable] = {
 }
 
 
+class FilterFunc(Protocol):
+    """Tag Function Protocol"""
+
+    name: str
+
+    def __call__(self, *args, **kwargs): ...
+
+
+def custom_filter(name: str):
+    """Custom filter decorator function that set function attributes, ``filter``
+    for making filter registries variable.
+
+    :param: name: A filter name for make different use-case of a function.
+    """
+
+    def func_internal(func: Callable[[...], Any]) -> TagFunc:
+        func.filter = name
+
+        @wraps(func)
+        def wrapped(*args, **kwargs):
+            # NOTE: Able to do anything before calling custom filter function.
+            return func(*args, **kwargs)
+
+        return wrapped
+
+    return func_internal
+
+
+FilterRegistry = Union[FilterFunc, Callable[[...], Any]]
+
+
+def make_filter_registry() -> dict[str, FilterRegistry]:
+    """Return registries of all functions that able to called with task.
+
+    :rtype: dict[str, Registry]
+    """
+    rs: dict[str, Registry] = {}
+    for module in config().engine.registry_filter:
+        # NOTE: try to sequential import task functions
+        try:
+            importer = import_module(module)
+        except ModuleNotFoundError:
+            continue
+
+        for fstr, func in inspect.getmembers(importer, inspect.isfunction):
+            # NOTE: check function attribute that already set tag by
+            #   ``utils.tag`` decorator.
+            if not hasattr(func, "filter"):
+                continue
+
+            rs[func.filter] = import_string(f"{module}.{fstr}")
+
+    rs.update(FILTERS)
+    return rs
+
+
+def get_args_const(
+    expr: str,
+) -> tuple[str, list[Constant], dict[str, Constant]]:
+    """Get arguments and keyword-arguments from function calling string."""
+    try:
+        mod: Module = parse(expr)
+    except SyntaxError:
+        raise UtilException(
+            f"post-filter: {expr} does not valid because it raise syntax error."
+        ) from None
+    body: list[Expr] = mod.body
+
+    if len(body) > 1:
+        raise ValueError
+
+    caller: Union[Name, Call]
+    if isinstance((caller := body[0].value), Name):
+        return caller.id, [], {}
+    elif not isinstance(caller, Call):
+        raise ValueError(
+            f"Get arguments does not support for caller type: {type(caller)}"
+        )
+
+    name: Name = caller.func
+    args: list[Constant] = caller.args
+    keywords: dict[str, Constant] = {k.arg: k.value for k in caller.keywords}
+
+    if any(not isinstance(i, Constant) for i in args):
+        raise ValueError("Argument should be constant.")
+
+    return name.id, args, keywords
+
+
+@custom_filter("fmt")
+def datetime_format(value: datetime, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
+    return value.strftime(fmt)
+
+
 def __map_filter(
     value: Any,
     post_filter: list[str],
+    filters: dict[str, FilterRegistry],
 ) -> Any:
     """Mapping post-filter to value with sequence list of filter function name
-    that will get from the FILTERS.
+    that will get from the filter registry.
 
     :param value: A string value that want to mapped with filter function.
     :param post_filter: A list of post-filter function name.
+    :param filters: A filter registry.
     """
-    for f in post_filter:
+    for _filter in post_filter:
+        func_name, _args, _kwargs = get_args_const(_filter)
+        args = [arg.value for arg in _args]
+        kwargs = {k: v.value for k, v in _kwargs.items()}
+
+        if func_name not in filters:
+            raise UtilException(
+                f"The post-filter: {func_name} does not support yet."
+            )
+
         try:
-            if isinstance((f_func := FILTERS[f]), list):
+            if isinstance((f_func := filters[func_name]), list):
+                if args or kwargs:
+                    raise UtilException(
+                        "Chain filter function does not support for passing "
+                        "arguments."
+                    )
                 for func in f_func:
                     value: Any = func(value)
             else:
-                value: Any = f_func(value)
+                value: Any = f_func(value, *args, **kwargs)
         except Exception as err:
             logging.warning(str(err))
             raise UtilException(
-                f"The post-filter function: {f} does not fit with "
+                f"The post-filter function: {func_name} does not fit with "
                 f"{value} (type: {type(value).__name__})."
             ) from None
     return value
@@ -351,6 +468,8 @@ def __map_filter(
 def __param2template(
     value: str,
     params: DictData,
+    *,
+    filters: dict[str, FilterRegistry] | None = None,
 ) -> Any:
     """(Sub-function) Pass param to template string that can search by
     ``RE_CALLER`` regular expression.
@@ -363,6 +482,8 @@ def __param2template(
     :param params: A parameter value that getting with matched regular
         expression.
     """
+    filters: dict[str, FilterRegistry] = filters or make_filter_registry()
+
     # NOTE: remove space before and after this string value.
     value: str = value.strip()
     for found in Re.RE_CALLER.finditer(value):
@@ -382,12 +503,6 @@ def __param2template(
         if not hasdot(caller, params):
             raise UtilException(f"The params does not set caller: {caller!r}.")
 
-        # VALIDATE: check post-filter function name should exist on FILTERS
-        if f_not_sup := [f for f in pfilter if f not in FILTERS]:
-            raise UtilException(
-                f"The post-filter: {f_not_sup} does not support yet."
-            )
-
         # NOTE: from validate step, it guarantee that caller exists in params.
         getter: Any = getdot(caller, params)
 
@@ -396,15 +511,17 @@ def __param2template(
         #   concat other string value, it will return origin value from the
         #   ``getdot`` function.
         if value.replace(found.group(0), "", 1) == "":
-            return __map_filter(getter, pfilter)
+            return __map_filter(getter, pfilter, filters=filters)
 
         # NOTE: map post-filter function.
-        getter: Any = __map_filter(getter, pfilter)
+        getter: Any = __map_filter(getter, pfilter, filters=filters)
         if not isinstance(getter, str):
             getter: str = str(getter)
 
         value: str = value.replace(found.group(0), getter, 1)
 
+    # TODO: Passing environment variable with format ${ ... } to string value
+    #   before return to outside.
     return value
 
 
@@ -422,13 +539,14 @@ def param2template(
     :rtype: Any
     :returns: An any getter value from the params input.
     """
+    filters: dict[str, FilterRegistry] = make_filter_registry()
     if isinstance(value, dict):
         return {k: param2template(value[k], params) for k in value}
     elif isinstance(value, (list, tuple, set)):
         return type(value)([param2template(i, params) for i in value])
     elif not isinstance(value, str):
         return value
-    return __param2template(value, params)
+    return __param2template(value, params, filters=filters)
 
 
 def dash2underscore(

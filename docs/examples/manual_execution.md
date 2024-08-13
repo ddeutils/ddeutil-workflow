@@ -1,6 +1,12 @@
 # Manual Execution
 
+This execution usecase is getting data from external API and prepare that data
+and aggregate it into daily layer to silver data zone.
+
 ## Prerequisite
+
+I will use only core package of the workflow because I will run with manual
+action.
 
 ```shell
 pip install ddeutil-workflow
@@ -12,10 +18,18 @@ Create the first pipeline template:
 pipe-run-manual:
   type: workflow.pipeline.Pipeline
   jobs:
-    ...
+    stage-to-curated:
+      stages:
+        - name: "Extract data from external API"
+          uses: tasks/https-external@httpx
+          with:
+            url: "https://"
+            auth: "http_conn_id"
 ```
 
 ## Getting Started
+
+That has ...
 
 ### Via CLI
 

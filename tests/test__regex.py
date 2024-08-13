@@ -62,13 +62,14 @@ def test_regex_caller_multiple():
 def test_regex_caller_filter(value, expected):
     rs = Re.RE_CALLER.search(value)
     assert expected == rs.groupdict()
-    pfilter = [
-        i.strip()
-        for i in rs.group("post_filters").strip().removeprefix("|").split("|")
-    ]
-    print()
-    print(rs.group("post_filters"))
-    print(pfilter)
+
+
+def test_regex_caller_filter_with_args():
+    rs = Re.RE_CALLER.search("${{ params.asat-dt | fmt('%Y%m%d') }}")
+    assert {
+        "caller": "params.asat-dt",
+        "post_filters": "| fmt('%Y%m%d') ",
+    } == rs.groupdict()
 
 
 @pytest.mark.parametrize(
