@@ -16,6 +16,10 @@ def test_param2template():
             "int": "${{ params.value }}",
             "int_but_str": "value is ${{ params.value | abs}}",
             "list": ["${{ params.src }}", "${{ params.value }}"],
+            "str_env": (
+                "${{ params.src }}-${WORKFLOW_CORE_TIMEZONE:-}"
+                "${WORKFLOW_DUMMY:-}"
+            ),
         },
         params={
             "params": {
@@ -29,6 +33,7 @@ def test_param2template():
         "int": -10,
         "int_but_str": "value is 10",
         "list": ["foo", -10],
+        "str_env": "foo-Asia/Bangkok-",
     } == value
 
     with pytest.raises(UtilException):

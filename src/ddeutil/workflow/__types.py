@@ -27,7 +27,7 @@ class Re:
     """Regular expression config."""
 
     # NOTE: Search caller
-    # \${{\s*(?P<caller>[a-zA-Z0-9_.\s'\"\[\]\(\)\-\{}]+?)\s*(?P<post_filters>(?:\|\s*(?:[a-zA-Z0-9_.,-\\%\s'\"[\]()\{}]+)\s*)*)}}
+    # \${{\s*(?P<caller>[a-zA-Z0-9_.\s'\"\[\]\(\)\-\{}]+?)\s*(?P<post_filters>(?:\|\s*(?:[a-zA-Z0-9_]{3,}[a-zA-Z0-9_.,-\\%\s'\"[\]()\{}]+)\s*)*)}}
     __re_caller: str = r"""
         \$
         {{
@@ -38,7 +38,7 @@ class Re:
             (?P<post_filters>
                 (?:
                     \|\s*
-                    (?:[a-zA-Z0-9_.,-\\%\s'\"[\]()\{}]+)
+                    (?:[a-zA-Z0-9_]{3,}[a-zA-Z0-9_.,-\\%\s'\"[\]()\{}]*)
                     \s*
                 )*
             )
@@ -49,6 +49,7 @@ class Re:
     )
 
     # NOTE: Search task
+    # ^(?P<path>[^/@]+)/(?P<func>[^@]+)@(?P<tag>.+)$
     __re_task_fmt: str = r"""
         ^
             (?P<path>[^/@]+)

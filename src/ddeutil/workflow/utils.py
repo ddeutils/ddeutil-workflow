@@ -23,7 +23,7 @@ from typing import Any, Callable, Literal, Optional, Protocol, Union
 from zoneinfo import ZoneInfo
 
 from ddeutil.core import getdot, hasdot, import_string, lazy
-from ddeutil.io import PathData
+from ddeutil.io import PathData, search_env_replace
 from ddeutil.io.models.lineage import dt_now
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
@@ -393,18 +393,20 @@ def get_args_const(
         mod: Module = parse(expr)
     except SyntaxError:
         raise UtilException(
-            f"post-filter: {expr} does not valid because it raise syntax error."
+            f"Post-filter: {expr} does not valid because it raise syntax error."
         ) from None
     body: list[Expr] = mod.body
 
     if len(body) > 1:
-        raise ValueError
+        raise UtilException(
+            "Post-filter function should be only one calling per pipe"
+        )
 
     caller: Union[Name, Call]
     if isinstance((caller := body[0].value), Name):
         return caller.id, [], {}
     elif not isinstance(caller, Call):
-        raise ValueError(
+        raise UtilException(
             f"Get arguments does not support for caller type: {type(caller)}"
         )
 
@@ -413,7 +415,7 @@ def get_args_const(
     keywords: dict[str, Constant] = {k.arg: k.value for k in caller.keywords}
 
     if any(not isinstance(i, Constant) for i in args):
-        raise ValueError("Argument should be constant.")
+        raise UtilException("Argument should be constant.")
 
     return name.id, args, keywords
 
@@ -520,9 +522,7 @@ def __param2template(
 
         value: str = value.replace(found.group(0), getter, 1)
 
-    # TODO: Passing environment variable with format ${ ... } to string value
-    #   before return to outside.
-    return value
+    return search_env_replace(value)
 
 
 def param2template(
@@ -561,7 +561,7 @@ def dash2underscore(
     return values
 
 
-def cross_product(matrix: Matrix) -> Iterator:
+def cross_product(matrix: Matrix) -> Iterator[DictData]:
     """Iterator of products value from matrix."""
     yield from (
         {_k: _v for e in mapped for _k, _v in e.items()}
