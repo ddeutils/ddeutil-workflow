@@ -19,7 +19,8 @@ def dotenv_setting() -> None:
         env_str: str = dedent(
             f"""
             WORKFLOW_ROOT_PATH={OUTSIDE_PATH.resolve()}
-            WORKFLOW_CORE_REGISTRY="ddeutil.workflow,tests"
+            WORKFLOW_CORE_REGISTRY=ddeutil.workflow,tests
+            WORKFLOW_CORE_REGISTRY_FILTER=ddeutil.workflow.utils
             WORKFLOW_CORE_PATH_CONF=tests/conf
             WORKFLOW_CORE_PATH_CONF=tests/conf
             WORKFLOW_CORE_TIMEZONE=Asia/Bangkok

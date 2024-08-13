@@ -26,3 +26,19 @@ pipe-condition:
             echo 'Hello World';
 
         - name: "Empty stage"
+
+pipe-scheduling:
+  type: pipeline.Pipeline
+  on:
+    - 'every_5_minute_bkk'
+    - 'every_2_minute_bkk'
+    - 'every_hour_bkk'
+  params:
+    name: str
+  jobs:
+    condition-job:
+      stages:
+        - name: "Empty stage"
+
+        - name: "Call-out"
+          echo: "Hello ${{ params.name | upper }}"

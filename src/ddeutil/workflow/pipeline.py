@@ -7,9 +7,13 @@ from __future__ import annotations
 
 import copy
 import logging
+import os
 import time
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from datetime import datetime
 from queue import Queue
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
@@ -19,8 +23,16 @@ from .__types import DictData, DictStr, Matrix, MatrixExclude, MatrixInclude
 from .exceptions import JobException, PipelineException
 from .loader import Loader
 from .on import On
+from .scheduler import CronRunner
 from .stage import Stage
-from .utils import Param, Result, cross_product, dash2underscore, gen_id
+from .utils import (
+    Param,
+    Result,
+    cross_product,
+    dash2underscore,
+    gen_id,
+    get_diff_sec,
+)
 
 
 class Strategy(BaseModel):
@@ -382,7 +394,7 @@ class Pipeline(BaseModel):
             for k in self.params
             if (k not in params and self.params[k].required)
         ):
-            raise ValueError(
+            raise PipelineException(
                 f"Required Param on this pipeline setting does not set: "
                 f"{', '.join(check_key)}."
             )
@@ -399,6 +411,68 @@ class Pipeline(BaseModel):
             ),
             "jobs": {},
         }
+
+    def release(
+        self,
+        on: On,
+        params: DictData | None = None,
+        *,
+        waiting_sec: int = 600,
+        sleep_interval: int = 10,
+    ) -> str:
+        """Start running pipeline with the on schedule in period of 30 minutes.
+        That mean it will still running at background 30 minutes until the
+        schedule matching with its time.
+        """
+        params: DictData = params or {}
+        logging.info(f"[CORE] Start release: {self.name!r} : {on.cronjob}")
+
+        gen: CronRunner = on.generate(datetime.now())
+        tz: ZoneInfo = gen.tz
+        next_running_time: datetime = gen.next
+
+        if get_diff_sec(next_running_time, tz=tz) < waiting_sec:
+            logging.debug(
+                f"[CORE]: {self.name} closely to run >> "
+                f"{next_running_time:%Y-%m-%d %H:%M:%S}"
+            )
+
+            # NOTE: Release when the time is nearly to schedule time.
+            while (duration := get_diff_sec(next_running_time, tz=tz)) > 15:
+                time.sleep(sleep_interval)
+                logging.debug(
+                    f"[CORE]: {self.name!r} : Sleep until: {duration}"
+                )
+
+            time.sleep(1)
+            rs: Result = self.execute(params=params)
+            logging.debug(f"{rs.context}")
+
+            return f"[CORE]: Start Execute: {self.name}"
+        return f"[CORE]: {self.name} does not closely to run yet."
+
+    def poke(self, params: DictData | None = None):
+        """Poke pipeline threading task for executing with its schedules that
+        was set on the `on`.
+        """
+        params: DictData = params or {}
+        logging.info(
+            f"[CORE]: Start Poking: {self.name!r} :"
+            f"{gen_id(self.name, unique=True)}"
+        )
+        with ThreadPoolExecutor(
+            max_workers=int(
+                os.getenv("WORKFLOW_CORE_MAX_PIPELINE_POKING", "4")
+            ),
+        ) as executor:
+            futures: list[Future] = [
+                executor.submit(self.release, on, params=params)
+                for on in self.on
+            ]
+            for future in as_completed(futures):
+                result = future.result()
+                logging.info(result)
+        return params
 
     def execute(
         self,
@@ -430,7 +504,7 @@ class Pipeline(BaseModel):
 
         """
         logging.info(
-            f"[CORE]: Start Pipeline {self.name}:"
+            f"[CORE]: Start Execute: {self.name}:"
             f"{gen_id(self.name, unique=True)}"
         )
         params: DictData = params or {}
@@ -481,13 +555,15 @@ class Pipeline(BaseModel):
             #   context.
             job_context: DictData = copy.deepcopy(rs.context)
             job_rs: Result = job.execute(params=job_context)
-            if job_rs.status == 0:
-                # NOTE: Receive output of job execution.
-                rs.context["jobs"][job_id] = job.set_outputs(job_rs.context)
-            else:
-                raise PipelineException(
+            if job_rs.status != 0:
+                logging.warning(
                     f"Getting status does not equal zero on job: {job_id}."
                 )
+                rs.status = 1
+                return rs
+
+            # NOTE: Receive output of job execution.
+            rs.context["jobs"][job_id] = job.set_outputs(job_rs.context)
 
         if not not_time_out_flag:
             logging.warning("Execution of pipeline was time out")

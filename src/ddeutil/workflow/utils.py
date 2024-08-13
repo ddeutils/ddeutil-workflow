@@ -33,6 +33,10 @@ from .__types import DictData, Matrix, Re
 from .exceptions import ParamValueException, UtilException
 
 
+def get_diff_sec(dt: datetime, tz: ZoneInfo) -> int:
+    return round((dt - datetime.now(tz=tz)).total_seconds())
+
+
 class Engine(BaseModel):
     """Engine Model"""
 
@@ -228,6 +232,7 @@ class DatetimeParam(DefaultParam):
     default: datetime = Field(default_factory=dt_now)
 
     def receive(self, value: str | datetime | date | None = None) -> datetime:
+        """Receive value that match with datetime."""
         if value is None:
             return self.default
 
@@ -249,6 +254,7 @@ class StrParam(DefaultParam):
     type: Literal["str"] = "str"
 
     def receive(self, value: Optional[str] = None) -> str | None:
+        """Receive value that match with str."""
         if value is None:
             return self.default
         return str(value)
@@ -260,6 +266,7 @@ class IntParam(DefaultParam):
     type: Literal["int"] = "int"
 
     def receive(self, value: Optional[int] = None) -> int | None:
+        """Receive value that match with int."""
         if value is None:
             return self.default
         if not isinstance(value, int):
@@ -274,6 +281,8 @@ class IntParam(DefaultParam):
 
 
 class ChoiceParam(BaseParam):
+    """Choice parameter."""
+
     type: Literal["choice"] = "choice"
     options: list[str]
 
@@ -293,8 +302,8 @@ class ChoiceParam(BaseParam):
 Param = Union[
     ChoiceParam,
     DatetimeParam,
-    StrParam,
     IntParam,
+    StrParam,
 ]
 
 
@@ -304,6 +313,11 @@ class Result:
     the pipeline execution.
     """
 
+    # TODO: Add running ID to this result dataclass.
+    # ---
+    # parent_run_id: str
+    # run_id: str
+    #
     status: int = field(default=2)
     context: DictData = field(default_factory=dict)
 
@@ -314,17 +328,12 @@ def make_exec(path: str | Path):
     f.chmod(f.stat().st_mode | stat.S_IEXEC)
 
 
-# TODO: change this const to dynamic registry of filter for support custom
-#   filter function by your own coding.
-#   ---
-#   > @custom_filter(name='demo')
-#   > def demo_filter(value, ...):
-#   >   ...
-#
 FILTERS: dict[str, callable] = {
     "abs": abs,
     "str": str,
     "int": int,
+    "upper": lambda x: x.upper(),
+    "lower": lambda x: x.lower(),
     "rstr": [str, repr],
 }
 

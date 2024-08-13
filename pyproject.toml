@@ -33,8 +33,8 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 app = [
-    "fastapi==0.112.0",
-    "apscheduler[sqlalchemy]==3.10.4",
+    "fastapi[standard]==0.112.0",
+#    "apscheduler[sqlalchemy]==3.10.4",
 ]
 
 [project.urls]

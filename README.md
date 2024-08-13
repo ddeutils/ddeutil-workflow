@@ -264,6 +264,7 @@ def odbc_mssql_procedure(_exec: str, params: dict):
 ```bash
 export WORKFLOW_ROOT_PATH=.
 export WORKFLOW_CORE_REGISTRY=ddeutil.workflow,tests.utils
+export WORKFLOW_CORE_REGISTRY_FILTER=ddeutil.workflow.utils
 export WORKFLOW_CORE_PATH_CONF=conf
 export WORKFLOW_CORE_TIMEZONE=Asia/Bangkok
 export WORKFLOW_CORE_DEFAULT_STAGE_ID=true
@@ -285,6 +286,12 @@ from the master node via RestAPI.
 > This feature do not start yet because I still research and find the best tool
 > to use it provision an app service, like `starlette`, `fastapi`, `apscheduler`.
 
+Local testing;
+
 ```shell
-(venv) $ workflow start -p 7070
+(venv) $ uvicorn src.ddeutil.workflow.app:app --host 0.0.0.0 --port 80 --reload
 ```
+
+> [!NOTE]
+> If this package already deploy, it able to use
+> `uvicorn ddeutil.workflow.app:app --host 0.0.0.0 --port 80`

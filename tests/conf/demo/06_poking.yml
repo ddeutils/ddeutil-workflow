@@ -1,0 +1,8 @@
+poke-batch-1:
+  pipelines:
+    - name: pipeline-name-01
+      params:
+        ...
+    - name: pipeline-name-02
+      params:
+        ...
