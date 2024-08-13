@@ -21,7 +21,7 @@ pipe-condition:
       stages:
         - name: "Test if condition"
           id: condition-stage
-          if: ${{ params.name }} == "foo"
+          if: '"${{ params.name }}" == "foo"'
           shell: |
             echo 'Hello World';
 

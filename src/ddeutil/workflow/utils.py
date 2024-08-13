@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import inspect
+import logging
 import os
 import stat
 from abc import ABC, abstractmethod
@@ -306,22 +307,43 @@ def make_exec(path: str | Path):
     f.chmod(f.stat().st_mode | stat.S_IEXEC)
 
 
+# TODO: change this const to dynamic registry of filter for support custom
+#   filter function by your own coding.
+#   ---
+#   > @custom_filter(name='demo')
+#   > def demo_filter(value, ...):
+#   >   ...
+#
 FILTERS: dict[str, callable] = {
     "abs": abs,
+    "str": str,
+    "int": int,
+    "rstr": [str, repr],
 }
 
 
 def __map_filter(
     value: Any,
     post_filter: list[str],
-):
+) -> Any:
+    """Mapping post-filter to value with sequence list of filter function name
+    that will get from the FILTERS.
+
+    :param value: A string value that want to mapped with filter function.
+    :param post_filter: A list of post-filter function name.
+    """
     for f in post_filter:
         try:
-            value: Any = FILTERS[f](value)
-        except Exception:
+            if isinstance((f_func := FILTERS[f]), list):
+                for func in f_func:
+                    value: Any = func(value)
+            else:
+                value: Any = f_func(value)
+        except Exception as err:
+            logging.warning(str(err))
             raise UtilException(
                 f"The post-filter function: {f} does not fit with "
-                f"{value}({type(value)})."
+                f"{value} (type: {type(value).__name__})."
             ) from None
     return value
 
@@ -329,8 +351,20 @@ def __map_filter(
 def __param2template(
     value: str,
     params: DictData,
-    repr_flag: bool = False,
 ) -> Any:
+    """(Sub-function) Pass param to template string that can search by
+    ``RE_CALLER`` regular expression.
+
+        The getter value that map a template should have typing support align
+    with the pipeline parameter types that is `str`, `int`, `datetime`, and
+    `list`.
+
+    :param value: A string value that want to mapped with an params
+    :param params: A parameter value that getting with matched regular
+        expression.
+    """
+    # NOTE: remove space before and after this string value.
+    value: str = value.strip()
     for found in Re.RE_CALLER.finditer(value):
         # NOTE:
         #   Get caller and filter values that setting inside;
@@ -348,6 +382,7 @@ def __param2template(
         if not hasdot(caller, params):
             raise UtilException(f"The params does not set caller: {caller!r}.")
 
+        # VALIDATE: check post-filter function name should exist on FILTERS
         if f_not_sup := [f for f in pfilter if f not in FILTERS]:
             raise UtilException(
                 f"The post-filter: {f_not_sup} does not support yet."
@@ -356,33 +391,26 @@ def __param2template(
         # NOTE: from validate step, it guarantee that caller exists in params.
         getter: Any = getdot(caller, params)
 
-        # NOTE: check type of vars
-        if isinstance(getter, (str, int)):
-
-            # NOTE: map post-filter function.
-            getter: Any = __map_filter(getter, pfilter)
-
-            value: str = value.replace(
-                found.group(0), (repr(getter) if repr_flag else str(getter)), 1
-            )
-            continue
-
         # NOTE:
-        #   If type of getter caller does not formatting, it will return origin
-        #   value from the ``getdot`` function.
-        if value.replace(found.group(0), "", 1) != "":
-            raise UtilException(
-                "Callable variable should not pass other outside ${{ ... }}"
-            )
-        return __map_filter(getter, pfilter)
+        #   If type of getter caller is not string type and it does not use to
+        #   concat other string value, it will return origin value from the
+        #   ``getdot`` function.
+        if value.replace(found.group(0), "", 1) == "":
+            return __map_filter(getter, pfilter)
+
+        # NOTE: map post-filter function.
+        getter: Any = __map_filter(getter, pfilter)
+        if not isinstance(getter, str):
+            getter: str = str(getter)
+
+        value: str = value.replace(found.group(0), getter, 1)
+
     return value
 
 
 def param2template(
     value: Any,
     params: DictData,
-    *,
-    repr_flag: bool = False,
 ) -> Any:
     """Pass param to template string that can search by ``RE_CALLER`` regular
     expression.
@@ -390,8 +418,6 @@ def param2template(
     :param value: A value that want to mapped with an params
     :param params: A parameter value that getting with matched regular
         expression.
-    :param repr_flag: A repr flag for using repr instead of str if it set be
-        true.
 
     :rtype: Any
     :returns: An any getter value from the params input.
@@ -402,7 +428,7 @@ def param2template(
         return type(value)([param2template(i, params) for i in value])
     elif not isinstance(value, str):
         return value
-    return __param2template(value, params, repr_flag=repr_flag)
+    return __param2template(value, params)
 
 
 def dash2underscore(

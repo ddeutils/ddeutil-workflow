@@ -99,9 +99,7 @@ class BaseStage(BaseModel, ABC):
 
         _g: DictData = globals() | params
         try:
-            rs: bool = eval(
-                param2template(self.condition, params, repr_flag=True), _g, {}
-            )
+            rs: bool = eval(param2template(self.condition, params), _g, {})
             if not isinstance(rs, bool):
                 raise TypeError("Return type of condition does not be boolean")
             return not rs
