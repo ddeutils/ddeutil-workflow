@@ -33,8 +33,12 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 app = [
+    "schedule==1.2.2,<2.0.0",
+]
+api = [
     "fastapi[standard]==0.112.0",
-#    "apscheduler[sqlalchemy]==3.10.4",
+    "apscheduler[sqlalchemy]==3.10.4,<4.0.0",
+    "croniter==3.0.3",
 ]
 
 [project.urls]

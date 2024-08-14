@@ -1,36 +1,41 @@
-import logging
+# ------------------------------------------------------------------------------
+# Copyright (c) 2022 Korawich Anuttra. All rights reserved.
+# Licensed under the MIT License. See LICENSE in the project root for
+# license information.
+# ------------------------------------------------------------------------------
+import functools
 import time
 
-from fastapi import BackgroundTasks, FastAPI
-
-app = FastAPI()
+import schedule
 
 
-def write_pipeline(task_id: str, message=""):
-    logging.info(task_id, ":", message)
-    time.sleep(5)
-    logging.info(task_id, ": run task successfully!!!")
+def catch_exceptions(cancel_on_failure=False):
+    def catch_exceptions_decorator(job_func):
+        @functools.wraps(job_func)
+        def wrapper(*args, **kwargs):
+            try:
+                return job_func(*args, **kwargs)
+            except Exception as err:
+                print(err)
+
+                if cancel_on_failure:
+                    return schedule.CancelJob
+
+        return wrapper
+
+    return catch_exceptions_decorator
 
 
-@app.post("/schedule/{pipeline}")
-async def send_schedule(pipeline: str, background_tasks: BackgroundTasks):
-    background_tasks.add_task(
-        write_pipeline,
-        pipeline,
-        message=f"some message for {pipeline}",
-    )
-    return {"message": f"Schedule sent {pipeline!r} in the background"}
+@catch_exceptions(cancel_on_failure=True)
+def bad_task():
+    return 1 / 0
 
 
-@app.get("/pipeline/{pipeline}")
-async def get_pipeline(
-    pipeline: str,
-):
-    return {"message": f"getting pipeline {pipeline}"}
+schedule.every(5).seconds.do(bad_task)
 
-
-@app.get("/pipeline/{pipeline}/logging")
-async def get_pipeline_log(
-    pipeline: str,
-):
-    return {"message": f"getting pipeline {pipeline} logging"}
+if __name__ == "__main__":
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
+        if not schedule.get_jobs():
+            break

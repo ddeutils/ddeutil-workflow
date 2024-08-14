@@ -137,7 +137,7 @@ cython_debug/
 .ruff_cache/
 
 # Examples data for testing
-demo_sqlite.db
+jobs-store.sqlite
 *.parquet
 logs/
 

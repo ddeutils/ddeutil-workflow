@@ -25,7 +25,7 @@ from zoneinfo import ZoneInfo
 from ddeutil.core import getdot, hasdot, import_string, lazy
 from ddeutil.io import PathData, search_env_replace
 from ddeutil.io.models.lineage import dt_now
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
@@ -33,8 +33,13 @@ from .__types import DictData, Matrix, Re
 from .exceptions import ParamValueException, UtilException
 
 
-def get_diff_sec(dt: datetime, tz: ZoneInfo) -> int:
-    return round((dt - datetime.now(tz=tz)).total_seconds())
+def get_diff_sec(dt: datetime, tz: ZoneInfo | None = None) -> int:
+    """Return second value that come from diff of an input datetime and the
+    current datetime with specific timezone.
+    """
+    return round(
+        (dt - datetime.now(tz=(tz or ZoneInfo("UTC")))).total_seconds()
+    )
 
 
 class Engine(BaseModel):
@@ -55,7 +60,19 @@ class Engine(BaseModel):
         """
         if (_regis := values.get("registry")) and isinstance(_regis, str):
             values["registry"] = [_regis]
+        if (_regis_filter := values.get("registry_filter")) and isinstance(
+            _regis, str
+        ):
+            values["registry_filter"] = [_regis_filter]
         return values
+
+
+class CoreConf(BaseModel):
+    """Core Config Model"""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    tz: ZoneInfo = Field(default_factory=lambda: ZoneInfo("UTC"))
 
 
 class ConfParams(BaseModel):
@@ -64,6 +81,10 @@ class ConfParams(BaseModel):
     engine: Engine = Field(
         default_factory=Engine,
         description="A engine mapping values.",
+    )
+    core: CoreConf = Field(
+        default_factory=CoreConf,
+        description="A core config value",
     )
 
 
@@ -199,7 +220,7 @@ class BaseParam(BaseModel, ABC):
 
     @abstractmethod
     def receive(self, value: Optional[Any] = None) -> Any:
-        raise ParamValueException(
+        raise NotImplementedError(
             "Receive value and validate typing before return valid value."
         )
 
@@ -211,7 +232,7 @@ class DefaultParam(BaseParam):
 
     @abstractmethod
     def receive(self, value: Optional[Any] = None) -> Any:
-        raise ParamValueException(
+        raise NotImplementedError(
             "Receive value and validate typing before return valid value."
         )
 
@@ -434,7 +455,7 @@ def datetime_format(value: datetime, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
     return value.strftime(fmt)
 
 
-def __map_filter(
+def map_post_filter(
     value: Any,
     post_filter: list[str],
     filters: dict[str, FilterRegistry],
@@ -476,7 +497,7 @@ def __map_filter(
     return value
 
 
-def __param2template(
+def str2template(
     value: str,
     params: DictData,
     *,
@@ -492,6 +513,7 @@ def __param2template(
     :param value: A string value that want to mapped with an params
     :param params: A parameter value that getting with matched regular
         expression.
+    :param filters:
     """
     filters: dict[str, FilterRegistry] = filters or make_filter_registry()
 
@@ -522,10 +544,10 @@ def __param2template(
         #   concat other string value, it will return origin value from the
         #   ``getdot`` function.
         if value.replace(found.group(0), "", 1) == "":
-            return __map_filter(getter, pfilter, filters=filters)
+            return map_post_filter(getter, pfilter, filters=filters)
 
         # NOTE: map post-filter function.
-        getter: Any = __map_filter(getter, pfilter, filters=filters)
+        getter: Any = map_post_filter(getter, pfilter, filters=filters)
         if not isinstance(getter, str):
             getter: str = str(getter)
 
@@ -555,7 +577,7 @@ def param2template(
         return type(value)([param2template(i, params) for i in value])
     elif not isinstance(value, str):
         return value
-    return __param2template(value, params, filters=filters)
+    return str2template(value, params, filters=filters)
 
 
 def dash2underscore(

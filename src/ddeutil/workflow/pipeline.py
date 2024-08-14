@@ -368,6 +368,13 @@ class Pipeline(BaseModel):
             }
         return values
 
+    @model_validator(mode="after")
+    def __validate_jobs_need(self):
+        for job in self.jobs:
+            if [need for need in self.jobs[job].needs if need not in self.jobs]:
+                raise ValueError("")
+        return self
+
     def job(self, name: str) -> Job:
         """Return Job model that exists on this pipeline.
 
@@ -387,6 +394,7 @@ class Pipeline(BaseModel):
         job execution.
 
         :param params: A parameter mapping that receive from pipeline execution.
+        :rtype: DictData
         """
         # VALIDATE: Incoming params should have keys that set on this pipeline.
         if check_key := tuple(
@@ -460,19 +468,25 @@ class Pipeline(BaseModel):
             f"[CORE]: Start Poking: {self.name!r} :"
             f"{gen_id(self.name, unique=True)}"
         )
+        results = []
         with ThreadPoolExecutor(
             max_workers=int(
                 os.getenv("WORKFLOW_CORE_MAX_PIPELINE_POKING", "4")
             ),
         ) as executor:
             futures: list[Future] = [
-                executor.submit(self.release, on, params=params)
+                executor.submit(
+                    self.release,
+                    on,
+                    params=params,
+                )
                 for on in self.on
             ]
             for future in as_completed(futures):
-                result = future.result()
-                logging.info(result)
-        return params
+                rs = future.result()
+                logging.info(rs)
+                results.append(rs)
+        return results
 
     def execute(
         self,
@@ -548,7 +562,7 @@ class Pipeline(BaseModel):
             #   data in this level, that mean the data that push to parallel job
             #   should not use across another job.
             #
-            if any(rs.context["jobs"].get(need) for need in job.needs):
+            if any(need not in rs.context["jobs"] for need in job.needs):
                 jq.put(job_id)
 
             # NOTE: copy current the result context for reference other job

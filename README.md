@@ -280,18 +280,21 @@ export WORKFLOW_APP_INTERVAL=10
 ## Deployment
 
 This package able to run as a application service for receive manual trigger
-from the master node via RestAPI.
+from the master node via RestAPI or use to be Scheduler background service
+like crontab job but via Python API.
 
-> [!WARNING]
-> This feature do not start yet because I still research and find the best tool
-> to use it provision an app service, like `starlette`, `fastapi`, `apscheduler`.
-
-Local testing;
+### Schedule Service
 
 ```shell
-(venv) $ uvicorn src.ddeutil.workflow.app:app --host 0.0.0.0 --port 80 --reload
+(venv) $ python src.ddeutil.workflow.app
+```
+
+### API Server
+
+```shell
+(venv) $ uvicorn src.ddeutil.workflow.api:app --host 0.0.0.0 --port 80 --reload
 ```
 
 > [!NOTE]
 > If this package already deploy, it able to use
-> `uvicorn ddeutil.workflow.app:app --host 0.0.0.0 --port 80`
+> `uvicorn ddeutil.workflow.api:app --host 0.0.0.0 --port 80`
