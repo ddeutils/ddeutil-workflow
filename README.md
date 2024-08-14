@@ -9,7 +9,6 @@
 
 - [Installation](#installation)
 - [Getting Started](#getting-started)
-- [Core Features](#core-features)
   - [On](#on)
   - [Pipeline](#pipeline)
 - [Usage](#usage)
@@ -20,12 +19,14 @@
 - [Deployment](#deployment)
 
 This **Workflow** objects was created for easy to make a simple metadata
-driven pipeline that able to **ETL, T, EL, or ELT** by `.yaml` file.
+driven for data pipeline orchestration that able to use for **ETL, T, EL, or
+ELT** by a `.yaml` file template.
 
-I think we should not create the multiple pipeline per use-case if we able to
-write some dynamic pipeline that just change the input parameters per use-case
-instead. This way we can handle a lot of pipelines in our orgs with metadata only.
-It called **Metadata Driven**.
+In my opinion, I think it should not create duplicate pipeline codes if I can
+write with dynamic input parameters on the one template pipeline that just change
+the input parameters per use-case instead.
+This way I can handle a lot of logical pipelines in our orgs with only metadata
+configuration. It called **Metadata Driven Data Pipeline**.
 
 Next, we should get some monitoring tools for manage logging that return from
 pipeline running. Because it not show us what is a use-case that running data
@@ -47,6 +48,10 @@ this package with application add-ons, you should add `app` in installation;
 
 ```shell
 pip install ddeutil-workflow[app]
+```
+
+```shell
+pip install ddeutil-workflow[api]
 ```
 
 ## Getting Started

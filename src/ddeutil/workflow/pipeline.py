@@ -176,11 +176,31 @@ class Job(BaseModel):
 
         return output[next(iter(output))]
 
-    def strategy_execute(self, strategy: DictData, params: DictData) -> Result:
-        context: DictData = {}
-        context.update(params)
+    def strategy_execute(
+        self,
+        strategy: DictData,
+        params: DictData,
+    ) -> Result:
+        """Strategy execution with passing dynamic parameters from the pipeline
+        stage execution.
+
+        :param strategy
+        :param params
+        :rtype: Result
+        """
+        # NOTE: Create strategy execution context and update a matrix and copied
+        #   of params. So, the context value will have structure like;
+        #   ---
+        #   {
+        #       "params": { ... },      <== Current input params
+        #       "jobs": { ... },        <== Current input params
+        #       "matrix": { ... }       <== Current strategy value
+        #   }
+        #
+        context: DictData = copy.deepcopy(params)
         context.update({"matrix": strategy})
 
+        # IMPORTANT: The stage execution only run sequentially one-by-one.
         for stage in self.stages:
             _st_name: str = stage.id or stage.name
 
@@ -189,6 +209,27 @@ class Job(BaseModel):
                 continue
             logging.info(f"[JOB]: Start execute the stage: {_st_name!r}")
 
+            # NOTE: Logging a matrix that pass on this stage execution.
+            if strategy:
+                logging.info(f"[...]: Matrix: {strategy}")
+
+            # NOTE:
+            #       I do not use below syntax because `params` dict be the
+            #   reference memory pointer and it was changed when I action
+            #   anything like update or re-construct this.
+            #
+            #       ... params |= stage.execute(params=params)
+            #
+            #   This step will add the stage result to ``stages`` key in
+            #   that stage id. It will have structure like;
+            #   ---
+            #   {
+            #       "params": { ... },
+            #       "jobs": { ... },
+            #       "matrix": { ... },
+            #       "stages": { { "stage-id-1": ... }, ... }
+            #   }
+            #
             rs: Result = stage.execute(params=context)
             if rs.status == 0:
                 stage.set_outputs(rs.context, params=context)
@@ -216,69 +257,15 @@ class Job(BaseModel):
         :rtype: Result
         """
         strategy_context: DictData = {}
+
+        # TODO: we should add option for ``wait_as_complete`` for release
+        #   a stage execution to run on background (multi-thread).
+        #   ---
+        #   >>> from concurrency
+        #
         for strategy in self.strategy.make():
-
-            # NOTE: Create strategy context and update matrix and params to this
-            #   context. So, the context will have structure like;
-            #   ---
-            #   {
-            #       "params": { ... },      <== Current input params
-            #       "jobs": { ... },
-            #       "matrix": { ... }       <== Current strategy value
-            #   }
-            #
-            context: DictData = {}
-            context.update(params)
-            context.update({"matrix": strategy})
-
-            # TODO: we should add option for ``wait_as_complete`` for release
-            #   a stage execution to run on background (multi-thread).
-            #   ---
-            #   >>> from concurrency
-            #
-            # IMPORTANT: The stage execution only run sequentially one-by-one.
-            for stage in self.stages:
-                _st_name: str = stage.id or stage.name
-
-                if stage.is_skip(params=context):
-                    logging.info(f"[JOB]: Skip the stage: {_st_name!r}")
-                    continue
-                logging.info(f"[JOB]: Start execute the stage: {_st_name!r}")
-
-                # NOTE: Logging a matrix that pass on this stage execution.
-                if strategy:
-                    logging.info(f"[...]: Matrix: {strategy}")
-
-                # NOTE:
-                #       I do not use below syntax because `params` dict be the
-                #   reference memory pointer and it was changed when I action
-                #   anything like update or re-construct this.
-                #
-                #       ... params |= stage.execute(params=params)
-                #
-                #   This step will add the stage result to ``stages`` key in
-                #   that stage id. It will have structure like;
-                #   ---
-                #   {
-                #       "params": { ... },
-                #       "jobs": { ... },
-                #       "matrix": { ... },
-                #       "stages": { { "stage-id-1": ... }, ... }
-                #   }
-                #
-                rs: Result = stage.execute(params=context)
-                if rs.status == 0:
-                    stage.set_outputs(rs.context, params=context)
-                else:
-                    raise JobException(
-                        f"Getting status does not equal zero on stage: "
-                        f"{stage.name}."
-                    )
-
-            strategy_context[gen_id(strategy)] = {
-                "matrix": strategy,
-                "stages": context.pop("stages", {}),
-            }
+            rs = self.strategy_execute(strategy, params=params)
+            strategy_context.update(rs.context)
 
         return Result(status=0, context=strategy_context)
 
@@ -371,8 +358,13 @@ class Pipeline(BaseModel):
     @model_validator(mode="after")
     def __validate_jobs_need(self):
         for job in self.jobs:
-            if [need for need in self.jobs[job].needs if need not in self.jobs]:
-                raise ValueError("")
+            if not_exist := [
+                need for need in self.jobs[job].needs if need not in self.jobs
+            ]:
+                raise PipelineException(
+                    f"This needed jobs: {not_exist} do not exist in this "
+                    f"pipeline."
+                )
         return self
 
     def job(self, name: str) -> Job:
