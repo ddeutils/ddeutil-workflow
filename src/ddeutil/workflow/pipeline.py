@@ -9,8 +9,14 @@ import copy
 import logging
 import os
 import time
-from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from concurrent.futures import (
+    Future,
+    ProcessPoolExecutor,
+    ThreadPoolExecutor,
+    as_completed,
+)
 from datetime import datetime
+from pickle import PickleError
 from queue import Queue
 from typing import Optional
 from zoneinfo import ZoneInfo
@@ -51,7 +57,7 @@ class Strategy(BaseModel):
     """
 
     fail_fast: bool = Field(default=False)
-    max_parallel: int = Field(default=-1)
+    max_parallel: int = Field(default=1, gt=0)
     matrix: Matrix = Field(default_factory=dict)
     include: MatrixInclude = Field(
         default_factory=list,
@@ -197,7 +203,7 @@ class Job(BaseModel):
         #       "matrix": { ... }       <== Current strategy value
         #   }
         #
-        context: DictData = copy.deepcopy(params)
+        context: DictData = params
         context.update({"matrix": strategy})
 
         # IMPORTANT: The stage execution only run sequentially one-by-one.
@@ -257,15 +263,43 @@ class Job(BaseModel):
         :rtype: Result
         """
         strategy_context: DictData = {}
+        if self.strategy.max_parallel > 1:
 
-        # TODO: we should add option for ``wait_as_complete`` for release
-        #   a stage execution to run on background (multi-thread).
-        #   ---
-        #   >>> from concurrency
-        #
-        for strategy in self.strategy.make():
-            rs = self.strategy_execute(strategy, params=params)
-            strategy_context.update(rs.context)
+            # FIXME: (WF001) I got error that raise when use
+            #  ``ProcessPoolExecutor``;
+            #   _pickle.PicklingError: Can't pickle
+            #       <function ??? at 0x000001F0BE80F160>: attribute lookup ???
+            #       on ddeutil.workflow.stage failed
+            #
+            with ProcessPoolExecutor(
+                max_workers=self.strategy.max_parallel
+            ) as pool:
+                pool_result: list[Future] = [
+                    pool.submit(
+                        self.strategy_execute,
+                        st,
+                        params=copy.deepcopy(params),
+                    )
+                    for st in self.strategy.make()
+                ]
+                for pool_rs in as_completed(pool_result):
+                    try:
+                        rs: Result = pool_rs.result(timeout=60)
+                        strategy_context.update(rs.context)
+                    except PickleError as err:
+                        # NOTE: I do not want to fix this issue because it does
+                        #   not make sense and over-engineering with this bug
+                        #   fix process.
+                        raise JobException(
+                            f"PyStage that create object on locals does use "
+                            f"parallel in strategy;\n\t{err}"
+                        ) from None
+        else:
+            for strategy in self.strategy.make():
+                rs: Result = self.strategy_execute(
+                    strategy, params=copy.deepcopy(params)
+                )
+                strategy_context.update(rs.context)
 
         return Result(status=0, context=strategy_context)
 
