@@ -10,12 +10,15 @@ import logging
 import os
 import time
 from concurrent.futures import (
+    FIRST_EXCEPTION,
     Future,
     ProcessPoolExecutor,
     ThreadPoolExecutor,
     as_completed,
+    wait,
 )
 from datetime import datetime
+from multiprocessing import Event, Manager
 from pickle import PickleError
 from queue import Queue
 from typing import Optional
@@ -26,7 +29,7 @@ from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
 from .__types import DictData, DictStr, Matrix, MatrixExclude, MatrixInclude
-from .exceptions import JobException, PipelineException
+from .exceptions import JobException, PipelineException, StageException
 from .loader import Loader
 from .on import On
 from .scheduler import CronRunner
@@ -47,6 +50,8 @@ class Strategy(BaseModel):
 
     Data Validate:
         >>> strategy = {
+        ...     'max-parallel': 1,
+        ...     'fail-fast': False,
         ...     'matrix': {
         ...         'first': [1, 2, 3],
         ...         'second': ['foo', 'bar']
@@ -186,14 +191,30 @@ class Job(BaseModel):
         self,
         strategy: DictData,
         params: DictData,
+        *,
+        event: Event | None = None,
     ) -> Result:
         """Strategy execution with passing dynamic parameters from the pipeline
         stage execution.
 
-        :param strategy
-        :param params
+        :param strategy:
+        :param params:
+        :param event: An manger event that pass to the PoolThreadExecutor.
         :rtype: Result
         """
+        _stop_rs: Result = Result(
+            status=1,
+            context={
+                gen_id(strategy): {
+                    "matrix": strategy,
+                    "stages": {},
+                    "error": "Event stopped",
+                },
+            },
+        )
+        if event and event.is_set():
+            return _stop_rs
+
         # NOTE: Create strategy execution context and update a matrix and copied
         #   of params. So, the context value will have structure like;
         #   ---
@@ -236,6 +257,8 @@ class Job(BaseModel):
             #       "stages": { { "stage-id-1": ... }, ... }
             #   }
             #
+            if event and event.is_set():
+                return _stop_rs
             rs: Result = stage.execute(params=context)
             if rs.status == 0:
                 stage.set_outputs(rs.context, params=context)
@@ -244,6 +267,8 @@ class Job(BaseModel):
                     f"Getting status does not equal zero on stage: "
                     f"{stage.name}."
                 )
+        # TODO: Filter and warning if it pass any objects to context between
+        #   strategy job executor like function, etc.
         return Result(
             status=0,
             context={
@@ -263,14 +288,26 @@ class Job(BaseModel):
         :rtype: Result
         """
         strategy_context: DictData = {}
-        if self.strategy.max_parallel > 1:
+        rs = Result(context=strategy_context)
 
-            # FIXME: (WF001) I got error that raise when use
-            #  ``ProcessPoolExecutor``;
-            #   _pickle.PicklingError: Can't pickle
-            #       <function ??? at 0x000001F0BE80F160>: attribute lookup ???
-            #       on ddeutil.workflow.stage failed
-            #
+        if self.strategy.max_parallel == 1:
+            for strategy in self.strategy.make():
+                rs: Result = self.strategy_execute(
+                    strategy, params=copy.deepcopy(params)
+                )
+                strategy_context.update(rs.context)
+            return rs
+
+        # FIXME: (WF001) I got error that raise when use
+        #  ``ProcessPoolExecutor``;
+        #   ---
+        #   _pickle.PicklingError: Can't pickle
+        #       <function ??? at 0x000001F0BE80F160>: attribute lookup ???
+        #       on ddeutil.workflow.stage failed
+        #
+        with Manager() as manager:
+            event: Event = manager.Event()
+
             with ProcessPoolExecutor(
                 max_workers=self.strategy.max_parallel
             ) as pool:
@@ -279,9 +316,44 @@ class Job(BaseModel):
                         self.strategy_execute,
                         st,
                         params=copy.deepcopy(params),
+                        event=event,
                     )
                     for st in self.strategy.make()
                 ]
+                if self.strategy.fail_fast:
+
+                    # NOTE: Get results from a collection of tasks with a
+                    #   timeout that has the first exception.
+                    done, not_done = wait(
+                        pool_result, timeout=60, return_when=FIRST_EXCEPTION
+                    )
+                    logging.error(
+                        "[JOB]: Strategy is set Fail Fast, the strategies do "
+                        f"not run is {not_done}"
+                    )
+
+                    # NOTE: Stop all running tasks
+                    event.set()
+
+                    # NOTE: Cancel any scheduled tasks
+                    for future in pool_result:
+                        future.cancel()
+
+                    for f in done:
+                        if f.exception():
+                            logging.error(
+                                f"One task failed with: {f.exception()}, "
+                                f"shutting down"
+                            )
+                        elif f.cancelled():
+                            continue
+                        else:
+                            rs: Result = f.result(timeout=60)
+                            strategy_context.update(rs.context)
+                    rs.status = 1
+                    rs.context = strategy_context
+                    return rs
+
                 for pool_rs in as_completed(pool_result):
                     try:
                         rs: Result = pool_rs.result(timeout=60)
@@ -294,14 +366,23 @@ class Job(BaseModel):
                             f"PyStage that create object on locals does use "
                             f"parallel in strategy;\n\t{err}"
                         ) from None
-        else:
-            for strategy in self.strategy.make():
-                rs: Result = self.strategy_execute(
-                    strategy, params=copy.deepcopy(params)
-                )
-                strategy_context.update(rs.context)
-
-        return Result(status=0, context=strategy_context)
+                    except TimeoutError:
+                        rs.status = 1
+                        logging.warning("Task is hanging. Attempting to kill.")
+                        pool_rs.cancel()
+                        if not pool_rs.cancelled():
+                            logging.warning("Failed to cancel the task.")
+                        else:
+                            logging.warning("Task canceled successfully.")
+                    except StageException as err:
+                        rs.status = 1
+                        logging.warning(
+                            f"Get stage exception with fail-fast does not set;"
+                            f"\n\t{err}"
+                        )
+        rs.status = 0
+        rs.context = strategy_context
+        return rs
 
 
 class Pipeline(BaseModel):
@@ -514,6 +595,8 @@ class Pipeline(BaseModel):
                 results.append(rs)
         return results
 
+    def job_execute(self): ...
+
     def execute(
         self,
         params: DictData | None = None,
@@ -600,6 +683,7 @@ class Pipeline(BaseModel):
                     f"Getting status does not equal zero on job: {job_id}."
                 )
                 rs.status = 1
+                rs.context["jobs"][job_id] = job.set_outputs(job_rs.context)
                 return rs
 
             # NOTE: Receive output of job execution.

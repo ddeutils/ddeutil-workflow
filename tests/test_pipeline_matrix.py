@@ -55,7 +55,7 @@ def test_pipe_job_matrix():
         "table": ["customer", "sales"],
         "partition": [1, 2, 3],
     } == multi_sys.strategy.matrix
-    assert 1 == multi_sys.strategy.max_parallel
+    assert 2 == multi_sys.strategy.max_parallel
     assert [
         {"partition": 4, "system": "csv", "table": "customer"},
     ] == multi_sys.strategy.include
@@ -148,3 +148,12 @@ def test_pipe_matrix():
             },
         },
     } == rs.context
+
+
+def test_pipe_matrix_fail_fast():
+    pipeline = pipe.Pipeline.from_loader(
+        name="pipeline_matrix_fail_fast",
+        externals={},
+    )
+    rs = pipeline.execute(params={"source": "src", "target": "tgt"})
+    print(rs)
