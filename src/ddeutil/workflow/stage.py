@@ -200,12 +200,16 @@ class BashStage(BaseStage):
             bash=bash, env=param2template(self.env, params)
         ) as sh:
             logging.info(f"[STAGE]: Shell-Execute: {sh}")
-            rs: CompletedProcess = subprocess.run(
-                sh,
-                shell=False,
-                capture_output=True,
-                text=True,
-            )
+            try:
+                rs: CompletedProcess = subprocess.run(
+                    sh,
+                    shell=False,
+                    capture_output=True,
+                    text=True,
+                )
+            except Exception as err:
+                logging.error(str(err))
+                raise StageException(f"Subprocess error: {err}") from None
         if rs.returncode > 0:
             err: str = (
                 rs.stderr.encode("utf-8").decode("utf-16")
@@ -213,7 +217,10 @@ class BashStage(BaseStage):
                 else rs.stderr
             )
             logging.error(f"{err}\n\n```bash\n{bash}```")
-            raise StageException(f"{err}\n\n```bash\n{bash}```")
+            raise StageException(
+                f"{err.__class__.__name__}: {err}\nRunning Statement:\n---\n"
+                f"```bash\n{bash}\n```"
+            )
         return Result(
             status=0,
             context={
@@ -271,13 +278,15 @@ class PyStage(BaseStage):
             globals() | params | param2template(self.vars, params)
         )
         _locals: DictData = {}
+        run: str = param2template(self.run, params)
         try:
             logging.info(f"[STAGE]: Py-Execute: {uuid.uuid4()}")
-            exec(param2template(self.run, params), _globals, _locals)
+            exec(run, _globals, _locals)
         except Exception as err:
+            logging.error(str(err))
             raise StageException(
                 f"{err.__class__.__name__}: {err}\nRunning Statement:\n---\n"
-                f"{self.run}"
+                f"{run}"
             ) from None
         return Result(
             status=0,

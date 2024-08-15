@@ -1,4 +1,4 @@
-from ddeutil.workflow.utils import Result
+from ddeutil.workflow.utils import ReResult, Result
 
 
 def test_result_default():
@@ -20,3 +20,24 @@ def test_result_context():
         "params": {"source": "src", "target": "tgt"},
         "additional-key": "new-value-to-add",
     } == rs.context
+
+
+def test_re_result_context():
+    main_rs = ReResult()
+    print(main_rs)
+
+    sub_rs = ReResult(
+        status=1,
+        context={
+            "jobs": {
+                "first-job": {
+                    "stages": {
+                        "stage-id-1": {"outputs": {}},
+                    },
+                },
+            },
+        },
+    )
+    print(sub_rs)
+    main_rs.receive(sub_rs)
+    print(main_rs)

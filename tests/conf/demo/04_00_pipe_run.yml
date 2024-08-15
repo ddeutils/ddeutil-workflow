@@ -128,3 +128,12 @@ run_python_with_params:
         - name: Echo hello world
           bash: |
             echo 'Hello World';
+
+
+pipe-raise-run:
+  jobs:
+    first-job:
+      stages:
+        - name: Raise Error Inside
+          id: raise-error
+          run: raise ValueError('Testing raise error inside PyStage!!!')

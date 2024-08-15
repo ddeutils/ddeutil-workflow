@@ -12,7 +12,6 @@ import stat
 from abc import ABC, abstractmethod
 from ast import Call, Constant, Expr, Module, Name, parse
 from collections.abc import Iterator
-from dataclasses import dataclass, field
 from datetime import date, datetime
 from functools import wraps
 from hashlib import md5
@@ -329,9 +328,16 @@ Param = Union[
 ]
 
 
-@dataclass
-class Result:
-    """Result Dataclass object for passing parameter and receiving output from
+class Context(BaseModel):
+    """Context Pydantic Model"""
+
+    params: dict = Field(default_factory=dict)
+    jobs: dict = Field(default_factory=dict)
+    error: dict = Field(default_factory=dict)
+
+
+class Result(BaseModel):
+    """Result Pydantic Model for passing parameter and receiving output from
     the pipeline execution.
     """
 
@@ -340,8 +346,40 @@ class Result:
     # parent_run_id: str
     # run_id: str
     #
-    status: int = field(default=2)
-    context: DictData = field(default_factory=dict)
+    status: int = Field(default=2)
+    context: DictData = Field(default_factory=dict)
+
+    def receive(self, result: Result) -> Result:
+        self.__dict__["status"] = result.status
+        self.__dict__["context"].update(result.context)
+        return self
+
+    def receive_jobs(self, result: Result) -> Result:
+        self.__dict__["status"] = result.status
+        if "jobs" not in self.__dict__["context"]:
+            self.__dict__["context"]["jobs"] = {}
+        self.__dict__["context"]["jobs"].update(result.context)
+        return self
+
+
+class ReResult(BaseModel):
+    """Result Pydantic Model for passing parameter and receiving output from
+    the pipeline execution.
+    """
+
+    # TODO: Add running ID to this result dataclass.
+    # ---
+    # parent_run_id: str
+    # run_id: str
+    #
+    status: int = Field(default=2)
+    context: Context = Field(default_factory=Context)
+
+    def receive(self, result: ReResult) -> ReResult:
+        self.__dict__["status"] = result.status
+        self.__dict__["context"].__dict__["jobs"].update(result.context.jobs)
+        self.__dict__["context"].__dict__["error"].update(result.context.error)
+        return self
 
 
 def make_exec(path: str | Path):

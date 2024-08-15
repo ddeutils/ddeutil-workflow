@@ -29,7 +29,12 @@ from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
 from .__types import DictData, DictStr, Matrix, MatrixExclude, MatrixInclude
-from .exceptions import JobException, PipelineException, StageException
+from .exceptions import (
+    JobException,
+    PipelineException,
+    StageException,
+    UtilException,
+)
 from .loader import Loader
 from .on import On
 from .scheduler import CronRunner
@@ -205,6 +210,9 @@ class Job(BaseModel):
         :param params:
         :param event: An manger event that pass to the PoolThreadExecutor.
         :rtype: Result
+
+        :raise JobException: If it has any error from StageException or
+            UtilException.
         """
         _stop_rs: Result = Result(
             status=1,
@@ -263,14 +271,14 @@ class Job(BaseModel):
             #
             if event and event.is_set():
                 return _stop_rs
-            rs: Result = stage.execute(params=context)
-            if rs.status == 0:
+            try:
+                rs: Result = stage.execute(params=context)
                 stage.set_outputs(rs.context, params=context)
-            else:
+            except (StageException, UtilException) as err:
                 raise JobException(
-                    f"Getting status does not equal zero on stage: "
-                    f"{stage.name}."
-                )
+                    f"Getting raise error from stage execution: "
+                    f"{err.__class__.__name__}: {err}"
+                ) from None
         return Result(
             status=0,
             context={
@@ -294,15 +302,18 @@ class Job(BaseModel):
         :rtype: Result
         """
         strategy_context: DictData = {}
-        rs = Result(context=strategy_context)
 
+        # NOTE: Normal Job execution.
         if (not self.strategy.is_set()) or self.strategy.max_parallel == 1:
             for strategy in self.strategy.make():
                 rs: Result = self.strategy_execute(
                     strategy, params=copy.deepcopy(params)
                 )
                 strategy_context.update(rs.context)
-            return rs
+            return Result(
+                status=0,
+                context=strategy_context,
+            )
 
         # WARNING: (WF001) I got error that raise when use
         #  ``ProcessPoolExecutor``;
@@ -327,17 +338,17 @@ class Job(BaseModel):
                     for st in self.strategy.make()
                 ]
                 if self.strategy.fail_fast:
-                    return self.__exec_fail_fast(event, features)
-                strategy_context = self.__exec_all_completed(features).context
-        rs.status = 0
-        rs.context = strategy_context
-        return rs
+                    return self.__catch_fail_fast(event, features)
+                strategy_context = self.__catch_all_completed(features).context
+        return Result(
+            status=0,
+            context=strategy_context,
+        )
 
     @staticmethod
-    def __exec_fail_fast(event: Event, features: list[Future]) -> Result:
+    def __catch_fail_fast(event: Event, features: list[Future]) -> Result:
         """Job parallel pool execution with fail-fast"""
         strategy_context: DictData = {}
-        final_rs: Result = Result(status=0, context=strategy_context)
         # NOTE: Get results from a collection of tasks with a
         #   timeout that has the first exception.
         done, not_done = wait(
@@ -355,10 +366,10 @@ class Job(BaseModel):
         for future in features:
             future.cancel()
 
-        final_rs.status = 0
+        status: int = 0
         for f in done:
             if f.exception():
-                final_rs.status = 1
+                status = 1
                 logging.error(
                     f"[JOB]: One stage failed with: {f.exception()}"
                     f", shutting down"
@@ -368,14 +379,16 @@ class Job(BaseModel):
             else:
                 rs: Result = f.result(timeout=60)
                 strategy_context.update(rs.context)
-        final_rs.context = strategy_context
-        return final_rs
+        return Result(
+            status=status,
+            context=strategy_context,
+        )
 
     @staticmethod
-    def __exec_all_completed(features: list[Future]) -> Result:
+    def __catch_all_completed(features: list[Future]) -> Result:
         """Job parallel pool execution with all-completed"""
         strategy_context: DictData = {}
-        final_rs: Result = Result(status=0, context=strategy_context)
+        status: int = 0
         for pool_rs in as_completed(features):
             try:
                 rs: Result = pool_rs.result(timeout=60)
@@ -386,24 +399,23 @@ class Job(BaseModel):
                 #   this bug fix process.
                 raise JobException(
                     f"PyStage that create object on locals does use "
-                    f"parallel in strategy;\n\t{err}"
+                    f"parallel in strategy execution;\n\t{err}"
                 ) from None
             except TimeoutError:
-                final_rs.status = 1
+                status = 1
                 logging.warning("Task is hanging. Attempting to kill.")
                 pool_rs.cancel()
                 if not pool_rs.cancelled():
                     logging.warning("Failed to cancel the task.")
                 else:
                     logging.warning("Task canceled successfully.")
-            except StageException as err:
-                final_rs.status = 1
-                logging.warning(
+            except JobException as err:
+                status = 1
+                logging.error(
                     f"Get stage exception with fail-fast does not set;"
-                    f"\n\t{err}"
+                    f"{err.__class__.__name__}:\n\t{err}"
                 )
-        final_rs.context = strategy_context
-        return final_rs
+        return Result(status=status, context=strategy_context)
 
 
 class Pipeline(BaseModel):
@@ -620,7 +632,7 @@ class Pipeline(BaseModel):
         self,
         job: str,
         params: DictData,
-    ):
+    ) -> Result:
         """Job Executor that use on pipeline executor.
         :param job: A job ID that want to execute.
         :param params: A params that was parameterized from pipeline execution.
@@ -631,18 +643,18 @@ class Pipeline(BaseModel):
                 f"The job ID: {job} does not exists on {self.name!r} pipeline."
             )
 
-        job_obj: Job = self.jobs[job]
-
-        rs: Result = job_obj.execute(params=params)
-        if rs.status != 0:
-            logging.warning(
-                f"Getting status does not equal zero on job: {job}."
-            )
-            return Result(
-                status=1, context={job: job_obj.set_outputs(rs.context)}
-            )
-
-        return Result(status=0, context={job: job_obj.set_outputs(rs.context)})
+        try:
+            job_obj: Job = self.jobs[job]
+            j_rs: Result = job_obj.execute(params=params)
+        except JobException as err:
+            raise PipelineException(
+                f"The job ID: {job} get raise error: {err.__class__.__name__}:"
+                f"\n{err}"
+            ) from None
+        return Result(
+            status=j_rs.status,
+            context={job: job_obj.set_outputs(j_rs.context)},
+        )
 
     def execute(
         self,
@@ -684,23 +696,36 @@ class Pipeline(BaseModel):
             logging.warning("[PIPELINE]: This pipeline does not have any jobs")
             return Result(status=0, context=params)
 
-        # NOTE: create a job queue that keep the job that want to running after
+        # NOTE: Create a job queue that keep the job that want to running after
         #   it dependency condition.
         jq: Queue = Queue()
         for job_id in self.jobs:
             jq.put(job_id)
 
+        # NOTE: Create start timestamp
         ts: float = time.monotonic()
 
         # NOTE: Create result context that will pass this context to any
         #   execution dependency.
         rs: Result = Result(context=self.parameterize(params))
-        if (
-            worker := int(os.getenv("WORKFLOW_CORE_MAX_JOB_PARALLEL", "1"))
-        ) == 1:
-            return self.__exec_non_threading(rs, jq, ts, timeout=timeout)
-
-        return self.__exec_threading(rs, jq, ts, worker=worker, timeout=timeout)
+        try:
+            rs.receive(
+                self.__exec_non_threading(rs, jq, ts, timeout=timeout)
+                if (
+                    worker := int(
+                        os.getenv("WORKFLOW_CORE_MAX_JOB_PARALLEL", "1")
+                    )
+                )
+                == 1
+                else self.__exec_threading(
+                    rs, jq, ts, worker=worker, timeout=timeout
+                )
+            )
+            return rs
+        except PipelineException as err:
+            rs.context.update({"error": {"message": str(err)}})
+            rs.status = 1
+            return rs
 
     def __exec_threading(
         self,
@@ -736,17 +761,20 @@ class Pipeline(BaseModel):
                         params=copy.deepcopy(rs.context),
                     ),
                 )
+
             for future in as_completed(futures):
-                # TODO: Handle this exception in pipeline level, or not?
                 if err := future.exception():
                     logging.error(f"{err}")
-                job_rs: Result = future.result(timeout=20)
-                rs.context["jobs"].update(job_rs.context)
+                    raise PipelineException(f"{err}")
+
+                # NOTE: Update job result to pipeline result.
+                rs.receive_jobs(future.result(timeout=20))
 
         if not not_time_out_flag:
-            logging.warning("Execution of pipeline was time out")
-            rs.status = 1
-            return rs
+            logging.warning("[PIPELINE]: Execution of pipeline was timeout")
+            raise PipelineException(
+                f"Execution of pipeline: {self.name} was timeout"
+            )
         rs.status = 0
         return rs
 
@@ -767,17 +795,21 @@ class Pipeline(BaseModel):
             job_id: str = job_queue.get()
             logging.info(f"[PIPELINE]: Start execute the job: {job_id!r}")
             job: Job = self.jobs[job_id]
+
+            # NOTE:
             if any(need not in rs.context["jobs"] for need in job.needs):
                 job_queue.put(job_id)
                 time.sleep(0.5)
                 continue
 
+            # NOTE: Start job execution.
             job_rs = self.job_execute(job_id, params=copy.deepcopy(rs.context))
             rs.context["jobs"].update(job_rs.context)
 
         if not not_time_out_flag:
-            logging.warning("Execution of pipeline was time out")
-            rs.status = 1
-            return rs
+            logging.warning("[PIPELINE]: Execution of pipeline was time out")
+            raise PipelineException(
+                f"Execution of pipeline: {self.name} was timeout"
+            )
         rs.status = 0
         return rs
