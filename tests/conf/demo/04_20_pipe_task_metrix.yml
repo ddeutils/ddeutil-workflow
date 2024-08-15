@@ -43,8 +43,10 @@ ingest_multiple_system:
 pipeline_matrix_fail_fast:
   type: pipeline.Pipeline
   on:
-    - 'every_5_minute_bkk'
-    - 'every_2_minute_bkk'
+#    - 'every_5_minute_bkk'
+#    - 'every_2_minute_bkk'
+    - cronjob: '* * * * *'
+      timezone: "Asia/Bangkok"
   params:
     name: str
   jobs:

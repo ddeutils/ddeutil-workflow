@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any, Callable, Literal, Optional, Protocol, Union
 from zoneinfo import ZoneInfo
 
-from ddeutil.core import getdot, hasdot, import_string, lazy
+from ddeutil.core import getdot, hasdot, hash_str, import_string, lazy, str2bool
 from ddeutil.io import PathData, search_env_replace
 from ddeutil.io.models.lineage import dt_now
 from pydantic import BaseModel, ConfigDict, Field
@@ -89,7 +89,15 @@ class ConfParams(BaseModel):
 
 
 def config() -> ConfParams:
-    """Load Config data from ``workflows-conf.yaml`` file."""
+    """Load Config data from ``workflows-conf.yaml`` file.
+
+    Configuration Docs:
+    ---
+    :var engine.registry:
+    :var engine.registry_filter:
+    :var paths.root:
+    :var paths.conf:
+    """
     root_path: str = os.getenv("WORKFLOW_ROOT_PATH", ".")
 
     regis: list[str] = ["ddeutil.workflow"]
@@ -119,19 +127,31 @@ def config() -> ConfParams:
     )
 
 
-def gen_id(value: Any, *, sensitive: bool = True, unique: bool = False) -> str:
+def gen_id(
+    value: Any,
+    *,
+    sensitive: bool = True,
+    unique: bool = False,
+) -> str:
     """Generate running ID for able to tracking. This generate process use `md5`
-    function.
+    algorithm function if ``WORKFLOW_CORE_PIPELINE_ID_SIMPLE`` set to false.
+    But it will cut this hashing value length to 10 it the setting value set to
+    true.
 
-    :param value:
-    :param sensitive:
-    :param unique:
+    :param value: A value that want to add to prefix before hashing with md5.
+    :param sensitive: A flag that convert the value to lower case before hashing
+    :param unique: A flag that add timestamp at microsecond level to value
+        before hashing.
     :rtype: str
     """
     if not isinstance(value, str):
         value: str = str(value)
 
     tz: ZoneInfo = ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
+    if str2bool(os.getenv("WORKFLOW_CORE_PIPELINE_ID_SIMPLE", "true")):
+        return hash_str(f"{(value if sensitive else value.lower())}", n=10) + (
+            f"{datetime.now(tz=tz):%Y%m%d%H%M%S%f}" if unique else ""
+        )
     return md5(
         (
             f"{(value if sensitive else value.lower())}"

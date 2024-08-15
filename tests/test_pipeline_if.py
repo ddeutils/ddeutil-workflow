@@ -21,7 +21,7 @@ def test_pipe_id():
             "condition-job": {
                 "matrix": {},
                 "stages": {
-                    "ab2214618b003cb11f62e1766d176986": {"outputs": {}},
+                    "6708019737": {"outputs": {}},
                 },
             },
         },

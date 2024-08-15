@@ -84,12 +84,13 @@ def test_pipe_matrix():
         externals={},
     )
     rs = pipeline.execute(params={"source": "src", "target": "tgt"})
+    print(rs.context)
     assert {
         "params": {"source": "src", "target": "tgt"},
         "jobs": {
             "multiple-system": {
                 "strategies": {
-                    "ee5917b59c2a4f9fd6e6921f9966b400": {
+                    "9696245497": {
                         "matrix": {
                             "table": "customer",
                             "system": "csv",
@@ -100,7 +101,7 @@ def test_pipe_matrix():
                             "end-stage": {"outputs": {"passing_value": 10}},
                         },
                     },
-                    "cf30d610117956231786c6ed34df2e96": {
+                    "8141249744": {
                         "matrix": {
                             "table": "customer",
                             "system": "csv",
@@ -111,7 +112,7 @@ def test_pipe_matrix():
                             "end-stage": {"outputs": {"passing_value": 10}},
                         },
                     },
-                    "ec753d2915cdc4f82a2329d1ca51bfe8": {
+                    "3590257855": {
                         "matrix": {
                             "table": "sales",
                             "system": "csv",
@@ -122,7 +123,7 @@ def test_pipe_matrix():
                             "end-stage": {"outputs": {"passing_value": 10}},
                         },
                     },
-                    "d3a8459afe955fc81fa7a543bd993c58": {
+                    "3698996074": {
                         "matrix": {
                             "table": "sales",
                             "system": "csv",
@@ -133,7 +134,7 @@ def test_pipe_matrix():
                             "end-stage": {"outputs": {"passing_value": 10}},
                         },
                     },
-                    "2f3fe68ee7a285a18723f000e65c4f05": {
+                    "4390593385": {
                         "matrix": {
                             "table": "customer",
                             "system": "csv",

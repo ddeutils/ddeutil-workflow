@@ -39,7 +39,7 @@ def test_pipe_job_task():
         },
     )
     assert {
-        "99914b932bd37a50b983c5e7c90ae93b": {
+        "1354680202": {
             "matrix": {},
             "stages": {"extract-load": {"outputs": {"records": 1}}},
         },
