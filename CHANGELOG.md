@@ -2,6 +2,34 @@
 
 ## Latest Changes
 
+## 0.0.7
+
+### :sparkles: Features
+
+- :dart: feat: add remove prefix map in hook stage support special param name. (_2024-08-15_)
+- :dart: feat: pipeline execute can run parallel job that not need deps. (_2024-08-15_)
+- :dart: feat: add job_execute method on pipeline object. (_2024-08-15_)
+- :dart: feat: implement fail-fast for job strategy executor. (_2024-08-15_)
+- :dart: feat: add muti-processing when job startegy make more than one. (_2024-08-14_)
+- :dart: feat: add strategy execution for support parallel job execution. (_2024-08-14_)
+- :dart: feat: add fastapi app for handler pipeline schedule. (_2024-08-14_)
+- :dart: feat: add poke and release methods on pipeline object. (_2024-08-13_)
+- :dart: feat: add search env to param2template utils function. (_2024-08-13_)
+- :dart: feat: implement passing arguments to custom filter function. (_2024-08-13_)
+- :dart: feat: add post-filter on regex caller that extract from template value. (_2024-08-13_)
+- :dart: feat: add post-filter value on caller regex. (_2024-08-13_)
+- :dart: feat: change exception on utils to sub-exception class of workflow class. (_2024-08-12_)
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: config python logging and coverage omit files. (_2024-08-13_)
+
+### :card_file_box: Documents
+
+- :page_facing_up: docs: init and update example docs. (_2024-08-12_)
+- :page_facing_up: docs: update config value of this package on readme. (_2024-08-12_)
+- :page_facing_up: docs: update readme for add hook function example. (_2024-08-12_)
+
 ## 0.0.6
 
 ### :sparkles: Features
