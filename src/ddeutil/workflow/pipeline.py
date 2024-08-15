@@ -39,6 +39,7 @@ from .utils import (
     Result,
     cross_product,
     dash2underscore,
+    filter_func,
     gen_id,
     get_diff_sec,
 )
@@ -81,6 +82,10 @@ class Strategy(BaseModel):
         dash2underscore("max-parallel", values)
         dash2underscore("fail-fast", values)
         return values
+
+    def is_set(self) -> bool:
+        """Return True if this strategy was set from yaml template."""
+        return len(self.matrix) > 0
 
     def make(self) -> list[DictStr]:
         """Return List of product of matrix values that already filter with
@@ -180,9 +185,8 @@ class Job(BaseModel):
                 return stage
         raise ValueError(f"Stage ID {stage_id} does not exists")
 
-    @staticmethod
-    def set_outputs(output: DictData) -> DictData:
-        if len(output) > 1:
+    def set_outputs(self, output: DictData) -> DictData:
+        if len(output) > 1 and self.strategy.is_set():
             return {"strategies": output}
 
         return output[next(iter(output))]
@@ -267,14 +271,16 @@ class Job(BaseModel):
                     f"Getting status does not equal zero on stage: "
                     f"{stage.name}."
                 )
-        # TODO: Filter and warning if it pass any objects to context between
-        #   strategy job executor like function, etc.
         return Result(
             status=0,
             context={
                 gen_id(strategy): {
                     "matrix": strategy,
-                    "stages": context.pop("stages", {}),
+                    # NOTE: (WF001) filter own created function from stages
+                    #   value, because it does not dump with pickle when you
+                    #   execute with multiprocess.
+                    #
+                    "stages": filter_func(context.pop("stages", {})),
                 },
             },
         )
@@ -290,7 +296,7 @@ class Job(BaseModel):
         strategy_context: DictData = {}
         rs = Result(context=strategy_context)
 
-        if self.strategy.max_parallel == 1:
+        if (not self.strategy.is_set()) or self.strategy.max_parallel == 1:
             for strategy in self.strategy.make():
                 rs: Result = self.strategy_execute(
                     strategy, params=copy.deepcopy(params)
@@ -298,7 +304,7 @@ class Job(BaseModel):
                 strategy_context.update(rs.context)
             return rs
 
-        # FIXME: (WF001) I got error that raise when use
+        # WARNING: (WF001) I got error that raise when use
         #  ``ProcessPoolExecutor``;
         #   ---
         #   _pickle.PicklingError: Can't pickle
@@ -310,9 +316,9 @@ class Job(BaseModel):
 
             with ProcessPoolExecutor(
                 max_workers=self.strategy.max_parallel
-            ) as pool:
-                pool_result: list[Future] = [
-                    pool.submit(
+            ) as executor:
+                features: list[Future] = [
+                    executor.submit(
                         self.strategy_execute,
                         st,
                         params=copy.deepcopy(params),
@@ -325,20 +331,20 @@ class Job(BaseModel):
                     # NOTE: Get results from a collection of tasks with a
                     #   timeout that has the first exception.
                     done, not_done = wait(
-                        pool_result, timeout=60, return_when=FIRST_EXCEPTION
+                        features, timeout=1800, return_when=FIRST_EXCEPTION
                     )
                     nd: str = (
                         f", the strategies do not run is {not_done}"
                         if not_done
                         else ""
                     )
-                    logging.warning(f"[JOB]: Strategy is set Fail Fast{nd}")
+                    logging.debug(f"[JOB]: Strategy is set Fail Fast{nd}")
 
                     # NOTE: Stop all running tasks
                     event.set()
 
                     # NOTE: Cancel any scheduled tasks
-                    for future in pool_result:
+                    for future in features:
                         future.cancel()
 
                     rs.status = 0
@@ -346,8 +352,8 @@ class Job(BaseModel):
                         if f.exception():
                             rs.status = 1
                             logging.error(
-                                f"One task failed with: {f.exception()}, "
-                                f"shutting down"
+                                f"[JOB]: One stage failed with: {f.exception()}"
+                                f", shutting down"
                             )
                         elif f.cancelled():
                             continue
@@ -357,14 +363,14 @@ class Job(BaseModel):
                     rs.context = strategy_context
                     return rs
 
-                for pool_rs in as_completed(pool_result):
+                for pool_rs in as_completed(features):
                     try:
                         rs: Result = pool_rs.result(timeout=60)
                         strategy_context.update(rs.context)
                     except PickleError as err:
-                        # NOTE: I do not want to fix this issue because it does
-                        #   not make sense and over-engineering with this bug
-                        #   fix process.
+                        # NOTE: (WF001) I do not want to fix this issue because
+                        #   it does not make sense and over-engineering with
+                        #   this bug fix process.
                         raise JobException(
                             f"PyStage that create object on locals does use "
                             f"parallel in strategy;\n\t{err}"
@@ -697,6 +703,9 @@ class Pipeline(BaseModel):
                         need not in rs.context["jobs"] for need in job.needs
                     ):
                         jq.put(job_id)
+                        time.sleep(0.5)
+                        continue
+
                     futures.append(
                         executor.submit(
                             self.job_execute,
@@ -705,6 +714,9 @@ class Pipeline(BaseModel):
                         ),
                     )
                 for future in as_completed(futures):
+                    # TODO: Handle this exception in pipeline level, or not?
+                    if err := future.exception():
+                        logging.error(f"{err}")
                     job_rs: Result = future.result(timeout=20)
                     rs.context["jobs"].update(job_rs.context)
         else:
@@ -719,6 +731,8 @@ class Pipeline(BaseModel):
                 job: Job = self.jobs[job_id]
                 if any(need not in rs.context["jobs"] for need in job.needs):
                     jq.put(job_id)
+                    time.sleep(0.5)
+                    continue
 
                 job_rs = self.job_execute(
                     job_id, params=copy.deepcopy(rs.context)

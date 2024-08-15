@@ -19,6 +19,7 @@ from hashlib import md5
 from importlib import import_module
 from itertools import product
 from pathlib import Path
+from types import FunctionType
 from typing import Any, Callable, Literal, Optional, Protocol, Union
 from zoneinfo import ZoneInfo
 
@@ -578,6 +579,25 @@ def param2template(
     elif not isinstance(value, str):
         return value
     return str2template(value, params, filters=filters)
+
+
+def filter_func(value: Any):
+    """Filter own created function out of any value with replace it to its
+    function name. If it is built-in function, it does not have any changing.
+    """
+    if isinstance(value, dict):
+        return {k: filter_func(value[k]) for k in value}
+    elif isinstance(value, (list, tuple, set)):
+        return type(value)([filter_func(i) for i in value])
+
+    if isinstance(value, FunctionType):
+        # NOTE: If it want to improve to get this function, it able to save to
+        #   some global memory storage.
+        #   ---
+        #   >>> GLOBAL_DICT[value.__name__] = value
+        #
+        return value.__name__
+    return value
 
 
 def dash2underscore(

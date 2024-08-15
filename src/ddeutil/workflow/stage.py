@@ -132,7 +132,7 @@ class EmptyStage(BaseStage):
             stage does not pass any output.
         """
         stm: str = param2template(self.echo, params=params) or "..."
-        logging.info(f"[STAGE]: Empty-Execute: {self.name!r}: " f"( {stm} )")
+        logging.info(f"[STAGE]: Empty-Execute: {self.name!r}: ( {stm} )")
         return Result(status=0, context={})
 
 
@@ -416,7 +416,8 @@ class TriggerStage(BaseStage):
         except PipelineException as err:
             _alias_stage: str = self.id or self.name
             raise StageException(
-                f"Trigger Stage: {_alias_stage} get trigger pipeline exception."
+                f"Trigger Stage: {_alias_stage} get trigger pipeline "
+                f"exception;\n\t{err}"
             ) from err
         return rs
 

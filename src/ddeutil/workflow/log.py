@@ -6,10 +6,14 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from functools import lru_cache
 
+from pydantic import BaseModel, Field
 from rich.console import Console
 from rich.logging import RichHandler
+
+from .__types import DictData
 
 console = Console(color_system="256", width=200, style="blue")
 
@@ -28,3 +32,22 @@ def get_logger(module_name):
     logger.addHandler(handler)
     logger.setLevel(logging.DEBUG)
     return logger
+
+
+class BaseLog(BaseModel):
+    """Base logging model."""
+
+    parent_id: str
+    id: str
+    input: DictData
+    output: DictData
+    update_time: datetime = Field(default_factory=datetime.now)
+
+
+class StageLog(BaseLog): ...
+
+
+class JobLog(BaseLog): ...
+
+
+class PipelineLog(BaseLog): ...
