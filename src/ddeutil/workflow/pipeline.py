@@ -327,10 +327,12 @@ class Job(BaseModel):
                     done, not_done = wait(
                         pool_result, timeout=60, return_when=FIRST_EXCEPTION
                     )
-                    logging.error(
-                        "[JOB]: Strategy is set Fail Fast, the strategies do "
-                        f"not run is {not_done}"
+                    nd: str = (
+                        f", the strategies do not run is {not_done}"
+                        if not_done
+                        else ""
                     )
+                    logging.warning(f"[JOB]: Strategy is set Fail Fast{nd}")
 
                     # NOTE: Stop all running tasks
                     event.set()
@@ -339,8 +341,10 @@ class Job(BaseModel):
                     for future in pool_result:
                         future.cancel()
 
+                    rs.status = 0
                     for f in done:
                         if f.exception():
+                            rs.status = 1
                             logging.error(
                                 f"One task failed with: {f.exception()}, "
                                 f"shutting down"
@@ -350,7 +354,6 @@ class Job(BaseModel):
                         else:
                             rs: Result = f.result(timeout=60)
                             strategy_context.update(rs.context)
-                    rs.status = 1
                     rs.context = strategy_context
                     return rs
 
@@ -595,7 +598,29 @@ class Pipeline(BaseModel):
                 results.append(rs)
         return results
 
-    def job_execute(self): ...
+    def job_execute(
+        self,
+        job: str,
+        params: DictData,
+    ):
+        """Job Executor that use on pipeline executor."""
+        if job not in self.jobs:
+            raise PipelineException(
+                f"The job ID: {job} does not exists on {self.name!r} pipeline."
+            )
+
+        job_obj: Job = self.jobs[job]
+
+        rs: Result = job_obj.execute(params=params)
+        if rs.status != 0:
+            logging.warning(
+                f"Getting status does not equal zero on job: {job}."
+            )
+            return Result(
+                status=1, context={job: job_obj.set_outputs(rs.context)}
+            )
+
+        return Result(status=0, context={job: job_obj.set_outputs(rs.context)})
 
     def execute(
         self,
@@ -650,6 +675,16 @@ class Pipeline(BaseModel):
         #   execution dependency.
         rs: Result = Result(context=self.parameterize(params))
 
+        # def task(job_queue: Queue):
+        #     ...
+        #
+        # with ThreadPoolExecutor(max_workers=3) as executor:
+        #
+        #     executor.submit(
+        #         task,
+        #         job_queue=jq,
+        #     )
+
         # IMPORTANT: The job execution can run parallel and waiting by needed.
         while not jq.empty() and (
             not_time_out_flag := ((time.monotonic() - ts) < timeout)
@@ -676,18 +711,10 @@ class Pipeline(BaseModel):
 
             # NOTE: copy current the result context for reference other job
             #   context.
-            job_context: DictData = copy.deepcopy(rs.context)
-            job_rs: Result = job.execute(params=job_context)
-            if job_rs.status != 0:
-                logging.warning(
-                    f"Getting status does not equal zero on job: {job_id}."
-                )
-                rs.status = 1
-                rs.context["jobs"][job_id] = job.set_outputs(job_rs.context)
-                return rs
-
-            # NOTE: Receive output of job execution.
-            rs.context["jobs"][job_id] = job.set_outputs(job_rs.context)
+            job_rs: Result = self.job_execute(
+                job_id, params=copy.deepcopy(rs.context)
+            )
+            rs.context["jobs"].update(job_rs.context)
 
         if not not_time_out_flag:
             logging.warning("Execution of pipeline was time out")

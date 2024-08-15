@@ -155,5 +155,5 @@ def test_pipe_matrix_fail_fast():
         name="pipeline_matrix_fail_fast",
         externals={},
     )
-    rs = pipeline.execute(params={"source": "src", "target": "tgt"})
+    rs = pipeline.execute(params={"name": "foo"})
     print(rs)

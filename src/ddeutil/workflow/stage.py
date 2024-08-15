@@ -131,10 +131,8 @@ class EmptyStage(BaseStage):
         :param params: A context data that want to add output result. But this
             stage does not pass any output.
         """
-        logging.info(
-            f"[STAGE]: Empty-Execute: {self.name!r}: "
-            f"({param2template(self.echo, params=params)})"
-        )
+        stm: str = param2template(self.echo, params=params) or "..."
+        logging.info(f"[STAGE]: Empty-Execute: {self.name!r}: " f"( {stm} )")
         return Result(status=0, context={})
 
 

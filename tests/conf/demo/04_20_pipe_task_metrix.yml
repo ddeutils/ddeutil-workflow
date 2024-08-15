@@ -42,9 +42,11 @@ ingest_multiple_system:
 
 pipeline_matrix_fail_fast:
   type: pipeline.Pipeline
+  on:
+    - 'every_5_minute_bkk'
+    - 'every_2_minute_bkk'
   params:
-    source: str
-    target: str
+    name: str
   jobs:
     multiple-system:
       strategy:

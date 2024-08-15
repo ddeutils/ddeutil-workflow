@@ -19,5 +19,7 @@ logging.basicConfig(
 
 
 if __name__ == "__main__":
-    pipe = Pipeline.from_loader(name="pipe-scheduling", externals={})
+    # pipe = Pipeline.from_loader(name="pipe-scheduling", externals={})
+    # pipe.poke(params={"name": "FOO"})
+    pipe = Pipeline.from_loader(name="pipeline_matrix_fail_fast", externals={})
     pipe.poke(params={"name": "FOO"})
