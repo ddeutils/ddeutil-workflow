@@ -46,13 +46,10 @@ pip install ddeutil-workflow
 This project need `ddeutil-io` extension namespace packages. If you want to install
 this package with application add-ons, you should add `app` in installation;
 
-```shell
-pip install ddeutil-workflow[app]
-```
-
-```shell
-pip install ddeutil-workflow[api]
-```
+| Usecase            | Install Optional          |
+|--------------------|---------------------------|
+| Scheduler Service  | `ddeutil-workflow[app]`   |
+| FastAPI Server     | `ddeutil-workflow[api]`   |
 
 ## Getting Started
 
