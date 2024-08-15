@@ -44,3 +44,8 @@ def dummy_task_2(
         logging.debug("... Start Schema Conversion ...")
     logging.debug(f"... Writing data to {sink}")
     return {"records": 1}
+
+
+@tag("odbc", alias="mssql-proc")
+def odbc_mssql_procedure(_exec: str, params: dict):
+    return {"exec": _exec, "params": params}

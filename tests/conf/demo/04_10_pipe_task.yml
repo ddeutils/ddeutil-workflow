@@ -54,3 +54,25 @@ ingest_csv_to_parquet:
           with:
             source: ${{ params.source }}
             sink: ${{ params.sink }}
+
+
+pipe_hook_mssql_proc:
+  type: pipeline.Pipeline
+  params:
+    run_date: datetime
+    sp_name: str
+    source_name: str
+    target_name: str
+  jobs:
+    transform:
+      stages:
+        - name: "Transform Data in MS SQL Server"
+          id: transform
+          uses: tasks/mssql-proc@odbc
+          with:
+            _exec: ${{ params.sp_name }}
+            params:
+              run_mode: "T"
+              run_date: ${{ params.run_date }}
+              source: ${{ params.source_name }}
+              target: ${{ params.target_name }}

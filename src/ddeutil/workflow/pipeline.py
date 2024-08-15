@@ -603,7 +603,11 @@ class Pipeline(BaseModel):
         job: str,
         params: DictData,
     ):
-        """Job Executor that use on pipeline executor."""
+        """Job Executor that use on pipeline executor.
+        :param job: A job ID that want to execute.
+        :param params: A params that was parameterized from pipeline execution.
+        """
+        # VALIDATE: check a job ID that exists in this pipeline or not.
         if job not in self.jobs:
             raise PipelineException(
                 f"The job ID: {job} does not exists on {self.name!r} pipeline."
@@ -674,13 +678,39 @@ class Pipeline(BaseModel):
         # NOTE: Create result context that will pass this context to any
         #   execution dependency.
         rs: Result = Result(context=self.parameterize(params))
-
-        # IMPORTANT: The job execution can run parallel and waiting by needed.
-        with ThreadPoolExecutor(
-            max_workers=int(os.getenv("WORKFLOW_CORE_MAX_JOB_PARALLEL", "2")),
-        ) as executor:
-            futures: list[Future] = []
-
+        if (
+            worker := int(os.getenv("WORKFLOW_CORE_MAX_JOB_PARALLEL", "1"))
+        ) > 1:
+            # IMPORTANT: The job execution can run parallel and waiting by
+            #   needed.
+            with ThreadPoolExecutor(max_workers=worker) as executor:
+                futures: list[Future] = []
+                while not jq.empty() and (
+                    not_time_out_flag := ((time.monotonic() - ts) < timeout)
+                ):
+                    job_id: str = jq.get()
+                    logging.info(
+                        f"[PIPELINE]: Start execute the job: {job_id!r}"
+                    )
+                    job: Job = self.jobs[job_id]
+                    if any(
+                        need not in rs.context["jobs"] for need in job.needs
+                    ):
+                        jq.put(job_id)
+                    futures.append(
+                        executor.submit(
+                            self.job_execute,
+                            job_id,
+                            params=copy.deepcopy(rs.context),
+                        ),
+                    )
+                for future in as_completed(futures):
+                    job_rs: Result = future.result(timeout=20)
+                    rs.context["jobs"].update(job_rs.context)
+        else:
+            logging.info(
+                f"[CORE]: Run {self.name} with non-threading job executor"
+            )
             while not jq.empty() and (
                 not_time_out_flag := ((time.monotonic() - ts) < timeout)
             ):
@@ -690,16 +720,9 @@ class Pipeline(BaseModel):
                 if any(need not in rs.context["jobs"] for need in job.needs):
                     jq.put(job_id)
 
-                futures.append(
-                    executor.submit(
-                        self.job_execute,
-                        job_id,
-                        params=copy.deepcopy(rs.context),
-                    ),
+                job_rs = self.job_execute(
+                    job_id, params=copy.deepcopy(rs.context)
                 )
-
-            for future in as_completed(futures):
-                job_rs: Result = future.result()
                 rs.context["jobs"].update(job_rs.context)
 
         if not not_time_out_flag:

@@ -346,7 +346,7 @@ class HookStage(BaseStage):
         return rgt[hook.func][hook.tag]
 
     def execute(self, params: DictData) -> Result:
-        """Execute the Task function that already mark registry.
+        """Execute the Hook function that already in the hook registry.
 
         :param params: A parameter that want to pass before run any statement.
         :type params: DictData
@@ -361,7 +361,7 @@ class HookStage(BaseStage):
         args: DictData = param2template(self.args, params)
         ips = inspect.signature(t_func)
         if any(
-            k not in args
+            (k.removeprefix("_") not in args and k not in args)
             for k in ips.parameters
             if ips.parameters[k].default == Parameter.empty
         ):
@@ -369,6 +369,11 @@ class HookStage(BaseStage):
                 f"Necessary params, ({', '.join(ips.parameters.keys())}), "
                 f"does not set to args"
             )
+
+        # NOTE: add '_' prefix if it want to use.
+        for k in ips.parameters:
+            if k.removeprefix("_") in args:
+                args[k] = args.pop(k.removeprefix("_"))
 
         try:
             logging.info(f"[STAGE]: Hook-Execute: {t_func.name}@{t_func.tag}")
