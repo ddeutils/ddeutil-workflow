@@ -17,9 +17,9 @@ from datetime import date, datetime
 from functools import wraps
 from hashlib import md5
 from importlib import import_module
+from inspect import isfunction
 from itertools import product
 from pathlib import Path
-from types import FunctionType
 from typing import Any, Callable, Literal, Optional, Protocol, Union
 from zoneinfo import ZoneInfo
 
@@ -590,7 +590,7 @@ def filter_func(value: Any):
     elif isinstance(value, (list, tuple, set)):
         return type(value)([filter_func(i) for i in value])
 
-    if isinstance(value, FunctionType):
+    if isfunction(value):
         # NOTE: If it want to improve to get this function, it able to save to
         #   some global memory storage.
         #   ---

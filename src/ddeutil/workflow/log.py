@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from functools import lru_cache
+from typing import Union
 
 from pydantic import BaseModel, Field
 from rich.console import Console
@@ -51,3 +52,28 @@ class JobLog(BaseLog): ...
 
 
 class PipelineLog(BaseLog): ...
+
+
+Log = Union[
+    StageLog,
+    JobLog,
+    PipelineLog,
+]
+
+
+def push_log_memory(log: DictData):
+    """Push message log to globals log queue."""
+    print(log)
+
+
+LOGS_REGISTRY = {
+    "memory": push_log_memory,
+}
+
+
+def push_log(log: DictData, mode: str = "memory"):
+    return LOGS_REGISTRY[mode](log)
+
+
+def save_log():
+    """Save log that push to queue to target saving"""

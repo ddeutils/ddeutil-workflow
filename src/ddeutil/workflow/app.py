@@ -3,6 +3,8 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
+from __future__ import annotations
+
 import functools
 import time
 
@@ -10,6 +12,8 @@ import schedule
 
 
 def catch_exceptions(cancel_on_failure=False):
+    """Catch exception error from scheduler job."""
+
     def catch_exceptions_decorator(job_func):
         @functools.wraps(job_func)
         def wrapper(*args, **kwargs):

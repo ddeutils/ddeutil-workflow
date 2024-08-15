@@ -327,71 +327,83 @@ class Job(BaseModel):
                     for st in self.strategy.make()
                 ]
                 if self.strategy.fail_fast:
-
-                    # NOTE: Get results from a collection of tasks with a
-                    #   timeout that has the first exception.
-                    done, not_done = wait(
-                        features, timeout=1800, return_when=FIRST_EXCEPTION
-                    )
-                    nd: str = (
-                        f", the strategies do not run is {not_done}"
-                        if not_done
-                        else ""
-                    )
-                    logging.debug(f"[JOB]: Strategy is set Fail Fast{nd}")
-
-                    # NOTE: Stop all running tasks
-                    event.set()
-
-                    # NOTE: Cancel any scheduled tasks
-                    for future in features:
-                        future.cancel()
-
-                    rs.status = 0
-                    for f in done:
-                        if f.exception():
-                            rs.status = 1
-                            logging.error(
-                                f"[JOB]: One stage failed with: {f.exception()}"
-                                f", shutting down"
-                            )
-                        elif f.cancelled():
-                            continue
-                        else:
-                            rs: Result = f.result(timeout=60)
-                            strategy_context.update(rs.context)
-                    rs.context = strategy_context
-                    return rs
-
-                for pool_rs in as_completed(features):
-                    try:
-                        rs: Result = pool_rs.result(timeout=60)
-                        strategy_context.update(rs.context)
-                    except PickleError as err:
-                        # NOTE: (WF001) I do not want to fix this issue because
-                        #   it does not make sense and over-engineering with
-                        #   this bug fix process.
-                        raise JobException(
-                            f"PyStage that create object on locals does use "
-                            f"parallel in strategy;\n\t{err}"
-                        ) from None
-                    except TimeoutError:
-                        rs.status = 1
-                        logging.warning("Task is hanging. Attempting to kill.")
-                        pool_rs.cancel()
-                        if not pool_rs.cancelled():
-                            logging.warning("Failed to cancel the task.")
-                        else:
-                            logging.warning("Task canceled successfully.")
-                    except StageException as err:
-                        rs.status = 1
-                        logging.warning(
-                            f"Get stage exception with fail-fast does not set;"
-                            f"\n\t{err}"
-                        )
+                    return self.__exec_fail_fast(event, features)
+                strategy_context = self.__exec_all_completed(features).context
         rs.status = 0
         rs.context = strategy_context
         return rs
+
+    @staticmethod
+    def __exec_fail_fast(event: Event, features: list[Future]) -> Result:
+        """Job parallel pool execution with fail-fast"""
+        strategy_context: DictData = {}
+        final_rs: Result = Result(status=0, context=strategy_context)
+        # NOTE: Get results from a collection of tasks with a
+        #   timeout that has the first exception.
+        done, not_done = wait(
+            features, timeout=1800, return_when=FIRST_EXCEPTION
+        )
+        nd: str = (
+            f", the strategies do not run is {not_done}" if not_done else ""
+        )
+        logging.debug(f"[JOB]: Strategy is set Fail Fast{nd}")
+
+        # NOTE: Stop all running tasks
+        event.set()
+
+        # NOTE: Cancel any scheduled tasks
+        for future in features:
+            future.cancel()
+
+        final_rs.status = 0
+        for f in done:
+            if f.exception():
+                final_rs.status = 1
+                logging.error(
+                    f"[JOB]: One stage failed with: {f.exception()}"
+                    f", shutting down"
+                )
+            elif f.cancelled():
+                continue
+            else:
+                rs: Result = f.result(timeout=60)
+                strategy_context.update(rs.context)
+        final_rs.context = strategy_context
+        return final_rs
+
+    @staticmethod
+    def __exec_all_completed(features: list[Future]) -> Result:
+        """Job parallel pool execution with all-completed"""
+        strategy_context: DictData = {}
+        final_rs: Result = Result(status=0, context=strategy_context)
+        for pool_rs in as_completed(features):
+            try:
+                rs: Result = pool_rs.result(timeout=60)
+                strategy_context.update(rs.context)
+            except PickleError as err:
+                # NOTE: (WF001) I do not want to fix this issue because
+                #   it does not make sense and over-engineering with
+                #   this bug fix process.
+                raise JobException(
+                    f"PyStage that create object on locals does use "
+                    f"parallel in strategy;\n\t{err}"
+                ) from None
+            except TimeoutError:
+                final_rs.status = 1
+                logging.warning("Task is hanging. Attempting to kill.")
+                pool_rs.cancel()
+                if not pool_rs.cancelled():
+                    logging.warning("Failed to cancel the task.")
+                else:
+                    logging.warning("Task canceled successfully.")
+            except StageException as err:
+                final_rs.status = 1
+                logging.warning(
+                    f"Get stage exception with fail-fast does not set;"
+                    f"\n\t{err}"
+                )
+        final_rs.context = strategy_context
+        return final_rs
 
 
 class Pipeline(BaseModel):
@@ -679,65 +691,89 @@ class Pipeline(BaseModel):
             jq.put(job_id)
 
         ts: float = time.monotonic()
-        not_time_out_flag: bool = True
 
         # NOTE: Create result context that will pass this context to any
         #   execution dependency.
         rs: Result = Result(context=self.parameterize(params))
         if (
             worker := int(os.getenv("WORKFLOW_CORE_MAX_JOB_PARALLEL", "1"))
-        ) > 1:
-            # IMPORTANT: The job execution can run parallel and waiting by
-            #   needed.
-            with ThreadPoolExecutor(max_workers=worker) as executor:
-                futures: list[Future] = []
-                while not jq.empty() and (
-                    not_time_out_flag := ((time.monotonic() - ts) < timeout)
-                ):
-                    job_id: str = jq.get()
-                    logging.info(
-                        f"[PIPELINE]: Start execute the job: {job_id!r}"
-                    )
-                    job: Job = self.jobs[job_id]
-                    if any(
-                        need not in rs.context["jobs"] for need in job.needs
-                    ):
-                        jq.put(job_id)
-                        time.sleep(0.5)
-                        continue
+        ) == 1:
+            return self.__exec_non_threading(rs, jq, ts, timeout=timeout)
 
-                    futures.append(
-                        executor.submit(
-                            self.job_execute,
-                            job_id,
-                            params=copy.deepcopy(rs.context),
-                        ),
-                    )
-                for future in as_completed(futures):
-                    # TODO: Handle this exception in pipeline level, or not?
-                    if err := future.exception():
-                        logging.error(f"{err}")
-                    job_rs: Result = future.result(timeout=20)
-                    rs.context["jobs"].update(job_rs.context)
-        else:
-            logging.info(
-                f"[CORE]: Run {self.name} with non-threading job executor"
-            )
-            while not jq.empty() and (
+        return self.__exec_threading(rs, jq, ts, worker=worker, timeout=timeout)
+
+    def __exec_threading(
+        self,
+        rs: Result,
+        job_queue: Queue,
+        ts: float,
+        *,
+        worker: int = 1,
+        timeout: int = 600,
+    ) -> Result:
+        """Pipeline threading execution."""
+        not_time_out_flag: bool = True
+
+        # IMPORTANT: The job execution can run parallel and waiting by
+        #   needed.
+        with ThreadPoolExecutor(max_workers=worker) as executor:
+            futures: list[Future] = []
+            while not job_queue.empty() and (
                 not_time_out_flag := ((time.monotonic() - ts) < timeout)
             ):
-                job_id: str = jq.get()
+                job_id: str = job_queue.get()
                 logging.info(f"[PIPELINE]: Start execute the job: {job_id!r}")
                 job: Job = self.jobs[job_id]
                 if any(need not in rs.context["jobs"] for need in job.needs):
-                    jq.put(job_id)
+                    job_queue.put(job_id)
                     time.sleep(0.5)
                     continue
 
-                job_rs = self.job_execute(
-                    job_id, params=copy.deepcopy(rs.context)
+                futures.append(
+                    executor.submit(
+                        self.job_execute,
+                        job_id,
+                        params=copy.deepcopy(rs.context),
+                    ),
                 )
+            for future in as_completed(futures):
+                # TODO: Handle this exception in pipeline level, or not?
+                if err := future.exception():
+                    logging.error(f"{err}")
+                job_rs: Result = future.result(timeout=20)
                 rs.context["jobs"].update(job_rs.context)
+
+        if not not_time_out_flag:
+            logging.warning("Execution of pipeline was time out")
+            rs.status = 1
+            return rs
+        rs.status = 0
+        return rs
+
+    def __exec_non_threading(
+        self,
+        rs: Result,
+        job_queue: Queue,
+        ts: float,
+        *,
+        timeout: int = 600,
+    ) -> Result:
+        """Pipeline non-threading execution."""
+        not_time_out_flag: bool = True
+        logging.info(f"[CORE]: Run {self.name} with non-threading job executor")
+        while not job_queue.empty() and (
+            not_time_out_flag := ((time.monotonic() - ts) < timeout)
+        ):
+            job_id: str = job_queue.get()
+            logging.info(f"[PIPELINE]: Start execute the job: {job_id!r}")
+            job: Job = self.jobs[job_id]
+            if any(need not in rs.context["jobs"] for need in job.needs):
+                job_queue.put(job_id)
+                time.sleep(0.5)
+                continue
+
+            job_rs = self.job_execute(job_id, params=copy.deepcopy(rs.context))
+            rs.context["jobs"].update(job_rs.context)
 
         if not not_time_out_flag:
             logging.warning("Execution of pipeline was time out")
