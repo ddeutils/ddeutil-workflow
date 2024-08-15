@@ -675,46 +675,32 @@ class Pipeline(BaseModel):
         #   execution dependency.
         rs: Result = Result(context=self.parameterize(params))
 
-        # def task(job_queue: Queue):
-        #     ...
-        #
-        # with ThreadPoolExecutor(max_workers=3) as executor:
-        #
-        #     executor.submit(
-        #         task,
-        #         job_queue=jq,
-        #     )
-
         # IMPORTANT: The job execution can run parallel and waiting by needed.
-        while not jq.empty() and (
-            not_time_out_flag := ((time.monotonic() - ts) < timeout)
-        ):
-            job_id: str = jq.get()
-            logging.info(f"[PIPELINE]: Start execute the job: {job_id!r}")
-            job: Job = self.jobs[job_id]
+        with ThreadPoolExecutor(
+            max_workers=int(os.getenv("WORKFLOW_CORE_MAX_JOB_PARALLEL", "2")),
+        ) as executor:
+            futures: list[Future] = []
 
-            # TODO: Condition on ``needs`` of this job was set. It should create
-            #   multithreading process on this step.
-            #   But, I don't know how to handle changes params between each job
-            #   execution while its use them together.
-            #   ---
-            #   >>> import multiprocessing
-            #   >>> with multiprocessing.Pool(processes=3) as pool:
-            #   ...     results = pool.starmap(merge_names, ('', '', ...))
-            #   ---
-            #   This case we use multi-process because I want to split usage of
-            #   data in this level, that mean the data that push to parallel job
-            #   should not use across another job.
-            #
-            if any(need not in rs.context["jobs"] for need in job.needs):
-                jq.put(job_id)
+            while not jq.empty() and (
+                not_time_out_flag := ((time.monotonic() - ts) < timeout)
+            ):
+                job_id: str = jq.get()
+                logging.info(f"[PIPELINE]: Start execute the job: {job_id!r}")
+                job: Job = self.jobs[job_id]
+                if any(need not in rs.context["jobs"] for need in job.needs):
+                    jq.put(job_id)
 
-            # NOTE: copy current the result context for reference other job
-            #   context.
-            job_rs: Result = self.job_execute(
-                job_id, params=copy.deepcopy(rs.context)
-            )
-            rs.context["jobs"].update(job_rs.context)
+                futures.append(
+                    executor.submit(
+                        self.job_execute,
+                        job_id,
+                        params=copy.deepcopy(rs.context),
+                    ),
+                )
+
+            for future in as_completed(futures):
+                job_rs: Result = future.result()
+                rs.context["jobs"].update(job_rs.context)
 
         if not not_time_out_flag:
             logging.warning("Execution of pipeline was time out")

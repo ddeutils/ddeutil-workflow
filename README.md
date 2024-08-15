@@ -273,6 +273,9 @@ export WORKFLOW_CORE_REGISTRY_FILTER=ddeutil.workflow.utils
 export WORKFLOW_CORE_PATH_CONF=conf
 export WORKFLOW_CORE_TIMEZONE=Asia/Bangkok
 export WORKFLOW_CORE_DEFAULT_STAGE_ID=true
+
+export WORKFLOW_CORE_MAX_PIPELINE_POKING=4
+export WORKFLOW_CORE_MAX_JOB_PARALLEL=2
 ```
 
 Application config:

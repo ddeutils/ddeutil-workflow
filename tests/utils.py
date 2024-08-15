@@ -25,6 +25,9 @@ def dotenv_setting() -> None:
             WORKFLOW_CORE_PATH_CONF=tests/conf
             WORKFLOW_CORE_TIMEZONE=Asia/Bangkok
             WORKFLOW_CORE_DEFAULT_STAGE_ID=true
+
+            WORKFLOW_CORE_MAX_PIPELINE_POKING=4
+            WORKFLOW_CORE_MAX_JOB_PARALLEL=2
             """
         ).strip()
         env_path.write_text(env_str)
