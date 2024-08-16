@@ -558,15 +558,25 @@ def map_post_filter(
 
 def not_in_template(value: Any, *, not_in: str = "matrix.") -> bool:
     if isinstance(value, dict):
-        return any(not_in_template(value[k]) for k in value)
+        return any(not_in_template(value[k], not_in=not_in) for k in value)
     elif isinstance(value, (list, tuple, set)):
-        return any(not_in_template(i) for i in value)
+        return any(not_in_template(i, not_in=not_in) for i in value)
     elif not isinstance(value, str):
         return False
     return any(
         (not found.group("caller").strip().startswith(not_in))
         for found in Re.RE_CALLER.finditer(value.strip())
     )
+
+
+def has_template(value: Any) -> bool:
+    if isinstance(value, dict):
+        return any(has_template(value[k]) for k in value)
+    elif isinstance(value, (list, tuple, set)):
+        return any(has_template(i) for i in value)
+    elif not isinstance(value, str):
+        return False
+    return bool(Re.RE_CALLER.findall(value.strip()))
 
 
 def str2template(

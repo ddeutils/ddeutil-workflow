@@ -55,7 +55,7 @@ from .utils import (
     filter_func,
     gen_id,
     get_diff_sec,
-    not_in_template,
+    has_template,
 )
 
 __all__: TupleStr = (
@@ -214,9 +214,8 @@ class Job(BaseModel):
             self.run_id = gen_id(self.id or "", unique=True)
 
         # VALIDATE: Validate job id should not dynamic with params template.
-        #   (allow only matrix)
-        if not_in_template(self.id):
-            raise ValueError("Job ID should only template with matrix.")
+        if has_template(self.id):
+            raise ValueError("Job ID should not has any template.")
 
         return self
 
@@ -605,11 +604,9 @@ class Pipeline(BaseModel):
             self.run_id = gen_id(self.name, unique=True)
 
         # VALIDATE: Validate pipeline name should not dynamic with params
-        #   template. (allow only matrix)
-        if not_in_template(self.name) or not_in_template(
-            self.name, not_in="params."
-        ):
-            raise ValueError("Job ID should not any template.")
+        #   template.
+        if has_template(self.name):
+            raise ValueError("Pipeline name should not has any template.")
 
         return self
 

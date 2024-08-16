@@ -11,6 +11,7 @@ pipe_trigger:
             author-run: Trigger Runner
             run-date: '2024-08-01'
 
+
 pipe-condition:
   type: pipeline.Pipeline
   on: 'every_5_minute_bkk'
@@ -26,6 +27,19 @@ pipe-condition:
             echo 'Hello World';
 
         - name: "Empty stage"
+
+
+pipe-condition-raise:
+  type: pipeline.Pipeline
+  params:
+    name: str
+  jobs:
+    condition-job:
+      stages:
+        - name: "Test if condition failed"
+          id: condition-stage
+          if: '"${{ params.name }}"'
+
 
 pipe-scheduling:
   type: pipeline.Pipeline

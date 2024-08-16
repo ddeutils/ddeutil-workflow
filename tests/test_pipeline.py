@@ -1,4 +1,6 @@
+import pytest
 from ddeutil.workflow.pipeline import Job, Pipeline
+from pydantic import ValidationError
 
 
 def test_pipe_model():
@@ -38,3 +40,9 @@ def test_pipe_model():
 
     demo_job: Job = p.job("demo-run")
     assert [{}] == demo_job.strategy.make()
+
+
+def test_pipe_model_name_raise():
+
+    with pytest.raises(ValidationError):
+        Pipeline(name="manual-pipeline-${{ params.test }}")

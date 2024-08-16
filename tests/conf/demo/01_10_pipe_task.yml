@@ -2,12 +2,9 @@ pipe-run-hook:
   type: pipeline.Pipeline
   desc: Extract and download data from Postgres to Azure Data Lake
   params:
-    run-date:
-      type: datetime
-    source:
-      type: str
-    target:
-      type: str
+    run-date: datetime
+    source: str
+    target: str
   jobs:
     extract-load:
       stages:
@@ -68,3 +65,36 @@ pipe_hook_mssql_proc:
               run_date: ${{ params.run_date }}
               source: ${{ params.source_name }}
               target: ${{ params.target_name }}
+
+
+pipe-hook-return-type:
+  type: pipeline.Pipeline
+  jobs:
+    first-job:
+      stages:
+        - name: "Return type not valid"
+          id: valid-type
+          uses: tasks/return-type-not-valid@raise
+        - name: "Necessary argument do not pass"
+          id: args-necessary
+          uses: tasks/mssql-proc@odbc
+          with:
+            params:
+              run_mode: "T"
+              run_date: 2024-08-01
+              source: src
+              target: tgt
+        - name: "Hook value not valid"
+          id: hook-not-valid
+          uses: tasks-foo-bar
+        - name: "Hook does not register"
+          id: hook-not-register
+          uses: tasks/abc@foo
+    second-job:
+      stages:
+        - name: "Extract & Load Local System"
+          id: extract-load
+          uses: tasks/el-csv-to-parquet@polars-dir
+          with:
+            source: src
+            sink: sink

@@ -44,10 +44,10 @@ pip install ddeutil-workflow
 This project need `ddeutil-io` extension namespace packages. If you want to install
 this package with application add-ons, you should add `app` in installation;
 
-| Usecase            | Install Optional          |
-|--------------------|---------------------------|
-| Scheduler Service  | `ddeutil-workflow[app]`   |
-| FastAPI Server     | `ddeutil-workflow[api]`   |
+| Usecase            | Install Optional          | Support |
+|--------------------|---------------------------|---------|
+| Scheduler Service  | `ddeutil-workflow[app]`   | No      |
+| FastAPI Server     | `ddeutil-workflow[api]`   | No      |
 
 ## Getting Started
 
@@ -190,23 +190,24 @@ pipe.execute(params={
 
 ## Configuration
 
-```bash
-export WORKFLOW_ROOT_PATH=.
-export WORKFLOW_CORE_REGISTRY=ddeutil.workflow,tests.utils
-export WORKFLOW_CORE_REGISTRY_FILTER=ddeutil.workflow.utils
-export WORKFLOW_CORE_PATH_CONF=conf
-export WORKFLOW_CORE_TIMEZONE=Asia/Bangkok
-export WORKFLOW_CORE_DEFAULT_STAGE_ID=true
-export WORKFLOW_CORE_MAX_PIPELINE_POKING=4
-export WORKFLOW_CORE_MAX_JOB_PARALLEL=2
-```
+| Environment                          | Default                        | Description |
+|--------------------------------------|--------------------------------|-------------|
+| `WORKFLOW_ROOT_PATH`                 | .                              |             |
+| `WORKFLOW_CORE_REGISTRY`             | ddeutil.workflow,tests.utils   |             |
+| `WORKFLOW_CORE_REGISTRY_FILTER`      | ddeutil.workflow.utils         |             |
+| `WORKFLOW_CORE_PATH_CONF`            | conf                           |             |
+| `WORKFLOW_CORE_TIMEZONE`             | Asia/Bangkok                   |             |
+| `WORKFLOW_CORE_DEFAULT_STAGE_ID`     | true                           |             |
+| `WORKFLOW_CORE_MAX_PIPELINE_POKING`  | 4                              |             |
+| `WORKFLOW_CORE_MAX_JOB_PARALLEL`     | 2                              |             |
 
-Application config:
 
-```bash
-export WORKFLOW_APP_DB_URL=postgresql+asyncpg://user:pass@localhost:5432/schedule
-export WORKFLOW_APP_INTERVAL=10
-```
+**Application**:
+
+| Environment               | Default                                                | Description |
+|---------------------------|--------------------------------------------------------|-------------|
+| `WORKFLOW_APP_DB_URL`     | postgresql+asyncpg://user:pass@localhost:5432/schedule |             |
+| `WORKFLOW_APP_INTERVAL`   | 10                                                     |             |
 
 ## Deployment
 

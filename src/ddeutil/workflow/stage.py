@@ -202,7 +202,7 @@ class BaseStage(BaseModel, ABC):
             return not rs
         except Exception as err:
             logging.error(f"({self.run_id}) [STAGE]: {err}")
-            raise StageException(str(err)) from err
+            raise StageException(f"{err.__class__.__name__}: {err}") from err
 
 
 class EmptyStage(BaseStage):
@@ -281,7 +281,9 @@ class BashStage(BaseStage):
             # NOTE: make sure that shell script file does not have `\r` char.
             f.write("\n" + bash.replace("\r\n", "\n"))
 
+        # NOTE: Make this .sh file able to executable.
         make_exec(f"./{f_name}")
+
         logging.debug(
             f"({self.run_id}) [STAGE]: Start create `.sh` file and running a "
             f"bash statement."
@@ -410,7 +412,9 @@ def extract_hook(hook: str) -> Callable[[], TagFunc]:
     :rtype: Callable[[], TagFunc]
     """
     if not (found := Re.RE_TASK_FMT.search(hook)):
-        raise ValueError("Task does not match with task format regex.")
+        raise ValueError(
+            f"Hook {hook!r} does not match with hook format regex."
+        )
 
     # NOTE: Pass the searching hook string to `path`, `func`, and `tag`.
     hook: HookSearch = HookSearch(**found.groupdict())
@@ -454,6 +458,7 @@ class HookStage(BaseStage):
         description="A pointer that want to load function from registry.",
     )
     args: DictData = Field(
+        default_factory=dict,
         description="An arguments that want to pass to the hook function.",
         alias="with",
     )
@@ -468,10 +473,7 @@ class HookStage(BaseStage):
         """
         t_func_hook: str = param2template(self.uses, params)
         t_func: TagFunc = extract_hook(t_func_hook)()
-        if not callable(t_func):
-            raise ImportError(
-                f"Hook caller {t_func_hook!r} function does not callable."
-            )
+
         # VALIDATE: check input task caller parameters that exists before
         #   calling.
         args: DictData = param2template(self.args, params)
@@ -482,7 +484,7 @@ class HookStage(BaseStage):
             if ips.parameters[k].default == Parameter.empty
         ):
             raise ValueError(
-                f"Necessary params, ({', '.join(ips.parameters.keys())}), "
+                f"Necessary params, ({', '.join(ips.parameters.keys())}, ), "
                 f"does not set to args"
             )
         # NOTE: add '_' prefix if it want to use.
@@ -500,9 +502,8 @@ class HookStage(BaseStage):
         #   Check the result type from hook function, it should be dict.
         if not isinstance(rs, dict):
             raise TypeError(
-                f"Return of hook function: {t_func.name}@{t_func.tag} does "
-                f"not serialize to result model, you should fix it to "
-                f"`dict` type."
+                f"Return type: '{t_func.name}@{t_func.tag}' does not serialize "
+                f"to result model, you change return type to `dict`."
             )
         return Result(status=0, context=rs)
 

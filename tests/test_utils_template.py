@@ -4,6 +4,7 @@ import pytest
 from ddeutil.workflow.exceptions import UtilException
 from ddeutil.workflow.utils import (
     get_args_const,
+    has_template,
     make_filter_registry,
     not_in_template,
     param2template,
@@ -96,3 +97,29 @@ def test_matrix_not_in_template():
         "test": [1, False, "${{ stages.foo.matrix }}"],
     }
     assert not_in_template(value)
+
+
+def test_has_template():
+    value = {
+        "params": {
+            "test": "${{ matrix.value.test }}",
+        },
+        "test": [1, False, "${{ matrix.foo }}"],
+    }
+    assert has_template(value)
+
+    value = {
+        "params": {
+            "test": "${{ params.value.test }}",
+        },
+        "test": [1, False, "${{ matrix.foo }}"],
+    }
+    assert has_template(value)
+
+    value = {
+        "params": {
+            "test": "${ matrix.value.test }",
+        },
+        "test": [1, False, "{{ stages.foo.matrix }}"],
+    }
+    assert not has_template(value)

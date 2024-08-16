@@ -12,7 +12,7 @@ from ddeutil.workflow.utils import tag
 
 
 @tag("polars-dir", alias="el-csv-to-parquet")
-def dummy_task_1(
+def dummy_task_polars_dir(
     source: str,
     sink: str,
     conversion: dict[str, Any] | None = None,
@@ -29,7 +29,7 @@ def dummy_task_1(
 
 
 @tag("polars-dir-scan", alias="el-csv-to-parquet")
-def dummy_task_2(
+def dummy_task_polars_dir_scan(
     source: str,
     sink: str,
     conversion: dict[str, Any] | None = None,
@@ -47,5 +47,10 @@ def dummy_task_2(
 
 
 @tag("odbc", alias="mssql-proc")
-def odbc_mssql_procedure(_exec: str, params: dict):
+def dummy_task_odbc_mssql_procedure(_exec: str, params: dict):
     return {"exec": _exec, "params": params}
+
+
+@tag("raise", alias="return-type-not-valid")
+def dummy_task_raise_return_type_not_valid():
+    return True

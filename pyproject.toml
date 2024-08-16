@@ -62,10 +62,12 @@ concurrency = ["thread", "multiprocessing"]
 source = ["ddeutil.workflow", "tests"]
 omit = [
     "scripts/",
+    # Omit this files because it does not ready to production.
     "src/ddeutil/workflow/api.py",
     "src/ddeutil/workflow/app.py",
     "src/ddeutil/workflow/repeat.py",
     "src/ddeutil/workflow/route.py",
+    "src/ddeutil/workflow/log.py",
     "tests/utils.py",
     "tests/tasks/dummy.py",
 ]
