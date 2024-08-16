@@ -60,7 +60,7 @@ class Strategy(BaseModel):
         ...     'fail-fast': False,
         ...     'matrix': {
         ...         'first': [1, 2, 3],
-        ...         'second': ['foo', 'bar']
+        ...         'second': ['foo', 'bar'],
         ...     },
         ...     'include': [{'first': 4, 'second': 'foo'}],
         ...     'exclude': [{'first': 1, 'second': 'bar'}],
@@ -148,18 +148,25 @@ class Job(BaseModel):
     Data Validate:
         >>> job = {
         ...     "runs-on": None,
-        ...     "strategy": {},
+        ...     "strategy": {
+        ...         "max-parallel": 1,
+        ...         "matrix": {
+        ...             "first": [1, 2, 3],
+        ...             "second": ['foo', 'bar'],
+        ...         },
+        ...     },
         ...     "needs": [],
         ...     "stages": [
         ...         {
         ...             "name": "Some stage",
         ...             "run": "print('Hello World')",
         ...         },
+        ...         ...
         ...     ],
         ... }
     """
 
-    name: Optional[str] = Field(default=None)
+    id: Optional[str] = Field(default=None)
     desc: Optional[str] = Field(default=None)
     runs_on: Optional[str] = Field(default=None)
     stages: list[Stage] = Field(
@@ -174,6 +181,9 @@ class Job(BaseModel):
         default_factory=Strategy,
         description="A strategy matrix that want to generate.",
     )
+    run_id: Optional[str] = Field(
+        default=None, description="A running job ID.", repr=False
+    )
 
     @model_validator(mode="before")
     def __prepare_keys(cls, values: DictData) -> DictData:
@@ -182,6 +192,12 @@ class Job(BaseModel):
         """
         dash2underscore("runs-on", values)
         return values
+
+    @model_validator(mode="after")
+    def __prepare_running_id(self):
+        if self.run_id is None:
+            self.run_id = gen_id(self.id or "", unique=True)
+        return self
 
     def stage(self, stage_id: str) -> Stage:
         """Return stage model that match with an input stage ID."""
@@ -203,29 +219,32 @@ class Job(BaseModel):
         *,
         event: Event | None = None,
     ) -> Result:
-        """Strategy execution with passing dynamic parameters from the pipeline
-        stage execution.
+        """Job Strategy execution with passing dynamic parameters from the
+        pipeline execution to strategy matrix.
 
-        :param strategy:
-        :param params:
+            This execution is the minimum level execution of job model.
+
+        :param strategy: A metrix strategy value.
+        :param params: A dynamic parameters.
         :param event: An manger event that pass to the PoolThreadExecutor.
         :rtype: Result
 
         :raise JobException: If it has any error from StageException or
             UtilException.
         """
-        _stop_rs: Result = Result(
-            status=1,
-            context={
-                gen_id(strategy): {
-                    "matrix": strategy,
-                    "stages": {},
-                    "error": "Event stopped",
-                },
-            },
-        )
         if event and event.is_set():
-            return _stop_rs
+            return Result(
+                status=1,
+                context={
+                    gen_id(strategy): {
+                        "matrix": strategy,
+                        "stages": {},
+                        "error": {
+                            "message": "Process Event stopped before execution"
+                        },
+                    },
+                },
+            )
 
         # NOTE: Create strategy execution context and update a matrix and copied
         #   of params. So, the context value will have structure like;
@@ -241,16 +260,25 @@ class Job(BaseModel):
 
         # IMPORTANT: The stage execution only run sequentially one-by-one.
         for stage in self.stages:
+
+            # IMPORTANT: Change any stage running IDs to this job running ID.
+            stage.run_id = self.run_id
+
             _st_name: str = stage.id or stage.name
 
             if stage.is_skipped(params=context):
-                logging.info(f"[JOB]: Skip the stage: {_st_name!r}")
+                logging.info(
+                    f"({self.run_id}) [JOB]: Skip the stage: {_st_name!r}"
+                )
                 continue
-            logging.info(f"[JOB]: Start execute the stage: {_st_name!r}")
+
+            logging.info(
+                f"({self.run_id}) [JOB]: Start execute the stage: {_st_name!r}"
+            )
 
             # NOTE: Logging a matrix that pass on this stage execution.
             if strategy:
-                logging.info(f"[...]: Matrix: {strategy}")
+                logging.info(f"({self.run_id}) [JOB]: Matrix: {strategy}")
 
             # NOTE:
             #       I do not use below syntax because `params` dict be the
@@ -270,14 +298,30 @@ class Job(BaseModel):
             #   }
             #
             if event and event.is_set():
-                return _stop_rs
+                return Result(
+                    status=1,
+                    context={
+                        gen_id(strategy): {
+                            "matrix": strategy,
+                            "stages": filter_func(context.pop("stages", {})),
+                            "error": {
+                                "message": (
+                                    "Process Event stopped before execution"
+                                ),
+                            },
+                        },
+                    },
+                )
             try:
                 rs: Result = stage.execute(params=context)
                 stage.set_outputs(rs.context, params=context)
             except (StageException, UtilException) as err:
+                logging.error(
+                    f"({self.run_id}) [JOB]: {err.__class__.__name__}: {err}"
+                )
                 raise JobException(
-                    f"Getting raise error from stage execution: "
-                    f"{err.__class__.__name__}: {err}"
+                    f"Get stage execution error: {err.__class__.__name__}: "
+                    f"{err}"
                 ) from None
         return Result(
             status=0,
@@ -325,24 +369,27 @@ class Job(BaseModel):
         with Manager() as manager:
             event: Event = manager.Event()
 
+            # NOTE: Start process pool executor for running strategy executor in
+            #   parallel mode.
             with ProcessPoolExecutor(
                 max_workers=self.strategy.max_parallel
             ) as executor:
                 features: list[Future] = [
                     executor.submit(
                         self.strategy_execute,
-                        st,
+                        strategy,
                         params=copy.deepcopy(params),
                         event=event,
                     )
-                    for st in self.strategy.make()
+                    for strategy in self.strategy.make()
                 ]
                 if self.strategy.fail_fast:
-                    return self.__catch_fail_fast(event, features)
-                strategy_context = self.__catch_all_completed(features).context
+                    rs = self.__catch_fail_fast(event, features)
+                else:
+                    rs = self.__catch_all_completed(features)
         return Result(
             status=0,
-            context=strategy_context,
+            context=rs.context,
         )
 
     @staticmethod
@@ -444,6 +491,9 @@ class Pipeline(BaseModel):
         default_factory=dict,
         description="A mapping of job ID and job model that already loaded.",
     )
+    run_id: Optional[str] = Field(
+        default=None, description="A running job ID.", repr=False
+    )
 
     @classmethod
     def from_loader(
@@ -504,7 +554,7 @@ class Pipeline(BaseModel):
         return values
 
     @model_validator(mode="after")
-    def __validate_jobs_need(self):
+    def __validate_jobs_need_and_prepare_running_id(self):
         for job in self.jobs:
             if not_exist := [
                 need for need in self.jobs[job].needs if need not in self.jobs
@@ -513,6 +563,13 @@ class Pipeline(BaseModel):
                     f"This needed jobs: {not_exist} do not exist in this "
                     f"pipeline."
                 )
+
+            # NOTE: update a job id with its job id from pipeline template
+            self.jobs[job].id = job
+
+        if self.run_id is None:
+            self.run_id = gen_id(self.name, unique=True)
+
         return self
 
     def job(self, name: str) -> Job:
@@ -644,6 +701,7 @@ class Pipeline(BaseModel):
             )
 
         try:
+            logging.info(f"({self.run_id}) [PIPELINE]: Start execute: {job!r}")
             job_obj: Job = self.jobs[job]
             j_rs: Result = job_obj.execute(params=params)
         except JobException as err:
@@ -747,8 +805,12 @@ class Pipeline(BaseModel):
                 not_time_out_flag := ((time.monotonic() - ts) < timeout)
             ):
                 job_id: str = job_queue.get()
-                logging.info(f"[PIPELINE]: Start execute the job: {job_id!r}")
                 job: Job = self.jobs[job_id]
+
+                # IMPORTANT:
+                #   Change any job running IDs to this pipeline running ID.
+                job.run_id = self.run_id
+
                 if any(need not in rs.context["jobs"] for need in job.needs):
                     job_queue.put(job_id)
                     time.sleep(0.5)
@@ -771,7 +833,9 @@ class Pipeline(BaseModel):
                 rs.receive_jobs(future.result(timeout=20))
 
         if not not_time_out_flag:
-            logging.warning("[PIPELINE]: Execution of pipeline was timeout")
+            logging.warning(
+                f"({self.run_id}) [PIPELINE]: Execution of pipeline was timeout"
+            )
             raise PipelineException(
                 f"Execution of pipeline: {self.name} was timeout"
             )
@@ -793,8 +857,11 @@ class Pipeline(BaseModel):
             not_time_out_flag := ((time.monotonic() - ts) < timeout)
         ):
             job_id: str = job_queue.get()
-            logging.info(f"[PIPELINE]: Start execute the job: {job_id!r}")
             job: Job = self.jobs[job_id]
+
+            # IMPORTANT:
+            #   Change any job running IDs to this pipeline running ID.
+            job.run_id = self.run_id
 
             # NOTE:
             if any(need not in rs.context["jobs"] for need in job.needs):
@@ -807,7 +874,9 @@ class Pipeline(BaseModel):
             rs.context["jobs"].update(job_rs.context)
 
         if not not_time_out_flag:
-            logging.warning("[PIPELINE]: Execution of pipeline was time out")
+            logging.warning(
+                f"({self.run_id}) [PIPELINE]: Execution of pipeline was timeout"
+            )
             raise PipelineException(
                 f"Execution of pipeline: {self.name} was timeout"
             )

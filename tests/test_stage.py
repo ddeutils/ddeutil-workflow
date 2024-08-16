@@ -11,3 +11,5 @@ def test_empty_stage():
     print(stage)
     print(stage.run_id)
     print(stage.execute(params={}))
+    stage.run_id = "demo"
+    print(stage.run_id)

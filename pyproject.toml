@@ -83,7 +83,7 @@ addopts = [
 filterwarnings = ["error"]
 log_cli = true
 log_cli_level = "DEBUG"
-log_cli_format = "%(asctime)s [%(levelname)-7s] %(message)-85s (%(filename)s:%(lineno)s)"
+log_cli_format = "%(asctime)s [%(levelname)-7s] %(message)-100s (%(filename)s:%(lineno)s)"
 log_cli_date_format = "%Y%m%d %H:%M:%S"
 
 [tool.black]
