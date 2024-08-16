@@ -44,11 +44,11 @@ pipeline.
 This project need `ddeutil-io` extension namespace packages. If you want to install
 this package with application add-ons, you should add `app` in installation;
 
-| Usecase           | Install Optional                    | Support |
-|-------------------|-------------------------------------|---------|
-| Python Core API   | `pip install ddeutil-workflow`      | :x:     |
-| Scheduler Service | `pip install ddeutil-workflow[app]` | :x:     |
-| FastAPI Server    | `pip install ddeutil-workflow[api]` | :x:     |
+| Usecase           | Install Optional                    | Support            |
+|-------------------|-------------------------------------|--------------------|
+| Python Core API   | `pip install ddeutil-workflow`      | :heavy_check_mark: |
+| Scheduler Service | `pip install ddeutil-workflow[app]` | :x:                |
+| FastAPI Server    | `pip install ddeutil-workflow[api]` | :x:                |
 
 ## Getting Started
 
@@ -84,7 +84,7 @@ assert '2022-01-01 00:20:00' f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
 The **Pipeline** object that is the core feature of this project.
 
 ```yaml
-run_py_local:
+pipeline-name:
   type: ddeutil.workflow.pipeline.Pipeline
   on: 'on_every_5_min'
   params:
@@ -92,12 +92,16 @@ run_py_local:
       type: str
     run-date:
       type: datetime
+  jobs:
+    first-job:
+      stages:
+        - ...
 ```
 
 ```python
 from ddeutil.workflow.pipeline import Pipeline
 
-pipe = Pipeline.from_loader(name='run_py_local', externals={})
+pipe = Pipeline.from_loader(name='pipeline-name', externals={})
 pipe.execute(params={'author-run': 'Local Workflow', 'run-date': '2024-01-01'})
 ```
 
@@ -126,80 +130,46 @@ use-case.
 run_py_local:
   type: pipeline.Pipeline
   on:
-    - cronjob: '* * * * *'
+    - cronjob: '*/5 * * * *'
       timezone: "Asia/Bangkok"
   params:
     author-run: str
     run-date: datetime
   jobs:
-    first-job:
+    getting-api-data:
       stages:
-        - name: "Printing Information"
-          id: define-func
-          run: |
-            x = '${{ params.run-date | fmt("%Y%m%d") }}'
-            print(f'Hello at {x}')
-
-            def echo(name: str):
-              print(f'Hello {name}')
-        - name: "Run Sequence and use var from Above"
-          vars:
-            x: ${{ params.author-run }}
-          run: |
-            print(f'Receive x from above with {x}')
-            # Change x value
-            x: int = 1
-        - name: "Call Function"
-          vars:
-            echo: ${{ stages.define-func.outputs.echo }}
-          run: |
-            echo('Caller')
-    second-job:
-      stages:
-        - name: "Echo Bash Script"
-          id: shell-echo
-          bash: |
-            echo "Hello World from Shell"
-```
-
-```python
-from datetime import datetime
-from ddeutil.workflow.pipeline import Pipeline
-
-pipe: Pipeline = Pipeline.from_loader(name='run_py_local', externals={})
-pipe.execute(params={
-    'author-run': 'Local Workflow',
-    'run-date': datetime(2024, 1, 1),
-})
-```
-
-```shell
-> Hello at 20240101
-> Receive x from above with Local Workflow
-> Hello Caller
-> Hello World from Shell
+        - name: "Retrieve API Data"
+          id: retrieve-api
+          uses: tasks/get-api-with-oauth-to-s3@requests
+          with:
+            url: https://open-data/
+            auth: ${API_ACCESS_REFRESH_TOKEN}
+            aws_s3_path: my-data/open-data/
+            # This Authentication code should implement with your custom hook function
+            aws_access_client_id: ${AWS_ACCESS_CLIENT_ID}
+            aws_access_client_secret: ${AWS_ACCESS_CLIENT_SECRET}
 ```
 
 ## Configuration
 
-| Environment                          | Default                        | Description |
-|--------------------------------------|--------------------------------|-------------|
-| `WORKFLOW_ROOT_PATH`                 | .                              |             |
-| `WORKFLOW_CORE_REGISTRY`             | ddeutil.workflow,tests.utils   |             |
-| `WORKFLOW_CORE_REGISTRY_FILTER`      | ddeutil.workflow.utils         |             |
-| `WORKFLOW_CORE_PATH_CONF`            | conf                           |             |
-| `WORKFLOW_CORE_TIMEZONE`             | Asia/Bangkok                   |             |
-| `WORKFLOW_CORE_DEFAULT_STAGE_ID`     | true                           |             |
-| `WORKFLOW_CORE_MAX_PIPELINE_POKING`  | 4                              |             |
-| `WORKFLOW_CORE_MAX_JOB_PARALLEL`     | 2                              |             |
+| Environment                          | Default                      | Description                                                                |
+|--------------------------------------|------------------------------|----------------------------------------------------------------------------|
+| `WORKFLOW_ROOT_PATH`                 | .                            | The root path of the workflow application                                  |
+| `WORKFLOW_CORE_REGISTRY`             | ddeutil.workflow,tests.utils | List of importable string for the hook stage                               |
+| `WORKFLOW_CORE_REGISTRY_FILTER`      | ddeutil.workflow.utils       | List of importable string for the filter template                          |
+| `WORKFLOW_CORE_PATH_CONF`            | conf                         | The config path that keep all template `.yaml` files                       |
+| `WORKFLOW_CORE_TIMEZONE`             | Asia/Bangkok                 | A Timezone string value that will pass to `ZoneInfo` object                |
+| `WORKFLOW_CORE_DEFAULT_STAGE_ID`     | true                         | A flag that enable default stage ID that use for catch an execution output |
+| `WORKFLOW_CORE_MAX_PIPELINE_POKING`  | 4                            |                                                                            |
+| `WORKFLOW_CORE_MAX_JOB_PARALLEL`     | 2                            |                                                                            |
 
 
 **Application**:
 
-| Environment               | Default                                                | Description |
-|---------------------------|--------------------------------------------------------|-------------|
-| `WORKFLOW_APP_DB_URL`     | postgresql+asyncpg://user:pass@localhost:5432/schedule |             |
-| `WORKFLOW_APP_INTERVAL`   | 10                                                     |             |
+| Environment               | Default                                                | Description                                                        |
+|---------------------------|--------------------------------------------------------|--------------------------------------------------------------------|
+| `WORKFLOW_APP_DB_URL`     | postgresql+asyncpg://user:pass@localhost:5432/schedule | A Database URL that will pass to SQLAlchemy create_engine function |
+| `WORKFLOW_APP_INTERVAL`   | 10                                                     |                                                                    |
 
 ## Deployment
 
