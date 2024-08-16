@@ -16,9 +16,13 @@
 - [Configuration](#configuration)
 - [Deployment](#deployment)
 
-The **Lightweight Workflow Framework** was created for easy to make a simple
-metadata driven for data pipeline orchestration that able to use for **ETL, T,
-EL, or ELT** by a `.yaml` template.
+The **Lightweight workflow orchestration** with less dependencies the was created
+for easy to make a simple metadata driven for data pipeline orchestration.
+It can to use for **ETL, T, EL, or ELT** by a `.yaml` template.
+
+> [!WARNING]
+> This package provide only orchestration workload. That mean you should not use
+> workflow stage to process any large data which use lot of compute usecase.
 
 In my opinion, I think it should not create duplicate pipeline codes if I can
 write with dynamic input parameters on the one template pipeline that just change
@@ -37,32 +41,20 @@ pipeline.
 
 ## Installation
 
-```shell
-pip install ddeutil-workflow
-```
-
 This project need `ddeutil-io` extension namespace packages. If you want to install
 this package with application add-ons, you should add `app` in installation;
 
-| Usecase            | Install Optional          | Support |
-|--------------------|---------------------------|---------|
-| Scheduler Service  | `ddeutil-workflow[app]`   | No      |
-| FastAPI Server     | `ddeutil-workflow[api]`   | No      |
+| Usecase           | Install Optional                    | Support |
+|-------------------|-------------------------------------|---------|
+| Python Core API   | `pip install ddeutil-workflow`      | :x:     |
+| Scheduler Service | `pip install ddeutil-workflow[app]` | :x:     |
+| FastAPI Server    | `pip install ddeutil-workflow[api]` | :x:     |
 
 ## Getting Started
-
-The first step, you should start create the connections and datasets for In and
-Out of you data that want to use in pipeline of workflow. Some of this component
-is similar component of the **Airflow** because I like it orchestration concepts.
 
 The main feature of this project is the `Pipeline` object that can call any
 registries function. The pipeline can handle everything that you want to do, it
 will passing parameters and catching the output for re-use it to next step.
-
-> [!IMPORTANT]
-> In the future of this project, I will drop the connection and dataset to
-> dynamic registries instead of main features because it have a lot of maintain
-> vendor codes and deps. (I do not have time to handle this features)
 
 ### On
 
