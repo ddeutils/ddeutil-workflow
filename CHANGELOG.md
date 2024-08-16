@@ -2,6 +2,29 @@
 
 ## Latest Changes
 
+## 0.0.8
+
+### :sparkles: Features
+
+- :dart: feat: add running id for job and pipeline objects. (_2024-08-16_)
+- :dart: feat: add decorator function for error handler on stage object. (_2024-08-16_)
+- :dart: feat: improve exception error should not raise from execution. (_2024-08-15_)
+- :dart: feat: add filter function on job strategy execution. (_2024-08-15_)
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: add pipeline poke testcase. (_2024-08-15_)
+- :construction: refactored: split the large execute function on job and pipeline to private funcs. (_2024-08-15_)
+
+### :card_file_box: Documents
+
+- :page_facing_up: docs: update readme and move hook stage example to docs/. (_2024-08-16_)
+- :page_facing_up: docs: update readme on installation topic. (_2024-08-15_)
+
+### :bug: Fix Bugs
+
+- :gear: fixed: change logging of catch methods on job object. (_2024-08-16_)
+
 ## 0.0.7
 
 ### :sparkles: Features
