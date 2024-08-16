@@ -3,9 +3,6 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-"""
-Define Errors Object for Node package
-"""
 from __future__ import annotations
 
 
@@ -24,4 +21,4 @@ class JobException(WorkflowException): ...
 class PipelineException(WorkflowException): ...
 
 
-class ParamValueException(ValueError): ...
+class ParamValueException(WorkflowException): ...

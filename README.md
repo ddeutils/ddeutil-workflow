@@ -132,11 +132,12 @@ use-case.
 > I recommend you to use `task` stage for all actions that you want to do with
 > pipeline object.
 
-### Python & Bash
-
 ```yaml
 run_py_local:
   type: pipeline.Pipeline
+  on:
+    - cronjob: '* * * * *'
+      timezone: "Asia/Bangkok"
   params:
     author-run: str
     run-date: datetime
@@ -146,12 +147,11 @@ run_py_local:
         - name: "Printing Information"
           id: define-func
           run: |
-            x = '${{ params.author-run }}'
-            print(f'Hello {x}')
+            x = '${{ params.run-date | fmt("%Y%m%d") }}'
+            print(f'Hello at {x}')
 
             def echo(name: str):
               print(f'Hello {name}')
-
         - name: "Run Sequence and use var from Above"
           vars:
             x: ${{ params.author-run }}
@@ -159,7 +159,6 @@ run_py_local:
             print(f'Receive x from above with {x}')
             # Change x value
             x: int = 1
-
         - name: "Call Function"
           vars:
             echo: ${{ stages.define-func.outputs.echo }}
@@ -174,91 +173,21 @@ run_py_local:
 ```
 
 ```python
+from datetime import datetime
 from ddeutil.workflow.pipeline import Pipeline
 
-pipe = Pipeline.from_loader(name='run_py_local', externals={})
-pipe.execute(params={'author-run': 'Local Workflow', 'run-date': '2024-01-01'})
+pipe: Pipeline = Pipeline.from_loader(name='run_py_local', externals={})
+pipe.execute(params={
+    'author-run': 'Local Workflow',
+    'run-date': datetime(2024, 1, 1),
+})
 ```
 
 ```shell
-> Hello Local Workflow
+> Hello at 20240101
 > Receive x from above with Local Workflow
 > Hello Caller
 > Hello World from Shell
-```
-
-### Hook (Extract & Load)
-
-```yaml
-pipe_el_pg_to_lake:
-  type: pipeline.Pipeline
-  params:
-    run-date: datetime
-    author-email: str
-  jobs:
-    extract-load:
-      stages:
-        - name: "Extract Load from Postgres to Lake"
-          id: extract-load
-          uses: tasks/postgres-to-delta@polars
-          with:
-            source:
-              conn: conn_postgres_url
-              query: |
-                select * from ${{ params.name }}
-                where update_date = '${{ params.datetime }}'
-            sink:
-              conn: conn_az_lake
-              endpoint: "/${{ params.name }}"
-```
-
-Implement hook:
-
-```python
-from ddeutil.workflow.utils import tag
-
-@tag('polars', alias='postgres-to-delta')
-def postgres_to_delta(source, sink):
-    return {
-        "source": source, "sink": sink
-    }
-```
-
-### Hook (Transform)
-
-```yaml
-pipeline_hook_mssql_proc:
-  type: pipeline.Pipeline
-  params:
-    run_date: datetime
-    sp_name: str
-    source_name: str
-    target_name: str
-  jobs:
-    transform:
-      stages:
-        - name: "Transform Data in MS SQL Server"
-          id: transform
-          uses: tasks/mssql-proc@odbc
-          with:
-            exec: ${{ params.sp_name }}
-            params:
-              run_mode: "T"
-              run_date: ${{ params.run_date }}
-              source: ${{ params.source_name }}
-              target: ${{ params.target_name }}
-```
-
-Implement hook:
-
-```python
-from ddeutil.workflow.utils import tag
-
-@tag('odbc', alias='mssql-proc')
-def odbc_mssql_procedure(_exec: str, params: dict):
-    return {
-        "exec": _exec, "params": params
-    }
 ```
 
 ## Configuration
@@ -270,7 +199,6 @@ export WORKFLOW_CORE_REGISTRY_FILTER=ddeutil.workflow.utils
 export WORKFLOW_CORE_PATH_CONF=conf
 export WORKFLOW_CORE_TIMEZONE=Asia/Bangkok
 export WORKFLOW_CORE_DEFAULT_STAGE_ID=true
-
 export WORKFLOW_CORE_MAX_PIPELINE_POKING=4
 export WORKFLOW_CORE_MAX_JOB_PARALLEL=2
 ```

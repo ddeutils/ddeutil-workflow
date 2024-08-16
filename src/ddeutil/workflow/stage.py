@@ -85,6 +85,7 @@ class BaseStage(BaseModel, ABC):
         if "stages" not in params:
             params["stages"] = {}
 
+        # NOTE: Set the output to that stage generated ID.
         params["stages"][_id] = {"outputs": output}
         return params
 
@@ -92,6 +93,7 @@ class BaseStage(BaseModel, ABC):
         """Return true if condition of this stage do not correct.
 
         :param params: A parameters that want to pass to condition template.
+        :rtype: bool
         """
         params: DictData = params or {}
         if self.condition is None:
@@ -323,15 +325,19 @@ class HookStage(BaseStage):
     """
 
     uses: str = Field(
-        description="A pointer that want to load function from registry",
+        description="A pointer that want to load function from registry.",
     )
-    args: DictData = Field(alias="with")
+    args: DictData = Field(
+        description="An arguments that want to pass to the hook function.",
+        alias="with",
+    )
 
     @staticmethod
     def extract_hook(hook: str) -> Callable[[], TagFunc]:
         """Extract Hook string value to hook function.
 
         :param hook: A hook value that able to match with Task regex.
+        :rtype: Callable[[], TagFunc]
         """
         if not (found := Re.RE_TASK_FMT.search(hook)):
             raise ValueError("Task does not match with task format regex.")
@@ -387,15 +393,17 @@ class HookStage(BaseStage):
         try:
             logging.info(f"[STAGE]: Hook-Execute: {t_func.name}@{t_func.tag}")
             rs: DictData = t_func(**param2template(args, params))
-        except Exception as err:
-            raise StageException(f"{err.__class__.__name__}: {err}") from err
 
-        # VALIDATE: Check the result type from hook function, it should be dict.
-        if not isinstance(rs, dict):
-            raise StageException(
-                f"Return of hook function: {t_func.name}@{t_func.tag} does not "
-                f"serialize to result model, you should fix it to `dict` type."
-            )
+            # VALIDATE:
+            #   Check the result type from hook function, it should be dict.
+            if not isinstance(rs, dict):
+                raise TypeError(
+                    f"Return of hook function: {t_func.name}@{t_func.tag} does "
+                    f"not serialize to result model, you should fix it to "
+                    f"`dict` type."
+                )
+        except Exception as err:
+            raise StageException(f"{err.__class__.__name__}: {err}") from None
         return Result(status=0, context=rs)
 
 
@@ -403,15 +411,17 @@ class TriggerStage(BaseStage):
     """Trigger Pipeline execution stage that execute another pipeline object."""
 
     trigger: str = Field(description="A trigger pipeline name.")
-    params: DictData = Field(default_factory=dict)
+    params: DictData = Field(
+        default_factory=dict,
+        description="A parameter that want to pass to pipeline execution.",
+    )
 
     def execute(self, params: DictData) -> Result:
-        """Trigger execution.
+        """Trigger pipeline execution.
 
         :param params: A parameter data that want to use in this execution.
         :rtype: Result
         """
-        from .exceptions import PipelineException
         from .pipeline import Pipeline
 
         try:
@@ -422,11 +432,11 @@ class TriggerStage(BaseStage):
             rs: Result = pipe.execute(
                 params=param2template(self.params, params)
             )
-        except PipelineException as err:
+        except Exception as err:
             _alias_stage: str = self.id or self.name
             raise StageException(
                 f"Trigger Stage: {_alias_stage} get trigger pipeline "
-                f"exception;\n\t{err}"
+                f"exception;\n\t{err.__class__.__name__}: {err}"
             ) from err
         return rs
 

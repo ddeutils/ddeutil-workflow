@@ -47,10 +47,10 @@ class Engine(BaseModel):
 
     paths: PathData = Field(default_factory=PathData)
     registry: list[str] = Field(
-        default_factory=lambda: ["ddeutil.workflow"],
+        default_factory=lambda: ["ddeutil.workflow"],  # pragma: no cover
     )
     registry_filter: list[str] = Field(
-        default=lambda: ["ddeutil.workflow.utils"]
+        default_factory=lambda: ["ddeutil.workflow.utils"],  # pragma: no cover
     )
 
     @model_validator(mode="before")
