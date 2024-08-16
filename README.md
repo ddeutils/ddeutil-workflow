@@ -12,9 +12,6 @@
   - [On](#on)
   - [Pipeline](#pipeline)
 - [Usage](#usage)
-  - [Python & Bash](#python--bash)
-  - [Hook (EL)](#hook-extract--load)
-  - [Hook (T)](#hook-transform)
 - [Configuration](#configuration)
 - [Deployment](#deployment)
 
