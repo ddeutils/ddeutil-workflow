@@ -392,9 +392,15 @@ class Job(BaseModel):
             context=rs.context,
         )
 
-    @staticmethod
-    def __catch_fail_fast(event: Event, features: list[Future]) -> Result:
-        """Job parallel pool execution with fail-fast"""
+    def __catch_fail_fast(self, event: Event, features: list[Future]) -> Result:
+        """Job parallel pool features catching with fail-fast mode. That will
+        stop all not done features if it receive the first exception from all
+        running features.
+
+        :param event:
+        :param features: A list of features.
+        :rtype: Result
+        """
         strategy_context: DictData = {}
         # NOTE: Get results from a collection of tasks with a
         #   timeout that has the first exception.
@@ -418,8 +424,8 @@ class Job(BaseModel):
             if f.exception():
                 status = 1
                 logging.error(
-                    f"[JOB]: One stage failed with: {f.exception()}"
-                    f", shutting down"
+                    f"({self.run_id}) [JOB]: One stage failed with: "
+                    f"{f.exception()}, shutting down this feature."
                 )
             elif f.cancelled():
                 continue
@@ -431,14 +437,16 @@ class Job(BaseModel):
             context=strategy_context,
         )
 
-    @staticmethod
-    def __catch_all_completed(features: list[Future]) -> Result:
-        """Job parallel pool execution with all-completed"""
+    def __catch_all_completed(self, features: list[Future]) -> Result:
+        """Job parallel pool features catching with all-completed mode.
+
+        :param features: A list of features.
+        """
         strategy_context: DictData = {}
         status: int = 0
-        for pool_rs in as_completed(features):
+        for feature in as_completed(features):
             try:
-                rs: Result = pool_rs.result(timeout=60)
+                rs: Result = feature.result(timeout=60)
                 strategy_context.update(rs.context)
             except PickleError as err:
                 # NOTE: (WF001) I do not want to fix this issue because
@@ -451,16 +459,17 @@ class Job(BaseModel):
             except TimeoutError:
                 status = 1
                 logging.warning("Task is hanging. Attempting to kill.")
-                pool_rs.cancel()
-                if not pool_rs.cancelled():
+                feature.cancel()
+                if not feature.cancelled():
                     logging.warning("Failed to cancel the task.")
                 else:
                     logging.warning("Task canceled successfully.")
             except JobException as err:
                 status = 1
                 logging.error(
-                    f"Get stage exception with fail-fast does not set;"
-                    f"{err.__class__.__name__}:\n\t{err}"
+                    f"({self.run_id}) [JOB]: Get stage exception with "
+                    f"fail-fast does not set;\n{err.__class__.__name__}:\n\t"
+                    f"{err}"
                 )
         return Result(status=status, context=strategy_context)
 
