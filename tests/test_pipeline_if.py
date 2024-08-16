@@ -7,8 +7,8 @@ def test_stage_if():
     pipeline = pipe.Pipeline.from_loader(name="pipe-condition", externals={})
     stage = pipeline.job("condition-job").stage(stage_id="condition-stage")
 
-    assert not stage.is_skip(params=pipeline.parameterize(params))
-    assert stage.is_skip(params=pipeline.parameterize({"name": "bar"}))
+    assert not stage.is_skipped(params=pipeline.parameterize(params))
+    assert stage.is_skipped(params=pipeline.parameterize({"name": "bar"}))
     assert {"name": "foo"} == params
 
 

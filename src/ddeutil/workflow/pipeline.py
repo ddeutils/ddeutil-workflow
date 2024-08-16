@@ -243,7 +243,7 @@ class Job(BaseModel):
         for stage in self.stages:
             _st_name: str = stage.id or stage.name
 
-            if stage.is_skip(params=context):
+            if stage.is_skipped(params=context):
                 logging.info(f"[JOB]: Skip the stage: {_st_name!r}")
                 continue
             logging.info(f"[JOB]: Start execute the stage: {_st_name!r}")

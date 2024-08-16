@@ -84,7 +84,6 @@ def test_pipe_matrix():
         externals={},
     )
     rs = pipeline.execute(params={"source": "src", "target": "tgt"})
-    print(rs.context)
     assert {
         "params": {"source": "src", "target": "tgt"},
         "jobs": {
