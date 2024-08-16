@@ -45,6 +45,14 @@ class SimLoad:
                 self.data = data
         if not self.data:
             raise ValueError(f"Config {name!r} does not found on conf path")
+
+        # TODO: Validate the version of template data that mean if version of
+        #   Template were change it should raise to upgrade package version.
+        #   ---
+        #   <pipeline-name>:
+        #       version: 1
+        #       type: pipeline.Pipeline
+        #
         self.conf_params: ConfParams = params
         self.externals: DictData = externals
 

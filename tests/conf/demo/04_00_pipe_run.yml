@@ -1,8 +1,7 @@
 # Case:
 #   Run Python statement from config value.
-run_python:
-  version: 1
-  type: ddeutil.workflow.pipeline.Pipeline
+pipe-run-common:
+  type: pipeline.Pipeline
   desc: |
     ## Run Python Workflow
 
@@ -21,7 +20,6 @@ run_python:
           run: |
             print(f'Hello {x}')
             x: str = 'New Name'
-
         - name: Run Sequence and use var from Above
           id: run-var
           vars:
@@ -31,13 +29,11 @@ run_python:
 
             # Change x value
             x: int = 1
-
     raise-run:
       stages:
         - name: Raise Error Inside
           id: raise-error
           run: raise ValueError('Testing raise error inside PyStage!!!')
-
     next-run:
       stages:
         - name: Set variable and function
@@ -45,12 +41,9 @@ run_python:
             var_inside: str = 'Inside'
             def echo() -> None:
               print(f"Echo {var_inside}"
-
         - name: Call that variable
           run: echo()
-
         - name: Final of Next running job
-
     bash-run:
       stages:
         - name: Echo hello world
@@ -59,7 +52,6 @@ run_python:
             echo "Hello World";
             VAR='Foo';
             echo "Variable $VAR";
-
     # WARNING:
     #   The limitation of the bash running statement is it cannot use env var
     #   calling with brace, ${ ... }, because this file was read from
@@ -74,14 +66,19 @@ run_python:
           bash: |
             echo "Hello World";
             VAR='Foo';
-            echo "Variable $VAR";
-            echo "ENV $PASSING";
+            echo "Variable $$VAR";
+            echo "ENV $$PASSING";
+        - name: Raise Error inside bash
+          id: raise-error
+          bash: |
+            printf '%s\n' "Test Raise Error case with failed" >&2;
+            exit 1;
 
 
 # Case:
 #   Run Python statement from config value with parameters.
 run_python_with_params:
-  type: ddeutil.workflow.pipeline.Pipeline
+  type: pipeline.Pipeline
   params:
     author-run: str
     run-date: datetime
@@ -93,7 +90,6 @@ run_python_with_params:
           run: |
             x = '${{ params.author-run }}'
             print(f'Hello {x}')
-
         - name: Run Sequence and use var from Above
           id: setting-x
           vars:
@@ -102,7 +98,6 @@ run_python_with_params:
             print(f'Receive x from above with {x}')
             # Change x value
             x: int = 1
-
     second-job:
       stages:
         - name: Set variable and function
@@ -112,7 +107,6 @@ run_python_with_params:
             def echo(var: str) -> None:
               print(f"Echo {var}")
             echo(var_inside)
-
         - name: Call that variable
           id: call-func
           vars:
@@ -120,9 +114,7 @@ run_python_with_params:
           run: |
             print("Call function that create from above stage")
             echo("Call Function Outside")
-
         - name: Final of Next running job
-
     final-job:
       stages:
         - name: Echo hello world

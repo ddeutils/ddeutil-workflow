@@ -4,7 +4,7 @@ pipe_trigger:
   jobs:
     trigger-job:
       stages:
-        - name: "Trigger run_python pipeline"
+        - name: "Trigger run_python_with_params pipeline"
           trigger: run_python_with_params
           id: trigger-stage
           params:

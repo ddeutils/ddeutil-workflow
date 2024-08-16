@@ -33,6 +33,11 @@ from pathlib import Path
 from subprocess import CompletedProcess
 from typing import Callable, Optional, Union
 
+try:
+    from typing import ParamSpec
+except ImportError:
+    from typing_extensions import ParamSpec
+
 from ddeutil.core import str2bool
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
@@ -49,18 +54,23 @@ from .utils import (
     param2template,
 )
 
+P = ParamSpec("P")
+__all__: TupleStr = (
+    "Stage",
+    "handler_result",
+)
 
-def handler_result(message: str | None = None):
+
+def handler_result(message: str | None = None) -> Callable[P, Result]:
     """Decorator function for handler result from the stage execution."""
     message: str = message or ""
 
-    def decorator(func):
+    def decorator(func: Callable[P, Result]) -> Callable[P, Result]:
 
         @wraps(func)
         def wrapped(self: BaseStage, *args, **kwargs):
             try:
-                rs: DictData = func(self, *args, **kwargs)
-                return Result(status=0, context=rs)
+                return func(self, *args, **kwargs)
             except Exception as err:
                 logging.error(
                     f"({self.run_id}) [STAGE]: {err.__class__.__name__}: {err}"
@@ -246,13 +256,13 @@ class BashStage(BaseStage):
         f_shebang: str = "bash" if sys.platform.startswith("win") else "sh"
         with open(f"./{f_name}", mode="w", newline="\n") as f:
             # NOTE: write header of `.sh` file
-            f.write(f"#!/bin/{f_shebang}\n")
+            f.write(f"#!/bin/{f_shebang}\n\n")
 
             # NOTE: add setting environment variable before bash skip statement.
             f.writelines([f"{k}='{env[k]}';\n" for k in env])
 
             # NOTE: make sure that shell script file does not have `\r` char.
-            f.write(bash.replace("\r\n", "\n"))
+            f.write("\n" + bash.replace("\r\n", "\n"))
 
         make_exec(f"./{f_name}")
         logging.debug(
@@ -265,7 +275,7 @@ class BashStage(BaseStage):
         Path(f"./{f_name}").unlink()
 
     @handler_result()
-    def execute(self, params: DictData) -> DictData:
+    def execute(self, params: DictData) -> Result:
         """Execute the Bash statement with the Python build-in ``subprocess``
         package.
 
@@ -288,19 +298,19 @@ class BashStage(BaseStage):
                 rs.stderr.encode("utf-8").decode("utf-16")
                 if "\\x00" in rs.stderr
                 else rs.stderr
-            )
-            logging.error(
-                f"({self.run_id}) [STAGE]: {err}\n\n```bash\n{bash}```"
-            )
+            ).removesuffix("\n")
             raise StageException(
-                f"{err.__class__.__name__}: {err}\nRunning Statement:"
-                f"\n---\n```bash\n{bash}\n```"
+                f"Subprocess: {err}\nRunning Statement:\n---\n"
+                f"```bash\n{bash}\n```"
             )
-        return {
-            "return_code": rs.returncode,
-            "stdout": rs.stdout.rstrip("\n"),
-            "stderr": rs.stderr.rstrip("\n"),
-        }
+        return Result(
+            status=0,
+            context={
+                "return_code": rs.returncode,
+                "stdout": rs.stdout.rstrip("\n"),
+                "stderr": rs.stderr.rstrip("\n"),
+            },
+        )
 
 
 class PyStage(BaseStage):
@@ -348,7 +358,7 @@ class PyStage(BaseStage):
         return params
 
     @handler_result()
-    def execute(self, params: DictData) -> DictData:
+    def execute(self, params: DictData) -> Result:
         """Execute the Python statement that pass all globals and input params
         to globals argument on ``exec`` build-in function.
 
@@ -363,7 +373,9 @@ class PyStage(BaseStage):
         run: str = param2template(self.run, params)
         logging.info(f"({self.run_id}) [STAGE]: Py-Execute: {uuid.uuid4()}")
         exec(run, _globals, _locals)
-        return {"locals": _locals, "globals": _globals}
+        return Result(
+            status=0, context={"locals": _locals, "globals": _globals}
+        )
 
 
 @dataclass
@@ -431,7 +443,7 @@ class HookStage(BaseStage):
     )
 
     @handler_result()
-    def execute(self, params: DictData) -> DictData:
+    def execute(self, params: DictData) -> Result:
         """Execute the Hook function that already in the hook registry.
 
         :param params: A parameter that want to pass before run any statement.
@@ -476,7 +488,7 @@ class HookStage(BaseStage):
                 f"not serialize to result model, you should fix it to "
                 f"`dict` type."
             )
-        return rs
+        return Result(status=0, context=rs)
 
 
 class TriggerStage(BaseStage):
@@ -500,7 +512,7 @@ class TriggerStage(BaseStage):
     )
 
     @handler_result("Raise from trigger pipeline")
-    def execute(self, params: DictData) -> DictData:
+    def execute(self, params: DictData) -> Result:
         """Trigger pipeline execution.
 
         :param params: A parameter data that want to use in this execution.
@@ -511,8 +523,7 @@ class TriggerStage(BaseStage):
         # NOTE: Loading pipeline object from trigger name.
         _trigger: str = param2template(self.trigger, params=params)
         pipe: Pipeline = Pipeline.from_loader(name=_trigger, externals={})
-        rs: Result = pipe.execute(params=param2template(self.params, params))
-        return rs.context
+        return pipe.execute(params=param2template(self.params, params))
 
 
 # NOTE: Order of parsing stage data
