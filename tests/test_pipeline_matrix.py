@@ -46,7 +46,7 @@ def test_pipe_strategy_model():
 
 def test_pipe_job_matrix():
     pipeline = pipe.Pipeline.from_loader(
-        name="ingest_multiple_system",
+        name="pipe-run-matrix",
         externals={},
     )
     multi_sys = pipeline.job(name="multiple-system")
@@ -80,7 +80,7 @@ def test_pipe_job_matrix():
 
 def test_pipe_matrix():
     pipeline = pipe.Pipeline.from_loader(
-        name="ingest_multiple_system",
+        name="pipe-run-matrix",
         externals={},
     )
     rs = pipeline.execute(params={"source": "src", "target": "tgt"})
@@ -152,7 +152,7 @@ def test_pipe_matrix():
 
 def test_pipe_matrix_fail_fast():
     pipeline = pipe.Pipeline.from_loader(
-        name="pipeline_matrix_fail_fast",
+        name="pipe-run-matrix-fail-fast",
         externals={},
     )
     rs = pipeline.execute(params={"name": "foo"})

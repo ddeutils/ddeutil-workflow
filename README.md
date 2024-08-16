@@ -16,9 +16,9 @@
 - [Configuration](#configuration)
 - [Deployment](#deployment)
 
-This **Workflow** objects was created for easy to make a simple metadata
-driven for data pipeline orchestration that able to use for **ETL, T, EL, or
-ELT** by a `.yaml` file template.
+The **Lightweight Workflow Framework** was created for easy to make a simple
+metadata driven for data pipeline orchestration that able to use for **ETL, T,
+EL, or ELT** by a `.yaml` template.
 
 In my opinion, I think it should not create duplicate pipeline codes if I can
 write with dynamic input parameters on the one template pipeline that just change

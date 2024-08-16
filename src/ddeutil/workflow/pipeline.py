@@ -21,11 +21,12 @@ from datetime import datetime
 from multiprocessing import Event, Manager
 from pickle import PickleError
 from queue import Queue
+from textwrap import dedent
 from typing import Optional
 from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, Field
-from pydantic.functional_validators import model_validator
+from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
 from .__types import (
@@ -54,6 +55,7 @@ from .utils import (
     filter_func,
     gen_id,
     get_diff_sec,
+    not_in_template,
 )
 
 __all__: TupleStr = (
@@ -210,6 +212,12 @@ class Job(BaseModel):
     def __prepare_running_id(self):
         if self.run_id is None:
             self.run_id = gen_id(self.id or "", unique=True)
+
+        # VALIDATE: Validate job id should not dynamic with params template.
+        #   (allow only matrix)
+        if not_in_template(self.id):
+            raise ValueError("Job ID should only template with matrix.")
+
         return self
 
     def stage(self, stage_id: str) -> Stage:
@@ -222,7 +230,6 @@ class Job(BaseModel):
     def set_outputs(self, output: DictData) -> DictData:
         if len(output) > 1 and self.strategy.is_set():
             return {"strategies": output}
-
         return output[next(iter(output))]
 
     def strategy_execute(
@@ -327,7 +334,7 @@ class Job(BaseModel):
                 )
             try:
                 rs: Result = stage.execute(params=context)
-                stage.set_outputs(rs.context, params=context)
+                stage.set_outputs(rs.context, to=context)
             except (StageException, UtilException) as err:
                 logging.error(
                     f"({self.run_id}) [JOB]: {err.__class__.__name__}: {err}"
@@ -575,6 +582,11 @@ class Pipeline(BaseModel):
             }
         return values
 
+    @field_validator("desc", mode="after")
+    def ___prepare_desc(cls, value: str) -> str:
+        """Prepare description string that was created on a template."""
+        return dedent(value)
+
     @model_validator(mode="after")
     def __validate_jobs_need_and_prepare_running_id(self):
         for job in self.jobs:
@@ -591,6 +603,13 @@ class Pipeline(BaseModel):
 
         if self.run_id is None:
             self.run_id = gen_id(self.name, unique=True)
+
+        # VALIDATE: Validate pipeline name should not dynamic with params
+        #   template. (allow only matrix)
+        if not_in_template(self.name) or not_in_template(
+            self.name, not_in="params."
+        ):
+            raise ValueError("Job ID should not any template.")
 
         return self
 

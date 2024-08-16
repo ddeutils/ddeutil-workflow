@@ -556,6 +556,19 @@ def map_post_filter(
     return value
 
 
+def not_in_template(value: Any, *, not_in: str = "matrix.") -> bool:
+    if isinstance(value, dict):
+        return any(not_in_template(value[k]) for k in value)
+    elif isinstance(value, (list, tuple, set)):
+        return any(not_in_template(i) for i in value)
+    elif not isinstance(value, str):
+        return False
+    return any(
+        (not found.group("caller").strip().startswith(not_in))
+        for found in Re.RE_CALLER.finditer(value.strip())
+    )
+
+
 def str2template(
     value: str,
     params: DictData,

@@ -1,4 +1,4 @@
-ingest_multiple_system:
+pipe-run-matrix:
   type: pipeline.Pipeline
   params:
     source: str
@@ -40,7 +40,7 @@ ingest_multiple_system:
             passing_value: int = 10
 
 
-pipeline_matrix_fail_fast:
+pipe-run-matrix-fail-fast:
   type: pipeline.Pipeline
   on:
 #    - 'every_5_minute_bkk'

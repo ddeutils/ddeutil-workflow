@@ -1,10 +1,4 @@
-# Case:
-#   Extract data from a Source Database to Azure Data Lake.
-#
-#   * The source table should dynamic picking with schema and table names
-#   * Incremental loading with ``run_date`` parameter
-# ---
-ingest_postgres_to_minio:
+pipe-run-hook:
   type: pipeline.Pipeline
   desc: Extract and download data from Postgres to Azure Data Lake
   params:
@@ -37,8 +31,6 @@ ingest_postgres_to_minio:
               endpoint: /persisted/${{ target.schema }}/${{ target.path }}
 
 
-# Case:
-#   Extract data on the Local File System from CSV to Parquet.
 ingest_csv_to_parquet:
   type: pipeline.Pipeline
   params:

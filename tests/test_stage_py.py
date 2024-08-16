@@ -17,7 +17,7 @@ def test_stage_py_raise():
         stage.execute(params={"x": "Foo"})
 
 
-def test_pipe_stage_py():
+def test_stage_py():
     # NOTE: Get stage from the specific pipeline.
     pipeline: Pipeline = Pipeline.from_loader(
         name="pipe-run-common", externals={}
@@ -31,7 +31,7 @@ def test_pipe_stage_py():
         "stages": {"hello-world": {"outputs": {"x": "Foo"}}},
     }
     rs = stage.execute(params=p)
-    _prepare_rs = stage.set_outputs(rs.context, p)
+    _prepare_rs = stage.set_outputs(rs.context, to=p)
     assert {
         "params": {"name": "Author"},
         "stages": {
@@ -41,16 +41,16 @@ def test_pipe_stage_py():
     } == _prepare_rs
 
 
-def test_pipe_stage_py_func():
+def test_stage_py_func():
     pipeline: Pipeline = Pipeline.from_loader(
-        name="run_python_with_params", externals={}
+        name="pipe-run-python", externals={}
     )
     stage: Stage = pipeline.job("second-job").stage(stage_id="create-func")
     assert stage.id == "create-func"
 
     # NOTE: Start execute with manual stage parameters.
     rs: Result = stage.execute(params={})
-    _prepare_rs = stage.set_outputs(rs.context, {})
+    _prepare_rs = stage.set_outputs(rs.context, to={})
     assert ("var_inside", "echo") == tuple(
         _prepare_rs["stages"]["create-func"]["outputs"].keys()
     )

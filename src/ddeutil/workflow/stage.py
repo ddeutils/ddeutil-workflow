@@ -31,6 +31,7 @@ from functools import wraps
 from inspect import Parameter
 from pathlib import Path
 from subprocess import CompletedProcess
+from textwrap import dedent
 from typing import Callable, Optional, Union
 
 try:
@@ -51,18 +52,26 @@ from .utils import (
     gen_id,
     make_exec,
     make_registry,
+    not_in_template,
     param2template,
 )
 
 P = ParamSpec("P")
 __all__: TupleStr = (
     "Stage",
+    "EmptyStage",
+    "BashStage",
+    "PyStage",
+    "HookStage",
+    "TriggerStage",
     "handler_result",
 )
 
 
 def handler_result(message: str | None = None) -> Callable[P, Result]:
-    """Decorator function for handler result from the stage execution."""
+    """Decorator function for handler result from the stage execution. This
+    function should to use with execution method only.
+    """
     message: str = message or ""
 
     def decorator(func: Callable[P, Result]) -> Callable[P, Result]:
@@ -70,17 +79,19 @@ def handler_result(message: str | None = None) -> Callable[P, Result]:
         @wraps(func)
         def wrapped(self: BaseStage, *args, **kwargs):
             try:
+                # NOTE: Start calling origin function with a passing args.
                 return func(self, *args, **kwargs)
             except Exception as err:
+                # NOTE: Start catching error from the stage execution.
                 logging.error(
                     f"({self.run_id}) [STAGE]: {err.__class__.__name__}: {err}"
                 )
                 if isinstance(err, StageException):
                     raise StageException(
-                        f"{self.__class__.__name__}: {message}\n---\n\t{err}"
+                        f"{self.__class__.__name__}: {message}\n\t{err}"
                     ) from err
                 raise StageException(
-                    f"{self.__class__.__name__}: {message}\n---\n\t"
+                    f"{self.__class__.__name__}: {message}\n\t"
                     f"{err.__class__.__name__}: {err}"
                 ) from None
 
@@ -119,6 +130,14 @@ class BaseStage(BaseModel, ABC):
     def __prepare_running_id(self):
         if self.run_id is None:
             self.run_id = gen_id(self.name + (self.id or ""), unique=True)
+
+        # VALIDATE: Validate stage id and name should not dynamic with params
+        #   template. (allow only matrix)
+        if not_in_template(self.id) or not_in_template(self.name):
+            raise ValueError(
+                "Stage name and ID should only template with matrix."
+            )
+
         return self
 
     @abstractmethod
@@ -131,11 +150,11 @@ class BaseStage(BaseModel, ABC):
         """
         raise NotImplementedError("Stage should implement ``execute`` method.")
 
-    def set_outputs(self, output: DictData, params: DictData) -> DictData:
+    def set_outputs(self, output: DictData, to: DictData) -> DictData:
         """Set an outputs from execution process to an input params.
 
         :param output: A output data that want to extract to an output key.
-        :param params: A context data that want to add output result.
+        :param to: A context data that want to add output result.
         :rtype: DictData
         """
         if not (
@@ -147,25 +166,23 @@ class BaseStage(BaseModel, ABC):
                 f"stage does not set ID or default stage ID config flag not be "
                 f"True."
             )
-            return params
+            return to
 
         # NOTE: Create stages key to receive an output from the stage execution.
-        if "stages" not in params:
-            params["stages"] = {}
+        if "stages" not in to:
+            to["stages"] = {}
 
-        # TODO: Validate stage id and name should not dynamic with params
-        #   template. (allow only matrix)
         if self.id:
-            _id: str = param2template(self.id, params=params)
+            _id: str = param2template(self.id, params=to)
         else:
-            _id: str = gen_id(param2template(self.name, params=params))
+            _id: str = gen_id(param2template(self.name, params=to))
 
         # NOTE: Set the output to that stage generated ID.
-        params["stages"][_id] = {"outputs": output}
+        to["stages"][_id] = {"outputs": output}
         logging.debug(
             f"({self.run_id}) [STAGE]: Set output complete with stage ID: {_id}"
         )
-        return params
+        return to
 
     def is_skipped(self, params: DictData | None = None) -> bool:
         """Return true if condition of this stage do not correct.
@@ -282,7 +299,7 @@ class BashStage(BaseStage):
         :param params: A parameter data that want to use in this execution.
         :rtype: Result
         """
-        bash: str = param2template(self.bash, params)
+        bash: str = param2template(dedent(self.bash), params)
         with self.__prepare_bash(
             bash=bash, env=param2template(self.env, params)
         ) as sh:
@@ -337,25 +354,24 @@ class PyStage(BaseStage):
         ),
     )
 
-    def set_outputs(self, output: DictData, params: DictData) -> DictData:
+    def set_outputs(self, output: DictData, to: DictData) -> DictData:
         """Set an outputs from the Python execution process to an input params.
 
         :param output: A output data that want to extract to an output key.
-        :param params: A context data that want to add output result.
+        :param to: A context data that want to add output result.
         :rtype: DictData
         """
         # NOTE: The output will fileter unnecessary keys from locals.
         _locals: DictData = output["locals"]
         super().set_outputs(
-            {k: _locals[k] for k in _locals if k != "__annotations__"},
-            params=params,
+            {k: _locals[k] for k in _locals if k != "__annotations__"}, to=to
         )
 
         # NOTE:
         #   Override value that changing from the globals that pass via exec.
         _globals: DictData = output["globals"]
-        params.update({k: _globals[k] for k in params if k in _globals})
-        return params
+        to.update({k: _globals[k] for k in to if k in _globals})
+        return to
 
     @handler_result()
     def execute(self, params: DictData) -> Result:
@@ -370,7 +386,7 @@ class PyStage(BaseStage):
             globals() | params | param2template(self.vars, params)
         )
         _locals: DictData = {}
-        run: str = param2template(self.run, params)
+        run: str = param2template(dedent(self.run), params)
         logging.info(f"({self.run_id}) [STAGE]: Py-Execute: {uuid.uuid4()}")
         exec(run, _globals, _locals)
         return Result(
@@ -427,7 +443,7 @@ class HookStage(BaseStage):
     Data Validate:
         >>> stage = {
         ...     "name": "Task stage execution",
-        ...     "task": "tasks/function-name@tag-name",
+        ...     "uses": "tasks/function-name@tag-name",
         ...     "args": {
         ...         "FOO": "BAR",
         ...     },
@@ -523,6 +539,10 @@ class TriggerStage(BaseStage):
         # NOTE: Loading pipeline object from trigger name.
         _trigger: str = param2template(self.trigger, params=params)
         pipe: Pipeline = Pipeline.from_loader(name=_trigger, externals={})
+
+        # NOTE: Set running pipeline ID from running stage ID.
+        pipe.run_id = self.run_id
+
         return pipe.execute(params=param2template(self.params, params))
 
 

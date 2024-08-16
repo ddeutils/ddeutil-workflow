@@ -8,7 +8,7 @@ from ddeutil.workflow.utils import Result
 
 def test_stage_trigger():
     pipeline = pipe.Pipeline.from_loader(name="pipe_trigger", externals={})
-    stage: st.TriggerStage = pipeline.job("trigger-job").stage(
+    stage: st.Stage = pipeline.job("trigger-job").stage(
         stage_id="trigger-stage"
     )
     rs: Result = stage.execute(params={})

@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ddeutil-workflow"
-description = "Data Developer & Engineer Workflow Utility Objects"
+description = "Lightweight Workflow Framework"
 readme = {file = "README.md", content-type = "text/markdown"}
 license = {text = "MIT"}
 authors = [{ name = "ddeutils", email = "korawich.anu@gmail.com" }]
-keywords = ['data', 'workflow', 'utility', 'pipeline']
+keywords = ['pipeline', 'workflow']
 classifiers = [
     "Topic :: Utilities",
     "Natural Language :: English",

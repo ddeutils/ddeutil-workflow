@@ -2,7 +2,7 @@ import ddeutil.workflow.pipeline as pipe
 
 
 def test_pipeline_run_raise():
-    pipeline = pipe.Pipeline.from_loader("pipe-raise-run", externals={})
+    pipeline = pipe.Pipeline.from_loader("pipe-run-python-raise", externals={})
     rs = pipeline.execute(params={})
     print(rs)
     assert 1 == rs.status
