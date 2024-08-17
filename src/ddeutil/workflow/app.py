@@ -35,7 +35,14 @@ def bad_task():
     return 1 / 0
 
 
+@catch_exceptions(cancel_on_failure=True)
+def observe_pipeline_able_to_poke():
+    return True
+
+
 schedule.every(5).seconds.do(bad_task)
+schedule.every(1).minutes.do(observe_pipeline_able_to_poke)
+
 
 if __name__ == "__main__":
     while True:

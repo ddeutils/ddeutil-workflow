@@ -25,7 +25,6 @@ pipe-condition:
           if: '"${{ params.name }}" == "foo"'
           shell: |
             echo 'Hello World';
-
         - name: "Empty stage"
 
 
@@ -53,6 +52,5 @@ pipe-scheduling:
     condition-job:
       stages:
         - name: "Empty stage"
-
         - name: "Call-out"
           echo: "Hello ${{ params.name | upper }}"

@@ -18,7 +18,7 @@
 
 The **Lightweight workflow orchestration** with less dependencies the was created
 for easy to make a simple metadata driven for data pipeline orchestration.
-It can to use for **ETL, T, EL, or ELT** by a `.yaml` template.
+It can to use for data operator by a `.yaml` template.
 
 > [!WARNING]
 > This package provide only orchestration workload. That mean you should not use
@@ -50,6 +50,18 @@ this package with application add-ons, you should add `app` in installation;
 | Scheduler Service | `pip install ddeutil-workflow[app]` | :x:                |
 | FastAPI Server    | `pip install ddeutil-workflow[api]` | :x:                |
 
+
+> I added this feature to the main milestone.
+
+Docker image repository support:
+
+| Docker Image                | Python Version | Support |
+|-----------------------------|----------------|---------|
+| ddeutil-workflow:latest     | `3.9`          | :x:     |
+| ddeutil-workflow:python3.10 | `3.10`         | :x:     |
+| ddeutil-workflow:python3.11 | `3.11`         | :x:     |
+| ddeutil-workflow:python3.12 | `3.12`         | :x:     |
+
 ## Getting Started
 
 The main feature of this project is the `Pipeline` object that can call any
@@ -58,9 +70,11 @@ will passing parameters and catching the output for re-use it to next step.
 
 ### On
 
-The **On** is schedule object.
+The **On** is schedule object that receive crontab value and able to generate
+datetime value with next or previous with any start point of an input datetime.
 
 ```yaml
+# This file should keep under this path: `./root-path/conf-path/*`
 on_every_5_min:
   type: on.On
   cron: "*/5 * * * *"
@@ -69,14 +83,16 @@ on_every_5_min:
 ```python
 from ddeutil.workflow.on import On
 
+# NOTE: Start load the on data from `.yaml` template file with this key.
 schedule = On.from_loader(name='on_every_5_min', externals={})
+
 assert '*/5 * * * *' == str(schedule.cronjob)
 
 cron_iter = schedule.generate('2022-01-01 00:00:00')
-assert '2022-01-01 00:05:00' f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
-assert '2022-01-01 00:10:00' f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
-assert '2022-01-01 00:15:00' f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
-assert '2022-01-01 00:20:00' f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
+
+assert "2022-01-01 00:05:00" f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
+assert "2022-01-01 00:10:00" f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
+assert "2022-01-01 00:15:00" f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
 ```
 
 ### Pipeline
@@ -84,6 +100,7 @@ assert '2022-01-01 00:20:00' f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
 The **Pipeline** object that is the core feature of this project.
 
 ```yaml
+# This file should keep under this path: `./root-path/conf-path/*`
 pipeline-name:
   type: ddeutil.workflow.pipeline.Pipeline
   on: 'on_every_5_min'
@@ -95,7 +112,7 @@ pipeline-name:
   jobs:
     first-job:
       stages:
-        - ...
+        - name: "Empty stage do logging to console only!!"
 ```
 
 ```python
@@ -106,12 +123,16 @@ pipe.execute(params={'author-run': 'Local Workflow', 'run-date': '2024-01-01'})
 ```
 
 > [!NOTE]
-> The above parameter use short declarative statement. You can pass a parameter
-> type to the key of a parameter name.
+> The above parameter can use short declarative statement. You can pass a parameter
+> type to the key of a parameter name but it does not handler default value if you
+> run this pipeline workflow with schedule.
+>
 > ```yaml
+> ...
 > params:
 >   author-run: str
 >   run-date: datetime
+> ...
 > ```
 >
 > And for the type, you can remove `ddeutil.workflow` prefix because we can find
@@ -123,8 +144,10 @@ This is examples that use workflow file for running common Data Engineering
 use-case.
 
 > [!IMPORTANT]
-> I recommend you to use `task` stage for all actions that you want to do with
-> pipeline object.
+> I recommend you to use the `hook` stage for all actions that you want to do
+> with pipeline activity that you want to orchestrate. Because it able to dynamic
+> an input argument with the same hook function that make you use less time to
+> maintenance your data pipelines.
 
 ```yaml
 run_py_local:

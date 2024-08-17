@@ -520,8 +520,15 @@ class Pipeline(BaseModel):
         description="A mapping of job ID and job model that already loaded.",
     )
     run_id: Optional[str] = Field(
-        default=None, description="A running job ID.", repr=False
+        default=None,
+        description="A running pipeline ID.",
+        repr=False,
     )
+
+    @property
+    def gen_run_id(self) -> str:
+        """Running ID of this pipeline that always generate new unique value."""
+        return gen_id(self.name, unique=True)
 
     @classmethod
     def from_loader(
@@ -601,7 +608,7 @@ class Pipeline(BaseModel):
             self.jobs[job].id = job
 
         if self.run_id is None:
-            self.run_id = gen_id(self.name, unique=True)
+            self.run_id = self.gen_run_id
 
         # VALIDATE: Validate pipeline name should not dynamic with params
         #   template.
@@ -662,14 +669,13 @@ class Pipeline(BaseModel):
         *,
         waiting_sec: int = 600,
         sleep_interval: int = 10,
-    ) -> str:
+    ) -> Result:
         """Start running pipeline with the on schedule in period of 30 minutes.
         That mean it will still running at background 30 minutes until the
         schedule matching with its time.
         """
         params: DictData = params or {}
         logging.info(f"[CORE] Start release: {self.name!r} : {on.cronjob}")
-
         gen: CronRunner = on.generate(datetime.now())
         tz: ZoneInfo = gen.tz
         next_running_time: datetime = gen.next
@@ -687,16 +693,19 @@ class Pipeline(BaseModel):
                     f"[CORE]: {self.name!r} : Sleep until: {duration}"
                 )
 
-            time.sleep(1)
+            time.sleep(0.5)
             rs: Result = self.execute(params=params)
-            logging.debug(f"{rs.context}")
+            logging.debug(f"[CORE]: {rs.context}")
+            return rs
+        return Result(status=0, context=params)
 
-            return f"[CORE]: Start Execute: {self.name}"
-        return f"[CORE]: {self.name} does not closely to run yet."
+    def poke(self, params: DictData | None = None) -> list[Result]:
+        """Poke pipeline with threading executor pool for executing with all its
+        schedules that was set on the `on` value. This method will observe its
+        schedule that nearing to run with the ``self.release()`` method.
 
-    def poke(self, params: DictData | None = None):
-        """Poke pipeline threading task for executing with its schedules that
-        was set on the `on`.
+        :param params: A parameters that want to pass to the release method.
+        :rtype: list[Result]
         """
         params: DictData = params or {}
         logging.info(
@@ -709,6 +718,8 @@ class Pipeline(BaseModel):
                 os.getenv("WORKFLOW_CORE_MAX_PIPELINE_POKING", "4")
             ),
         ) as executor:
+            # TODO: Can this parameter able to generate when it run by the app
+            #   schedule.
             futures: list[Future] = [
                 executor.submit(
                     self.release,
@@ -729,6 +740,7 @@ class Pipeline(BaseModel):
         params: DictData,
     ) -> Result:
         """Job Executor that use on pipeline executor.
+
         :param job: A job ID that want to execute.
         :param params: A params that was parameterized from pipeline execution.
         """
@@ -737,14 +749,13 @@ class Pipeline(BaseModel):
             raise PipelineException(
                 f"The job ID: {job} does not exists on {self.name!r} pipeline."
             )
-
         try:
             logging.info(f"({self.run_id}) [PIPELINE]: Start execute: {job!r}")
             job_obj: Job = self.jobs[job]
             j_rs: Result = job_obj.execute(params=params)
         except JobException as err:
             raise PipelineException(
-                f"The job ID: {job} get raise error: {err.__class__.__name__}:"
+                f"The job ID: {job} get error: {err.__class__.__name__}:"
                 f"\n{err}"
             ) from None
         return Result(

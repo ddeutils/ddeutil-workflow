@@ -22,6 +22,11 @@ from pathlib import Path
 from typing import Any, Callable, Literal, Optional, Protocol, Union
 from zoneinfo import ZoneInfo
 
+try:
+    from typing import ParamSpec
+except ImportError:
+    from typing_extensions import ParamSpec
+
 from ddeutil.core import getdot, hasdot, hash_str, import_string, lazy, str2bool
 from ddeutil.io import PathData, search_env_replace
 from ddeutil.io.models.lineage import dt_now
@@ -31,6 +36,8 @@ from typing_extensions import Self
 
 from .__types import DictData, Matrix, Re
 from .exceptions import ParamValueException, UtilException
+
+P = ParamSpec("P")
 
 
 def get_diff_sec(dt: datetime, tz: ZoneInfo | None = None) -> int:
@@ -257,7 +264,8 @@ class DefaultParam(BaseParam):
         )
 
     @model_validator(mode="after")
-    def check_default(self) -> Self:
+    def __check_default(self) -> Self:
+        """Check default value should pass when it set required."""
         if not self.required and self.default is None:
             raise ParamValueException(
                 "Default should set when this parameter does not required."
@@ -273,7 +281,13 @@ class DatetimeParam(DefaultParam):
     default: datetime = Field(default_factory=dt_now)
 
     def receive(self, value: str | datetime | date | None = None) -> datetime:
-        """Receive value that match with datetime."""
+        """Receive value that match with datetime. If a input value pass with
+        None, it will use default value instead.
+
+        :param value: A value that want to validate with datetime parameter
+            type.
+        :rtype: datetime
+        """
         if value is None:
             return self.default
 
@@ -295,7 +309,11 @@ class StrParam(DefaultParam):
     type: Literal["str"] = "str"
 
     def receive(self, value: Optional[str] = None) -> str | None:
-        """Receive value that match with str."""
+        """Receive value that match with str.
+
+        :param value: A value that want to validate with string parameter type.
+        :rtype: str | None
+        """
         if value is None:
             return self.default
         return str(value)
@@ -307,7 +325,11 @@ class IntParam(DefaultParam):
     type: Literal["int"] = "int"
 
     def receive(self, value: Optional[int] = None) -> int | None:
-        """Receive value that match with int."""
+        """Receive value that match with int.
+
+        :param value: A value that want to validate with integer parameter type.
+        :rtype: int | None
+        """
         if value is None:
             return self.default
         if not isinstance(value, int):
@@ -426,7 +448,7 @@ class FilterFunc(Protocol):
     def __call__(self, *args, **kwargs): ...
 
 
-def custom_filter(name: str):
+def custom_filter(name: str) -> Callable[P, TagFunc]:
     """Custom filter decorator function that set function attributes, ``filter``
     for making filter registries variable.
 
@@ -511,7 +533,11 @@ def get_args_const(
 
 @custom_filter("fmt")
 def datetime_format(value: datetime, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
-    return value.strftime(fmt)
+    if isinstance(value, datetime):
+        return value.strftime(fmt)
+    raise UtilException(
+        "This custom function should pass input value with datetime type."
+    )
 
 
 def map_post_filter(
@@ -557,6 +583,12 @@ def map_post_filter(
 
 
 def not_in_template(value: Any, *, not_in: str = "matrix.") -> bool:
+    """Check value should not pass template with not_in value prefix.
+
+    :param value:
+    :param not_in:
+    :rtype: bool
+    """
     if isinstance(value, dict):
         return any(not_in_template(value[k], not_in=not_in) for k in value)
     elif isinstance(value, (list, tuple, set)):
@@ -570,6 +602,11 @@ def not_in_template(value: Any, *, not_in: str = "matrix.") -> bool:
 
 
 def has_template(value: Any) -> bool:
+    """Check value include templating string.
+
+    :param value:
+    :rtype: bool
+    """
     if isinstance(value, dict):
         return any(has_template(value[k]) for k in value)
     elif isinstance(value, (list, tuple, set)):
@@ -662,7 +699,7 @@ def param2template(
     return str2template(value, params, filters=filters)
 
 
-def filter_func(value: Any):
+def filter_func(value: Any) -> Any:
     """Filter own created function out of any value with replace it to its
     function name. If it is built-in function, it does not have any changing.
     """
