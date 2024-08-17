@@ -13,7 +13,7 @@ from abc import ABC, abstractmethod
 from ast import Call, Constant, Expr, Module, Name, parse
 from collections.abc import Iterator
 from datetime import date, datetime
-from functools import wraps
+from functools import partial, wraps
 from hashlib import md5
 from importlib import import_module
 from inspect import isfunction
@@ -371,7 +371,9 @@ Param = Union[
 
 
 class Context(BaseModel):
-    """Context Pydantic Model"""
+    """Context Pydantic Model that use to passing context data between workflow
+    objects such as Pipeline, Job, and Stage.
+    """
 
     params: dict = Field(default_factory=dict)
     jobs: dict = Field(default_factory=dict)
@@ -383,13 +385,14 @@ class Result(BaseModel):
     the pipeline execution.
     """
 
-    # TODO: Add running ID to this result dataclass.
-    # ---
-    # parent_run_id: str
-    # run_id: str
-    #
     status: int = Field(default=2)
     context: DictData = Field(default_factory=dict)
+
+    # NOTE: Ignore this field to compare another result model with __eq__.
+    run_id: str = Field(
+        default_factory=partial(gen_id, "manual", unique=True),
+        repr=False,
+    )
 
     def receive(self, result: Result) -> Result:
         self.__dict__["status"] = result.status
@@ -404,6 +407,14 @@ class Result(BaseModel):
         return self
 
 
+class ReContext(BaseModel):
+    """Context Pydantic Model"""
+
+    params: dict = Field(default_factory=dict)
+    jobs: dict = Field(default_factory=dict)
+    error: dict = Field(default_factory=dict)
+
+
 class ReResult(BaseModel):
     """Result Pydantic Model for passing parameter and receiving output from
     the pipeline execution.
@@ -415,7 +426,7 @@ class ReResult(BaseModel):
     # run_id: str
     #
     status: int = Field(default=2)
-    context: Context = Field(default_factory=Context)
+    context: ReContext = Field(default_factory=Context)
 
     def receive(self, result: ReResult) -> ReResult:
         self.__dict__["status"] = result.status

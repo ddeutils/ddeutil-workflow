@@ -3,8 +3,10 @@ from ddeutil.workflow.utils import ReResult, Result
 
 def test_result_default():
     rs = Result()
+    rs2 = Result()
     assert 2 == rs.status
     assert {} == rs.context
+    assert rs == rs2
 
 
 def test_result_context():

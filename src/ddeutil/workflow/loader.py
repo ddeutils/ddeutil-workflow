@@ -35,7 +35,7 @@ class SimLoad:
         self,
         name: str,
         params: ConfParams,
-        externals: DictData,
+        externals: DictData | None = None,
     ) -> None:
         self.data: DictData = {}
         for file in PathSearch(params.engine.paths.conf).files:
@@ -54,7 +54,8 @@ class SimLoad:
         #       type: pipeline.Pipeline
         #
         self.conf_params: ConfParams = params
-        self.externals: DictData = externals
+        self.externals: DictData = externals or {}
+        self.data.update(self.externals)
 
     @cached_property
     def type(self) -> AnyModelType:

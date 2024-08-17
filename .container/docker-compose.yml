@@ -1,0 +1,9 @@
+version: "3.8"
+services:
+  app:
+    build: .
+    image: ddeutil-workflow:latest
+    volumes:
+      - ../conf:/home/workflow/conf
+#    stdin_open: true
+#    tty: true

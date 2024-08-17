@@ -42,6 +42,7 @@ except ImportError:
 from ddeutil.core import str2bool
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
+from typing_extensions import Self
 
 from .__types import DictData, DictStr, Re, TupleStr
 from .exceptions import StageException
@@ -139,6 +140,9 @@ class BaseStage(BaseModel, ABC):
             )
 
         return self
+
+    def get_running_id(self, run_id: str) -> Self:
+        return self.model_copy(update={"run_id": run_id})
 
     @abstractmethod
     def execute(self, params: DictData) -> Result:
@@ -539,11 +543,13 @@ class TriggerStage(BaseStage):
 
         # NOTE: Loading pipeline object from trigger name.
         _trigger: str = param2template(self.trigger, params=params)
-        pipe: Pipeline = Pipeline.from_loader(name=_trigger, externals={})
 
-        # NOTE: Set running pipeline ID from running stage ID.
-        pipe.run_id = self.run_id
-
+        # NOTE: Set running pipeline ID from running stage ID to external
+        #   params on Loader object.
+        pipe: Pipeline = Pipeline.from_loader(
+            name=_trigger, externals={"run_id": self.run_id}
+        )
+        logging.info(f"({self.run_id}) [STAGE]: Trigger-Execute: {_trigger!r}")
         return pipe.execute(params=param2template(self.params, params))
 
 
