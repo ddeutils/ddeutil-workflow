@@ -44,6 +44,7 @@ from .exceptions import (
     UtilException,
 )
 from .loader import Loader
+from .log import FileLog, Log
 from .on import On
 from .scheduler import CronRunner
 from .stage import Stage
@@ -680,30 +681,43 @@ class Pipeline(BaseModel):
         params: DictData | None = None,
         *,
         waiting_sec: int = 600,
-        sleep_interval: int = 10,
+        sleep_interval: int = 20,
+        log: Log = None,
     ) -> Result:
         """Start running pipeline with the on schedule in period of 30 minutes.
         That mean it will still running at background 30 minutes until the
         schedule matching with its time.
         """
         params: DictData = params or {}
-        logging.info(f"[CORE] Start release: {self.name!r} : {on.cronjob}")
+        log: Log = log or FileLog
+        logging.info(
+            f"({self.run_id}) [CORE]: {self.name!r} : "
+            f"{on.cronjob} : Start release"
+        )
+
+        # TODO: Can it able to use the latest release from logging?
         gen: CronRunner = on.generate(datetime.now())
         tz: ZoneInfo = gen.tz
 
         # NOTE: get next schedule time that generate from now.
         next_running_time: datetime = gen.next
 
+        # NOTE: get next utils it does not logging.
+        while log.is_pointed(self.name, next_running_time):
+            next_running_time: datetime = gen.next
+
         # VALIDATE: Check the different time between the next schedule time and
         #   now that less than waiting period (second unit).
         if get_diff_sec(next_running_time, tz=tz) < waiting_sec:
             logging.debug(
-                f"({self.run_id}) [CORE]: {self.name} closely to run >> "
-                f"{next_running_time:%Y-%m-%d %H:%M:%S}"
+                f"({self.run_id}) [CORE]: {self.name!r} : {on.cronjob} : "
+                f"Closely to run >> {next_running_time:%Y-%m-%d %H:%M:%S}"
             )
 
             # NOTE: Release when the time is nearly to schedule time.
-            while (duration := get_diff_sec(next_running_time, tz=tz)) > 15:
+            while (duration := get_diff_sec(next_running_time, tz=tz)) > (
+                sleep_interval + 5
+            ):
                 time.sleep(sleep_interval)
                 logging.debug(
                     f"({self.run_id}) [CORE]: {self.name!r} : "
@@ -716,7 +730,7 @@ class Pipeline(BaseModel):
             #   templating.
             release_params: DictData = {
                 "release": {
-                    "logical_date": datetime.now(tz=tz),
+                    "logical_date": next_running_time,
                 },
             }
 
@@ -726,11 +740,25 @@ class Pipeline(BaseModel):
             rs: Result = pipeline.execute(
                 params=param2template(params, release_params),
             )
-            logging.debug(f"({pipeline.run_id}) [CORE]: {rs.context}")
+            logging.debug(
+                f"({pipeline.run_id}) [CORE]: {self.name!r} : {on.cronjob} : "
+                f"End release"
+            )
 
             del pipeline
 
             rs.parent_run_id = self.run_id
+            rs_log: Log = log.model_validate(
+                {
+                    "name": self.name,
+                    "on": str(on.cronjob),
+                    "release": next_running_time,
+                    "context": rs.context,
+                    "parent_run_id": rs.run_id,
+                    "run_id": rs.run_id,
+                }
+            )
+            rs_log.save()
             return rs
         return Result(status=0, context=params)
 
@@ -757,7 +785,7 @@ class Pipeline(BaseModel):
             # TODO: Can this parameter able to generate when it run by the app
             #   schedule.
             futures: list[Future] = [
-                executor.submit(self.release, on, params=params)
+                executor.submit(self.release, on, params=params, log=FileLog)
                 for on in self.on
             ]
             for future in as_completed(futures):
@@ -878,6 +906,10 @@ class Pipeline(BaseModel):
     ) -> Result:
         """Pipeline threading execution."""
         not_time_out_flag: bool = True
+        logging.debug(
+            f"({self.run_id}): [CORE]: Run {self.name} with threading job "
+            f"executor"
+        )
 
         # IMPORTANT: The job execution can run parallel and waiting by
         #   needed.
@@ -930,7 +962,10 @@ class Pipeline(BaseModel):
     ) -> Result:
         """Pipeline non-threading execution."""
         not_time_out_flag: bool = True
-        logging.info(f"[CORE]: Run {self.name} with non-threading job executor")
+        logging.debug(
+            f"({self.run_id}): [CORE]: Run {self.name} with non-threading job "
+            f"executor"
+        )
         while not job_queue.empty() and (
             not_time_out_flag := ((time.monotonic() - ts) < timeout)
         ):

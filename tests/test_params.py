@@ -6,5 +6,8 @@ def test_params_str():
     rs = str_params.receive("foo")
     assert rs == "foo"
 
+    rs = str_params.receive(None)
+    assert rs is None
+
     rs = str_params.receive(10)
     assert rs == "10"
