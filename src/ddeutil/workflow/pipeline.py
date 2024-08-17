@@ -56,6 +56,7 @@ from .utils import (
     gen_id,
     get_diff_sec,
     has_template,
+    param2template,
 )
 
 __all__: TupleStr = (
@@ -534,7 +535,7 @@ class Pipeline(BaseModel):
     )
 
     @property
-    def gen_run_id(self) -> str:
+    def new_run_id(self) -> str:
         """Running ID of this pipeline that always generate new unique value."""
         return gen_id(self.name, unique=True)
 
@@ -616,7 +617,7 @@ class Pipeline(BaseModel):
             self.jobs[job].id = job
 
         if self.run_id is None:
-            self.run_id = self.gen_run_id
+            self.run_id = self.new_run_id
 
         # VALIDATE: Validate pipeline name should not dynamic with params
         #   template.
@@ -624,6 +625,9 @@ class Pipeline(BaseModel):
             raise ValueError("Pipeline name should not has any template.")
 
         return self
+
+    def get_running_id(self, run_id: str) -> Self:
+        return self.model_copy(update={"run_id": run_id})
 
     def job(self, name: str) -> Job:
         """Return Job model that exists on this pipeline.
@@ -686,11 +690,15 @@ class Pipeline(BaseModel):
         logging.info(f"[CORE] Start release: {self.name!r} : {on.cronjob}")
         gen: CronRunner = on.generate(datetime.now())
         tz: ZoneInfo = gen.tz
+
+        # NOTE: get next schedule time that generate from now.
         next_running_time: datetime = gen.next
 
+        # VALIDATE: Check the different time between the next schedule time and
+        #   now that less than waiting period (second unit).
         if get_diff_sec(next_running_time, tz=tz) < waiting_sec:
             logging.debug(
-                f"[CORE]: {self.name} closely to run >> "
+                f"({self.run_id}) [CORE]: {self.name} closely to run >> "
                 f"{next_running_time:%Y-%m-%d %H:%M:%S}"
             )
 
@@ -698,12 +706,31 @@ class Pipeline(BaseModel):
             while (duration := get_diff_sec(next_running_time, tz=tz)) > 15:
                 time.sleep(sleep_interval)
                 logging.debug(
-                    f"[CORE]: {self.name!r} : Sleep until: {duration}"
+                    f"({self.run_id}) [CORE]: {self.name!r} : "
+                    f"Sleep until: {duration}"
                 )
 
             time.sleep(0.5)
-            rs: Result = self.execute(params=params)
-            logging.debug(f"[CORE]: {rs.context}")
+
+            # NOTE: Release parameter that use to change if params has
+            #   templating.
+            release_params: DictData = {
+                "release": {
+                    "logical_date": datetime.now(tz=tz),
+                },
+            }
+
+            # WARNING: Re-create pipeline object that use new running pipeline
+            #   ID.
+            pipeline: Self = self.get_running_id(run_id=self.new_run_id)
+            rs: Result = pipeline.execute(
+                params=param2template(params, release_params),
+            )
+            logging.debug(f"({pipeline.run_id}) [CORE]: {rs.context}")
+
+            del pipeline
+
+            rs.parent_run_id = self.run_id
             return rs
         return Result(status=0, context=params)
 
@@ -716,11 +743,12 @@ class Pipeline(BaseModel):
         :rtype: list[Result]
         """
         params: DictData = params or {}
-        logging.info(
-            f"[CORE]: Start Poking: {self.name!r} :"
-            f"{gen_id(self.name, unique=True)}"
-        )
-        results = []
+        logging.info(f"({self.run_id}) [CORE]: Start Poking: {self.name!r} ...")
+        results: list[Result] = []
+
+        if len(self.on) == 0:
+            return results
+
         with ThreadPoolExecutor(
             max_workers=int(
                 os.getenv("WORKFLOW_CORE_MAX_PIPELINE_POKING", "4")
@@ -729,16 +757,12 @@ class Pipeline(BaseModel):
             # TODO: Can this parameter able to generate when it run by the app
             #   schedule.
             futures: list[Future] = [
-                executor.submit(
-                    self.release,
-                    on,
-                    params=params,
-                )
+                executor.submit(self.release, on, params=params)
                 for on in self.on
             ]
             for future in as_completed(futures):
-                rs = future.result()
-                logging.info(rs)
+                rs: Result = future.result()
+                logging.info(rs.context["params"])
                 results.append(rs)
         return results
 

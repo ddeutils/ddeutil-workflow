@@ -43,14 +43,14 @@ pipe-condition-raise:
 pipe-scheduling:
   type: pipeline.Pipeline
   on:
-    - 'every_5_minute_bkk'
+#    - 'every_5_minute_bkk'
     - 'every_2_minute_bkk'
-    - 'every_hour_bkk'
+#    - 'every_hour_bkk'
   params:
-    name: str
+    asat-dt: datetime
   jobs:
     condition-job:
       stages:
         - name: "Empty stage"
         - name: "Call-out"
-          echo: "Hello ${{ params.name | upper }}"
+          echo: "Hello ${{ params.asat-dt | fmt('%Y-%m-%d') }}"

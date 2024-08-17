@@ -370,16 +370,6 @@ Param = Union[
 ]
 
 
-class Context(BaseModel):
-    """Context Pydantic Model that use to passing context data between workflow
-    objects such as Pipeline, Job, and Stage.
-    """
-
-    params: dict = Field(default_factory=dict)
-    jobs: dict = Field(default_factory=dict)
-    error: dict = Field(default_factory=dict)
-
-
 class Result(BaseModel):
     """Result Pydantic Model for passing parameter and receiving output from
     the pipeline execution.
@@ -389,6 +379,10 @@ class Result(BaseModel):
     context: DictData = Field(default_factory=dict)
 
     # NOTE: Ignore this field to compare another result model with __eq__.
+    parent_run_id: Optional[str] = Field(
+        default=None,
+        repr=False,
+    )
     run_id: str = Field(
         default_factory=partial(gen_id, "manual", unique=True),
         repr=False,
@@ -397,13 +391,20 @@ class Result(BaseModel):
     def receive(self, result: Result) -> Result:
         self.__dict__["status"] = result.status
         self.__dict__["context"].update(result.context)
+        self.__dict__["parent_run_id"] = result.parent_run_id
+        self.__dict__["run_id"] = result.run_id
         return self
 
     def receive_jobs(self, result: Result) -> Result:
         self.__dict__["status"] = result.status
+
+        # NOTE: Check the context has jobs key.
         if "jobs" not in self.__dict__["context"]:
             self.__dict__["context"]["jobs"] = {}
+
         self.__dict__["context"]["jobs"].update(result.context)
+        self.__dict__["parent_run_id"] = result.parent_run_id
+        self.__dict__["run_id"] = result.run_id
         return self
 
 
@@ -426,7 +427,7 @@ class ReResult(BaseModel):
     # run_id: str
     #
     status: int = Field(default=2)
-    context: ReContext = Field(default_factory=Context)
+    context: ReContext = Field(default_factory=ReContext)
 
     def receive(self, result: ReResult) -> ReResult:
         self.__dict__["status"] = result.status

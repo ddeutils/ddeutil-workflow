@@ -44,7 +44,7 @@ pipe-run-matrix-fail-fast:
   type: pipeline.Pipeline
   on:
 #    - 'every_5_minute_bkk'
-#    - 'every_2_minute_bkk'
+    - 'every_2_minute_bkk'
     - cronjob: '* * * * *'
       timezone: "Asia/Bangkok"
   params:
@@ -72,4 +72,4 @@ pipe-run-matrix-fail-fast:
         - name: Extract & Load Multi-System
           run: |
             if ${{ matrix.partition }} == 1:
-              raise ValueError
+              raise ValueError('Value of partition matrix was equaled 1.')
