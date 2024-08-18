@@ -30,7 +30,7 @@ except ImportError:
 from ddeutil.core import getdot, hasdot, hash_str, import_string, lazy, str2bool
 from ddeutil.io import PathData, search_env_replace
 from ddeutil.io.models.lineage import dt_now
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
@@ -379,20 +379,36 @@ class Result(BaseModel):
     context: DictData = Field(default_factory=dict)
 
     # NOTE: Ignore this field to compare another result model with __eq__.
-    parent_run_id: Optional[str] = Field(
+    _parent_run_id: Optional[str] = PrivateAttr(
         default=None,
-        repr=False,
+        # repr=False,
     )
-    run_id: str = Field(
+    _run_id: str = PrivateAttr(
         default_factory=partial(gen_id, "manual", unique=True),
-        repr=False,
+        # repr=False,
     )
+
+    def set_run_id(self, running_id: str) -> Self:
+        self._run_id = running_id
+        return self
+
+    def set_parent_run_id(self, running_id: str) -> Self:
+        self._parent_run_id = running_id
+        return self
+
+    @property
+    def parent_run_id(self):
+        return self._parent_run_id
+
+    @property
+    def run_id(self):
+        return self._run_id
 
     def receive(self, result: Result) -> Result:
         self.__dict__["status"] = result.status
         self.__dict__["context"].update(result.context)
-        self.__dict__["parent_run_id"] = result.parent_run_id
-        self.__dict__["run_id"] = result.run_id
+        self.__dict__["_parent_run_id"] = result.parent_run_id
+        self.__dict__["_run_id"] = result.run_id
         return self
 
     def receive_jobs(self, result: Result) -> Result:
@@ -403,8 +419,8 @@ class Result(BaseModel):
             self.__dict__["context"]["jobs"] = {}
 
         self.__dict__["context"]["jobs"].update(result.context)
-        self.__dict__["parent_run_id"] = result.parent_run_id
-        self.__dict__["run_id"] = result.run_id
+        self.__dict__["_parent_run_id"] = result.parent_run_id
+        self.__dict__["_run_id"] = result.run_id
         return self
 
 

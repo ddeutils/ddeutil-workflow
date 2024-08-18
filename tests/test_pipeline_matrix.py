@@ -55,7 +55,7 @@ def test_pipe_job_matrix():
         "table": ["customer", "sales"],
         "partition": [1, 2, 3],
     } == multi_sys.strategy.matrix
-    assert 2 == multi_sys.strategy.max_parallel
+    assert 4 == multi_sys.strategy.max_parallel
     assert [
         {"partition": 4, "system": "csv", "table": "customer"},
     ] == multi_sys.strategy.include

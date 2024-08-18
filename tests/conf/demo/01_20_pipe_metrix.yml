@@ -6,7 +6,7 @@ pipe-run-matrix:
   jobs:
     multiple-system:
       strategy:
-        max-parallel: 2
+        max-parallel: 4
         fail-fast: true
         matrix:
           table: ['customer', 'sales']
@@ -52,7 +52,7 @@ pipe-run-matrix-fail-fast:
   jobs:
     multiple-system:
       strategy:
-        max-parallel: 2
+        max-parallel: 4
 #        fail-fast: true
         matrix:
           table: [ 'customer', 'sales' ]

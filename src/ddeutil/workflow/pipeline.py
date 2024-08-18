@@ -12,16 +12,15 @@ import time
 from concurrent.futures import (
     FIRST_EXCEPTION,
     Future,
-    ProcessPoolExecutor,
     ThreadPoolExecutor,
     as_completed,
     wait,
 )
 from datetime import datetime
-from multiprocessing import Event, Manager
 from pickle import PickleError
 from queue import Queue
 from textwrap import dedent
+from threading import Event
 from typing import Optional
 from zoneinfo import ZoneInfo
 
@@ -327,7 +326,8 @@ class Job(BaseModel):
                     context={
                         gen_id(strategy): {
                             "matrix": strategy,
-                            "stages": filter_func(context.pop("stages", {})),
+                            # "stages": filter_func(context.pop("stages", {})),
+                            "stages": context.pop("stages", {}),
                             "error": {
                                 "message": (
                                     "Process Event stopped before execution"
@@ -388,34 +388,52 @@ class Job(BaseModel):
                 context=strategy_context,
             )
 
-        # WARNING: (WF001) I got error that raise when use
-        #  ``ProcessPoolExecutor``;
-        #   ---
-        #   _pickle.PicklingError: Can't pickle
-        #       <function ??? at 0x000001F0BE80F160>: attribute lookup ???
-        #       on ddeutil.workflow.stage failed
+        # # WARNING: (WF001) I got error that raise when use
+        # #  ``ProcessPoolExecutor``;
+        # #   ---
+        # #   _pickle.PicklingError: Can't pickle
+        # #       <function ??? at 0x000001F0BE80F160>: attribute lookup ???
+        # #       on ddeutil.workflow.stage failed
+        # #
+        # # from multiprocessing import Event, Manager
+        # with Manager() as manager:
+        #     event: Event = manager.Event()
         #
-        with Manager() as manager:
-            event: Event = manager.Event()
-
-            # NOTE: Start process pool executor for running strategy executor in
-            #   parallel mode.
-            with ProcessPoolExecutor(
-                max_workers=self.strategy.max_parallel
-            ) as executor:
-                features: list[Future] = [
-                    executor.submit(
-                        self.strategy_execute,
-                        strategy,
-                        params=copy.deepcopy(params),
-                        event=event,
-                    )
-                    for strategy in self.strategy.make()
-                ]
-                if self.strategy.fail_fast:
-                    rs = self.__catch_fail_fast(event, features)
-                else:
-                    rs = self.__catch_all_completed(features)
+        #     # NOTE: Start process pool executor for running strategy executor
+        #     #   in parallel mode.
+        #     with ProcessPoolExecutor(
+        #         max_workers=self.strategy.max_parallel
+        #     ) as executor:
+        #         features: list[Future] = [
+        #             executor.submit(
+        #                 self.strategy_execute,
+        #                 strategy,
+        #                 params=copy.deepcopy(params),
+        #                 event=event,
+        #             )
+        #             for strategy in self.strategy.make()
+        #         ]
+        #         if self.strategy.fail_fast:
+        #             rs = self.__catch_fail_fast(event, features)
+        #         else:
+        #             rs = self.__catch_all_completed(features)
+        event: Event = Event()
+        with ThreadPoolExecutor(
+            max_workers=self.strategy.max_parallel
+        ) as executor:
+            features: list[Future] = [
+                executor.submit(
+                    self.strategy_execute,
+                    strategy,
+                    params=copy.deepcopy(params),
+                    event=event,
+                )
+                for strategy in self.strategy.make()
+            ]
+            if self.strategy.fail_fast:
+                rs = self.__catch_fail_fast(event, features)
+            else:
+                rs = self.__catch_all_completed(features)
         return Result(
             status=0,
             context=rs.context,
@@ -747,7 +765,7 @@ class Pipeline(BaseModel):
 
             del pipeline
 
-            rs.parent_run_id = self.run_id
+            rs.set_parent_run_id(self.run_id)
             rs_log: Log = log.model_validate(
                 {
                     "name": self.name,
@@ -878,7 +896,7 @@ class Pipeline(BaseModel):
         rs: Result = Result(context=self.parameterize(params))
         try:
             rs.receive(
-                self.__exec_non_threading(rs, jq, ts, timeout=timeout)
+                self.__exec_non_threading(rs, ts, timeout=timeout)
                 if (
                     worker := int(
                         os.getenv("WORKFLOW_CORE_MAX_JOB_PARALLEL", "1")
@@ -886,7 +904,7 @@ class Pipeline(BaseModel):
                 )
                 == 1
                 else self.__exec_threading(
-                    rs, jq, ts, worker=worker, timeout=timeout
+                    rs, ts, worker=worker, timeout=timeout
                 )
             )
             return rs
@@ -898,7 +916,6 @@ class Pipeline(BaseModel):
     def __exec_threading(
         self,
         rs: Result,
-        job_queue: Queue,
         ts: float,
         *,
         worker: int = 1,
@@ -910,6 +927,12 @@ class Pipeline(BaseModel):
             f"({self.run_id}): [CORE]: Run {self.name} with threading job "
             f"executor"
         )
+
+        # NOTE: Create a job queue that keep the job that want to running after
+        #   it dependency condition.
+        job_queue: Queue = Queue()
+        for job_id in self.jobs:
+            job_queue.put(job_id)
 
         # IMPORTANT: The job execution can run parallel and waiting by
         #   needed.
@@ -933,6 +956,10 @@ class Pipeline(BaseModel):
                         params=copy.deepcopy(rs.context),
                     ),
                 )
+                job_queue.task_done()
+
+            # NOTE: Wait for all items to finish processing
+            job_queue.join()
 
             for future in as_completed(futures):
                 if err := future.exception():
@@ -955,7 +982,6 @@ class Pipeline(BaseModel):
     def __exec_non_threading(
         self,
         rs: Result,
-        job_queue: Queue,
         ts: float,
         *,
         timeout: int = 600,
@@ -966,6 +992,12 @@ class Pipeline(BaseModel):
             f"({self.run_id}): [CORE]: Run {self.name} with non-threading job "
             f"executor"
         )
+        # NOTE: Create a job queue that keep the job that want to running after
+        #   it dependency condition.
+        job_queue: Queue = Queue()
+        for job_id in self.jobs:
+            job_queue.put(job_id)
+
         while not job_queue.empty() and (
             not_time_out_flag := ((time.monotonic() - ts) < timeout)
         ):
@@ -981,6 +1013,10 @@ class Pipeline(BaseModel):
             # NOTE: Start job execution.
             job_rs = self.job_execute(job_id, params=copy.deepcopy(rs.context))
             rs.context["jobs"].update(job_rs.context)
+            job_queue.task_done()
+
+        # NOTE: Wait for all items to finish processing
+        job_queue.join()
 
         if not not_time_out_flag:
             logging.warning(

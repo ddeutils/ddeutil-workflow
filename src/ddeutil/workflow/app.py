@@ -37,16 +37,32 @@ def bad_task():
 
 @catch_exceptions(cancel_on_failure=True)
 def observe_pipeline_able_to_poke():
+    # TODO: Get the pipeline
+    #   >>> for chunk of pipelines:
+    #   ...     executor.submit(func, chuck)
+    #   ---
+    #   This function will multithread to running pipeline poke method.
+    #
     return True
 
 
-schedule.every(5).seconds.do(bad_task)
-schedule.every(1).minutes.do(observe_pipeline_able_to_poke)
+def task_sleep_more_than_interval():
+    import threading
+    from datetime import datetime
+
+    time.sleep(3)
+    n = datetime.now()
+    print(f"{n:%Y-%m-%d %H:%M:%S} This running on: {threading.get_ident()}")
+
+
+# schedule.every(5).seconds.do(bad_task)
+schedule.every(2).seconds.do(task_sleep_more_than_interval)
+# schedule.every(1).minutes.do(observe_pipeline_able_to_poke)
 
 
 if __name__ == "__main__":
     while True:
         schedule.run_pending()
-        time.sleep(1)
+        # time.sleep(1)
         if not schedule.get_jobs():
             break
