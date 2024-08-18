@@ -5,6 +5,7 @@
 # ------------------------------------------------------------------------------
 from __future__ import annotations
 
+from collections.abc import Iterator
 from functools import cached_property
 from typing import TypeVar
 
@@ -39,7 +40,7 @@ class SimLoad:
     ) -> None:
         self.data: DictData = {}
         for file in PathSearch(params.engine.paths.conf).files:
-            if any(file.suffix.endswith(s) for s in ("yml", "yaml")) and (
+            if any(file.suffix.endswith(s) for s in (".yml", ".yaml")) and (
                 data := YamlFlResolve(file).read().get(name, {})
             ):
                 self.data = data
@@ -57,6 +58,39 @@ class SimLoad:
         self.externals: DictData = externals or {}
         self.data.update(self.externals)
 
+    @classmethod
+    def find(
+        cls,
+        obj: object,
+        params: ConfParams,
+        include: list[str] | None = None,
+    ) -> Iterator[tuple[str, DictData]]:
+        """Find all object"""
+        for file in PathSearch(params.engine.paths.conf).files:
+            if any(file.suffix.endswith(s) for s in (".yml", ".yaml")) and (
+                values := YamlFlResolve(file).read()
+            ):
+                for key, data in values.items():
+                    if (
+                        (t := data.get("type"))
+                        and issubclass(cls.get_type(t, params), obj)
+                        and all(i in data for i in (include or data.keys()))
+                    ):
+                        yield key, data
+
+    @classmethod
+    def get_type(cls, t: str, params: ConfParams) -> AnyModelType:
+        try:
+            # NOTE: Auto adding module prefix if it does not set
+            return import_string(f"ddeutil.workflow.{t}")
+        except ModuleNotFoundError:
+            for registry in params.engine.registry:
+                try:
+                    return import_string(f"{registry}.{t}")
+                except ModuleNotFoundError:
+                    continue
+            return import_string(f"{t}")
+
     @cached_property
     def type(self) -> AnyModelType:
         """Return object of string type which implement on any registry. The
@@ -66,16 +100,7 @@ class SimLoad:
             raise ValueError(
                 f"the 'type' value: {_typ} does not exists in config data."
             )
-        try:
-            # NOTE: Auto adding module prefix if it does not set
-            return import_string(f"ddeutil.workflow.{_typ}")
-        except ModuleNotFoundError:
-            for registry in self.conf_params.engine.registry:
-                try:
-                    return import_string(f"{registry}.{_typ}")
-                except ModuleNotFoundError:
-                    continue
-            return import_string(f"{_typ}")
+        return self.get_type(_typ, self.conf_params)
 
 
 class Loader(SimLoad):
@@ -84,6 +109,16 @@ class Loader(SimLoad):
     :param name: A name of config data that will read by Yaml Loader object.
     :param externals: An external parameters
     """
+
+    @classmethod
+    def find(
+        cls,
+        obj,
+        *,
+        include: list[str] | None = None,
+        **kwargs,
+    ) -> DictData:
+        return super().find(obj=obj, params=config(), include=include)
 
     def __init__(self, name: str, externals: DictData) -> None:
         super().__init__(name, config(), externals)

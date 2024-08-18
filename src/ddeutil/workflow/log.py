@@ -13,6 +13,7 @@ from datetime import datetime
 
 # from functools import lru_cache
 from pathlib import Path
+from queue import PriorityQueue
 from typing import Optional, Union
 
 from pydantic import BaseModel, Field
@@ -73,11 +74,33 @@ class FileLog(BaseLog):
         self.pointer().mkdir(parents=True, exist_ok=True)
 
     @classmethod
-    def is_pointed(cls, name: str, release: datetime) -> bool:
+    def is_pointed(
+        cls,
+        name: str,
+        release: datetime,
+        *,
+        q: PriorityQueue | None = None,
+    ) -> bool:
         """Check this log already point."""
-        return (
+        if q is None:
+            return (
+                config().engine.paths.root
+                / f"./logs/{name}/{release:%Y%m%d%H%M%S}"
+            ).exists()
+
+        if (
             config().engine.paths.root / f"./logs/{name}/{release:%Y%m%d%H%M%S}"
-        ).exists()
+        ).exists() and q.empty():
+            return True
+
+        if not q.empty():
+            latest = q.get()
+            q.put(latest)
+            if release == latest:
+                return True
+
+        q.put(release)
+        return False
 
     def pointer(self) -> Path:
         return (
@@ -97,4 +120,13 @@ class FileLog(BaseLog):
         )
 
 
-Log = Union[FileLog,]
+class SQLiteLog(BaseLog):
+
+    def save(self) -> None:
+        raise NotImplementedError("SQLiteLog does not implement yet.")
+
+
+Log = Union[
+    FileLog,
+    SQLiteLog,
+]

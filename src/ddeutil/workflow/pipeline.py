@@ -18,7 +18,7 @@ from concurrent.futures import (
 )
 from datetime import datetime
 from pickle import PickleError
-from queue import Queue
+from queue import PriorityQueue, Queue
 from textwrap import dedent
 from threading import Event
 from typing import Optional
@@ -407,7 +407,7 @@ class Job(BaseModel):
         #     with ProcessPoolExecutor(
         #         max_workers=self.strategy.max_parallel
         #     ) as executor:
-        #         features: list[Future] = [
+        #         futures: list[Future] = [
         #             executor.submit(
         #                 self.strategy_execute,
         #                 strategy,
@@ -417,9 +417,9 @@ class Job(BaseModel):
         #             for strategy in self.strategy.make()
         #         ]
         #         if self.strategy.fail_fast:
-        #             rs = self.__catch_fail_fast(event, features)
+        #             rs = self.__catch_fail_fast(event, futures)
         #         else:
-        #             rs = self.__catch_all_completed(features)
+        #             rs = self.__catch_all_completed(futures)
 
         # NOTE: Create event for cancel executor stop running.
         event: Event = Event()
@@ -427,7 +427,7 @@ class Job(BaseModel):
         with ThreadPoolExecutor(
             max_workers=self.strategy.max_parallel
         ) as executor:
-            features: list[Future] = [
+            futures: list[Future] = [
                 executor.submit(
                     self.strategy_execute,
                     strategy,
@@ -437,28 +437,28 @@ class Job(BaseModel):
                 for strategy in self.strategy.make()
             ]
             if self.strategy.fail_fast:
-                rs: Result = self.__catch_fail_fast(event, features)
+                rs: Result = self.__catch_fail_fast(event, futures)
             else:
-                rs: Result = self.__catch_all_completed(features)
+                rs: Result = self.__catch_all_completed(futures)
         return Result(
             status=0,
             context=rs.context,
         )
 
-    def __catch_fail_fast(self, event: Event, features: list[Future]) -> Result:
-        """Job parallel pool features catching with fail-fast mode. That will
-        stop all not done features if it receive the first exception from all
-        running features.
+    def __catch_fail_fast(self, event: Event, futures: list[Future]) -> Result:
+        """Job parallel pool futures catching with fail-fast mode. That will
+        stop all not done futures if it receive the first exception from all
+        running futures.
 
         :param event:
-        :param features: A list of features.
+        :param futures: A list of futures.
         :rtype: Result
         """
         strategy_context: DictData = {}
         # NOTE: Get results from a collection of tasks with a
         #   timeout that has the first exception.
         done, not_done = wait(
-            features, timeout=1800, return_when=FIRST_EXCEPTION
+            futures, timeout=1800, return_when=FIRST_EXCEPTION
         )
         nd: str = (
             f", the strategies do not run is {not_done}" if not_done else ""
@@ -469,37 +469,37 @@ class Job(BaseModel):
         event.set()
 
         # NOTE: Cancel any scheduled tasks
-        for future in features:
+        for future in futures:
             future.cancel()
 
         status: int = 0
-        for f in done:
-            if f.exception():
+        for future in done:
+            if future.exception():
                 status = 1
                 logging.error(
                     f"({self.run_id}) [JOB]: One stage failed with: "
-                    f"{f.exception()}, shutting down this feature."
+                    f"{future.exception()}, shutting down this future."
                 )
-            elif f.cancelled():
+            elif future.cancelled():
                 continue
             else:
-                rs: Result = f.result(timeout=60)
+                rs: Result = future.result(timeout=60)
                 strategy_context.update(rs.context)
         return Result(
             status=status,
             context=strategy_context,
         )
 
-    def __catch_all_completed(self, features: list[Future]) -> Result:
-        """Job parallel pool features catching with all-completed mode.
+    def __catch_all_completed(self, futures: list[Future]) -> Result:
+        """Job parallel pool futures catching with all-completed mode.
 
-        :param features: A list of features.
+        :param futures: A list of futures.
         """
         strategy_context: DictData = {}
         status: int = 0
-        for feature in as_completed(features):
+        for future in as_completed(futures):
             try:
-                rs: Result = feature.result(timeout=60)
+                rs: Result = future.result(timeout=60)
                 strategy_context.update(rs.context)
             except PickleError as err:
                 # NOTE: (WF001) I do not want to fix this issue because
@@ -512,8 +512,8 @@ class Job(BaseModel):
             except TimeoutError:
                 status = 1
                 logging.warning("Task is hanging. Attempting to kill.")
-                feature.cancel()
-                if not feature.cancelled():
+                future.cancel()
+                if not future.cancelled():
                     logging.warning("Failed to cancel the task.")
                 else:
                     logging.warning("Task canceled successfully.")
@@ -528,7 +528,7 @@ class Job(BaseModel):
 
 
 class Pipeline(BaseModel):
-    """Pipeline Model this is the main feature of this project because it use to
+    """Pipeline Model this is the main future of this project because it use to
     be workflow data for running everywhere that you want. It use lightweight
     coding line to execute it.
     """
@@ -707,6 +707,7 @@ class Pipeline(BaseModel):
         waiting_sec: int = 60,
         sleep_interval: int = 20,
         log: Log = None,
+        lq: PriorityQueue = None,
     ) -> Result:
         """Start running pipeline with the on schedule in period of 30 minutes.
         That mean it will still running at background 30 minutes until the
@@ -727,7 +728,7 @@ class Pipeline(BaseModel):
         next_running_time: datetime = gen.next
 
         # NOTE: get next utils it does not logging.
-        while log.is_pointed(self.name, next_running_time):
+        while log.is_pointed(self.name, next_running_time, q=lq):
             next_running_time: datetime = gen.next
 
         # VALIDATE: Check the different time between the next schedule time and
@@ -783,8 +784,21 @@ class Pipeline(BaseModel):
                 }
             )
             rs_log.save()
-            return rs
-        return Result(status=0, context=params)
+        else:
+            logging.debug(
+                f"({self.run_id}) [CORE]: {self.name!r} : {on.cronjob} : "
+                f"Does not closely >> {next_running_time:%Y-%m-%d %H:%M:%S}"
+            )
+            rs = Result(status=0, context={"params": params})
+
+        if lq is not None:
+            if next_running_time != (latest := lq.get()):
+                raise PipelineException(
+                    f"Logging queue failed on {next_running_time} because "
+                    f"the latest running is {latest}."
+                )
+            lq.task_done()
+        return rs
 
     def poke(self, params: DictData | None = None) -> list[Result]:
         """Poke pipeline with threading executor pool for executing with all its
@@ -797,6 +811,7 @@ class Pipeline(BaseModel):
         params: DictData = params or {}
         logging.info(f"({self.run_id}) [CORE]: Start Poking: {self.name!r} ...")
         results: list[Result] = []
+        log_queue: PriorityQueue = PriorityQueue()
 
         if len(self.on) == 0:
             return results
@@ -807,13 +822,22 @@ class Pipeline(BaseModel):
             ),
         ) as executor:
             futures: list[Future] = [
-                executor.submit(self.release, on, params=params, log=FileLog)
+                executor.submit(
+                    self.release,
+                    on,
+                    params=params,
+                    log=FileLog,
+                    lq=log_queue,
+                )
                 for on in self.on
             ]
             for future in as_completed(futures):
                 rs: Result = future.result()
-                logging.info(rs.context["params"])
+                logging.info(rs.context.get("params", {}))
                 results.append(rs)
+
+            log_queue.join()
+
         return results
 
     def job_execute(
