@@ -13,7 +13,7 @@ from abc import ABC, abstractmethod
 from ast import Call, Constant, Expr, Module, Name, parse
 from collections.abc import Iterator
 from datetime import date, datetime
-from functools import partial, wraps
+from functools import wraps
 from hashlib import md5
 from importlib import import_module
 from inspect import isfunction
@@ -379,14 +379,14 @@ class Result(BaseModel):
     context: DictData = Field(default_factory=dict)
 
     # NOTE: Ignore this field to compare another result model with __eq__.
-    _parent_run_id: Optional[str] = PrivateAttr(
-        default=None,
-        # repr=False,
-    )
-    _run_id: str = PrivateAttr(
-        default_factory=partial(gen_id, "manual", unique=True),
-        # repr=False,
-    )
+    _parent_run_id: Optional[str] = PrivateAttr(default=None)
+    _run_id: Optional[str] = PrivateAttr(default=None)
+
+    @model_validator(mode="after")
+    def __prepare_run_id(self):
+        if self._run_id is None:
+            self._run_id = gen_id("manual", unique=True)
+        return self
 
     def set_run_id(self, running_id: str) -> Self:
         self._run_id = running_id
@@ -421,34 +421,6 @@ class Result(BaseModel):
         self.__dict__["context"]["jobs"].update(result.context)
         self._parent_run_id = result.parent_run_id
         self._run_id = result.run_id
-        return self
-
-
-class ReContext(BaseModel):
-    """Context Pydantic Model"""
-
-    params: dict = Field(default_factory=dict)
-    jobs: dict = Field(default_factory=dict)
-    error: dict = Field(default_factory=dict)
-
-
-class ReResult(BaseModel):
-    """Result Pydantic Model for passing parameter and receiving output from
-    the pipeline execution.
-    """
-
-    # TODO: Add running ID to this result dataclass.
-    # ---
-    # parent_run_id: str
-    # run_id: str
-    #
-    status: int = Field(default=2)
-    context: ReContext = Field(default_factory=ReContext)
-
-    def receive(self, result: ReResult) -> ReResult:
-        self.__dict__["status"] = result.status
-        self.__dict__["context"].__dict__["jobs"].update(result.context.jobs)
-        self.__dict__["context"].__dict__["error"].update(result.context.error)
         return self
 
 

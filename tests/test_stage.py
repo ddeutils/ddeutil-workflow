@@ -24,7 +24,8 @@ def test_empty_stage():
     )
 
     rs: Result = stage.execute(params={})
-    assert Result(status=0) == rs
+    assert 0 == rs.status
+    assert {} == rs.context
 
     stage.run_id = "demo"
     assert "demo" == stage.run_id

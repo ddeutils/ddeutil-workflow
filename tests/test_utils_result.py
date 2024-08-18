@@ -1,12 +1,20 @@
-from ddeutil.workflow.utils import ReResult, Result
+import logging
+import time
+
+from ddeutil.workflow.utils import Result
 
 
 def test_result_default():
     rs = Result()
+
+    time.sleep(1)
+
     rs2 = Result()
+    logging.info(f"Run ID: {rs.run_id}, Parent Run ID: {rs.parent_run_id}")
+    logging.info(f"Run ID: {rs2.run_id}, Parent Run ID: {rs2.parent_run_id}")
     assert 2 == rs.status
     assert {} == rs.context
-    assert rs == rs2
+    assert rs != rs2
 
 
 def test_result_context():
@@ -22,24 +30,3 @@ def test_result_context():
         "params": {"source": "src", "target": "tgt"},
         "additional-key": "new-value-to-add",
     } == rs.context
-
-
-def test_re_result_context():
-    main_rs = ReResult()
-    print(main_rs)
-
-    sub_rs = ReResult(
-        status=1,
-        context={
-            "jobs": {
-                "first-job": {
-                    "stages": {
-                        "stage-id-1": {"outputs": {}},
-                    },
-                },
-            },
-        },
-    )
-    print(sub_rs)
-    main_rs.receive(sub_rs)
-    print(main_rs)

@@ -704,7 +704,7 @@ class Pipeline(BaseModel):
         on: On,
         params: DictData | None = None,
         *,
-        waiting_sec: int = 600,
+        waiting_sec: int = 60,
         sleep_interval: int = 20,
         log: Log = None,
     ) -> Result:

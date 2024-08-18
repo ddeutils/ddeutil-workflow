@@ -12,7 +12,8 @@ def test_stage_hook():
     stage: Stage = pipeline.job("second-job").stage("extract-load")
     rs: Result = stage.execute({})
 
-    assert Result(status=0, context={"records": 1}) == rs
+    assert 0 == rs.status
+    assert {"records": 1} == rs.context
 
 
 def test_stage_hook_raise_return_type():
