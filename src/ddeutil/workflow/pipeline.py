@@ -326,6 +326,9 @@ class Job(BaseModel):
                     context={
                         gen_id(strategy): {
                             "matrix": strategy,
+                            # NOTE: If job strategy executor use multithreading,
+                            #   it will not filter function object from context.
+                            # ---
                             # "stages": filter_func(context.pop("stages", {})),
                             "stages": context.pop("stages", {}),
                             "error": {
@@ -417,7 +420,10 @@ class Job(BaseModel):
         #             rs = self.__catch_fail_fast(event, features)
         #         else:
         #             rs = self.__catch_all_completed(features)
+
+        # NOTE: Create event for cancel executor stop running.
         event: Event = Event()
+
         with ThreadPoolExecutor(
             max_workers=self.strategy.max_parallel
         ) as executor:
@@ -431,9 +437,9 @@ class Job(BaseModel):
                 for strategy in self.strategy.make()
             ]
             if self.strategy.fail_fast:
-                rs = self.__catch_fail_fast(event, features)
+                rs: Result = self.__catch_fail_fast(event, features)
             else:
-                rs = self.__catch_all_completed(features)
+                rs: Result = self.__catch_all_completed(features)
         return Result(
             status=0,
             context=rs.context,
@@ -800,8 +806,6 @@ class Pipeline(BaseModel):
                 os.getenv("WORKFLOW_CORE_MAX_PIPELINE_POKING", "4")
             ),
         ) as executor:
-            # TODO: Can this parameter able to generate when it run by the app
-            #   schedule.
             futures: list[Future] = [
                 executor.submit(self.release, on, params=params, log=FileLog)
                 for on in self.on

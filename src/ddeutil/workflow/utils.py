@@ -407,8 +407,8 @@ class Result(BaseModel):
     def receive(self, result: Result) -> Result:
         self.__dict__["status"] = result.status
         self.__dict__["context"].update(result.context)
-        self.__dict__["_parent_run_id"] = result.parent_run_id
-        self.__dict__["_run_id"] = result.run_id
+        self._parent_run_id = result.parent_run_id
+        self._run_id = result.run_id
         return self
 
     def receive_jobs(self, result: Result) -> Result:
@@ -419,8 +419,8 @@ class Result(BaseModel):
             self.__dict__["context"]["jobs"] = {}
 
         self.__dict__["context"]["jobs"].update(result.context)
-        self.__dict__["_parent_run_id"] = result.parent_run_id
-        self.__dict__["_run_id"] = result.run_id
+        self._parent_run_id = result.parent_run_id
+        self._run_id = result.run_id
         return self
 
 
