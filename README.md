@@ -39,6 +39,11 @@ pipeline.
 > and all of config file from several data orchestration framework tools from my
 > experience on Data Engineer.
 
+**Rules of This Workflow engine**:
+
+1. Minimum unit of scheduling is 1 minute
+2. Cannot re-run only failed stage and its pending downstream
+
 ## Installation
 
 This project need `ddeutil-io` extension namespace packages. If you want to install
@@ -52,15 +57,15 @@ this package with application add-ons, you should add `app` in installation;
 
 
 > I added this feature to the main milestone.
-
-Docker image repository support:
-
-| Docker Image                | Python Version | Support |
-|-----------------------------|----------------|---------|
-| ddeutil-workflow:latest     | `3.9`          | :x:     |
-| ddeutil-workflow:python3.10 | `3.10`         | :x:     |
-| ddeutil-workflow:python3.11 | `3.11`         | :x:     |
-| ddeutil-workflow:python3.12 | `3.12`         | :x:     |
+>
+> **Docker Images** supported:
+>
+> | Docker Image                | Python Version | Support |
+> |-----------------------------|----------------|---------|
+> | ddeutil-workflow:latest     | `3.9`          | :x:     |
+> | ddeutil-workflow:python3.10 | `3.10`         | :x:     |
+> | ddeutil-workflow:python3.11 | `3.11`         | :x:     |
+> | ddeutil-workflow:python3.12 | `3.12`         | :x:     |
 
 ## Getting Started
 
