@@ -14,6 +14,7 @@
   - [Pipeline](#pipeline)
 - [Usage](#usage)
 - [Configuration](#configuration)
+- [Future](#future)
 - [Deployment](#deployment)
 
 The **Lightweight workflow orchestration** with less dependencies the was created
@@ -43,6 +44,8 @@ pipeline.
 
 1. Minimum unit of scheduling is 1 minute
 2. Cannot re-run only failed stage and its pending downstream
+3. All parallel tasks inside workflow engine use Threading
+   (Because Python 3.13 unlock GIL)
 
 ## Installation
 
@@ -195,10 +198,23 @@ run_py_local:
 
 **Application**:
 
-| Environment               | Default                                                | Description                                                        |
-|---------------------------|--------------------------------------------------------|--------------------------------------------------------------------|
-| `WORKFLOW_APP_DB_URL`     | postgresql+asyncpg://user:pass@localhost:5432/schedule | A Database URL that will pass to SQLAlchemy create_engine function |
-| `WORKFLOW_APP_INTERVAL`   | 10                                                     |                                                                    |
+| Environment                         | Default | Description |
+|-------------------------------------|---------|-------------|
+| `WORKFLOW_APP_PROCESS_WORKER`       | 2       |             |
+| `WORKFLOW_APP_PIPELINE_PER_PROCESS` | 100     |             |
+
+**API server**:
+
+| Environment           | Default                                                | Description                                                        |
+|-----------------------|--------------------------------------------------------|--------------------------------------------------------------------|
+| `WORKFLOW_API_DB_URL` | postgresql+asyncpg://user:pass@localhost:5432/schedule | A Database URL that will pass to SQLAlchemy create_engine function |
+
+## Future
+
+The current milestone that will develop and necessary features that should to
+implement on this project.
+
+- ...
 
 ## Deployment
 

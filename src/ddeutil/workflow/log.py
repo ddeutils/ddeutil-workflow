@@ -7,14 +7,14 @@ from __future__ import annotations
 
 import json
 import os
-
-# import logging
 from abc import ABC, abstractmethod
 from datetime import datetime
 
+# import logging
+from heapq import heappop, heappush
+
 # from functools import lru_cache
 from pathlib import Path
-from queue import PriorityQueue
 from typing import Optional, Union
 
 from ddeutil.core import str2bool
@@ -81,13 +81,13 @@ class FileLog(BaseLog):
         name: str,
         release: datetime,
         *,
-        q: PriorityQueue | None = None,
+        queue: list[datetime] | None = None,
     ) -> bool:
         """Check this log already point."""
         if not str2bool(os.getenv("WORKFLOW_LOG_ENABLE_WRITE", "false")):
             return False
 
-        if q is None:
+        if queue is None:
             return (
                 config().engine.paths.root
                 / f"./logs/{name}/{release:%Y%m%d%H%M%S}"
@@ -95,16 +95,15 @@ class FileLog(BaseLog):
 
         if (
             config().engine.paths.root / f"./logs/{name}/{release:%Y%m%d%H%M%S}"
-        ).exists() and q.empty():
+        ).exists() and not queue:
             return True
 
-        if not q.empty():
-            latest = q.get()
-            q.put(latest)
+        if queue:
+            latest: datetime = heappop(queue)
+            heappush(queue, latest)
             if release == latest:
                 return True
 
-        q.put(release)
         return False
 
     def pointer(self) -> Path:

@@ -44,3 +44,16 @@ def test_on_aws():
         externals={},
     )
     assert "Asia/Bangkok" == schedule.tz
+
+
+def test_on_every_minute():
+    schedule = On.from_loader(
+        name="every_minute_bkk",
+        externals={},
+    )
+    current: datetime = datetime(2024, 8, 1, 12, 5, 45)
+    adjust: datetime = current.replace(second=0, microsecond=0).astimezone(
+        tz=ZoneInfo(schedule.tz)
+    )
+    gen = schedule.generate(adjust)
+    print(f"{gen.next:%Y-%m-%d %H:%M:%S}")

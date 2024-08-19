@@ -63,14 +63,19 @@ class SimLoad:
         cls,
         obj: object,
         params: ConfParams,
+        *,
         include: list[str] | None = None,
+        exclude: list[str] | None = None,
     ) -> Iterator[tuple[str, DictData]]:
         """Find all object"""
+        exclude: list[str] = exclude or []
         for file in PathSearch(params.engine.paths.conf).files:
             if any(file.suffix.endswith(s) for s in (".yml", ".yaml")) and (
                 values := YamlFlResolve(file).read()
             ):
                 for key, data in values.items():
+                    if key in exclude:
+                        continue
                     if (
                         (t := data.get("type"))
                         and issubclass(cls.get_type(t, params), obj)
@@ -116,9 +121,12 @@ class Loader(SimLoad):
         obj,
         *,
         include: list[str] | None = None,
+        exclude: list[str] | None = None,
         **kwargs,
     ) -> DictData:
-        return super().find(obj=obj, params=config(), include=include)
+        return super().find(
+            obj=obj, params=config(), include=include, exclude=exclude
+        )
 
     def __init__(self, name: str, externals: DictData) -> None:
         super().__init__(name, config(), externals)

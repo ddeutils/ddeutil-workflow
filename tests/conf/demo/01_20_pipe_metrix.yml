@@ -6,7 +6,7 @@ pipe-run-matrix:
   jobs:
     multiple-system:
       strategy:
-        max-parallel: 4
+        max-parallel: 1
         fail-fast: true
         matrix:
           table: ['customer', 'sales']
@@ -40,6 +40,79 @@ pipe-run-matrix:
             passing_value: int = 10
 
 
+pipe-run-matrix-parallel:
+  type: pipeline.Pipeline
+  params:
+    source: str
+    target: str
+  jobs:
+    multiple-system:
+      strategy:
+        max-parallel: 4
+        fail-fast: true
+        matrix:
+          table: ['customer', 'sales']
+          system: ['csv']
+          partition: [1, 2, 3]
+        exclude:
+          - table: customer
+            system: csv
+            partition: 1
+          - table: sales
+            partition: 3
+        include:
+          - table: customer
+            system: csv
+            partition: 4
+      stages:
+        - name: Extract & Load Multi-System
+          uses: tasks/el-${{ matrix.system }}-to-parquet@polars-dir
+          id: ${{ matrix.table }}-${{ matrix.partition }}
+          with:
+            source:
+              conn: ${{ params.source }}
+              table: ${{ matrix.table }}
+            sink:
+              conn: ${{ params.target }}
+              endpoint: /raw/${{ matrix.table }}_${{ matrix.system }}
+
+        - name: End Stage
+          id: end-stage
+          run: |
+            passing_value: int = 10
+
+pipe-run-matrix-raise:
+  type: pipeline.Pipeline
+  on:
+    - 'every_2_minute_bkk'
+  params:
+    name: str
+  jobs:
+    multiple-system:
+      strategy:
+        max-parallel: 4
+        fail-fast: false
+        matrix:
+          table: [ 'customer', 'sales' ]
+          system: [ 'csv' ]
+          partition: [ 1, 2, 3 ]
+        exclude:
+          - table: customer
+            system: csv
+            partition: 1
+          - table: sales
+            partition: 3
+        include:
+          - table: customer
+            system: csv
+            partition: 4
+      stages:
+        - name: Extract & Load Multi-System
+          run: |
+            if ${{ matrix.partition }} == 1:
+              raise ValueError('Value of partition matrix was equaled 1.')
+
+
 pipe-run-matrix-fail-fast:
   type: pipeline.Pipeline
   on:
@@ -53,7 +126,7 @@ pipe-run-matrix-fail-fast:
     multiple-system:
       strategy:
         max-parallel: 4
-#        fail-fast: true
+        fail-fast: true
         matrix:
           table: [ 'customer', 'sales' ]
           system: [ 'csv' ]

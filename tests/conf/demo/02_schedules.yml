@@ -4,9 +4,21 @@ every_5_minute_bkk:
   timezone: "Asia/Bangkok"
 
 
+every_minute_bkk:
+  type: on.On
+  cronjob: "* * * * *"
+  timezone: "Asia/Bangkok"
+
+
 every_2_minute_bkk:
   type: on.On
   cronjob: "*/2 * * * *"
+  timezone: "Asia/Bangkok"
+
+
+every_3_minute_bkk:
+  type: on.On
+  cronjob: "*/3 * * * *"
   timezone: "Asia/Bangkok"
 
 

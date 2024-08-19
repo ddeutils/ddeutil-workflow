@@ -17,8 +17,9 @@ from concurrent.futures import (
     wait,
 )
 from datetime import datetime
+from heapq import heapify, heappop, heappush
 from pickle import PickleError
-from queue import PriorityQueue, Queue
+from queue import Queue
 from textwrap import dedent
 from threading import Event
 from typing import Optional
@@ -707,7 +708,7 @@ class Pipeline(BaseModel):
         waiting_sec: int = 60,
         sleep_interval: int = 20,
         log: Log = None,
-        lq: PriorityQueue = None,
+        lq: list[datetime] = None,
     ) -> Result:
         """Start running pipeline with the on schedule in period of 30 minutes.
         That mean it will still running at background 30 minutes until the
@@ -727,12 +728,16 @@ class Pipeline(BaseModel):
         next_running_time: datetime = gen.next
 
         # NOTE: get next utils it does not logging.
-        while log.is_pointed(self.name, next_running_time, q=lq):
+        # while log.is_pointed(self.name, next_running_time, queue=lq):
+        #     next_running_time: datetime = gen.next
+        while log.is_pointed(self.name, next_running_time, queue=lq):
             next_running_time: datetime = gen.next
+
+        heappush(lq, next_running_time)
 
         # VALIDATE: Check the different time between the next schedule time and
         #   now that less than waiting period (second unit).
-        if get_diff_sec(next_running_time, tz=tz) > waiting_sec:
+        if get_diff_sec(next_running_time, tz=tz) <= waiting_sec:
             logging.debug(
                 f"({self.run_id}) [CORE]: {self.name!r} : {on.cronjob} : "
                 f"Closely to run >> {next_running_time:%Y-%m-%d %H:%M:%S}"
@@ -743,7 +748,7 @@ class Pipeline(BaseModel):
                 sleep_interval + 5
             ):
                 logging.debug(
-                    f"({self.run_id}) [CORE]: {self.name!r} : "
+                    f"({self.run_id}) [CORE]: {self.name!r} : {on.cronjob} : "
                     f"Sleep until: {duration}"
                 )
                 time.sleep(sleep_interval)
@@ -795,19 +800,21 @@ class Pipeline(BaseModel):
 
         failed_check: bool = False
         put_back: list[datetime] = []
-        while latest := lq.get():
+
+        while latest := heappop(lq):
             if next_running_time == latest:
                 break
 
             elif next_running_time > latest:
                 put_back.append(latest)
 
-            if lq.empty():
+            if not lq:
                 failed_check = True
                 break
 
-        for p in put_back:
-            lq.put(p)
+        # NOTE: Put datetime back to log queue.
+        lq.extend(put_back)
+        heapify(lq)
 
         if failed_check:
             raise PipelineException(
@@ -828,8 +835,10 @@ class Pipeline(BaseModel):
         params: DictData = params or {}
         logging.info(f"({self.run_id}) [CORE]: Start Poking: {self.name!r} ...")
         results: list[Result] = []
-        log_queue: PriorityQueue = PriorityQueue()
+        log_queue: list[datetime] = []
 
+        # NOTE: If this pipeline does not set schedule, it will return empty
+        #   result.
         if len(self.on) == 0:
             return results
 
@@ -852,6 +861,12 @@ class Pipeline(BaseModel):
                 rs: Result = future.result()
                 logging.info(rs.context.get("params", {}))
                 results.append(rs)
+
+        if len(log_queue) > 0:
+            logging.error(
+                f"({self.run_id}) [CORE]: Log Queue does empty when poke "
+                f"is finishing."
+            )
 
         return results
 

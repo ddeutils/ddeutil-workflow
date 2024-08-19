@@ -9,6 +9,7 @@ import inspect
 import logging
 import os
 import stat
+import time
 from abc import ABC, abstractmethod
 from ast import Call, Constant, Expr, Module, Name, parse
 from collections.abc import Iterator
@@ -17,8 +18,9 @@ from functools import wraps
 from hashlib import md5
 from importlib import import_module
 from inspect import isfunction
-from itertools import product
+from itertools import chain, islice, product
 from pathlib import Path
+from random import randrange
 from typing import Any, Callable, Literal, Optional, Protocol, Union
 from zoneinfo import ZoneInfo
 
@@ -47,6 +49,13 @@ def get_diff_sec(dt: datetime, tz: ZoneInfo | None = None) -> int:
     return round(
         (dt - datetime.now(tz=(tz or ZoneInfo("UTC")))).total_seconds()
     )
+
+
+def delay() -> None:
+    """Delay time that use time.sleep with random second value between
+    0.00 - 0.99 seconds.
+    """
+    time.sleep(randrange(0, 99, step=10) / 100)
 
 
 class Engine(BaseModel):
@@ -738,3 +747,25 @@ def cross_product(matrix: Matrix) -> Iterator[DictData]:
             *[[{k: v} for v in vs] for k, vs in matrix.items()]
         )
     )
+
+
+def batch(iterable: Iterator[Any], n: int) -> Iterator[Any]:
+    """Batch data into iterators of length n. The last batch may be shorter.
+
+    Example:
+        >>> for b in batch('ABCDEFG', 3):
+        ...     print(list(b))
+        ['A', 'B', 'C']
+        ['D', 'E', 'F']
+        ['G']
+    """
+    if n < 1:
+        raise ValueError("n must be at least one")
+    it = iter(iterable)
+    while True:
+        chunk_it = islice(it, n)
+        try:
+            first_el = next(chunk_it)
+        except StopIteration:
+            return
+        yield chain((first_el,), chunk_it)

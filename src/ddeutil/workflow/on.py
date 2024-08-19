@@ -172,6 +172,14 @@ class On(BaseModel):
             start: datetime = datetime.fromisoformat(start)
         return self.cronjob.schedule(date=start, tz=self.tz)
 
+    def next(self, start: str | datetime) -> datetime:
+        """Return a next datetime from Cron runner object that start with any
+        date that given from input.
+        """
+        if not isinstance(start, datetime):
+            start: datetime = datetime.fromisoformat(start)
+        return self.cronjob.schedule(date=start, tz=self.tz).next
+
 
 class AwsOn(On):
     """Implement On AWS Schedule for AWS Service like AWS Glue."""
