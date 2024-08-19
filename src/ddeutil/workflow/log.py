@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import os
 
 # import logging
 from abc import ABC, abstractmethod
@@ -16,6 +17,7 @@ from pathlib import Path
 from queue import PriorityQueue
 from typing import Optional, Union
 
+from ddeutil.core import str2bool
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
 
@@ -54,12 +56,12 @@ class BaseLog(BaseModel, ABC):
 
     @model_validator(mode="after")
     def __model_action(self):
-        self.do_before()
+        if str2bool(os.getenv("WORKFLOW_LOG_ENABLE_WRITE", "false")):
+            self.do_before()
         return self
 
     def do_before(self) -> None:
         """To something before end up of initial log model."""
-        ...
 
     @abstractmethod
     def save(self) -> None:
@@ -82,6 +84,9 @@ class FileLog(BaseLog):
         q: PriorityQueue | None = None,
     ) -> bool:
         """Check this log already point."""
+        if not str2bool(os.getenv("WORKFLOW_LOG_ENABLE_WRITE", "false")):
+            return False
+
         if q is None:
             return (
                 config().engine.paths.root
@@ -110,6 +115,9 @@ class FileLog(BaseLog):
 
     def save(self) -> None:
         """Save logging data"""
+        if not str2bool(os.getenv("WORKFLOW_LOG_ENABLE_WRITE", "false")):
+            return
+
         log_file: Path = self.pointer() / f"{self.run_id}.log"
         log_file.write_text(
             json.dumps(

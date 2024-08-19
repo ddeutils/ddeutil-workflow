@@ -175,16 +175,17 @@ run_py_local:
 
 ## Configuration
 
-| Environment                          | Default                      | Description                                                                |
-|--------------------------------------|------------------------------|----------------------------------------------------------------------------|
-| `WORKFLOW_ROOT_PATH`                 | .                            | The root path of the workflow application                                  |
-| `WORKFLOW_CORE_REGISTRY`             | ddeutil.workflow,tests.utils | List of importable string for the hook stage                               |
-| `WORKFLOW_CORE_REGISTRY_FILTER`      | ddeutil.workflow.utils       | List of importable string for the filter template                          |
-| `WORKFLOW_CORE_PATH_CONF`            | conf                         | The config path that keep all template `.yaml` files                       |
-| `WORKFLOW_CORE_TIMEZONE`             | Asia/Bangkok                 | A Timezone string value that will pass to `ZoneInfo` object                |
-| `WORKFLOW_CORE_DEFAULT_STAGE_ID`     | true                         | A flag that enable default stage ID that use for catch an execution output |
-| `WORKFLOW_CORE_MAX_PIPELINE_POKING`  | 4                            |                                                                            |
-| `WORKFLOW_CORE_MAX_JOB_PARALLEL`     | 2                            |                                                                            |
+| Environment                         | Component | Default                      | Description                                                                |
+|-------------------------------------|-----------|------------------------------|----------------------------------------------------------------------------|
+| `WORKFLOW_ROOT_PATH`                | Core      | .                            | The root path of the workflow application                                  |
+| `WORKFLOW_CORE_REGISTRY`            | Core      | ddeutil.workflow,tests.utils | List of importable string for the hook stage                               |
+| `WORKFLOW_CORE_REGISTRY_FILTER`     | Core      | ddeutil.workflow.utils       | List of importable string for the filter template                          |
+| `WORKFLOW_CORE_PATH_CONF`           | Core      | conf                         | The config path that keep all template `.yaml` files                       |
+| `WORKFLOW_CORE_TIMEZONE`            | Core      | Asia/Bangkok                 | A Timezone string value that will pass to `ZoneInfo` object                |
+| `WORKFLOW_CORE_DEFAULT_STAGE_ID`    | Core      | true                         | A flag that enable default stage ID that use for catch an execution output |
+| `WORKFLOW_CORE_MAX_PIPELINE_POKING` | Core      | 4                            |                                                                            |
+| `WORKFLOW_CORE_MAX_JOB_PARALLEL`    | Core      | 2                            |                                                                            |
+| `WORKFLOW_LOG_ENABLE_WRITE`         | Logging   | true                         |                                                                            |
 
 
 **Application**:

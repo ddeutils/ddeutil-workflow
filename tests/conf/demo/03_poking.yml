@@ -1,8 +1,0 @@
-poke-batch-1:
-  pipelines:
-    - name: pipe-run-matrix-fail-fast
-      params:
-        name: FOO
-    - name: pipe-scheduling
-      params:
-        asat-dt: ${{ release.logical_date }}

@@ -702,7 +702,7 @@ class Pipeline(BaseModel):
     def release(
         self,
         on: On,
-        params: DictData | None = None,
+        params: DictData,
         *,
         waiting_sec: int = 60,
         sleep_interval: int = 20,
@@ -713,7 +713,6 @@ class Pipeline(BaseModel):
         That mean it will still running at background 30 minutes until the
         schedule matching with its time.
         """
-        params: DictData = params or {}
         log: Log = log or FileLog
         logging.info(
             f"({self.run_id}) [CORE]: {self.name!r} : "
@@ -733,7 +732,7 @@ class Pipeline(BaseModel):
 
         # VALIDATE: Check the different time between the next schedule time and
         #   now that less than waiting period (second unit).
-        if get_diff_sec(next_running_time, tz=tz) < waiting_sec:
+        if get_diff_sec(next_running_time, tz=tz) > waiting_sec:
             logging.debug(
                 f"({self.run_id}) [CORE]: {self.name!r} : {on.cronjob} : "
                 f"Closely to run >> {next_running_time:%Y-%m-%d %H:%M:%S}"
@@ -743,11 +742,11 @@ class Pipeline(BaseModel):
             while (duration := get_diff_sec(next_running_time, tz=tz)) > (
                 sleep_interval + 5
             ):
-                time.sleep(sleep_interval)
                 logging.debug(
                     f"({self.run_id}) [CORE]: {self.name!r} : "
                     f"Sleep until: {duration}"
                 )
+                time.sleep(sleep_interval)
 
             time.sleep(0.5)
 
@@ -791,13 +790,31 @@ class Pipeline(BaseModel):
             )
             rs = Result(status=0, context={"params": params})
 
-        if lq is not None:
-            if next_running_time != (latest := lq.get()):
-                raise PipelineException(
-                    f"Logging queue failed on {next_running_time} because "
-                    f"the latest running is {latest}."
-                )
-            lq.task_done()
+        if lq is None:
+            return rs
+
+        failed_check: bool = False
+        put_back: list[datetime] = []
+        while latest := lq.get():
+            if next_running_time == latest:
+                break
+
+            elif next_running_time > latest:
+                put_back.append(latest)
+
+            if lq.empty():
+                failed_check = True
+                break
+
+        for p in put_back:
+            lq.put(p)
+
+        if failed_check:
+            raise PipelineException(
+                f"Logging queue failed on {next_running_time} because "
+                f"running release date does not track in queue."
+            )
+        time.sleep(0.25)
         return rs
 
     def poke(self, params: DictData | None = None) -> list[Result]:
@@ -835,8 +852,6 @@ class Pipeline(BaseModel):
                 rs: Result = future.result()
                 logging.info(rs.context.get("params", {}))
                 results.append(rs)
-
-            log_queue.join()
 
         return results
 
@@ -1017,7 +1032,7 @@ class Pipeline(BaseModel):
         """Pipeline non-threading execution."""
         not_time_out_flag: bool = True
         logging.debug(
-            f"({self.run_id}): [CORE]: Run {self.name} with non-threading job "
+            f"({self.run_id}) [CORE]: Run {self.name} with non-threading job "
             f"executor"
         )
         # NOTE: Create a job queue that keep the job that want to running after
