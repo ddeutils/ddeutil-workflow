@@ -52,9 +52,6 @@ jobs:
           uv pip install -U pip
           uv pip install -U -e .
           uv pip install -U pytest
-
-      - name: List all Python dependencies
-        run: |
           uv pip list
 
       - name: Use Python virtual environment
