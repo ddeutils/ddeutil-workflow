@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from abc import ABC, abstractmethod
 from datetime import datetime
 
@@ -74,6 +75,41 @@ class FileLog(BaseLog):
 
     def do_before(self) -> None:
         self.pointer().mkdir(parents=True, exist_ok=True)
+
+    @classmethod
+    def latest_point(
+        cls,
+        name: str,
+        *,
+        queue: list[datetime] | None = None,
+    ) -> datetime | None:
+        """Return latest point that exist in current logging pointer keeping."""
+        keeping: Path = config().engine.paths.root / f"./logs/{name}/"
+        if not keeping.exists():
+            return None
+
+        keeping_files: list[int] = [
+            int(found.stem)
+            for found in keeping.glob("*")
+            if found.is_dir() and re.match(r"\d{14}", found.stem)
+        ]
+
+        latest = max(keeping_files or [None])
+
+        if not queue:
+            if latest is None:
+                return None
+            return datetime.strptime(str(latest), "%Y%m%d%H%M%S")
+
+        latest_queue: datetime = max(queue)
+
+        if latest is None:
+            return latest_queue
+
+        latest_dt: datetime = datetime.strptime(
+            str(latest), "%Y%m%d%H%M%S"
+        ).replace(tzinfo=latest_queue.tzinfo)
+        return max(latest_dt, latest_queue)
 
     @classmethod
     def is_pointed(

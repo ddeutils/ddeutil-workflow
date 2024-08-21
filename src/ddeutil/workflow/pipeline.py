@@ -16,8 +16,8 @@ from concurrent.futures import (
     as_completed,
     wait,
 )
-from datetime import datetime
-from heapq import heapify, heappop, heappush
+from datetime import datetime, timedelta
+from heapq import heappush
 from pickle import PickleError
 from queue import Queue
 from textwrap import dedent
@@ -53,6 +53,7 @@ from .utils import (
     Result,
     cross_product,
     dash2underscore,
+    delay,
     filter_func,
     gen_id,
     get_diff_sec,
@@ -705,8 +706,8 @@ class Pipeline(BaseModel):
         on: On,
         params: DictData,
         *,
-        waiting_sec: int = 60,
-        sleep_interval: int = 20,
+        waiting_sec: int = 55,
+        sleep_interval: int = 15,
         log: Log = None,
         lq: list[datetime] = None,
     ) -> Result:
@@ -714,14 +715,27 @@ class Pipeline(BaseModel):
         That mean it will still running at background 30 minutes until the
         schedule matching with its time.
         """
+        delay()
         log: Log = log or FileLog
         logging.info(
             f"({self.run_id}) [CORE]: {self.name!r} : "
             f"{on.cronjob} : Start release"
         )
+        current_running_time = datetime.now()
+        latest_running_time = log.latest_point(
+            name=self.name, queue=lq
+        ).replace(tzinfo=ZoneInfo(on.tz))
+        if latest_running_time is None or (
+            latest_running_time
+            < current_running_time.replace(tzinfo=ZoneInfo(on.tz))
+        ):
+            latest_running_time = current_running_time.replace(
+                tzinfo=ZoneInfo(on.tz)
+            )
 
-        # TODO: Can it able to use the latest release from logging?
-        gen: CronRunner = on.generate(datetime.now())
+        gen: CronRunner = on.generate(
+            latest_running_time + timedelta(seconds=1)
+        )
         tz: ZoneInfo = gen.tz
 
         # NOTE: get next schedule time that generate from now.
@@ -798,29 +812,7 @@ class Pipeline(BaseModel):
         if lq is None:
             return rs
 
-        failed_check: bool = False
-        put_back: list[datetime] = []
-
-        while latest := heappop(lq):
-            if next_running_time == latest:
-                break
-
-            elif next_running_time > latest:
-                put_back.append(latest)
-
-            if not lq:
-                failed_check = True
-                break
-
-        # NOTE: Put datetime back to log queue.
-        lq.extend(put_back)
-        heapify(lq)
-
-        if failed_check:
-            raise PipelineException(
-                f"Logging queue failed on {next_running_time} because "
-                f"running release date does not track in queue."
-            )
+        lq.remove(next_running_time)
         time.sleep(0.25)
         return rs
 
