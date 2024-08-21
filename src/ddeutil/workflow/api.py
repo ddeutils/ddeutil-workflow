@@ -56,7 +56,7 @@ async def fetch_current_time():
 
 
 @app.on_event("startup")
-@repeat_every(seconds=10)
+@repeat_every(seconds=10, logger=logger)
 def broker_upper_messages():
     for _ in range(app.queue_limit):
         try:

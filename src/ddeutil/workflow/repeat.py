@@ -5,19 +5,23 @@
 # ------------------------------------------------------------------------------
 import asyncio
 import logging
+import os
 from asyncio import ensure_future
 from datetime import datetime
 from functools import wraps
+from zoneinfo import ZoneInfo
 
 from croniter import croniter
 from starlette.concurrency import run_in_threadpool
 
 
-def get_delta(cron: str):
+def get_cron_delta(cron: str):
     """This function returns the time delta between now and the next cron
     execution time.
     """
-    now: datetime = datetime.now()
+    now: datetime = datetime.now(
+        tz=ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
+    )
     cron = croniter(cron, now)
     return (cron.get_next(datetime) - now).total_seconds()
 
@@ -57,14 +61,14 @@ def repeat_at(
                 nonlocal repititions
                 while max_repetitions is None or repititions < max_repetitions:
                     try:
-                        sleepTime = get_delta(cron)
-                        await asyncio.sleep(sleepTime)
+                        sleep_time = get_cron_delta(cron)
+                        await asyncio.sleep(sleep_time)
                         if is_coroutine:
                             await func(*args, **kwargs)
                         else:
                             await run_in_threadpool(func, *args, **kwargs)
                     except Exception as e:
-                        if logger is not None:
+                        if logger:
                             logger.exception(e)
                         if raise_exceptions:
                             raise e

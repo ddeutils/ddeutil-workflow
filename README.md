@@ -54,7 +54,7 @@ this package with application add-ons, you should add `app` in installation;
 
 | Usecase           | Install Optional                         | Support            |
 |-------------------|------------------------------------------|--------------------|
-| Python Core API   | `pip install ddeutil-workflow`           | :heavy_check_mark: |
+| Python & CLI      | `pip install ddeutil-workflow`           | :heavy_check_mark: |
 | Scheduler Service | `pip install ddeutil-workflow[schedule]` | :x:                |
 | FastAPI Server    | `pip install ddeutil-workflow[api]`      | :x:                |
 

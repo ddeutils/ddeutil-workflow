@@ -28,6 +28,7 @@ dependencies = [
     "fmtutil",
     "ddeutil-io",
     "python-dotenv==1.0.1",
+    "typer==0.12.4",
 ]
 dynamic = ["version"]
 
@@ -44,6 +45,9 @@ api = [
 [project.urls]
 Homepage = "https://github.com/ddeutils/ddeutil-workflow/"
 "Source Code" = "https://github.com/ddeutils/ddeutil-workflow/"
+
+[project.scripts]
+workflow = "ddeutil.workflow.cli:app"
 
 [tool.setuptools.dynamic]
 version = {attr = "ddeutil.workflow.__about__.__version__"}
@@ -63,8 +67,6 @@ source = ["ddeutil.workflow", "tests"]
 omit = [
     "scripts/",
     # Omit this files because it does not ready to production.
-    "src/ddeutil/workflow/api.py",
-    "src/ddeutil/workflow/schedule.py",
     "src/ddeutil/workflow/repeat.py",
     "src/ddeutil/workflow/route.py",
     "tests/utils.py",
