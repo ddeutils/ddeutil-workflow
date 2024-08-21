@@ -18,11 +18,11 @@ from threading import Thread
 from zoneinfo import ZoneInfo
 
 from ddeutil.workflow.__types import DictData
+from ddeutil.workflow.cron import CronRunner
 from ddeutil.workflow.exceptions import WorkflowException
 from ddeutil.workflow.loader import Loader
 from ddeutil.workflow.on import On
 from ddeutil.workflow.pipeline import Pipeline
-from ddeutil.workflow.scheduler import CronRunner
 from ddeutil.workflow.utils import (
     Result,
     batch,

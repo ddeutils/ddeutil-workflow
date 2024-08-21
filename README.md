@@ -52,11 +52,11 @@ pipeline.
 This project need `ddeutil-io` extension namespace packages. If you want to install
 this package with application add-ons, you should add `app` in installation;
 
-| Usecase           | Install Optional                    | Support            |
-|-------------------|-------------------------------------|--------------------|
-| Python Core API   | `pip install ddeutil-workflow`      | :heavy_check_mark: |
-| Scheduler Service | `pip install ddeutil-workflow[app]` | :x:                |
-| FastAPI Server    | `pip install ddeutil-workflow[api]` | :x:                |
+| Usecase           | Install Optional                         | Support            |
+|-------------------|------------------------------------------|--------------------|
+| Python Core API   | `pip install ddeutil-workflow`           | :heavy_check_mark: |
+| Scheduler Service | `pip install ddeutil-workflow[schedule]` | :x:                |
+| FastAPI Server    | `pip install ddeutil-workflow[api]`      | :x:                |
 
 
 > I added this feature to the main milestone.

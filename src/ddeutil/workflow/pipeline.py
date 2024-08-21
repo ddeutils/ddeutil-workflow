@@ -37,6 +37,7 @@ from .__types import (
     MatrixInclude,
     TupleStr,
 )
+from .cron import CronRunner
 from .exceptions import (
     JobException,
     PipelineException,
@@ -46,7 +47,6 @@ from .exceptions import (
 from .loader import Loader
 from .log import FileLog, Log
 from .on import On
-from .scheduler import CronRunner
 from .stage import Stage
 from .utils import (
     Param,
@@ -717,19 +717,18 @@ class Pipeline(BaseModel):
         """
         delay()
         log: Log = log or FileLog
-        logging.info(
-            f"({self.run_id}) [CORE]: {self.name!r} : "
-            f"{on.cronjob} : Start release"
-        )
         current_running_time = datetime.now()
-        latest_running_time = log.latest_point(
-            name=self.name, queue=lq
-        ).replace(tzinfo=ZoneInfo(on.tz))
-        if latest_running_time is None or (
-            latest_running_time
+        if not (
+            latest_running_time := log.latest_point(name=self.name, queue=lq)
+        ) or (
+            latest_running_time.replace(tzinfo=ZoneInfo(on.tz))
             < current_running_time.replace(tzinfo=ZoneInfo(on.tz))
         ):
-            latest_running_time = current_running_time.replace(
+            latest_running_time: datetime = current_running_time.replace(
+                tzinfo=ZoneInfo(on.tz)
+            )
+        else:
+            latest_running_time: datetime = latest_running_time.replace(
                 tzinfo=ZoneInfo(on.tz)
             )
 

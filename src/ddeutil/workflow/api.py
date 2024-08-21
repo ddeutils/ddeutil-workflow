@@ -9,13 +9,8 @@ import asyncio
 import queue
 import time
 import uuid
-from contextlib import asynccontextmanager
 from datetime import datetime
 
-from apscheduler.executors.pool import ProcessPoolExecutor
-from apscheduler.jobstores.memory import MemoryJobStore
-from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import BackgroundTasks, FastAPI
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import UJSONResponse
@@ -28,49 +23,10 @@ from .route import schedule_route, workflow_route
 logger = get_logger(__name__)
 
 
-def broker_upper_messages():
-    for _ in range(app.queue_limit):
-        try:
-            obj = app.queue.get_nowait()
-            app.output_dict[obj["request_id"]] = obj["text"].upper()
-            logger.info(f"Upper message: {app.output_dict}")
-        except queue.Empty:
-            pass
-
-
-jobstores = {
-    "default": MemoryJobStore(),
-    "sqlite": SQLAlchemyJobStore(url="sqlite:///jobs-store.sqlite"),
-}
-executors = {
-    "default": {"type": "threadpool", "max_workers": 5},
-    "processpool": ProcessPoolExecutor(max_workers=5),
-}
-scheduler = AsyncIOScheduler(
-    jobstores=jobstores,
-    executors=executors,
-    timezone="Asia/Bangkok",
-)
-
-
-@asynccontextmanager
-async def lifespan(_: FastAPI):
-    scheduler.start()
-    yield
-    scheduler.shutdown(wait=False)
-
-
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.include_router(schedule_route)
 app.include_router(workflow_route)
-
-app.scheduler = scheduler
-app.scheduler.add_job(
-    broker_upper_messages,
-    "interval",
-    seconds=10,
-)
 app.queue = queue.Queue()
 app.output_dict = {}
 app.queue_limit = 2
@@ -93,9 +49,20 @@ async def send_schedule(name: str, background_tasks: BackgroundTasks):
     return {"message": f"Schedule sent {name!r} in the background"}
 
 
-@repeat_every(seconds=2, max_repetitions=3)
 async def fetch_current_time():
     logger.info(f"Fetch: {datetime.now()}")
+
+
+@app.on_event("startup")
+@repeat_every(seconds=10)
+def broker_upper_messages():
+    for _ in range(app.queue_limit):
+        try:
+            obj = app.queue.get_nowait()
+            app.output_dict[obj["request_id"]] = obj["text"].upper()
+            logger.info(f"Upper message: {app.output_dict}")
+        except queue.Empty:
+            pass
 
 
 class Payload(BaseModel):
@@ -103,7 +70,7 @@ class Payload(BaseModel):
 
 
 async def get_result(request_id):
-    while 1:
+    while True:
         if request_id in app.output_dict:
             result = app.output_dict[request_id]
             del app.output_dict[request_id]

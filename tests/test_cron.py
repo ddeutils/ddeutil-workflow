@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-import ddeutil.workflow.scheduler as schedule
+import ddeutil.workflow.cron as cron
 
 from tests.utils import str2dt
 
@@ -20,30 +20,30 @@ def test_timezone():
     assert timedelta(0) == timezone.utc.utcoffset(jan1_in_utc)
 
 
-def test_scheduler_cronjob():
-    cr1 = schedule.CronJob("*/5 * * * *")
-    cr2 = schedule.CronJob("*/5,3,6 9-17/2 * 1-3 1-5")
+def test_cron_cronjob():
+    cr1 = cron.CronJob("*/5 * * * *")
+    cr2 = cron.CronJob("*/5,3,6 9-17/2 * 1-3 1-5")
 
     assert str(cr1) == "*/5 * * * *"
     assert str(cr2) == "0,3,5-6,10,15,20,25,30,35,40,45,50,55 9-17/2 * 1-3 1-5"
     assert cr1 != cr2
     assert cr1 < cr2
 
-    cr = schedule.CronJob("0 */12 1 ? 0")
+    cr = cron.CronJob("0 */12 1 ? 0")
     assert str(cr) == "0 0,12 1 ? 0"
 
-    cr = schedule.CronJob("*/4 0 1 * 1")
+    cr = cron.CronJob("*/4 0 1 * 1")
     assert str(cr) == "*/4 0 1 * 1"
 
-    cr = schedule.CronJob("*/4 */3 1 * 1")
+    cr = cron.CronJob("*/4 */3 1 * 1")
     assert str(cr) == "*/4 */3 1 * 1"
 
 
-def test_scheduler_cronjob_to_list():
-    cr = schedule.CronJob("0 */12 1 1 0")
+def test_cron_cronjob_to_list():
+    cr = cron.CronJob("0 */12 1 1 0")
     assert cr.to_list() == [[0], [0, 12], [1], [1], [0]]
 
-    cr = schedule.CronJob("*/4 */3 1 * 1")
+    cr = cron.CronJob("*/4 */3 1 * 1")
     assert cr.to_list() == [
         [0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56],
         [0, 3, 6, 9, 12, 15, 18, 21],
@@ -52,7 +52,7 @@ def test_scheduler_cronjob_to_list():
         [1],
     ]
 
-    cr = schedule.CronJob("*/30 */12 23 */3 *")
+    cr = cron.CronJob("*/30 */12 23 */3 *")
     assert cr.to_list() == [
         [0, 30],
         [0, 12],
@@ -62,8 +62,8 @@ def test_scheduler_cronjob_to_list():
     ]
 
 
-def test_scheduler_option():
-    cr = schedule.CronJob(
+def test_cron_option():
+    cr = cron.CronJob(
         "*/5,3,6 9-17/2 * 1-3 1-5",
         option={
             "output_hashes": True,
@@ -72,7 +72,7 @@ def test_scheduler_option():
     assert (
         str(cr) == "0,3,5-6,10,15,20,25,30,35,40,45,50,55 H(9-17)/2 H 1-3 1-5"
     )
-    cr = schedule.CronJob(
+    cr = cron.CronJob(
         "*/5 9-17/2 * 1-3,5 1-5",
         option={
             "output_weekday_names": True,
@@ -82,8 +82,8 @@ def test_scheduler_option():
     assert str(cr) == "*/5 9-17/2 * JAN-MAR,MAY MON-FRI"
 
 
-def test_scheduler_next_previous():
-    sch = schedule.CronJob("*/30 */12 23 */3 *").schedule(
+def test_cron_next_previous():
+    sch = cron.CronJob("*/30 */12 23 */3 *").schedule(
         date=datetime(2024, 1, 1, 12, tzinfo=ZoneInfo("Asia/Bangkok")),
     )
     t = sch.next
@@ -110,8 +110,8 @@ def test_scheduler_next_previous():
     assert sch.next == str2dt("2024-01-23 00:30:00")
 
 
-def test_scheduler_cronjob_year():
-    cr = schedule.CronJobYear("*/5 * * * * */8,1999")
+def test_cron_cronjob_year():
+    cr = cron.CronJobYear("*/5 * * * * */8,1999")
     assert str(cr) == (
         "*/5 * * * * 1990,1998-1999,2006,2014,2022,2030,2038,2046,2054,2062,"
         "2070,2078,2086,2094"

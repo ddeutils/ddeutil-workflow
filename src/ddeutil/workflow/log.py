@@ -6,15 +6,13 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 from abc import ABC, abstractmethod
 from datetime import datetime
-
-# import logging
+from functools import lru_cache
 from heapq import heappop, heappush
-
-# from functools import lru_cache
 from pathlib import Path
 from typing import Optional, Union
 
@@ -22,26 +20,33 @@ from ddeutil.core import str2bool
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
 
-# from rich.console import Console
-# from rich.logging import RichHandler
+try:
+    from rich.console import Console
+    from rich.logging import RichHandler
+except ImportError:
+    Console = None
+    RichHandler = None
+
 from .__types import DictData
 from .utils import config
 
-# console = Console(color_system="256", width=200, style="blue")
-# @lru_cache
-# def get_logger(module_name):
-#     logger = logging.getLogger(module_name)
-#     handler = RichHandler(
-#         rich_tracebacks=True, console=console, tracebacks_show_locals=True
-#     )
-#     handler.setFormatter(
-#         logging.Formatter(
-#             "[ %(threadName)s:%(funcName)s:%(process)d ] - %(message)s"
-#         )
-#     )
-#     logger.addHandler(handler)
-#     logger.setLevel(logging.DEBUG)
-#     return logger
+
+@lru_cache
+def get_logger(module_name: str):
+    logger = logging.getLogger(module_name)
+    handler = RichHandler(
+        rich_tracebacks=True,
+        console=Console(color_system="256", width=200, style="blue"),
+        tracebacks_show_locals=True,
+    )
+    handler.setFormatter(
+        logging.Formatter(
+            "[ %(threadName)s:%(funcName)s:%(process)d ] - %(message)s"
+        )
+    )
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
+    return logger
 
 
 class BaseLog(BaseModel, ABC):

@@ -32,12 +32,12 @@ dependencies = [
 dynamic = ["version"]
 
 [project.optional-dependencies]
-app = [
+schedule = [
     "schedule==1.2.2,<2.0.0",
 ]
 api = [
-    "fastapi[standard]==0.112.0",
-    "apscheduler[sqlalchemy]==3.10.4,<4.0.0",
+    "fastapi[standard]==0.112.1",
+    # TODO: This package can migrate to use /cron/
     "croniter==3.0.3",
 ]
 
@@ -64,10 +64,9 @@ omit = [
     "scripts/",
     # Omit this files because it does not ready to production.
     "src/ddeutil/workflow/api.py",
-    "src/ddeutil/workflow/app.py",
+    "src/ddeutil/workflow/schedule.py",
     "src/ddeutil/workflow/repeat.py",
     "src/ddeutil/workflow/route.py",
-    "src/ddeutil/workflow/log.py",
     "tests/utils.py",
     "tests/tasks/dummy.py",
 ]
