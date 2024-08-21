@@ -31,4 +31,4 @@ def test_log_file_latest():
         name="pipe-scheduling-not-exists",
         queue=[datetime(2024, 8, 21, 11, 5)],
     )
-    assert rs == datetime(2024, 8, 21, 11, 5)
+    assert rs is None

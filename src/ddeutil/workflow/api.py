@@ -11,6 +11,7 @@ import time
 import uuid
 from datetime import datetime
 
+from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import UJSONResponse
@@ -21,6 +22,7 @@ from .repeat import repeat_every
 from .route import schedule_route, workflow_route
 
 logger = get_logger(__name__)
+load_dotenv()
 
 
 app = FastAPI()
