@@ -111,19 +111,26 @@ class FileLog(BaseLog):
         *,
         queue: list[datetime] | None = None,
     ) -> bool:
-        """Check this log already point."""
+        """Check this log already point.
+
+        :param name: A pipeline name.
+        :param release: A release datetime.
+        :param queue: A list of queue of datetime that already run in the
+            future.
+        """
         if not str2bool(os.getenv("WORKFLOW_LOG_ENABLE_WRITE", "false")):
             return False
 
-        pointer_path: Path = (
+        # NOTE: create pointer path that use the same logic of pointer method.
+        pointer: Path = (
             config().engine.paths.root
             / f"./logs/pipeline={name}/release={release:%Y%m%d%H%M%S}"
         )
 
         if queue is None:
-            return pointer_path.exists()
+            return pointer.exists()
 
-        if pointer_path.exists() and not queue:
+        if pointer.exists() and not queue:
             return True
 
         if queue:

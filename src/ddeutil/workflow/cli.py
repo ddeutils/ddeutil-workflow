@@ -15,6 +15,7 @@ state = {"verbose": False}
 
 @cli.command()
 def run(pipeline: str):
+    """Run workflow manually"""
     if state["verbose"]:
         print("About to create a user")
 
@@ -26,6 +27,7 @@ def run(pipeline: str):
 
 @cli.command()
 def schedule(exclude: Optional[str]):
+    """Start workflow scheduler"""
     if state["verbose"]:
         print("About to delete a user")
 

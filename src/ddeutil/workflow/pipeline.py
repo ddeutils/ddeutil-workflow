@@ -184,9 +184,15 @@ class Job(BaseModel):
         ... }
     """
 
-    id: Optional[str] = Field(default=None)
-    desc: Optional[str] = Field(default=None)
-    runs_on: Optional[str] = Field(default=None)
+    id: Optional[str] = Field(default=None, description="A job ID.")
+    desc: Optional[str] = Field(
+        default=None,
+        description="A job description that can be string of markdown content.",
+    )
+    runs_on: Optional[str] = Field(
+        default=None,
+        description="A target executor node for this job use to execution.",
+    )
     stages: list[Stage] = Field(
         default_factory=list,
         description="A list of Stage of this job.",
@@ -200,7 +206,9 @@ class Job(BaseModel):
         description="A strategy matrix that want to generate.",
     )
     run_id: Optional[str] = Field(
-        default=None, description="A running job ID.", repr=False
+        default=None,
+        description="A running job ID.",
+        repr=False,
     )
 
     @model_validator(mode="before")
@@ -210,6 +218,11 @@ class Job(BaseModel):
         """
         dash2underscore("runs-on", values)
         return values
+
+    @field_validator("desc", mode="after")
+    def ___prepare_desc(cls, value: str) -> str:
+        """Prepare description string that was created on a template."""
+        return dedent(value)
 
     @model_validator(mode="after")
     def __prepare_running_id(self):
@@ -223,6 +236,12 @@ class Job(BaseModel):
         return self
 
     def get_running_id(self, run_id: str) -> Self:
+        """Return Job model object that changing job running ID with an
+        input running ID.
+
+        :param run_id: A replace job running ID.
+        :rtype: Self
+        """
         return self.model_copy(update={"run_id": run_id})
 
     def stage(self, stage_id: str) -> Stage:
@@ -496,6 +515,7 @@ class Job(BaseModel):
         """Job parallel pool futures catching with all-completed mode.
 
         :param futures: A list of futures.
+        :rtype: Result
         """
         strategy_context: DictData = {}
         status: int = 0
@@ -539,8 +559,7 @@ class Pipeline(BaseModel):
     desc: Optional[str] = Field(
         default=None,
         description=(
-            "A pipeline description that is able to be string of markdown "
-            "content."
+            "A pipeline description that can be string of markdown content."
         ),
     )
     params: dict[str, Param] = Field(
@@ -572,11 +591,14 @@ class Pipeline(BaseModel):
         name: str,
         externals: DictData | None = None,
     ) -> Self:
-        """Create Pipeline instance from the Loader object.
+        """Create Pipeline instance from the Loader object that only receive
+        an input pipeline name. The loader object will use this pipeline name to
+        searching configuration data of this pipeline model in conf path.
 
         :param name: A pipeline name that want to pass to Loader object.
         :param externals: An external parameters that want to pass to Loader
             object.
+        :rtype: Self
         """
         loader: Loader = Loader(name, externals=(externals or {}))
         loader_data: DictData = copy.deepcopy(loader.data)
@@ -599,6 +621,8 @@ class Pipeline(BaseModel):
                 on = [on]
             if any(not isinstance(i, (dict, str)) for i in on):
                 raise TypeError("The ``on`` key should be list of str or dict")
+
+            # NOTE: Pass on value to Loader and keep on model object to on field
             data["on"] = [
                 (
                     Loader(n, externals=(externals or {})).data
@@ -631,13 +655,14 @@ class Pipeline(BaseModel):
 
     @model_validator(mode="after")
     def __validate_jobs_need_and_prepare_running_id(self):
+        """Validate each need job in any jobs should exists."""
         for job in self.jobs:
             if not_exist := [
                 need for need in self.jobs[job].needs if need not in self.jobs
             ]:
                 raise PipelineException(
                     f"This needed jobs: {not_exist} do not exist in this "
-                    f"pipeline."
+                    f"pipeline, {self.name!r}"
                 )
 
             # NOTE: update a job id with its job id from pipeline template
@@ -649,11 +674,20 @@ class Pipeline(BaseModel):
         # VALIDATE: Validate pipeline name should not dynamic with params
         #   template.
         if has_template(self.name):
-            raise ValueError("Pipeline name should not has any template.")
+            raise ValueError(
+                f"Pipeline name should not has any template, please check, "
+                f"{self.name!r}."
+            )
 
         return self
 
     def get_running_id(self, run_id: str) -> Self:
+        """Return Pipeline model object that changing pipeline running ID with
+        an input running ID.
+
+        :param run_id: A replace pipeline running ID.
+        :rtype: Self
+        """
         return self.model_copy(update={"run_id": run_id})
 
     def job(self, name: str) -> Job:
@@ -666,7 +700,10 @@ class Pipeline(BaseModel):
         :returns: A job model that exists on this pipeline by input name.
         """
         if name not in self.jobs:
-            raise ValueError(f"Job {name!r} does not exists")
+            raise ValueError(
+                f"A Job {name!r} does not exists in this pipeline, "
+                f"{self.name!r}"
+            )
         return self.jobs[name]
 
     def parameterize(self, params: DictData) -> DictData:
@@ -714,6 +751,11 @@ class Pipeline(BaseModel):
         """Start running pipeline with the on schedule in period of 30 minutes.
         That mean it will still running at background 30 minutes until the
         schedule matching with its time.
+
+            This method allow pipeline use log object to save the execution
+        result to log destination like file log to local /logs directory.
+
+        :rtype: Result
         """
         delay()
         log: Log = log or FileLog
@@ -915,9 +957,8 @@ class Pipeline(BaseModel):
             for limit time of execution and waiting job dependency.
         :rtype: Result
 
-        ---
-
         See Also:
+        ---
 
             The result of execution process for each jobs and stages on this
         pipeline will keeping in dict which able to catch out with all jobs and
@@ -954,7 +995,7 @@ class Pipeline(BaseModel):
                 self.__exec_non_threading(rs, ts, timeout=timeout)
                 if (
                     worker := int(
-                        os.getenv("WORKFLOW_CORE_MAX_JOB_PARALLEL", "1")
+                        os.getenv("WORKFLOW_CORE_MAX_JOB_PARALLEL", "2")
                     )
                 )
                 == 1
@@ -973,10 +1014,17 @@ class Pipeline(BaseModel):
         rs: Result,
         ts: float,
         *,
-        worker: int = 1,
+        worker: int = 2,
         timeout: int = 600,
     ) -> Result:
-        """Pipeline threading execution."""
+        """Pipeline threading execution.
+
+        :param rs:
+        :param ts:
+        :param timeout: A second value unit that bounding running time.
+        :param worker: A number of threading executor pool size.
+        :rtype: Result
+        """
         not_time_out_flag: bool = True
         logging.debug(
             f"({self.run_id}): [CORE]: Run {self.name} with threading job "
@@ -1024,15 +1072,17 @@ class Pipeline(BaseModel):
                 # NOTE: Update job result to pipeline result.
                 rs.receive_jobs(future.result(timeout=20))
 
-        if not not_time_out_flag:
-            logging.warning(
-                f"({self.run_id}) [PIPELINE]: Execution of pipeline was timeout"
-            )
-            raise PipelineException(
-                f"Execution of pipeline: {self.name} was timeout"
-            )
-        rs.status = 0
-        return rs
+        if not_time_out_flag:
+            rs.status = 0
+            return rs
+
+        # NOTE: Raise timeout error.
+        logging.warning(
+            f"({self.run_id}) [PIPELINE]: Execution of pipeline was timeout"
+        )
+        raise PipelineException(
+            f"Execution of pipeline: {self.name} was timeout"
+        )
 
     def __exec_non_threading(
         self,
@@ -1041,7 +1091,13 @@ class Pipeline(BaseModel):
         *,
         timeout: int = 600,
     ) -> Result:
-        """Pipeline non-threading execution."""
+        """Pipeline non-threading execution.
+
+        :param rs:
+        :param ts:
+        :param timeout: A second value unit that bounding running time.
+        :rtype: Result
+        """
         not_time_out_flag: bool = True
         logging.debug(
             f"({self.run_id}) [CORE]: Run {self.name} with non-threading job "
@@ -1073,12 +1129,14 @@ class Pipeline(BaseModel):
         # NOTE: Wait for all items to finish processing
         job_queue.join()
 
-        if not not_time_out_flag:
-            logging.warning(
-                f"({self.run_id}) [PIPELINE]: Execution of pipeline was timeout"
-            )
-            raise PipelineException(
-                f"Execution of pipeline: {self.name} was timeout"
-            )
-        rs.status = 0
-        return rs
+        if not_time_out_flag:
+            rs.status = 0
+            return rs
+
+        # NOTE: Raise timeout error.
+        logging.warning(
+            f"({self.run_id}) [PIPELINE]: Execution of pipeline was timeout"
+        )
+        raise PipelineException(
+            f"Execution of pipeline: {self.name} was timeout"
+        )

@@ -190,10 +190,11 @@ run_py_local:
 | `WORKFLOW_CORE_REGISTRY_FILTER`     | Core      | ddeutil.workflow.utils       | List of importable string for the filter template                          |
 | `WORKFLOW_CORE_PATH_CONF`           | Core      | conf                         | The config path that keep all template `.yaml` files                       |
 | `WORKFLOW_CORE_TIMEZONE`            | Core      | Asia/Bangkok                 | A Timezone string value that will pass to `ZoneInfo` object                |
-| `WORKFLOW_CORE_DEFAULT_STAGE_ID`    | Core      | true                         | A flag that enable default stage ID that use for catch an execution output |
+| `WORKFLOW_CORE_STAGE_DEFAULT_ID`    | Core      | true                         | A flag that enable default stage ID that use for catch an execution output |
+| `WORKFLOW_CORE_STAGE_RAISE_ERROR`   | Core      | true                         | A flag that all stage raise StageException from stage execution            |
 | `WORKFLOW_CORE_MAX_PIPELINE_POKING` | Core      | 4                            |                                                                            |
-| `WORKFLOW_CORE_MAX_JOB_PARALLEL`    | Core      | 2                            |                                                                            |
-| `WORKFLOW_LOG_ENABLE_WRITE`         | Logging   | true                         |                                                                            |
+| `WORKFLOW_CORE_MAX_JOB_PARALLEL`    | Core      | 2                            | The maximum job number that able to run parallel in pipeline executor      |
+| `WORKFLOW_LOG_ENABLE_WRITE`         | Log       | true                         | A flag that enable logging object saving log to its destination            |
 
 
 **Application**:

@@ -72,29 +72,44 @@ __all__: TupleStr = (
 def handler_result(message: str | None = None) -> Callable[P, Result]:
     """Decorator function for handler result from the stage execution. This
     function should to use with execution method only.
+
+    :param message: A message that want to add at prefix of exception statement.
     """
     message: str = message or ""
 
     def decorator(func: Callable[P, Result]) -> Callable[P, Result]:
 
         @wraps(func)
-        def wrapped(self: BaseStage, *args, **kwargs):
+        def wrapped(self: Stage, *args, **kwargs):
             try:
                 # NOTE: Start calling origin function with a passing args.
-                return func(self, *args, **kwargs)
+                return func(self, *args, **kwargs).set_run_id(self.run_id)
             except Exception as err:
                 # NOTE: Start catching error from the stage execution.
                 logging.error(
                     f"({self.run_id}) [STAGE]: {err.__class__.__name__}: {err}"
                 )
-                if isinstance(err, StageException):
+                if str2bool(
+                    os.getenv("WORKFLOW_CORE_STAGE_RAISE_ERROR", "true")
+                ):
+                    # NOTE: If error that raise from stage execution course by
+                    #   itself, it will return that error with previous
+                    #   dependency.
+                    if isinstance(err, StageException):
+                        raise StageException(
+                            f"{self.__class__.__name__}: {message}\n\t{err}"
+                        ) from err
                     raise StageException(
-                        f"{self.__class__.__name__}: {message}\n\t{err}"
-                    ) from err
-                raise StageException(
-                    f"{self.__class__.__name__}: {message}\n\t"
-                    f"{err.__class__.__name__}: {err}"
-                ) from None
+                        f"{self.__class__.__name__}: {message}\n\t"
+                        f"{err.__class__.__name__}: {err}"
+                    ) from None
+                rs: Result = Result(
+                    status=1,
+                    context={
+                        "error_message": f"{err.__class__.__name__}: {err}",
+                    },
+                )
+                return rs.set_run_id(self.run_id)
 
         return wrapped
 
@@ -115,10 +130,11 @@ class BaseStage(BaseModel, ABC):
         ),
     )
     name: str = Field(
-        description="A stage name that want to logging when start execution."
+        description="A stage name that want to logging when start execution.",
     )
     condition: Optional[str] = Field(
         default=None,
+        description="A stage condition statement to allow stage executable.",
         alias="if",
     )
     run_id: Optional[str] = Field(
@@ -129,6 +145,10 @@ class BaseStage(BaseModel, ABC):
 
     @model_validator(mode="after")
     def __prepare_running_id(self):
+        """Prepare stage running ID that use default value of field and this
+        method will validate name and id fields should not contain any template
+        parameter (exclude matrix template).
+        """
         if self.run_id is None:
             self.run_id = gen_id(self.name + (self.id or ""), unique=True)
 
@@ -142,6 +162,12 @@ class BaseStage(BaseModel, ABC):
         return self
 
     def get_running_id(self, run_id: str) -> Self:
+        """Return Stage model object that changing stage running ID with an
+        input running ID.
+
+        :param run_id: A replace stage running ID.
+        :rtype: Self
+        """
         return self.model_copy(update={"run_id": run_id})
 
     @abstractmethod
@@ -163,7 +189,7 @@ class BaseStage(BaseModel, ABC):
         """
         if not (
             self.id
-            or str2bool(os.getenv("WORKFLOW_CORE_DEFAULT_STAGE_ID", "false"))
+            or str2bool(os.getenv("WORKFLOW_CORE_STAGE_DEFAULT_ID", "false"))
         ):
             logging.debug(
                 f"({self.run_id}) [STAGE]: Output does not set because this "
@@ -182,10 +208,10 @@ class BaseStage(BaseModel, ABC):
             _id: str = gen_id(param2template(self.name, params=to))
 
         # NOTE: Set the output to that stage generated ID.
-        to["stages"][_id] = {"outputs": output}
         logging.debug(
             f"({self.run_id}) [STAGE]: Set output complete with stage ID: {_id}"
         )
+        to["stages"][_id] = {"outputs": output}
         return to
 
     def is_skipped(self, params: DictData | None = None) -> bool:
@@ -295,6 +321,7 @@ class BashStage(BaseStage):
 
         yield [f_shebang, f_name]
 
+        # Note: Remove .sh file that use to run bash.
         Path(f"./{f_name}").unlink()
 
     @handler_result()
@@ -387,14 +414,19 @@ class PyStage(BaseStage):
         :param params: A parameter that want to pass before run any statement.
         :rtype: Result
         """
+        # NOTE: Replace the run statement that has templating value.
+        run: str = param2template(dedent(self.run), params)
+
         # NOTE: create custom globals value that will pass to exec function.
         _globals: DictData = (
             globals() | params | param2template(self.vars, params)
         )
         _locals: DictData = {}
-        run: str = param2template(dedent(self.run), params)
-        logging.info(f"({self.run_id}) [STAGE]: Py-Execute: {uuid.uuid4()}")
+
+        # NOTE: Start exec the run statement.
+        logging.info(f"({self.run_id}) [STAGE]: Py-Execute: {self.name}")
         exec(run, _globals, _locals)
+
         return Result(
             status=0, context={"locals": _locals, "globals": _globals}
         )
@@ -402,7 +434,9 @@ class PyStage(BaseStage):
 
 @dataclass
 class HookSearch:
-    """Hook Search dataclass."""
+    """Hook Search dataclass that use for receive regular expression grouping
+    dict from searching hook string value.
+    """
 
     path: str
     func: str
@@ -410,7 +444,8 @@ class HookSearch:
 
 
 def extract_hook(hook: str) -> Callable[[], TagFunc]:
-    """Extract Hook string value to hook function.
+    """Extract Hook function from string value to hook partial function that
+    does run it at runtime.
 
     :param hook: A hook value that able to match with Task regex.
     :rtype: Callable[[], TagFunc]
@@ -497,8 +532,7 @@ class HookStage(BaseStage):
                 args[k] = args.pop(k.removeprefix("_"))
 
         logging.info(
-            f"({self.run_id}) [STAGE]: Hook-Execute: "
-            f"{t_func.name}@{t_func.tag}"
+            f"({self.run_id}) [STAGE]: Hook-Execute: {t_func.name}@{t_func.tag}"
         )
         rs: DictData = t_func(**param2template(args, params))
 
@@ -532,7 +566,7 @@ class TriggerStage(BaseStage):
         description="A parameter that want to pass to pipeline execution.",
     )
 
-    @handler_result("Raise from trigger pipeline")
+    @handler_result("Raise from TriggerStage")
     def execute(self, params: DictData) -> Result:
         """Trigger pipeline execution.
 

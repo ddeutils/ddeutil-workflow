@@ -146,13 +146,13 @@ class On(BaseModel):
         )
 
     @model_validator(mode="before")
-    def __prepare_values(cls, values):
+    def __prepare_values(cls, values: DictData) -> DictData:
         if tz := values.pop("tz", None):
             values["timezone"] = tz
         return values
 
     @field_validator("tz")
-    def __validate_tz(cls, value: str):
+    def __validate_tz(cls, value: str) -> str:
         """Validate timezone value that able to initialize with ZoneInfo after
         it passing to this model in before mode."""
         try:
