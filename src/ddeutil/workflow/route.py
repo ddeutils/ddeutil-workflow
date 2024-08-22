@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Request
 from fastapi import status as st
 
-from .log import get_logger
-
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 workflow = APIRouter(prefix="/wf", tags=["workflow"])
 
 
