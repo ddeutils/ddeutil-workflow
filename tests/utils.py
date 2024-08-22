@@ -24,12 +24,16 @@ def dotenv_setting() -> None:
             WORKFLOW_CORE_PATH_CONF=tests/conf
             WORKFLOW_CORE_PATH_CONF=tests/conf
             WORKFLOW_CORE_TIMEZONE=Asia/Bangkok
-            WORKFLOW_CORE_DEFAULT_STAGE_ID=true
-
+            WORKFLOW_CORE_STAGE_DEFAULT_ID=true
+            WORKFLOW_CORE_STAGE_RAISE_ERROR=true
+            WORKFLOW_CORE_PIPELINE_ID_SIMPLE=true
             WORKFLOW_CORE_MAX_PIPELINE_POKING=4
-            WORKFLOW_CORE_MAX_JOB_PARALLEL=2
-
+            WORKFLOW_CORE_MAX_JOB_PARALLEL=1
             WORKFLOW_LOG_ENABLE_WRITE=true
+            WORKFLOW_APP_PROCESS_WORKER=2
+            WORKFLOW_APP_PIPELINE_PER_PROCESS=1
+            WORKFLOW_API_ENABLE_ROUTE_WORKFLOW=true
+            WORKFLOW_API_ENABLE_ROUTE_SCHEDULE=true
             """
         ).strip()
         env_path.write_text(env_str)
