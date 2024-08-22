@@ -1,14 +1,19 @@
+# ------------------------------------------------------------------------------
+# Copyright (c) 2022 Korawich Anuttra. All rights reserved.
+# Licensed under the MIT License. See LICENSE in the project root for
+# license information.
+# ------------------------------------------------------------------------------
 from __future__ import annotations
 
 from typing import Optional
 
-import typer
+from typer import Typer
 
-app = typer.Typer()
+cli: Typer = Typer()
 state = {"verbose": False}
 
 
-@app.command()
+@cli.command()
 def run(pipeline: str):
     if state["verbose"]:
         print("About to create a user")
@@ -19,7 +24,7 @@ def run(pipeline: str):
         print("Just created a user")
 
 
-@app.command()
+@cli.command()
 def schedule(exclude: Optional[str]):
     if state["verbose"]:
         print("About to delete a user")
@@ -30,10 +35,10 @@ def schedule(exclude: Optional[str]):
         print("Just deleted a user")
 
 
-@app.callback()
+@cli.callback()
 def main(verbose: bool = False):
     """
-    Manage users in the awesome CLI app.
+    Manage workflow with CLI.
     """
     if verbose:
         print("Will write verbose output")
@@ -41,4 +46,4 @@ def main(verbose: bool = False):
 
 
 if __name__ == "__main__":
-    app()
+    cli()

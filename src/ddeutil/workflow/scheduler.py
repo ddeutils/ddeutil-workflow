@@ -20,7 +20,6 @@ from zoneinfo import ZoneInfo
 from ddeutil.workflow.__types import DictData
 from ddeutil.workflow.cron import CronRunner
 from ddeutil.workflow.exceptions import WorkflowException
-from ddeutil.workflow.loader import Loader
 from ddeutil.workflow.log import FileLog, Log
 from ddeutil.workflow.on import On
 from ddeutil.workflow.pipeline import Pipeline
@@ -221,6 +220,7 @@ def workflow_task(
                 "running in background."
             )
             time.sleep(15)
+            workflow_long_running_task(threads)
         return CancelJob
 
     # IMPORTANT:
@@ -428,11 +428,11 @@ def workflow(
                 externals=(externals or {}),
             )
             for loader in batch(
-                Loader.find(Pipeline, include=["on"], excluded=excluded),
-                # [
-                #     ("pipe-scheduling", None),
-                #     # ("pipe-scheduling-minute", None),
-                # ],
+                # Loader.find(Pipeline, include=["on"], excluded=excluded),
+                [
+                    ("pipe-scheduling", None),
+                    # ("pipe-scheduling-minute", None),
+                ],
                 n=1,
             )
         ]

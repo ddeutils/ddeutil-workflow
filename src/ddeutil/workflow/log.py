@@ -6,12 +6,10 @@
 from __future__ import annotations
 
 import json
-import logging
 import os
 import re
 from abc import ABC, abstractmethod
 from datetime import datetime
-from functools import lru_cache
 from heapq import heappop, heappush
 from pathlib import Path
 from typing import Optional, Union
@@ -20,44 +18,22 @@ from ddeutil.core import str2bool
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
 
-try:
-    from rich.console import Console
-    from rich.logging import RichHandler
-except ImportError:
-    Console = None
-    RichHandler = None
-
 from .__types import DictData
 from .utils import config
-
-
-@lru_cache
-def get_logger(module_name: str):
-    logger = logging.getLogger(module_name)
-    handler = RichHandler(
-        rich_tracebacks=True,
-        console=Console(color_system="256", width=200, style="blue"),
-        tracebacks_show_locals=True,
-    )
-    handler.setFormatter(
-        logging.Formatter(
-            "%(asctime)s.%(msecs)03d (%(name)-10s, %(process)-5d, "
-            "%(thread)-5d) [%(levelname)-7s] %(message)-120s "
-            "(%(filename)s:%(lineno)s)"
-        )
-    )
-    logger.addHandler(handler)
-    logger.setLevel(logging.DEBUG)
-    return logger
 
 
 class BaseLog(BaseModel, ABC):
     """Base Log Pydantic Model"""
 
-    name: str
-    on: str
-    release: datetime
-    context: DictData
+    name: str = Field(description="A pipeline name.")
+    on: str = Field(description="A cronjob string of this piepline schedule.")
+    release: datetime = Field(description="A release datetime.")
+    context: DictData = Field(
+        default_factory=dict,
+        description=(
+            "A context data that receive from a pipeline execution result.",
+        ),
+    )
     parent_run_id: Optional[str] = Field(default=None)
     run_id: str
     update: datetime = Field(default_factory=datetime.now)
@@ -70,6 +46,7 @@ class BaseLog(BaseModel, ABC):
 
     def do_before(self) -> None:
         """To something before end up of initial log model."""
+        return
 
     @abstractmethod
     def save(self) -> None:
@@ -78,9 +55,13 @@ class BaseLog(BaseModel, ABC):
 
 
 class FileLog(BaseLog):
-    """Filee Log"""
+    """File Log Pydantic Model that use to saving log data from result of
+    pipeline execution. It inherit from BaseLog model that implement the
+    ``self.save`` method for file.
+    """
 
     def do_before(self) -> None:
+        """Create directory of release before saving log file."""
         self.pointer().mkdir(parents=True, exist_ok=True)
 
     @classmethod
@@ -90,8 +71,12 @@ class FileLog(BaseLog):
         *,
         queue: list[datetime] | None = None,
     ) -> datetime | None:
-        """Return latest point that exist in current logging pointer keeping."""
-        keeping: Path = config().engine.paths.root / f"./logs/{name}/"
+        """Return latest point that exist in current logging pointer keeping.
+
+        :param name: A pipeline name
+        :param queue: A release queue.
+        """
+        keeping: Path = config().engine.paths.root / f"./logs/pipeline={name}/"
         if not keeping.exists():
             return None
 
@@ -130,15 +115,15 @@ class FileLog(BaseLog):
         if not str2bool(os.getenv("WORKFLOW_LOG_ENABLE_WRITE", "false")):
             return False
 
-        if queue is None:
-            return (
-                config().engine.paths.root
-                / f"./logs/{name}/{release:%Y%m%d%H%M%S}"
-            ).exists()
+        pointer_path: Path = (
+            config().engine.paths.root
+            / f"./logs/pipeline={name}/release={release:%Y%m%d%H%M%S}"
+        )
 
-        if (
-            config().engine.paths.root / f"./logs/{name}/{release:%Y%m%d%H%M%S}"
-        ).exists() and not queue:
+        if queue is None:
+            return pointer_path.exists()
+
+        if pointer_path.exists() and not queue:
             return True
 
         if queue:
@@ -150,13 +135,16 @@ class FileLog(BaseLog):
         return False
 
     def pointer(self) -> Path:
+        """Return release directory path that was generated from model data."""
         return (
             config().engine.paths.root
-            / f"./logs/{self.name}/{self.release:%Y%m%d%H%M%S}"
+            / f"./logs/pipeline={self.name}/release={self.release:%Y%m%d%H%M%S}"
         )
 
     def save(self) -> None:
-        """Save logging data"""
+        """Save logging data that receive a context data from a pipeline
+        execution result.
+        """
         if not str2bool(os.getenv("WORKFLOW_LOG_ENABLE_WRITE", "false")):
             return
 

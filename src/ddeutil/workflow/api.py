@@ -8,23 +8,20 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import queue
-import time
 import uuid
-from datetime import datetime
+from queue import Empty, Queue
 
 from ddeutil.core import str2bool
 from dotenv import load_dotenv
-from fastapi import BackgroundTasks, FastAPI
+from fastapi import FastAPI
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import UJSONResponse
 from pydantic import BaseModel
 
-from .log import get_logger
 from .repeat import repeat_every
 
-logger = get_logger(__name__)
 load_dotenv()
+logger = logging.getLogger(__name__)
 logging.basicConfig(
     level=logging.DEBUG,
     format=(
@@ -38,41 +35,21 @@ logging.basicConfig(
 
 app = FastAPI()
 app.add_middleware(GZipMiddleware, minimum_size=1000)
-app.queue = queue.Queue()
+app.queue = Queue()
 app.output_dict = {}
 app.queue_limit = 2
-
-
-def write_pipeline(task_id: str, message=""):
-    logger.info(f"{task_id} : {message}")
-    time.sleep(5)
-    logger.info(f"{task_id} : run task successfully!!!")
-
-
-@app.post("/schedule/{name}", response_class=UJSONResponse)
-async def send_schedule(name: str, background_tasks: BackgroundTasks):
-    background_tasks.add_task(
-        write_pipeline,
-        name,
-        message=f"some message for {name}",
-    )
-    await fetch_current_time()
-    return {"message": f"Schedule sent {name!r} in the background"}
-
-
-async def fetch_current_time():
-    logger.info(f"Fetch: {datetime.now()}")
 
 
 @app.on_event("startup")
 @repeat_every(seconds=10, logger=logger)
 def broker_upper_messages():
+    """Broker for receive message from /upper path and change it to upper case."""
     for _ in range(app.queue_limit):
         try:
             obj = app.queue.get_nowait()
             app.output_dict[obj["request_id"]] = obj["text"].upper()
             logger.info(f"Upper message: {app.output_dict}")
-        except queue.Empty:
+        except Empty:
             pass
 
 
@@ -81,6 +58,7 @@ class Payload(BaseModel):
 
 
 async def get_result(request_id):
+    """Get data from output dict that global."""
     while True:
         if request_id in app.output_dict:
             result = app.output_dict[request_id]
