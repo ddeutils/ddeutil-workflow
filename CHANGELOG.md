@@ -2,6 +2,50 @@
 
 ## Latest Changes
 
+## 0.0.9
+
+### :sparkles: Features
+
+- :dart: feat: add optional raise error on stage object when env was set. (_2024-08-23_)
+- :dart: feat: change logging directory pattern of log file model object. (_2024-08-22_)
+- :dart: feat: add log saving on schedule features. (_2024-08-22_)
+- :dart: feat: add cli and script endpoint of this project. (_2024-08-21_)
+- :dart: feat: add api without using apscheduler. (_2024-08-21_)
+- :dart: feat: add get latest log from log object. (_2024-08-21_)
+- :dart: feat: update code for app that use schedule. (_2024-08-19_)
+- :dart: feat: add priority queue on release pipline method. (_2024-08-18_)
+- :dart: feat: change job parallel from process to thread. (_2024-08-18_)
+- :dart: feat: add file log to pipeline release. (_2024-08-17_)
+- :dart: feat: add params template for poke method that use. elease. prefix (_2024-08-17_)
+- :dart: feat: add validate stage id and name should not template rather than matrix. (_2024-08-16_)
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: change testcase that not use running id for check eq. (_2024-08-18_)
+- :test_tube: tests: add more testcase for raise error result. (_2024-08-16_)
+- :art: style: add type hint on stage object. (_2024-08-16_)
+
+### :card_file_box: Documents
+
+- :page_facing_up: docs: update readme for adding this workflow project rule to use. (_2024-08-19_)
+- :page_facing_up: docs: update readme file and doc-string. (_2024-08-17_)
+- :page_facing_up: docs: update readme and change usage example. (_2024-08-17_)
+- :page_facing_up: docs: update readme and main propose of this project. (_2024-08-17_)
+- :page_facing_up: docs: remove usage topic on readme. (_2024-08-16_)
+
+### :bug: Fix Bugs
+
+- :gear: fixed: update env var on testcase. (_2024-08-23_)
+- :gear: fixed: change assert does not valid on log testcase. (_2024-08-21_)
+- :gear: fixed: change logic of release with priority queue. (_2024-08-19_)
+- :gear: fixed: change receive result on result object. (_2024-08-18_)
+- :gear: fixed: fix import rich does not found. (_2024-08-17_)
+- :gear: fixed: change way to receive running executor ID from pipeline on job and stage obj. (_2024-08-17_)
+
+### :package: Build & Workflow
+
+- :toolbox: build: remove list deps stage on tests workflow. (_2024-08-21_)
+
 ## 0.0.8
 
 ### :sparkles: Features
