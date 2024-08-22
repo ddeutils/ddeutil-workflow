@@ -6,11 +6,14 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+import os
 import queue
 import time
 import uuid
 from datetime import datetime
 
+from ddeutil.core import str2bool
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI
 from fastapi.middleware.gzip import GZipMiddleware
@@ -19,16 +22,22 @@ from pydantic import BaseModel
 
 from .log import get_logger
 from .repeat import repeat_every
-from .route import schedule_route, workflow_route
 
 logger = get_logger(__name__)
 load_dotenv()
+logging.basicConfig(
+    level=logging.DEBUG,
+    format=(
+        "%(asctime)s.%(msecs)03d (%(name)-10s, %(process)-5d, %(thread)-5d) "
+        "[%(levelname)-7s] %(message)-120s (%(filename)s:%(lineno)s)"
+    ),
+    handlers=[logging.StreamHandler()],
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 
 
 app = FastAPI()
 app.add_middleware(GZipMiddleware, minimum_size=1000)
-app.include_router(schedule_route)
-app.include_router(workflow_route)
 app.queue = queue.Queue()
 app.output_dict = {}
 app.queue_limit = 2
@@ -87,3 +96,14 @@ async def message_upper(payload: Payload):
         {"text": payload.text, "request_id": request_id},
     )
     return await get_result(request_id)
+
+
+if str2bool(os.getenv("WORKFLOW_API_ENABLE_ROUTE_WORKFLOW", "true")):
+    from .route import workflow
+
+    app.include_router(workflow)
+
+if str2bool(os.getenv("WORKFLOW_API_ENABLE_ROUTE_SCHEDULE", "true")):
+    from .route import schedule
+
+    app.include_router(schedule)

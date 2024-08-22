@@ -21,6 +21,7 @@ from ddeutil.workflow.__types import DictData
 from ddeutil.workflow.cron import CronRunner
 from ddeutil.workflow.exceptions import WorkflowException
 from ddeutil.workflow.loader import Loader
+from ddeutil.workflow.log import FileLog, Log
 from ddeutil.workflow.on import On
 from ddeutil.workflow.pipeline import Pipeline
 from ddeutil.workflow.utils import (
@@ -78,12 +79,18 @@ def queue2str(queue: list[datetime]) -> Iterator[str]:
     return (f"{q:%Y-%m-%d %H:%M:%S}" for q in queue)
 
 
-def pipeline_release(task: PipelineTask) -> None:
+def pipeline_release(
+    task: PipelineTask,
+    *,
+    log: Log | None = None,
+) -> None:
     """Pipeline release, it will use with the same logic of `pipeline.release`
     method.
 
     :param task: A PipelineTask dataclass.
+    :param log: A log object.
     """
+    log: Log = log or FileLog
     pipeline: Pipeline = task.pipeline
     on: On = task.on
 
@@ -173,8 +180,22 @@ def pipeline_release(task: PipelineTask) -> None:
 
     heappush(task.queue[pipeline.name], future_running_time)
 
-    # NOTE: Set parent ID on this result
+    # NOTE: Set parent ID on this result.
     rs.set_parent_run_id(pipeline.run_id)
+
+    # NOTE: Save result to log object saving.
+    rs_log: Log = log.model_validate(
+        {
+            "name": pipeline.name,
+            "on": str(on.cronjob),
+            "release": next_running_time,
+            "context": rs.context,
+            "parent_run_id": rs.run_id,
+            "run_id": rs.run_id,
+        }
+    )
+    rs_log.save()
+
     logging.debug(f"[CORE]: {rs}")
 
 

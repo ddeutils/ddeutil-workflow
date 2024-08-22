@@ -1,62 +1,55 @@
-from enum import Enum
+from __future__ import annotations
 
-from fastapi import APIRouter, Request, status
-from pydantic import BaseModel, ConfigDict, Field
+from fastapi import APIRouter, Request
+from fastapi import status as st
 
 from .log import get_logger
 
 logger = get_logger(__name__)
-workflow_route = APIRouter(prefix="/workflow")
+workflow = APIRouter(prefix="/wf", tags=["workflow"])
 
 
-@workflow_route.get("/{name}")
-async def get_pipeline(name: str):
+@workflow.get("/")
+async def get_workflows():
+    return {"message": "getting all pipelines: []"}
+
+
+@workflow.get("/{name}")
+async def get_workflow(name: str):
     return {"message": f"getting pipeline {name}"}
 
 
-@workflow_route.get("/{name}/logs")
-async def get_pipeline_log(name: str):
+@workflow.get("/{name}/logs")
+async def get_workflow_logs(name: str):
     return {"message": f"getting pipeline {name} logs"}
+
+
+@workflow.get("/{name}/logs/{release}")
+async def get_workflow_release_log(name: str, release: str):
+    return {"message": f"getting pipeline {name} log in release {release}"}
+
+
+@workflow.delete(
+    "/{name}/logs/{release}",
+    status_code=st.HTTP_204_NO_CONTENT,
+)
+async def del_workflow_release_log(name: str, release: str):
+    return {"message": f"getting pipeline {name} log in release {release}"}
 
 
 class JobNotFoundError(Exception):
     pass
 
 
-schedule_route = APIRouter(prefix="/schedule", tags=["schedule"])
+schedule = APIRouter(prefix="/schedule", tags=["schedule"])
 
 
-class TriggerEnum(str, Enum):
-    interval = "interval"
-    cron = "cron"
+@schedule.post("/", name="scheduler:add_job", status_code=st.HTTP_201_CREATED)
+async def add_job(request: Request):
+    return {"job": f"{request}"}
 
 
-class Job(BaseModel):
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "func": "example.main:pytest_job",
-                "trigger": "interval",
-                "seconds": 3,
-                "id": "pytest_job",
-            },
-        },
-    )
-    func: str = Field()
-    trigger: TriggerEnum = Field(title="Trigger type")
-    seconds: int = Field(title="Interval in seconds")
-    id: str = Field(title="Job ID")
-
-
-@schedule_route.post(
-    "/", name="scheduler:add_job", status_code=status.HTTP_201_CREATED
-)
-async def add_job(request: Request, job: Job):
-    job = request.app.scheduler.add_job(**job.dict())
-    return {"job": f"{job.id}"}
-
-
-@schedule_route.get("/", name="scheduler:get_jobs", response_model=list)
+@schedule.get("/", name="scheduler:get_jobs", response_model=list)
 async def get_jobs(request: Request):
     jobs = request.app.scheduler.get_jobs()
     jobs = [
@@ -66,7 +59,7 @@ async def get_jobs(request: Request):
     return jobs
 
 
-@schedule_route.delete("/{job_id}", name="scheduler:remove_job")
+@schedule.delete("/{job_id}", name="scheduler:remove_job")
 async def remove_job(request: Request, job_id: str):
     try:
         deleted = request.app.scheduler.remove_job(job_id=job_id)

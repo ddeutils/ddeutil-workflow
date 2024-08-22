@@ -815,12 +815,18 @@ class Pipeline(BaseModel):
         time.sleep(0.25)
         return rs
 
-    def poke(self, params: DictData | None = None) -> list[Result]:
+    def poke(
+        self,
+        params: DictData | None = None,
+        *,
+        log: Log | None = None,
+    ) -> list[Result]:
         """Poke pipeline with threading executor pool for executing with all its
         schedules that was set on the `on` value. This method will observe its
         schedule that nearing to run with the ``self.release()`` method.
 
         :param params: A parameters that want to pass to the release method.
+        :param log: A log object that want to use on this poking process.
         :rtype: list[Result]
         """
         params: DictData = params or {}
@@ -843,7 +849,7 @@ class Pipeline(BaseModel):
                     self.release,
                     on,
                     params=params,
-                    log=FileLog,
+                    log=log,
                     lq=log_queue,
                 )
                 for on in self.on
