@@ -17,21 +17,22 @@ from heapq import heappush
 from threading import Thread
 from zoneinfo import ZoneInfo
 
-from ddeutil.workflow.__types import DictData
-from ddeutil.workflow.cron import CronRunner
-from ddeutil.workflow.exceptions import WorkflowException
-from ddeutil.workflow.log import FileLog, Log
-from ddeutil.workflow.on import On
-from ddeutil.workflow.pipeline import Pipeline
-from ddeutil.workflow.utils import (
+from dotenv import load_dotenv
+from schedule import CancelJob, Scheduler
+
+from .__types import DictData
+from .cron import CronRunner
+from .exceptions import WorkflowException
+from .log import FileLog, Log
+from .on import On
+from .pipeline import Pipeline
+from .utils import (
     Result,
     batch,
     delay,
     get_diff_sec,
     param2template,
 )
-from dotenv import load_dotenv
-from schedule import CancelJob, Scheduler
 
 load_dotenv("../../../.env")
 logging.basicConfig(

@@ -15,7 +15,7 @@ from typing_extensions import Self
 
 from .__types import DictData, DictStr, TupleStr
 from .cron import WEEKDAYS, CronJob, CronJobYear, CronRunner
-from .loader import Loader
+from .utils import Loader
 
 __all__: TupleStr = (
     "On",

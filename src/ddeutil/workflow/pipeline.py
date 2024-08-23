@@ -44,11 +44,11 @@ from .exceptions import (
     StageException,
     UtilException,
 )
-from .loader import Loader
 from .log import FileLog, Log
 from .on import On
 from .stage import Stage
 from .utils import (
+    Loader,
     Param,
     Result,
     cross_product,

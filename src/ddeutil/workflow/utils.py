@@ -14,14 +14,14 @@ from abc import ABC, abstractmethod
 from ast import Call, Constant, Expr, Module, Name, parse
 from collections.abc import Iterator
 from datetime import date, datetime
-from functools import wraps
+from functools import cached_property, wraps
 from hashlib import md5
 from importlib import import_module
 from inspect import isfunction
 from itertools import chain, islice, product
 from pathlib import Path
 from random import randrange
-from typing import Any, Callable, Literal, Optional, Protocol, Union
+from typing import Any, Callable, Literal, Optional, Protocol, TypeVar, Union
 from zoneinfo import ZoneInfo
 
 try:
@@ -30,7 +30,7 @@ except ImportError:
     from typing_extensions import ParamSpec
 
 from ddeutil.core import getdot, hasdot, hash_str, import_string, lazy, str2bool
-from ddeutil.io import PathData, search_env_replace
+from ddeutil.io import PathData, PathSearch, YamlFlResolve, search_env_replace
 from ddeutil.io.models.lineage import dt_now
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 from pydantic.functional_validators import model_validator
@@ -40,6 +40,8 @@ from .__types import DictData, Matrix, Re
 from .exceptions import ParamValueException, UtilException
 
 P = ParamSpec("P")
+AnyModel = TypeVar("AnyModel", bound=BaseModel)
+AnyModelType = type[AnyModel]
 
 
 def get_diff_sec(dt: datetime, tz: ZoneInfo | None = None) -> int:
@@ -141,6 +143,137 @@ def config() -> ConfParams:
             },
         }
     )
+
+
+class SimLoad:
+    """Simple Load Object that will search config data by given some identity
+    value like name of pipeline or on.
+
+    :param name: A name of config data that will read by Yaml Loader object.
+    :param params: A Params model object.
+    :param externals: An external parameters
+
+    Noted:
+    ---
+        The config data should have ``type`` key for modeling validation that
+    make this loader know what is config should to do pass to.
+
+        ... <identity-key>:
+        ...     type: <importable-object>
+
+    """
+
+    def __init__(
+        self,
+        name: str,
+        params: ConfParams,
+        externals: DictData | None = None,
+    ) -> None:
+        self.data: DictData = {}
+        for file in PathSearch(params.engine.paths.conf).files:
+            if any(file.suffix.endswith(s) for s in (".yml", ".yaml")) and (
+                data := YamlFlResolve(file).read().get(name, {})
+            ):
+                self.data = data
+        if not self.data:
+            raise ValueError(f"Config {name!r} does not found on conf path")
+
+        # TODO: Validate the version of template data that mean if version of
+        #   Template were change it should raise to upgrade package version.
+        #   ---
+        #   <pipeline-name>:
+        #       version: 1
+        #       type: pipeline.Pipeline
+        #
+        self.conf_params: ConfParams = params
+        self.externals: DictData = externals or {}
+        self.data.update(self.externals)
+
+    @classmethod
+    def find(
+        cls,
+        obj: object,
+        params: ConfParams,
+        *,
+        include: list[str] | None = None,
+        exclude: list[str] | None = None,
+    ) -> Iterator[tuple[str, DictData]]:
+        """Find all data that match with object type in config path. This class
+        method can use include and exclude list of identity name for filter and
+        adds-on.
+        """
+        exclude: list[str] = exclude or []
+        for file in PathSearch(params.engine.paths.conf).files:
+            if any(file.suffix.endswith(s) for s in (".yml", ".yaml")) and (
+                values := YamlFlResolve(file).read()
+            ):
+                for key, data in values.items():
+                    if key in exclude:
+                        continue
+                    if (
+                        (t := data.get("type"))
+                        and issubclass(cls.get_type(t, params), obj)
+                        and all(i in data for i in (include or data.keys()))
+                    ):
+                        yield key, data
+
+    @classmethod
+    def get_type(cls, t: str, params: ConfParams) -> AnyModelType:
+        """Return import type from string importable value in the type key.
+
+        :param t: A importable type string.
+        :param params: A config parameters that use registry to search this
+            type.
+        :rtype: AnyModelType
+        """
+        try:
+            # NOTE: Auto adding module prefix if it does not set
+            return import_string(f"ddeutil.workflow.{t}")
+        except ModuleNotFoundError:
+            for registry in params.engine.registry:
+                try:
+                    return import_string(f"{registry}.{t}")
+                except ModuleNotFoundError:
+                    continue
+            return import_string(f"{t}")
+
+    @cached_property
+    def type(self) -> AnyModelType:
+        """Return object of string type which implement on any registry. The
+        object type.
+
+        :rtype: AnyModelType
+        """
+        if not (_typ := self.data.get("type")):
+            raise ValueError(
+                f"the 'type' value: {_typ} does not exists in config data."
+            )
+        return self.get_type(_typ, self.conf_params)
+
+
+class Loader(SimLoad):
+    """Loader Object that get the config `yaml` file from current path.
+
+    :param name: A name of config data that will read by Yaml Loader object.
+    :param externals: An external parameters
+    """
+
+    @classmethod
+    def find(
+        cls,
+        obj,
+        *,
+        include: list[str] | None = None,
+        exclude: list[str] | None = None,
+        **kwargs,
+    ) -> DictData:
+        """Override the find class method from the Simple Loader object."""
+        return super().find(
+            obj=obj, params=config(), include=include, exclude=exclude
+        )
+
+    def __init__(self, name: str, externals: DictData) -> None:
+        super().__init__(name, config(), externals)
 
 
 def gen_id(
