@@ -10,41 +10,25 @@ from typing import Optional
 from typer import Typer
 
 cli: Typer = Typer()
-state = {"verbose": False}
 
 
 @cli.command()
 def run(pipeline: str):
     """Run workflow manually"""
-    if state["verbose"]:
-        print("About to create a user")
-
-    print(f"Creating user: {pipeline}")
-
-    if state["verbose"]:
-        print("Just created a user")
+    print(f"Running pipeline name: {pipeline}")
 
 
 @cli.command()
 def schedule(exclude: Optional[str]):
     """Start workflow scheduler"""
-    if state["verbose"]:
-        print("About to delete a user")
-
     print(f"Deleting user: {exclude}")
-
-    if state["verbose"]:
-        print("Just deleted a user")
 
 
 @cli.callback()
-def main(verbose: bool = False):
+def main():
     """
     Manage workflow with CLI.
     """
-    if verbose:
-        print("Will write verbose output")
-        state["verbose"] = True
 
 
 if __name__ == "__main__":

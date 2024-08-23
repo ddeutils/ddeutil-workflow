@@ -46,7 +46,7 @@ Homepage = "https://github.com/ddeutils/ddeutil-workflow/"
 "Source Code" = "https://github.com/ddeutils/ddeutil-workflow/"
 
 [project.scripts]
-workflow = "ddeutil.workflow.cli:app"
+wf = "ddeutil.workflow.cli:app"
 
 [tool.setuptools.dynamic]
 version = {attr = "ddeutil.workflow.__about__.__version__"}

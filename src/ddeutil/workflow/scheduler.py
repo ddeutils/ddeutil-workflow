@@ -34,7 +34,7 @@ from .utils import (
     param2template,
 )
 
-load_dotenv("../../../.env")
+load_dotenv()
 logging.basicConfig(
     level=logging.DEBUG,
     format=(
@@ -69,6 +69,10 @@ def catch_exceptions(cancel_on_failure=False):
 
 @dataclass
 class PipelineTask:
+    """Pipeline task dataclass that use to keep mapping data and objects for
+    passing in multithreading task.
+    """
+
     pipeline: Pipeline
     on: On
     queue: list[datetime]
