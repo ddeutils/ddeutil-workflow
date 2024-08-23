@@ -5,6 +5,7 @@
 # ------------------------------------------------------------------------------
 from __future__ import annotations
 
+import logging
 from typing import Optional
 
 from typer import Typer
@@ -15,13 +16,16 @@ cli: Typer = Typer()
 @cli.command()
 def run(pipeline: str):
     """Run workflow manually"""
-    print(f"Running pipeline name: {pipeline}")
+    logging.info(f"Running pipeline name: {pipeline}")
 
 
 @cli.command()
 def schedule(exclude: Optional[str]):
     """Start workflow scheduler"""
-    print(f"Deleting user: {exclude}")
+    from .scheduler import workflow
+
+    logging.info(f"Start schedule workflow: {exclude}")
+    workflow()
 
 
 @cli.callback()

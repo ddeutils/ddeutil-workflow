@@ -7,7 +7,7 @@ from ddeutil.workflow.utils import Result
 
 
 def test_stage_trigger():
-    pipeline = pipe.Pipeline.from_loader(name="pipe_trigger", externals={})
+    pipeline = pipe.Pipeline.from_loader(name="pipe-trigger", externals={})
     stage: st.Stage = pipeline.job("trigger-job").stage(
         stage_id="trigger-stage"
     )
@@ -20,7 +20,7 @@ def test_stage_trigger():
 
 
 def test_pipe_trigger():
-    pipeline = pipe.Pipeline.from_loader(name="pipe_trigger", externals={})
+    pipeline = pipe.Pipeline.from_loader(name="pipe-trigger", externals={})
     rs: Result = pipeline.execute(params={})
     # import json
     # print(json.dumps(rs.context, indent=2, default=str))

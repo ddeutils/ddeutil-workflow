@@ -121,6 +121,7 @@ pipe-run-python:
 
 
 pipe-run-python-raise:
+  type: pipeline.Pipeline
   jobs:
     first-job:
       stages:

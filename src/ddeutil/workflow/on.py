@@ -116,6 +116,7 @@ class On(BaseModel):
         :param externals: A extras external parameter that will keep in extras.
         """
         loader: Loader = Loader(name, externals=externals)
+
         # NOTE: Validate the config type match with current connection model
         if loader.type != cls:
             raise ValueError(f"Type {loader.type} does not match with {cls}")

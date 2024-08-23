@@ -631,17 +631,19 @@ class Pipeline(BaseModel):
         :rtype: Self
         """
         loader: Loader = Loader(name, externals=(externals or {}))
+
+        # NOTE: Validate the config type match with current connection model
+        if loader.type != cls:
+            raise ValueError(f"Type {loader.type} does not match with {cls}")
+
         loader_data: DictData = copy.deepcopy(loader.data)
 
         # NOTE: Add name to loader data
         loader_data["name"] = name.replace(" ", "_")
 
-        if "jobs" not in loader_data:
-            raise ValueError("Config does not set ``jobs`` value")
-
         # NOTE: Prepare `on` data
         cls.__bypass_on(loader_data)
-        return cls.model_validate(loader_data)
+        return cls.model_validate(obj=loader_data)
 
     @classmethod
     def __bypass_on(cls, data: DictData, externals: DictData | None = None):
@@ -805,8 +807,6 @@ class Pipeline(BaseModel):
         next_time: datetime = gen.next
 
         # NOTE: get next utils it does not logging.
-        # while log.is_pointed(self.name, next_time, queue=lq):
-        #     next_time: datetime = gen.next
         while log.is_pointed(self.name, next_time, queue=lq):
             next_time: datetime = gen.next
 
@@ -861,6 +861,7 @@ class Pipeline(BaseModel):
             f"End release {next_time:%Y-%m-%d %H:%M:%S}"
         )
 
+        # NOTE: Delete a copied pipeline instance for saving memory.
         del pipeline
 
         rs.set_parent_run_id(self.run_id)
@@ -877,6 +878,7 @@ class Pipeline(BaseModel):
         if lq:
             lq.remove(next_time)
 
+        # NOTE: Saving execution result to destination of the input log object.
         rs_log.save()
         time.sleep(0.05)
         return rs

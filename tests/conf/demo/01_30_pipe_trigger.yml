@@ -1,4 +1,4 @@
-pipe_trigger:
+pipe-trigger:
   type: pipeline.Pipeline
   on: 'every_5_minute_bkk'
   jobs:

@@ -99,7 +99,10 @@ class FileLog(BaseLog):
         return False
 
     def pointer(self) -> Path:
-        """Return release directory path that was generated from model data."""
+        """Return release directory path that was generated from model data.
+
+        :rtype: Path
+        """
         return (
             config().engine.paths.root
             / f"./logs/pipeline={self.name}/release={self.release:%Y%m%d%H%M%S}"
@@ -108,6 +111,8 @@ class FileLog(BaseLog):
     def save(self) -> Self:
         """Save logging data that receive a context data from a pipeline
         execution result.
+
+        :rtype: Self
         """
         if not str2bool(os.getenv("WORKFLOW_LOG_ENABLE_WRITE", "false")):
             return self

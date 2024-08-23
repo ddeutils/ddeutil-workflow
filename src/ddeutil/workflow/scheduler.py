@@ -5,6 +5,7 @@
 # ------------------------------------------------------------------------------
 from __future__ import annotations
 
+import copy
 import logging
 import os
 import time
@@ -15,10 +16,14 @@ from datetime import datetime, timedelta
 from functools import wraps
 from heapq import heappush
 from threading import Thread
+from typing import Optional
 from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
+from pydantic import BaseModel, Field
+from pydantic.functional_validators import model_validator
 from schedule import CancelJob, Scheduler
+from typing_extensions import Self
 
 from .__types import DictData
 from .cron import CronRunner
@@ -27,6 +32,7 @@ from .log import FileLog, Log
 from .on import On
 from .pipeline import Pipeline
 from .utils import (
+    Loader,
     Result,
     batch,
     delay,
@@ -48,15 +54,148 @@ logging.getLogger("schedule").setLevel(logging.INFO)
 
 tz: ZoneInfo = ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
 
+__all__ = (
+    "PipelineSchedule",
+    "Schedule",
+    "workflow",
+)
+
+
+class PipelineSchedule(BaseModel):
+    """Pipeline schedule Pydantic Model."""
+
+    name: str = Field(description="A pipeline name.")
+    on: list[On] = Field(
+        default_factory=list,
+        description="An override On instance value.",
+    )
+    params: DictData = Field(
+        default_factory=dict,
+        description="A parameters that want to use to pipeline execution.",
+    )
+
+    @model_validator(mode="before")
+    def __prepare__values(cls, values: DictData) -> DictData:
+        """Prepare incoming values before validating with model fields."""
+
+        values["name"] = values["name"].replace(" ", "_")
+
+        cls.__bypass_on(values)
+        return values
+
+    @classmethod
+    def __bypass_on(cls, data: DictData, externals: DictData | None = None):
+        """Bypass the on data to loaded config data."""
+        if on := data.pop("on", []):
+
+            if isinstance(on, str):
+                on = [on]
+
+            if any(not isinstance(n, (dict, str)) for n in on):
+                raise TypeError("The ``on`` key should be list of str or dict")
+
+            # NOTE: Pass on value to Loader and keep on model object to on field
+            data["on"] = [
+                (
+                    Loader(n, externals=(externals or {})).data
+                    if isinstance(n, str)
+                    else n
+                )
+                for n in on
+            ]
+        return data
+
+
+class Schedule(BaseModel):
+    """Schedule Pydantic Model that use to run with scheduler package. It does
+    not equal the on value in Pipeline model but it use same logic to running
+    release date with crontab interval.
+    """
+
+    desc: Optional[str] = Field(
+        default=None,
+        description=(
+            "A schedule description that can be string of markdown content."
+        ),
+    )
+    pipelines: list[PipelineSchedule] = Field(
+        default_factory=list,
+        description="A list of PipelineSchedule models.",
+    )
+
+    @classmethod
+    def from_loader(
+        cls,
+        name: str,
+        externals: DictData | None = None,
+    ) -> Self:
+        loader: Loader = Loader(name, externals=(externals or {}))
+
+        # NOTE: Validate the config type match with current connection model
+        if loader.type != cls:
+            raise ValueError(f"Type {loader.type} does not match with {cls}")
+
+        loader_data: DictData = copy.deepcopy(loader.data)
+
+        # NOTE: Add name to loader data
+        loader_data["name"] = name.replace(" ", "_")
+
+        return cls.model_validate(obj=loader_data)
+
+    def tasks(
+        self,
+        start_date: datetime,
+        queue: dict[str, list[datetime]],
+        running: dict[str, list[datetime]],
+        externals: DictData | None = None,
+    ) -> list[PipelineTask]:
+        """Generate Task from the current datetime.
+
+        :param start_date:
+        :param queue:
+        :param running:
+        :param externals:
+        :rtype: list[PipelineTask]
+        """
+
+        # NOTE: Create pair of pipeline and on.
+        pipeline_tasks: list[PipelineTask] = []
+        externals: DictData = externals or {}
+
+        for pipe in self.pipelines:
+            pipeline: Pipeline = Pipeline.from_loader(
+                pipe.name, externals=externals
+            )
+
+            # NOTE: Create default list of release datetime.
+            queue[pipe.name]: list[datetime] = []
+            running[pipe.name]: list[datetime] = []
+
+            for on in pipeline.on:
+                on_gen = on.generate(start_date)
+                next_running_date = on_gen.next
+                while next_running_date in queue[pipe.name]:
+                    next_running_date = on_gen.next
+
+                heappush(queue[pipe.name], next_running_date)
+
+                pipeline_tasks.append(
+                    PipelineTask(
+                        pipeline=pipeline, on=on, queue=queue, running=running
+                    ),
+                )
+
+        return pipeline_tasks
+
 
 def catch_exceptions(cancel_on_failure=False):
     """Catch exception error from scheduler job."""
 
-    def catch_exceptions_decorator(job_func):
-        @wraps(job_func)
-        def wrapper(*args, **kwargs):
+    def catch_exceptions_decorator(func):
+        @wraps(func)
+        def wrapper(self, *args, **kwargs):
             try:
-                return job_func(*args, **kwargs)
+                return func(self, *args, **kwargs)
             except Exception as err:
                 logging.exception(err)
                 if cancel_on_failure:
@@ -77,6 +216,124 @@ class PipelineTask:
     on: On
     queue: list[datetime]
     running: list[datetime]
+
+    @catch_exceptions(cancel_on_failure=True)
+    def release(self, log: Log | None = None) -> None:
+        """Pipeline release, it will use with the same logic of
+        `pipeline.release` method.
+
+        :param log: A log object.
+        """
+        log: Log = log or FileLog
+        pipeline: Pipeline = self.pipeline
+        on: On = self.on
+
+        gen: CronRunner = on.generate(
+            datetime.now(tz=tz).replace(second=0, microsecond=0)
+        )
+        cron_tz: ZoneInfo = gen.tz
+
+        # NOTE: get next schedule time that generate from now.
+        next_time: datetime = gen.next
+
+        # NOTE: get next utils it does not running.
+        while next_time in self.running[pipeline.name]:
+            next_time: datetime = gen.next
+
+        logging.debug(
+            f"[CORE]: {pipeline.name!r} : {on.cronjob} : "
+            f"{next_time:%Y-%m-%d %H:%M:%S}"
+        )
+        heappush(self.running[pipeline.name], next_time)
+
+        if get_diff_sec(next_time, tz=cron_tz) > 55:
+            logging.debug(
+                f"({pipeline.run_id}) [CORE]: {pipeline.name!r} : {on.cronjob} "
+                f": Does not closely >> {next_time:%Y-%m-%d %H:%M:%S}"
+            )
+
+            # NOTE: Add this next running datetime that not in period to queue
+            #   and remove it to running.
+            self.running[pipeline.name].remove(next_time)
+            heappush(self.queue[pipeline.name], next_time)
+
+            time.sleep(0.2)
+            return
+
+        logging.debug(
+            f"({pipeline.run_id}) [CORE]: {pipeline.name!r} : {on.cronjob} : "
+            f"Closely to run >> {next_time:%Y-%m-%d %H:%M:%S}"
+        )
+
+        # NOTE: Release when the time is nearly to schedule time.
+        while (duration := get_diff_sec(next_time, tz=tz)) > (15 + 5):
+            logging.debug(
+                f"({pipeline.run_id}) [CORE]: {pipeline.name!r} : {on.cronjob} "
+                f": Sleep until: {duration}"
+            )
+            time.sleep(15)
+
+        time.sleep(0.5)
+
+        # NOTE: Release parameter that use to change if params has
+        #   templating.
+        release_params: DictData = {
+            "release": {
+                "logical_date": next_time,
+            },
+        }
+
+        # WARNING: Re-create pipeline object that use new running pipeline
+        #   ID.
+        runner: Pipeline = pipeline.get_running_id(run_id=pipeline.new_run_id)
+        rs: Result = runner.execute(
+            # FIXME: replace fix parameters on this execution process.
+            params=param2template(
+                {"asat-dt": "${{ release.logical_date }}"}, release_params
+            ),
+        )
+        logging.debug(
+            f"({runner.run_id}) [CORE]: {pipeline.name!r} : {on.cronjob} : "
+            f"End release"
+        )
+
+        del runner
+
+        # NOTE: remove this release date from running
+        self.running[pipeline.name].remove(next_time)
+
+        # IMPORTANT:
+        #   Add the next running datetime to pipeline queue
+        finish_time: datetime = datetime.now(tz=cron_tz).replace(
+            second=0, microsecond=0
+        )
+        future_running_time: datetime = gen.next
+        while (
+            future_running_time in self.running[pipeline.name]
+            or future_running_time in self.queue[pipeline.name]
+            or future_running_time < finish_time
+        ):
+            future_running_time: datetime = gen.next
+
+        heappush(self.queue[pipeline.name], future_running_time)
+
+        # NOTE: Set parent ID on this result.
+        rs.set_parent_run_id(pipeline.run_id)
+
+        # NOTE: Save result to log object saving.
+        rs_log: Log = log.model_validate(
+            {
+                "name": pipeline.name,
+                "on": str(on.cronjob),
+                "release": next_time,
+                "context": rs.context,
+                "parent_run_id": rs.run_id,
+                "run_id": rs.run_id,
+            }
+        )
+        rs_log.save()
+
+        logging.debug(f"[CORE]: {rs}")
 
 
 def queue2str(queue: list[datetime]) -> Iterator[str]:
@@ -103,37 +360,40 @@ def pipeline_release(
     )
     cron_tz: ZoneInfo = gen.tz
 
-    next_running_time: datetime = gen.next
-    while next_running_time in task.running[pipeline.name]:
-        next_running_time: datetime = gen.next
+    # NOTE: get next schedule time that generate from now.
+    next_time: datetime = gen.next
+
+    # NOTE: get next utils it does not running.
+    while next_time in task.running[pipeline.name]:
+        next_time: datetime = gen.next
 
     logging.debug(
         f"[CORE]: {pipeline.name!r} : {on.cronjob} : "
-        f"{next_running_time:%Y-%m-%d %H:%M:%S}"
+        f"{next_time:%Y-%m-%d %H:%M:%S}"
     )
-    heappush(task.running[pipeline.name], next_running_time)
+    heappush(task.running[pipeline.name], next_time)
 
-    # TODO: event should set on this step for release next pipeline task?
-
-    if get_diff_sec(next_running_time, tz=cron_tz) > 55:
+    if get_diff_sec(next_time, tz=cron_tz) > 55:
         logging.debug(
             f"({pipeline.run_id}) [CORE]: {pipeline.name!r} : {on.cronjob} : "
-            f"Does not closely >> {next_running_time:%Y-%m-%d %H:%M:%S}"
+            f"Does not closely >> {next_time:%Y-%m-%d %H:%M:%S}"
         )
 
-        # NOTE: Add this next running datetime to queue
-        heappush(task.queue[pipeline.name], next_running_time)
-        task.running[pipeline.name].remove(next_running_time)
-        time.sleep(0.5)
+        # NOTE: Add this next running datetime that not in period to queue and
+        #   remove it to running.
+        task.running[pipeline.name].remove(next_time)
+        heappush(task.queue[pipeline.name], next_time)
+
+        time.sleep(0.2)
         return
 
     logging.debug(
         f"({pipeline.run_id}) [CORE]: {pipeline.name!r} : {on.cronjob} : "
-        f"Closely to run >> {next_running_time:%Y-%m-%d %H:%M:%S}"
+        f"Closely to run >> {next_time:%Y-%m-%d %H:%M:%S}"
     )
 
     # NOTE: Release when the time is nearly to schedule time.
-    while (duration := get_diff_sec(next_running_time, tz=tz)) > (15 + 5):
+    while (duration := get_diff_sec(next_time, tz=tz)) > (15 + 5):
         logging.debug(
             f"({pipeline.run_id}) [CORE]: {pipeline.name!r} : {on.cronjob} : "
             f"Sleep until: {duration}"
@@ -146,7 +406,7 @@ def pipeline_release(
     #   templating.
     release_params: DictData = {
         "release": {
-            "logical_date": next_running_time,
+            "logical_date": next_time,
         },
     }
 
@@ -167,7 +427,7 @@ def pipeline_release(
     del runner
 
     # NOTE: remove this release date from running
-    task.running[pipeline.name].remove(next_running_time)
+    task.running[pipeline.name].remove(next_time)
 
     # IMPORTANT:
     #   Add the next running datetime to pipeline queue
@@ -192,7 +452,7 @@ def pipeline_release(
         {
             "name": pipeline.name,
             "on": str(on.cronjob),
-            "release": next_running_time,
+            "release": next_time,
             "context": rs.context,
             "parent_run_id": rs.run_id,
             "run_id": rs.run_id,
@@ -215,7 +475,7 @@ def workflow_task(
         This workflow task will start every minute at :02 second.
     """
     start_date: datetime = datetime.now(tz=tz)
-    start_date_minute = start_date.replace(second=0, microsecond=0)
+    start_date_minute: datetime = start_date.replace(second=0, microsecond=0)
 
     if start_date > stop:
         logging.info("[WORKFLOW]: Stop this schedule with datetime stopper.")
@@ -282,8 +542,7 @@ def workflow_task(
             f"{current_running_time:%Y%m%d%H%M}"
         )
         pipe_thread: Thread = Thread(
-            target=pipeline_release,
-            args=(task,),
+            target=task.release,
             name=thread_name,
             daemon=True,
         )
@@ -313,13 +572,13 @@ def workflow_long_running_task(threads: dict[str, Thread]) -> None:
 
 
 def workflow_control(
-    pipelines: list[str],
+    schedules: list[str],
     until: datetime | None = None,
     externals: DictData | None = None,
 ) -> list[str]:
     """Workflow scheduler control.
 
-    :param pipelines: A list of pipeline names that want to schedule running.
+    :param schedules: A list of pipeline names that want to schedule running.
     :param until:
     :param externals: An external parameters that pass to Loader.
     """
@@ -340,27 +599,11 @@ def workflow_control(
 
     # NOTE: Create pair of pipeline and on.
     pipeline_tasks: list[PipelineTask] = []
-
-    for name in pipelines:
-        pipeline: Pipeline = Pipeline.from_loader(name, externals=externals)
-
-        # NOTE: Create default list of release datetime.
-        wf_queue[name]: list[datetime] = []
-        wf_running[name]: list[datetime] = []
-
-        for on in pipeline.on:
-
-            on_gen = on.generate(start_date_waiting)
-            next_running_date = on_gen.next
-            while next_running_date in wf_queue[name]:
-                next_running_date = on_gen.next
-
-            heappush(wf_queue[name], next_running_date)
-            pipeline_tasks.append(
-                PipelineTask(
-                    pipeline=pipeline, on=on, queue=wf_queue, running=wf_running
-                ),
-            )
+    for name in schedules:
+        sch: Schedule = Schedule.from_loader(name, externals=externals)
+        pipeline_tasks.extend(
+            sch.tasks(start_date_waiting, wf_queue, wf_running, externals)
+        )
 
     # NOTE: This schedule job will start every minute at :02 seconds.
     schedule.every(1).minutes.at(":02").do(
@@ -377,7 +620,7 @@ def workflow_control(
     ).tag("monitor")
 
     # NOTE: Start running schedule
-    logging.info(f"[WORKFLOW]: Start schedule: {pipelines}")
+    logging.info(f"[WORKFLOW]: Start schedule: {schedules}")
     while True:
         schedule.run_pending()
         time.sleep(1)
@@ -391,7 +634,7 @@ def workflow_control(
 
     logging.warning(f"Queue: {[wf_queue[wf] for wf in wf_queue]}")
     logging.warning(f"Running: {[wf_running[wf] for wf in wf_running]}")
-    return pipelines
+    return schedules
 
 
 def workflow(
@@ -422,24 +665,17 @@ def workflow(
                                                            pipeline task 02 02
                   ==> ...
     """
-    excluded: list = excluded or []
+    excluded: list[str] = excluded or []
 
     with ProcessPoolExecutor(max_workers=2) as executor:
         futures: list[Future] = [
             executor.submit(
                 workflow_control,
-                pipelines=[load[0] for load in loader],
+                schedules=[load[0] for load in loader],
                 until=until,
                 externals=(externals or {}),
             )
-            for loader in batch(
-                # Loader.find(Pipeline, include=["on"], excluded=excluded),
-                [
-                    ("pipe-scheduling", None),
-                    # ("pipe-scheduling-minute", None),
-                ],
-                n=1,
-            )
+            for loader in batch(Loader.find(Schedule, excluded=excluded), n=100)
         ]
 
         results: list[str] = []
