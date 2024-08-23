@@ -86,8 +86,20 @@ class Strategy(BaseModel):
     """
 
     fail_fast: bool = Field(default=False)
-    max_parallel: int = Field(default=1, gt=0)
-    matrix: Matrix = Field(default_factory=dict)
+    max_parallel: int = Field(
+        default=1,
+        gt=0,
+        description=(
+            "The maximum number of executor thread pool that want to run "
+            "parallel"
+        ),
+    )
+    matrix: Matrix = Field(
+        default_factory=dict,
+        description=(
+            "A matrix values that want to cross product to possible strategies."
+        ),
+    )
     include: MatrixInclude = Field(
         default_factory=list,
         description="A list of additional matrix that want to adds-in.",
@@ -406,7 +418,7 @@ class Job(BaseModel):
         :param params: An input parameters that use on job execution.
         :rtype: Result
         """
-        strategy_context: DictData = {}
+        context: DictData = {}
 
         # NOTE: Normal Job execution.
         if (not self.strategy.is_set()) or self.strategy.max_parallel == 1:
@@ -414,10 +426,10 @@ class Job(BaseModel):
                 rs: Result = self.execute_strategy(
                     strategy, params=copy.deepcopy(params)
                 )
-                strategy_context.update(rs.context)
+                context.update(rs.context)
             return Result(
                 status=0,
-                context=strategy_context,
+                context=context,
             )
 
         # # WARNING: (WF001) I got error that raise when use
@@ -465,6 +477,8 @@ class Job(BaseModel):
                 )
                 for strategy in self.strategy.make()
             ]
+
+            # NOTE: Dynamic catching futures object with fail-fast flag.
             if self.strategy.fail_fast:
                 rs: Result = self.__catch_fail_fast(event, futures)
             else:
@@ -483,7 +497,7 @@ class Job(BaseModel):
         :param futures: A list of futures.
         :rtype: Result
         """
-        strategy_context: DictData = {}
+        context: DictData = {}
         # NOTE: Get results from a collection of tasks with a
         #   timeout that has the first exception.
         done, not_done = wait(
@@ -492,14 +506,16 @@ class Job(BaseModel):
         nd: str = (
             f", the strategies do not run is {not_done}" if not_done else ""
         )
-        logging.debug(f"[JOB]: Strategy is set Fail Fast{nd}")
+        logging.debug(f"({self.run_id}) [JOB]: Strategy is set Fail Fast{nd}")
 
-        # NOTE: Stop all running tasks
-        event.set()
+        if len(done) != len(futures):
 
-        # NOTE: Cancel any scheduled tasks
-        for future in futures:
-            future.cancel()
+            # NOTE: Stop all running tasks
+            event.set()
+
+            # NOTE: Cancel any scheduled tasks
+            for future in futures:
+                future.cancel()
 
         status: int = 0
         for future in done:
@@ -513,11 +529,8 @@ class Job(BaseModel):
                 continue
             else:
                 rs: Result = future.result(timeout=60)
-                strategy_context.update(rs.context)
-        return Result(
-            status=status,
-            context=strategy_context,
-        )
+                context.update(rs.context)
+        return Result(status=status, context=context)
 
     def __catch_all_completed(self, futures: list[Future]) -> Result:
         """Job parallel pool futures catching with all-completed mode.
@@ -525,12 +538,12 @@ class Job(BaseModel):
         :param futures: A list of futures.
         :rtype: Result
         """
-        strategy_context: DictData = {}
+        context: DictData = {}
         status: int = 0
         for future in as_completed(futures):
             try:
                 rs: Result = future.result(timeout=60)
-                strategy_context.update(rs.context)
+                context.update(rs.context)
             except PickleError as err:
                 # NOTE: (WF001) I do not want to fix this issue because
                 #   it does not make sense and over-engineering with
@@ -541,12 +554,20 @@ class Job(BaseModel):
                 ) from None
             except TimeoutError:
                 status = 1
-                logging.warning("Task is hanging. Attempting to kill.")
+                logging.warning(
+                    f"({self.run_id}) [JOB]: Task is hanging. Attempting to "
+                    f"kill."
+                )
                 future.cancel()
+                time.sleep(0.1)
                 if not future.cancelled():
-                    logging.warning("Failed to cancel the task.")
+                    logging.warning(
+                        f"({self.run_id}) [JOB]: Failed to cancel the task."
+                    )
                 else:
-                    logging.warning("Task canceled successfully.")
+                    logging.warning(
+                        f"({self.run_id}) [JOB]: Task canceled successfully."
+                    )
             except JobException as err:
                 status = 1
                 logging.error(
@@ -554,7 +575,7 @@ class Job(BaseModel):
                     f"fail-fast does not set;\n{err.__class__.__name__}:\n\t"
                     f"{err}"
                 )
-        return Result(status=status, context=strategy_context)
+        return Result(status=status, context=context)
 
 
 class Pipeline(BaseModel):
@@ -927,6 +948,7 @@ class Pipeline(BaseModel):
 
         :param job: A job ID that want to execute.
         :param params: A params that was parameterized from pipeline execution.
+        :rtype: Result
         """
         # VALIDATE: check a job ID that exists in this pipeline or not.
         if job not in self.jobs:
@@ -942,10 +964,8 @@ class Pipeline(BaseModel):
             j_rs: Result = job_obj.execute(params=params)
 
         except JobException as err:
-            raise PipelineException(
-                f"The job ID: {job} get error: {err.__class__.__name__}:"
-                f"\n{err}"
-            ) from None
+            raise PipelineException(f"{job}: JobException: {err}") from None
+
         return Result(
             status=j_rs.status,
             context={job: job_obj.set_outputs(j_rs.context)},
@@ -979,12 +999,18 @@ class Pipeline(BaseModel):
             ... ${job-name}.stages.${stage-id}.outputs.${key}
 
         """
-        logging.info(f"({self.run_id}) [CORE]: Start Execute: {self.name} ...")
+        logging.info(
+            f"({self.run_id}) [CORE]: Start Execute: {self.name!r} ..."
+        )
         params: DictData = params or {}
+        ts: float = time.monotonic()
 
         # NOTE: It should not do anything if it does not have job.
         if not self.jobs:
-            logging.warning("[PIPELINE]: This pipeline does not have any jobs")
+            logging.warning(
+                f"({self.run_id}) [PIPELINE]: This pipeline: {self.name!r} "
+                f"does not have any jobs"
+            )
             return Result(status=0, context=params)
 
         # NOTE: Create a job queue that keep the job that want to running after
@@ -993,46 +1019,42 @@ class Pipeline(BaseModel):
         for job_id in self.jobs:
             jq.put(job_id)
 
-        # NOTE: Create start timestamp
-        ts: float = time.monotonic()
-
         # NOTE: Create result context that will pass this context to any
         #   execution dependency.
-        rs: Result = Result(context=self.parameterize(params))
+        context: DictData = self.parameterize(params)
         try:
-            rs.receive(
-                self.__exec_non_threading(rs, ts, timeout=timeout)
-                if (
-                    worker := int(
-                        os.getenv("WORKFLOW_CORE_MAX_JOB_PARALLEL", "2")
-                    )
-                )
-                == 1
+            worker: int = int(os.getenv("WORKFLOW_CORE_MAX_JOB_PARALLEL", "2"))
+            (
+                self.__exec_non_threading(context, ts, jq, timeout=timeout)
+                if worker == 1
                 else self.__exec_threading(
-                    rs, ts, worker=worker, timeout=timeout
+                    context, ts, jq, worker=worker, timeout=timeout
                 )
             )
-            return rs
+            return Result(status=0, context=context)
         except PipelineException as err:
-            rs.context.update({"error": {"message": str(err)}})
-            rs.status = 1
-            return rs
+            context.update(
+                {"error_message": f"{err.__class__.__name__}: {err}"}
+            )
+            return Result(status=1, context=context)
 
     def __exec_threading(
         self,
-        rs: Result,
+        context: DictData,
         ts: float,
+        job_queue: Queue,
         *,
         worker: int = 2,
         timeout: int = 600,
-    ) -> Result:
+    ) -> DictData:
         """Pipeline threading execution.
 
-        :param rs:
-        :param ts:
+        :param context: A context pipeline data that want to downstream passing.
+        :param ts: A start timestamp that use for checking execute time should
+            timeout.
         :param timeout: A second value unit that bounding running time.
         :param worker: A number of threading executor pool size.
-        :rtype: Result
+        :rtype: DictData
         """
         not_time_out_flag: bool = True
         logging.debug(
@@ -1040,32 +1062,27 @@ class Pipeline(BaseModel):
             f"executor"
         )
 
-        # NOTE: Create a job queue that keep the job that want to running after
-        #   it dependency condition.
-        job_queue: Queue = Queue()
-        for job_id in self.jobs:
-            job_queue.put(job_id)
-
         # IMPORTANT: The job execution can run parallel and waiting by
         #   needed.
         with ThreadPoolExecutor(max_workers=worker) as executor:
             futures: list[Future] = []
+
             while not job_queue.empty() and (
                 not_time_out_flag := ((time.monotonic() - ts) < timeout)
             ):
                 job_id: str = job_queue.get()
                 job: Job = self.jobs[job_id]
 
-                if any(need not in rs.context["jobs"] for need in job.needs):
+                if any(need not in context["jobs"] for need in job.needs):
                     job_queue.put(job_id)
-                    time.sleep(0.5)
+                    time.sleep(0.25)
                     continue
 
                 futures.append(
                     executor.submit(
                         self.execute_job,
                         job_id,
-                        params=copy.deepcopy(rs.context),
+                        params=copy.deepcopy(context),
                     ),
                 )
                 job_queue.task_done()
@@ -1079,15 +1096,15 @@ class Pipeline(BaseModel):
                     raise PipelineException(f"{err}")
 
                 # NOTE: Update job result to pipeline result.
-                rs.receive_jobs(future.result(timeout=20))
+                context["jobs"].update(future.result(timeout=20).conext)
 
         if not_time_out_flag:
-            rs.status = 0
-            return rs
+            return context
 
         # NOTE: Raise timeout error.
         logging.warning(
-            f"({self.run_id}) [PIPELINE]: Execution of pipeline was timeout"
+            f"({self.run_id}) [PIPELINE]: Execution of pipeline, {self.name!r} "
+            f", was timeout"
         )
         raise PipelineException(
             f"Execution of pipeline: {self.name} was timeout"
@@ -1095,28 +1112,26 @@ class Pipeline(BaseModel):
 
     def __exec_non_threading(
         self,
-        rs: Result,
+        context: DictData,
         ts: float,
+        job_queue: Queue,
         *,
         timeout: int = 600,
-    ) -> Result:
-        """Pipeline non-threading execution.
+    ) -> DictData:
+        """Pipeline non-threading execution that use sequential job running
+        and waiting previous run successful.
 
-        :param rs:
-        :param ts:
+        :param context: A context pipeline data that want to downstream passing.
+        :param ts: A start timestamp that use for checking execute time should
+            timeout.
         :param timeout: A second value unit that bounding running time.
-        :rtype: Result
+        :rtype: DictData
         """
         not_time_out_flag: bool = True
         logging.debug(
             f"({self.run_id}) [CORE]: Run {self.name} with non-threading job "
             f"executor"
         )
-        # NOTE: Create a job queue that keep the job that want to running after
-        #   it dependency condition.
-        job_queue: Queue = Queue()
-        for job_id in self.jobs:
-            job_queue.put(job_id)
 
         while not job_queue.empty() and (
             not_time_out_flag := ((time.monotonic() - ts) < timeout)
@@ -1125,22 +1140,21 @@ class Pipeline(BaseModel):
             job: Job = self.jobs[job_id]
 
             # NOTE:
-            if any(need not in rs.context["jobs"] for need in job.needs):
+            if any(need not in context["jobs"] for need in job.needs):
                 job_queue.put(job_id)
-                time.sleep(0.5)
+                time.sleep(0.25)
                 continue
 
             # NOTE: Start job execution.
-            job_rs = self.execute_job(job_id, params=copy.deepcopy(rs.context))
-            rs.context["jobs"].update(job_rs.context)
+            job_rs = self.execute_job(job_id, params=copy.deepcopy(context))
+            context["jobs"].update(job_rs.context)
             job_queue.task_done()
 
         # NOTE: Wait for all items to finish processing
         job_queue.join()
 
         if not_time_out_flag:
-            rs.status = 0
-            return rs
+            return context
 
         # NOTE: Raise timeout error.
         logging.warning(
