@@ -44,7 +44,7 @@ app.queue_limit = 2
 @repeat_every(seconds=10, logger=logger)
 def broker_upper_messages():
     """Broker for receive message from the `/upper` path and change it to upper
-    case.
+    case. This broker use interval running in background every 10 seconds.
     """
     for _ in range(app.queue_limit):
         try:

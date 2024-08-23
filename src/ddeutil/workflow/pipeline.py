@@ -184,7 +184,13 @@ class Job(BaseModel):
         ... }
     """
 
-    id: Optional[str] = Field(default=None, description="A job ID.")
+    id: Optional[str] = Field(
+        default=None,
+        description=(
+            "A job ID, this value will add from pipeline after validation "
+            "process."
+        ),
+    )
     desc: Optional[str] = Field(
         default=None,
         description="A job description that can be string of markdown content.",
@@ -252,11 +258,12 @@ class Job(BaseModel):
         raise ValueError(f"Stage ID {stage_id} does not exists")
 
     def set_outputs(self, output: DictData) -> DictData:
+        """Setting output of job execution"""
         if len(output) > 1 and self.strategy.is_set():
             return {"strategies": output}
         return output[next(iter(output))]
 
-    def strategy_execute(
+    def execute_strategy(
         self,
         strategy: DictData,
         params: DictData,
@@ -276,6 +283,7 @@ class Job(BaseModel):
         :raise JobException: If it has any error from StageException or
             UtilException.
         """
+        # NOTE: Force stop this execution if event was set from main execution.
         if event and event.is_set():
             return Result(
                 status=1,
@@ -283,7 +291,7 @@ class Job(BaseModel):
                     gen_id(strategy): {
                         "matrix": strategy,
                         "stages": {},
-                        "error": {
+                        "error_message": {
                             "message": "Process Event stopped before execution"
                         },
                     },
@@ -352,7 +360,7 @@ class Job(BaseModel):
                             # ---
                             # "stages": filter_func(context.pop("stages", {})),
                             "stages": context.pop("stages", {}),
-                            "error": {
+                            "error_message": {
                                 "message": (
                                     "Process Event stopped before execution"
                                 ),
@@ -403,7 +411,7 @@ class Job(BaseModel):
         # NOTE: Normal Job execution.
         if (not self.strategy.is_set()) or self.strategy.max_parallel == 1:
             for strategy in self.strategy.make():
-                rs: Result = self.strategy_execute(
+                rs: Result = self.execute_strategy(
                     strategy, params=copy.deepcopy(params)
                 )
                 strategy_context.update(rs.context)
@@ -430,7 +438,7 @@ class Job(BaseModel):
         #     ) as executor:
         #         futures: list[Future] = [
         #             executor.submit(
-        #                 self.strategy_execute,
+        #                 self.execute_strategy,
         #                 strategy,
         #                 params=copy.deepcopy(params),
         #                 event=event,
@@ -450,7 +458,7 @@ class Job(BaseModel):
         ) as executor:
             futures: list[Future] = [
                 executor.submit(
-                    self.strategy_execute,
+                    self.execute_strategy,
                     strategy,
                     params=copy.deepcopy(params),
                     event=event,
@@ -551,8 +559,9 @@ class Job(BaseModel):
 
 class Pipeline(BaseModel):
     """Pipeline Model this is the main future of this project because it use to
-    be workflow data for running everywhere that you want. It use lightweight
-    coding line to execute it.
+    be workflow data for running everywhere that you want or using it to
+    scheduler task in background. It use lightweight coding line from Pydantic
+    Model and enhance execute method on it.
     """
 
     name: str = Field(description="A pipeline name.")
@@ -909,7 +918,7 @@ class Pipeline(BaseModel):
 
         return results
 
-    def job_execute(
+    def execute_job(
         self,
         job: str,
         params: DictData,
@@ -1054,7 +1063,7 @@ class Pipeline(BaseModel):
 
                 futures.append(
                     executor.submit(
-                        self.job_execute,
+                        self.execute_job,
                         job_id,
                         params=copy.deepcopy(rs.context),
                     ),
@@ -1122,7 +1131,7 @@ class Pipeline(BaseModel):
                 continue
 
             # NOTE: Start job execution.
-            job_rs = self.job_execute(job_id, params=copy.deepcopy(rs.context))
+            job_rs = self.execute_job(job_id, params=copy.deepcopy(rs.context))
             rs.context["jobs"].update(job_rs.context)
             job_queue.task_done()
 
