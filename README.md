@@ -14,7 +14,6 @@
   - [Pipeline](#pipeline)
 - [Usage](#usage)
 - [Configuration](#configuration)
-- [Future](#future)
 - [Deployment](#deployment)
 
 The **Lightweight workflow orchestration** with less dependencies the was created
@@ -199,23 +198,18 @@ run_py_local:
 
 **Application**:
 
-| Environment                         | Default | Description |
-|-------------------------------------|---------|-------------|
-| `WORKFLOW_APP_PROCESS_WORKER`       | 2       |             |
-| `WORKFLOW_APP_PIPELINE_PER_PROCESS` | 100     |             |
+| Environment                         | Default                          | Description                                                             |
+|-------------------------------------|----------------------------------|-------------------------------------------------------------------------|
+| `WORKFLOW_APP_PROCESS_WORKER`       | 2                                | The maximum process worker number that run in scheduler app module      |
+| `WORKFLOW_APP_SCHEDULE_PER_PROCESS` | 100                              | A schedule per process that run parallel                                |
+| `WORKFLOW_APP_STOP_BOUNDARY_DELTA`  | '{"minutes": 5, "seconds": 20}'  | A time delta value that use to stop scheduler app in json string format |
 
 **API server**:
 
-| Environment           | Default                                                | Description                                                        |
-|-----------------------|--------------------------------------------------------|--------------------------------------------------------------------|
-| `WORKFLOW_API_DB_URL` | postgresql+asyncpg://user:pass@localhost:5432/schedule | A Database URL that will pass to SQLAlchemy create_engine function |
-
-## Future
-
-The current milestone that will develop and necessary features that should to
-implement on this project.
-
-- ...
+| Environment                          | Default | Description                                                                       |
+|--------------------------------------|---------|-----------------------------------------------------------------------------------|
+| `WORKFLOW_API_ENABLE_ROUTE_WORKFLOW` | true    | A flag that enable workflow route to manage execute manually and workflow logging |
+| `WORKFLOW_API_ENABLE_ROUTE_SCHEDULE` | true    | A flag that enable run scheduler                                                  |
 
 ## Deployment
 

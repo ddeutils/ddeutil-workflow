@@ -31,7 +31,8 @@ def dotenv_setting() -> None:
             WORKFLOW_CORE_MAX_JOB_PARALLEL=1
             WORKFLOW_LOG_ENABLE_WRITE=true
             WORKFLOW_APP_PROCESS_WORKER=2
-            WORKFLOW_APP_PIPELINE_PER_PROCESS=1
+            WORKFLOW_APP_SCHEDULE_PER_PROCESS=100
+            WORKFLOW_APP_STOP_BOUNDARY_DELTA='{{"minutes": 5, "seconds": 20}}'
             WORKFLOW_API_ENABLE_ROUTE_WORKFLOW=true
             WORKFLOW_API_ENABLE_ROUTE_SCHEDULE=true
             """

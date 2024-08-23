@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import copy
+import json
 import logging
 import os
 import time
@@ -22,8 +23,14 @@ from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
-from schedule import CancelJob, Scheduler
 from typing_extensions import Self
+
+try:
+    from schedule import CancelJob, Scheduler
+except ImportError:
+    raise ImportError(
+        "Should install schedule package before use this module."
+    ) from None
 
 from .__types import DictData
 from .cron import CronRunner
@@ -41,6 +48,7 @@ from .utils import (
 )
 
 load_dotenv()
+tz: ZoneInfo = ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
 logging.basicConfig(
     level=logging.DEBUG,
     format=(
@@ -52,7 +60,6 @@ logging.basicConfig(
 )
 logging.getLogger("schedule").setLevel(logging.INFO)
 
-tz: ZoneInfo = ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
 
 __all__ = (
     "PipelineSchedule",
@@ -151,10 +158,10 @@ class Schedule(BaseModel):
     ) -> list[PipelineTask]:
         """Generate Task from the current datetime.
 
-        :param start_date:
+        :param start_date: A start date that get from the workflow schedule.
         :param queue:
         :param running:
-        :param externals:
+        :param externals: An external parameters that pass to the Loader object.
         :rtype: list[PipelineTask]
         """
 
@@ -193,6 +200,24 @@ def catch_exceptions(cancel_on_failure=False):
 
     def catch_exceptions_decorator(func):
         @wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except Exception as err:
+                logging.exception(err)
+                if cancel_on_failure:
+                    return CancelJob
+
+        return wrapper
+
+    return catch_exceptions_decorator
+
+
+def catch_exceptions_method(cancel_on_failure=False):
+    """Catch exception error from scheduler job."""
+
+    def catch_exceptions_decorator(func):
+        @wraps(func)
         def wrapper(self, *args, **kwargs):
             try:
                 return func(self, *args, **kwargs)
@@ -206,7 +231,7 @@ def catch_exceptions(cancel_on_failure=False):
     return catch_exceptions_decorator
 
 
-@dataclass
+@dataclass(frozen=True)
 class PipelineTask:
     """Pipeline task dataclass that use to keep mapping data and objects for
     passing in multithreading task.
@@ -217,7 +242,7 @@ class PipelineTask:
     queue: list[datetime]
     running: list[datetime]
 
-    @catch_exceptions(cancel_on_failure=True)
+    @catch_exceptions_method(cancel_on_failure=True)
     def release(self, log: Log | None = None) -> None:
         """Pipeline release, it will use with the same logic of
         `pipeline.release` method.
@@ -333,134 +358,11 @@ class PipelineTask:
         )
         rs_log.save()
 
-        logging.debug(f"[CORE]: {rs}")
+        logging.debug(f"[CORE]: {'-' * 100}")
 
 
 def queue2str(queue: list[datetime]) -> Iterator[str]:
     return (f"{q:%Y-%m-%d %H:%M:%S}" for q in queue)
-
-
-def pipeline_release(
-    task: PipelineTask,
-    *,
-    log: Log | None = None,
-) -> None:
-    """Pipeline release, it will use with the same logic of `pipeline.release`
-    method.
-
-    :param task: A PipelineTask dataclass.
-    :param log: A log object.
-    """
-    log: Log = log or FileLog
-    pipeline: Pipeline = task.pipeline
-    on: On = task.on
-
-    gen: CronRunner = on.generate(
-        datetime.now(tz=tz).replace(second=0, microsecond=0)
-    )
-    cron_tz: ZoneInfo = gen.tz
-
-    # NOTE: get next schedule time that generate from now.
-    next_time: datetime = gen.next
-
-    # NOTE: get next utils it does not running.
-    while next_time in task.running[pipeline.name]:
-        next_time: datetime = gen.next
-
-    logging.debug(
-        f"[CORE]: {pipeline.name!r} : {on.cronjob} : "
-        f"{next_time:%Y-%m-%d %H:%M:%S}"
-    )
-    heappush(task.running[pipeline.name], next_time)
-
-    if get_diff_sec(next_time, tz=cron_tz) > 55:
-        logging.debug(
-            f"({pipeline.run_id}) [CORE]: {pipeline.name!r} : {on.cronjob} : "
-            f"Does not closely >> {next_time:%Y-%m-%d %H:%M:%S}"
-        )
-
-        # NOTE: Add this next running datetime that not in period to queue and
-        #   remove it to running.
-        task.running[pipeline.name].remove(next_time)
-        heappush(task.queue[pipeline.name], next_time)
-
-        time.sleep(0.2)
-        return
-
-    logging.debug(
-        f"({pipeline.run_id}) [CORE]: {pipeline.name!r} : {on.cronjob} : "
-        f"Closely to run >> {next_time:%Y-%m-%d %H:%M:%S}"
-    )
-
-    # NOTE: Release when the time is nearly to schedule time.
-    while (duration := get_diff_sec(next_time, tz=tz)) > (15 + 5):
-        logging.debug(
-            f"({pipeline.run_id}) [CORE]: {pipeline.name!r} : {on.cronjob} : "
-            f"Sleep until: {duration}"
-        )
-        time.sleep(15)
-
-    time.sleep(0.5)
-
-    # NOTE: Release parameter that use to change if params has
-    #   templating.
-    release_params: DictData = {
-        "release": {
-            "logical_date": next_time,
-        },
-    }
-
-    # WARNING: Re-create pipeline object that use new running pipeline
-    #   ID.
-    runner: Pipeline = pipeline.get_running_id(run_id=pipeline.new_run_id)
-    rs: Result = runner.execute(
-        # FIXME: replace fix parameters on this execution process.
-        params=param2template(
-            {"asat-dt": "${{ release.logical_date }}"}, release_params
-        ),
-    )
-    logging.debug(
-        f"({runner.run_id}) [CORE]: {pipeline.name!r} : {on.cronjob} : "
-        f"End release"
-    )
-
-    del runner
-
-    # NOTE: remove this release date from running
-    task.running[pipeline.name].remove(next_time)
-
-    # IMPORTANT:
-    #   Add the next running datetime to pipeline queue
-    finish_time: datetime = datetime.now(tz=cron_tz).replace(
-        second=0, microsecond=0
-    )
-    future_running_time: datetime = gen.next
-    while (
-        future_running_time in task.running[pipeline.name]
-        or future_running_time in task.queue[pipeline.name]
-        or future_running_time < finish_time
-    ):
-        future_running_time: datetime = gen.next
-
-    heappush(task.queue[pipeline.name], future_running_time)
-
-    # NOTE: Set parent ID on this result.
-    rs.set_parent_run_id(pipeline.run_id)
-
-    # NOTE: Save result to log object saving.
-    rs_log: Log = log.model_validate(
-        {
-            "name": pipeline.name,
-            "on": str(on.cronjob),
-            "release": next_time,
-            "context": rs.context,
-            "parent_run_id": rs.run_id,
-            "run_id": rs.run_id,
-        }
-    )
-    rs_log.save()
-
-    logging.debug(f"[CORE]: {rs}")
 
 
 @catch_exceptions(cancel_on_failure=True)
@@ -473,6 +375,11 @@ def workflow_task(
     the threading in background.
 
         This workflow task will start every minute at :02 second.
+
+    :param pipeline_tasks:
+    :param stop:
+    :param threads:
+    :rtype: CancelJob | None
     """
     start_date: datetime = datetime.now(tz=tz)
     start_date_minute: datetime = start_date.replace(second=0, microsecond=0)
@@ -537,6 +444,8 @@ def workflow_task(
         # NOTE: Remove this datetime from queue.
         task.queue[task.pipeline.name].pop(0)
 
+        # NOTE: Create thread name that able to tracking with observe schedule
+        #   job.
         thread_name: str = (
             f"{task.pipeline.name}|{str(task.on.cronjob)}|"
             f"{current_running_time:%Y%m%d%H%M}"
@@ -561,6 +470,7 @@ def workflow_long_running_task(threads: dict[str, Thread]) -> None:
     control.
 
     :param threads: A mapping of Thread object and its name.
+    :rtype: None
     """
     logging.debug("[MONITOR]: Start checking long running pipeline release.")
     snapshot_threads = list(threads.keys())
@@ -573,14 +483,15 @@ def workflow_long_running_task(threads: dict[str, Thread]) -> None:
 
 def workflow_control(
     schedules: list[str],
-    until: datetime | None = None,
+    stop: datetime | None = None,
     externals: DictData | None = None,
 ) -> list[str]:
     """Workflow scheduler control.
 
     :param schedules: A list of pipeline names that want to schedule running.
-    :param until:
+    :param stop: An datetime value that use to stop running schedule.
     :param externals: An external parameters that pass to Loader.
+    :rtype: list[str]
     """
     schedule: Scheduler = Scheduler()
     start_date: datetime = datetime.now(tz=tz)
@@ -597,7 +508,7 @@ def workflow_control(
         second=0, microsecond=0
     )
 
-    # NOTE: Create pair of pipeline and on.
+    # NOTE: Create pair of pipeline and on from schedule model.
     pipeline_tasks: list[PipelineTask] = []
     for name in schedules:
         sch: Schedule = Schedule.from_loader(name, externals=externals)
@@ -609,7 +520,17 @@ def workflow_control(
     schedule.every(1).minutes.at(":02").do(
         workflow_task,
         pipeline_tasks=pipeline_tasks,
-        stop=until or (start_date + timedelta(minutes=5, seconds=20)),
+        # FIXME: Change upper bound datetime that stop schedule app.
+        stop=stop
+        or (
+            start_date
+            + timedelta(
+                **json.loads(
+                    os.getenv("WORKFLOW_APP_STOP_BOUNDARY_DELTA")
+                    or '{"minutes": 5, "seconds": 20}'
+                )
+            )
+        ),
         threads=thread_releases,
     ).tag("control")
 
@@ -638,19 +559,19 @@ def workflow_control(
 
 
 def workflow(
-    until: datetime | None = None,
+    stop: datetime | None = None,
     externals: DictData | None = None,
     excluded: list[str] | None = None,
 ):
     """Workflow application that running multiprocessing schedule with chunk of
     pipelines that exists in config path.
 
-    :param until:
+    :param stop:
     :param excluded:
     :param externals:
 
         This function will get all pipelines that include on value that was
-    created in config path and chuck it with WORKFLOW_APP_PIPELINE_PER_PROCESS
+    created in config path and chuck it with WORKFLOW_APP_SCHEDULE_PER_PROCESS
     value to multiprocess executor pool.
 
     The current workflow logic:
@@ -667,15 +588,20 @@ def workflow(
     """
     excluded: list[str] = excluded or []
 
-    with ProcessPoolExecutor(max_workers=2) as executor:
+    with ProcessPoolExecutor(
+        max_workers=int(os.getenv("WORKFLOW_APP_PROCESS_WORKER") or "2"),
+    ) as executor:
         futures: list[Future] = [
             executor.submit(
                 workflow_control,
                 schedules=[load[0] for load in loader],
-                until=until,
+                stop=stop,
                 externals=(externals or {}),
             )
-            for loader in batch(Loader.find(Schedule, excluded=excluded), n=100)
+            for loader in batch(
+                Loader.find(Schedule, excluded=excluded),
+                n=int(os.getenv("WORKFLOW_APP_SCHEDULE_PER_PROCESS") or "100"),
+            )
         ]
 
         results: list[str] = []
@@ -688,6 +614,5 @@ def workflow(
 
 
 if __name__ == "__main__":
-    # TODO: Define input arguments that want to manage this application.
     workflow_rs: list[str] = workflow()
     logging.info(f"Application run success: {workflow_rs}")

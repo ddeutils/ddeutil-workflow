@@ -71,7 +71,7 @@ class FileLog(BaseLog):
         *,
         queue: list[datetime] | None = None,
     ) -> bool:
-        """Check this log already point.
+        """Check this log already point in the destination.
 
         :param name: A pipeline name.
         :param release: A release datetime.
@@ -122,6 +122,7 @@ class FileLog(BaseLog):
             json.dumps(
                 self.model_dump(),
                 default=str,
+                indent=2,
             ),
             encoding="utf-8",
         )
