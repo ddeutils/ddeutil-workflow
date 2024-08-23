@@ -7,16 +7,15 @@ from __future__ import annotations
 
 import json
 import os
-import re
 from abc import ABC, abstractmethod
 from datetime import datetime
-from heapq import heappop, heappush
 from pathlib import Path
 from typing import Optional, Union
 
 from ddeutil.core import str2bool
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
+from typing_extensions import Self
 
 from .__types import DictData
 from .utils import config
@@ -65,45 +64,6 @@ class FileLog(BaseLog):
         self.pointer().mkdir(parents=True, exist_ok=True)
 
     @classmethod
-    def latest_point(
-        cls,
-        name: str,
-        *,
-        queue: list[datetime] | None = None,
-    ) -> datetime | None:
-        """Return latest point that exist in current logging pointer keeping.
-
-        :param name: A pipeline name
-        :param queue: A release queue.
-        """
-        keeping: Path = config().engine.paths.root / f"./logs/pipeline={name}/"
-        if not keeping.exists():
-            return None
-
-        keeping_files: list[int] = [
-            int(found.stem)
-            for found in keeping.glob("*")
-            if found.is_dir() and re.match(r"\d{14}", found.stem)
-        ]
-
-        latest = max(keeping_files or [None])
-
-        if not queue:
-            if latest is None:
-                return None
-            return datetime.strptime(str(latest), "%Y%m%d%H%M%S")
-
-        latest_queue: datetime = max(queue)
-
-        if latest is None:
-            return latest_queue
-
-        latest_dt: datetime = datetime.strptime(
-            str(latest), "%Y%m%d%H%M%S"
-        ).replace(tzinfo=latest_queue.tzinfo)
-        return max(latest_dt, latest_queue)
-
-    @classmethod
     def is_pointed(
         cls,
         name: str,
@@ -133,11 +93,8 @@ class FileLog(BaseLog):
         if pointer.exists() and not queue:
             return True
 
-        if queue:
-            latest: datetime = heappop(queue)
-            heappush(queue, latest)
-            if release == latest:
-                return True
+        if queue and release in queue:
+            return True
 
         return False
 
@@ -148,12 +105,12 @@ class FileLog(BaseLog):
             / f"./logs/pipeline={self.name}/release={self.release:%Y%m%d%H%M%S}"
         )
 
-    def save(self) -> None:
+    def save(self) -> Self:
         """Save logging data that receive a context data from a pipeline
         execution result.
         """
         if not str2bool(os.getenv("WORKFLOW_LOG_ENABLE_WRITE", "false")):
-            return
+            return self
 
         log_file: Path = self.pointer() / f"{self.run_id}.log"
         log_file.write_text(
@@ -163,6 +120,7 @@ class FileLog(BaseLog):
             ),
             encoding="utf-8",
         )
+        return self
 
 
 class SQLiteLog(BaseLog):

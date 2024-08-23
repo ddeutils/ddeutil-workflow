@@ -773,7 +773,7 @@ class Pipeline(BaseModel):
         on: On,
         params: DictData,
         *,
-        waiting_sec: int = 55,
+        waiting_sec: int = 60,
         sleep_interval: int = 15,
         log: Log = None,
         lq: list[datetime] = None,
@@ -785,106 +785,100 @@ class Pipeline(BaseModel):
             This method allow pipeline use log object to save the execution
         result to log destination like file log to local /logs directory.
 
+        :param on: An on schedule value.
+        :param params: A pipeline parameter that pass to execute method.
+        :param waiting_sec: A second period value that allow pipeline execute.
+        :param sleep_interval: A second value that want to waiting until time
+            to execute.
+        :param log: A log object that want to save execution result.
+        :param lq: A list of release time that already running.
         :rtype: Result
         """
         delay()
-        log: Log = log or FileLog
-        current_running_time = datetime.now()
-        if not (
-            latest_running_time := log.latest_point(name=self.name, queue=lq)
-        ) or (
-            latest_running_time.replace(tzinfo=ZoneInfo(on.tz))
-            < current_running_time.replace(tzinfo=ZoneInfo(on.tz))
-        ):
-            latest_running_time: datetime = current_running_time.replace(
-                tzinfo=ZoneInfo(on.tz)
-            )
-        else:
-            latest_running_time: datetime = latest_running_time.replace(
-                tzinfo=ZoneInfo(on.tz)
-            )
 
-        gen: CronRunner = on.generate(
-            latest_running_time + timedelta(seconds=1)
-        )
+        log: Log = log or FileLog
+        current_time: datetime = datetime.now().replace(second=0, microsecond=0)
+        gen: CronRunner = on.generate(current_time + timedelta(seconds=1))
         tz: ZoneInfo = gen.tz
 
         # NOTE: get next schedule time that generate from now.
-        next_running_time: datetime = gen.next
+        next_time: datetime = gen.next
 
         # NOTE: get next utils it does not logging.
-        # while log.is_pointed(self.name, next_running_time, queue=lq):
-        #     next_running_time: datetime = gen.next
-        while log.is_pointed(self.name, next_running_time, queue=lq):
-            next_running_time: datetime = gen.next
+        # while log.is_pointed(self.name, next_time, queue=lq):
+        #     next_time: datetime = gen.next
+        while log.is_pointed(self.name, next_time, queue=lq):
+            next_time: datetime = gen.next
 
-        heappush(lq, next_running_time)
+        # NOTE: push this next running time to log queue
+        heappush(lq, next_time)
 
         # VALIDATE: Check the different time between the next schedule time and
         #   now that less than waiting period (second unit).
-        if get_diff_sec(next_running_time, tz=tz) <= waiting_sec:
+        if get_diff_sec(next_time, tz=tz) > waiting_sec:
             logging.debug(
                 f"({self.run_id}) [CORE]: {self.name!r} : {on.cronjob} : "
-                f"Closely to run >> {next_running_time:%Y-%m-%d %H:%M:%S}"
+                f"Does not closely >> {next_time:%Y-%m-%d %H:%M:%S}"
             )
+            if lq:
+                lq.remove(next_time)
+            time.sleep(0.15)
+            return Result(status=0, context={"params": params})
 
-            # NOTE: Release when the time is nearly to schedule time.
-            while (duration := get_diff_sec(next_running_time, tz=tz)) > (
-                sleep_interval + 5
-            ):
-                logging.debug(
-                    f"({self.run_id}) [CORE]: {self.name!r} : {on.cronjob} : "
-                    f"Sleep until: {duration}"
-                )
-                time.sleep(sleep_interval)
+        logging.debug(
+            f"({self.run_id}) [CORE]: {self.name!r} : {on.cronjob} : "
+            f"Closely to run >> {next_time:%Y-%m-%d %H:%M:%S}"
+        )
 
-            time.sleep(0.5)
+        # NOTE: Release when the time is nearly to schedule time.
+        while (duration := get_diff_sec(next_time, tz=tz)) > (
+            sleep_interval + 5
+        ):
+            logging.debug(
+                f"({self.run_id}) [CORE]: {self.name!r} : {on.cronjob} : "
+                f"Sleep until: {duration}"
+            )
+            time.sleep(sleep_interval)
 
-            # NOTE: Release parameter that use to change if params has
-            #   templating.
-            release_params: DictData = {
-                "release": {
-                    "logical_date": next_running_time,
-                },
+        time.sleep(0.5)
+
+        # NOTE: Release parameter that use to change if params has
+        #   templating.
+        release_params: DictData = {
+            "release": {
+                "logical_date": next_time,
+            },
+        }
+
+        # WARNING: Re-create pipeline object that use new running pipeline
+        #   ID.
+        pipeline: Self = self.get_running_id(run_id=self.new_run_id)
+        rs: Result = pipeline.execute(
+            params=param2template(params, release_params),
+        )
+        logging.debug(
+            f"({pipeline.run_id}) [CORE]: {self.name!r} : {on.cronjob} : "
+            f"End release {next_time:%Y-%m-%d %H:%M:%S}"
+        )
+
+        del pipeline
+
+        rs.set_parent_run_id(self.run_id)
+        rs_log: Log = log.model_validate(
+            {
+                "name": self.name,
+                "on": str(on.cronjob),
+                "release": next_time,
+                "context": rs.context,
+                "parent_run_id": rs.run_id,
+                "run_id": rs.run_id,
             }
+        )
+        if lq:
+            lq.remove(next_time)
 
-            # WARNING: Re-create pipeline object that use new running pipeline
-            #   ID.
-            pipeline: Self = self.get_running_id(run_id=self.new_run_id)
-            rs: Result = pipeline.execute(
-                params=param2template(params, release_params),
-            )
-            logging.debug(
-                f"({pipeline.run_id}) [CORE]: {self.name!r} : {on.cronjob} : "
-                f"End release"
-            )
-
-            del pipeline
-
-            rs.set_parent_run_id(self.run_id)
-            rs_log: Log = log.model_validate(
-                {
-                    "name": self.name,
-                    "on": str(on.cronjob),
-                    "release": next_running_time,
-                    "context": rs.context,
-                    "parent_run_id": rs.run_id,
-                    "run_id": rs.run_id,
-                }
-            )
-            rs_log.save()
-        else:
-            logging.debug(
-                f"({self.run_id}) [CORE]: {self.name!r} : {on.cronjob} : "
-                f"Does not closely >> {next_running_time:%Y-%m-%d %H:%M:%S}"
-            )
-            rs = Result(status=0, context={"params": params})
-
-        if lq is None:
-            return rs
-
-        lq.remove(next_running_time)
-        time.sleep(0.25)
+        rs_log.save()
+        time.sleep(0.05)
         return rs
 
     def poke(
@@ -901,15 +895,18 @@ class Pipeline(BaseModel):
         :param log: A log object that want to use on this poking process.
         :rtype: list[Result]
         """
-        params: DictData = params or {}
-        logging.info(f"({self.run_id}) [CORE]: Start Poking: {self.name!r} ...")
-        results: list[Result] = []
-        log_queue: list[datetime] = []
+        logging.info(
+            f"({self.run_id}) [POKING]: Start Poking: {self.name!r} ..."
+        )
 
-        # NOTE: If this pipeline does not set schedule, it will return empty
-        #   result.
+        # NOTE: If this pipeline does not set the on schedule, it will return
+        #   empty result.
         if len(self.on) == 0:
-            return results
+            return []
+
+        params: DictData = params or {}
+        log_queue: list[datetime] = []
+        results: list[Result] = []
 
         with ThreadPoolExecutor(
             max_workers=int(
@@ -926,15 +923,15 @@ class Pipeline(BaseModel):
                 )
                 for on in self.on
             ]
+            # WARNING: This poking method does not allow to use fail-fast logic
+            #   to catching parallel execution result.
             for future in as_completed(futures):
-                rs: Result = future.result()
-                logging.info(rs.context.get("params", {}))
-                results.append(rs)
+                results.append(future.result(timeout=60))
 
         if len(log_queue) > 0:
             logging.error(
-                f"({self.run_id}) [CORE]: Log Queue does empty when poke "
-                f"is finishing."
+                f"({self.run_id}) [POKING]: Log Queue does empty when poking "
+                f"process was finishing."
             )
 
         return results
