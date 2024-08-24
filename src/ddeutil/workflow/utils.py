@@ -53,11 +53,13 @@ def get_diff_sec(dt: datetime, tz: ZoneInfo | None = None) -> int:
     )
 
 
-def delay() -> None:
+def delay(second: float = 0) -> None:
     """Delay time that use time.sleep with random second value between
     0.00 - 0.99 seconds.
+
+    :param second: A second number that want to adds-on random value.
     """
-    time.sleep(randrange(0, 99, step=10) / 100)
+    time.sleep(second + randrange(0, 99, step=10) / 100)
 
 
 class Engine(BaseModel):

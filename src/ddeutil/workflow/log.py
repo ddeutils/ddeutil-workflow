@@ -22,7 +22,7 @@ from .utils import config
 
 
 class BaseLog(BaseModel, ABC):
-    """Base Log Pydantic Model"""
+    """Base Log Pydantic Model abstraction that implement only model fields."""
 
     name: str = Field(description="A pipeline name.")
     on: str = Field(description="A cronjob string of this piepline schedule.")

@@ -188,7 +188,11 @@ class Schedule(BaseModel):
 
                 pipeline_tasks.append(
                     PipelineTask(
-                        pipeline=pipeline, on=on, queue=queue, running=running
+                        pipeline=pipeline,
+                        on=on,
+                        params=pipe.params,
+                        queue=queue,
+                        running=running,
                     ),
                 )
 
@@ -239,6 +243,7 @@ class PipelineTask:
 
     pipeline: Pipeline
     on: On
+    params: DictData
     queue: list[datetime]
     running: list[datetime]
 
@@ -266,7 +271,7 @@ class PipelineTask:
             next_time: datetime = gen.next
 
         logging.debug(
-            f"[CORE]: {pipeline.name!r} : {on.cronjob} : "
+            f"({pipeline.run_id}) [CORE]: {pipeline.name!r} : {on.cronjob} : "
             f"{next_time:%Y-%m-%d %H:%M:%S}"
         )
         heappush(self.running[pipeline.name], next_time)
@@ -312,10 +317,7 @@ class PipelineTask:
         #   ID.
         runner: Pipeline = pipeline.get_running_id(run_id=pipeline.new_run_id)
         rs: Result = runner.execute(
-            # FIXME: replace fix parameters on this execution process.
-            params=param2template(
-                {"asat-dt": "${{ release.logical_date }}"}, release_params
-            ),
+            params=param2template(self.params, release_params),
         )
         logging.debug(
             f"({runner.run_id}) [CORE]: {pipeline.name!r} : {on.cronjob} : "
@@ -434,7 +436,6 @@ def workflow_task(
             )
             continue
         elif len(task.queue[task.pipeline.name]) == 0:
-            # TODO: Should auto add new queue?
             logging.warning(
                 f"[WORKFLOW]: Queue is empty for : {task.pipeline.name!r} : "
                 f"{task.on.cronjob}"
@@ -472,7 +473,9 @@ def workflow_long_running_task(threads: dict[str, Thread]) -> None:
     :param threads: A mapping of Thread object and its name.
     :rtype: None
     """
-    logging.debug("[MONITOR]: Start checking long running pipeline release.")
+    logging.debug(
+        "[MONITOR]: Start checking long running pipeline release task."
+    )
     snapshot_threads = list(threads.keys())
     for t_name in snapshot_threads:
 
@@ -520,7 +523,6 @@ def workflow_control(
     schedule.every(1).minutes.at(":02").do(
         workflow_task,
         pipeline_tasks=pipeline_tasks,
-        # FIXME: Change upper bound datetime that stop schedule app.
         stop=stop
         or (
             start_date
@@ -553,8 +555,12 @@ def workflow_control(
             logging.warning("[WORKFLOW]: Does not have any schedule jobs !!!")
             break
 
-    logging.warning(f"Queue: {[wf_queue[wf] for wf in wf_queue]}")
-    logging.warning(f"Running: {[wf_running[wf] for wf in wf_running]}")
+    logging.warning(
+        f"Queue: {[list(queue2str(wf_queue[wf])) for wf in wf_queue]}"
+    )
+    logging.warning(
+        f"Running: {[list(queue2str(wf_running[wf])) for wf in wf_running]}"
+    )
     return schedules
 
 
@@ -562,13 +568,14 @@ def workflow(
     stop: datetime | None = None,
     externals: DictData | None = None,
     excluded: list[str] | None = None,
-):
+) -> list[str]:
     """Workflow application that running multiprocessing schedule with chunk of
     pipelines that exists in config path.
 
     :param stop:
     :param excluded:
     :param externals:
+    :rtype: list[str]
 
         This function will get all pipelines that include on value that was
     created in config path and chuck it with WORKFLOW_APP_SCHEDULE_PER_PROCESS

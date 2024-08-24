@@ -37,7 +37,7 @@ app = FastAPI()
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.queue = Queue()
 app.output_dict = {}
-app.queue_limit = 2
+app.queue_limit = 5
 
 
 @app.on_event("startup")
@@ -66,11 +66,12 @@ async def get_result(request_id):
             result = app.output_dict[request_id]
             del app.output_dict[request_id]
             return {"message": result}
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0.0025)
 
 
 @app.post("/upper", response_class=UJSONResponse)
 async def message_upper(payload: Payload):
+    """Convert message from any case to the upper case."""
     request_id: str = str(uuid.uuid4())
     app.queue.put(
         {"text": payload.text, "request_id": request_id},
