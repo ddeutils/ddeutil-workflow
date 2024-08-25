@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import contextlib
 import inspect
-import logging
 import os
 import subprocess
 import sys
@@ -46,6 +45,7 @@ from typing_extensions import Self
 
 from .__types import DictData, DictStr, Re, TupleStr
 from .exceptions import StageException
+from .log import get_logger
 from .utils import (
     Registry,
     Result,
@@ -58,6 +58,9 @@ from .utils import (
 )
 
 P = ParamSpec("P")
+logger = get_logger("ddeutil.workflow")
+
+
 __all__: TupleStr = (
     "Stage",
     "EmptyStage",
@@ -86,7 +89,7 @@ def handler_result(message: str | None = None) -> Callable[P, Result]:
                 return func(self, *args, **kwargs).set_run_id(self.run_id)
             except Exception as err:
                 # NOTE: Start catching error from the stage execution.
-                logging.error(
+                logger.error(
                     f"({self.run_id}) [STAGE]: {err.__class__.__name__}: {err}"
                 )
                 if str2bool(
@@ -191,7 +194,7 @@ class BaseStage(BaseModel, ABC):
             self.id
             or str2bool(os.getenv("WORKFLOW_CORE_STAGE_DEFAULT_ID", "false"))
         ):
-            logging.debug(
+            logger.debug(
                 f"({self.run_id}) [STAGE]: Output does not set because this "
                 f"stage does not set ID or default stage ID config flag not be "
                 f"True."
@@ -208,7 +211,7 @@ class BaseStage(BaseModel, ABC):
             _id: str = gen_id(param2template(self.name, params=to))
 
         # NOTE: Set the output to that stage generated ID.
-        logging.debug(
+        logger.debug(
             f"({self.run_id}) [STAGE]: Set output complete with stage ID: {_id}"
         )
         to["stages"][_id] = {"outputs": output}
@@ -231,7 +234,7 @@ class BaseStage(BaseModel, ABC):
                 raise TypeError("Return type of condition does not be boolean")
             return not rs
         except Exception as err:
-            logging.error(f"({self.run_id}) [STAGE]: {err}")
+            logger.error(f"({self.run_id}) [STAGE]: {err}")
             raise StageException(f"{err.__class__.__name__}: {err}") from err
 
 
@@ -258,7 +261,7 @@ class EmptyStage(BaseStage):
         :param params: A context data that want to add output result. But this
             stage does not pass any output.
         """
-        logging.info(
+        logger.info(
             f"({self.run_id}) [STAGE]: Empty-Execute: {self.name!r}: "
             f"( {param2template(self.echo, params=params) or '...'} )"
         )
@@ -314,7 +317,7 @@ class BashStage(BaseStage):
         # NOTE: Make this .sh file able to executable.
         make_exec(f"./{f_name}")
 
-        logging.debug(
+        logger.debug(
             f"({self.run_id}) [STAGE]: Start create `.sh` file and running a "
             f"bash statement."
         )
@@ -336,7 +339,7 @@ class BashStage(BaseStage):
         with self.__prepare_bash(
             bash=bash, env=param2template(self.env, params)
         ) as sh:
-            logging.info(f"({self.run_id}) [STAGE]: Shell-Execute: {sh}")
+            logger.info(f"({self.run_id}) [STAGE]: Shell-Execute: {sh}")
             rs: CompletedProcess = subprocess.run(
                 sh,
                 shell=False,
@@ -424,7 +427,7 @@ class PyStage(BaseStage):
         _locals: DictData = {}
 
         # NOTE: Start exec the run statement.
-        logging.info(f"({self.run_id}) [STAGE]: Py-Execute: {self.name}")
+        logger.info(f"({self.run_id}) [STAGE]: Py-Execute: {self.name}")
         exec(run, _globals, _locals)
 
         return Result(
@@ -531,7 +534,7 @@ class HookStage(BaseStage):
             if k.removeprefix("_") in args:
                 args[k] = args.pop(k.removeprefix("_"))
 
-        logging.info(
+        logger.info(
             f"({self.run_id}) [STAGE]: Hook-Execute: {t_func.name}@{t_func.tag}"
         )
         rs: DictData = t_func(**param2template(args, params))
@@ -583,7 +586,7 @@ class TriggerStage(BaseStage):
         pipe: Pipeline = Pipeline.from_loader(
             name=_trigger, externals={"run_id": self.run_id}
         )
-        logging.info(f"({self.run_id}) [STAGE]: Trigger-Execute: {_trigger!r}")
+        logger.info(f"({self.run_id}) [STAGE]: Trigger-Execute: {_trigger!r}")
         return pipe.execute(params=param2template(self.params, params))
 
 

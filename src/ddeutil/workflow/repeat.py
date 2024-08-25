@@ -3,33 +3,44 @@
 # Licensed under the MIT License.
 # This code refs from: https://github.com/priyanshu-panwar/fastapi-utilities
 # ------------------------------------------------------------------------------
+from __future__ import annotations
+
 import asyncio
-import logging
 import os
 from asyncio import ensure_future
 from datetime import datetime
-from functools import wraps
+from functools import partial, wraps
 from zoneinfo import ZoneInfo
 
-from croniter import croniter
 from starlette.concurrency import run_in_threadpool
 
+from .cron import CronJob
+from .log import get_logger
 
-def get_cron_delta(cron: str):
+logger = get_logger("ddeutil.workflow")
+
+
+def get_cronjob_delta(cron: str):
     """This function returns the time delta between now and the next cron
     execution time.
     """
     now: datetime = datetime.now(
         tz=ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
     )
-    cron = croniter(cron, now)
-    return (cron.get_next(datetime) - now).total_seconds()
+    cron = CronJob(cron)
+    return (cron.schedule(now).next - now).total_seconds()
+
+
+def cron_valid(cron: str):
+    try:
+        CronJob(cron)
+    except Exception as err:
+        raise ValueError(f"Crontab value does not valid, {cron}") from err
 
 
 def repeat_at(
     *,
     cron: str,
-    logger: logging.Logger = None,
     raise_exceptions: bool = False,
     max_repetitions: int = None,
 ):
@@ -38,38 +49,35 @@ def repeat_at(
 
     :param cron: str
         Cron-style string for periodic execution, eg. '0 0 * * *' every midnight
-    :param logger: logging.Logger (default None)
-        Logger object to log exceptions
     :param raise_exceptions: bool (default False)
         Whether to raise exceptions or log them
     :param max_repetitions: int (default None)
         Maximum number of times to repeat the function. If None, repeat
         indefinitely.
-
     """
+    if max_repetitions and max_repetitions <= 0:
+        raise ValueError(
+            "max_repetitions should more than zero if it want to set"
+        )
 
     def decorator(func):
-        is_coroutine = asyncio.iscoroutinefunction(func)
+        if asyncio.iscoroutinefunction(func):
+            func = partial(run_in_threadpool, func=func)
 
         @wraps(func)
         def wrapper(*_args, **_kwargs):
-            repititions = 0
-            if not croniter.is_valid(cron):
-                raise ValueError("Invalid cron expression")
+            repititions: int = 0
+            cron_valid(cron)
 
             async def loop(*args, **kwargs):
                 nonlocal repititions
                 while max_repetitions is None or repititions < max_repetitions:
+                    sleep_time = get_cronjob_delta(cron)
+                    await asyncio.sleep(sleep_time)
                     try:
-                        sleep_time = get_cron_delta(cron)
-                        await asyncio.sleep(sleep_time)
-                        if is_coroutine:
-                            await func(*args, **kwargs)
-                        else:
-                            await run_in_threadpool(func, *args, **kwargs)
+                        await func(*args, **kwargs)
                     except Exception as e:
-                        if logger:
-                            logger.exception(e)
+                        logger.exception(e)
                         if raise_exceptions:
                             raise e
                     repititions += 1
@@ -85,7 +93,6 @@ def repeat_every(
     *,
     seconds: float,
     wait_first: bool = False,
-    logger: logging.Logger = None,
     raise_exceptions: bool = False,
     max_repetitions: int = None,
 ):
@@ -97,17 +104,20 @@ def repeat_every(
     :param wait_first: bool (default False)
         Whether to wait `seconds` seconds before executing the function for the
         first time.
-    :param logger: logging.Logger (default None)
-        The logger to use for logging exceptions.
     :param raise_exceptions: bool (default False)
         Whether to raise exceptions instead of logging them.
     :param max_repetitions: int (default None)
         The maximum number of times to repeat the function. If None, the
         function will repeat indefinitely.
     """
+    if max_repetitions and max_repetitions <= 0:
+        raise ValueError(
+            "max_repetitions should more than zero if it want to set"
+        )
 
     def decorator(func):
-        is_coroutine = asyncio.iscoroutinefunction(func)
+        if asyncio.iscoroutinefunction(func):
+            func = partial(run_in_threadpool, func=func)
 
         @wraps(func)
         async def wrapper(*_args, **_kwargs):
@@ -115,19 +125,18 @@ def repeat_every(
 
             async def loop(*args, **kwargs):
                 nonlocal repetitions
+
                 if wait_first:
                     await asyncio.sleep(seconds)
+
                 while max_repetitions is None or repetitions < max_repetitions:
                     try:
-                        if is_coroutine:
-                            await func(*args, **kwargs)
-                        else:
-                            await run_in_threadpool(func, *args, **kwargs)
+                        await func(*args, **kwargs)
                     except Exception as e:
-                        if logger is not None:
-                            logger.exception(e)
+                        logger.exception(e)
                         if raise_exceptions:
                             raise e
+
                     repetitions += 1
                     await asyncio.sleep(seconds)
 

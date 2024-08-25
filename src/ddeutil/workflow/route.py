@@ -1,22 +1,53 @@
+# ------------------------------------------------------------------------------
+# Copyright (c) 2022 Korawich Anuttra. All rights reserved.
+# Licensed under the MIT License. See LICENSE in the project root for
+# license information.
+# ------------------------------------------------------------------------------
 from __future__ import annotations
 
-import logging
-
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi import status as st
+from fastapi.responses import UJSONResponse
 
-logger = logging.getLogger(__name__)
-workflow = APIRouter(prefix="/wf", tags=["workflow"])
+from .__types import DictData
+from .log import get_logger
+from .pipeline import Pipeline
+from .repeat import repeat_every
+from .utils import Loader
+
+logger = get_logger("ddeutil.workflow")
+workflow = APIRouter(prefix="/workflow", tags=["workflow"])
+schedule = APIRouter(prefix="/schedule", tags=["schedule"])
 
 
-@workflow.get("/")
+@workflow.get(
+    "/",
+    response_class=UJSONResponse,
+)
 async def get_workflows():
-    return {"message": "getting all pipelines: []"}
+    pipelines: DictData = Loader.find(Pipeline)
+    return {
+        "message": f"getting all pipelines: {pipelines}",
+    }
 
 
-@workflow.get("/{name}")
+@workflow.get(
+    "/{name}",
+    response_class=UJSONResponse,
+    status_code=st.HTTP_200_OK,
+)
 async def get_workflow(name: str):
-    return {"message": f"getting pipeline {name}"}
+    """Return model of pipeline that passing an input pipeline name."""
+    try:
+        pipeline: Pipeline = Pipeline.from_loader(name=name, externals={})
+    except ValueError:
+        raise HTTPException(
+            status_code=st.HTTP_404_NOT_FOUND,
+            detail=(
+                f"Workflow pipeline name: {name!r} does not found in /conf path"
+            ),
+        ) from None
+    return pipeline.model_dump(exclude=["on"])
 
 
 @workflow.get("/{name}/logs")
@@ -37,19 +68,12 @@ async def del_workflow_release_log(name: str, release: str):
     return {"message": f"getting pipeline {name} log in release {release}"}
 
 
-class JobNotFoundError(Exception):
-    pass
+@schedule.on_event("startup")
+@repeat_every(seconds=60)
+def schedule_broker_up(): ...
 
 
-schedule = APIRouter(prefix="/schedule", tags=["schedule"])
-
-
-@schedule.post("/", name="scheduler:add_job", status_code=st.HTTP_201_CREATED)
-async def add_job(request: Request):
-    return {"job": f"{request}"}
-
-
-@schedule.get("/", name="scheduler:get_jobs", response_model=list)
+@schedule.get("/", response_class=UJSONResponse)
 async def get_jobs(request: Request):
     jobs = request.app.scheduler.get_jobs()
     jobs = [
@@ -57,15 +81,3 @@ async def get_jobs(request: Request):
         for job in jobs
     ]
     return jobs
-
-
-@schedule.delete("/{job_id}", name="scheduler:remove_job")
-async def remove_job(request: Request, job_id: str):
-    try:
-        deleted = request.app.scheduler.remove_job(job_id=job_id)
-        logger.debug(f"Job {job_id} deleted: {deleted}")
-        return {"job": f"{job_id}"}
-    except AttributeError as err:
-        raise JobNotFoundError(
-            f"No job by the id of {job_id} was found"
-        ) from err

@@ -35,7 +35,7 @@ except ImportError:
 from .__types import DictData
 from .cron import CronRunner
 from .exceptions import WorkflowException
-from .log import FileLog, Log
+from .log import FileLog, Log, get_logger
 from .on import On
 from .pipeline import Pipeline
 from .utils import (
@@ -48,15 +48,7 @@ from .utils import (
 )
 
 load_dotenv()
-logging.basicConfig(
-    level=logging.DEBUG,
-    format=(
-        "%(asctime)s.%(msecs)03d (%(name)-10s, %(process)-5d, %(thread)-5d) "
-        "[%(levelname)-7s] %(message)-120s (%(filename)s:%(lineno)s)"
-    ),
-    handlers=[logging.StreamHandler()],
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
+logger = get_logger("ddeutil.workflow")
 logging.getLogger("schedule").setLevel(logging.INFO)
 
 
@@ -207,7 +199,7 @@ def catch_exceptions(cancel_on_failure=False):
             try:
                 return func(*args, **kwargs)
             except Exception as err:
-                logging.exception(err)
+                logger.exception(err)
                 if cancel_on_failure:
                     return CancelJob
 
@@ -225,7 +217,7 @@ def catch_exceptions_method(cancel_on_failure=False):
             try:
                 return func(self, *args, **kwargs)
             except Exception as err:
-                logging.exception(err)
+                logger.exception(err)
                 if cancel_on_failure:
                     return CancelJob
 
@@ -272,14 +264,14 @@ class PipelineTask:
         ):
             next_time: datetime = gen.next
 
-        logging.debug(
+        logger.debug(
             f"({pipeline.run_id}) [CORE]: {pipeline.name!r} : {on.cronjob} : "
             f"{next_time:%Y-%m-%d %H:%M:%S}"
         )
         heappush(self.running[pipeline.name], next_time)
 
         if get_diff_sec(next_time, tz=cron_tz) > 55:
-            logging.debug(
+            logger.debug(
                 f"({pipeline.run_id}) [CORE]: {pipeline.name!r} : {on.cronjob} "
                 f": Does not closely >> {next_time:%Y-%m-%d %H:%M:%S}"
             )
@@ -292,14 +284,14 @@ class PipelineTask:
             time.sleep(0.2)
             return
 
-        logging.debug(
+        logger.debug(
             f"({pipeline.run_id}) [CORE]: {pipeline.name!r} : {on.cronjob} : "
             f"Closely to run >> {next_time:%Y-%m-%d %H:%M:%S}"
         )
 
         # NOTE: Release when the time is nearly to schedule time.
         while (duration := get_diff_sec(next_time, tz=tz)) > (15 + 5):
-            logging.debug(
+            logger.debug(
                 f"({pipeline.run_id}) [CORE]: {pipeline.name!r} : {on.cronjob} "
                 f": Sleep until: {duration}"
             )
@@ -321,7 +313,7 @@ class PipelineTask:
         rs: Result = runner.execute(
             params=param2template(self.params, release_params),
         )
-        logging.debug(
+        logger.debug(
             f"({runner.run_id}) [CORE]: {pipeline.name!r} : {on.cronjob} : "
             f"End release - {next_time:%Y-%m-%d %H:%M:%S}"
         )
@@ -361,7 +353,7 @@ class PipelineTask:
             future_running_time: datetime = gen.next
 
         heappush(self.queue[pipeline.name], future_running_time)
-        logging.debug(f"[CORE]: {'-' * 100}")
+        logger.debug(f"[CORE]: {'-' * 100}")
 
 
 def queue2str(queue: list[datetime]) -> Iterator[str]:
@@ -389,9 +381,9 @@ def workflow_task(
     start_date_minute: datetime = start_date.replace(second=0, microsecond=0)
 
     if start_date > stop:
-        logging.info("[WORKFLOW]: Stop this schedule with datetime stopper.")
+        logger.info("[WORKFLOW]: Stop this schedule with datetime stopper.")
         while len(threads) > 0:
-            logging.warning(
+            logger.warning(
                 "[WORKFLOW]: Waiting pipeline release thread that still "
                 "running in background."
             )
@@ -414,7 +406,7 @@ def workflow_task(
     for task in pipeline_tasks:
 
         # NOTE: Get incoming datetime queue.
-        logging.debug(
+        logger.debug(
             f"[WORKFLOW]: Current queue: {task.pipeline.name!r} : "
             f"{list(queue2str(task.queue[task.pipeline.name]))}"
         )
@@ -431,14 +423,14 @@ def workflow_task(
             task.on.next(current_running_time)
             != task.queue[task.pipeline.name][0]
         ):
-            logging.debug(
+            logger.debug(
                 f"[WORKFLOW]: Skip schedule "
                 f"{current_running_time:%Y-%m-%d %H:%M:%S} "
                 f"for : {task.pipeline.name!r} : {task.on.cronjob}"
             )
             continue
         elif len(task.queue[task.pipeline.name]) == 0:
-            logging.warning(
+            logger.warning(
                 f"[WORKFLOW]: Queue is empty for : {task.pipeline.name!r} : "
                 f"{task.on.cronjob}"
             )
@@ -465,7 +457,7 @@ def workflow_task(
 
         delay()
 
-    logging.debug(f"[WORKFLOW]: {'=' * 100}")
+    logger.debug(f"[WORKFLOW]: {'=' * 100}")
 
 
 def workflow_long_running_task(threads: dict[str, Thread]) -> None:
@@ -475,7 +467,7 @@ def workflow_long_running_task(threads: dict[str, Thread]) -> None:
     :param threads: A mapping of Thread object and its name.
     :rtype: None
     """
-    logging.debug(
+    logger.debug(
         "[MONITOR]: Start checking long running pipeline release task."
     )
     snapshot_threads = list(threads.keys())
@@ -546,22 +538,22 @@ def workflow_control(
     ).tag("monitor")
 
     # NOTE: Start running schedule
-    logging.info(f"[WORKFLOW]: Start schedule: {schedules}")
+    logger.info(f"[WORKFLOW]: Start schedule: {schedules}")
     while True:
         schedule.run_pending()
         time.sleep(1)
         if not schedule.get_jobs("control"):
             schedule.clear("monitor")
-            logging.warning(
+            logger.warning(
                 f"[WORKFLOW]: Pipeline release thread: {thread_releases}"
             )
-            logging.warning("[WORKFLOW]: Does not have any schedule jobs !!!")
+            logger.warning("[WORKFLOW]: Does not have any schedule jobs !!!")
             break
 
-    logging.warning(
+    logger.warning(
         f"Queue: {[list(queue2str(wf_queue[wf])) for wf in wf_queue]}"
     )
-    logging.warning(
+    logger.warning(
         f"Running: {[list(queue2str(wf_running[wf])) for wf in wf_running]}"
     )
     return schedules
@@ -617,7 +609,7 @@ def workflow(
         results: list[str] = []
         for future in as_completed(futures):
             if err := future.exception():
-                logging.error(str(err))
+                logger.error(str(err))
                 raise WorkflowException(str(err)) from err
             results.extend(future.result(timeout=1))
         return results
@@ -625,4 +617,4 @@ def workflow(
 
 if __name__ == "__main__":
     workflow_rs: list[str] = workflow()
-    logging.info(f"Application run success: {workflow_rs}")
+    logger.info(f"Application run success: {workflow_rs}")

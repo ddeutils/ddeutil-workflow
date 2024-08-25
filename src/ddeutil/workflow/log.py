@@ -6,9 +6,11 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from abc import ABC, abstractmethod
 from datetime import datetime
+from functools import lru_cache
 from pathlib import Path
 from typing import Optional, Union
 
@@ -19,6 +21,27 @@ from typing_extensions import Self
 
 from .__types import DictData
 from .utils import config
+
+
+@lru_cache
+def get_logger(name: str):
+    """Return logger with an input module name."""
+    logger = logging.getLogger(name)
+    formatter = logging.Formatter(
+        fmt=(
+            "%(asctime)s.%(msecs)03d (%(name)-10s, %(process)-5d, "
+            "%(thread)-5d) [%(levelname)-7s] %(message)-120s "
+            "(%(filename)s:%(lineno)s)"
+        ),
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    stream = logging.StreamHandler()
+    stream.setFormatter(formatter)
+    logger.addHandler(stream)
+
+    debug: bool = str2bool(os.getenv("WORKFLOW_LOG_DEBUG_MODE", "true"))
+    logger.setLevel(logging.DEBUG if debug else logging.INFO)
+    return logger
 
 
 class BaseLog(BaseModel, ABC):

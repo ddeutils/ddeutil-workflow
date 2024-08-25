@@ -263,7 +263,7 @@ class Loader(SimLoad):
     @classmethod
     def find(
         cls,
-        obj,
+        obj: object,
         *,
         include: list[str] | None = None,
         exclude: list[str] | None = None,

@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 import json
-import logging
 import os
 from datetime import datetime
 from enum import Enum
@@ -16,21 +15,15 @@ from zoneinfo import ZoneInfo
 from ddeutil.core import str2list
 from typer import Argument, Option, Typer
 
+from .log import get_logger
+
+logger = get_logger("ddeutil.workflow")
 cli: Typer = Typer()
 cli_log: Typer = Typer()
 cli.add_typer(
     cli_log,
     name="log",
     help="Logging commands",
-)
-logging.basicConfig(
-    level=logging.DEBUG,
-    format=(
-        "%(asctime)s.%(msecs)03d (%(name)-10s, %(process)-5d, %(thread)-5d) "
-        "[%(levelname)-7s] %(message)-120s (%(filename)s:%(lineno)s)"
-    ),
-    handlers=[logging.StreamHandler()],
-    datefmt="%Y-%m-%d %H:%M:%S",
 )
 
 
@@ -50,8 +43,8 @@ def run(
     """Run pipeline workflow manually with an input custom parameters that able
     to receive with pipeline params config.
     """
-    logging.info(f"Running pipeline name: {pipeline}")
-    logging.info(f"... with Parameters: {json.dumps(json.loads(params))}")
+    logger.info(f"Running pipeline name: {pipeline}")
+    logger.info(f"... with Parameters: {json.dumps(json.loads(params))}")
 
 
 @cli.command()
@@ -78,21 +71,19 @@ def schedule(
     module.
     """
     excluded: list[str] = str2list(excluded) if excluded else []
-    externals: str = json.loads(externals or "{}")
-
-    logging.info(f"Start schedule workflow with excluded: {excluded}")
-    logging.info(f"... with Parameters: {json.dumps(json.loads(externals))}")
+    externals: str = externals or "{}"
     if stop:
         stop: datetime = stop.astimezone(
             tz=ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
         )
-        logging.info(f"... stop at: {stop}")
 
     from .scheduler import workflow
 
     # NOTE: Start running workflow scheduler application.
-    workflow_rs: list[str] = workflow(stop=stop, excluded=excluded)
-    logging.info(f"Application run success: {workflow_rs}")
+    workflow_rs: list[str] = workflow(
+        stop=stop, excluded=excluded, externals=json.loads(externals)
+    )
+    logger.info(f"Application run success: {workflow_rs}")
 
 
 @cli_log.command("pipeline-get")
@@ -113,7 +104,7 @@ def pipeline_log_get(
         ),
     ] = True,
 ):
-    logging.info(f"{name} : limit {limit} : desc: {desc}")
+    logger.info(f"{name} : limit {limit} : desc: {desc}")
     return [""]
 
 
@@ -129,8 +120,7 @@ def pipeline_log_delete(
         Argument(case_sensitive=True),
     ]
 ):
-    logging.info(mode)
-    return
+    logger.info(mode)
 
 
 @cli.callback()

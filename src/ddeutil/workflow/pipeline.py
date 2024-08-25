@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 import copy
-import logging
 import os
 import time
 from concurrent.futures import (
@@ -44,7 +43,7 @@ from .exceptions import (
     StageException,
     UtilException,
 )
-from .log import FileLog, Log
+from .log import FileLog, Log, get_logger
 from .on import On
 from .stage import Stage
 from .utils import (
@@ -60,6 +59,9 @@ from .utils import (
     has_template,
     param2template,
 )
+
+logger = get_logger("ddeutil.workflow")
+
 
 __all__: TupleStr = (
     "Strategy",
@@ -331,18 +333,18 @@ class Job(BaseModel):
             _st_name: str = stage.id or stage.name
 
             if stage.is_skipped(params=context):
-                logging.info(
+                logger.info(
                     f"({self.run_id}) [JOB]: Skip the stage: {_st_name!r}"
                 )
                 continue
 
-            logging.info(
+            logger.info(
                 f"({self.run_id}) [JOB]: Start execute the stage: {_st_name!r}"
             )
 
             # NOTE: Logging a matrix that pass on this stage execution.
             if strategy:
-                logging.info(f"({self.run_id}) [JOB]: Matrix: {strategy}")
+                logger.info(f"({self.run_id}) [JOB]: Matrix: {strategy}")
 
             # NOTE:
             #       I do not use below syntax because `params` dict be the
@@ -384,7 +386,7 @@ class Job(BaseModel):
                 rs: Result = stage.execute(params=context)
                 stage.set_outputs(rs.context, to=context)
             except (StageException, UtilException) as err:
-                logging.error(
+                logger.error(
                     f"({self.run_id}) [JOB]: {err.__class__.__name__}: {err}"
                 )
                 raise JobException(
@@ -506,7 +508,7 @@ class Job(BaseModel):
         nd: str = (
             f", the strategies do not run is {not_done}" if not_done else ""
         )
-        logging.debug(f"({self.run_id}) [JOB]: Strategy is set Fail Fast{nd}")
+        logger.debug(f"({self.run_id}) [JOB]: Strategy is set Fail Fast{nd}")
 
         if len(done) != len(futures):
 
@@ -521,7 +523,7 @@ class Job(BaseModel):
         for future in done:
             if future.exception():
                 status = 1
-                logging.error(
+                logger.error(
                     f"({self.run_id}) [JOB]: One stage failed with: "
                     f"{future.exception()}, shutting down this future."
                 )
@@ -554,23 +556,23 @@ class Job(BaseModel):
                 ) from None
             except TimeoutError:
                 status = 1
-                logging.warning(
+                logger.warning(
                     f"({self.run_id}) [JOB]: Task is hanging. Attempting to "
                     f"kill."
                 )
                 future.cancel()
                 time.sleep(0.1)
                 if not future.cancelled():
-                    logging.warning(
+                    logger.warning(
                         f"({self.run_id}) [JOB]: Failed to cancel the task."
                     )
                 else:
-                    logging.warning(
+                    logger.warning(
                         f"({self.run_id}) [JOB]: Task canceled successfully."
                     )
             except JobException as err:
                 status = 1
-                logging.error(
+                logger.error(
                     f"({self.run_id}) [JOB]: Get stage exception with "
                     f"fail-fast does not set;\n{err.__class__.__name__}:\n\t"
                     f"{err}"
@@ -810,7 +812,7 @@ class Pipeline(BaseModel):
         # NOTE: get next schedule time that generate from now.
         next_time: datetime = gen.next
 
-        # NOTE: get next utils it does not logging.
+        # NOTE: get next utils it does not logger.
         while log.is_pointed(self.name, next_time, queue=queue):
             next_time: datetime = gen.next
 
@@ -820,7 +822,7 @@ class Pipeline(BaseModel):
         # VALIDATE: Check the different time between the next schedule time and
         #   now that less than waiting period (second unit).
         if get_diff_sec(next_time, tz=cron_tz) > waiting_sec:
-            logging.debug(
+            logger.debug(
                 f"({self.run_id}) [CORE]: {self.name!r} : {on.cronjob} : "
                 f"Does not closely >> {next_time:%Y-%m-%d %H:%M:%S}"
             )
@@ -831,7 +833,7 @@ class Pipeline(BaseModel):
             time.sleep(0.15)
             return Result(status=0, context={"params": params})
 
-        logging.debug(
+        logger.debug(
             f"({self.run_id}) [CORE]: {self.name!r} : {on.cronjob} : "
             f"Closely to run >> {next_time:%Y-%m-%d %H:%M:%S}"
         )
@@ -840,7 +842,7 @@ class Pipeline(BaseModel):
         while (duration := get_diff_sec(next_time, tz=cron_tz)) > (
             sleep_interval + 5
         ):
-            logging.debug(
+            logger.debug(
                 f"({self.run_id}) [CORE]: {self.name!r} : {on.cronjob} : "
                 f"Sleep until: {duration}"
             )
@@ -862,7 +864,7 @@ class Pipeline(BaseModel):
         rs: Result = runner.execute(
             params=param2template(params, release_params),
         )
-        logging.debug(
+        logger.debug(
             f"({runner.run_id}) [CORE]: {self.name!r} : {on.cronjob} : "
             f"End release {next_time:%Y-%m-%d %H:%M:%S}"
         )
@@ -902,7 +904,7 @@ class Pipeline(BaseModel):
         :param log: A log object that want to use on this poking process.
         :rtype: list[Result]
         """
-        logging.info(
+        logger.info(
             f"({self.run_id}) [POKING]: Start Poking: {self.name!r} ..."
         )
 
@@ -934,7 +936,7 @@ class Pipeline(BaseModel):
                 results.append(future.result(timeout=60))
 
         if len(queue) > 0:
-            logging.error(
+            logger.error(
                 f"({self.run_id}) [POKING]: Log Queue does empty when poking "
                 f"process was finishing."
             )
@@ -958,7 +960,7 @@ class Pipeline(BaseModel):
                 f"The job ID: {job} does not exists on {self.name!r} pipeline."
             )
         try:
-            logging.info(f"({self.run_id}) [PIPELINE]: Start execute: {job!r}")
+            logger.info(f"({self.run_id}) [PIPELINE]: Start execute: {job!r}")
 
             # IMPORTANT:
             #   Change any job running IDs to this pipeline running ID.
@@ -1001,15 +1003,13 @@ class Pipeline(BaseModel):
             ... ${job-name}.stages.${stage-id}.outputs.${key}
 
         """
-        logging.info(
-            f"({self.run_id}) [CORE]: Start Execute: {self.name!r} ..."
-        )
+        logger.info(f"({self.run_id}) [CORE]: Start Execute: {self.name!r} ...")
         params: DictData = params or {}
         ts: float = time.monotonic()
 
         # NOTE: It should not do anything if it does not have job.
         if not self.jobs:
-            logging.warning(
+            logger.warning(
                 f"({self.run_id}) [PIPELINE]: This pipeline: {self.name!r} "
                 f"does not have any jobs"
             )
@@ -1059,7 +1059,7 @@ class Pipeline(BaseModel):
         :rtype: DictData
         """
         not_time_out_flag: bool = True
-        logging.debug(
+        logger.debug(
             f"({self.run_id}): [CORE]: Run {self.name} with threading job "
             f"executor"
         )
@@ -1094,7 +1094,7 @@ class Pipeline(BaseModel):
 
             for future in as_completed(futures):
                 if err := future.exception():
-                    logging.error(f"{err}")
+                    logger.error(f"{err}")
                     raise PipelineException(f"{err}")
 
                 # NOTE: Update job result to pipeline result.
@@ -1104,7 +1104,7 @@ class Pipeline(BaseModel):
             return context
 
         # NOTE: Raise timeout error.
-        logging.warning(
+        logger.warning(
             f"({self.run_id}) [PIPELINE]: Execution of pipeline, {self.name!r} "
             f", was timeout"
         )
@@ -1130,7 +1130,7 @@ class Pipeline(BaseModel):
         :rtype: DictData
         """
         not_time_out_flag: bool = True
-        logging.debug(
+        logger.debug(
             f"({self.run_id}) [CORE]: Run {self.name} with non-threading job "
             f"executor"
         )
@@ -1159,7 +1159,7 @@ class Pipeline(BaseModel):
             return context
 
         # NOTE: Raise timeout error.
-        logging.warning(
+        logger.warning(
             f"({self.run_id}) [PIPELINE]: Execution of pipeline was timeout"
         )
         raise PipelineException(

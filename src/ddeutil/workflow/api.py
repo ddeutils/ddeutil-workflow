@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 import os
 import uuid
 from queue import Empty, Queue
@@ -18,19 +17,11 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import UJSONResponse
 from pydantic import BaseModel
 
+from .log import get_logger
 from .repeat import repeat_every
 
 load_dotenv()
-logger = logging.getLogger(__name__)
-logging.basicConfig(
-    level=logging.DEBUG,
-    format=(
-        "%(asctime)s.%(msecs)03d (%(name)-10s, %(process)-5d, %(thread)-5d) "
-        "[%(levelname)-7s] %(message)-120s (%(filename)s:%(lineno)s)"
-    ),
-    handlers=[logging.StreamHandler()],
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
+logger = get_logger("ddeutil.workflow")
 
 
 app = FastAPI()
@@ -41,7 +32,7 @@ app.queue_limit = 5
 
 
 @app.on_event("startup")
-@repeat_every(seconds=10, logger=logger)
+@repeat_every(seconds=10)
 def broker_upper_messages():
     """Broker for receive message from the `/upper` path and change it to upper
     case. This broker use interval running in background every 10 seconds.
