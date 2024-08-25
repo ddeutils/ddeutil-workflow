@@ -17,4 +17,8 @@ def test_log_file():
             "update": datetime.now(),
         },
     )
-    log.save()
+    log.save(excluded=None)
+
+
+def test_log_find_logs():
+    print(next(FileLog.find_logs(name="pipe-scheduling")))

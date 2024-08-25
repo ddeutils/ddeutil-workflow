@@ -9,7 +9,7 @@ import asyncio
 import os
 from asyncio import ensure_future
 from datetime import datetime
-from functools import partial, wraps
+from functools import wraps
 from zoneinfo import ZoneInfo
 
 from starlette.concurrency import run_in_threadpool
@@ -38,6 +38,24 @@ def cron_valid(cron: str):
         raise ValueError(f"Crontab value does not valid, {cron}") from err
 
 
+async def run_func(
+    is_coroutine,
+    func,
+    *args,
+    raise_exceptions: bool = False,
+    **kwargs,
+):
+    try:
+        if is_coroutine:
+            await func(*args, **kwargs)
+        else:
+            await run_in_threadpool(func, *args, **kwargs)
+    except Exception as e:
+        logger.exception(e)
+        if raise_exceptions:
+            raise e
+
+
 def repeat_at(
     *,
     cron: str,
@@ -61,8 +79,7 @@ def repeat_at(
         )
 
     def decorator(func):
-        if asyncio.iscoroutinefunction(func):
-            func = partial(run_in_threadpool, func=func)
+        is_coroutine: bool = asyncio.iscoroutinefunction(func)
 
         @wraps(func)
         def wrapper(*_args, **_kwargs):
@@ -74,12 +91,13 @@ def repeat_at(
                 while max_repetitions is None or repititions < max_repetitions:
                     sleep_time = get_cronjob_delta(cron)
                     await asyncio.sleep(sleep_time)
-                    try:
-                        await func(*args, **kwargs)
-                    except Exception as e:
-                        logger.exception(e)
-                        if raise_exceptions:
-                            raise e
+                    await run_func(
+                        is_coroutine,
+                        func,
+                        *args,
+                        raise_exceptions=raise_exceptions,
+                        **kwargs,
+                    )
                     repititions += 1
 
             ensure_future(loop(*_args, **_kwargs))
@@ -116,8 +134,7 @@ def repeat_every(
         )
 
     def decorator(func):
-        if asyncio.iscoroutinefunction(func):
-            func = partial(run_in_threadpool, func=func)
+        is_coroutine: bool = asyncio.iscoroutinefunction(func)
 
         @wraps(func)
         async def wrapper(*_args, **_kwargs):
@@ -130,12 +147,13 @@ def repeat_every(
                     await asyncio.sleep(seconds)
 
                 while max_repetitions is None or repetitions < max_repetitions:
-                    try:
-                        await func(*args, **kwargs)
-                    except Exception as e:
-                        logger.exception(e)
-                        if raise_exceptions:
-                            raise e
+                    await run_func(
+                        is_coroutine,
+                        func,
+                        *args,
+                        raise_exceptions=raise_exceptions,
+                        **kwargs,
+                    )
 
                     repetitions += 1
                     await asyncio.sleep(seconds)

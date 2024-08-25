@@ -86,6 +86,13 @@ class FileLog(BaseLog):
         self.pointer().mkdir(parents=True, exist_ok=True)
 
     @classmethod
+    def find_logs(cls, name: str):
+        pointer: Path = config().engine.paths.root / f"./logs/pipeline={name}"
+        for file in pointer.glob("./release=*/*.log"):
+            with file.open(mode="r", encoding="utf-8") as f:
+                yield json.load(f)
+
+    @classmethod
     def is_pointed(
         cls,
         name: str,
