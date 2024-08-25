@@ -87,16 +87,9 @@ class FileLog(BaseLog):
             / f"./logs/pipeline={name}/release={release:%Y%m%d%H%M%S}"
         )
 
-        if queue is None:
+        if not queue:
             return pointer.exists()
-
-        if pointer.exists() and not queue:
-            return True
-
-        if queue and release in queue:
-            return True
-
-        return False
+        return pointer.exists() or (release in queue)
 
     def pointer(self) -> Path:
         """Return release directory path that was generated from model data.

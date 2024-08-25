@@ -778,14 +778,14 @@ class Pipeline(BaseModel):
         waiting_sec: int = 60,
         sleep_interval: int = 15,
         log: Log = None,
-        lq: list[datetime] = None,
+        queue: list[datetime] = None,
     ) -> Result:
         """Start running pipeline with the on schedule in period of 30 minutes.
         That mean it will still running at background 30 minutes until the
         schedule matching with its time.
 
             This method allow pipeline use log object to save the execution
-        result to log destination like file log to local /logs directory.
+        result to log destination like file log to local `/logs` directory.
 
         :param on: An on schedule value.
         :param params: A pipeline parameter that pass to execute method.
@@ -793,35 +793,41 @@ class Pipeline(BaseModel):
         :param sleep_interval: A second value that want to waiting until time
             to execute.
         :param log: A log object that want to save execution result.
-        :param lq: A list of release time that already running.
+        :param queue: A list of release time that already running.
         :rtype: Result
         """
         delay()
 
+        queue: list[datetime] = queue or []
         log: Log = log or FileLog
-        current_time: datetime = datetime.now().replace(second=0, microsecond=0)
-        gen: CronRunner = on.generate(current_time + timedelta(seconds=1))
-        tz: ZoneInfo = gen.tz
+        tz: ZoneInfo = ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
+        gen: CronRunner = on.generate(
+            datetime.now(tz=tz).replace(second=0, microsecond=0)
+            + timedelta(seconds=1)
+        )
+        cron_tz: ZoneInfo = gen.tz
 
         # NOTE: get next schedule time that generate from now.
         next_time: datetime = gen.next
 
         # NOTE: get next utils it does not logging.
-        while log.is_pointed(self.name, next_time, queue=lq):
+        while log.is_pointed(self.name, next_time, queue=queue):
             next_time: datetime = gen.next
 
         # NOTE: push this next running time to log queue
-        heappush(lq, next_time)
+        heappush(queue, next_time)
 
         # VALIDATE: Check the different time between the next schedule time and
         #   now that less than waiting period (second unit).
-        if get_diff_sec(next_time, tz=tz) > waiting_sec:
+        if get_diff_sec(next_time, tz=cron_tz) > waiting_sec:
             logging.debug(
                 f"({self.run_id}) [CORE]: {self.name!r} : {on.cronjob} : "
                 f"Does not closely >> {next_time:%Y-%m-%d %H:%M:%S}"
             )
-            if lq:
-                lq.remove(next_time)
+
+            # NOTE: Remove next datetime from queue.
+            queue.remove(next_time)
+
             time.sleep(0.15)
             return Result(status=0, context={"params": params})
 
@@ -831,7 +837,7 @@ class Pipeline(BaseModel):
         )
 
         # NOTE: Release when the time is nearly to schedule time.
-        while (duration := get_diff_sec(next_time, tz=tz)) > (
+        while (duration := get_diff_sec(next_time, tz=cron_tz)) > (
             sleep_interval + 5
         ):
             logging.debug(
@@ -852,17 +858,17 @@ class Pipeline(BaseModel):
 
         # WARNING: Re-create pipeline object that use new running pipeline
         #   ID.
-        pipeline: Self = self.get_running_id(run_id=self.new_run_id)
-        rs: Result = pipeline.execute(
+        runner: Self = self.get_running_id(run_id=self.new_run_id)
+        rs: Result = runner.execute(
             params=param2template(params, release_params),
         )
         logging.debug(
-            f"({pipeline.run_id}) [CORE]: {self.name!r} : {on.cronjob} : "
+            f"({runner.run_id}) [CORE]: {self.name!r} : {on.cronjob} : "
             f"End release {next_time:%Y-%m-%d %H:%M:%S}"
         )
 
         # NOTE: Delete a copied pipeline instance for saving memory.
-        del pipeline
+        del runner
 
         rs.set_parent_run_id(self.run_id)
         rs_log: Log = log.model_validate(
@@ -875,11 +881,10 @@ class Pipeline(BaseModel):
                 "run_id": rs.run_id,
             }
         )
-        if lq:
-            lq.remove(next_time)
-
         # NOTE: Saving execution result to destination of the input log object.
-        rs_log.save()
+        rs_log.save(excluded=None)
+
+        queue.remove(next_time)
         time.sleep(0.05)
         return rs
 
@@ -907,21 +912,19 @@ class Pipeline(BaseModel):
             return []
 
         params: DictData = params or {}
-        log_queue: list[datetime] = []
+        queue: list[datetime] = []
         results: list[Result] = []
 
-        with ThreadPoolExecutor(
-            max_workers=int(
-                os.getenv("WORKFLOW_CORE_MAX_PIPELINE_POKING", "4")
-            ),
-        ) as executor:
+        wk: int = int(os.getenv("WORKFLOW_CORE_MAX_PIPELINE_POKING") or "4")
+        with ThreadPoolExecutor(max_workers=wk) as executor:
+            # TODO: If I want to run infinite loop.
             futures: list[Future] = [
                 executor.submit(
                     self.release,
                     on,
                     params=params,
                     log=log,
-                    lq=log_queue,
+                    queue=queue,
                 )
                 for on in self.on
             ]
@@ -930,7 +933,7 @@ class Pipeline(BaseModel):
             for future in as_completed(futures):
                 results.append(future.result(timeout=60))
 
-        if len(log_queue) > 0:
+        if len(queue) > 0:
             logging.error(
                 f"({self.run_id}) [POKING]: Log Queue does empty when poking "
                 f"process was finishing."

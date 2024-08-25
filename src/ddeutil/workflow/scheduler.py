@@ -48,7 +48,6 @@ from .utils import (
 )
 
 load_dotenv()
-tz: ZoneInfo = ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
 logging.basicConfig(
     level=logging.DEBUG,
     format=(
@@ -254,6 +253,7 @@ class PipelineTask:
 
         :param log: A log object.
         """
+        tz: ZoneInfo = ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
         log: Log = log or FileLog
         pipeline: Pipeline = self.pipeline
         on: On = self.on
@@ -267,7 +267,9 @@ class PipelineTask:
         next_time: datetime = gen.next
 
         # NOTE: get next utils it does not running.
-        while next_time in self.running[pipeline.name]:
+        while log.is_pointed(
+            pipeline.name, next_time, queue=self.running[pipeline.name]
+        ):
             next_time: datetime = gen.next
 
         logging.debug(
@@ -321,10 +323,26 @@ class PipelineTask:
         )
         logging.debug(
             f"({runner.run_id}) [CORE]: {pipeline.name!r} : {on.cronjob} : "
-            f"End release"
+            f"End release - {next_time:%Y-%m-%d %H:%M:%S}"
         )
 
         del runner
+
+        # NOTE: Set parent ID on this result.
+        rs.set_parent_run_id(pipeline.run_id)
+
+        # NOTE: Save result to log object saving.
+        rs_log: Log = log.model_validate(
+            {
+                "name": pipeline.name,
+                "on": str(on.cronjob),
+                "release": next_time,
+                "context": rs.context,
+                "parent_run_id": rs.run_id,
+                "run_id": rs.run_id,
+            }
+        )
+        rs_log.save(excluded=None)
 
         # NOTE: remove this release date from running
         self.running[pipeline.name].remove(next_time)
@@ -343,23 +361,6 @@ class PipelineTask:
             future_running_time: datetime = gen.next
 
         heappush(self.queue[pipeline.name], future_running_time)
-
-        # NOTE: Set parent ID on this result.
-        rs.set_parent_run_id(pipeline.run_id)
-
-        # NOTE: Save result to log object saving.
-        rs_log: Log = log.model_validate(
-            {
-                "name": pipeline.name,
-                "on": str(on.cronjob),
-                "release": next_time,
-                "context": rs.context,
-                "parent_run_id": rs.run_id,
-                "run_id": rs.run_id,
-            }
-        )
-        rs_log.save(excluded=None)
-
         logging.debug(f"[CORE]: {'-' * 100}")
 
 
@@ -383,6 +384,7 @@ def workflow_task(
     :param threads:
     :rtype: CancelJob | None
     """
+    tz: ZoneInfo = ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
     start_date: datetime = datetime.now(tz=tz)
     start_date_minute: datetime = start_date.replace(second=0, microsecond=0)
 
@@ -496,6 +498,7 @@ def workflow_control(
     :param externals: An external parameters that pass to Loader.
     :rtype: list[str]
     """
+    tz: ZoneInfo = ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
     schedule: Scheduler = Scheduler()
     start_date: datetime = datetime.now(tz=tz)
 
