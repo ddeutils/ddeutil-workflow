@@ -45,10 +45,9 @@ class BaseLog(BaseModel, ABC):
 
     def do_before(self) -> None:
         """To something before end up of initial log model."""
-        return
 
     @abstractmethod
-    def save(self) -> None:
+    def save(self, excluded: list[str] | None) -> None:
         """Save logging"""
         raise NotImplementedError("Log should implement ``save`` method.")
 
@@ -78,6 +77,7 @@ class FileLog(BaseLog):
         :param queue: A list of queue of datetime that already run in the
             future.
         """
+        # NOTE: Check environ variable was set for real writing.
         if not str2bool(os.getenv("WORKFLOW_LOG_ENABLE_WRITE", "false")):
             return False
 
@@ -108,19 +108,22 @@ class FileLog(BaseLog):
             / f"./logs/pipeline={self.name}/release={self.release:%Y%m%d%H%M%S}"
         )
 
-    def save(self) -> Self:
+    def save(self, excluded: list[str] | None) -> Self:
         """Save logging data that receive a context data from a pipeline
         execution result.
 
+        :param excluded: An excluded list of key name that want to pass in the
+            model_dump method.
         :rtype: Self
         """
+        # NOTE: Check environ variable was set for real writing.
         if not str2bool(os.getenv("WORKFLOW_LOG_ENABLE_WRITE", "false")):
             return self
 
         log_file: Path = self.pointer() / f"{self.run_id}.log"
         log_file.write_text(
             json.dumps(
-                self.model_dump(),
+                self.model_dump(exclude=excluded),
                 default=str,
                 indent=2,
             ),
@@ -131,7 +134,7 @@ class FileLog(BaseLog):
 
 class SQLiteLog(BaseLog):
 
-    def save(self) -> None:
+    def save(self, excluded: list[str] | None) -> None:
         raise NotImplementedError("SQLiteLog does not implement yet.")
 
 

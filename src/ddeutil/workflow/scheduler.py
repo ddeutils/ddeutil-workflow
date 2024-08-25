@@ -358,7 +358,7 @@ class PipelineTask:
                 "run_id": rs.run_id,
             }
         )
-        rs_log.save()
+        rs_log.save(excluded=None)
 
         logging.debug(f"[CORE]: {'-' * 100}")
 
