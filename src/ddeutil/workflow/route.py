@@ -5,6 +5,8 @@
 # ------------------------------------------------------------------------------
 from __future__ import annotations
 
+import copy
+
 from fastapi import APIRouter, HTTPException, Request
 from fastapi import status as st
 from fastapi.responses import UJSONResponse
@@ -12,7 +14,6 @@ from fastapi.responses import UJSONResponse
 from .__types import DictData
 from .log import get_logger
 from .pipeline import Pipeline
-from .repeat import repeat_every
 from .utils import Loader
 
 logger = get_logger("ddeutil.workflow")
@@ -78,15 +79,40 @@ async def get_workflow_release_log(name: str, release: str):
     status_code=st.HTTP_204_NO_CONTENT,
 )
 async def del_workflow_release_log(name: str, release: str):
-    return {"message": f"getting pipeline {name} log in release {release}"}
-
-
-@schedule.on_event("startup")
-@repeat_every(seconds=60)
-def schedule_broker_up():
-    logger.info("Start listening schedule from queue ...")
+    return {"message": f"deleted pipeline {name} log in release {release}"}
 
 
 @schedule.get("/", response_class=UJSONResponse)
-async def get_jobs(request: Request):
-    return {}
+async def get_schedulers(request: Request):
+    snapshot = copy.deepcopy(request.app.scheduler)
+    return snapshot
+
+
+@schedule.get("/{name}", response_class=UJSONResponse)
+async def get_scheduler(request: Request, name: str):
+    if name in request.app.scheduler:
+        return {
+            "message": f"getting {name} to schedule listener.",
+            "scheduler": request.app.scheduler.get(name),
+        }
+    raise HTTPException(
+        status_code=st.HTTP_404_NOT_FOUND,
+        detail=f"Does not found {name} in schedule listener",
+    )
+
+
+@schedule.post("/{name}", response_class=UJSONResponse)
+async def add_scheduler(request: Request, name: str):
+    request.app.scheduler[name] = []
+    return {"message": f"adding {name} to schedule listener."}
+
+
+@schedule.delete("/{name}", response_class=UJSONResponse)
+async def del_scheduler(request: Request, name: str):
+    if name in request.app.scheduler:
+        request.app.scheduler.pop(name)
+        return {"message": f"deleted {name} to schedule listener."}
+    raise HTTPException(
+        status_code=st.HTTP_404_NOT_FOUND,
+        detail=f"Does not found {name} in schedule listener",
+    )
