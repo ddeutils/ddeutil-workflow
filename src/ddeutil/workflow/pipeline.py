@@ -805,8 +805,6 @@ class Pipeline(BaseModel):
         :param queue: A list of release time that already running.
         :rtype: Result
         """
-        delay()
-
         queue: list[datetime] = queue or []
         log: Log = log or FileLog
         tz: ZoneInfo = ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
@@ -927,16 +925,19 @@ class Pipeline(BaseModel):
         wk: int = int(os.getenv("WORKFLOW_CORE_MAX_PIPELINE_POKING") or "4")
         with ThreadPoolExecutor(max_workers=wk) as executor:
             # TODO: If I want to run infinite loop.
-            futures: list[Future] = [
-                executor.submit(
-                    self.release,
-                    on,
-                    params=params,
-                    log=log,
-                    queue=queue,
+            futures: list[Future] = []
+            for on in self.on:
+                futures.append(
+                    executor.submit(
+                        self.release,
+                        on,
+                        params=params,
+                        log=log,
+                        queue=queue,
+                    )
                 )
-                for on in self.on
-            ]
+                delay()
+
             # WARNING: This poking method does not allow to use fail-fast logic
             #   to catching parallel execution result.
             for future in as_completed(futures):

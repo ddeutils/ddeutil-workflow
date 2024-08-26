@@ -1,7 +1,9 @@
 from datetime import datetime, timedelta, timezone
+from functools import partial
 from zoneinfo import ZoneInfo
 
 import ddeutil.workflow.cron as cron
+import pytest
 
 from tests.utils import str2dt
 
@@ -18,6 +20,34 @@ def test_timezone():
     )
 
     assert timedelta(0) == timezone.utc.utcoffset(jan1_in_utc)
+
+
+def test_cron_cronpart():
+    cpart = cron.CronPart(
+        unit=cron.Unit(
+            name="month",
+            range=partial(range, 1, 13),
+            min=1,
+            max=12,
+            alt=[
+                "JAN",
+                "FEB",
+                "MAR",
+                "APR",
+                "MAY",
+                "JUN",
+                "JUL",
+                "AUG",
+                "SEP",
+                "OCT",
+                "NOV",
+                "DEC",
+            ],
+        ),
+        values="3,5-8",
+        options=cron.Options(),
+    )
+    assert [3, 5, 6, 7, 8] == cpart.values
 
 
 def test_cron_cronjob():
@@ -109,6 +139,12 @@ def test_cron_next_previous():
     assert sch.next == str2dt("2024-01-23 00:00:00")
     assert sch.next == str2dt("2024-01-23 00:30:00")
 
+    # sch = cron.CronJob("0 0 23 1 ?").schedule(
+    #     date=datetime(2024, 1, 1, 12, tzinfo=ZoneInfo("Asia/Bangkok")),
+    # )
+    # assert sch.next == str2dt("2025-01-23 00:00:00")
+    # assert sch.next == str2dt("2026-01-23 00:00:00")
+
 
 def test_cron_cronjob_year():
     cr = cron.CronJobYear("*/5 * * * * */8,1999")
@@ -134,5 +170,5 @@ def test_cron_year_next_year():
     sch = cron.CronJobYear("0 0 1 * * 2023").schedule(
         date=datetime(2024, 10, 1, 12, tzinfo=ZoneInfo("Asia/Bangkok")),
     )
-    print(sch.next)
-    print("=====")
+    with pytest.raises(cron.CronYearLimit):
+        _ = sch.next

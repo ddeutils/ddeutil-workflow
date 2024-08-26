@@ -37,6 +37,31 @@ WEEKDAYS: dict[str, int] = {
 class CronYearLimit(Exception): ...
 
 
+def str2cron(value: str) -> str:
+    """Convert Special String to Crontab.
+
+    @reboot 	Run once, at system startup
+    @yearly 	Run once every year, "0 0 1 1 *"
+    @annually   (same as @yearly)
+    @monthly    Run once every month, "0 0 1 * *"
+    @weekly 	Run once every week, "0 0 * * 0"
+    @daily  	Run once each day, "0 0 * * *"
+    @midnight   (same as @daily)
+    @hourly 	Run once an hour, "0 * * * *"
+    """
+    mapping_spacial_str = {
+        "@reboot": "",
+        "@yearly": "0 0 1 1 *",
+        "@annually": "0 0 1 1 *",
+        "@monthly": "0 0 1 * *",
+        "@weekly": "0 0 * * 0",
+        "@daily": "0 0 * * *",
+        "@midnight": "0 0 * * *",
+        "@hourly": "0 * * * *",
+    }
+    return mapping_spacial_str[value]
+
+
 @dataclass(frozen=True)
 class Unit:
     name: str
@@ -235,17 +260,21 @@ class CronPart:
         :type value: str
 
         TODO: support for `L`, `W`, and `#`
-        TODO: if you didn't care what day of the week the 7th was, you
-            could enter ? in the Day-of-week field.
-        TODO: L : the Day-of-month or Day-of-week fields specifies the last day
-            of the month or week.
+        ---
+        TODO: The ? (question mark) wildcard specifies one or another.
+            In the Day-of-month field you could enter 7, and if you didn't care
+            what day of the week the seventh was, you could enter ? in the
+            Day-of-week field.
+        TODO: L : The L wildcard in the Day-of-month or Day-of-week fields
+            specifies the last day of the month or week.
             DEV: use -1 for represent with L
-        TODO: W : In the Day-of-month field, 3W specifies the weekday closest
-            to the third day of the month.
-        TODO: # : 3#2 would be the second Tuesday of the month,
+        TODO: W : The W wildcard in the Day-of-month field specifies a weekday.
+            In the Day-of-month field, 3W specifies the weekday closest to the
+            third day of the month.
+        TODO: # : 3#2 would be the second Tuesday of every month,
             the 3 refers to Tuesday because it is the third day of each week.
 
-        Noted:
+        Examples:
             -   0 10 * * ? *
                 Run at 10:00 am (UTC) every day
 
@@ -278,6 +307,7 @@ class CronPart:
         :rtype: tuple[int, ...]
         """
         interval_list: list[list[int]] = []
+        # NOTE: Start replace alternative like JAN to FEB or MON to SUN.
         for _value in self.replace_alternative(value.upper()).split(","):
             if _value == "?":
                 continue
@@ -297,11 +327,18 @@ class CronPart:
                     f"{self.unit.name!r}"
                 )
 
+            # NOTE: Generate interval that has step
             interval_list.append(self._interval(value_range_list, value_step))
+
         return tuple(item for sublist in interval_list for item in sublist)
 
     def replace_alternative(self, value: str) -> str:
-        """Replaces the alternative representations of numbers in a string."""
+        """Replaces the alternative representations of numbers in a string.
+
+            For example if value == 'JAN,AUG' it will replace to '1,8'.
+
+        :param value: A string value that want to replace alternative to int.
+        """
         for i, alt in enumerate(self.unit.alt):
             if alt in value:
                 value: str = value.replace(alt, str(self.unit.min + i))
@@ -458,7 +495,7 @@ class CronJob:
     """The Cron Job Converter object that generate datetime dimension of cron
     job schedule format,
 
-            ... * * * * * <command to execute>
+        *  *  *  *  *  <command to execute>
 
         (i)     minute (0 - 59)
         (ii)    hour (0 - 23)
@@ -472,9 +509,20 @@ class CronJob:
         Support special value with `/`, `*`, `-`, `,`, and `?` (in day of month
     and day of week value).
 
+        Fields          | Values            | Wildcards
+        ---             | ---               | ---
+        Minutes         | 0–59              | , - * /
+        Hours           | 0–23              | , - * /
+        Day-of-month    | 1–31              | , - * ? / L W
+        Month           | 1–12 or JAN-DEC   | , - * /
+        Day-of-week     | 1–7 or SUN-SAT    | , - * ? / L
+        Year            | 1970–2199         | , - * /
+
     References:
         - https://github.com/Sonic0/cron-converter
         - https://pypi.org/project/python-crontab/
+        - https://docs.aws.amazon.com/glue/latest/dg/ -
+            monitor-data-warehouse-schedule.html
     """
 
     cron_length: int = 5
@@ -569,6 +617,10 @@ class CronJob:
     def to_list(self) -> list[list[int]]:
         """Returns the cron schedule as a 2-dimensional list of integers."""
         return [part.values for part in self.parts]
+
+    def check(self, date: datetime, mode: str) -> bool:
+        assert mode in ("year", "month", "day", "hour", "minute")
+        return getattr(date, mode) in getattr(self, mode).values
 
     def schedule(
         self,
@@ -677,7 +729,7 @@ class CronRunner:
         # NOTE: Set reset flag to false if start any action.
         self.reset_flag: bool = False
 
-        # NOTE: For loop with 25 times.
+        # NOTE: For loop with 25 times by default.
         for _ in range(
             max(self.shift_limit, 100) if self.is_year else self.shift_limit
         ):
@@ -720,10 +772,7 @@ class CronRunner:
 
         # NOTE:
         #   Start while-loop for checking this date include in this cronjob.
-        while (
-            getattr(self.date, mode) not in getattr(self.cron, mode).values
-        ) or addition_cond(self.date):
-
+        while not self.cron.check(self.date, mode) or addition_cond(self.date):
             if mode == "year" and (
                 getattr(self.date, mode)
                 > (max_year := max(self.cron.year.values))

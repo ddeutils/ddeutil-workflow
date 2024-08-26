@@ -1,12 +1,4 @@
-import logging
-
 from ddeutil.workflow.pipeline import Pipeline
-
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s [%(levelname)8.8s] %(message)s",
-    handlers=[logging.StreamHandler()],
-)
 
 
 def test_pipeline_poke():
