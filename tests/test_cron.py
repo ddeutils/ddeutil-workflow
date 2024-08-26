@@ -116,3 +116,23 @@ def test_cron_cronjob_year():
         "*/5 * * * * 1990,1998-1999,2006,2014,2022,2030,2038,2046,2054,2062,"
         "2070,2078,2086,2094"
     )
+
+
+def test_cron_next_year():
+    sch = cron.CronJob("0 0 1 * *").schedule(
+        date=datetime(2024, 10, 1, 12, tzinfo=ZoneInfo("Asia/Bangkok")),
+    )
+    print(sch.next)
+    print("=====")
+    # print(sch.next)
+    # print(sch.next)
+    # print(sch.next)
+    # print(sch.next)
+
+
+def test_cron_year_next_year():
+    sch = cron.CronJobYear("0 0 1 * * 2023").schedule(
+        date=datetime(2024, 10, 1, 12, tzinfo=ZoneInfo("Asia/Bangkok")),
+    )
+    print(sch.next)
+    print("=====")

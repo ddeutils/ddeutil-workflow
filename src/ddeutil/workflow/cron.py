@@ -10,7 +10,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from functools import partial, total_ordering
-from typing import Callable, Optional, Union
+from typing import ClassVar, Optional, Union
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from ddeutil.core import (
@@ -32,6 +32,9 @@ WEEKDAYS: dict[str, int] = {
     "Fri": 5,
     "Sat": 6,
 }
+
+
+class CronYearLimit(Exception): ...
 
 
 @dataclass(frozen=True)
@@ -598,9 +601,12 @@ class CronRunner:
     cron schedule object value.
     """
 
+    shift_limit: ClassVar[int] = 25
+
     __slots__: tuple[str, ...] = (
         "__start_date",
         "cron",
+        "is_year",
         "date",
         "reset_flag",
         "tz",
@@ -639,6 +645,7 @@ class CronRunner:
 
         self.__start_date: datetime = self.date
         self.cron: CronJob | CronJobYear = cron
+        self.is_year: bool = isinstance(cron, CronJobYear)
         self.reset_flag: bool = True
 
     def reset(self) -> None:
@@ -663,45 +670,79 @@ class CronRunner:
         return self.find_date(reverse=True)
 
     def find_date(self, reverse: bool = False) -> datetime:
-        """Returns the time the schedule would run by `next` or `prev`.
+        """Returns the time the schedule would run by `next` or `prev` methods.
 
         :param reverse: A reverse flag.
         """
         # NOTE: Set reset flag to false if start any action.
         self.reset_flag: bool = False
-        for _ in range(25):
+
+        # NOTE: For loop with 25 times.
+        for _ in range(
+            max(self.shift_limit, 100) if self.is_year else self.shift_limit
+        ):
+
+            # NOTE: Shift the date
             if all(
                 not self.__shift_date(mode, reverse)
-                for mode in ("month", "day", "hour", "minute")
+                for mode in ("year", "month", "day", "hour", "minute")
             ):
                 return copy.deepcopy(self.date.replace(second=0, microsecond=0))
+
         raise RecursionError("Unable to find execution time for schedule")
 
     def __shift_date(self, mode: str, reverse: bool = False) -> bool:
-        """Increments the mode value until matches with the schedule."""
+        """Increments the mode of date value ("month", "day", "hour", "minute")
+        until matches with the schedule.
+
+        :param mode: A mode of date that want to shift.
+        :param reverse: A flag that define shifting next or previous
+        """
         switch: dict[str, str] = {
+            "year": "year",
             "month": "year",
             "day": "month",
             "hour": "day",
             "minute": "hour",
         }
         current_value: int = getattr(self.date, switch[mode])
-        _addition_condition: Callable[[], bool] = (
-            (
-                lambda: WEEKDAYS.get(self.date.strftime("%a"))
-                not in self.cron.dow.values
+
+        if not self.is_year and mode == "year":
+            return False
+
+        # NOTE: Additional condition for weekdays
+        def addition_cond(dt: datetime) -> bool:
+            return (
+                WEEKDAYS.get(dt.strftime("%a")) not in self.cron.dow.values
+                if mode == "day"
+                else False
             )
-            if mode == "day"
-            else lambda: False
-        )
-        # NOTE: Start while-loop for checking this date include in this cronjob.
+
+        # NOTE:
+        #   Start while-loop for checking this date include in this cronjob.
         while (
             getattr(self.date, mode) not in getattr(self.cron, mode).values
-        ) or _addition_condition():
+        ) or addition_cond(self.date):
+
+            if mode == "year" and (
+                getattr(self.date, mode)
+                > (max_year := max(self.cron.year.values))
+            ):
+                raise CronYearLimit(
+                    f"The year is out of limit with this crontab value: "
+                    f"{max_year}."
+                )
+
+            # NOTE: Shift date with it mode matrix unit.
             self.date: datetime = next_date(self.date, mode, reverse=reverse)
+
+            # NOTE: Replace date that less than it mode to zero.
             self.date: datetime = replace_date(self.date, mode, reverse=reverse)
+
             if current_value != getattr(self.date, switch[mode]):
                 return mode != "month"
+
+        # NOTE: Return False if the date that match with condition.
         return False
 
 
