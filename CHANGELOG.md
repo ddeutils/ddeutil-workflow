@@ -2,6 +2,50 @@
 
 ## Latest Changes
 
+## 0.0.10
+
+### :sparkles: Features
+
+- :dart: feat: update cron feature that has many wildcard char. (_2024-08-26_)
+- :dart: feat: support cronjob with year layer. (_2024-08-26_)
+- :dart: feat: add serialize fields for workflow route. (_2024-08-26_)
+- :dart: feat: add serialize on cronjob field for api. (_2024-08-26_)
+- :dart: feat: add logging with package name on utils. (_2024-08-26_)
+- :dart: feat: add logging with this package name for disable. (_2024-08-25_)
+- :dart: feat: add excluded args on save log method. (_2024-08-25_)
+- :dart: feat: update cli command. (_2024-08-25_)
+- :dart: feat: add schedule model for support scheduler feature. (_2024-08-23_)
+- :dart: feat: change logic of pipeline release method. (_2024-08-23_)
+
+### :black_nib: Code Changes
+
+- :art: style: change code on repeat to func program. (_2024-08-26_)
+- :art: style: change coding style for job and pipeline. (_2024-08-23_)
+- :construction: refactored: change executer method name. (_2024-08-23_)
+- :construction: refactored: move loader module to utils. (_2024-08-23_)
+
+### :card_file_box: Documents
+
+- :page_facing_up: docs: move getting started topic on readme to api docs. (_2024-08-26_)
+
+### :bug: Fix Bugs
+
+- :gear: fixed: remove default queue on release method that change iden of queue. (_2024-08-26_)
+- :gear: fixed: move saving log on pipeline release step. (_2024-08-25_)
+- :gear: fixed: merge branch 'main'. (_2024-08-24_)
+- :gear: fixed: fix path of load_env for support cli. (_2024-08-23_)
+- :gear: fixed: use logging instead override get logging func. (_2024-08-23_)
+
+### :package: Build & Workflow
+
+- :toolbox: build: change install pakcage with schedule. (_2024-08-23_)
+- :toolbox: build: change install pakcage with schedule. (_2024-08-23_)
+
+### :postbox: Dependencies
+
+- :pushpin: deps: update typer to 0.12.5 and fastapi to 0.112.2. (_2024-08-26_)
+- :pushpin: deps: remove fmtutil package deps from this project. (_2024-08-23_)
+
 ## 0.0.9
 
 ### :sparkles: Features
