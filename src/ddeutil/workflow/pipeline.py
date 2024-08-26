@@ -87,7 +87,10 @@ class Strategy(BaseModel):
         ... }
     """
 
-    fail_fast: bool = Field(default=False)
+    fail_fast: bool = Field(
+        default=False,
+        serialization_alias="fail-fast",
+    )
     max_parallel: int = Field(
         default=1,
         gt=0,
@@ -95,6 +98,7 @@ class Strategy(BaseModel):
             "The maximum number of executor thread pool that want to run "
             "parallel"
         ),
+        serialization_alias="max-parallel",
     )
     matrix: Matrix = Field(
         default_factory=dict,
@@ -212,6 +216,7 @@ class Job(BaseModel):
     runs_on: Optional[str] = Field(
         default=None,
         description="A target executor node for this job use to execution.",
+        serialization_alias="runs-on",
     )
     stages: list[Stage] = Field(
         default_factory=list,
@@ -229,6 +234,7 @@ class Job(BaseModel):
         default=None,
         description="A running job ID.",
         repr=False,
+        exclude=True,
     )
 
     @model_validator(mode="before")
@@ -610,6 +616,7 @@ class Pipeline(BaseModel):
         default=None,
         description="A running pipeline ID.",
         repr=False,
+        exclude=True,
     )
 
     @property

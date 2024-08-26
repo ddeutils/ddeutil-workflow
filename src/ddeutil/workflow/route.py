@@ -44,7 +44,7 @@ async def get_workflows():
     response_class=UJSONResponse,
     status_code=st.HTTP_200_OK,
 )
-async def get_workflow(name: str):
+async def get_workflow(name: str) -> DictData:
     """Return model of pipeline that passing an input pipeline name."""
     try:
         pipeline: Pipeline = Pipeline.from_loader(name=name, externals={})
@@ -55,7 +55,12 @@ async def get_workflow(name: str):
                 f"Workflow pipeline name: {name!r} does not found in /conf path"
             ),
         ) from None
-    return pipeline.model_dump(exclude=["on"])
+    return pipeline.model_dump(
+        by_alias=True,
+        exclude_none=True,
+        exclude_unset=True,
+        exclude_defaults=True,
+    )
 
 
 @workflow.get("/{name}/logs")
@@ -79,14 +84,9 @@ async def del_workflow_release_log(name: str, release: str):
 @schedule.on_event("startup")
 @repeat_every(seconds=60)
 def schedule_broker_up():
-    logger.info("Log from schedule ...")
+    logger.info("Start listening schedule from queue ...")
 
 
 @schedule.get("/", response_class=UJSONResponse)
 async def get_jobs(request: Request):
-    jobs = request.app.scheduler.get_jobs()
-    jobs = [
-        {k: v for k, v in job.__getstate__().items() if k != "trigger"}
-        for job in jobs
-    ]
-    return jobs
+    return {}

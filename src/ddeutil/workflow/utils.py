@@ -33,6 +33,7 @@ from ddeutil.core import getdot, hasdot, hash_str, import_string, lazy, str2bool
 from ddeutil.io import PathData, PathSearch, YamlFlResolve, search_env_replace
 from ddeutil.io.models.lineage import dt_now
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
+from pydantic.functional_serializers import field_serializer
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
@@ -390,6 +391,10 @@ class BaseParam(BaseModel, ABC):
         raise NotImplementedError(
             "Receive value and validate typing before return valid value."
         )
+
+    @field_serializer("type")
+    def __serializer_type(self, value: str) -> str:
+        return value
 
 
 class DefaultParam(BaseParam):

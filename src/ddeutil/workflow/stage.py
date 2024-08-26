@@ -144,6 +144,7 @@ class BaseStage(BaseModel, ABC):
         default=None,
         description="A running stage ID.",
         repr=False,
+        exclude=True,
     )
 
     @model_validator(mode="after")
