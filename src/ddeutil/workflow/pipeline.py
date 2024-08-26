@@ -783,11 +783,11 @@ class Pipeline(BaseModel):
         self,
         on: On,
         params: DictData,
+        queue: list[datetime],
         *,
         waiting_sec: int = 60,
         sleep_interval: int = 15,
         log: Log = None,
-        queue: list[datetime] = None,
     ) -> Result:
         """Start running pipeline with the on schedule in period of 30 minutes.
         That mean it will still running at background 30 minutes until the
@@ -798,14 +798,13 @@ class Pipeline(BaseModel):
 
         :param on: An on schedule value.
         :param params: A pipeline parameter that pass to execute method.
+        :param queue: A list of release time that already running.
         :param waiting_sec: A second period value that allow pipeline execute.
         :param sleep_interval: A second value that want to waiting until time
             to execute.
         :param log: A log object that want to save execution result.
-        :param queue: A list of release time that already running.
         :rtype: Result
         """
-        queue: list[datetime] = queue or []
         log: Log = log or FileLog
         tz: ZoneInfo = ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
         gen: CronRunner = on.generate(
@@ -836,7 +835,13 @@ class Pipeline(BaseModel):
             queue.remove(next_time)
 
             time.sleep(0.15)
-            return Result(status=0, context={"params": params})
+            return Result(
+                status=0,
+                context={
+                    "params": params,
+                    "poking": {"skipped": [str(on.cronjob)], "run": []},
+                },
+            )
 
         logger.debug(
             f"({self.run_id}) [CORE]: {self.name!r} : {on.cronjob} : "
@@ -893,7 +898,13 @@ class Pipeline(BaseModel):
 
         queue.remove(next_time)
         time.sleep(0.05)
-        return rs
+        return Result(
+            status=0,
+            context={
+                "params": params,
+                "poking": {"skipped": [], "run": [str(on.cronjob)]},
+            },
+        )
 
     def poke(
         self,
