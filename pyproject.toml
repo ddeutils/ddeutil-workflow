@@ -37,8 +37,6 @@ schedule = [
 ]
 api = [
     "fastapi[standard]==0.112.1",
-    # TODO: This package can migrate to use /cron/
-    "croniter==3.0.3",
 ]
 
 [project.urls]

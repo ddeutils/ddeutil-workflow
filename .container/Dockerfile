@@ -10,7 +10,7 @@ RUN apt-get -y update  \
 
 COPY . .
 
-RUN pip install --no-cache-dir -e .[app]
+RUN pip install --no-cache-dir -U ddeutil-workflow[app]
 
 USER workflow
 

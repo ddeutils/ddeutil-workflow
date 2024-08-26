@@ -16,13 +16,20 @@ from .repeat import repeat_every
 from .utils import Loader
 
 logger = get_logger("ddeutil.workflow")
-workflow = APIRouter(prefix="/workflow", tags=["workflow"])
-schedule = APIRouter(prefix="/schedule", tags=["schedule"])
+workflow = APIRouter(
+    prefix="/workflow",
+    tags=["workflow"],
+)
+schedule = APIRouter(
+    prefix="/schedule",
+    tags=["schedule"],
+)
 
 
 @workflow.get(
     "/",
     response_class=UJSONResponse,
+    status_code=st.HTTP_200_OK,
 )
 async def get_workflows():
     pipelines: DictData = Loader.find(Pipeline)
@@ -69,8 +76,9 @@ async def del_workflow_release_log(name: str, release: str):
 
 
 @schedule.on_event("startup")
-@repeat_every(seconds=60)
-def schedule_broker_up(): ...
+@repeat_every(seconds=10)
+def schedule_broker_up():
+    logger.info("Log from schedule ...")
 
 
 @schedule.get("/", response_class=UJSONResponse)

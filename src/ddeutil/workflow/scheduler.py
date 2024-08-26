@@ -601,7 +601,7 @@ def workflow(
                 externals=(externals or {}),
             )
             for loader in batch(
-                Loader.find(Schedule, excluded=excluded),
+                Loader.finds(Schedule, excluded=excluded),
                 n=int(os.getenv("WORKFLOW_APP_SCHEDULE_PER_PROCESS") or "100"),
             )
         ]

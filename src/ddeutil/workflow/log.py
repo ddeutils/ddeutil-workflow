@@ -93,6 +93,23 @@ class FileLog(BaseLog):
                 yield json.load(f)
 
     @classmethod
+    def find_log(cls, name: str, release: datetime | None = None):
+        if release is not None:
+            pointer: Path = (
+                config().engine.paths.root
+                / f"./logs/pipeline={name}/release={release:%Y%m%d%H%M%S}"
+            )
+            if not pointer.exists():
+                raise FileNotFoundError(
+                    f"Pointer: ./logs/pipeline={name}/"
+                    f"release={release:%Y%m%d%H%M%S} does not found."
+                )
+            return cls.model_validate(
+                obj=json.loads(pointer.read_text(encoding="utf-8"))
+            )
+        raise NotImplementedError("Find latest log does not implement yet.")
+
+    @classmethod
     def is_pointed(
         cls,
         name: str,

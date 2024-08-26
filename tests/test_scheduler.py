@@ -8,5 +8,5 @@ def test_scheduler_model():
 
 
 def test_loader_find_schedule():
-    for finding in Loader.find(Schedule, excluded=[]):
+    for finding in Loader.finds(Schedule, excluded=[]):
         print(finding)

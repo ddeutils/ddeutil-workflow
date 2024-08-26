@@ -39,6 +39,7 @@ from typing_extensions import Self
 from .__types import DictData, Matrix, Re
 from .exceptions import ParamValueException, UtilException
 
+logger = logging.getLogger("ddeutil.workflow")
 P = ParamSpec("P")
 AnyModel = TypeVar("AnyModel", bound=BaseModel)
 AnyModelType = type[AnyModel]
@@ -192,7 +193,7 @@ class SimLoad:
         self.data.update(self.externals)
 
     @classmethod
-    def find(
+    def finds(
         cls,
         obj: object,
         params: ConfParams,
@@ -212,10 +213,8 @@ class SimLoad:
                 for key, data in values.items():
                     if key in exclude:
                         continue
-                    if (
-                        (t := data.get("type"))
-                        and issubclass(cls.get_type(t, params), obj)
-                        and all(i in data for i in (include or data.keys()))
+                    if issubclass(cls.get_type(data["type"], params), obj) and (
+                        include is None or all(i in data for i in include)
                     ):
                         yield key, data
 
@@ -261,7 +260,7 @@ class Loader(SimLoad):
     """
 
     @classmethod
-    def find(
+    def finds(
         cls,
         obj: object,
         *,
@@ -270,7 +269,7 @@ class Loader(SimLoad):
         **kwargs,
     ) -> DictData:
         """Override the find class method from the Simple Loader object."""
-        return super().find(
+        return super().finds(
             obj=obj, params=config(), include=include, exclude=exclude
         )
 
@@ -718,7 +717,7 @@ def map_post_filter(
             else:
                 value: Any = f_func(value, *args, **kwargs)
         except Exception as err:
-            logging.warning(str(err))
+            logger.warning(str(err))
             raise UtilException(
                 f"The post-filter function: {func_name} does not fit with "
                 f"{value} (type: {type(value).__name__})."

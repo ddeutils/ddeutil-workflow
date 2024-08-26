@@ -17,6 +17,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import UJSONResponse
 from pydantic import BaseModel
 
+from .__about__ import __version__
 from .log import get_logger
 from .repeat import repeat_every
 
@@ -24,7 +25,14 @@ load_dotenv()
 logger = get_logger("ddeutil.workflow")
 
 
-app = FastAPI()
+app = FastAPI(
+    titile="Workflow API",
+    description=(
+        "This is workflow FastAPI web application that use to manage manual "
+        "execute or schedule workflow via RestAPI."
+    ),
+    version=__version__,
+)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.queue = Queue()
 app.output_dict = {}
