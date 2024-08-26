@@ -57,3 +57,11 @@ def test_on_every_minute():
     )
     gen = schedule.generate(adjust)
     print(f"{gen.next:%Y-%m-%d %H:%M:%S}")
+
+
+def test_on_serialize():
+    schedule = On.from_loader(
+        name="every_minute_bkk",
+        externals={},
+    )
+    print(schedule.model_dump())

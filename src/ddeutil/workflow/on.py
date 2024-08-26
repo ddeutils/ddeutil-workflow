@@ -10,6 +10,7 @@ from typing import Annotated, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field
+from pydantic.functional_serializers import field_serializer
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
@@ -101,7 +102,7 @@ class On(BaseModel):
         passing["cronjob"] = interval2crontab(
             **{v: value[v] for v in value if v in ("interval", "day", "time")}
         )
-        return cls(extras=externals, **passing)
+        return cls(extras=externals | passing.pop("extras", {}), **passing)
 
     @classmethod
     def from_loader(
@@ -132,7 +133,7 @@ class On(BaseModel):
                             if v in ("interval", "day", "time")
                         }
                     ),
-                    extras=externals,
+                    extras=externals | loader_data.pop("extras", {}),
                     **loader_data,
                 )
             )
@@ -141,7 +142,7 @@ class On(BaseModel):
         return cls.model_validate(
             obj=dict(
                 cronjob=loader_data.pop("cronjob"),
-                extras=externals,
+                extras=externals | loader_data.pop("extras", {}),
                 **loader_data,
             )
         )
@@ -166,6 +167,10 @@ class On(BaseModel):
     def __prepare_cronjob(cls, value: str | CronJob) -> CronJob:
         """Prepare crontab value that able to receive with string type."""
         return CronJob(value) if isinstance(value, str) else value
+
+    @field_serializer("cronjob")
+    def __serialize_cronjob(self, value: CronJob) -> str:
+        return str(value)
 
     def generate(self, start: str | datetime) -> CronRunner:
         """Return Cron runner object."""
