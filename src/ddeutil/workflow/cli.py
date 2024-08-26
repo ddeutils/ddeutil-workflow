@@ -23,7 +23,7 @@ cli_log: Typer = Typer()
 cli.add_typer(
     cli_log,
     name="log",
-    help="Logging commands",
+    help="Logging of workflow CLI",
 )
 
 

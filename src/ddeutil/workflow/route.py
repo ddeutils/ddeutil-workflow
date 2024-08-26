@@ -32,7 +32,8 @@ schedule = APIRouter(
     status_code=st.HTTP_200_OK,
 )
 async def get_workflows():
-    pipelines: DictData = Loader.find(Pipeline)
+    """Return all pipeline workflows that exists in config path."""
+    pipelines: DictData = Loader.finds(Pipeline)
     return {
         "message": f"getting all pipelines: {pipelines}",
     }
@@ -76,7 +77,7 @@ async def del_workflow_release_log(name: str, release: str):
 
 
 @schedule.on_event("startup")
-@repeat_every(seconds=10)
+@repeat_every(seconds=60)
 def schedule_broker_up():
     logger.info("Log from schedule ...")
 

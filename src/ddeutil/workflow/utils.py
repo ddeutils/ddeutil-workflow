@@ -163,6 +163,8 @@ class SimLoad:
 
         ... <identity-key>:
         ...     type: <importable-object>
+        ...     <key-data>: <value-data>
+        ...     ...
 
     """
 
@@ -178,16 +180,11 @@ class SimLoad:
                 data := YamlFlResolve(file).read().get(name, {})
             ):
                 self.data = data
+
+        # VALIDATE: check the data that reading should not empty.
         if not self.data:
             raise ValueError(f"Config {name!r} does not found on conf path")
 
-        # TODO: Validate the version of template data that mean if version of
-        #   Template were change it should raise to upgrade package version.
-        #   ---
-        #   <pipeline-name>:
-        #       version: 1
-        #       type: pipeline.Pipeline
-        #
         self.conf_params: ConfParams = params
         self.externals: DictData = externals or {}
         self.data.update(self.externals)
@@ -213,30 +210,10 @@ class SimLoad:
                 for key, data in values.items():
                     if key in exclude:
                         continue
-                    if issubclass(cls.get_type(data["type"], params), obj) and (
+                    if issubclass(get_type(data["type"], params), obj) and (
                         include is None or all(i in data for i in include)
                     ):
                         yield key, data
-
-    @classmethod
-    def get_type(cls, t: str, params: ConfParams) -> AnyModelType:
-        """Return import type from string importable value in the type key.
-
-        :param t: A importable type string.
-        :param params: A config parameters that use registry to search this
-            type.
-        :rtype: AnyModelType
-        """
-        try:
-            # NOTE: Auto adding module prefix if it does not set
-            return import_string(f"ddeutil.workflow.{t}")
-        except ModuleNotFoundError:
-            for registry in params.engine.registry:
-                try:
-                    return import_string(f"{registry}.{t}")
-                except ModuleNotFoundError:
-                    continue
-            return import_string(f"{t}")
 
     @cached_property
     def type(self) -> AnyModelType:
@@ -249,7 +226,7 @@ class SimLoad:
             raise ValueError(
                 f"the 'type' value: {_typ} does not exists in config data."
             )
-        return self.get_type(_typ, self.conf_params)
+        return get_type(_typ, self.conf_params)
 
 
 class Loader(SimLoad):
@@ -308,6 +285,26 @@ def gen_id(
             + (f"{datetime.now(tz=tz):%Y%m%d%H%M%S%f}" if unique else "")
         ).encode()
     ).hexdigest()
+
+
+def get_type(t: str, params: ConfParams) -> AnyModelType:
+    """Return import type from string importable value in the type key.
+
+    :param t: A importable type string.
+    :param params: A config parameters that use registry to search this
+        type.
+    :rtype: AnyModelType
+    """
+    try:
+        # NOTE: Auto adding module prefix if it does not set
+        return import_string(f"ddeutil.workflow.{t}")
+    except ModuleNotFoundError:
+        for registry in params.engine.registry:
+            try:
+                return import_string(f"{registry}.{t}")
+            except ModuleNotFoundError:
+                continue
+        return import_string(f"{t}")
 
 
 class TagFunc(Protocol):
