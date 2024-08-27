@@ -8,36 +8,36 @@ from __future__ import annotations
 import copy
 import os
 from datetime import datetime, timedelta
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi import status as st
 from fastapi.responses import UJSONResponse
+from pydantic import BaseModel
 
 from .__types import DictData
 from .log import get_logger
 from .pipeline import Pipeline
 from .scheduler import Schedule
-from .utils import Loader
+from .utils import Loader, Result
 
 logger = get_logger("ddeutil.workflow")
 workflow = APIRouter(
     prefix="/workflow",
     tags=["workflow"],
+    default_response_class=UJSONResponse,
 )
 schedule = APIRouter(
     prefix="/schedule",
     tags=["schedule"],
+    default_response_class=UJSONResponse,
 )
 
 ListDate = list[datetime]
 
 
-@workflow.get(
-    "/",
-    response_class=UJSONResponse,
-    status_code=st.HTTP_200_OK,
-)
+@workflow.get("/")
 async def get_workflows():
     """Return all pipeline workflows that exists in config path."""
     pipelines: DictData = Loader.finds(Pipeline)
@@ -46,11 +46,7 @@ async def get_workflows():
     }
 
 
-@workflow.get(
-    "/{name}",
-    response_class=UJSONResponse,
-    status_code=st.HTTP_200_OK,
-)
+@workflow.get("/{name}")
 async def get_workflow(name: str) -> DictData:
     """Return model of pipeline that passing an input pipeline name."""
     try:
@@ -70,6 +66,34 @@ async def get_workflow(name: str) -> DictData:
     )
 
 
+class ExecutePayload(BaseModel):
+    params: dict[str, Any]
+
+
+@workflow.post("/{name}/execute", status_code=st.HTTP_202_ACCEPTED)
+async def execute_workflow(name: str, payload: ExecutePayload) -> DictData:
+    """Return model of pipeline that passing an input pipeline name."""
+    try:
+        pipeline: Pipeline = Pipeline.from_loader(name=name, externals={})
+    except ValueError:
+        raise HTTPException(
+            status_code=st.HTTP_404_NOT_FOUND,
+            detail=(
+                f"Workflow pipeline name: {name!r} does not found in /conf path"
+            ),
+        ) from None
+
+    # NOTE: Start execute manually
+    rs: Result = pipeline.execute(params=payload.params)
+
+    return rs.model_dump(
+        by_alias=True,
+        exclude_none=True,
+        exclude_unset=True,
+        exclude_defaults=True,
+    )
+
+
 @workflow.get("/{name}/logs")
 async def get_workflow_logs(name: str):
     return {"message": f"getting pipeline {name!r} logs"}
@@ -80,22 +104,36 @@ async def get_workflow_release_log(name: str, release: str):
     return {"message": f"getting pipeline {name!r} log in release {release}"}
 
 
-@workflow.delete(
-    "/{name}/logs/{release}",
-    status_code=st.HTTP_204_NO_CONTENT,
-)
+@workflow.delete("/{name}/logs/{release}", status_code=st.HTTP_204_NO_CONTENT)
 async def del_workflow_release_log(name: str, release: str):
     return {"message": f"deleted pipeline {name!r} log in release {release}"}
 
 
-@schedule.get("/", response_class=UJSONResponse)
-async def get_schedulers(request: Request):
+@schedule.get("/{name}")
+async def get_schedule(name: str):
+    try:
+        sch: Schedule = Schedule.from_loader(name=name, externals={})
+    except ValueError:
+        raise HTTPException(
+            status_code=st.HTTP_404_NOT_FOUND,
+            detail=(f"Schedule name: {name!r} does not found in /conf path"),
+        ) from None
+    return sch.model_dump(
+        by_alias=True,
+        exclude_none=True,
+        exclude_unset=True,
+        exclude_defaults=True,
+    )
+
+
+@schedule.get("/deploy")
+async def get_deploy_schedulers(request: Request):
     snapshot = copy.deepcopy(request.state.scheduler)
-    return snapshot
+    return {"schedule": snapshot}
 
 
-@schedule.get("/{name}", response_class=UJSONResponse)
-async def get_scheduler(request: Request, name: str):
+@schedule.get("/deploy/{name}")
+async def get_deploy_scheduler(request: Request, name: str):
     if name in request.state.scheduler:
         sch = Schedule.from_loader(name)
         getter: list[dict[str, dict[str, list[datetime]]]] = []
@@ -122,8 +160,8 @@ async def get_scheduler(request: Request, name: str):
     )
 
 
-@schedule.post("/{name}", response_class=UJSONResponse)
-async def add_scheduler(request: Request, name: str):
+@schedule.post("/deploy/{name}")
+async def add_deploy_scheduler(request: Request, name: str):
     """Adding schedule name to application state store."""
     if name in request.state.scheduler:
         raise HTTPException(
@@ -159,8 +197,8 @@ async def add_scheduler(request: Request, name: str):
     return {"message": f"adding {name!r} to schedule listener."}
 
 
-@schedule.delete("/{name}", response_class=UJSONResponse)
-async def del_scheduler(request: Request, name: str):
+@schedule.delete("/deploy/{name}")
+async def del_deploy_scheduler(request: Request, name: str):
     if name in request.state.scheduler:
         request.state.scheduler.remove(name)
         sche = Schedule.from_loader(name)

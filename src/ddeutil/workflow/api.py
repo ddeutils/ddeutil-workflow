@@ -143,7 +143,7 @@ if str2bool(os.getenv("WORKFLOW_API_ENABLE_ROUTE_SCHEDULE", "true")):
     @schedule.on_event("startup")
     @repeat_at(cron="* * * * *", delay=2)
     def schedule_broker_up():
-        logger.info(
+        logger.debug(
             f"[SCHEDULER]: Start listening schedule from queue "
             f"{app.state.scheduler}"
         )
