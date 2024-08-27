@@ -20,7 +20,7 @@ from .log import get_logger
 logger = get_logger("ddeutil.workflow")
 
 
-def get_cronjob_delta(cron: str):
+def get_cronjob_delta(cron: str) -> float:
     """This function returns the time delta between now and the next cron
     execution time.
     """
@@ -59,6 +59,7 @@ async def run_func(
 def repeat_at(
     *,
     cron: str,
+    delay: float = 0,
     raise_exceptions: bool = False,
     max_repetitions: int = None,
 ):
@@ -67,6 +68,7 @@ def repeat_at(
 
     :param cron: str
         Cron-style string for periodic execution, eg. '0 0 * * *' every midnight
+    :param delay:
     :param raise_exceptions: bool (default False)
         Whether to raise exceptions or log them
     :param max_repetitions: int (default None)
@@ -89,7 +91,7 @@ def repeat_at(
             async def loop(*args, **kwargs):
                 nonlocal repititions
                 while max_repetitions is None or repititions < max_repetitions:
-                    sleep_time = get_cronjob_delta(cron)
+                    sleep_time = get_cronjob_delta(cron) + delay
                     await asyncio.sleep(sleep_time)
                     await run_func(
                         is_coroutine,

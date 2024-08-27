@@ -12,8 +12,8 @@ import uuid
 from collections.abc import AsyncIterator
 from datetime import datetime, timedelta
 from queue import Empty, Queue
+from threading import Thread
 from typing import TypedDict
-from zoneinfo import ZoneInfo
 
 from ddeutil.core import str2bool
 from dotenv import load_dotenv
@@ -24,7 +24,8 @@ from pydantic import BaseModel
 
 from .__about__ import __version__
 from .log import get_logger
-from .repeat import repeat_every
+from .repeat import repeat_at, repeat_every
+from .scheduler import PipelineTask
 
 load_dotenv()
 logger = get_logger("ddeutil.workflow")
@@ -33,16 +34,22 @@ logger = get_logger("ddeutil.workflow")
 class State(TypedDict):
     upper_queue: Queue
     upper_result: dict[str, str]
-    scheduler: dict
-    scheduler_threads: dict
+    scheduler: list[str]
+    pipeline_threads: dict[str, Thread]
+    pipeline_tasks: list[PipelineTask]
+    pipeline_queue: dict[str, list[datetime]]
+    pipeline_running: dict[str, list[datetime]]
 
 
 @contextlib.asynccontextmanager
 async def lifespan(a: FastAPI) -> AsyncIterator[State]:
     a.state.upper_queue = Queue()
     a.state.upper_result = {}
-    a.state.scheduler = {}
-    a.state.scheduler_threads = {}
+    a.state.scheduler = []
+    a.state.pipeline_threads = {}
+    a.state.pipeline_tasks = []
+    a.state.pipeline_queue = {}
+    a.state.pipeline_running = {}
 
     await asyncio.create_task(broker_upper_messages())
 
@@ -59,7 +66,10 @@ async def lifespan(a: FastAPI) -> AsyncIterator[State]:
         #   ... }
         #
         "scheduler": a.state.scheduler,
-        "scheduler_threads": a.state.scheduler_threads,
+        "pipeline_queue": a.state.pipeline_queue,
+        "pipeline_running": a.state.pipeline_running,
+        "pipeline_threads": a.state.pipeline_threads,
+        "pipeline_tasks": a.state.pipeline_tasks,
     }
 
 
@@ -126,35 +136,20 @@ if str2bool(os.getenv("WORKFLOW_API_ENABLE_ROUTE_WORKFLOW", "true")):
 
 if str2bool(os.getenv("WORKFLOW_API_ENABLE_ROUTE_SCHEDULE", "true")):
     from .route import schedule
-    from .scheduler import PipelineTask, Schedule, workflow_task
+    from .scheduler import workflow_task
 
     app.include_router(schedule)
 
     @schedule.on_event("startup")
-    @repeat_every(seconds=60)
+    @repeat_at(cron="* * * * *", delay=2)
     def schedule_broker_up():
         logger.info(
             f"[SCHEDULER]: Start listening schedule from queue "
             f"{app.state.scheduler}"
         )
-        tz: ZoneInfo = ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
-        start_date: datetime = datetime.now(tz=tz)
-        start_date_waiting: datetime = (
-            start_date + timedelta(minutes=1)
-        ).replace(second=0, microsecond=0)
-
-        # NOTE: Create pair of pipeline and on from schedule model.
-        pipeline_tasks: list[PipelineTask] = []
-        for name in app.state.scheduler:
-
-            sch = Schedule.from_loader(name)
-            pipeline_tasks.extend(
-                sch.tasks(start_date_waiting, **app.state.scheduler[name])
-            )
-
-        if pipeline_tasks:
+        if app.state.pipeline_tasks:
             workflow_task(
-                pipeline_tasks,
-                start_date_waiting + timedelta(minutes=1),
-                app.state.scheduler_threads,
+                app.state.pipeline_tasks,
+                stop=datetime.now() + timedelta(minutes=1),
+                threads=app.state.pipeline_threads,
             )

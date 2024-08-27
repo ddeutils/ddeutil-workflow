@@ -12,7 +12,7 @@ import os
 import time
 from collections.abc import Iterator
 from concurrent.futures import Future, ProcessPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from functools import wraps
 from heapq import heappush
@@ -235,9 +235,9 @@ class PipelineTask:
 
     pipeline: Pipeline
     on: On
-    params: DictData
-    queue: list[datetime]
-    running: list[datetime]
+    params: DictData = field(compare=False, hash=False)
+    queue: list[datetime] = field(compare=False, hash=False)
+    running: list[datetime] = field(compare=False, hash=False)
 
     @catch_exceptions_method(cancel_on_failure=True)
     def release(self, log: Log | None = None) -> None:
@@ -356,6 +356,13 @@ class PipelineTask:
         heappush(self.queue[pipeline.name], future_running_time)
         logger.debug(f"[CORE]: {'-' * 100}")
 
+    def __eq__(self, other):
+        if isinstance(other, PipelineTask):
+            return (
+                self.pipeline.name == other.pipeline.name
+                and self.on.cronjob == other.on.cronjob
+            )
+
 
 def queue2str(queue: list[datetime]) -> Iterator[str]:
     return (f"{q:%Y-%m-%d %H:%M:%S}" for q in queue)
@@ -381,7 +388,7 @@ def workflow_task(
     start_date: datetime = datetime.now(tz=tz)
     start_date_minute: datetime = start_date.replace(second=0, microsecond=0)
 
-    if start_date > stop:
+    if start_date > stop.replace(tzinfo=tz):
         logger.info("[WORKFLOW]: Stop this schedule with datetime stopper.")
         while len(threads) > 0:
             logger.warning(

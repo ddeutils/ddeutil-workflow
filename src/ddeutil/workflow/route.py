@@ -6,7 +6,9 @@
 from __future__ import annotations
 
 import copy
-from datetime import datetime
+import os
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi import status as st
@@ -15,6 +17,7 @@ from fastapi.responses import UJSONResponse
 from .__types import DictData
 from .log import get_logger
 from .pipeline import Pipeline
+from .scheduler import Schedule
 from .utils import Loader
 
 logger = get_logger("ddeutil.workflow")
@@ -28,7 +31,6 @@ schedule = APIRouter(
 )
 
 ListDate = list[datetime]
-SchedulerValueT = tuple[ListDate, ListDate]
 
 
 @workflow.get(
@@ -95,9 +97,24 @@ async def get_schedulers(request: Request):
 @schedule.get("/{name}", response_class=UJSONResponse)
 async def get_scheduler(request: Request, name: str):
     if name in request.state.scheduler:
+        sch = Schedule.from_loader(name)
+        getter: list[dict[str, dict[str, list[datetime]]]] = []
+        for pipe in sch.pipelines:
+            getter.append(
+                {
+                    pipe.name: {
+                        "queue": copy.deepcopy(
+                            request.state.pipeline_queue[pipe.name]
+                        ),
+                        "running": copy.deepcopy(
+                            request.state.pipeline_running[pipe.name]
+                        ),
+                    }
+                }
+            )
         return {
             "message": f"getting {name!r} to schedule listener.",
-            "scheduler": request.state.scheduler.get(name),
+            "scheduler": getter,
         }
     raise HTTPException(
         status_code=st.HTTP_404_NOT_FOUND,
@@ -108,17 +125,57 @@ async def get_scheduler(request: Request, name: str):
 @schedule.post("/{name}", response_class=UJSONResponse)
 async def add_scheduler(request: Request, name: str):
     """Adding schedule name to application state store."""
-    wf_queue: ListDate = []
-    wf_running: ListDate = []
-    request.state.scheduler[name]: SchedulerValueT = (wf_queue, wf_running)
+    if name in request.state.scheduler:
+        raise HTTPException(
+            status_code=st.HTTP_302_FOUND,
+            detail="This schedule already exists in scheduler list.",
+        )
+
+    request.state.scheduler.append(name)
+
+    tz: ZoneInfo = ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
+    start_date: datetime = datetime.now(tz=tz)
+    start_date_waiting: datetime = (start_date + timedelta(minutes=1)).replace(
+        second=0, microsecond=0
+    )
+
+    # NOTE: Create pair of pipeline and on from schedule model.
+    try:
+        sch = Schedule.from_loader(name)
+    except ValueError as e:
+        request.state.scheduler.remove(name)
+        logger.exception(e)
+        raise HTTPException(
+            status_code=st.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from None
+    request.state.pipeline_tasks.extend(
+        sch.tasks(
+            start_date_waiting,
+            queue=request.state.pipeline_queue,
+            running=request.state.pipeline_running,
+        ),
+    )
     return {"message": f"adding {name!r} to schedule listener."}
 
 
 @schedule.delete("/{name}", response_class=UJSONResponse)
 async def del_scheduler(request: Request, name: str):
     if name in request.state.scheduler:
-        request.state.scheduler.pop(name)
+        request.state.scheduler.remove(name)
+        sche = Schedule.from_loader(name)
+        for pipeline_task in sche.tasks(datetime.now(), {}, {}):
+            request.state.pipeline_tasks.remove(pipeline_task)
+
+        for pipe in sche.pipelines:
+            if pipe in request.state.pipeline_queue:
+                request.state.pipeline_queue.pop(pipe, {})
+
+            if pipe in request.state.pipeline_running:
+                request.state.pipeline_running.pop(pipe, {})
+
         return {"message": f"deleted {name!r} to schedule listener."}
+
     raise HTTPException(
         status_code=st.HTTP_404_NOT_FOUND,
         detail=f"Does not found {name!r} in schedule listener",
