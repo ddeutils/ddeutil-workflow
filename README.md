@@ -44,7 +44,6 @@ this package with application add-ons, you should add `app` in installation;
 | Usecase           | Install Optional                         | Support            |
 |-------------------|------------------------------------------|--------------------|
 | Python & CLI      | `pip install ddeutil-workflow`           | :heavy_check_mark: |
-| Scheduler Service | `pip install ddeutil-workflow[schedule]` | :x:                |
 | FastAPI Server    | `pip install ddeutil-workflow[api]`      | :x:                |
 
 
@@ -72,61 +71,59 @@ use-case.
 
 ```yaml
 run_py_local:
-  type: pipeline.Pipeline
-  on:
-    - cronjob: '*/5 * * * *'
-      timezone: "Asia/Bangkok"
-  params:
-    author-run: str
-    run-date: datetime
-  jobs:
-    getting-api-data:
-      stages:
-        - name: "Retrieve API Data"
-          id: retrieve-api
-          uses: tasks/get-api-with-oauth-to-s3@requests
-          with:
-            url: https://open-data/
-            auth: ${API_ACCESS_REFRESH_TOKEN}
-            aws_s3_path: my-data/open-data/
+   type: pipeline.Pipeline
+   on:
+      # If pipeline workflow deploy to schedule, it will running every 5 minutes
+      # with Asia/Bangkok timezone.
+      - cronjob: '*/5 * * * *'
+        timezone: "Asia/Bangkok"
+   params:
+      # Incoming execution parameters will validate with this type. It allow
+      # to set default value or templating.
+      author-run: str
+      run-date: datetime
+   jobs:
+      getting-api-data:
+         stages:
+            - name: "Retrieve API Data"
+              id: retrieve-api
+              uses: tasks/get-api-with-oauth-to-s3@requests
+              with:
+                 url: https://open-data/
+                 auth: ${API_ACCESS_REFRESH_TOKEN}
+                 aws_s3_path: my-data/open-data/
 
-            # This Authentication code should implement with your custom hook function.
-            # The template allow you to use environment variable.
-            aws_access_client_id: ${AWS_ACCESS_CLIENT_ID}
-            aws_access_client_secret: ${AWS_ACCESS_CLIENT_SECRET}
+                 # This Authentication code should implement with your custom hook function.
+                 # The template allow you to use environment variable.
+                 aws_access_client_id: ${AWS_ACCESS_CLIENT_ID}
+                 aws_access_client_secret: ${AWS_ACCESS_CLIENT_SECRET}
 ```
 
 ## Configuration
 
-| Environment                         | Component | Default                      | Description                                                                |
-|-------------------------------------|-----------|------------------------------|----------------------------------------------------------------------------|
-| `WORKFLOW_ROOT_PATH`                | Core      | .                            | The root path of the workflow application                                  |
-| `WORKFLOW_CORE_REGISTRY`            | Core      | ddeutil.workflow,tests.utils | List of importable string for the hook stage                               |
-| `WORKFLOW_CORE_REGISTRY_FILTER`     | Core      | ddeutil.workflow.utils       | List of importable string for the filter template                          |
-| `WORKFLOW_CORE_PATH_CONF`           | Core      | conf                         | The config path that keep all template `.yaml` files                       |
-| `WORKFLOW_CORE_TIMEZONE`            | Core      | Asia/Bangkok                 | A Timezone string value that will pass to `ZoneInfo` object                |
-| `WORKFLOW_CORE_STAGE_DEFAULT_ID`    | Core      | true                         | A flag that enable default stage ID that use for catch an execution output |
-| `WORKFLOW_CORE_STAGE_RAISE_ERROR`   | Core      | true                         | A flag that all stage raise StageException from stage execution            |
-| `WORKFLOW_CORE_MAX_PIPELINE_POKING` | Core      | 4                            |                                                                            |
-| `WORKFLOW_CORE_MAX_JOB_PARALLEL`    | Core      | 2                            | The maximum job number that able to run parallel in pipeline executor      |
-| `WORKFLOW_LOG_DEBUG_MODE`           | Log       | true                         | A flag that enable logging with debug level mode                           |
-| `WORKFLOW_LOG_ENABLE_WRITE`         | Log       | true                         | A flag that enable logging object saving log to its destination            |
+| Environment                         | Component | Default                         | Description                                                                |
+|-------------------------------------|-----------|---------------------------------|----------------------------------------------------------------------------|
+| `WORKFLOW_ROOT_PATH`                | Core      | .                               | The root path of the workflow application                                  |
+| `WORKFLOW_CORE_REGISTRY`            | Core      | ddeutil.workflow,tests.utils    | List of importable string for the hook stage                               |
+| `WORKFLOW_CORE_REGISTRY_FILTER`     | Core      | ddeutil.workflow.utils          | List of importable string for the filter template                          |
+| `WORKFLOW_CORE_PATH_CONF`           | Core      | conf                            | The config path that keep all template `.yaml` files                       |
+| `WORKFLOW_CORE_TIMEZONE`            | Core      | Asia/Bangkok                    | A Timezone string value that will pass to `ZoneInfo` object                |
+| `WORKFLOW_CORE_STAGE_DEFAULT_ID`    | Core      | true                            | A flag that enable default stage ID that use for catch an execution output |
+| `WORKFLOW_CORE_STAGE_RAISE_ERROR`   | Core      | true                            | A flag that all stage raise StageException from stage execution            |
+| `WORKFLOW_CORE_MAX_PIPELINE_POKING` | Core      | 4                               |                                                                            |
+| `WORKFLOW_CORE_MAX_JOB_PARALLEL`    | Core      | 2                               | The maximum job number that able to run parallel in pipeline executor      |
+| `WORKFLOW_LOG_DEBUG_MODE`           | Log       | true                            | A flag that enable logging with debug level mode                           |
+| `WORKFLOW_LOG_ENABLE_WRITE`         | Log       | true                            | A flag that enable logging object saving log to its destination            |
+| `WORKFLOW_APP_PROCESS_WORKER`       | Schedule  | 2                               | The maximum process worker number that run in scheduler app module         |
+| `WORKFLOW_APP_SCHEDULE_PER_PROCESS` | Schedule  | 100                             | A schedule per process that run parallel                                   |
+| `WORKFLOW_APP_STOP_BOUNDARY_DELTA`  | Schedule  | '{"minutes": 5, "seconds": 20}' | A time delta value that use to stop scheduler app in json string format    |
 
+**API Application**:
 
-**Application**:
-
-| Environment                         | Default                          | Description                                                             |
-|-------------------------------------|----------------------------------|-------------------------------------------------------------------------|
-| `WORKFLOW_APP_PROCESS_WORKER`       | 2                                | The maximum process worker number that run in scheduler app module      |
-| `WORKFLOW_APP_SCHEDULE_PER_PROCESS` | 100                              | A schedule per process that run parallel                                |
-| `WORKFLOW_APP_STOP_BOUNDARY_DELTA`  | '{"minutes": 5, "seconds": 20}'  | A time delta value that use to stop scheduler app in json string format |
-
-**API server**:
-
-| Environment                          | Default | Description                                                                       |
-|--------------------------------------|---------|-----------------------------------------------------------------------------------|
-| `WORKFLOW_API_ENABLE_ROUTE_WORKFLOW` | true    | A flag that enable workflow route to manage execute manually and workflow logging |
-| `WORKFLOW_API_ENABLE_ROUTE_SCHEDULE` | true    | A flag that enable run scheduler                                                  |
+| Environment                          | Component | Default | Description                                                                       |
+|--------------------------------------|-----------|---------|-----------------------------------------------------------------------------------|
+| `WORKFLOW_API_ENABLE_ROUTE_WORKFLOW` | API       | true    | A flag that enable workflow route to manage execute manually and workflow logging |
+| `WORKFLOW_API_ENABLE_ROUTE_SCHEDULE` | API       | true    | A flag that enable run scheduler                                                  |
 
 ## Deployment
 
@@ -134,16 +131,16 @@ This package able to run as a application service for receive manual trigger
 from the master node via RestAPI or use to be Scheduler background service
 like crontab job but via Python API.
 
-### Schedule Service
+### Schedule App
 
 ```shell
-(venv) $ python src.ddeutil.workflow.app
+(venv) $ ddeutil-workflow schedule
 ```
 
 ### API Server
 
 ```shell
-(venv) $ uvicorn src.ddeutil.workflow.api:app --host 0.0.0.0 --port 80 --reload
+(venv) $ uvicorn src.ddeutil.workflow.api:app --host 0.0.0.0 --port 80
 ```
 
 > [!NOTE]
