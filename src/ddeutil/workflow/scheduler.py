@@ -26,11 +26,9 @@ from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
 try:
-    from schedule import CancelJob, Scheduler
+    from schedule import CancelJob
 except ImportError:
-    raise ImportError(
-        "Should install schedule package before use this module."
-    ) from None
+    CancelJob = None
 
 from .__types import DictData
 from .cron import CronRunner
@@ -54,8 +52,10 @@ logging.getLogger("schedule").setLevel(logging.INFO)
 
 __all__ = (
     "PipelineSchedule",
+    "PipelineTask",
     "Schedule",
     "workflow",
+    "workflow_task",
 )
 
 
@@ -145,13 +145,14 @@ class Schedule(BaseModel):
         start_date: datetime,
         queue: dict[str, list[datetime]],
         running: dict[str, list[datetime]],
+        *,
         externals: DictData | None = None,
     ) -> list[PipelineTask]:
         """Generate Task from the current datetime.
 
         :param start_date: A start date that get from the workflow schedule.
-        :param queue:
-        :param running:
+        :param queue: A mapping of name and list of datetime for queue.
+        :param running: A mapping of name and list of datetime for running.
         :param externals: An external parameters that pass to the Loader object.
         :rtype: list[PipelineTask]
         """
@@ -490,6 +491,13 @@ def workflow_control(
     :param externals: An external parameters that pass to Loader.
     :rtype: list[str]
     """
+    try:
+        from schedule import Scheduler
+    except ImportError:
+        raise ImportError(
+            "Should install schedule package before use this module."
+        ) from None
+
     tz: ZoneInfo = ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
     schedule: Scheduler = Scheduler()
     start_date: datetime = datetime.now(tz=tz)
@@ -511,7 +519,9 @@ def workflow_control(
     for name in schedules:
         sch: Schedule = Schedule.from_loader(name, externals=externals)
         pipeline_tasks.extend(
-            sch.tasks(start_date_waiting, wf_queue, wf_running, externals)
+            sch.tasks(
+                start_date_waiting, wf_queue, wf_running, externals=externals
+            ),
         )
 
     # NOTE: This schedule job will start every minute at :02 seconds.
@@ -617,4 +627,4 @@ def workflow(
 
 if __name__ == "__main__":
     workflow_rs: list[str] = workflow()
-    logger.info(f"Application run success: {workflow_rs}")
+    logger.info(f"[WORKFLOW]: Application run success: {workflow_rs}")

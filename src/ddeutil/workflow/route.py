@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import copy
+from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi import status as st
@@ -25,6 +26,9 @@ schedule = APIRouter(
     prefix="/schedule",
     tags=["schedule"],
 )
+
+ListDate = list[datetime]
+SchedulerValueT = tuple[ListDate, ListDate]
 
 
 @workflow.get(
@@ -66,12 +70,12 @@ async def get_workflow(name: str) -> DictData:
 
 @workflow.get("/{name}/logs")
 async def get_workflow_logs(name: str):
-    return {"message": f"getting pipeline {name} logs"}
+    return {"message": f"getting pipeline {name!r} logs"}
 
 
 @workflow.get("/{name}/logs/{release}")
 async def get_workflow_release_log(name: str, release: str):
-    return {"message": f"getting pipeline {name} log in release {release}"}
+    return {"message": f"getting pipeline {name!r} log in release {release}"}
 
 
 @workflow.delete(
@@ -79,40 +83,43 @@ async def get_workflow_release_log(name: str, release: str):
     status_code=st.HTTP_204_NO_CONTENT,
 )
 async def del_workflow_release_log(name: str, release: str):
-    return {"message": f"deleted pipeline {name} log in release {release}"}
+    return {"message": f"deleted pipeline {name!r} log in release {release}"}
 
 
 @schedule.get("/", response_class=UJSONResponse)
 async def get_schedulers(request: Request):
-    snapshot = copy.deepcopy(request.app.scheduler)
+    snapshot = copy.deepcopy(request.state.scheduler)
     return snapshot
 
 
 @schedule.get("/{name}", response_class=UJSONResponse)
 async def get_scheduler(request: Request, name: str):
-    if name in request.app.scheduler:
+    if name in request.state.scheduler:
         return {
-            "message": f"getting {name} to schedule listener.",
-            "scheduler": request.app.scheduler.get(name),
+            "message": f"getting {name!r} to schedule listener.",
+            "scheduler": request.state.scheduler.get(name),
         }
     raise HTTPException(
         status_code=st.HTTP_404_NOT_FOUND,
-        detail=f"Does not found {name} in schedule listener",
+        detail=f"Does not found {name!r} in schedule listener",
     )
 
 
 @schedule.post("/{name}", response_class=UJSONResponse)
 async def add_scheduler(request: Request, name: str):
-    request.app.scheduler[name] = []
-    return {"message": f"adding {name} to schedule listener."}
+    """Adding schedule name to application state store."""
+    wf_queue: ListDate = []
+    wf_running: ListDate = []
+    request.state.scheduler[name]: SchedulerValueT = (wf_queue, wf_running)
+    return {"message": f"adding {name!r} to schedule listener."}
 
 
 @schedule.delete("/{name}", response_class=UJSONResponse)
 async def del_scheduler(request: Request, name: str):
-    if name in request.app.scheduler:
-        request.app.scheduler.pop(name)
-        return {"message": f"deleted {name} to schedule listener."}
+    if name in request.state.scheduler:
+        request.state.scheduler.pop(name)
+        return {"message": f"deleted {name!r} to schedule listener."}
     raise HTTPException(
         status_code=st.HTTP_404_NOT_FOUND,
-        detail=f"Does not found {name} in schedule listener",
+        detail=f"Does not found {name!r} in schedule listener",
     )
