@@ -51,7 +51,8 @@ async def get_workflow(name: str) -> DictData:
     """Return model of pipeline that passing an input pipeline name."""
     try:
         pipeline: Pipeline = Pipeline.from_loader(name=name, externals={})
-    except ValueError:
+    except ValueError as err:
+        logger.exception(err)
         raise HTTPException(
             status_code=st.HTTP_404_NOT_FOUND,
             detail=(
