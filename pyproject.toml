@@ -34,7 +34,7 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 api = [
-    "fastapi[standard]==0.112.2,<1.0.0",
+    "fastapi==0.112.2,<1.0.0",
 ]
 
 [project.urls]

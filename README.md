@@ -44,7 +44,7 @@ this package with application add-ons, you should add `app` in installation;
 | Usecase           | Install Optional                         | Support            |
 |-------------------|------------------------------------------|--------------------|
 | Python & CLI      | `pip install ddeutil-workflow`           | :heavy_check_mark: |
-| FastAPI Server    | `pip install ddeutil-workflow[api]`      | :x:                |
+| FastAPI Server    | `pip install ddeutil-workflow[api]`      | :heavy_check_mark: |
 
 
 > I added this feature to the main milestone.
