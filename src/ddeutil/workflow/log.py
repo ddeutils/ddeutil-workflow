@@ -47,13 +47,13 @@ def get_logger(name: str):
 class BaseLog(BaseModel, ABC):
     """Base Log Pydantic Model abstraction that implement only model fields."""
 
-    name: str = Field(description="A pipeline name.")
+    name: str = Field(description="A workflow name.")
     on: str = Field(description="A cronjob string of this piepline schedule.")
     release: datetime = Field(description="A release datetime.")
     context: DictData = Field(
         default_factory=dict,
         description=(
-            "A context data that receive from a pipeline execution result.",
+            "A context data that receive from a workflow execution result.",
         ),
     )
     parent_run_id: Optional[str] = Field(default=None)
@@ -77,7 +77,7 @@ class BaseLog(BaseModel, ABC):
 
 class FileLog(BaseLog):
     """File Log Pydantic Model that use to saving log data from result of
-    pipeline execution. It inherit from BaseLog model that implement the
+    workflow execution. It inherit from BaseLog model that implement the
     ``self.save`` method for file.
     """
 
@@ -87,7 +87,7 @@ class FileLog(BaseLog):
 
     @classmethod
     def find_logs(cls, name: str):
-        pointer: Path = config().engine.paths.root / f"./logs/pipeline={name}"
+        pointer: Path = config().engine.paths.root / f"./logs/workflow={name}"
         for file in pointer.glob("./release=*/*.log"):
             with file.open(mode="r", encoding="utf-8") as f:
                 yield json.load(f)
@@ -97,11 +97,11 @@ class FileLog(BaseLog):
         if release is not None:
             pointer: Path = (
                 config().engine.paths.root
-                / f"./logs/pipeline={name}/release={release:%Y%m%d%H%M%S}"
+                / f"./logs/workflow={name}/release={release:%Y%m%d%H%M%S}"
             )
             if not pointer.exists():
                 raise FileNotFoundError(
-                    f"Pointer: ./logs/pipeline={name}/"
+                    f"Pointer: ./logs/workflow={name}/"
                     f"release={release:%Y%m%d%H%M%S} does not found."
                 )
             return cls.model_validate(
@@ -119,7 +119,7 @@ class FileLog(BaseLog):
     ) -> bool:
         """Check this log already point in the destination.
 
-        :param name: A pipeline name.
+        :param name: A workflow name.
         :param release: A release datetime.
         :param queue: A list of queue of datetime that already run in the
             future.
@@ -131,7 +131,7 @@ class FileLog(BaseLog):
         # NOTE: create pointer path that use the same logic of pointer method.
         pointer: Path = (
             config().engine.paths.root
-            / f"./logs/pipeline={name}/release={release:%Y%m%d%H%M%S}"
+            / f"./logs/workflow={name}/release={release:%Y%m%d%H%M%S}"
         )
 
         if not queue:
@@ -145,11 +145,11 @@ class FileLog(BaseLog):
         """
         return (
             config().engine.paths.root
-            / f"./logs/pipeline={self.name}/release={self.release:%Y%m%d%H%M%S}"
+            / f"./logs/workflow={self.name}/release={self.release:%Y%m%d%H%M%S}"
         )
 
     def save(self, excluded: list[str] | None) -> Self:
-        """Save logging data that receive a context data from a pipeline
+        """Save logging data that receive a context data from a workflow
         execution result.
 
         :param excluded: An excluded list of key name that want to pass in the

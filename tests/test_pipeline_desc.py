@@ -1,11 +1,11 @@
-import ddeutil.workflow as pipe
+import ddeutil.workflow as wf
 
 
 def test_pipe_desc():
-    pipeline = pipe.Pipeline.from_loader(
-        name="pipe-run-common",
+    workflow = wf.Workflow.from_loader(
+        name="wf-run-common",
         externals={},
     )
-    assert pipeline.desc == (
+    assert workflow.desc == (
         "## Run Python Workflow\n\nThis is a running python workflow\n"
     )

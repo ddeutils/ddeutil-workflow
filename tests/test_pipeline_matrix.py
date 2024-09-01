@@ -1,8 +1,8 @@
-import ddeutil.workflow as pipe
+import ddeutil.workflow as wf
 
 
 def test_pipe_strategy_model():
-    strategy = pipe.Strategy.model_validate(
+    strategy = wf.Strategy.model_validate(
         obj={
             "matrix": {
                 "table": ["customer", "sales"],
@@ -45,11 +45,11 @@ def test_pipe_strategy_model():
 
 
 def test_pipe_job_matrix():
-    pipeline = pipe.Pipeline.from_loader(
-        name="pipe-run-matrix",
+    workflow = wf.Workflow.from_loader(
+        name="wf-run-matrix",
         externals={},
     )
-    multi_sys = pipeline.job(name="multiple-system")
+    multi_sys = workflow.job(name="multiple-system")
     assert {
         "system": ["csv"],
         "table": ["customer", "sales"],
@@ -79,11 +79,11 @@ def test_pipe_job_matrix():
 
 
 def test_pipe_matrix():
-    pipeline = pipe.Pipeline.from_loader(
-        name="pipe-run-matrix",
+    workflow = wf.Workflow.from_loader(
+        name="wf-run-matrix",
         externals={},
     )
-    rs = pipeline.execute(params={"source": "src", "target": "tgt"})
+    rs = workflow.execute(params={"source": "src", "target": "tgt"})
     assert {
         "params": {"source": "src", "target": "tgt"},
         "jobs": {
@@ -151,9 +151,9 @@ def test_pipe_matrix():
 
 
 def test_pipe_matrix_fail_fast():
-    pipeline = pipe.Pipeline.from_loader(
-        name="pipe-run-matrix-fail-fast",
+    workflow = wf.Workflow.from_loader(
+        name="wf-run-matrix-fail-fast",
         externals={},
     )
-    rs = pipeline.execute(params={"name": "foo"})
+    rs = workflow.execute(params={"name": "foo"})
     print(rs)

@@ -1,19 +1,19 @@
-pipe-trigger:
-  type: ddeutil.workflow.Pipeline
+wf-trigger:
+  type: ddeutil.workflow.Workflow
   on: 'every_5_minute_bkk'
   jobs:
     trigger-job:
       stages:
-        - name: "Trigger pipe-run-python pipeline"
-          trigger: pipe-run-python
+        - name: "Trigger wf-run-python workflow"
+          trigger: wf-run-python
           id: trigger-stage
           params:
             author-run: Trigger Runner
             run-date: '2024-08-01'
 
 
-pipe-condition:
-  type: ddeutil.workflow.Pipeline
+wf-condition:
+  type: ddeutil.workflow.Workflow
   on: 'every_5_minute_bkk'
   params:
     name: str
@@ -28,8 +28,8 @@ pipe-condition:
         - name: "Empty stage"
 
 
-pipe-condition-raise:
-  type: ddeutil.workflow.Pipeline
+wf-condition-raise:
+  type: ddeutil.workflow.Workflow
   params:
     name: str
   jobs:
@@ -40,8 +40,8 @@ pipe-condition-raise:
           if: '"${{ params.name }}"'
 
 
-pipe-scheduling:
-  type: ddeutil.workflow.Pipeline
+wf-scheduling:
+  type: ddeutil.workflow.Workflow
   on:
 #    - 'every_5_minute_bkk'
     - 'every_3_minute_bkk'
@@ -56,8 +56,8 @@ pipe-scheduling:
           echo: "Hello ${{ params.asat-dt | fmt('%Y-%m-%d') }}"
 
 
-pipe-scheduling-minute:
-  type: ddeutil.workflow.Pipeline
+wf-scheduling-minute:
+  type: ddeutil.workflow.Workflow
   on:
     - cronjob: '* * * * *'
       timezone: "Asia/Bangkok"

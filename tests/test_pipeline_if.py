@@ -1,20 +1,20 @@
-import ddeutil.workflow as pipe
+import ddeutil.workflow as wf
 from ddeutil.workflow.utils import Result
 
 
 def test_stage_if():
     params = {"name": "foo"}
-    pipeline = pipe.Pipeline.from_loader(name="pipe-condition", externals={})
-    stage = pipeline.job("condition-job").stage(stage_id="condition-stage")
+    workflow = wf.Workflow.from_loader(name="wf-condition", externals={})
+    stage = workflow.job("condition-job").stage(stage_id="condition-stage")
 
-    assert not stage.is_skipped(params=pipeline.parameterize(params))
-    assert stage.is_skipped(params=pipeline.parameterize({"name": "bar"}))
+    assert not stage.is_skipped(params=workflow.parameterize(params))
+    assert stage.is_skipped(params=workflow.parameterize({"name": "bar"}))
     assert {"name": "foo"} == params
 
 
 def test_pipe_id():
-    pipeline = pipe.Pipeline.from_loader(name="pipe-condition", externals={})
-    rs: Result = pipeline.execute(params={"name": "bar"})
+    workflow = wf.Workflow.from_loader(name="wf-condition", externals={})
+    rs: Result = workflow.execute(params={"name": "bar"})
     assert {
         "params": {"name": "bar"},
         "jobs": {

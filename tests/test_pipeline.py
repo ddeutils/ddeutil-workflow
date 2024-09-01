@@ -1,5 +1,5 @@
 import pytest
-from ddeutil.workflow import Job, Pipeline
+from ddeutil.workflow import Job, Workflow
 from pydantic import ValidationError
 
 
@@ -31,7 +31,7 @@ def test_pipe_model():
             ]
         },
     }
-    p = Pipeline(name="manual-pipeline", jobs=data)
+    p = Workflow(name="manual-workflow", jobs=data)
     assert "Run Hello World" == p.jobs.get("demo-run").stages[0].name
     assert (
         "Run Sequence and use var from Above"
@@ -45,4 +45,4 @@ def test_pipe_model():
 def test_pipe_model_name_raise():
 
     with pytest.raises(ValidationError):
-        Pipeline(name="manual-pipeline-${{ params.test }}")
+        Workflow(name="manual-workflow-${{ params.test }}")

@@ -39,7 +39,7 @@ except ImportError:
 
 from .__types import DictData
 from .cron import CronRunner
-from .exceptions import JobException, PipelineException, WorkflowException
+from .exceptions import JobException, WorkflowException
 from .job import Job
 from .log import FileLog, Log, get_logger
 from .on import On
@@ -61,36 +61,36 @@ logging.getLogger("schedule").setLevel(logging.INFO)
 
 
 __all__ = (
-    "Pipeline",
-    "PipelineSchedule",
-    "PipelineTask",
+    "Workflow",
+    "WorkflowSchedule",
+    "WorkflowTask",
     "Schedule",
-    "workflow",
+    "workflow_runner",
     "workflow_task",
 )
 
 
-class Pipeline(BaseModel):
-    """Pipeline Model this is the main future of this project because it use to
+class Workflow(BaseModel):
+    """Workflow Model this is the main future of this project because it use to
     be workflow data for running everywhere that you want or using it to
     scheduler task in background. It use lightweight coding line from Pydantic
     Model and enhance execute method on it.
     """
 
-    name: str = Field(description="A pipeline name.")
+    name: str = Field(description="A workflow name.")
     desc: Optional[str] = Field(
         default=None,
         description=(
-            "A pipeline description that can be string of markdown content."
+            "A workflow description that can be string of markdown content."
         ),
     )
     params: dict[str, Param] = Field(
         default_factory=dict,
-        description="A parameters that want to use on this pipeline.",
+        description="A parameters that want to use on this workflow.",
     )
     on: list[On] = Field(
         default_factory=list,
-        description="A list of On instance for this pipeline schedule.",
+        description="A list of On instance for this workflow schedule.",
     )
     jobs: dict[str, Job] = Field(
         default_factory=dict,
@@ -98,14 +98,14 @@ class Pipeline(BaseModel):
     )
     run_id: Optional[str] = Field(
         default=None,
-        description="A running pipeline ID.",
+        description="A running workflow ID.",
         repr=False,
         exclude=True,
     )
 
     @property
     def new_run_id(self) -> str:
-        """Running ID of this pipeline that always generate new unique value."""
+        """Running ID of this workflow that always generate new unique value."""
         return gen_id(self.name, unique=True)
 
     @classmethod
@@ -114,11 +114,11 @@ class Pipeline(BaseModel):
         name: str,
         externals: DictData | None = None,
     ) -> Self:
-        """Create Pipeline instance from the Loader object that only receive
-        an input pipeline name. The loader object will use this pipeline name to
-        searching configuration data of this pipeline model in conf path.
+        """Create Workflow instance from the Loader object that only receive
+        an input workflow name. The loader object will use this workflow name to
+        searching configuration data of this workflow model in conf path.
 
-        :param name: A pipeline name that want to pass to Loader object.
+        :param name: A workflow name that want to pass to Loader object.
         :param externals: An external parameters that want to pass to Loader
             object.
         :rtype: Self
@@ -185,48 +185,48 @@ class Pipeline(BaseModel):
             if not_exist := [
                 need for need in self.jobs[job].needs if need not in self.jobs
             ]:
-                raise PipelineException(
+                raise WorkflowException(
                     f"This needed jobs: {not_exist} do not exist in this "
-                    f"pipeline, {self.name!r}"
+                    f"workflow, {self.name!r}"
                 )
 
-            # NOTE: update a job id with its job id from pipeline template
+            # NOTE: update a job id with its job id from workflow template
             self.jobs[job].id = job
 
         if self.run_id is None:
             self.run_id = self.new_run_id
 
-        # VALIDATE: Validate pipeline name should not dynamic with params
+        # VALIDATE: Validate workflow name should not dynamic with params
         #   template.
         if has_template(self.name):
             raise ValueError(
-                f"Pipeline name should not has any template, please check, "
+                f"Workflow name should not has any template, please check, "
                 f"{self.name!r}."
             )
 
         return self
 
     def get_running_id(self, run_id: str) -> Self:
-        """Return Pipeline model object that changing pipeline running ID with
+        """Return Workflow model object that changing workflow running ID with
         an input running ID.
 
-        :param run_id: A replace pipeline running ID.
+        :param run_id: A replace workflow running ID.
         :rtype: Self
         """
         return self.model_copy(update={"run_id": run_id})
 
     def job(self, name: str) -> Job:
-        """Return Job model that exists on this pipeline.
+        """Return Job model that exists on this workflow.
 
         :param name: A job name that want to get from a mapping of job models.
         :type name: str
 
         :rtype: Job
-        :returns: A job model that exists on this pipeline by input name.
+        :returns: A job model that exists on this workflow by input name.
         """
         if name not in self.jobs:
             raise ValueError(
-                f"A Job {name!r} does not exists in this pipeline, "
+                f"A Job {name!r} does not exists in this workflow, "
                 f"{self.name!r}"
             )
         return self.jobs[name]
@@ -236,17 +236,17 @@ class Pipeline(BaseModel):
         will create jobs key to params mapping that will keep any result from
         job execution.
 
-        :param params: A parameter mapping that receive from pipeline execution.
+        :param params: A parameter mapping that receive from workflow execution.
         :rtype: DictData
         """
-        # VALIDATE: Incoming params should have keys that set on this pipeline.
+        # VALIDATE: Incoming params should have keys that set on this workflow.
         if check_key := tuple(
             f"{k!r}"
             for k in self.params
             if (k not in params and self.params[k].required)
         ):
-            raise PipelineException(
-                f"Required Param on this pipeline setting does not set: "
+            raise WorkflowException(
+                f"Required Param on this workflow setting does not set: "
                 f"{', '.join(check_key)}."
             )
 
@@ -273,22 +273,26 @@ class Pipeline(BaseModel):
         sleep_interval: int = 15,
         log: Log = None,
     ) -> Result:
-        """Start running pipeline with the on schedule in period of 30 minutes.
+        """Start running workflow with the on schedule in period of 30 minutes.
         That mean it will still running at background 30 minutes until the
         schedule matching with its time.
 
-            This method allow pipeline use log object to save the execution
+            This method allow workflow use log object to save the execution
         result to log destination like file log to local `/logs` directory.
 
         :param on: An on schedule value.
-        :param params: A pipeline parameter that pass to execute method.
+        :param params: A workflow parameter that pass to execute method.
         :param queue: A list of release time that already running.
-        :param waiting_sec: A second period value that allow pipeline execute.
+        :param waiting_sec: A second period value that allow workflow execute.
         :param sleep_interval: A second value that want to waiting until time
             to execute.
         :param log: A log object that want to save execution result.
         :rtype: Result
         """
+        logger.debug(
+            f"({self.run_id}) [CORE]: {self.name!r}: {on.cronjob} : run with "
+            f"queue id: {id(queue)}"
+        )
         log: Log = log or FileLog
         tz: ZoneInfo = ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
         gen: CronRunner = on.generate(
@@ -352,7 +356,7 @@ class Pipeline(BaseModel):
             },
         }
 
-        # WARNING: Re-create pipeline object that use new running pipeline
+        # WARNING: Re-create workflow object that use new running workflow
         #   ID.
         runner: Self = self.get_running_id(run_id=self.new_run_id)
         rs: Result = runner.execute(
@@ -363,7 +367,7 @@ class Pipeline(BaseModel):
             f"End release {next_time:%Y-%m-%d %H:%M:%S}"
         )
 
-        # NOTE: Delete a copied pipeline instance for saving memory.
+        # NOTE: Delete a copied workflow instance for saving memory.
         del runner
 
         rs.set_parent_run_id(self.run_id)
@@ -396,7 +400,7 @@ class Pipeline(BaseModel):
         *,
         log: Log | None = None,
     ) -> list[Result]:
-        """Poke pipeline with threading executor pool for executing with all its
+        """Poke workflow with threading executor pool for executing with all its
         schedules that was set on the `on` value. This method will observe its
         schedule that nearing to run with the ``self.release()`` method.
 
@@ -408,7 +412,7 @@ class Pipeline(BaseModel):
             f"({self.run_id}) [POKING]: Start Poking: {self.name!r} ..."
         )
 
-        # NOTE: If this pipeline does not set the on schedule, it will return
+        # NOTE: If this workflow does not set the on schedule, it will return
         #   empty result.
         if len(self.on) == 0:
             return []
@@ -417,8 +421,8 @@ class Pipeline(BaseModel):
         queue: list[datetime] = []
         results: list[Result] = []
 
-        wk: int = int(os.getenv("WORKFLOW_CORE_MAX_PIPELINE_POKING") or "4")
-        with ThreadPoolExecutor(max_workers=wk) as executor:
+        worker: int = int(os.getenv("WORKFLOW_CORE_MAX_NUM_POKING") or "4")
+        with ThreadPoolExecutor(max_workers=worker) as executor:
             # TODO: If I want to run infinite loop.
             futures: list[Future] = []
             for on in self.on:
@@ -431,7 +435,7 @@ class Pipeline(BaseModel):
                         queue=queue,
                     )
                 )
-                delay()
+                delay(second=0.15)
 
             # WARNING: This poking method does not allow to use fail-fast logic
             #   to catching parallel execution result.
@@ -451,27 +455,27 @@ class Pipeline(BaseModel):
         job: str,
         params: DictData,
     ) -> Result:
-        """Job Executor that use on pipeline executor.
+        """Job Executor that use on workflow executor.
 
         :param job: A job ID that want to execute.
-        :param params: A params that was parameterized from pipeline execution.
+        :param params: A params that was parameterized from workflow execution.
         :rtype: Result
         """
-        # VALIDATE: check a job ID that exists in this pipeline or not.
+        # VALIDATE: check a job ID that exists in this workflow or not.
         if job not in self.jobs:
-            raise PipelineException(
-                f"The job ID: {job} does not exists on {self.name!r} pipeline."
+            raise WorkflowException(
+                f"The job ID: {job} does not exists on {self.name!r} workflow."
             )
         try:
-            logger.info(f"({self.run_id}) [PIPELINE]: Start execute: {job!r}")
+            logger.info(f"({self.run_id}) [WORKFLOW]: Start execute: {job!r}")
 
             # IMPORTANT:
-            #   Change any job running IDs to this pipeline running ID.
+            #   Change any job running IDs to this workflow running ID.
             job_obj: Job = self.jobs[job].get_running_id(self.run_id)
             j_rs: Result = job_obj.execute(params=params)
 
         except JobException as err:
-            raise PipelineException(f"{job}: JobException: {err}") from None
+            raise WorkflowException(f"{job}: JobException: {err}") from None
 
         return Result(
             status=j_rs.status,
@@ -484,12 +488,12 @@ class Pipeline(BaseModel):
         *,
         timeout: int = 60,
     ) -> Result:
-        """Execute pipeline with passing dynamic parameters to any jobs that
-        included in the pipeline.
+        """Execute workflow with passing dynamic parameters to any jobs that
+        included in the workflow.
 
-        :param params: An input parameters that use on pipeline execution that
+        :param params: An input parameters that use on workflow execution that
             will parameterize before using it.
-        :param timeout: A pipeline execution time out in second unit that use
+        :param timeout: A workflow execution time out in second unit that use
             for limit time of execution and waiting job dependency.
         :rtype: Result
 
@@ -497,7 +501,7 @@ class Pipeline(BaseModel):
         ---
 
             The result of execution process for each jobs and stages on this
-        pipeline will keeping in dict which able to catch out with all jobs and
+        workflow will keeping in dict which able to catch out with all jobs and
         stages by dot annotation.
 
             For example, when I want to use the output from previous stage, I
@@ -513,7 +517,7 @@ class Pipeline(BaseModel):
         # NOTE: It should not do anything if it does not have job.
         if not self.jobs:
             logger.warning(
-                f"({self.run_id}) [PIPELINE]: This pipeline: {self.name!r} "
+                f"({self.run_id}) [WORKFLOW]: This workflow: {self.name!r} "
                 f"does not have any jobs"
             )
             return Result(status=0, context=params)
@@ -537,7 +541,7 @@ class Pipeline(BaseModel):
                 )
             )
             return Result(status=0, context=context)
-        except PipelineException as err:
+        except WorkflowException as err:
             context.update(
                 {"error_message": f"{err.__class__.__name__}: {err}"}
             )
@@ -552,9 +556,9 @@ class Pipeline(BaseModel):
         worker: int = 2,
         timeout: int = 600,
     ) -> DictData:
-        """Pipeline threading execution.
+        """Workflow threading execution.
 
-        :param context: A context pipeline data that want to downstream passing.
+        :param context: A context workflow data that want to downstream passing.
         :param ts: A start timestamp that use for checking execute time should
             timeout.
         :param timeout: A second value unit that bounding running time.
@@ -598,9 +602,9 @@ class Pipeline(BaseModel):
             for future in as_completed(futures):
                 if err := future.exception():
                     logger.error(f"{err}")
-                    raise PipelineException(f"{err}")
+                    raise WorkflowException(f"{err}")
 
-                # NOTE: Update job result to pipeline result.
+                # NOTE: Update job result to workflow result.
                 context["jobs"].update(future.result(timeout=20).conext)
 
         if not_time_out_flag:
@@ -608,11 +612,11 @@ class Pipeline(BaseModel):
 
         # NOTE: Raise timeout error.
         logger.warning(
-            f"({self.run_id}) [PIPELINE]: Execution of pipeline, {self.name!r} "
+            f"({self.run_id}) [WORKFLOW]: Execution of workflow, {self.name!r} "
             f", was timeout"
         )
-        raise PipelineException(
-            f"Execution of pipeline: {self.name} was timeout"
+        raise WorkflowException(
+            f"Execution of workflow: {self.name} was timeout"
         )
 
     def __exec_non_threading(
@@ -623,10 +627,10 @@ class Pipeline(BaseModel):
         *,
         timeout: int = 600,
     ) -> DictData:
-        """Pipeline non-threading execution that use sequential job running
+        """Workflow non-threading execution that use sequential job running
         and waiting previous run successful.
 
-        :param context: A context pipeline data that want to downstream passing.
+        :param context: A context workflow data that want to downstream passing.
         :param ts: A start timestamp that use for checking execute time should
             timeout.
         :param timeout: A second value unit that bounding running time.
@@ -663,24 +667,24 @@ class Pipeline(BaseModel):
 
         # NOTE: Raise timeout error.
         logger.warning(
-            f"({self.run_id}) [PIPELINE]: Execution of pipeline was timeout"
+            f"({self.run_id}) [WORKFLOW]: Execution of workflow was timeout"
         )
-        raise PipelineException(
-            f"Execution of pipeline: {self.name} was timeout"
+        raise WorkflowException(
+            f"Execution of workflow: {self.name} was timeout"
         )
 
 
-class PipelineSchedule(BaseModel):
-    """Pipeline schedule Pydantic Model."""
+class WorkflowSchedule(BaseModel):
+    """Workflow schedule Pydantic Model."""
 
-    name: str = Field(description="A pipeline name.")
+    name: str = Field(description="A workflow name.")
     on: list[On] = Field(
         default_factory=list,
         description="An override On instance value.",
     )
     params: DictData = Field(
         default_factory=dict,
-        description="A parameters that want to use to pipeline execution.",
+        description="A parameters that want to use to workflow execution.",
     )
 
     @model_validator(mode="before")
@@ -717,7 +721,7 @@ class PipelineSchedule(BaseModel):
 
 class Schedule(BaseModel):
     """Schedule Pydantic Model that use to run with scheduler package. It does
-    not equal the on value in Pipeline model but it use same logic to running
+    not equal the on value in Workflow model but it use same logic to running
     release date with crontab interval.
     """
 
@@ -727,9 +731,9 @@ class Schedule(BaseModel):
             "A schedule description that can be string of markdown content."
         ),
     )
-    pipelines: list[PipelineSchedule] = Field(
+    workflows: list[WorkflowSchedule] = Field(
         default_factory=list,
-        description="A list of PipelineSchedule models.",
+        description="A list of WorkflowSchedule models.",
     )
 
     @classmethod
@@ -758,48 +762,46 @@ class Schedule(BaseModel):
         running: dict[str, list[datetime]],
         *,
         externals: DictData | None = None,
-    ) -> list[PipelineTask]:
+    ) -> list[WorkflowTask]:
         """Generate Task from the current datetime.
 
         :param start_date: A start date that get from the workflow schedule.
         :param queue: A mapping of name and list of datetime for queue.
         :param running: A mapping of name and list of datetime for running.
         :param externals: An external parameters that pass to the Loader object.
-        :rtype: list[PipelineTask]
+        :rtype: list[WorkflowTask]
         """
 
-        # NOTE: Create pair of pipeline and on.
-        pipeline_tasks: list[PipelineTask] = []
+        # NOTE: Create pair of workflow and on.
+        workflow_tasks: list[WorkflowTask] = []
         externals: DictData = externals or {}
 
-        for pipe in self.pipelines:
-            pipeline: Pipeline = Pipeline.from_loader(
-                pipe.name, externals=externals
-            )
+        for wfs in self.workflows:
+            wf: Workflow = Workflow.from_loader(wfs.name, externals=externals)
 
             # NOTE: Create default list of release datetime.
-            queue[pipe.name]: list[datetime] = []
-            running[pipe.name]: list[datetime] = []
+            queue[wfs.name]: list[datetime] = []
+            running[wfs.name]: list[datetime] = []
 
-            for on in pipeline.on:
+            for on in wf.on:
                 on_gen = on.generate(start_date)
                 next_running_date = on_gen.next
-                while next_running_date in queue[pipe.name]:
+                while next_running_date in queue[wfs.name]:
                     next_running_date = on_gen.next
 
-                heappush(queue[pipe.name], next_running_date)
+                heappush(queue[wfs.name], next_running_date)
 
-                pipeline_tasks.append(
-                    PipelineTask(
-                        pipeline=pipeline,
+                workflow_tasks.append(
+                    WorkflowTask(
+                        workflow=wf,
                         on=on,
-                        params=pipe.params,
+                        params=wfs.params,
                         queue=queue,
                         running=running,
                     ),
                 )
 
-        return pipeline_tasks
+        return workflow_tasks
 
 
 def catch_exceptions(cancel_on_failure=False):
@@ -839,12 +841,12 @@ def catch_exceptions_method(cancel_on_failure=False):
 
 
 @dataclass(frozen=True)
-class PipelineTask:
-    """Pipeline task dataclass that use to keep mapping data and objects for
+class WorkflowTask:
+    """Workflow task dataclass that use to keep mapping data and objects for
     passing in multithreading task.
     """
 
-    pipeline: Pipeline
+    workflow: Workflow
     on: On
     params: DictData = field(compare=False, hash=False)
     queue: list[datetime] = field(compare=False, hash=False)
@@ -852,14 +854,14 @@ class PipelineTask:
 
     @catch_exceptions_method(cancel_on_failure=True)
     def release(self, log: Log | None = None) -> None:
-        """Pipeline release, it will use with the same logic of
-        `pipeline.release` method.
+        """Workflow release, it will use with the same logic of
+        `workflow.release` method.
 
         :param log: A log object.
         """
         tz: ZoneInfo = ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
         log: Log = log or FileLog
-        pipeline: Pipeline = self.pipeline
+        wf: Workflow = self.workflow
         on: On = self.on
 
         gen: CronRunner = on.generate(
@@ -871,40 +873,38 @@ class PipelineTask:
         next_time: datetime = gen.next
 
         # NOTE: get next utils it does not running.
-        while log.is_pointed(
-            pipeline.name, next_time, queue=self.running[pipeline.name]
-        ):
+        while log.is_pointed(wf.name, next_time, queue=self.running[wf.name]):
             next_time: datetime = gen.next
 
         logger.debug(
-            f"({pipeline.run_id}) [CORE]: {pipeline.name!r} : {on.cronjob} : "
+            f"({wf.run_id}) [CORE]: {wf.name!r} : {on.cronjob} : "
             f"{next_time:%Y-%m-%d %H:%M:%S}"
         )
-        heappush(self.running[pipeline.name], next_time)
+        heappush(self.running[wf.name], next_time)
 
         if get_diff_sec(next_time, tz=cron_tz) > 55:
             logger.debug(
-                f"({pipeline.run_id}) [CORE]: {pipeline.name!r} : {on.cronjob} "
+                f"({wf.run_id}) [CORE]: {wf.name!r} : {on.cronjob} "
                 f": Does not closely >> {next_time:%Y-%m-%d %H:%M:%S}"
             )
 
             # NOTE: Add this next running datetime that not in period to queue
             #   and remove it to running.
-            self.running[pipeline.name].remove(next_time)
-            heappush(self.queue[pipeline.name], next_time)
+            self.running[wf.name].remove(next_time)
+            heappush(self.queue[wf.name], next_time)
 
             time.sleep(0.2)
             return
 
         logger.debug(
-            f"({pipeline.run_id}) [CORE]: {pipeline.name!r} : {on.cronjob} : "
+            f"({wf.run_id}) [CORE]: {wf.name!r} : {on.cronjob} : "
             f"Closely to run >> {next_time:%Y-%m-%d %H:%M:%S}"
         )
 
         # NOTE: Release when the time is nearly to schedule time.
         while (duration := get_diff_sec(next_time, tz=tz)) > (15 + 5):
             logger.debug(
-                f"({pipeline.run_id}) [CORE]: {pipeline.name!r} : {on.cronjob} "
+                f"({wf.run_id}) [CORE]: {wf.name!r} : {on.cronjob} "
                 f": Sleep until: {duration}"
             )
             time.sleep(15)
@@ -919,26 +919,26 @@ class PipelineTask:
             },
         }
 
-        # WARNING: Re-create pipeline object that use new running pipeline
+        # WARNING: Re-create workflow object that use new running workflow
         #   ID.
-        runner: Pipeline = pipeline.get_running_id(run_id=pipeline.new_run_id)
+        runner: Workflow = wf.get_running_id(run_id=wf.new_run_id)
         rs: Result = runner.execute(
             params=param2template(self.params, release_params),
         )
         logger.debug(
-            f"({runner.run_id}) [CORE]: {pipeline.name!r} : {on.cronjob} : "
+            f"({runner.run_id}) [CORE]: {wf.name!r} : {on.cronjob} : "
             f"End release - {next_time:%Y-%m-%d %H:%M:%S}"
         )
 
         del runner
 
         # NOTE: Set parent ID on this result.
-        rs.set_parent_run_id(pipeline.run_id)
+        rs.set_parent_run_id(wf.run_id)
 
         # NOTE: Save result to log object saving.
         rs_log: Log = log.model_validate(
             {
-                "name": pipeline.name,
+                "name": wf.name,
                 "on": str(on.cronjob),
                 "release": next_time,
                 "context": rs.context,
@@ -949,28 +949,28 @@ class PipelineTask:
         rs_log.save(excluded=None)
 
         # NOTE: remove this release date from running
-        self.running[pipeline.name].remove(next_time)
+        self.running[wf.name].remove(next_time)
 
         # IMPORTANT:
-        #   Add the next running datetime to pipeline queue
+        #   Add the next running datetime to workflow queue
         finish_time: datetime = datetime.now(tz=cron_tz).replace(
             second=0, microsecond=0
         )
         future_running_time: datetime = gen.next
         while (
-            future_running_time in self.running[pipeline.name]
-            or future_running_time in self.queue[pipeline.name]
+            future_running_time in self.running[wf.name]
+            or future_running_time in self.queue[wf.name]
             or future_running_time < finish_time
         ):
             future_running_time: datetime = gen.next
 
-        heappush(self.queue[pipeline.name], future_running_time)
+        heappush(self.queue[wf.name], future_running_time)
         logger.debug(f"[CORE]: {'-' * 100}")
 
     def __eq__(self, other):
-        if isinstance(other, PipelineTask):
+        if isinstance(other, WorkflowTask):
             return (
-                self.pipeline.name == other.pipeline.name
+                self.workflow.name == other.workflow.name
                 and self.on.cronjob == other.on.cronjob
             )
 
@@ -981,16 +981,16 @@ def queue2str(queue: list[datetime]) -> Iterator[str]:
 
 @catch_exceptions(cancel_on_failure=True)
 def workflow_task(
-    pipeline_tasks: list[PipelineTask],
+    workflow_tasks: list[WorkflowTask],
     stop: datetime,
     threads: dict[str, Thread],
 ) -> CancelJob | None:
-    """Workflow task generator that create release pair of pipeline and on to
+    """Workflow task generator that create release pair of workflow and on to
     the threading in background.
 
         This workflow task will start every minute at :02 second.
 
-    :param pipeline_tasks:
+    :param workflow_tasks:
     :param stop:
     :param threads:
     :rtype: CancelJob | None
@@ -1003,7 +1003,7 @@ def workflow_task(
         logger.info("[WORKFLOW]: Stop this schedule with datetime stopper.")
         while len(threads) > 0:
             logger.warning(
-                "[WORKFLOW]: Waiting pipeline release thread that still "
+                "[WORKFLOW]: Waiting workflow release thread that still "
                 "running in background."
             )
             time.sleep(15)
@@ -1011,57 +1011,57 @@ def workflow_task(
         return CancelJob
 
     # IMPORTANT:
-    #       Filter pipeline & on that should to run with `pipeline_release`
+    #       Filter workflow & on that should to run with `workflow_release`
     #   function. It will deplicate running with different schedule value
     #   because I use current time in this condition.
     #
-    #       For example, if a pipeline A queue has '00:02:00' time that
+    #       For example, if a workflow A queue has '00:02:00' time that
     #   should to run and its schedule has '*/2 * * * *' and '*/35 * * * *'.
     #   This condition will release with 2 threading job.
     #
     #   '00:02:00'  --> '*/2 * * * *'   --> running
     #               --> '*/35 * * * *'  --> skip
     #
-    for task in pipeline_tasks:
+    for task in workflow_tasks:
 
         # NOTE: Get incoming datetime queue.
         logger.debug(
-            f"[WORKFLOW]: Current queue: {task.pipeline.name!r} : "
-            f"{list(queue2str(task.queue[task.pipeline.name]))}"
+            f"[WORKFLOW]: Current queue: {task.workflow.name!r} : "
+            f"{list(queue2str(task.queue[task.workflow.name]))}"
         )
 
         # NOTE: Create minute unit value for any scheduler datetime that
-        #   checking a pipeline task should run in this datetime.
+        #   checking a workflow task should run in this datetime.
         current_running_time: datetime = start_date_minute.astimezone(
             tz=ZoneInfo(task.on.tz)
         )
         if (
-            len(task.queue[task.pipeline.name]) > 0
-            and current_running_time != task.queue[task.pipeline.name][0]
+            len(task.queue[task.workflow.name]) > 0
+            and current_running_time != task.queue[task.workflow.name][0]
         ) or (
             task.on.next(current_running_time)
-            != task.queue[task.pipeline.name][0]
+            != task.queue[task.workflow.name][0]
         ):
             logger.debug(
                 f"[WORKFLOW]: Skip schedule "
                 f"{current_running_time:%Y-%m-%d %H:%M:%S} "
-                f"for : {task.pipeline.name!r} : {task.on.cronjob}"
+                f"for : {task.workflow.name!r} : {task.on.cronjob}"
             )
             continue
-        elif len(task.queue[task.pipeline.name]) == 0:
+        elif len(task.queue[task.workflow.name]) == 0:
             logger.warning(
-                f"[WORKFLOW]: Queue is empty for : {task.pipeline.name!r} : "
+                f"[WORKFLOW]: Queue is empty for : {task.workflow.name!r} : "
                 f"{task.on.cronjob}"
             )
             continue
 
         # NOTE: Remove this datetime from queue.
-        task.queue[task.pipeline.name].pop(0)
+        task.queue[task.workflow.name].pop(0)
 
         # NOTE: Create thread name that able to tracking with observe schedule
         #   job.
         thread_name: str = (
-            f"{task.pipeline.name}|{str(task.on.cronjob)}|"
+            f"{task.workflow.name}|{str(task.on.cronjob)}|"
             f"{current_running_time:%Y%m%d%H%M}"
         )
         pipe_thread: Thread = Thread(
@@ -1087,7 +1087,7 @@ def workflow_long_running_task(threads: dict[str, Thread]) -> None:
     :rtype: None
     """
     logger.debug(
-        "[MONITOR]: Start checking long running pipeline release task."
+        "[MONITOR]: Start checking long running workflow release task."
     )
     snapshot_threads = list(threads.keys())
     for t_name in snapshot_threads:
@@ -1104,7 +1104,7 @@ def workflow_control(
 ) -> list[str]:
     """Workflow scheduler control.
 
-    :param schedules: A list of pipeline names that want to schedule running.
+    :param schedules: A list of workflow names that want to schedule running.
     :param stop: An datetime value that use to stop running schedule.
     :param externals: An external parameters that pass to Loader.
     :rtype: list[str]
@@ -1122,7 +1122,7 @@ def workflow_control(
 
     # NOTE: Design workflow queue caching.
     #   ---
-    #   {"pipeline-name": [<release-datetime>, <release-datetime>, ...]}
+    #   {"workflow-name": [<release-datetime>, <release-datetime>, ...]}
     #
     wf_queue: dict[str, list[datetime]] = {}
     wf_running: dict[str, list[datetime]] = {}
@@ -1132,11 +1132,11 @@ def workflow_control(
         second=0, microsecond=0
     )
 
-    # NOTE: Create pair of pipeline and on from schedule model.
-    pipeline_tasks: list[PipelineTask] = []
+    # NOTE: Create pair of workflow and on from schedule model.
+    workflow_tasks: list[WorkflowTask] = []
     for name in schedules:
         sch: Schedule = Schedule.from_loader(name, externals=externals)
-        pipeline_tasks.extend(
+        workflow_tasks.extend(
             sch.tasks(
                 start_date_waiting, wf_queue, wf_running, externals=externals
             ),
@@ -1145,7 +1145,7 @@ def workflow_control(
     # NOTE: This schedule job will start every minute at :02 seconds.
     schedule.every(1).minutes.at(":02").do(
         workflow_task,
-        pipeline_tasks=pipeline_tasks,
+        workflow_tasks=workflow_tasks,
         stop=stop
         or (
             start_date
@@ -1173,7 +1173,7 @@ def workflow_control(
         if not schedule.get_jobs("control"):
             schedule.clear("monitor")
             logger.warning(
-                f"[WORKFLOW]: Pipeline release thread: {thread_releases}"
+                f"[WORKFLOW]: Workflow release thread: {thread_releases}"
             )
             logger.warning("[WORKFLOW]: Does not have any schedule jobs !!!")
             break
@@ -1187,33 +1187,33 @@ def workflow_control(
     return schedules
 
 
-def workflow(
+def workflow_runner(
     stop: datetime | None = None,
     externals: DictData | None = None,
     excluded: list[str] | None = None,
 ) -> list[str]:
     """Workflow application that running multiprocessing schedule with chunk of
-    pipelines that exists in config path.
+    workflows that exists in config path.
 
     :param stop:
     :param excluded:
     :param externals:
     :rtype: list[str]
 
-        This function will get all pipelines that include on value that was
+        This function will get all workflows that include on value that was
     created in config path and chuck it with WORKFLOW_APP_SCHEDULE_PER_PROCESS
     value to multiprocess executor pool.
 
     The current workflow logic:
     ---
         PIPELINES ==> process 01 ==> schedule 1 minute --> thread of release
-                                                           pipeline task 01 01
+                                                           workflow task 01 01
                                                        --> thread of release
-                                                           pipeline task 01 02
+                                                           workflow task 01 02
                   ==> process 02 ==> schedule 1 minute --> thread of release
-                                                           pipeline task 02 01
+                                                           workflow task 02 01
                                                        --> thread of release
-                                                           pipeline task 02 02
+                                                           workflow task 02 02
                   ==> ...
     """
     excluded: list[str] = excluded or []
@@ -1241,8 +1241,3 @@ def workflow(
                 raise WorkflowException(str(err)) from err
             results.extend(future.result(timeout=1))
         return results
-
-
-if __name__ == "__main__":
-    workflow_rs: list[str] = workflow()
-    logger.info(f"[WORKFLOW]: Application run success: {workflow_rs}")

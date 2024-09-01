@@ -6,7 +6,7 @@ from ddeutil.workflow.log import FileLog
 def test_log_file():
     log = FileLog.model_validate(
         obj={
-            "name": "pipe-scheduling",
+            "name": "wf-scheduling",
             "on": "*/2 * * * *",
             "release": datetime(2024, 1, 1, 1),
             "context": {
@@ -21,4 +21,4 @@ def test_log_file():
 
 
 def test_log_find_logs():
-    print(next(FileLog.find_logs(name="pipe-scheduling")))
+    print(next(FileLog.find_logs(name="wf-scheduling")))

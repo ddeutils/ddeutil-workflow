@@ -577,18 +577,18 @@ class TriggerStage(BaseStage):
         :param params: A parameter data that want to use in this execution.
         :rtype: Result
         """
-        from . import Pipeline
+        from . import Workflow
 
         # NOTE: Loading pipeline object from trigger name.
         _trigger: str = param2template(self.trigger, params=params)
 
         # NOTE: Set running pipeline ID from running stage ID to external
         #   params on Loader object.
-        pipe: Pipeline = Pipeline.from_loader(
+        wf: Workflow = Workflow.from_loader(
             name=_trigger, externals={"run_id": self.run_id}
         )
         logger.info(f"({self.run_id}) [STAGE]: Trigger-Execute: {_trigger!r}")
-        return pipe.execute(params=param2template(self.params, params))
+        return wf.execute(params=param2template(self.params, params))
 
 
 # NOTE: Order of parsing stage data

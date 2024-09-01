@@ -7,22 +7,22 @@
 [![code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 The **Lightweight workflow orchestration** with less dependencies the was created
-for easy to make a simple metadata driven for data pipeline orchestration.
+for easy to make a simple metadata driven for data workflow orchestration.
 It can to use for data operator by a `.yaml` template.
 
 > [!WARNING]
 > This package provide only orchestration workload. That mean you should not use
 > workflow stage to process any large data which use lot of compute usecase.
 
-In my opinion, I think it should not create duplicate pipeline codes if I can
-write with dynamic input parameters on the one template pipeline that just change
+In my opinion, I think it should not create duplicate workflow codes if I can
+write with dynamic input parameters on the one template workflow that just change
 the input parameters per use-case instead.
-This way I can handle a lot of logical pipelines in our orgs with only metadata
+This way I can handle a lot of logical workflows in our orgs with only metadata
 configuration. It called **Metadata Driven Data Pipeline**.
 
 Next, we should get some monitoring tools for manage logging that return from
-pipeline running. Because it not show us what is a use-case that running data
-pipeline.
+workflow running. Because it not show us what is a use-case that running data
+workflow.
 
 > [!NOTE]
 > _Disclaimer_: I inspire the dynamic statement from the GitHub Action `.yml` files
@@ -65,15 +65,15 @@ use-case.
 
 > [!IMPORTANT]
 > I recommend you to use the `hook` stage for all actions that you want to do
-> with pipeline activity that you want to orchestrate. Because it able to dynamic
+> with workflow activity that you want to orchestrate. Because it able to dynamic
 > an input argument with the same hook function that make you use less time to
-> maintenance your data pipelines.
+> maintenance your data workflows.
 
 ```yaml
 run_py_local:
-   type: Pipeline
+   type: Workflow
    on:
-      # If pipeline workflow deploy to schedule, it will running every 5 minutes
+      # If workflow deploy to schedule, it will running every 5 minutes
       # with Asia/Bangkok timezone.
       - cronjob: '*/5 * * * *'
         timezone: "Asia/Bangkok"
@@ -110,8 +110,8 @@ run_py_local:
 | `WORKFLOW_CORE_TIMEZONE`            | Core      | Asia/Bangkok                     | A Timezone string value that will pass to `ZoneInfo` object                |
 | `WORKFLOW_CORE_STAGE_DEFAULT_ID`    | Core      | true                             | A flag that enable default stage ID that use for catch an execution output |
 | `WORKFLOW_CORE_STAGE_RAISE_ERROR`   | Core      | true                             | A flag that all stage raise StageException from stage execution            |
-| `WORKFLOW_CORE_MAX_PIPELINE_POKING` | Core      | 4                                |                                                                            |
-| `WORKFLOW_CORE_MAX_JOB_PARALLEL`    | Core      | 2                                | The maximum job number that able to run parallel in pipeline executor      |
+| `WORKFLOW_CORE_MAX_NUM_POKING`      | Core      | 4                                |                                                                            |
+| `WORKFLOW_CORE_MAX_JOB_PARALLEL`    | Core      | 2                                | The maximum job number that able to run parallel in workflow executor      |
 | `WORKFLOW_LOG_DEBUG_MODE`           | Log       | true                             | A flag that enable logging with debug level mode                           |
 | `WORKFLOW_LOG_ENABLE_WRITE`         | Log       | true                             | A flag that enable logging object saving log to its destination            |
 | `WORKFLOW_APP_PROCESS_WORKER`       | Schedule  | 2                                | The maximum process worker number that run in scheduler app module         |

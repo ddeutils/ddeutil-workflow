@@ -16,7 +16,7 @@ from fastapi import status as st
 from fastapi.responses import UJSONResponse
 from pydantic import BaseModel
 
-from . import Pipeline
+from . import Workflow
 from .__types import DictData
 from .log import get_logger
 from .scheduler import Schedule
@@ -39,27 +39,27 @@ ListDate = list[datetime]
 
 @workflow.get("/")
 async def get_workflows():
-    """Return all pipeline workflows that exists in config path."""
-    pipelines: DictData = Loader.finds(Pipeline)
+    """Return all workflow workflows that exists in config path."""
+    workflows: DictData = Loader.finds(Workflow)
     return {
-        "message": f"getting all pipelines: {pipelines}",
+        "message": f"getting all workflows: {workflows}",
     }
 
 
 @workflow.get("/{name}")
 async def get_workflow(name: str) -> DictData:
-    """Return model of pipeline that passing an input pipeline name."""
+    """Return model of workflow that passing an input workflow name."""
     try:
-        pipeline: Pipeline = Pipeline.from_loader(name=name, externals={})
+        wf: Workflow = Workflow.from_loader(name=name, externals={})
     except ValueError as err:
         logger.exception(err)
         raise HTTPException(
             status_code=st.HTTP_404_NOT_FOUND,
             detail=(
-                f"Workflow pipeline name: {name!r} does not found in /conf path"
+                f"Workflow workflow name: {name!r} does not found in /conf path"
             ),
         ) from None
-    return pipeline.model_dump(
+    return wf.model_dump(
         by_alias=True,
         exclude_none=True,
         exclude_unset=True,
@@ -73,19 +73,19 @@ class ExecutePayload(BaseModel):
 
 @workflow.post("/{name}/execute", status_code=st.HTTP_202_ACCEPTED)
 async def execute_workflow(name: str, payload: ExecutePayload) -> DictData:
-    """Return model of pipeline that passing an input pipeline name."""
+    """Return model of workflow that passing an input workflow name."""
     try:
-        pipeline: Pipeline = Pipeline.from_loader(name=name, externals={})
+        wf: Workflow = Workflow.from_loader(name=name, externals={})
     except ValueError:
         raise HTTPException(
             status_code=st.HTTP_404_NOT_FOUND,
             detail=(
-                f"Workflow pipeline name: {name!r} does not found in /conf path"
+                f"Workflow workflow name: {name!r} does not found in /conf path"
             ),
         ) from None
 
     # NOTE: Start execute manually
-    rs: Result = pipeline.execute(params=payload.params)
+    rs: Result = wf.execute(params=payload.params)
 
     return rs.model_dump(
         by_alias=True,
@@ -97,17 +97,17 @@ async def execute_workflow(name: str, payload: ExecutePayload) -> DictData:
 
 @workflow.get("/{name}/logs")
 async def get_workflow_logs(name: str):
-    return {"message": f"getting pipeline {name!r} logs"}
+    return {"message": f"getting workflow {name!r} logs"}
 
 
 @workflow.get("/{name}/logs/{release}")
 async def get_workflow_release_log(name: str, release: str):
-    return {"message": f"getting pipeline {name!r} log in release {release}"}
+    return {"message": f"getting workflow {name!r} log in release {release}"}
 
 
 @workflow.delete("/{name}/logs/{release}", status_code=st.HTTP_204_NO_CONTENT)
 async def del_workflow_release_log(name: str, release: str):
-    return {"message": f"deleted pipeline {name!r} log in release {release}"}
+    return {"message": f"deleted workflow {name!r} log in release {release}"}
 
 
 @schedule.get("/{name}")
@@ -138,15 +138,15 @@ async def get_deploy_scheduler(request: Request, name: str):
     if name in request.state.scheduler:
         sch = Schedule.from_loader(name)
         getter: list[dict[str, dict[str, list[datetime]]]] = []
-        for pipe in sch.pipelines:
+        for pipe in sch.workflows:
             getter.append(
                 {
                     pipe.name: {
                         "queue": copy.deepcopy(
-                            request.state.pipeline_queue[pipe.name]
+                            request.state.workflow_queue[pipe.name]
                         ),
                         "running": copy.deepcopy(
-                            request.state.pipeline_running[pipe.name]
+                            request.state.workflow_running[pipe.name]
                         ),
                     }
                 }
@@ -178,7 +178,7 @@ async def add_deploy_scheduler(request: Request, name: str):
         second=0, microsecond=0
     )
 
-    # NOTE: Create pair of pipeline and on from schedule model.
+    # NOTE: Create pair of workflow and on from schedule model.
     try:
         sch = Schedule.from_loader(name)
     except ValueError as e:
@@ -188,11 +188,11 @@ async def add_deploy_scheduler(request: Request, name: str):
             status_code=st.HTTP_404_NOT_FOUND,
             detail=str(e),
         ) from None
-    request.state.pipeline_tasks.extend(
+    request.state.workflow_tasks.extend(
         sch.tasks(
             start_date_waiting,
-            queue=request.state.pipeline_queue,
-            running=request.state.pipeline_running,
+            queue=request.state.workflow_queue,
+            running=request.state.workflow_running,
         ),
     )
     return {"message": f"adding {name!r} to schedule listener."}
@@ -203,15 +203,15 @@ async def del_deploy_scheduler(request: Request, name: str):
     if name in request.state.scheduler:
         request.state.scheduler.remove(name)
         sche = Schedule.from_loader(name)
-        for pipeline_task in sche.tasks(datetime.now(), {}, {}):
-            request.state.pipeline_tasks.remove(pipeline_task)
+        for workflow_task in sche.tasks(datetime.now(), {}, {}):
+            request.state.workflow_tasks.remove(workflow_task)
 
-        for pipe in sche.pipelines:
-            if pipe in request.state.pipeline_queue:
-                request.state.pipeline_queue.pop(pipe, {})
+        for pipe in sche.workflows:
+            if pipe in request.state.workflow_queue:
+                request.state.workflow_queue.pop(pipe, {})
 
-            if pipe in request.state.pipeline_running:
-                request.state.pipeline_running.pop(pipe, {})
+            if pipe in request.state.workflow_running:
+                request.state.workflow_running.pop(pipe, {})
 
         return {"message": f"deleted {name!r} to schedule listener."}
 

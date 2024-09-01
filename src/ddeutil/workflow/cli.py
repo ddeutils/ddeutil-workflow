@@ -29,21 +29,21 @@ cli.add_typer(
 
 @cli.command()
 def run(
-    pipeline: Annotated[
+    workflow: Annotated[
         str,
-        Argument(help="A pipeline name that want to run manually"),
+        Argument(help="A workflow name that want to run manually"),
     ],
     params: Annotated[
         str,
         Argument(
-            help="A json string for parameters of this pipeline execution."
+            help="A json string for parameters of this workflow execution."
         ),
     ],
 ):
-    """Run pipeline workflow manually with an input custom parameters that able
-    to receive with pipeline params config.
+    """Run workflow workflow manually with an input custom parameters that able
+    to receive with workflow params config.
     """
-    logger.info(f"Running pipeline name: {pipeline}")
+    logger.info(f"Running workflow name: {workflow}")
     logger.info(f"... with Parameters: {json.dumps(json.loads(params))}")
 
 
@@ -63,7 +63,7 @@ def schedule(
     externals: Annotated[
         Optional[str],
         Argument(
-            help="A json string for parameters of this pipeline execution."
+            help="A json string for parameters of this workflow execution."
         ),
     ] = None,
 ):
@@ -77,20 +77,20 @@ def schedule(
             tz=ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
         )
 
-    from .scheduler import workflow
+    from .scheduler import workflow_runner
 
     # NOTE: Start running workflow scheduler application.
-    workflow_rs: list[str] = workflow(
+    workflow_rs: list[str] = workflow_runner(
         stop=stop, excluded=excluded, externals=json.loads(externals)
     )
     logger.info(f"Application run success: {workflow_rs}")
 
 
-@cli_log.command("pipeline-get")
-def pipeline_log_get(
+@cli_log.command("workflow-get")
+def workflow_log_get(
     name: Annotated[
         str,
-        Argument(help="A pipeline name that want to getting log"),
+        Argument(help="A workflow name that want to getting log"),
     ],
     limit: Annotated[
         int,
@@ -113,8 +113,8 @@ class LogMode(str, Enum):
     delete = "delete"
 
 
-@cli_log.command("pipeline-delete")
-def pipeline_log_delete(
+@cli_log.command("workflow-delete")
+def workflow_log_delete(
     mode: Annotated[
         LogMode,
         Argument(case_sensitive=True),

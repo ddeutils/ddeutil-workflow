@@ -1,14 +1,14 @@
 from datetime import datetime
 
-import ddeutil.workflow as pipe
+import ddeutil.workflow as wf
 import ddeutil.workflow.stage as st
 from ddeutil.core import getdot
 from ddeutil.workflow.utils import Result
 
 
 def test_stage_trigger():
-    pipeline = pipe.Pipeline.from_loader(name="pipe-trigger", externals={})
-    stage: st.Stage = pipeline.job("trigger-job").stage(
+    workflow = wf.Workflow.from_loader(name="wf-trigger", externals={})
+    stage: st.Stage = workflow.job("trigger-job").stage(
         stage_id="trigger-stage"
     )
     rs: Result = stage.execute(params={})
@@ -20,8 +20,8 @@ def test_stage_trigger():
 
 
 def test_pipe_trigger():
-    pipeline = pipe.Pipeline.from_loader(name="pipe-trigger", externals={})
-    rs: Result = pipeline.execute(params={})
+    workflow = wf.Workflow.from_loader(name="wf-trigger", externals={})
+    rs: Result = workflow.execute(params={})
     # import json
     # print(json.dumps(rs.context, indent=2, default=str))
     assert {

@@ -1,5 +1,5 @@
-pipe-run-common:
-  type: ddeutil.workflow.Pipeline
+wf-run-common:
+  type: ddeutil.workflow.Workflow
   desc: |
     ## Run Python Workflow
 
@@ -75,8 +75,8 @@ pipe-run-common:
 
 # Case:
 #   Run Python statement from config value with parameters.
-pipe-run-python:
-  type: ddeutil.workflow.Pipeline
+wf-run-python:
+  type: ddeutil.workflow.Workflow
   params:
     author-run: str
     run-date: datetime
@@ -120,8 +120,8 @@ pipe-run-python:
             echo 'Hello World';
 
 
-pipe-run-python-raise:
-  type: ddeutil.workflow.Pipeline
+wf-run-python-raise:
+  type: ddeutil.workflow.Workflow
   jobs:
     first-job:
       stages:

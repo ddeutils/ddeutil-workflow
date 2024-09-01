@@ -1,15 +1,15 @@
 import pytest
-from ddeutil.workflow import Pipeline
+from ddeutil.workflow import Workflow
 from ddeutil.workflow.exceptions import StageException
 from ddeutil.workflow.stage import Stage
 from ddeutil.workflow.utils import Result
 
 
 def test_stage_py_raise():
-    pipeline: Pipeline = Pipeline.from_loader(
-        name="pipe-run-common", externals={}
+    workflow: Workflow = Workflow.from_loader(
+        name="wf-run-common", externals={}
     )
-    stage: Stage = pipeline.job("raise-run").stage(stage_id="raise-error")
+    stage: Stage = workflow.job("raise-run").stage(stage_id="raise-error")
 
     assert stage.id == "raise-error"
 
@@ -18,11 +18,11 @@ def test_stage_py_raise():
 
 
 def test_stage_py():
-    # NOTE: Get stage from the specific pipeline.
-    pipeline: Pipeline = Pipeline.from_loader(
-        name="pipe-run-common", externals={}
+    # NOTE: Get stage from the specific workflow.
+    workflow: Workflow = Workflow.from_loader(
+        name="wf-run-common", externals={}
     )
-    stage: Stage = pipeline.job("demo-run").stage(stage_id="run-var")
+    stage: Stage = workflow.job("demo-run").stage(stage_id="run-var")
     assert stage.id == "run-var"
 
     # NOTE: Start execute with manual stage parameters.
@@ -42,10 +42,10 @@ def test_stage_py():
 
 
 def test_stage_py_func():
-    pipeline: Pipeline = Pipeline.from_loader(
-        name="pipe-run-python", externals={}
+    workflow: Workflow = Workflow.from_loader(
+        name="wf-run-python", externals={}
     )
-    stage: Stage = pipeline.job("second-job").stage(stage_id="create-func")
+    stage: Stage = workflow.job("second-job").stage(stage_id="create-func")
     assert stage.id == "create-func"
 
     # NOTE: Start execute with manual stage parameters.

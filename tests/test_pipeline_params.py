@@ -1,12 +1,12 @@
 from datetime import datetime
 
-import ddeutil.workflow as pipe
+import ddeutil.workflow as wf
 
 
 def test_pipe_params_py():
-    pipeline = pipe.Pipeline.from_loader(
-        name="pipe-run-hook",
+    workflow = wf.Workflow.from_loader(
+        name="wf-run-hook",
         externals={},
     )
-    rs = pipeline.params["run-date"].receive("2024-01-01")
+    rs = workflow.params["run-date"].receive("2024-01-01")
     assert rs == datetime(2024, 1, 1)

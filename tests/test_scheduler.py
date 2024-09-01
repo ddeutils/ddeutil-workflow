@@ -1,11 +1,11 @@
-from ddeutil.workflow import Pipeline
+from ddeutil.workflow import Workflow
 from ddeutil.workflow.on import On
-from ddeutil.workflow.scheduler import PipelineTask, Schedule
+from ddeutil.workflow.scheduler import Schedule, WorkflowTask
 from ddeutil.workflow.utils import Loader
 
 
 def test_scheduler_model():
-    schedule = Schedule.from_loader("schedule-pipe")
+    schedule = Schedule.from_loader("schedule-wf")
     print(schedule)
 
 
@@ -14,15 +14,15 @@ def test_scheduler_loader_find_schedule():
         print(finding)
 
 
-def test_scheduler_remove_pipe_task():
+def test_scheduler_remove_wf_task():
     queue = []
     running = []
-    pipeline_tasks: list[PipelineTask] = []
-    pipe: Pipeline = Pipeline.from_loader("pipe-scheduling", externals={})
-    for on in pipe.on:
+    pipeline_tasks: list[WorkflowTask] = []
+    wf: Workflow = Workflow.from_loader("wf-scheduling", externals={})
+    for on in wf.on:
         pipeline_tasks.append(
-            PipelineTask(
-                pipeline=pipe,
+            WorkflowTask(
+                workflow=wf,
                 on=on,
                 params={"asat-dt": "${{ release.logical_date }}"},
                 queue=queue,
@@ -31,11 +31,11 @@ def test_scheduler_remove_pipe_task():
         )
     assert 2 == len(pipeline_tasks)
 
-    pipe: Pipeline = Pipeline.from_loader("pipe-scheduling", externals={})
-    for on in pipe.on:
+    wf: Workflow = Workflow.from_loader("wf-scheduling", externals={})
+    for on in wf.on:
         pipeline_tasks.remove(
-            PipelineTask(
-                pipeline=pipe,
+            WorkflowTask(
+                workflow=wf,
                 on=on,
                 params={"asat-dt": "${{ release.logical_date }}"},
                 queue=["test"],
@@ -45,11 +45,11 @@ def test_scheduler_remove_pipe_task():
 
     assert 0 == len(pipeline_tasks)
 
-    pipe: Pipeline = Pipeline.from_loader("pipe-scheduling", externals={})
-    for on in pipe.on:
+    wf: Workflow = Workflow.from_loader("wf-scheduling", externals={})
+    for on in wf.on:
         pipeline_tasks.append(
-            PipelineTask(
-                pipeline=pipe,
+            WorkflowTask(
+                workflow=wf,
                 on=on,
                 params={"asat-dt": "${{ release.logical_date }}"},
                 queue=queue,
@@ -57,8 +57,8 @@ def test_scheduler_remove_pipe_task():
             )
         )
 
-    remover = PipelineTask(
-        pipeline=pipe,
+    remover = WorkflowTask(
+        workflow=wf,
         on=On.from_loader(name="every_minute_bkk", externals={}),
         params={"asat-dt": "${{ release.logical_date }}"},
         queue=[1, 2, 3],

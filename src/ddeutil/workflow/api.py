@@ -25,7 +25,7 @@ from pydantic import BaseModel
 from .__about__ import __version__
 from .log import get_logger
 from .repeat import repeat_at, repeat_every
-from .scheduler import PipelineTask
+from .scheduler import WorkflowTask
 
 load_dotenv()
 logger = get_logger("ddeutil.workflow")
@@ -35,10 +35,10 @@ class State(TypedDict):
     upper_queue: Queue
     upper_result: dict[str, str]
     scheduler: list[str]
-    pipeline_threads: dict[str, Thread]
-    pipeline_tasks: list[PipelineTask]
-    pipeline_queue: dict[str, list[datetime]]
-    pipeline_running: dict[str, list[datetime]]
+    workflow_threads: dict[str, Thread]
+    workflow_tasks: list[WorkflowTask]
+    workflow_queue: dict[str, list[datetime]]
+    workflow_running: dict[str, list[datetime]]
 
 
 @contextlib.asynccontextmanager
@@ -46,30 +46,30 @@ async def lifespan(a: FastAPI) -> AsyncIterator[State]:
     a.state.upper_queue = Queue()
     a.state.upper_result = {}
     a.state.scheduler = []
-    a.state.pipeline_threads = {}
-    a.state.pipeline_tasks = []
-    a.state.pipeline_queue = {}
-    a.state.pipeline_running = {}
+    a.state.workflow_threads = {}
+    a.state.workflow_tasks = []
+    a.state.workflow_queue = {}
+    a.state.workflow_running = {}
 
     await asyncio.create_task(broker_upper_messages())
 
     yield {
         "upper_queue": a.state.upper_queue,
         "upper_result": a.state.upper_result,
-        # NOTE: Scheduler value should be contain a key of pipeline workflow and
+        # NOTE: Scheduler value should be contain a key of workflow workflow and
         #   list of datetime of queue and running.
         #
         #   ... {
-        #   ...     '<pipeline-name>': (
+        #   ...     '<workflow-name>': (
         #   ...         [<running-datetime>, ...], [<queue-datetime>, ...]
         #   ...     )
         #   ... }
         #
         "scheduler": a.state.scheduler,
-        "pipeline_queue": a.state.pipeline_queue,
-        "pipeline_running": a.state.pipeline_running,
-        "pipeline_threads": a.state.pipeline_threads,
-        "pipeline_tasks": a.state.pipeline_tasks,
+        "workflow_queue": a.state.workflow_queue,
+        "workflow_running": a.state.workflow_running,
+        "workflow_threads": a.state.workflow_threads,
+        "workflow_tasks": a.state.workflow_tasks,
     }
 
 
@@ -147,9 +147,9 @@ if str2bool(os.getenv("WORKFLOW_API_ENABLE_ROUTE_SCHEDULE", "true")):
             f"[SCHEDULER]: Start listening schedule from queue "
             f"{app.state.scheduler}"
         )
-        if app.state.pipeline_tasks:
+        if app.state.workflow_tasks:
             workflow_task(
-                app.state.pipeline_tasks,
+                app.state.workflow_tasks,
                 stop=datetime.now() + timedelta(minutes=1),
-                threads=app.state.pipeline_threads,
+                threads=app.state.workflow_threads,
             )

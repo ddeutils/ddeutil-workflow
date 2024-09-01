@@ -6,13 +6,13 @@
 from .exceptions import (
     JobException,
     ParamValueException,
-    PipelineException,
     StageException,
     UtilException,
+    WorkflowException,
 )
 from .job import Job, Strategy
 from .on import On, interval2crontab
-from .scheduler import Pipeline
+from .scheduler import Workflow
 from .stage import Stage, handler_result
 from .utils import (
     Param,

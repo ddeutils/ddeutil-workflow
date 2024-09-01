@@ -1,5 +1,5 @@
-pipe-run-matrix:
-  type: ddeutil.workflow.Pipeline
+wf-run-matrix:
+  type: ddeutil.workflow.Workflow
   params:
     source: str
     target: str
@@ -40,8 +40,8 @@ pipe-run-matrix:
             passing_value: int = 10
 
 
-pipe-run-matrix-parallel:
-  type: ddeutil.workflow.Pipeline
+wf-run-matrix-parallel:
+  type: ddeutil.workflow.Workflow
   params:
     source: str
     target: str
@@ -81,8 +81,8 @@ pipe-run-matrix-parallel:
           run: |
             passing_value: int = 10
 
-pipe-run-matrix-raise:
-  type: ddeutil.workflow.Pipeline
+wf-run-matrix-raise:
+  type: ddeutil.workflow.Workflow
   on:
     - 'every_2_minute_bkk'
   params:
@@ -113,8 +113,8 @@ pipe-run-matrix-raise:
               raise ValueError('Value of partition matrix was equaled 1.')
 
 
-pipe-run-matrix-fail-fast:
-  type: ddeutil.workflow.Pipeline
+wf-run-matrix-fail-fast:
+  type: ddeutil.workflow.Workflow
   on:
 #    - 'every_5_minute_bkk'
     - cronjob: '* * * * *'

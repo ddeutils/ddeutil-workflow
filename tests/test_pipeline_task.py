@@ -1,15 +1,15 @@
 from datetime import datetime
 
-import ddeutil.workflow as pipe
+import ddeutil.workflow as wf
 import ddeutil.workflow.stage as st
 
 
 def test_pipe_stage_task():
-    pipeline = pipe.Pipeline.from_loader(
+    workflow = wf.Workflow.from_loader(
         name="ingest_csv_to_parquet",
         externals={},
     )
-    stage: st.HookStage = pipeline.job("extract-load").stage("extract-load")
+    stage: st.HookStage = workflow.job("extract-load").stage("extract-load")
     rs = stage.execute(
         params={
             "params": {
@@ -24,11 +24,11 @@ def test_pipe_stage_task():
 
 
 def test_pipe_job_task():
-    pipeline = pipe.Pipeline.from_loader(
+    workflow = wf.Workflow.from_loader(
         name="ingest_csv_to_parquet",
         externals={},
     )
-    el_job: pipe.Job = pipeline.job("extract-load")
+    el_job: wf.Job = workflow.job("extract-load")
     rs = el_job.execute(
         params={
             "params": {
@@ -47,11 +47,11 @@ def test_pipe_job_task():
 
 
 def test_pipe_task():
-    pipeline = pipe.Pipeline.from_loader(
+    workflow = wf.Workflow.from_loader(
         name="ingest_csv_to_parquet",
         externals={},
     )
-    rs = pipeline.execute(
+    rs = workflow.execute(
         params={
             "run-date": datetime(2024, 1, 1),
             "source": "ds_csv_local_file",
@@ -79,11 +79,11 @@ def test_pipe_task():
 
 
 def test_pipe_task_with_prefix():
-    pipeline = pipe.Pipeline.from_loader(
+    workflow = wf.Workflow.from_loader(
         name="pipe_hook_mssql_proc",
         externals={},
     )
-    rs = pipeline.execute(
+    rs = workflow.execute(
         params={
             "run_date": datetime(2024, 1, 1),
             "sp_name": "proc-name",
