@@ -1,5 +1,5 @@
 pipe-run-matrix:
-  type: pipeline.Pipeline
+  type: ddeutil.workflow.Pipeline
   params:
     source: str
     target: str
@@ -41,7 +41,7 @@ pipe-run-matrix:
 
 
 pipe-run-matrix-parallel:
-  type: pipeline.Pipeline
+  type: ddeutil.workflow.Pipeline
   params:
     source: str
     target: str
@@ -82,7 +82,7 @@ pipe-run-matrix-parallel:
             passing_value: int = 10
 
 pipe-run-matrix-raise:
-  type: pipeline.Pipeline
+  type: ddeutil.workflow.Pipeline
   on:
     - 'every_2_minute_bkk'
   params:
@@ -114,7 +114,7 @@ pipe-run-matrix-raise:
 
 
 pipe-run-matrix-fail-fast:
-  type: pipeline.Pipeline
+  type: ddeutil.workflow.Pipeline
   on:
 #    - 'every_5_minute_bkk'
     - cronjob: '* * * * *'

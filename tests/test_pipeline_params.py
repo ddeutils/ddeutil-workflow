@@ -1,6 +1,6 @@
 from datetime import datetime
 
-import ddeutil.workflow.pipeline as pipe
+import ddeutil.workflow as pipe
 
 
 def test_pipe_params_py():

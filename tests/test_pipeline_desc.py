@@ -1,4 +1,4 @@
-import ddeutil.workflow.pipeline as pipe
+import ddeutil.workflow as pipe
 
 
 def test_pipe_desc():

@@ -577,7 +577,7 @@ class TriggerStage(BaseStage):
         :param params: A parameter data that want to use in this execution.
         :rtype: Result
         """
-        from .pipeline import Pipeline
+        from . import Pipeline
 
         # NOTE: Loading pipeline object from trigger name.
         _trigger: str = param2template(self.trigger, params=params)

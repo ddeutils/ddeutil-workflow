@@ -1,5 +1,5 @@
+import ddeutil.workflow as pipe
 import ddeutil.workflow.on as on
-import ddeutil.workflow.pipeline as pipe
 
 
 def test_pipe_on():

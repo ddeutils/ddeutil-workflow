@@ -1,5 +1,5 @@
+from ddeutil.workflow import Pipeline
 from ddeutil.workflow.on import On
-from ddeutil.workflow.pipeline import Pipeline
 from ddeutil.workflow.scheduler import PipelineTask, Schedule
 from ddeutil.workflow.utils import Loader
 

@@ -1,5 +1,5 @@
 pipe-trigger:
-  type: pipeline.Pipeline
+  type: ddeutil.workflow.Pipeline
   on: 'every_5_minute_bkk'
   jobs:
     trigger-job:
@@ -13,7 +13,7 @@ pipe-trigger:
 
 
 pipe-condition:
-  type: pipeline.Pipeline
+  type: ddeutil.workflow.Pipeline
   on: 'every_5_minute_bkk'
   params:
     name: str
@@ -29,7 +29,7 @@ pipe-condition:
 
 
 pipe-condition-raise:
-  type: pipeline.Pipeline
+  type: ddeutil.workflow.Pipeline
   params:
     name: str
   jobs:
@@ -41,7 +41,7 @@ pipe-condition-raise:
 
 
 pipe-scheduling:
-  type: pipeline.Pipeline
+  type: ddeutil.workflow.Pipeline
   on:
 #    - 'every_5_minute_bkk'
     - 'every_3_minute_bkk'
@@ -57,7 +57,7 @@ pipe-scheduling:
 
 
 pipe-scheduling-minute:
-  type: pipeline.Pipeline
+  type: ddeutil.workflow.Pipeline
   on:
     - cronjob: '* * * * *'
       timezone: "Asia/Bangkok"

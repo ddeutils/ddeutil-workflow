@@ -1,5 +1,5 @@
 pipe-run-common:
-  type: pipeline.Pipeline
+  type: ddeutil.workflow.Pipeline
   desc: |
     ## Run Python Workflow
 
@@ -76,7 +76,7 @@ pipe-run-common:
 # Case:
 #   Run Python statement from config value with parameters.
 pipe-run-python:
-  type: pipeline.Pipeline
+  type: ddeutil.workflow.Pipeline
   params:
     author-run: str
     run-date: datetime
@@ -121,7 +121,7 @@ pipe-run-python:
 
 
 pipe-run-python-raise:
-  type: pipeline.Pipeline
+  type: ddeutil.workflow.Pipeline
   jobs:
     first-job:
       stages:

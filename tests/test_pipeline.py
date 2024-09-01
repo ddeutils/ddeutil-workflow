@@ -1,5 +1,5 @@
 import pytest
-from ddeutil.workflow.pipeline import Job, Pipeline
+from ddeutil.workflow import Job, Pipeline
 from pydantic import ValidationError
 
 

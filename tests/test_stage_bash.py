@@ -1,6 +1,6 @@
 import pytest
+from ddeutil.workflow import Pipeline
 from ddeutil.workflow.exceptions import StageException
-from ddeutil.workflow.pipeline import Pipeline
 from ddeutil.workflow.stage import Stage
 from ddeutil.workflow.utils import Result
 

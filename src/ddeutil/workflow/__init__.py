@@ -10,8 +10,9 @@ from .exceptions import (
     StageException,
     UtilException,
 )
+from .job import Job, Strategy
 from .on import On, interval2crontab
-from .pipeline import Job, Pipeline, Strategy
+from .scheduler import Pipeline
 from .stage import Stage, handler_result
 from .utils import (
     Param,

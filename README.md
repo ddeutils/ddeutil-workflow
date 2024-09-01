@@ -71,7 +71,7 @@ use-case.
 
 ```yaml
 run_py_local:
-   type: pipeline.Pipeline
+   type: Pipeline
    on:
       # If pipeline workflow deploy to schedule, it will running every 5 minutes
       # with Asia/Bangkok timezone.

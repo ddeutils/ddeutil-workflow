@@ -16,9 +16,9 @@ from fastapi import status as st
 from fastapi.responses import UJSONResponse
 from pydantic import BaseModel
 
+from . import Pipeline
 from .__types import DictData
 from .log import get_logger
-from .pipeline import Pipeline
 from .scheduler import Schedule
 from .utils import Loader, Result
 
@@ -117,7 +117,7 @@ async def get_schedule(name: str):
     except ValueError:
         raise HTTPException(
             status_code=st.HTTP_404_NOT_FOUND,
-            detail=(f"Schedule name: {name!r} does not found in /conf path"),
+            detail=f"Schedule name: {name!r} does not found in /conf path",
         ) from None
     return sch.model_dump(
         by_alias=True,

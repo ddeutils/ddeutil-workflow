@@ -1,6 +1,6 @@
 import pytest
+from ddeutil.workflow import Job, Pipeline
 from ddeutil.workflow.exceptions import JobException
-from ddeutil.workflow.pipeline import Job, Pipeline
 from ddeutil.workflow.utils import Result
 
 

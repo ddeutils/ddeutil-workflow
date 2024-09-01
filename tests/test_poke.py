@@ -1,4 +1,4 @@
-from ddeutil.workflow.pipeline import Pipeline
+from ddeutil.workflow import Pipeline
 
 
 def test_pipeline_poke():

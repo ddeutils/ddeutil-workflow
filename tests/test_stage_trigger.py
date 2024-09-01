@@ -1,6 +1,6 @@
 from datetime import datetime
 
-import ddeutil.workflow.pipeline as pipe
+import ddeutil.workflow as pipe
 import ddeutil.workflow.stage as st
 from ddeutil.core import getdot
 from ddeutil.workflow.utils import Result
