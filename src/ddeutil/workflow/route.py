@@ -24,12 +24,12 @@ from .utils import Loader, Result
 
 logger = get_logger("ddeutil.workflow")
 workflow = APIRouter(
-    prefix="/workflow",
+    prefix="/api/workflow",
     tags=["workflow"],
     default_response_class=UJSONResponse,
 )
 schedule = APIRouter(
-    prefix="/schedule",
+    prefix="/api/schedule",
     tags=["schedule"],
     default_response_class=UJSONResponse,
 )
@@ -138,15 +138,15 @@ async def get_deploy_scheduler(request: Request, name: str):
     if name in request.state.scheduler:
         sch = Schedule.from_loader(name)
         getter: list[dict[str, dict[str, list[datetime]]]] = []
-        for pipe in sch.workflows:
+        for wf in sch.workflows:
             getter.append(
                 {
-                    pipe.name: {
+                    wf.name: {
                         "queue": copy.deepcopy(
-                            request.state.workflow_queue[pipe.name]
+                            request.state.workflow_queue[wf.name]
                         ),
                         "running": copy.deepcopy(
-                            request.state.workflow_running[pipe.name]
+                            request.state.workflow_running[wf.name]
                         ),
                     }
                 }
@@ -206,12 +206,12 @@ async def del_deploy_scheduler(request: Request, name: str):
         for workflow_task in sche.tasks(datetime.now(), {}, {}):
             request.state.workflow_tasks.remove(workflow_task)
 
-        for pipe in sche.workflows:
-            if pipe in request.state.workflow_queue:
-                request.state.workflow_queue.pop(pipe, {})
+        for wf in sche.workflows:
+            if wf in request.state.workflow_queue:
+                request.state.workflow_queue.pop(wf, {})
 
-            if pipe in request.state.workflow_running:
-                request.state.workflow_running.pop(pipe, {})
+            if wf in request.state.workflow_running:
+                request.state.workflow_running.pop(wf, {})
 
         return {"message": f"deleted {name!r} to schedule listener."}
 

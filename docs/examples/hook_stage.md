@@ -7,8 +7,8 @@
 ### Hook (Extract & Load)
 
 ```yaml
-pipe_el_pg_to_lake:
-  type: pipeline.Pipeline
+wf_el_pg_to_lake:
+  type: Workflow
   params:
     run-date: datetime
     author-email: str
@@ -44,8 +44,8 @@ def postgres_to_delta(source, sink):
 ### Hook (Transform)
 
 ```yaml
-pipeline_hook_mssql_proc:
-  type: pipeline.Pipeline
+wf_hook_mssql_proc:
+  type: Workflow
   params:
     run_date: datetime
     sp_name: str

@@ -151,7 +151,7 @@ def config() -> ConfParams:
 
 class SimLoad:
     """Simple Load Object that will search config data by given some identity
-    value like name of pipeline or on.
+    value like name of workflow or on.
 
     :param name: A name of config data that will read by Yaml Loader object.
     :param params: A Params model object.
@@ -517,7 +517,7 @@ Param = Union[
 
 class Result(BaseModel):
     """Result Pydantic Model for passing parameter and receiving output from
-    the pipeline execution.
+    the workflow execution.
     """
 
     status: int = Field(default=2)
@@ -655,7 +655,7 @@ def get_args_const(
 
     if len(body) > 1:
         raise UtilException(
-            "Post-filter function should be only one calling per pipe"
+            "Post-filter function should be only one calling per wf"
         )
 
     caller: Union[Name, Call]
@@ -771,7 +771,7 @@ def str2template(
     ``RE_CALLER`` regular expression.
 
         The getter value that map a template should have typing support align
-    with the pipeline parameter types that is `str`, `int`, `datetime`, and
+    with the workflow parameter types that is `str`, `int`, `datetime`, and
     `list`.
 
     :param value: A string value that want to mapped with an params

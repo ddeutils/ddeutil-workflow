@@ -191,7 +191,7 @@ class Job(BaseModel):
     id: Optional[str] = Field(
         default=None,
         description=(
-            "A job ID, this value will add from pipeline after validation "
+            "A job ID, this value will add from workflow after validation "
             "process."
         ),
     )
@@ -277,7 +277,7 @@ class Job(BaseModel):
         event: Event | None = None,
     ) -> Result:
         """Job Strategy execution with passing dynamic parameters from the
-        pipeline execution to strategy matrix.
+        workflow execution to strategy matrix.
 
             This execution is the minimum level execution of job model.
 
@@ -405,7 +405,7 @@ class Job(BaseModel):
         )
 
     def execute(self, params: DictData | None = None) -> Result:
-        """Job execution with passing dynamic parameters from the pipeline
+        """Job execution with passing dynamic parameters from the workflow
         execution. It will generate matrix values at the first step and for-loop
         any metrix to all stages dependency.
 

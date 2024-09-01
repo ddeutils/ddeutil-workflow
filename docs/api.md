@@ -35,14 +35,14 @@ assert "2022-01-01 00:15:00" f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
 
 ## Job
 
-## Pipeline
+## Workflow
 
-The **Pipeline** object that is the core feature of this project.
+The **Workflow** object that is the core feature of this project.
 
 ```yaml
 # This file should keep under this path: `./root-path/conf-path/*`
-pipeline-name:
-  type: ddeutil.workflow.pipeline.Pipeline
+wf-name:
+  type: Workflow
   on: 'on_every_5_min'
   params:
     author-run:
@@ -56,10 +56,10 @@ pipeline-name:
 ```
 
 ```python
-from ddeutil.workflow.pipeline import Pipeline
+from ddeutil.workflow import Workflow
 
-pipe = Pipeline.from_loader(name='pipeline-name', externals={})
-pipe.execute(params={'author-run': 'Local Workflow', 'run-date': '2024-01-01'})
+wf = Workflow.from_loader(name='pipeline-name', externals={})
+wf.execute(params={'author-run': 'Local Workflow', 'run-date': '2024-01-01'})
 ```
 
 > [!NOTE]

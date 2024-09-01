@@ -15,8 +15,8 @@ pip install ddeutil-workflow
 Create the first pipeline template:
 
 ```yaml
-pipe-run-manual:
-  type: workflow.pipeline.Pipeline
+wf-run-manual:
+  type: Workflow
   jobs:
     stage-to-curated:
       stages:
@@ -40,9 +40,9 @@ workflow pipeline exec -p "{\"asat-dt\": \"2024-08-01\"}"
 ### Via Python
 
 ```python
-from ddeutil.workflow.pipeline import Pipeline
+from ddeutil.workflow import Workflow
 
-pipe = Pipeline.from_loader('pipe-run-manual').execute(params={
+wf = Workflow.from_loader('pipe-run-manual').execute(params={
     "asat-dt": "2024-08-01",
 })
 ```

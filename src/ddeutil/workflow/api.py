@@ -81,6 +81,7 @@ app = FastAPI(
     ),
     version=__version__,
     lifespan=lifespan,
+    default_response_class=UJSONResponse,
 )
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
@@ -114,12 +115,13 @@ async def get_result(request_id: str) -> dict[str, str]:
         await asyncio.sleep(0.0025)
 
 
-@app.get("/", response_class=UJSONResponse)
+@app.get("/")
+@app.get("/api")
 async def health():
     return {"message": "Workflow API already start up"}
 
 
-@app.post("/", response_class=UJSONResponse)
+@app.post("/api")
 async def message_upper(payload: Payload):
     """Convert message from any case to the upper case."""
     request_id: str = str(uuid.uuid4())

@@ -5,7 +5,7 @@
 # ------------------------------------------------------------------------------
 """Stage Model that use for getting stage data template from Job Model.
 The stage that handle the minimize task that run in some thread (same thread at
-its job owner) that mean it is the lowest executor of a pipeline workflow that
+its job owner) that mean it is the lowest executor of a workflow workflow that
 can tracking logs.
 
     The output of stage execution only return 0 status because I do not want to
@@ -551,12 +551,12 @@ class HookStage(BaseStage):
 
 
 class TriggerStage(BaseStage):
-    """Trigger Pipeline execution stage that execute another pipeline object.
+    """Trigger Workflow execution stage that execute another workflow object.
 
     Data Validate:
         >>> stage = {
-        ...     "name": "Trigger pipeline stage execution",
-        ...     "trigger": 'pipeline-name-for-loader',
+        ...     "name": "Trigger workflow stage execution",
+        ...     "trigger": 'workflow-name-for-loader',
         ...     "params": {
         ...         "run-date": "2024-08-01",
         ...         "source": "src",
@@ -564,25 +564,25 @@ class TriggerStage(BaseStage):
         ... }
     """
 
-    trigger: str = Field(description="A trigger pipeline name.")
+    trigger: str = Field(description="A trigger workflow name.")
     params: DictData = Field(
         default_factory=dict,
-        description="A parameter that want to pass to pipeline execution.",
+        description="A parameter that want to pass to workflow execution.",
     )
 
     @handler_result("Raise from TriggerStage")
     def execute(self, params: DictData) -> Result:
-        """Trigger pipeline execution.
+        """Trigger workflow execution.
 
         :param params: A parameter data that want to use in this execution.
         :rtype: Result
         """
         from . import Workflow
 
-        # NOTE: Loading pipeline object from trigger name.
+        # NOTE: Loading workflow object from trigger name.
         _trigger: str = param2template(self.trigger, params=params)
 
-        # NOTE: Set running pipeline ID from running stage ID to external
+        # NOTE: Set running workflow ID from running stage ID to external
         #   params on Loader object.
         wf: Workflow = Workflow.from_loader(
             name=_trigger, externals={"run_id": self.run_id}

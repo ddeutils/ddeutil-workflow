@@ -18,7 +18,7 @@ In my opinion, I think it should not create duplicate workflow codes if I can
 write with dynamic input parameters on the one template workflow that just change
 the input parameters per use-case instead.
 This way I can handle a lot of logical workflows in our orgs with only metadata
-configuration. It called **Metadata Driven Data Pipeline**.
+configuration. It called **Metadata Driven Data Workflow**.
 
 Next, we should get some monitoring tools for manage logging that return from
 workflow running. Because it not show us what is a use-case that running data

@@ -1064,15 +1064,15 @@ def workflow_task(
             f"{task.workflow.name}|{str(task.on.cronjob)}|"
             f"{current_running_time:%Y%m%d%H%M}"
         )
-        pipe_thread: Thread = Thread(
+        wf_thread: Thread = Thread(
             target=task.release,
             name=thread_name,
             daemon=True,
         )
 
-        threads[thread_name] = pipe_thread
+        threads[thread_name] = wf_thread
 
-        pipe_thread.start()
+        wf_thread.start()
 
         delay()
 
