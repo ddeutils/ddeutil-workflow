@@ -2,6 +2,15 @@
 
 ## Latest Changes
 
+## 0.0.12
+
+> [!NOTE]
+> Change package name on PyPI from `ddeutil-pipe` to `ddeutil-workflow`.
+
+### :bug: Fix Bugs
+
+- :gear: fixed: change pypi package name from pipe to workflow. (_2024-09-01_)
+
 ## 0.0.11
 
 ### :sparkles: Features
