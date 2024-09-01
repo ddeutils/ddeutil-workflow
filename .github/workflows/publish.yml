@@ -50,7 +50,7 @@ jobs:
     if: github.event.action == 'released' && startsWith(github.ref, 'refs/tags')
     environment:
       name: pypi
-      url: https://pypi.org/p/ddeutil-pipe
+      url: https://pypi.org/p/ddeutil-workflow
     needs:
       - release-build
     permissions:
@@ -77,7 +77,7 @@ jobs:
     if: github.event.action == 'prereleased' && startsWith(github.ref, 'refs/tags')
     environment:
       name: testpypi
-      url: https://test.pypi.org/p/ddeutil-pipe
+      url: https://test.pypi.org/p/ddeutil-workflow
     needs:
       - release-build
     permissions:
