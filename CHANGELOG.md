@@ -2,6 +2,35 @@
 
 ## Latest Changes
 
+## 0.0.11
+
+### :sparkles: Features
+
+- :dart: feat: add workflow api that able to run pipeline manaully. (_2024-08-27_)
+- :dart: feat: add crud for schedule route on api component. (_2024-08-27_)
+- :dart: feat: change on start up event of lifespan context. (_2024-08-27_)
+- :dart: feat: add schedule routing path for manage schedule listener. (_2024-08-27_)
+
+### :black_nib: Code Changes
+
+- :construction: refactored: change Pipeline object to Workflow for miss-understanding to use. (_2024-09-01_)
+- :art: styled: move Pipeline from pipeline to scheduler and job. (_2024-09-01_)
+
+### :card_file_box: Documents
+
+- :page_facing_up: docs: update refactored pipline object on docs. (_2024-09-01_)
+- :page_facing_up: docs: update readme for host of api component. (_2024-08-31_)
+- :page_facing_up: docs: update readme docs for support merging schedul package to main deps. (_2024-08-27_)
+
+### :bug: Fix Bugs
+
+- :gear: fixed: change registry module to get type on env. (_2024-08-31_)
+
+### :postbox: Dependencies
+
+- :pushpin: deps: remove standard from fastapi deps. (_2024-08-31_)
+- :pushpin: deps: merge schedule option to main deps. (_2024-08-27_)
+
 ## 0.0.10
 
 ### :sparkles: Features
