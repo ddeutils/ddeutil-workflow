@@ -71,7 +71,7 @@ use-case.
 > maintenance your data workflows.
 
 ```yaml
-run_py_local:
+run-py-local:
    type: Workflow
    on:
       # If workflow deploy to schedule, it will running every 5 minutes
