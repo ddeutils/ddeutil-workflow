@@ -60,8 +60,11 @@ relative_files = true
 concurrency = ["thread", "multiprocessing"]
 source = ["ddeutil.workflow", "tests"]
 omit = [
+    "src/ddeutil/workflow/__about__.py",
     "scripts/",
     # Omit this files because it does not ready to production.
+    "src/ddeutil/workflow/api.py",
+    "src/ddeutil/workflow/cli.py",
     "src/ddeutil/workflow/repeat.py",
     "src/ddeutil/workflow/route.py",
     "tests/utils.py",

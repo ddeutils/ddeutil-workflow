@@ -1,3 +1,5 @@
+import os
+
 import pytest
 from ddeutil.workflow import Workflow
 from ddeutil.workflow.exceptions import StageException
@@ -15,6 +17,25 @@ def test_stage_py_raise():
 
     with pytest.raises(StageException):
         stage.execute(params={"x": "Foo"})
+
+
+def test_stage_py_not_raise():
+    workflow: Workflow = Workflow.from_loader(
+        name="wf-run-common", externals={}
+    )
+    stage: Stage = workflow.job("raise-run").stage(stage_id="raise-error")
+
+    assert stage.id == "raise-error"
+
+    os.environ["WORKFLOW_CORE_STAGE_RAISE_ERROR"] = "false"
+
+    rs = stage.execute(params={"x": "Foo"})
+    assert rs.status == 1
+    assert rs.context == {
+        "error_message": "ValueError: Testing raise error inside PyStage!!!"
+    }
+
+    os.environ["WORKFLOW_CORE_STAGE_RAISE_ERROR"] = "true"
 
 
 def test_stage_py():

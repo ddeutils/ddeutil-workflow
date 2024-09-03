@@ -1,6 +1,8 @@
 import ddeutil.workflow.stage as st
+import pytest
 from ddeutil.workflow.stage import Stage
 from ddeutil.workflow.utils import Result
+from pydantic import ValidationError
 
 
 def test_model_copy():
@@ -29,3 +31,14 @@ def test_empty_stage():
 
     stage.run_id = "demo"
     assert "demo" == stage.run_id
+
+
+def test_empty_stage_name_raise():
+    with pytest.raises(ValidationError):
+        st.EmptyStage.model_validate(
+            {
+                "run_id": "demo",
+                "name": "Empty ${{ params.name }}",
+                "echo": "hello world",
+            }
+        )

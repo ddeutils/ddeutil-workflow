@@ -1,11 +1,11 @@
 # Workflow
 
 [![test](https://github.com/ddeutils/ddeutil-workflow/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/ddeutils/ddeutil-workflow/actions/workflows/tests.yml)
+[![pypi version](https://img.shields.io/pypi/v/ddeutil-workflow)](https://pypi.org/project/ddeutil-workflow/)
 [![python support version](https://img.shields.io/pypi/pyversions/ddeutil-workflow)](https://pypi.org/project/ddeutil-workflow/)
 [![size](https://img.shields.io/github/languages/code-size/ddeutils/ddeutil-workflow)](https://github.com/ddeutils/ddeutil-workflow)
 [![gh license](https://img.shields.io/github/license/ddeutils/ddeutil-workflow)](https://github.com/ddeutils/ddeutil-workflow/blob/main/LICENSE)
 [![code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![pypi version](https://img.shields.io/pypi/v/ddeutil-workflow)](https://pypi.org/project/ddeutil-workflow/)
 
 The **Lightweight workflow orchestration** with less dependencies the was created
 for easy to make a simple metadata driven for data workflow orchestration.
@@ -20,10 +20,6 @@ write with dynamic input parameters on the one template workflow that just chang
 the input parameters per use-case instead.
 This way I can handle a lot of logical workflows in our orgs with only metadata
 configuration. It called **Metadata Driven Data Workflow**.
-
-Next, we should get some monitoring tools for manage logging that return from
-workflow running. Because it not show us what is a use-case that running data
-workflow.
 
 > [!NOTE]
 > _Disclaimer_: I inspire the dynamic statement from the GitHub Action `.yml` files
@@ -72,7 +68,7 @@ use-case.
 
 ```yaml
 run-py-local:
-   type: Workflow
+   type: ddeutil.workflow.Workflow
    on:
       # If workflow deploy to schedule, it will running every 5 minutes
       # with Asia/Bangkok timezone.
