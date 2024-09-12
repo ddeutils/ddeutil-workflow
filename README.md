@@ -68,6 +68,8 @@ use-case.
 
 ```yaml
 run-py-local:
+
+   # Validate model that use to parsing exists for template file
    type: ddeutil.workflow.Workflow
    on:
       # If workflow deploy to schedule, it will running every 5 minutes
@@ -77,7 +79,7 @@ run-py-local:
    params:
       # Incoming execution parameters will validate with this type. It allow
       # to set default value or templating.
-      author-run: str
+      source-extract: str
       run-date: datetime
    jobs:
       getting-api-data:
@@ -86,14 +88,43 @@ run-py-local:
               id: retrieve-api
               uses: tasks/get-api-with-oauth-to-s3@requests
               with:
-                 url: https://open-data/
-                 auth: ${API_ACCESS_REFRESH_TOKEN}
-                 aws_s3_path: my-data/open-data/
+                 # Arguments of source data that want to retrieve.
+                 method: post
+                 url: https://finances/open-data/currency-pairs/
+                 body:
+                    resource: ${{ params.source-extract }}
 
-                 # This Authentication code should implement with your custom hook function.
-                 # The template allow you to use environment variable.
+                    # You can able to use filtering like Jinja template but this
+                    # package does not use it.
+                    filter: ${{ params.run-date | fmt(fmt='%Y%m%d') }}
+                 auth:
+                    type: bearer
+                    keys: ${API_ACCESS_REFRESH_TOKEN}
+
+                 # Arguments of target data that want to landing.
+                 writing_mode: flatten
+                 aws_s3_path: my-data/open-data/${{ params.source-extract }}
+
+                 # This Authentication code should implement with your custom hook
+                 # function. The template allow you to use environment variable.
                  aws_access_client_id: ${AWS_ACCESS_CLIENT_ID}
                  aws_access_client_secret: ${AWS_ACCESS_CLIENT_SECRET}
+```
+
+The above workflow template is main executor pipeline that you want to do. If you
+want to schedule this workflow, you want to dynamic its parameters change base on
+execution time such as `run-date` should change base on that workflow running date.
+
+So, this package provide the `Schedule` template for this action.
+
+```yaml
+schedule-run-local-wf:
+   type: ddeutil.workflow.scheduler.Schedule
+   workflows:
+      - name: run-py-local
+        params:
+          source-extract: "USD-THB"
+          asat-dt: "${{ release.logical_date }}"
 ```
 
 ## Configuration

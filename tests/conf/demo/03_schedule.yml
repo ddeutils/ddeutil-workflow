@@ -5,7 +5,7 @@ schedule-wf:
 
     The first schedule config template for testing scheduler function able to
     use it
-  pipelines:
+  workflows:
     - name: 'wf-scheduling'
       on: ['every_3_minute_bkk', 'every_minute_bkk']
       params:
