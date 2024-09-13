@@ -428,7 +428,6 @@ class Workflow(BaseModel):
 
         worker: int = int(os.getenv("WORKFLOW_CORE_MAX_NUM_POKING") or "4")
         with ThreadPoolExecutor(max_workers=worker) as executor:
-            # TODO: If I want to run infinite loop.
             futures: list[Future] = []
             for on in self.on:
                 futures.append(
@@ -788,12 +787,16 @@ class Schedule(BaseModel):
             queue[wfs.name]: list[datetime] = []
             running[wfs.name]: list[datetime] = []
 
-            for on in wf.on:
+            # NOTE: Create default on if it does not passing on the Schedule.
+            _ons: list[On] = wf.on.copy() if len(wfs.on) == 0 else wfs.on
+
+            for on in _ons:
                 on_gen = on.generate(start_date)
                 next_running_date = on_gen.next
                 while next_running_date in queue[wfs.name]:
                     next_running_date = on_gen.next
 
+                # NOTE: Push the next running date to queue list.
                 heappush(queue[wfs.name], next_running_date)
 
                 workflow_tasks.append(

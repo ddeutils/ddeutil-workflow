@@ -9,6 +9,11 @@ def test_scheduler_model():
     print(schedule)
 
 
+def test_scheduler_model_default_on():
+    schedule = Schedule.from_loader("schedule-default-wf")
+    print(schedule)
+
+
 def test_scheduler_loader_find_schedule():
     for finding in Loader.finds(Schedule, excluded=[]):
         print(finding)
