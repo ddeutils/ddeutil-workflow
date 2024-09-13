@@ -37,6 +37,6 @@ every_day_noon:
 
 
 aws_every_5_minute_bkk:
-  type: on.AwsOn
+  type: on.YearOn
   cronjob: "*/5 * * * * 2024"
   timezone: "Asia/Bangkok"

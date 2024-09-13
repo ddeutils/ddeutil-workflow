@@ -20,6 +20,7 @@ from .utils import Loader
 
 __all__: TupleStr = (
     "On",
+    "YearOn",
     "interval2crontab",
 )
 
@@ -187,8 +188,10 @@ class On(BaseModel):
         return self.cronjob.schedule(date=start, tz=self.tz).next
 
 
-class AwsOn(On):
-    """Implement On AWS Schedule for AWS Service like AWS Glue."""
+class YearOn(On):
+    """Implement On Year Schedule Model for limit year matrix that use by some
+    data schedule tools like AWS Glue.
+    """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 

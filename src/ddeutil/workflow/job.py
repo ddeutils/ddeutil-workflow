@@ -14,11 +14,13 @@ from concurrent.futures import (
     as_completed,
     wait,
 )
+from functools import lru_cache
 from pickle import PickleError
 from textwrap import dedent
 from threading import Event
 from typing import Optional
 
+from ddeutil.core import freeze_args
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
@@ -53,12 +55,70 @@ logger = get_logger("ddeutil.workflow")
 __all__: TupleStr = (
     "Strategy",
     "Job",
+    "make",
 )
+
+
+@freeze_args
+@lru_cache
+def make(matrix, include, exclude) -> list[DictStr]:
+    """Return List of product of matrix values that already filter with
+    exclude and add include.
+
+    :param matrix: A matrix values that want to cross product to possible
+        parallelism values.
+    :param include: A list of additional matrix that want to adds-in.
+    :param exclude: A list of exclude matrix that want to filter-out.
+    :rtype: list[DictStr]
+    """
+    # NOTE: If it does not set matrix, it will return list of an empty dict.
+    if not (mt := matrix):
+        return [{}]
+
+    final: list[DictStr] = []
+    for r in cross_product(matrix=mt):
+        if any(
+            all(r[k] == v for k, v in exclude.items()) for exclude in exclude
+        ):
+            continue
+        final.append(r)
+
+    # NOTE: If it is empty matrix and include, it will return list of an
+    #   empty dict.
+    if not final and not include:
+        return [{}]
+
+    # NOTE: Add include to generated matrix with exclude list.
+    add: list[DictStr] = []
+    for inc in include:
+        # VALIDATE:
+        #   Validate any key in include list should be a subset of some one
+        #   in matrix.
+        if all(not (set(inc.keys()) <= set(m.keys())) for m in final):
+            raise ValueError("Include should have the keys equal to matrix")
+
+        # VALIDATE:
+        #   Validate value of include does not duplicate with generated
+        #   matrix.
+        if any(
+            all(inc.get(k) == v for k, v in m.items()) for m in [*final, *add]
+        ):
+            continue
+        add.append(inc)
+    final.extend(add)
+    return final
 
 
 class Strategy(BaseModel):
     """Strategy Model that will combine a matrix together for running the
-    special job.
+    special job with combination of matrix data.
+
+        This model does not be the part of job only because you can use it to
+    any model object. The propose of this model is generate metrix result that
+    comming from combination logic with any matrix values for running it with
+    parallelism.
+
+        [1, 2, 3] x [a, b] --> [1a], [1b], [2a], [2b], [3a], [3b]
 
     Data Validate:
         >>> strategy = {
@@ -105,13 +165,19 @@ class Strategy(BaseModel):
     def __prepare_keys(cls, values: DictData) -> DictData:
         """Rename key that use dash to underscore because Python does not
         support this character exist in any variable name.
+
+        :param values: A parsing values to this models
+        :rtype: DictData
         """
         dash2underscore("max-parallel", values)
         dash2underscore("fail-fast", values)
         return values
 
     def is_set(self) -> bool:
-        """Return True if this strategy was set from yaml template."""
+        """Return True if this strategy was set from yaml template.
+
+        :rtype: bool
+        """
         return len(self.matrix) > 0
 
     def make(self) -> list[DictStr]:
@@ -120,44 +186,7 @@ class Strategy(BaseModel):
 
         :rtype: list[DictStr]
         """
-        # NOTE: If it does not set matrix, it will return list of an empty dict.
-        if not (mt := self.matrix):
-            return [{}]
-
-        final: list[DictStr] = []
-        for r in cross_product(matrix=mt):
-            if any(
-                all(r[k] == v for k, v in exclude.items())
-                for exclude in self.exclude
-            ):
-                continue
-            final.append(r)
-
-        # NOTE: If it is empty matrix and include, it will return list of an
-        #   empty dict.
-        if not final and not self.include:
-            return [{}]
-
-        # NOTE: Add include to generated matrix with exclude list.
-        add: list[DictStr] = []
-        for include in self.include:
-            # VALIDATE:
-            #   Validate any key in include list should be a subset of some one
-            #   in matrix.
-            if all(not (set(include.keys()) <= set(m.keys())) for m in final):
-                raise ValueError("Include should have the keys equal to matrix")
-
-            # VALIDATE:
-            #   Validate value of include does not duplicate with generated
-            #   matrix.
-            if any(
-                all(include.get(k) == v for k, v in m.items())
-                for m in [*final, *add]
-            ):
-                continue
-            add.append(include)
-        final.extend(add)
-        return final
+        return make(self.matrix, self.include, self.exclude)
 
 
 class Job(BaseModel):
@@ -238,6 +267,7 @@ class Job(BaseModel):
 
     @model_validator(mode="after")
     def __prepare_running_id(self):
+        """Prepare the job running ID."""
         if self.run_id is None:
             self.run_id = gen_id(self.id or "", unique=True)
 
@@ -487,7 +517,7 @@ class Job(BaseModel):
         stop all not done futures if it receive the first exception from all
         running futures.
 
-        :param event:
+        :param event: An event
         :param futures: A list of futures.
         :rtype: Result
         """
@@ -529,7 +559,8 @@ class Job(BaseModel):
     def __catch_all_completed(self, futures: list[Future]) -> Result:
         """Job parallel pool futures catching with all-completed mode.
 
-        :param futures: A list of futures.
+        :param futures: A list of futures that want to catch all completed
+            result.
         :rtype: Result
         """
         context: DictData = {}

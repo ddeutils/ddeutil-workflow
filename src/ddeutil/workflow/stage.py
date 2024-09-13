@@ -62,12 +62,15 @@ logger = get_logger("ddeutil.workflow")
 
 
 __all__: TupleStr = (
-    "Stage",
+    "BaseStage",
     "EmptyStage",
     "BashStage",
     "PyStage",
     "HookStage",
     "TriggerStage",
+    "Stage",
+    "HookSearch",
+    "extract_hook",
     "handler_result",
 )
 
@@ -75,6 +78,14 @@ __all__: TupleStr = (
 def handler_result(message: str | None = None) -> Callable[P, Result]:
     """Decorator function for handler result from the stage execution. This
     function should to use with execution method only.
+
+        This stage exception handler still use ok-error concept but it allow
+    you force catching an output result with error message by specific
+    environment variable,`WORKFLOW_CORE_STAGE_RAISE_ERROR`.
+
+        Execution   --> Ok      --> Result with 0
+                    --> Error   --> Raise StageException
+                                --> Result with 1 (if env var was set)
 
     :param message: A message that want to add at prefix of exception statement.
     """
@@ -106,6 +117,9 @@ def handler_result(message: str | None = None) -> Callable[P, Result]:
                         f"{self.__class__.__name__}: {message}\n\t"
                         f"{err.__class__.__name__}: {err}"
                     ) from None
+
+                # NOTE: Catching exception error object to result with
+                #   error_message key.
                 rs: Result = Result(
                     status=1,
                     context={
@@ -209,6 +223,7 @@ class BaseStage(BaseModel, ABC):
         if self.id:
             _id: str = param2template(self.id, params=to)
         else:
+            # NOTE: If the stage ID did not set, it will use its name instead.
             _id: str = gen_id(param2template(self.name, params=to))
 
         # NOTE: Set the output to that stage generated ID.
@@ -219,7 +234,8 @@ class BaseStage(BaseModel, ABC):
         return to
 
     def is_skipped(self, params: DictData | None = None) -> bool:
-        """Return true if condition of this stage do not correct.
+        """Return true if condition of this stage do not correct. This process
+        use build-in eval function to execute the if-condition.
 
         :param params: A parameters that want to pass to condition template.
         :rtype: bool
@@ -257,10 +273,15 @@ class EmptyStage(BaseStage):
 
     def execute(self, params: DictData) -> Result:
         """Execution method for the Empty stage that do only logging out to
-        stdout.
+        stdout. This method does not use the `handler_result` decorator because
+        it does not get any error from logging function.
+
+            The result context should be empty and do not process anything
+        without calling logging function.
 
         :param params: A context data that want to add output result. But this
             stage does not pass any output.
+        :rtype: Result
         """
         logger.info(
             f"({self.run_id}) [STAGE]: Empty-Execute: {self.name!r}: "
@@ -302,6 +323,10 @@ class BashStage(BaseStage):
         """Return context of prepared bash statement that want to execute. This
         step will write the `.sh` file before giving this file name to context.
         After that, it will auto delete this file automatic.
+
+        :param bash: A bash statement that want to execute.
+        :param env: An environment variable that use on this bash statement.
+        :rtype: Iterator[TupleStr]
         """
         f_name: str = f"{uuid.uuid4()}.sh"
         f_shebang: str = "bash" if sys.platform.startswith("win") else "sh"
@@ -348,6 +373,7 @@ class BashStage(BaseStage):
                 text=True,
             )
         if rs.returncode > 0:
+            # NOTE: Prepare stderr message that returning from subprocess.
             err: str = (
                 rs.stderr.encode("utf-8").decode("utf-16")
                 if "\\x00" in rs.stderr
@@ -368,8 +394,11 @@ class BashStage(BaseStage):
 
 
 class PyStage(BaseStage):
-    """Python executor stage that running the Python statement that receive
-    globals nad additional variables.
+    """Python executor stage that running the Python statement with receiving
+    globals and additional variables.
+
+        This stage allow you to use any Python object that exists on the globals
+    such as import your installed package.
 
     Data Validate:
         >>> stage = {
@@ -392,7 +421,8 @@ class PyStage(BaseStage):
     )
 
     def set_outputs(self, output: DictData, to: DictData) -> DictData:
-        """Set an outputs from the Python execution process to an input params.
+        """Override set an outputs method for the Python execution process that
+        extract output from all the locals values.
 
         :param output: A output data that want to extract to an output key.
         :param to: A context data that want to add output result.
@@ -436,7 +466,7 @@ class PyStage(BaseStage):
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class HookSearch:
     """Hook Search dataclass that use for receive regular expression grouping
     dict from searching hook string value.
@@ -551,7 +581,9 @@ class HookStage(BaseStage):
 
 
 class TriggerStage(BaseStage):
-    """Trigger Workflow execution stage that execute another workflow object.
+    """Trigger Workflow execution stage that execute another workflow. This this
+    the core stage that allow you to create the reusable workflow object or
+    dynamic parameters workflow for common usecase.
 
     Data Validate:
         >>> stage = {
@@ -572,7 +604,8 @@ class TriggerStage(BaseStage):
 
     @handler_result("Raise from TriggerStage")
     def execute(self, params: DictData) -> Result:
-        """Trigger workflow execution.
+        """Trigger another workflow execution. It will waiting the trigger
+        workflow running complete before catching its result.
 
         :param params: A parameter data that want to use in this execution.
         :rtype: Result
@@ -591,7 +624,7 @@ class TriggerStage(BaseStage):
         return wf.execute(params=param2template(self.params, params))
 
 
-# NOTE: Order of parsing stage data
+# NOTE: An order of parsing stage model.
 Stage = Union[
     PyStage,
     BashStage,

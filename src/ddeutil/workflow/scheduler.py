@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import copy
+import inspect
 import json
 import logging
 import os
@@ -37,7 +38,7 @@ try:
 except ImportError:
     CancelJob = None
 
-from .__types import DictData
+from .__types import DictData, TupleStr
 from .cron import CronRunner
 from .exceptions import JobException, WorkflowException
 from .job import Job
@@ -57,16 +58,20 @@ from .utils import (
 
 load_dotenv()
 logger = get_logger("ddeutil.workflow")
+
+# NOTE: Adjust logging level on the schedule package.
 logging.getLogger("schedule").setLevel(logging.INFO)
 
 
-__all__ = (
+__all__: TupleStr = (
     "Workflow",
     "WorkflowSchedule",
     "WorkflowTask",
     "Schedule",
-    "workflow_runner",
     "workflow_task",
+    "workflow_long_running_task",
+    "workflow_control",
+    "workflow_runner",
 )
 
 
@@ -675,7 +680,7 @@ class Workflow(BaseModel):
 
 
 class WorkflowSchedule(BaseModel):
-    """Workflow schedule Pydantic Model."""
+    """Workflow schedule Pydantic model."""
 
     name: str = Field(description="A workflow name.")
     on: list[On] = Field(
@@ -808,34 +813,27 @@ def catch_exceptions(cancel_on_failure=False):
     """Catch exception error from scheduler job."""
 
     def catch_exceptions_decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            try:
+
+        try:
+            if inspect.ismethod(func):
+
+                @wraps(func)
+                def wrapper(self, *args, **kwargs):
+                    return func(self, *args, **kwargs)
+
+                return wrapper
+
+            @wraps(func)
+            def wrapper(*args, **kwargs):
                 return func(*args, **kwargs)
-            except Exception as err:
-                logger.exception(err)
-                if cancel_on_failure:
-                    return CancelJob
 
-        return wrapper
+            return wrapper
 
-    return catch_exceptions_decorator
-
-
-def catch_exceptions_method(cancel_on_failure=False):
-    """Catch exception error from scheduler job."""
-
-    def catch_exceptions_decorator(func):
-        @wraps(func)
-        def wrapper(self, *args, **kwargs):
-            try:
-                return func(self, *args, **kwargs)
-            except Exception as err:
-                logger.exception(err)
-                if cancel_on_failure:
-                    return CancelJob
-
-        return wrapper
+        except Exception as err:
+            logger.exception(err)
+            if cancel_on_failure:
+                return CancelJob
+            raise err
 
     return catch_exceptions_decorator
 
@@ -852,7 +850,7 @@ class WorkflowTask:
     queue: list[datetime] = field(compare=False, hash=False)
     running: list[datetime] = field(compare=False, hash=False)
 
-    @catch_exceptions_method(cancel_on_failure=True)
+    @catch_exceptions(cancel_on_failure=True)
     def release(self, log: Log | None = None) -> None:
         """Workflow release, it will use with the same logic of
         `workflow.release` method.

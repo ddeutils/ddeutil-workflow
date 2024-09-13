@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from ddeutil.workflow.on import AwsOn, On
+from ddeutil.workflow.on import On, YearOn
 
 
 def test_on():
@@ -39,7 +39,7 @@ def test_on_value():
 
 
 def test_on_aws():
-    schedule = AwsOn.from_loader(
+    schedule = YearOn.from_loader(
         name="aws_every_5_minute_bkk",
         externals={},
     )
