@@ -119,8 +119,14 @@ So, this package provide the `Schedule` template for this action.
 
 ```yaml
 schedule-run-local-wf:
+
+   # Validate model that use to parsing exists for template file
    type: ddeutil.workflow.scheduler.Schedule
    workflows:
+
+      # Map existing workflow that want to deploy with scheduler application.
+      # It allow you to passing release parameter that dynamic change depend the
+      # current context of this scheduler application releasing that time.
       - name: run-py-local
         params:
           source-extract: "USD-THB"
@@ -128,6 +134,10 @@ schedule-run-local-wf:
 ```
 
 ## Configuration
+
+The main configuration that use to dynamic changing with your propose of this
+application. If any configuration values do not set yet, it will use default value
+and do not raise any error to you.
 
 | Environment                         | Component | Default                          | Description                                                                |
 |-------------------------------------|-----------|----------------------------------|----------------------------------------------------------------------------|
