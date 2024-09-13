@@ -12,8 +12,9 @@ for easy to make a simple metadata driven for data workflow orchestration.
 It can to use for data operator by a `.yaml` template.
 
 > [!WARNING]
-> This package provide only orchestration workload. That mean you should not use
-> workflow stage to process any large data which use lot of compute usecase.
+> This package provide only orchestration workload task. That mean you should not
+> use the workflow stage to process any large volume data which use lot of compute
+> resource. :cold_sweat:
 
 In my opinion, I think it should not create duplicate workflow codes if I can
 write with dynamic input parameters on the one template workflow that just change
@@ -24,16 +25,16 @@ configuration. It called **Metadata Driven Data Workflow**.
 > [!NOTE]
 > _Disclaimer_: I inspire the dynamic statement from the GitHub Action `.yml` files
 > and all of config file from several data orchestration framework tools from my
-> experience on Data Engineer.
+> experience on Data Engineer. :grimacing:
 
-**Rules of This Workflow engine**:
+**:pushpin: <u>Rules of This Workflow engine</u>**:
 
-1. Minimum unit of scheduling is 1 minute
-2. Cannot re-run only failed stage and its pending downstream
-3. All parallel tasks inside workflow engine use Threading
-   (Because Python 3.13 unlock GIL)
+1. Minimum frequency unit of scheduling is **1 minute** :warning:
+2. Can not re-run only failed stage and its pending downstream :rotating_light:
+3. All parallel tasks inside workflow engine use Multi-Threading
+   (Because Python 3.13 unlock GIL :unlock:)
 
-## Installation
+## :round_pushpin: Installation
 
 This project need `ddeutil-io` extension namespace packages. If you want to install
 this package with application add-ons, you should add `app` in installation;
@@ -46,7 +47,7 @@ this package with application add-ons, you should add `app` in installation;
 
 > I added this feature to the main milestone.
 >
-> **Docker Images** supported:
+> :egg: **Docker Images** supported:
 >
 > | Docker Image                | Python Version | Support |
 > |-----------------------------|----------------|---------|
@@ -55,7 +56,7 @@ this package with application add-ons, you should add `app` in installation;
 > | ddeutil-workflow:python3.11 | `3.11`         | :x:     |
 > | ddeutil-workflow:python3.12 | `3.12`         | :x:     |
 
-## Usage
+## :beers: Usage
 
 This is examples that use workflow file for running common Data Engineering
 use-case.
@@ -133,7 +134,7 @@ schedule-run-local-wf:
           asat-dt: "${{ release.logical_date }}"
 ```
 
-## Configuration
+## :cookie: Configuration
 
 The main configuration that use to dynamic changing with your propose of this
 application. If any configuration values do not set yet, it will use default value
@@ -163,7 +164,7 @@ and do not raise any error to you.
 | `WORKFLOW_API_ENABLE_ROUTE_WORKFLOW` | API       | true    | A flag that enable workflow route to manage execute manually and workflow logging |
 | `WORKFLOW_API_ENABLE_ROUTE_SCHEDULE` | API       | true    | A flag that enable run scheduler                                                  |
 
-## Deployment
+## :rocket: Deployment
 
 This package able to run as a application service for receive manual trigger
 from the master node via RestAPI or use to be Scheduler background service
