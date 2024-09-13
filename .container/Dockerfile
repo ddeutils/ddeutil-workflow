@@ -14,4 +14,4 @@ RUN pip install --no-cache-dir -U ddeutil-workflow[app]
 
 USER workflow
 
-CMD ["workflow", "app", "run"]
+ENTRYPOINT ["ddeutil-workflow", "schedule"]
