@@ -2,6 +2,44 @@
 
 ## Latest Changes
 
+## 0.0.13
+
+### :sparkles: Features
+
+- :dart: feat: add default value for getting the on from workflow schedule model. (_2024-09-13_)
+
+### :black_nib: Code Changes
+
+- :construction: refactored: 📦 update fastapi requirement from <1.0.0,==0.112.2 to ==0.114.1 (_2024-09-12_)
+- :test_tube: tests: add testcase for incease coverage report. (_2024-09-03_)
+- :construction: refactored: ⬆ bump pypa/gh-action-pypi-publish from 1.9.0 to 1.10.0 (_2024-09-01_)
+
+### :card_file_box: Documents
+
+- :page_facing_up: docs: update readme file for refs tools. (_2024-09-16_)
+- :page_facing_up: docs: add emoji on readme. (_2024-09-13_)
+- :page_facing_up: docs: update readme file for more detail of schedule. (_2024-09-13_)
+- :page_facing_up: docs: update doc-string on stage and job modules. (_2024-09-13_)
+- :page_facing_up: docs: update readme file for add more usage. (_2024-09-12_)
+- :page_facing_up: docs: rename workflow name on example file and readme. (_2024-09-02_)
+- :page_facing_up: docs: update pypi version on readme. (_2024-09-02_)
+
+### :bug: Fix Bugs
+
+- :gear: fixed: remove test locals and globals. (_2024-09-13_)
+- :gear: fixed: update deps version of ddeutil-io. (_2024-09-13_)
+- :gear: fixed: merge branch for receive update from remote. (_2024-09-03_)
+
+### :package: Build & Workflow
+
+- :toolbox: build: add build ci for test building docker image. (_2024-09-13_)
+- :toolbox: build: fixed caching python deps on tests workflow. (_2024-09-13_)
+
+### :postbox: Dependencies
+
+- :pushpin: deps: update testing for support python version 3.13. (_2024-09-13_)
+- :pushpin: deps: adjust fastapi version that able to use on api. (_2024-09-12_)
+
 ## 0.0.12
 
 > [!NOTE]
