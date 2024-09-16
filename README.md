@@ -22,17 +22,23 @@ the input parameters per use-case instead.
 This way I can handle a lot of logical workflows in our orgs with only metadata
 configuration. It called **Metadata Driven Data Workflow**.
 
-> [!NOTE]
-> _Disclaimer_: I inspire the dynamic statement from the GitHub Action `.yml` files
-> and all of config file from several data orchestration framework tools from my
-> experience on Data Engineer. :grimacing:
-
 **:pushpin: <u>Rules of This Workflow engine</u>**:
 
 1. Minimum frequency unit of scheduling is **1 minute** :warning:
 2. Can not re-run only failed stage and its pending downstream :rotating_light:
 3. All parallel tasks inside workflow engine use Multi-Threading
    (Because Python 3.13 unlock GIL :unlock:)
+
+> [!NOTE]
+> _Disclaimer_: I inspire the dynamic statement from the [**GitHub Action**](https://github.com/features/actions)
+> `.yml` files and all of config file from several data orchestration framework
+> tools from my experience on Data Engineer. :grimacing:
+>
+> Other workflow that I interest on them and pick some interested feature to this
+> package:
+>
+> - [Google **Workflows**](https://cloud.google.com/workflows)
+> - [AWS **Step Functions**](https://aws.amazon.com/step-functions/)
 
 ## :round_pushpin: Installation
 
