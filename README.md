@@ -31,7 +31,7 @@ configuration. It called **Metadata Driven Data Workflow**.
 
 > [!NOTE]
 > _Disclaimer_: I inspire the dynamic statement from the [**GitHub Action**](https://github.com/features/actions)
-> `.yml` files and all of config file from several data orchestration framework
+> with `.yml` files and all of config file from several data orchestration framework
 > tools from my experience on Data Engineer. :grimacing:
 >
 > Other workflow that I interest on them and pick some interested feature to this

@@ -1,0 +1,101 @@
+site_name: Workflow
+theme:
+  name: material
+  features:
+    - navigation.indexes
+    - navigation.instant
+    - navigation.instant.prefetch
+    - navigation.sections
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.tabs.link
+    - content.code.annotation
+    - content.code.copy
+    - content.code.select
+    - content.footnote.tooltips
+    - content.tooltips
+  language: en
+  palette:
+    - scheme: default
+      toggle:
+        icon: material/toggle-switch-off-outline
+        name: Switch to dark mode
+      primary: black
+      accent: purple
+    - scheme: slate
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to light mode
+      primary: blue grey
+      accent: lime
+  font:
+    text: Work Sans
+    code: Roboto Mono
+  icon:
+    repo: fontawesome/brands/github-alt
+    admonition:
+        warning: material/alert-decagram-outline
+
+repo_name: ddeutils/ddeutil-workflow
+repo_url: https://github.com/ddeutils/ddeutil-workflow
+
+extra:
+  social:
+    - icon: fontawesome/brands/github-alt
+      link: https://github.com/ddeutils/ddeutil-workflow
+    - icon: fontawesome/brands/linkedin-in
+      link: https://www.linkedin.com/in/korawica
+    - icon: fontawesome/brands/x-twitter
+      link: https://x.com/korawica
+
+nav:
+  - Introduction: index.md
+  - API: api.md
+  - Examples:
+      - Hooks: examples/hook_stage.md
+  - Usages:
+      - Manual Execution: examples/manual_execution.md
+
+plugins:
+  - tags
+  - search
+
+markdown_extensions:
+  - attr_list
+  - md_in_html
+  - def_list
+  - admonition
+  - footnotes
+  - tables
+  - pymdownx.critic
+  - pymdownx.caret
+  - pymdownx.mark
+  - pymdownx.tilde
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+      combine_header_slug: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+copyright: |
+  Copyright &copy; 2024 <a href="https://github.com/ddeutils/ddeutil-workflow" target="_blank" rel="noopener">DDEUtils Organization</a>
