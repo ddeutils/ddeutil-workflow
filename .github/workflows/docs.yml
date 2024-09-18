@@ -1,0 +1,55 @@
+name: docs
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout all of contents
+        uses: actions/checkout@v4
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.9
+
+      - uses: actions/cache@v4
+        id: cache
+        with:
+          path: .venv
+          key: ${{ runner.os }}-python-${{ hashFiles('pyproject.toml') }}
+
+      - name: Install Python Dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          uv venv
+          uv pip install -U pip
+          uv pip install -U mkdocs-material
+          uv pip install pillow cairosvg
+
+      - name: Use Python virtual environment
+        run: |
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> $GITHUB_PATH
+          echo "VIRTUAL_ENV=$GITHUB_WORKSPACE/.venv" >> $GITHUB_ENV
+
+      - name: Check git is working
+        run: |
+          git config --global user.email "korawica@github.actions"
+          git config --global user.name "Testing Git on Travis CI"
+          git --version
+          git config --list
+
+      - name: Deploy GitHub Page
+        env:
+          CI: true
+        run: |
+          mkdocs gh-deploy --force

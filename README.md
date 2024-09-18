@@ -61,6 +61,7 @@ this package with application add-ons, you should add `app` in installation;
 > | ddeutil-workflow:python3.10 | `3.10`         | :x:     |
 > | ddeutil-workflow:python3.11 | `3.11`         | :x:     |
 > | ddeutil-workflow:python3.12 | `3.12`         | :x:     |
+> | ddeutil-workflow:python3.12 | `3.13`         | :x:     |
 
 ## :beers: Usage
 
