@@ -53,10 +53,11 @@ extra:
 nav:
   - Introduction: index.md
   - API: api.md
+  - State Machine Language: state_machine.md
   - Examples:
       - Hooks: examples/hook_stage.md
   - Usages:
-      - Manual Execution: examples/manual_execution.md
+      - Manual Execution: usages/manual_execution.md
 
 plugins:
   - tags
