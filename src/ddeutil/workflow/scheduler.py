@@ -11,7 +11,6 @@ import json
 import logging
 import os
 import time
-from collections.abc import Iterator
 from concurrent.futures import (
     Future,
     ProcessPoolExecutor,
@@ -54,6 +53,7 @@ from .utils import (
     get_diff_sec,
     has_template,
     param2template,
+    queue2str,
 )
 
 load_dotenv()
@@ -968,16 +968,12 @@ class WorkflowTask:
         heappush(self.queue[wf.name], future_running_time)
         logger.debug(f"[CORE]: {'-' * 100}")
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         if isinstance(other, WorkflowTask):
             return (
                 self.workflow.name == other.workflow.name
                 and self.on.cronjob == other.on.cronjob
             )
-
-
-def queue2str(queue: list[datetime]) -> Iterator[str]:
-    return (f"{q:%Y-%m-%d %H:%M:%S}" for q in queue)
 
 
 @catch_exceptions(cancel_on_failure=True)
@@ -1206,7 +1202,7 @@ def workflow_runner(
     value to multiprocess executor pool.
 
     The current workflow logic:
-    ---
+
         PIPELINES ==> process 01 ==> schedule 1 minute --> thread of release
                                                            workflow task 01 01
                                                        --> thread of release

@@ -524,8 +524,9 @@ class Job(BaseModel):
         :rtype: Result
         """
         context: DictData = {}
-        # NOTE: Get results from a collection of tasks with a
-        #   timeout that has the first exception.
+
+        # NOTE: Get results from a collection of tasks with a timeout that has
+        #   the first exception.
         done, not_done = wait(
             futures, timeout=1800, return_when=FIRST_EXCEPTION
         )
@@ -536,7 +537,7 @@ class Job(BaseModel):
 
         if len(done) != len(futures):
 
-            # NOTE: Stop all running tasks
+            # NOTE: Stop all running tasks with setting the event manager
             event.set()
 
             # NOTE: Cancel any scheduled tasks
@@ -553,9 +554,10 @@ class Job(BaseModel):
                 )
             elif future.cancelled():
                 continue
-            else:
-                rs: Result = future.result(timeout=60)
-                context.update(rs.context)
+
+            rs: Result = future.result(timeout=60)
+            context.update(rs.context)
+
         return Result(status=status, context=context)
 
     def __catch_all_completed(self, futures: list[Future]) -> Result:
@@ -587,14 +589,13 @@ class Job(BaseModel):
                 )
                 future.cancel()
                 time.sleep(0.1)
-                if not future.cancelled():
-                    logger.warning(
-                        f"({self.run_id}) [JOB]: Failed to cancel the task."
-                    )
-                else:
-                    logger.warning(
-                        f"({self.run_id}) [JOB]: Task canceled successfully."
-                    )
+
+                stmt: str = (
+                    "Failed to cancel the task."
+                    if not future.cancelled()
+                    else "Task canceled successfully."
+                )
+                logger.warning(f"({self.run_id}) [JOB]: {stmt}")
             except JobException as err:
                 status = 1
                 logger.error(

@@ -905,3 +905,7 @@ def batch(iterable: Iterator[Any], n: int) -> Iterator[Any]:
         except StopIteration:
             return
         yield chain((first_el,), chunk_it)
+
+
+def queue2str(queue: list[datetime]) -> Iterator[str]:
+    return (f"{q:%Y-%m-%d %H:%M:%S}" for q in queue)
