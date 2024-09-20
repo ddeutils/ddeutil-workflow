@@ -51,13 +51,17 @@ extra:
       link: https://x.com/korawica
 
 nav:
-  - Introduction: index.md
-  - API: api.md
+  - index.md
   - State Machine Language: state_machine.md
+  - Features:
+      - Stage: features/stage.md
+      - On: features/on.md
+      - Job: features/job.md
+      - Workflow: features/workflow.md
+      - Schedule: features/schedule.md
   - Examples:
       - Hooks: examples/hook_stage.md
-  - Usages:
-      - Manual Execution: usages/manual_execution.md
+      - Manual Execution: examples/manual_execution.md
 
 plugins:
   - tags

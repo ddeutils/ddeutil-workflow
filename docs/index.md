@@ -1,4 +1,4 @@
-# Workflow
+# Welcome to Workflow
 
 The **Lightweight workflow orchestration** with less dependencies the was created
 for easy to make a simple metadata driven for data workflow orchestration.
@@ -44,7 +44,6 @@ this package with application add-ons, you should add `app` in installation;
 |-------------------|------------------------------------------|--------------------|
 | Python & CLI      | `pip install ddeutil-workflow`           | :heavy_check_mark: |
 | FastAPI Server    | `pip install ddeutil-workflow[api]`      | :heavy_check_mark: |
-
 
 > I added this feature to the main milestone.
 >
