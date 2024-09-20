@@ -405,6 +405,8 @@ class Job(BaseModel):
                     },
                 )
             try:
+                # TODO: Can it change setting output step to:
+                #   stage.execute(params=context).to(context)
                 rs: Result = stage.execute(params=context)
                 stage.set_outputs(rs.context, to=context)
             except (StageException, UtilException) as err:

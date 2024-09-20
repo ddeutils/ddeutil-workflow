@@ -1,10 +1,10 @@
-import os
-
 import pytest
 from ddeutil.workflow import Workflow
 from ddeutil.workflow.exceptions import StageException
 from ddeutil.workflow.stage import Stage
 from ddeutil.workflow.utils import Result
+
+from tests.utils import override_env
 
 
 def test_stage_py_raise():
@@ -27,15 +27,13 @@ def test_stage_py_not_raise():
 
     assert stage.id == "raise-error"
 
-    os.environ["WORKFLOW_CORE_STAGE_RAISE_ERROR"] = "false"
-
-    rs = stage.execute(params={"x": "Foo"})
-    assert rs.status == 1
-    assert rs.context == {
-        "error_message": "ValueError: Testing raise error inside PyStage!!!"
-    }
-
-    os.environ["WORKFLOW_CORE_STAGE_RAISE_ERROR"] = "true"
+    with override_env({"WORKFLOW_CORE_STAGE_RAISE_ERROR": "false"}):
+        rs = stage.execute(params={"x": "Foo"})
+        assert rs.status == 1
+        assert isinstance(rs.context["error"], ValueError)
+        assert rs.context["error_message"] == (
+            "ValueError: Testing raise error inside PyStage!!!"
+        )
 
 
 def test_stage_py():

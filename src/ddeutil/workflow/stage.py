@@ -12,8 +12,11 @@ can tracking logs.
 handle stage error on this stage model. I think stage model should have a lot of
 usecase and it does not worry when I want to create a new one.
 
-    Execution --> Ok    --> Result with 0
-              --> Error --> Raise StageException
+    Execution   --> Ok    --> Result with 0
+                --> Error --> Raise StageException
+
+    On the context I/O that pass to stage object at execute process. The execute
+method receive `{"params": {...}}` for mapping to template.
 """
 from __future__ import annotations
 
@@ -119,10 +122,11 @@ def handler_result(message: str | None = None) -> Callable[P, Result]:
                     ) from None
 
                 # NOTE: Catching exception error object to result with
-                #   error_message key.
+                #   error_message and error keys.
                 rs: Result = Result(
                     status=1,
                     context={
+                        "error": err,
                         "error_message": f"{err.__class__.__name__}: {err}",
                     },
                 )
@@ -199,7 +203,8 @@ class BaseStage(BaseModel, ABC):
         raise NotImplementedError("Stage should implement ``execute`` method.")
 
     def set_outputs(self, output: DictData, to: DictData) -> DictData:
-        """Set an outputs from execution process to an input params.
+        """Set an outputs from execution process to the receive context. The
+        result from execution will pass to value of ``outputs`` key.
 
         :param output: A output data that want to extract to an output key.
         :param to: A context data that want to add output result.
@@ -226,7 +231,7 @@ class BaseStage(BaseModel, ABC):
             # NOTE: If the stage ID did not set, it will use its name instead.
             _id: str = gen_id(param2template(self.name, params=to))
 
-        # NOTE: Set the output to that stage generated ID.
+        # NOTE: Set the output to that stage generated ID with ``outputs`` key.
         logger.debug(
             f"({self.run_id}) [STAGE]: Set output complete with stage ID: {_id}"
         )
