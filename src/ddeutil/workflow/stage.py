@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import contextlib
 import inspect
-import os
 import subprocess
 import sys
 import uuid
@@ -41,12 +40,12 @@ try:
 except ImportError:
     from typing_extensions import ParamSpec
 
-from ddeutil.core import str2bool
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
 from .__types import DictData, DictStr, Re, TupleStr
+from .conf import config
 from .exceptions import StageException
 from .log import get_logger
 from .utils import (
@@ -72,7 +71,7 @@ __all__: TupleStr = (
     "HookStage",
     "TriggerStage",
     "Stage",
-    "HookSearch",
+    "HookSearchData",
     "extract_hook",
     "handler_result",
 )
@@ -90,8 +89,18 @@ def handler_result(message: str | None = None) -> Callable[P, Result]:
                     --> Error   --> Raise StageException
                                 --> Result with 1 (if env var was set)
 
+        On the last step, it will set the running ID on a return result object
+    from current stage ID before release the final result.
+
     :param message: A message that want to add at prefix of exception statement.
+    :rtype: Callable[P, Result]
     """
+    # NOTE: The prefix message string that want to add on the first exception
+    #   message dialog.
+    #
+    #       ... ValueError: {message}
+    #       ...     raise value error from the stage execution process.
+    #
     message: str = message or ""
 
     def decorator(func: Callable[P, Result]) -> Callable[P, Result]:
@@ -106,9 +115,7 @@ def handler_result(message: str | None = None) -> Callable[P, Result]:
                 logger.error(
                     f"({self.run_id}) [STAGE]: {err.__class__.__name__}: {err}"
                 )
-                if str2bool(
-                    os.getenv("WORKFLOW_CORE_STAGE_RAISE_ERROR", "true")
-                ):
+                if config.stage_raise_error:
                     # NOTE: If error that raise from stage execution course by
                     #   itself, it will return that error with previous
                     #   dependency.
@@ -166,10 +173,12 @@ class BaseStage(BaseModel, ABC):
     )
 
     @model_validator(mode="after")
-    def __prepare_running_id(self):
+    def __prepare_running_id(self) -> Self:
         """Prepare stage running ID that use default value of field and this
         method will validate name and id fields should not contain any template
         parameter (exclude matrix template).
+
+        :rtype: Self
         """
         if self.run_id is None:
             self.run_id = gen_id(self.name + (self.id or ""), unique=True)
@@ -210,10 +219,7 @@ class BaseStage(BaseModel, ABC):
         :param to: A context data that want to add output result.
         :rtype: DictData
         """
-        if not (
-            self.id
-            or str2bool(os.getenv("WORKFLOW_CORE_STAGE_DEFAULT_ID", "false"))
-        ):
+        if not (self.id or config.stage_default_id):
             logger.debug(
                 f"({self.run_id}) [STAGE]: Output does not set because this "
                 f"stage does not set ID or default stage ID config flag not be "
@@ -472,7 +478,7 @@ class PyStage(BaseStage):
 
 
 @dataclass(frozen=True)
-class HookSearch:
+class HookSearchData:
     """Hook Search dataclass that use for receive regular expression grouping
     dict from searching hook string value.
     """
@@ -495,7 +501,7 @@ def extract_hook(hook: str) -> Callable[[], TagFunc]:
         )
 
     # NOTE: Pass the searching hook string to `path`, `func`, and `tag`.
-    hook: HookSearch = HookSearch(**found.groupdict())
+    hook: HookSearchData = HookSearchData(**found.groupdict())
 
     # NOTE: Registry object should implement on this package only.
     rgt: dict[str, Registry] = make_registry(f"{hook.path}")
@@ -629,7 +635,11 @@ class TriggerStage(BaseStage):
         return wf.execute(params=param2template(self.params, params))
 
 
-# NOTE: An order of parsing stage model.
+# NOTE:
+#   An order of parsing stage model on the Job model with ``stages`` field.
+#   From the current build-in stages, they do not have stage that have the same
+#   fields that be cause of parsing on the Job's stages key.
+#
 Stage = Union[
     PyStage,
     BashStage,

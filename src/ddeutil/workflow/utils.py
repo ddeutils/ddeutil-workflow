@@ -528,7 +528,7 @@ class Result(BaseModel):
     _run_id: Optional[str] = PrivateAttr(default=None)
 
     @model_validator(mode="after")
-    def __prepare_run_id(self):
+    def __prepare_run_id(self) -> Self:
         if self._run_id is None:
             self._run_id = gen_id("manual", unique=True)
         return self

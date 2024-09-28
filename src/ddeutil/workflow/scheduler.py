@@ -584,11 +584,12 @@ class Workflow(BaseModel):
         worker: int = 2,
         timeout: int = 600,
     ) -> DictData:
-        """Workflow threading execution.
+        """Workflow execution by threading strategy.
 
         :param context: A context workflow data that want to downstream passing.
         :param ts: A start timestamp that use for checking execute time should
             timeout.
+        :param job_queue: A job queue object.
         :param timeout: A second value unit that bounding running time.
         :param worker: A number of threading executor pool size.
         :rtype: DictData
@@ -655,8 +656,8 @@ class Workflow(BaseModel):
         *,
         timeout: int = 600,
     ) -> DictData:
-        """Workflow non-threading execution that use sequential job running
-        and waiting previous run successful.
+        """Workflow execution with non-threading strategy that use sequential
+        job running and waiting previous run successful.
 
         :param context: A context workflow data that want to downstream passing.
         :param ts: A start timestamp that use for checking execute time should
