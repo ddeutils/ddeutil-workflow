@@ -27,7 +27,6 @@ from threading import Thread
 from typing import Optional
 from zoneinfo import ZoneInfo
 
-from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
@@ -38,6 +37,7 @@ except ImportError:
     CancelJob = None
 
 from .__types import DictData, TupleStr
+from .conf import config
 from .cron import CronRunner
 from .exceptions import JobException, WorkflowException
 from .job import Job
@@ -56,7 +56,6 @@ from .utils import (
     queue2str,
 )
 
-load_dotenv()
 logger = get_logger("ddeutil.workflow")
 
 # NOTE: Adjust logging level on the schedule package.
@@ -317,9 +316,8 @@ class Workflow(BaseModel):
             f"queue id: {id(queue)}"
         )
         log: Log = log or FileLog
-        tz: ZoneInfo = ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
         gen: CronRunner = on.generate(
-            datetime.now(tz=tz).replace(second=0, microsecond=0)
+            datetime.now(tz=config.tz).replace(second=0, microsecond=0)
             + timedelta(seconds=1)
         )
         cron_tz: ZoneInfo = gen.tz
@@ -560,14 +558,16 @@ class Workflow(BaseModel):
         context: DictData = self.parameterize(params)
         status: int = 0
         try:
-            worker: int = int(os.getenv("WORKFLOW_CORE_MAX_JOB_PARALLEL", "2"))
-            (
+            if config.max_job_parallel == 1:
                 self.__exec_non_threading(context, ts, jq, timeout=timeout)
-                if worker == 1
-                else self.__exec_threading(
-                    context, ts, jq, worker=worker, timeout=timeout
+            else:
+                self.__exec_threading(
+                    context,
+                    ts,
+                    jq,
+                    worker=config.max_job_parallel,
+                    timeout=timeout,
                 )
-            )
         except WorkflowException as err:
             context.update(
                 {"error_message": f"{err.__class__.__name__}: {err}"}
@@ -896,13 +896,12 @@ class WorkflowTaskData:
         :param log: A log object for saving result logging from workflow
             execution process.
         """
-        tz: ZoneInfo = ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
         log: Log = log or FileLog
         wf: Workflow = self.workflow
         on: On = self.on
 
         gen: CronRunner = on.generate(
-            datetime.now(tz=tz).replace(second=0, microsecond=0)
+            datetime.now(tz=config.tz).replace(second=0, microsecond=0)
         )
         cron_tz: ZoneInfo = gen.tz
 
@@ -939,7 +938,7 @@ class WorkflowTaskData:
         )
 
         # NOTE: Release when the time is nearly to schedule time.
-        while (duration := get_diff_sec(next_time, tz=tz)) > (15 + 5):
+        while (duration := get_diff_sec(next_time, tz=config.tz)) > (15 + 5):
             logger.debug(
                 f"({wf.run_id}) [CORE]: {wf.name!r} : {on.cronjob} "
                 f": Sleep until: {duration}"
@@ -1028,11 +1027,10 @@ def workflow_task(
     :param threads:
     :rtype: CancelJob | None
     """
-    tz: ZoneInfo = ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
-    start_date: datetime = datetime.now(tz=tz)
+    start_date: datetime = datetime.now(tz=config.tz)
     start_date_minute: datetime = start_date.replace(second=0, microsecond=0)
 
-    if start_date > stop.replace(tzinfo=tz):
+    if start_date > stop.replace(tzinfo=config.tz):
         logger.info("[WORKFLOW]: Stop this schedule with datetime stopper.")
         while len(threads) > 0:
             logger.warning(
@@ -1149,9 +1147,8 @@ def workflow_control(
             "Should install schedule package before use this module."
         ) from None
 
-    tz: ZoneInfo = ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
     schedule: Scheduler = Scheduler()
-    start_date: datetime = datetime.now(tz=tz)
+    start_date: datetime = datetime.now(tz=config.tz)
 
     # NOTE: Design workflow queue caching.
     #   ---
@@ -1237,7 +1234,7 @@ def workflow_runner(
     created in config path and chuck it with WORKFLOW_APP_SCHEDULE_PER_PROCESS
     value to multiprocess executor pool.
 
-    The current workflow logic:
+        The current workflow logic that split to process will be below diagram:
 
         PIPELINES ==> process 01 ==> schedule 1 minute --> thread of release
                                                            workflow task 01 01

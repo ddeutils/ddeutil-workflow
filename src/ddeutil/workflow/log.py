@@ -20,7 +20,7 @@ from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
 from .__types import DictData
-from .utils import config
+from .utils import load_config
 
 
 @lru_cache
@@ -87,7 +87,9 @@ class FileLog(BaseLog):
 
     @classmethod
     def find_logs(cls, name: str):
-        pointer: Path = config().engine.paths.root / f"./logs/workflow={name}"
+        pointer: Path = (
+            load_config().engine.paths.root / f"./logs/workflow={name}"
+        )
         for file in pointer.glob("./release=*/*.log"):
             with file.open(mode="r", encoding="utf-8") as f:
                 yield json.load(f)
@@ -96,7 +98,7 @@ class FileLog(BaseLog):
     def find_log(cls, name: str, release: datetime | None = None):
         if release is not None:
             pointer: Path = (
-                config().engine.paths.root
+                load_config().engine.paths.root
                 / f"./logs/workflow={name}/release={release:%Y%m%d%H%M%S}"
             )
             if not pointer.exists():
@@ -130,7 +132,7 @@ class FileLog(BaseLog):
 
         # NOTE: create pointer path that use the same logic of pointer method.
         pointer: Path = (
-            config().engine.paths.root
+            load_config().engine.paths.root
             / f"./logs/workflow={name}/release={release:%Y%m%d%H%M%S}"
         )
 
@@ -144,7 +146,7 @@ class FileLog(BaseLog):
         :rtype: Path
         """
         return (
-            config().engine.paths.root
+            load_config().engine.paths.root
             / f"./logs/workflow={self.name}/release={self.release:%Y%m%d%H%M%S}"
         )
 

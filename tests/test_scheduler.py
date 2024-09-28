@@ -1,6 +1,6 @@
 from ddeutil.workflow import Workflow
 from ddeutil.workflow.on import On
-from ddeutil.workflow.scheduler import Schedule, WorkflowTask
+from ddeutil.workflow.scheduler import Schedule, WorkflowTaskData
 from ddeutil.workflow.utils import Loader
 
 
@@ -22,11 +22,11 @@ def test_scheduler_loader_find_schedule():
 def test_scheduler_remove_wf_task():
     queue = []
     running = []
-    pipeline_tasks: list[WorkflowTask] = []
+    pipeline_tasks: list[WorkflowTaskData] = []
     wf: Workflow = Workflow.from_loader("wf-scheduling", externals={})
     for on in wf.on:
         pipeline_tasks.append(
-            WorkflowTask(
+            WorkflowTaskData(
                 workflow=wf,
                 on=on,
                 params={"asat-dt": "${{ release.logical_date }}"},
@@ -39,7 +39,7 @@ def test_scheduler_remove_wf_task():
     wf: Workflow = Workflow.from_loader("wf-scheduling", externals={})
     for on in wf.on:
         pipeline_tasks.remove(
-            WorkflowTask(
+            WorkflowTaskData(
                 workflow=wf,
                 on=on,
                 params={"asat-dt": "${{ release.logical_date }}"},
@@ -53,7 +53,7 @@ def test_scheduler_remove_wf_task():
     wf: Workflow = Workflow.from_loader("wf-scheduling", externals={})
     for on in wf.on:
         pipeline_tasks.append(
-            WorkflowTask(
+            WorkflowTaskData(
                 workflow=wf,
                 on=on,
                 params={"asat-dt": "${{ release.logical_date }}"},
@@ -62,7 +62,7 @@ def test_scheduler_remove_wf_task():
             )
         )
 
-    remover = WorkflowTask(
+    remover = WorkflowTaskData(
         workflow=wf,
         on=On.from_loader(name="every_minute_bkk", externals={}),
         params={"asat-dt": "${{ release.logical_date }}"},

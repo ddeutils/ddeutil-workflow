@@ -38,6 +38,7 @@ from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
 from .__types import DictData, Matrix, Re
+from .conf import config
 from .exceptions import ParamValueException, UtilException
 
 logger = logging.getLogger("ddeutil.workflow")
@@ -110,7 +111,7 @@ class ConfParams(BaseModel):
     )
 
 
-def config() -> ConfParams:
+def load_config() -> ConfParams:
     """Load Config data from ``workflows-conf.yaml`` file.
 
     Configuration Docs:
@@ -158,7 +159,7 @@ class SimLoad:
     :param externals: An external parameters
 
     Noted:
-    ---
+
         The config data should have ``type`` key for modeling validation that
     make this loader know what is config should to do pass to.
 
@@ -248,11 +249,11 @@ class Loader(SimLoad):
     ) -> DictData:
         """Override the find class method from the Simple Loader object."""
         return super().finds(
-            obj=obj, params=config(), include=include, exclude=exclude
+            obj=obj, params=load_config(), include=include, exclude=exclude
         )
 
     def __init__(self, name: str, externals: DictData) -> None:
-        super().__init__(name, config(), externals)
+        super().__init__(name, load_config(), externals)
 
 
 def gen_id(
@@ -275,15 +276,14 @@ def gen_id(
     if not isinstance(value, str):
         value: str = str(value)
 
-    tz: ZoneInfo = ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
     if str2bool(os.getenv("WORKFLOW_CORE_PIPELINE_ID_SIMPLE", "true")):
         return hash_str(f"{(value if sensitive else value.lower())}", n=10) + (
-            f"{datetime.now(tz=tz):%Y%m%d%H%M%S%f}" if unique else ""
+            f"{datetime.now(tz=config.tz):%Y%m%d%H%M%S%f}" if unique else ""
         )
     return md5(
         (
             f"{(value if sensitive else value.lower())}"
-            + (f"{datetime.now(tz=tz):%Y%m%d%H%M%S%f}" if unique else "")
+            + (f"{datetime.now(tz=config.tz):%Y%m%d%H%M%S%f}" if unique else "")
         ).encode()
     ).hexdigest()
 
@@ -350,7 +350,7 @@ def make_registry(submodule: str) -> dict[str, Registry]:
     :rtype: dict[str, Registry]
     """
     rs: dict[str, Registry] = {}
-    for module in config().engine.registry:
+    for module in load_config().engine.registry:
         # NOTE: try to sequential import task functions
         try:
             importer = import_module(f"{module}.{submodule}")
@@ -622,7 +622,7 @@ def make_filter_registry() -> dict[str, FilterRegistry]:
     :rtype: dict[str, Registry]
     """
     rs: dict[str, Registry] = {}
-    for module in config().engine.registry_filter:
+    for module in load_config().engine.registry_filter:
         # NOTE: try to sequential import task functions
         try:
             importer = import_module(module)
