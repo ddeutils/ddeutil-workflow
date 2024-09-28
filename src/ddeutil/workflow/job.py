@@ -598,7 +598,7 @@ class Job(BaseModel):
         """
         context: DictData = {}
         status: int = 0
-        for future in as_completed(futures):
+        for future in as_completed(futures, timeout=1800):
             try:
                 rs: Result = future.result(timeout=timeout)
                 context.update(rs.context)

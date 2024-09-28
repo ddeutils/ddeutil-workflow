@@ -317,13 +317,14 @@ class TagFunc(Protocol):
     def __call__(self, *args, **kwargs): ...
 
 
-def tag(name: str, alias: str | None = None):
+def tag(name: str, alias: str | None = None) -> Callable[P, TagFunc]:
     """Tag decorator function that set function attributes, ``tag`` and ``name``
     for making registries variable.
 
-    :param: name: A tag value for make different use-case of a function.
+    :param: name: A tag name for make different use-case of a function.
     :param: alias: A alias function name that keeping in registries. If this
         value does not supply, it will use original function name from __name__.
+    :rtype: Callable[P, TagFunc]
     """
 
     def func_internal(func: Callable[[...], Any]) -> TagFunc:
@@ -522,6 +523,8 @@ class Result(BaseModel):
 
     status: int = Field(default=2)
     context: DictData = Field(default_factory=dict)
+    start_at: datetime = Field(default_factory=dt_now)
+    end_at: Optional[datetime] = Field(default=None)
 
     # NOTE: Ignore this field to compare another result model with __eq__.
     _parent_run_id: Optional[str] = PrivateAttr(default=None)
@@ -569,8 +572,11 @@ class Result(BaseModel):
         return self
 
 
-def make_exec(path: str | Path):
-    """Change mode of file to be executable file."""
+def make_exec(path: str | Path) -> None:
+    """Change mode of file to be executable file.
+
+    :param path: A file path that want to make executable permission.
+    """
     f: Path = Path(path) if isinstance(path, str) else path
     f.chmod(f.stat().st_mode | stat.S_IEXEC)
 
@@ -593,14 +599,15 @@ class FilterFunc(Protocol):
     def __call__(self, *args, **kwargs): ...
 
 
-def custom_filter(name: str) -> Callable[P, TagFunc]:
+def custom_filter(name: str) -> Callable[P, FilterFunc]:
     """Custom filter decorator function that set function attributes, ``filter``
     for making filter registries variable.
 
     :param: name: A filter name for make different use-case of a function.
+    :rtype: Callable[P, FilterFunc]
     """
 
-    def func_internal(func: Callable[[...], Any]) -> TagFunc:
+    def func_internal(func: Callable[[...], Any]) -> FilterFunc:
         func.filter = name
 
         @wraps(func)
@@ -644,7 +651,10 @@ def make_filter_registry() -> dict[str, FilterRegistry]:
 def get_args_const(
     expr: str,
 ) -> tuple[str, list[Constant], dict[str, Constant]]:
-    """Get arguments and keyword-arguments from function calling string."""
+    """Get arguments and keyword-arguments from function calling string.
+
+    :rtype: tuple[str, list[Constant], dict[str, Constant]]
+    """
     try:
         mod: Module = parse(expr)
     except SyntaxError:
@@ -699,8 +709,8 @@ def map_post_filter(
     """
     for _filter in post_filter:
         func_name, _args, _kwargs = get_args_const(_filter)
-        args = [arg.value for arg in _args]
-        kwargs = {k: v.value for k, v in _kwargs.items()}
+        args: list = [arg.value for arg in _args]
+        kwargs: dict = {k: v.value for k, v in _kwargs.items()}
 
         if func_name not in filters:
             raise UtilException(
@@ -869,14 +879,20 @@ def dash2underscore(
     *,
     fixed: str | None = None,
 ) -> DictData:
-    """Change key name that has dash to underscore."""
+    """Change key name that has dash to underscore.
+
+    :rtype: DictData
+    """
     if key in values:
         values[(fixed or key.replace("-", "_"))] = values.pop(key)
     return values
 
 
 def cross_product(matrix: Matrix) -> Iterator[DictData]:
-    """Iterator of products value from matrix."""
+    """Iterator of products value from matrix.
+
+    :rtype: Iterator[DictData]
+    """
     yield from (
         {_k: _v for e in mapped for _k, _v in e.items()}
         for mapped in product(
@@ -897,7 +913,7 @@ def batch(iterable: Iterator[Any], n: int) -> Iterator[Any]:
     """
     if n < 1:
         raise ValueError("n must be at least one")
-    it = iter(iterable)
+    it: Iterator[Any] = iter(iterable)
     while True:
         chunk_it = islice(it, n)
         try:
