@@ -1,6 +1,11 @@
+# ------------------------------------------------------------------------------
+# Copyright (c) 2022 Korawich Anuttra. All rights reserved.
+# Licensed under the MIT License. See LICENSE in the project root for
+# license information.
+# ------------------------------------------------------------------------------
+from __future__ import annotations
+
 import logging
-import os
-from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from textwrap import dedent
@@ -45,16 +50,3 @@ def dotenv_setting() -> None:
 
 def str2dt(value: str) -> datetime:
     return datetime.fromisoformat(value).astimezone(ZoneInfo("Asia/Bangkok"))
-
-
-@contextmanager
-def override_env(env_vars: dict[str, str]):
-    prev_env_vars = {}
-    for k, v in env_vars.items():
-        prev_env_vars[k] = os.getenv(k)
-        os.environ[k] = v
-
-    yield env_vars
-
-    for k, v in prev_env_vars.items():
-        os.environ[k] = v

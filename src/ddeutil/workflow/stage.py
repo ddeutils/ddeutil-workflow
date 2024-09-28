@@ -607,7 +607,11 @@ class TriggerStage(BaseStage):
         ... }
     """
 
-    trigger: str = Field(description="A trigger workflow name.")
+    trigger: str = Field(
+        description=(
+            "A trigger workflow name that should already exist on the config."
+        ),
+    )
     params: DictData = Field(
         default_factory=dict,
         description="A parameter that want to pass to workflow execution.",
@@ -621,6 +625,7 @@ class TriggerStage(BaseStage):
         :param params: A parameter data that want to use in this execution.
         :rtype: Result
         """
+        # NOTE: Lazy import this workflow object.
         from . import Workflow
 
         # NOTE: Loading workflow object from trigger name.

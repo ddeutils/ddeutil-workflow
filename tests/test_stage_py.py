@@ -1,10 +1,11 @@
+from unittest import mock
+
 import pytest
 from ddeutil.workflow import Workflow
+from ddeutil.workflow.conf import Config
 from ddeutil.workflow.exceptions import StageException
 from ddeutil.workflow.stage import Stage
 from ddeutil.workflow.utils import Result
-
-from tests.utils import override_env
 
 
 def test_stage_py_raise():
@@ -20,14 +21,13 @@ def test_stage_py_raise():
 
 
 def test_stage_py_not_raise():
-    workflow: Workflow = Workflow.from_loader(
-        name="wf-run-common", externals={}
-    )
-    stage: Stage = workflow.job("raise-run").stage(stage_id="raise-error")
+    with mock.patch.object(Config, "stage_raise_error", False):
+        workflow: Workflow = Workflow.from_loader(
+            name="wf-run-common", externals={}
+        )
+        stage: Stage = workflow.job("raise-run").stage(stage_id="raise-error")
+        assert stage.id == "raise-error"
 
-    assert stage.id == "raise-error"
-
-    with override_env({"WORKFLOW_CORE_STAGE_RAISE_ERROR": "false"}):
         rs = stage.execute(params={"x": "Foo"})
         assert rs.status == 1
         assert isinstance(rs.context["error"], ValueError)

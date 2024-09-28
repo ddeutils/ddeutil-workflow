@@ -3,6 +3,8 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
+"""Job Model that use for keeping stages and node that running its stages.
+"""
 from __future__ import annotations
 
 import copy
@@ -61,9 +63,13 @@ __all__: TupleStr = (
 
 @freeze_args
 @lru_cache
-def make(matrix, include, exclude) -> list[DictStr]:
-    """Return List of product of matrix values that already filter with
-    exclude and add include.
+def make(
+    matrix: Matrix,
+    include: MatrixInclude,
+    exclude: MatrixExclude,
+) -> list[DictStr]:
+    """Make a list of product of matrix values that already filter with
+    exclude matrix and add specific matrix with include.
 
     :param matrix: A matrix values that want to cross product to possible
         parallelism values.
@@ -190,7 +196,7 @@ class Strategy(BaseModel):
 
 
 class Job(BaseModel):
-    """Job Model (group of stages).
+    """Job Pydantic model object (group of stages).
 
         This job model allow you to use for-loop that call matrix strategy. If
     you pass matrix mapping and it able to generate, you will see it running
@@ -220,8 +226,7 @@ class Job(BaseModel):
     id: Optional[str] = Field(
         default=None,
         description=(
-            "A job ID, this value will add from workflow after validation "
-            "process."
+            "A job ID that it will add from workflow after validation process."
         ),
     )
     desc: Optional[str] = Field(
@@ -256,6 +261,9 @@ class Job(BaseModel):
     def __prepare_keys(cls, values: DictData) -> DictData:
         """Rename key that use dash to underscore because Python does not
         support this character exist in any variable name.
+
+        :param values: A passing value that coming for initialize this object.
+        :rtype: DictData
         """
         dash2underscore("runs-on", values)
         return values
@@ -266,8 +274,11 @@ class Job(BaseModel):
         return dedent(value)
 
     @model_validator(mode="after")
-    def __prepare_running_id(self):
-        """Prepare the job running ID."""
+    def __prepare_running_id(self) -> Self:
+        """Prepare the job running ID.
+
+        :rtype: Self
+        """
         if self.run_id is None:
             self.run_id = gen_id(self.id or "", unique=True)
 
@@ -287,14 +298,22 @@ class Job(BaseModel):
         return self.model_copy(update={"run_id": run_id})
 
     def stage(self, stage_id: str) -> Stage:
-        """Return stage model that match with an input stage ID."""
+        """Return stage model that match with an input stage ID.
+
+        :param stage_id: A stage ID that want to extract from this job.
+        :rtype: Stage
+        """
         for stage in self.stages:
             if stage_id == (stage.id or ""):
                 return stage
         raise ValueError(f"Stage ID {stage_id} does not exists")
 
     def set_outputs(self, output: DictData) -> DictData:
-        """Setting output of job execution"""
+        """Setting output of job execution
+
+        :param output: An output context.
+        :rtype: DictData
+        """
         if len(output) > 1 and self.strategy.is_set():
             return {"strategies": output}
         return output[next(iter(output))]
@@ -445,12 +464,14 @@ class Job(BaseModel):
         :rtype: Result
         """
         context: DictData = {}
+        params: DictData = {} if params is None else params
 
-        # NOTE: Normal Job execution.
+        # NOTE: Normal Job execution without parallel strategy.
         if (not self.strategy.is_set()) or self.strategy.max_parallel == 1:
             for strategy in self.strategy.make():
                 rs: Result = self.execute_strategy(
-                    strategy, params=copy.deepcopy(params)
+                    strategy=strategy,
+                    params=copy.deepcopy(params),
                 )
                 context.update(rs.context)
             return Result(
@@ -466,6 +487,7 @@ class Job(BaseModel):
         # #       on ddeutil.workflow.stage failed
         # #
         # # from multiprocessing import Event, Manager
+        # #
         # with Manager() as manager:
         #     event: Event = manager.Event()
         #
@@ -505,21 +527,19 @@ class Job(BaseModel):
             ]
 
             # NOTE: Dynamic catching futures object with fail-fast flag.
-            if self.strategy.fail_fast:
-                rs: Result = self.__catch_fail_fast(event, futures)
-            else:
-                rs: Result = self.__catch_all_completed(futures)
-        return Result(
-            status=0,
-            context=rs.context,
-        )
+            return (
+                self.__catch_fail_fast(event, futures)
+                if self.strategy.fail_fast
+                else self.__catch_all_completed(futures)
+            )
 
     def __catch_fail_fast(self, event: Event, futures: list[Future]) -> Result:
         """Job parallel pool futures catching with fail-fast mode. That will
         stop all not done futures if it receive the first exception from all
         running futures.
 
-        :param event: An event
+        :param event: An event manager instance that able to set stopper on the
+            observing thread/process.
         :param futures: A list of futures.
         :rtype: Result
         """
@@ -528,19 +548,19 @@ class Job(BaseModel):
         # NOTE: Get results from a collection of tasks with a timeout that has
         #   the first exception.
         done, not_done = wait(
-            futures, timeout=1800, return_when=FIRST_EXCEPTION
+            futures,
+            timeout=1800,
+            return_when=FIRST_EXCEPTION,
         )
         nd: str = (
             f", the strategies do not run is {not_done}" if not_done else ""
         )
         logger.debug(f"({self.run_id}) [JOB]: Strategy is set Fail Fast{nd}")
 
+        # NOTE: Stop all running tasks with setting the event manager and cancel
+        #   any scheduled tasks.
         if len(done) != len(futures):
-
-            # NOTE: Stop all running tasks with setting the event manager
             event.set()
-
-            # NOTE: Cancel any scheduled tasks
             for future in futures:
                 future.cancel()
 
@@ -556,22 +576,31 @@ class Job(BaseModel):
                 continue
 
             rs: Result = future.result(timeout=60)
+
+            # NOTE: Update the result context to main job context.
             context.update(rs.context)
 
         return Result(status=status, context=context)
 
-    def __catch_all_completed(self, futures: list[Future]) -> Result:
+    def __catch_all_completed(
+        self,
+        futures: list[Future],
+        *,
+        timeout: int = 60,
+    ) -> Result:
         """Job parallel pool futures catching with all-completed mode.
 
         :param futures: A list of futures that want to catch all completed
             result.
+        :param timeout: A timeout of getting result from the future instance
+            when it was running completely.
         :rtype: Result
         """
         context: DictData = {}
         status: int = 0
         for future in as_completed(futures):
             try:
-                rs: Result = future.result(timeout=60)
+                rs: Result = future.result(timeout=timeout)
                 context.update(rs.context)
             except PickleError as err:
                 # NOTE: (WF001) I do not want to fix this issue because
