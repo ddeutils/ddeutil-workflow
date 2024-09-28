@@ -66,7 +66,7 @@ logging.getLogger("schedule").setLevel(logging.INFO)
 __all__: TupleStr = (
     "Workflow",
     "WorkflowSchedule",
-    "WorkflowTask",
+    "WorkflowTaskData",
     "Schedule",
     "workflow_task",
     "workflow_long_running_task",
@@ -91,7 +91,7 @@ class Workflow(BaseModel):
     )
     params: dict[str, Param] = Field(
         default_factory=dict,
-        description="A parameters that want to use on this workflow.",
+        description="A parameters that need to use on this workflow.",
     )
     on: list[On] = Field(
         default_factory=list,
@@ -103,14 +103,19 @@ class Workflow(BaseModel):
     )
     run_id: Optional[str] = Field(
         default=None,
-        description="A running workflow ID.",
+        description=(
+            "A running workflow ID that is able to change after initialize."
+        ),
         repr=False,
         exclude=True,
     )
 
     @property
     def new_run_id(self) -> str:
-        """Running ID of this workflow that always generate new unique value."""
+        """Running ID of this workflow that always generate new unique value.
+
+        :rtype: str
+        """
         return gen_id(self.name, unique=True)
 
     @classmethod
@@ -180,12 +185,18 @@ class Workflow(BaseModel):
 
     @field_validator("desc", mode="after")
     def ___prepare_desc(cls, value: str) -> str:
-        """Prepare description string that was created on a template."""
+        """Prepare description string that was created on a template.
+
+        :rtype: str
+        """
         return dedent(value)
 
     @model_validator(mode="after")
-    def __validate_jobs_need_and_prepare_running_id(self):
-        """Validate each need job in any jobs should exists."""
+    def __validate_jobs_need_and_prepare_running_id(self) -> Self:
+        """Validate each need job in any jobs should exists.
+
+        :rtype: Self
+        """
         for job in self.jobs:
             if not_exist := [
                 need for need in self.jobs[job].needs if need not in self.jobs
@@ -221,7 +232,7 @@ class Workflow(BaseModel):
         return self.model_copy(update={"run_id": run_id})
 
     def job(self, name: str) -> Job:
-        """Return Job model that exists on this workflow.
+        """Return this workflow's job that already created on this job field.
 
         :param name: A job name that want to get from a mapping of job models.
         :type name: str
@@ -237,11 +248,18 @@ class Workflow(BaseModel):
         return self.jobs[name]
 
     def parameterize(self, params: DictData) -> DictData:
-        """Prepare parameters before passing to execution process. This method
-        will create jobs key to params mapping that will keep any result from
-        job execution.
+        """Prepare a passing parameters before use it in execution process.
+        This method will validate keys of an incoming params with this object
+        necessary params field and then create a jobs key to result mapping
+        that will keep any execution result from its job.
+
+            ... {
+            ...     "params": <an-incoming-params>,
+            ...     "jobs": {}
+            ... }
 
         :param params: A parameter mapping that receive from workflow execution.
+        :type params: DictData
         :rtype: DictData
         """
         # VALIDATE: Incoming params should have keys that set on this workflow.
@@ -255,7 +273,7 @@ class Workflow(BaseModel):
                 f"{', '.join(check_key)}."
             )
 
-        # NOTE: mapping type of param before adding it to params variable.
+        # NOTE: Mapping type of param before adding it to the ``params`` key.
         return {
             "params": (
                 params
@@ -492,17 +510,19 @@ class Workflow(BaseModel):
         *,
         timeout: int = 60,
     ) -> Result:
-        """Execute workflow with passing dynamic parameters to any jobs that
-        included in the workflow.
+        """Execute workflow with passing a dynamic parameters to all jobs that
+        included in this workflow model.
 
         :param params: An input parameters that use on workflow execution that
-            will parameterize before using it.
+            will parameterize before using it. Default is None.
+        :type params: DictData | None
         :param timeout: A workflow execution time out in second unit that use
-            for limit time of execution and waiting job dependency.
+            for limit time of execution and waiting job dependency. Default is
+            60 seconds.
+        :type timeout: int
         :rtype: Result
 
         See Also:
-        ---
 
             The result of execution process for each jobs and stages on this
         workflow will keeping in dict which able to catch out with all jobs and
@@ -515,7 +535,10 @@ class Workflow(BaseModel):
 
         """
         logger.info(f"({self.run_id}) [CORE]: Start Execute: {self.name!r} ...")
-        params: DictData = params or {}
+
+        # NOTE: I use this condition because this method allow passing empty
+        #   params and I do not want to create new dict object.
+        params: DictData = {} if params is None else params
         ts: float = time.monotonic()
 
         # NOTE: It should not do anything if it does not have job.
@@ -535,6 +558,7 @@ class Workflow(BaseModel):
         # NOTE: Create result context that will pass this context to any
         #   execution dependency.
         context: DictData = self.parameterize(params)
+        status: int = 0
         try:
             worker: int = int(os.getenv("WORKFLOW_CORE_MAX_JOB_PARALLEL", "2"))
             (
@@ -544,12 +568,12 @@ class Workflow(BaseModel):
                     context, ts, jq, worker=worker, timeout=timeout
                 )
             )
-            return Result(status=0, context=context)
         except WorkflowException as err:
             context.update(
                 {"error_message": f"{err.__class__.__name__}: {err}"}
             )
-            return Result(status=1, context=context)
+            status = 1
+        return Result(status=status, context=context)
 
     def __exec_threading(
         self,
@@ -746,6 +770,15 @@ class Schedule(BaseModel):
         name: str,
         externals: DictData | None = None,
     ) -> Self:
+        """Create Schedule instance from the Loader object that only receive
+        an input schedule name. The loader object will use this schedule name to
+        searching configuration data of this schedule model in conf path.
+
+        :param name: A schedule name that want to pass to Loader object.
+        :param externals: An external parameters that want to pass to Loader
+            object.
+        :rtype: Self
+        """
         loader: Loader = Loader(name, externals=(externals or {}))
 
         # NOTE: Validate the config type match with current connection model
@@ -766,18 +799,18 @@ class Schedule(BaseModel):
         running: dict[str, list[datetime]],
         *,
         externals: DictData | None = None,
-    ) -> list[WorkflowTask]:
+    ) -> list[WorkflowTaskData]:
         """Generate Task from the current datetime.
 
         :param start_date: A start date that get from the workflow schedule.
         :param queue: A mapping of name and list of datetime for queue.
         :param running: A mapping of name and list of datetime for running.
         :param externals: An external parameters that pass to the Loader object.
-        :rtype: list[WorkflowTask]
+        :rtype: list[WorkflowTaskData]
         """
 
         # NOTE: Create pair of workflow and on.
-        workflow_tasks: list[WorkflowTask] = []
+        workflow_tasks: list[WorkflowTaskData] = []
         externals: DictData = externals or {}
 
         for wfs in self.workflows:
@@ -800,7 +833,7 @@ class Schedule(BaseModel):
                 heappush(queue[wfs.name], next_running_date)
 
                 workflow_tasks.append(
-                    WorkflowTask(
+                    WorkflowTaskData(
                         workflow=wf,
                         on=on,
                         params=wfs.params,
@@ -813,7 +846,9 @@ class Schedule(BaseModel):
 
 
 def catch_exceptions(cancel_on_failure=False):
-    """Catch exception error from scheduler job."""
+    """Catch exception error from scheduler job that running with schedule
+    package and return CancelJob if this function raise an error.
+    """
 
     def catch_exceptions_decorator(func):
 
@@ -842,7 +877,7 @@ def catch_exceptions(cancel_on_failure=False):
 
 
 @dataclass(frozen=True)
-class WorkflowTask:
+class WorkflowTaskData:
     """Workflow task dataclass that use to keep mapping data and objects for
     passing in multithreading task.
     """
@@ -858,7 +893,8 @@ class WorkflowTask:
         """Workflow release, it will use with the same logic of
         `workflow.release` method.
 
-        :param log: A log object.
+        :param log: A log object for saving result logging from workflow
+            execution process.
         """
         tz: ZoneInfo = ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
         log: Log = log or FileLog
@@ -969,7 +1005,7 @@ class WorkflowTask:
         logger.debug(f"[CORE]: {'-' * 100}")
 
     def __eq__(self, other) -> bool:
-        if isinstance(other, WorkflowTask):
+        if isinstance(other, WorkflowTaskData):
             return (
                 self.workflow.name == other.workflow.name
                 and self.on.cronjob == other.on.cronjob
@@ -978,7 +1014,7 @@ class WorkflowTask:
 
 @catch_exceptions(cancel_on_failure=True)
 def workflow_task(
-    workflow_tasks: list[WorkflowTask],
+    workflow_tasks: list[WorkflowTaskData],
     stop: datetime,
     threads: dict[str, Thread],
 ) -> CancelJob | None:
@@ -1130,7 +1166,7 @@ def workflow_control(
     )
 
     # NOTE: Create pair of workflow and on from schedule model.
-    workflow_tasks: list[WorkflowTask] = []
+    workflow_tasks: list[WorkflowTaskData] = []
     for name in schedules:
         sch: Schedule = Schedule.from_loader(name, externals=externals)
         workflow_tasks.extend(

@@ -12,7 +12,10 @@ from .exceptions import (
 )
 from .job import Job, Strategy
 from .on import On, interval2crontab
-from .scheduler import Workflow
+from .scheduler import (
+    Schedule,
+    Workflow,
+)
 from .stage import Stage, handler_result
 from .utils import (
     Param,
