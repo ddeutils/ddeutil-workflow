@@ -35,7 +35,7 @@ def test_config():
         obj={
             "registry": "ddeutil.workflow",
             "registry_filter": "ddeutil.workflow.utils",
-        }
+        },
     )
     assert ["ddeutil.workflow"] == engine.registry
     assert ["ddeutil.workflow.utils"] == engine.registry_filter

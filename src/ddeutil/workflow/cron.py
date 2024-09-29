@@ -14,7 +14,7 @@ from typing import ClassVar, Optional, Union
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from ddeutil.core import (
-    is_int,
+    checker,
     isinstance_check,
     must_split,
 )
@@ -38,16 +38,21 @@ class CronYearLimit(Exception): ...
 
 
 def str2cron(value: str) -> str:
-    """Convert Special String to Crontab.
+    """Convert Special String with the @ prefix to Crontab value.
 
-    @reboot 	Run once, at system startup
-    @yearly 	Run once every year, "0 0 1 1 *"
-    @annually   (same as @yearly)
-    @monthly    Run once every month, "0 0 1 * *"
-    @weekly 	Run once every week, "0 0 * * 0"
-    @daily  	Run once each day, "0 0 * * *"
-    @midnight   (same as @daily)
-    @hourly 	Run once an hour, "0 * * * *"
+    :param value: A string value that want to convert to cron value.
+    :rtype: str
+
+    Table:
+
+        @reboot 	Run once, at system startup
+        @yearly 	Run once every year, "0 0 1 1 *"
+        @annually   (same as @yearly)
+        @monthly    Run once every month, "0 0 1 * *"
+        @weekly 	Run once every week, "0 0 * * 0"
+        @daily  	Run once each day, "0 0 * * *"
+        @midnight   (same as @daily)
+        @hourly 	Run once an hour, "0 * * * *"
     """
     mapping_spacial_str = {
         "@reboot": "",
@@ -321,7 +326,9 @@ class CronPart:
                 self._parse_range(value_range)
             )
 
-            if (value_step and not is_int(value_step)) or value_step == "":
+            if (
+                value_step and not checker.is_int(value_step)
+            ) or value_step == "":
                 raise ValueError(
                     f"Invalid interval step value {value_step!r} for "
                     f"{self.unit.name!r}"

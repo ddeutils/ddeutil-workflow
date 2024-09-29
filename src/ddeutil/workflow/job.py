@@ -328,15 +328,17 @@ class Job(BaseModel):
         """Job Strategy execution with passing dynamic parameters from the
         workflow execution to strategy matrix.
 
-            This execution is the minimum level execution of job model.
+            This execution is the minimum level of execution of this job model.
+        It different with ``self.execute`` because this method run only one
+        strategy and return with context of this strategy data.
+
+        :raise JobException: If it has any error from StageException or
+            UtilException.
 
         :param strategy: A metrix strategy value.
         :param params: A dynamic parameters.
         :param event: An manger event that pass to the PoolThreadExecutor.
         :rtype: Result
-
-        :raise JobException: If it has any error from StageException or
-            UtilException.
         """
         # NOTE: Force stop this execution if event was set from main execution.
         if event and event.is_set():
@@ -424,8 +426,6 @@ class Job(BaseModel):
                     },
                 )
             try:
-                # TODO: Can it change setting output step to:
-                #   stage.execute(params=context).to(context)
                 rs: Result = stage.execute(params=context)
                 stage.set_outputs(rs.context, to=context)
             except (StageException, UtilException) as err:
@@ -457,8 +457,8 @@ class Job(BaseModel):
 
     def execute(self, params: DictData | None = None) -> Result:
         """Job execution with passing dynamic parameters from the workflow
-        execution. It will generate matrix values at the first step and for-loop
-        any metrix to all stages dependency.
+        execution. It will generate matrix values at the first step and run
+        multithread on this metrics to the ``stages`` field of this job.
 
         :param params: An input parameters that use on job execution.
         :rtype: Result
@@ -519,7 +519,7 @@ class Job(BaseModel):
             futures: list[Future] = [
                 executor.submit(
                     self.execute_strategy,
-                    strategy,
+                    strategy=strategy,
                     params=copy.deepcopy(params),
                     event=event,
                 )
@@ -563,6 +563,8 @@ class Job(BaseModel):
             event.set()
             for future in futures:
                 future.cancel()
+            else:
+                del future
 
         status: int = 0
         for future in done:
@@ -580,6 +582,8 @@ class Job(BaseModel):
             # NOTE: Update the result context to main job context.
             context.update(rs.context)
 
+            del future
+
         return Result(status=status, context=context)
 
     def __catch_all_completed(
@@ -590,12 +594,15 @@ class Job(BaseModel):
     ) -> Result:
         """Job parallel pool futures catching with all-completed mode.
 
+        :raise JobException: If a getting future result raise PickleError.
+
         :param futures: A list of futures that want to catch all completed
             result.
         :param timeout: A timeout of getting result from the future instance
             when it was running completely.
         :rtype: Result
         """
+        rs_final: Result = Result()
         context: DictData = {}
         status: int = 0
         for future in as_completed(futures, timeout=1800):
@@ -608,7 +615,7 @@ class Job(BaseModel):
                 #   this bug fix process.
                 raise JobException(
                     f"PyStage that create object on locals does use "
-                    f"parallel in strategy execution;\n\t{err}"
+                    f"parallel with multiprocess strategy execution;\n\t{err}"
                 ) from None
             except TimeoutError:
                 status = 1
@@ -632,4 +639,6 @@ class Job(BaseModel):
                     f"fail-fast does not set;\n{err.__class__.__name__}:\n\t"
                     f"{err}"
                 )
-        return Result(status=status, context=context)
+            finally:
+                del future
+        return rs_final.catch(status=status, context=context)

@@ -13,6 +13,7 @@ import time
 from abc import ABC, abstractmethod
 from ast import Call, Constant, Expr, Module, Name, parse
 from collections.abc import Iterator
+from dataclasses import field
 from datetime import date, datetime
 from functools import cached_property, wraps
 from hashlib import md5
@@ -32,7 +33,8 @@ except ImportError:
 from ddeutil.core import getdot, hasdot, hash_str, import_string, lazy, str2bool
 from ddeutil.io import PathData, PathSearch, YamlFlResolve, search_env_replace
 from ddeutil.io.models.lineage import dt_now
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic.dataclasses import dataclass
 from pydantic.functional_serializers import field_serializer
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
@@ -41,10 +43,11 @@ from .__types import DictData, Matrix, Re
 from .conf import config
 from .exceptions import ParamValueException, UtilException
 
-logger = logging.getLogger("ddeutil.workflow")
 P = ParamSpec("P")
 AnyModel = TypeVar("AnyModel", bound=BaseModel)
 AnyModelType = type[AnyModel]
+
+logger = logging.getLogger("ddeutil.workflow")
 
 
 def get_diff_sec(dt: datetime, tz: ZoneInfo | None = None) -> int:
@@ -516,31 +519,50 @@ Param = Union[
 ]
 
 
-class Result(BaseModel):
-    """Result Pydantic Model for passing parameter and receiving output from
-    the workflow execution.
+@dataclass
+class Result:
+    """Result Pydantic Model for passing and receiving data context from any
+    module execution process like stage execution, job execution, or workflow
+    execution.
+
+        For comparison property, this result will use ``status``, ``context``,
+    and ``_run_id`` fields to comparing with other result instance.
     """
 
-    status: int = Field(default=2)
-    context: DictData = Field(default_factory=dict)
-    start_at: datetime = Field(default_factory=dt_now)
-    end_at: Optional[datetime] = Field(default=None)
+    status: int = field(default=2)
+    context: DictData = field(default_factory=dict)
+    start_at: datetime = field(default_factory=dt_now, compare=False)
+    end_at: Optional[datetime] = field(default=None, compare=False)
 
     # NOTE: Ignore this field to compare another result model with __eq__.
-    _parent_run_id: Optional[str] = PrivateAttr(default=None)
-    _run_id: Optional[str] = PrivateAttr(default=None)
+    _run_id: Optional[str] = field(default=None)
+    _parent_run_id: Optional[str] = field(default=None, compare=False)
 
     @model_validator(mode="after")
     def __prepare_run_id(self) -> Self:
-        if self._run_id is None:
-            self._run_id = gen_id("manual", unique=True)
+        """Prepare running ID which use default ID if it initialize at the first
+        time
+
+        :rtype: Self
+        """
+        self._run_id = gen_id("manual", unique=True)
         return self
 
     def set_run_id(self, running_id: str) -> Self:
+        """Set a running ID.
+
+        :param running_id: A running ID that want to update on this model.
+        :rtype: Self
+        """
         self._run_id = running_id
         return self
 
     def set_parent_run_id(self, running_id: str) -> Self:
+        """Set a parent running ID.
+
+        :param running_id: A running ID that want to update on this model.
+        :rtype: Self
+        """
         self._parent_run_id = running_id
         return self
 
@@ -552,27 +574,46 @@ class Result(BaseModel):
     def run_id(self):
         return self._run_id
 
-    def receive(self, result: Result) -> Result:
+    def catch(self, status: int, context: DictData) -> Self:
+        """Catch the status and context to current data."""
+        self.__dict__["status"] = status
+        self.__dict__["context"].update(context)
+        return self
+
+    def receive(self, result: Result) -> Self:
+        """Receive context from another result object.
+
+        :rtype: Self
+        """
         self.__dict__["status"] = result.status
         self.__dict__["context"].update(result.context)
+
+        # NOTE: Update running ID from an incoming result.
         self._parent_run_id = result.parent_run_id
         self._run_id = result.run_id
         return self
 
-    def receive_jobs(self, result: Result) -> Result:
+    def receive_jobs(self, result: Result) -> Self:
+        """Receive context from another result object that use on the workflow
+        execution which create a ``jobs`` keys on the context if it do not
+        exist.
+
+        :rtype: Self
+        """
         self.__dict__["status"] = result.status
 
         # NOTE: Check the context has jobs key.
         if "jobs" not in self.__dict__["context"]:
             self.__dict__["context"]["jobs"] = {}
-
         self.__dict__["context"]["jobs"].update(result.context)
+
+        # NOTE: Update running ID from an incoming result.
         self._parent_run_id = result.parent_run_id
         self._run_id = result.run_id
         return self
 
 
-def make_exec(path: str | Path) -> None:
+def make_exec(path: str | Path) -> None:  # pragma: no cov
     """Change mode of file to be executable file.
 
     :param path: A file path that want to make executable permission.
@@ -581,7 +622,7 @@ def make_exec(path: str | Path) -> None:
     f.chmod(f.stat().st_mode | stat.S_IEXEC)
 
 
-FILTERS: dict[str, callable] = {
+FILTERS: dict[str, callable] = {  # pragma: no cov
     "abs": abs,
     "str": str,
     "int": int,
@@ -596,7 +637,7 @@ class FilterFunc(Protocol):
 
     name: str
 
-    def __call__(self, *args, **kwargs): ...
+    def __call__(self, *args, **kwargs): ...  # pragma: no cov
 
 
 def custom_filter(name: str) -> Callable[P, FilterFunc]:
@@ -688,6 +729,7 @@ def get_args_const(
 
 @custom_filter("fmt")
 def datetime_format(value: datetime, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
+    """Format datetime object to string with the format."""
     if isinstance(value, datetime):
         return value.strftime(fmt)
     raise UtilException(
@@ -923,5 +965,5 @@ def batch(iterable: Iterator[Any], n: int) -> Iterator[Any]:
         yield chain((first_el,), chunk_it)
 
 
-def queue2str(queue: list[datetime]) -> Iterator[str]:
+def queue2str(queue: list[datetime]) -> Iterator[str]:  # pragma: no cov
     return (f"{q:%Y-%m-%d %H:%M:%S}" for q in queue)
