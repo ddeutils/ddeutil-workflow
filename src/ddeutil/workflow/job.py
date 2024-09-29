@@ -335,12 +335,15 @@ class Job(BaseModel):
         :rtype: DictData
         """
         if self.id is None:
-            raise JobException()
+            raise JobException(
+                "This job do not set the ID before setting output."
+            )
 
         to[self.id] = (
             {"strategies": output}
-            if len(output) > 1 and self.strategy.is_set()
-            # NOTE: This is the best way to get single key from dict.
+            if self.strategy.is_set()
+            # NOTE:
+            #   This is the best way to get single key from dict.
             else output[next(iter(output))]
         )
         return to

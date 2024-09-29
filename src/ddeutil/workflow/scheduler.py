@@ -481,7 +481,7 @@ class Workflow(BaseModel):
 
     def execute_job(
         self,
-        job_name: str,
+        job_id: str,
         params: DictData,
         *,
         raise_error: bool = True,
@@ -493,26 +493,27 @@ class Workflow(BaseModel):
         model. It different with ``self.execute`` because this method run only
         one job and return with context of this job data.
 
-        :param job_name: A job ID that want to execute.
+        :param job_id: A job ID that want to execute.
         :param params: A params that was parameterized from workflow execution.
         :param raise_error: A flag that raise error instead catching to result
             if it get exception from job execution.
         :rtype: Result
         """
         # VALIDATE: check a job ID that exists in this workflow or not.
-        if job_name not in self.jobs:
+        if job_id not in self.jobs:
             raise WorkflowException(
-                f"The job ID: {job_name} does not exists in {self.name!r} "
+                f"The job ID: {job_id} does not exists in {self.name!r} "
                 f"workflow."
             )
 
         context: DictData = {}
-        logger.info(f"({self.run_id}) [WORKFLOW]: Start execute: {job_name!r}")
+        logger.info(f"({self.run_id}) [WORKFLOW]: Start execute: {job_id!r}")
 
         # IMPORTANT:
         #   Change any job running IDs to this workflow running ID.
+        #
         try:
-            job: Job = self.jobs[job_name].get_running_id(self.run_id)
+            job: Job = self.jobs[job_id].get_running_id(self.run_id)
             job.set_outputs(
                 job.execute(params=params).context,
                 to=context,
@@ -523,7 +524,7 @@ class Workflow(BaseModel):
             )
             if raise_error:
                 raise WorkflowException(
-                    f"Get job execution error {job_name}: JobException: {err}"
+                    f"Get job execution error {job_id}: JobException: {err}"
                 ) from None
             else:
                 raise NotImplementedError() from None
@@ -657,6 +658,8 @@ class Workflow(BaseModel):
                         params=copy.deepcopy(context),
                     ),
                 )
+
+                # NOTE: Mark this job queue done.
                 job_queue.task_done()
 
             # NOTE: Wait for all items to finish processing
@@ -668,7 +671,7 @@ class Workflow(BaseModel):
                     raise WorkflowException(f"{err}")
 
                 # NOTE: Update job result to workflow result.
-                context["jobs"].update(future.result(timeout=20).conext)
+                context["jobs"].update(future.result(timeout=20).context)
 
         if not_time_out_flag:
             return context
@@ -717,9 +720,14 @@ class Workflow(BaseModel):
                 time.sleep(0.25)
                 continue
 
-            # NOTE: Start job execution.
-            job_rs = self.execute_job(job_id, params=copy.deepcopy(context))
+            # NOTE: Start workflow job execution.
+            job_rs = self.execute_job(
+                job_id=job_id,
+                params=copy.deepcopy(context),
+            )
             context["jobs"].update(job_rs.context)
+
+            # NOTE: Mark this job queue done.
             job_queue.task_done()
 
         # NOTE: Wait for all items to finish processing
