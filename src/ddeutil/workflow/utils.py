@@ -897,8 +897,12 @@ def param2template(
 
 
 def filter_func(value: Any) -> Any:
-    """Filter own created function out of any value with replace it to its
-    function name. If it is built-in function, it does not have any changing.
+    """Filter out an own created function of any value of mapping context by
+    replacing it to its function name. If it is built-in function, it does not
+    have any changing.
+
+    :param value: A value context data that want to filter out function value.
+    :type: The same type of an input ``value``.
     """
     if isinstance(value, dict):
         return {k: filter_func(value[k]) for k in value}

@@ -11,10 +11,10 @@ def test_job_py():
     workflow: Workflow = Workflow.from_loader(
         name="wf-run-common", externals={}
     )
-    demo_job: Job = workflow.job("demo-run")
+    job: Job = workflow.job("demo-run")
 
     # NOTE: Job params will change schema structure with {"params": { ... }}
-    rs: Result = demo_job.execute(params={"params": {"name": "Foo"}})
+    rs: Result = job.execute(params={"params": {"name": "Foo"}})
     assert {
         "1354680202": {
             "matrix": {},

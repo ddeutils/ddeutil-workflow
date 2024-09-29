@@ -130,14 +130,13 @@ def handler_result(message: str | None = None) -> Callable[P, Result]:
 
                 # NOTE: Catching exception error object to result with
                 #   error_message and error keys.
-                rs: Result = Result(
+                return Result(
                     status=1,
                     context={
                         "error": err,
                         "error_message": f"{err.__class__.__name__}: {err}",
                     },
-                )
-                return rs.set_run_id(self.run_id)
+                ).set_run_id(self.run_id)
 
         return wrapped
 
@@ -215,6 +214,20 @@ class BaseStage(BaseModel, ABC):
         """Set an outputs from execution process to the receive context. The
         result from execution will pass to value of ``outputs`` key.
 
+            For example of setting output method, If you receive execute output
+        and want to set on the `to` like;
+
+            ... (i)   output: {'foo': bar}
+            ... (ii)  to: {}
+
+        The result of the `to` variable will be;
+
+            ... (iii) to: {
+                            'stages': {
+                                '<stage-id>': {'outputs': {'foo': 'bar'}}
+                            }
+                        }
+
         :param output: A output data that want to extract to an output key.
         :param to: A context data that want to add output result.
         :rtype: DictData
@@ -231,16 +244,15 @@ class BaseStage(BaseModel, ABC):
         if "stages" not in to:
             to["stages"] = {}
 
-        if self.id:
-            _id: str = param2template(self.id, params=to)
-        else:
-            # NOTE: If the stage ID did not set, it will use its name instead.
-            _id: str = gen_id(param2template(self.name, params=to))
+        # NOTE: If the stage ID did not set, it will use its name instead.
+        _id: str = (
+            param2template(self.id, params=to)
+            if self.id
+            else gen_id(param2template(self.name, params=to))
+        )
 
         # NOTE: Set the output to that stage generated ID with ``outputs`` key.
-        logger.debug(
-            f"({self.run_id}) [STAGE]: Set output complete with stage ID: {_id}"
-        )
+        logger.debug(f"({self.run_id}) [STAGE]: Set outputs on: {_id}")
         to["stages"][_id] = {"outputs": output}
         return to
 
@@ -251,10 +263,10 @@ class BaseStage(BaseModel, ABC):
         :param params: A parameters that want to pass to condition template.
         :rtype: bool
         """
-        params: DictData = params or {}
         if self.condition is None:
             return False
 
+        params: DictData = {} if params is None else params
         _g: DictData = globals() | params
         try:
             rs: bool = eval(param2template(self.condition, params), _g, {})
@@ -473,7 +485,8 @@ class PyStage(BaseStage):
         exec(run, _globals, _locals)
 
         return Result(
-            status=0, context={"locals": _locals, "globals": _globals}
+            status=0,
+            context={"locals": _locals, "globals": _globals},
         )
 
 

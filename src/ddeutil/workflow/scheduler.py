@@ -64,9 +64,9 @@ logging.getLogger("schedule").setLevel(logging.INFO)
 
 __all__: TupleStr = (
     "Workflow",
-    "WorkflowSchedule",
     "WorkflowTaskData",
     "Schedule",
+    "ScheduleWorkflow",
     "workflow_task",
     "workflow_long_running_task",
     "workflow_control",
@@ -75,10 +75,10 @@ __all__: TupleStr = (
 
 
 class Workflow(BaseModel):
-    """Workflow Model this is the main future of this project because it use to
-    be workflow data for running everywhere that you want or using it to
-    scheduler task in background. It use lightweight coding line from Pydantic
-    Model and enhance execute method on it.
+    """Workflow Pydantic Model this is the main future of this project because
+    it use to be workflow data for running everywhere that you want or using it
+    to scheduler task in background. It use lightweight coding line from
+    Pydantic Model and enhance execute method on it.
     """
 
     name: str = Field(description="A workflow name.")
@@ -148,8 +148,17 @@ class Workflow(BaseModel):
         return cls.model_validate(obj=loader_data)
 
     @classmethod
-    def __bypass_on(cls, data: DictData, externals: DictData | None = None):
-        """Bypass the on data to loaded config data."""
+    def __bypass_on(
+        cls,
+        data: DictData,
+        externals: DictData | None = None,
+    ) -> DictData:
+        """Bypass the on data to loaded config data.
+
+        :param data:
+        :param externals:
+        :rtype: DictData
+        """
         if on := data.pop("on", []):
             if isinstance(on, str):
                 on = [on]
@@ -472,35 +481,54 @@ class Workflow(BaseModel):
 
     def execute_job(
         self,
-        job: str,
+        job_name: str,
         params: DictData,
+        *,
+        raise_error: bool = True,
     ) -> Result:
-        """Job Executor that use on workflow executor.
+        """Workflow Job execution with passing dynamic parameters from the
+        workflow execution to the target job.
 
-        :param job: A job ID that want to execute.
+            This execution is the minimum level of execution of this workflow
+        model. It different with ``self.execute`` because this method run only
+        one job and return with context of this job data.
+
+        :param job_name: A job ID that want to execute.
         :param params: A params that was parameterized from workflow execution.
+        :param raise_error: A flag that raise error instead catching to result
+            if it get exception from job execution.
         :rtype: Result
         """
         # VALIDATE: check a job ID that exists in this workflow or not.
-        if job not in self.jobs:
+        if job_name not in self.jobs:
             raise WorkflowException(
-                f"The job ID: {job} does not exists on {self.name!r} workflow."
+                f"The job ID: {job_name} does not exists in {self.name!r} "
+                f"workflow."
             )
+
+        context: DictData = {}
+        logger.info(f"({self.run_id}) [WORKFLOW]: Start execute: {job_name!r}")
+
+        # IMPORTANT:
+        #   Change any job running IDs to this workflow running ID.
         try:
-            logger.info(f"({self.run_id}) [WORKFLOW]: Start execute: {job!r}")
-
-            # IMPORTANT:
-            #   Change any job running IDs to this workflow running ID.
-            job_obj: Job = self.jobs[job].get_running_id(self.run_id)
-            j_rs: Result = job_obj.execute(params=params)
-
+            job: Job = self.jobs[job_name].get_running_id(self.run_id)
+            job.set_outputs(
+                job.execute(params=params).context,
+                to=context,
+            )
         except JobException as err:
-            raise WorkflowException(f"{job}: JobException: {err}") from None
+            logger.error(
+                f"({self.run_id}) [WORKFLOW]: {err.__class__.__name__}: {err}"
+            )
+            if raise_error:
+                raise WorkflowException(
+                    f"Get job execution error {job_name}: JobException: {err}"
+                ) from None
+            else:
+                raise NotImplementedError() from None
 
-        return Result(
-            status=j_rs.status,
-            context={job: job_obj.set_outputs(j_rs.context)},
-        )
+        return Result(status=0, context=context)
 
     def execute(
         self,
@@ -554,20 +582,29 @@ class Workflow(BaseModel):
         #   execution dependency.
         context: DictData = self.parameterize(params)
         status: int = 0
+
         try:
             if config.max_job_parallel == 1:
-                self.__exec_non_threading(context, ts, jq, timeout=timeout)
+                self.__exec_non_threading(
+                    context=context,
+                    ts=ts,
+                    job_queue=jq,
+                    timeout=timeout,
+                )
             else:
                 self.__exec_threading(
-                    context,
-                    ts,
-                    jq,
+                    context=context,
+                    ts=ts,
+                    job_queue=jq,
                     worker=config.max_job_parallel,
                     timeout=timeout,
                 )
         except WorkflowException as err:
             context.update(
-                {"error_message": f"{err.__class__.__name__}: {err}"}
+                {
+                    "error": err,
+                    "error_message": f"{err.__class__.__name__}: {err}",
+                },
             )
             status = 1
         return Result(status=status, context=context)
@@ -700,8 +737,8 @@ class Workflow(BaseModel):
         )
 
 
-class WorkflowSchedule(BaseModel):
-    """Workflow schedule Pydantic model."""
+class ScheduleWorkflow(BaseModel):
+    """Schedule Workflow Pydantic model."""
 
     name: str = Field(description="A workflow name.")
     on: list[On] = Field(
@@ -714,7 +751,7 @@ class WorkflowSchedule(BaseModel):
     )
 
     @model_validator(mode="before")
-    def __prepare__values(cls, values: DictData) -> DictData:
+    def __prepare_values(cls, values: DictData) -> DictData:
         """Prepare incoming values before validating with model fields."""
 
         values["name"] = values["name"].replace(" ", "_")
@@ -757,9 +794,9 @@ class Schedule(BaseModel):
             "A schedule description that can be string of markdown content."
         ),
     )
-    workflows: list[WorkflowSchedule] = Field(
+    workflows: list[ScheduleWorkflow] = Field(
         default_factory=list,
-        description="A list of WorkflowSchedule models.",
+        description="A list of ScheduleWorkflow models.",
     )
 
     @classmethod

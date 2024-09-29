@@ -77,11 +77,12 @@ def make(
     :rtype: list[DictStr]
     """
     # NOTE: If it does not set matrix, it will return list of an empty dict.
-    if not (mt := matrix):
+    if len(matrix) == 0:
         return [{}]
 
+    # NOTE: Remove matrix that exists on the exclude.
     final: list[DictStr] = []
-    for r in cross_product(matrix=mt):
+    for r in cross_product(matrix=matrix):
         if any(
             all(r[k] == v for k, v in exclude.items()) for exclude in exclude
         ):
@@ -90,7 +91,7 @@ def make(
 
     # NOTE: If it is empty matrix and include, it will return list of an
     #   empty dict.
-    if not final and not include:
+    if len(final) == 0 and not include:
         return [{}]
 
     # NOTE: Add include to generated matrix with exclude list.
@@ -100,16 +101,20 @@ def make(
         #   Validate any key in include list should be a subset of some one
         #   in matrix.
         if all(not (set(inc.keys()) <= set(m.keys())) for m in final):
-            raise ValueError("Include should have the keys equal to matrix")
+            raise ValueError(
+                "Include should have the keys that equal to all final matrix."
+            )
 
         # VALIDATE:
-        #   Validate value of include does not duplicate with generated
-        #   matrix.
+        #   Validate value of include should not duplicate with generated
+        #   matrix. So, it will skip if this value already exists.
         if any(
             all(inc.get(k) == v for k, v in m.items()) for m in [*final, *add]
         ):
             continue
         add.append(inc)
+
+    # NOTE: Merge all matrix together.
     final.extend(add)
     return final
 
@@ -307,15 +312,38 @@ class Job(BaseModel):
                 return stage
         raise ValueError(f"Stage ID {stage_id} does not exists")
 
-    def set_outputs(self, output: DictData) -> DictData:
-        """Setting output of job execution
+    def set_outputs(self, output: DictData, to: DictData) -> DictData:
+        """Set an outputs from execution process to the receive context. The
+        result from execution will pass to value of ``strategies`` key.
+
+            For example of setting output method, If you receive execute output
+        and want to set on the `to` like;
+
+            ... (i)   output: {'strategy01': bar, 'strategy02': bar}
+            ... (ii)  to: {}
+
+        The result of the `to` variable will be;
+
+            ... (iii) to: {
+                            'strategies': {
+                                'strategy01': bar, 'strategy02': bar
+                            }
+                        }
 
         :param output: An output context.
+        :param to: A context data that want to add output result.
         :rtype: DictData
         """
-        if len(output) > 1 and self.strategy.is_set():
-            return {"strategies": output}
-        return output[next(iter(output))]
+        if self.id is None:
+            raise JobException()
+
+        to[self.id] = (
+            {"strategies": output}
+            if len(output) > 1 and self.strategy.is_set()
+            # NOTE: This is the best way to get single key from dict.
+            else output[next(iter(output))]
+        )
+        return to
 
     def execute_strategy(
         self,
@@ -323,6 +351,7 @@ class Job(BaseModel):
         params: DictData,
         *,
         event: Event | None = None,
+        raise_error: bool = True,
     ) -> Result:
         """Job Strategy execution with passing dynamic parameters from the
         workflow execution to strategy matrix.
@@ -337,34 +366,23 @@ class Job(BaseModel):
         :param strategy: A metrix strategy value.
         :param params: A dynamic parameters.
         :param event: An manger event that pass to the PoolThreadExecutor.
+        :param raise_error: A flag that raise error instead catching to result
+            if it get exception from stage execution.
         :rtype: Result
         """
-        # NOTE: Force stop this execution if event was set from main execution.
-        if event and event.is_set():
-            return Result(
-                status=1,
-                context={
-                    gen_id(strategy): {
-                        "matrix": strategy,
-                        "stages": {},
-                        "error_message": {
-                            "message": "Process Event stopped before execution"
-                        },
-                    },
-                },
-            )
+        strategy_id: str = gen_id(strategy)
 
         # NOTE: Create strategy execution context and update a matrix and copied
         #   of params. So, the context value will have structure like;
-        #   ---
+        #
         #   {
         #       "params": { ... },      <== Current input params
         #       "jobs": { ... },        <== Current input params
         #       "matrix": { ... }       <== Current strategy value
         #   }
         #
-        context: DictData = params
-        context.update({"matrix": strategy})
+        context: DictData = copy.deepcopy(params)
+        context.update({"matrix": strategy, "stages": {}})
 
         # IMPORTANT: The stage execution only run sequentially one-by-one.
         for stage in self.stages:
@@ -375,9 +393,7 @@ class Job(BaseModel):
             _st_name: str = stage.id or stage.name
 
             if stage.is_skipped(params=context):
-                logger.info(
-                    f"({self.run_id}) [JOB]: Skip the stage: {_st_name!r}"
-                )
+                logger.info(f"({self.run_id}) [JOB]: Skip stage: {_st_name!r}")
                 continue
 
             logger.info(
@@ -388,6 +404,32 @@ class Job(BaseModel):
             if strategy:
                 logger.info(f"({self.run_id}) [JOB]: Matrix: {strategy}")
 
+            # NOTE: Force stop this execution if event was set from main
+            #   execution.
+            if event and event.is_set():
+                return Result(
+                    status=1,
+                    context={
+                        strategy_id: {
+                            "matrix": strategy,
+                            # NOTE: If job strategy executor use multithreading,
+                            #   it will not filter function object from context.
+                            # ---
+                            # "stages": filter_func(context.pop("stages", {})),
+                            "stages": context.pop("stages", {}),
+                            # NOTE: Set the error keys.
+                            "error": JobException(
+                                "Process Event stopped before execution"
+                            ),
+                            "error_message": {
+                                "message": (
+                                    "Process Event stopped before execution"
+                                ),
+                            },
+                        },
+                    },
+                )
+
             # NOTE:
             #       I do not use below syntax because `params` dict be the
             #   reference memory pointer and it was changed when I action
@@ -397,7 +439,7 @@ class Job(BaseModel):
             #
             #   This step will add the stage result to ``stages`` key in
             #   that stage id. It will have structure like;
-            #   ---
+            #
             #   {
             #       "params": { ... },
             #       "jobs": { ... },
@@ -405,36 +447,22 @@ class Job(BaseModel):
             #       "stages": { { "stage-id-1": ... }, ... }
             #   }
             #
-            if event and event.is_set():
-                return Result(
-                    status=1,
-                    context={
-                        gen_id(strategy): {
-                            "matrix": strategy,
-                            # NOTE: If job strategy executor use multithreading,
-                            #   it will not filter function object from context.
-                            # ---
-                            # "stages": filter_func(context.pop("stages", {})),
-                            "stages": context.pop("stages", {}),
-                            "error_message": {
-                                "message": (
-                                    "Process Event stopped before execution"
-                                ),
-                            },
-                        },
-                    },
-                )
             try:
-                rs: Result = stage.execute(params=context)
-                stage.set_outputs(rs.context, to=context)
+                stage.set_outputs(
+                    stage.execute(params=context).context,
+                    to=context,
+                )
             except (StageException, UtilException) as err:
                 logger.error(
                     f"({self.run_id}) [JOB]: {err.__class__.__name__}: {err}"
                 )
-                raise JobException(
-                    f"Get stage execution error: {err.__class__.__name__}: "
-                    f"{err}"
-                ) from None
+                if raise_error:
+                    raise JobException(
+                        f"Get stage execution error: {err.__class__.__name__}: "
+                        f"{err}"
+                    ) from None
+                else:
+                    raise NotImplementedError() from None
 
             # NOTE: Remove new stage object that was created from
             #   ``get_running_id`` method.
@@ -443,12 +471,8 @@ class Job(BaseModel):
         return Result(
             status=0,
             context={
-                gen_id(strategy): {
+                strategy_id: {
                     "matrix": strategy,
-                    # NOTE: (WF001) filter own created function from stages
-                    #   value, because it does not dump with pickle when you
-                    #   execute with multiprocess.
-                    #
                     "stages": filter_func(context.pop("stages", {})),
                 },
             },
@@ -488,7 +512,7 @@ class Job(BaseModel):
                 executor.submit(
                     self.execute_strategy,
                     strategy=strategy,
-                    params=copy.deepcopy(params),
+                    params=params,
                     event=event,
                 )
                 for strategy in self.strategy.make()
@@ -496,12 +520,19 @@ class Job(BaseModel):
 
             # NOTE: Dynamic catching futures object with fail-fast flag.
             return (
-                self.__catch_fail_fast(event, futures)
+                self.__catch_fail_fast(event=event, futures=futures)
                 if self.strategy.fail_fast
-                else self.__catch_all_completed(futures)
+                else self.__catch_all_completed(futures=futures)
             )
 
-    def __catch_fail_fast(self, event: Event, futures: list[Future]) -> Result:
+    def __catch_fail_fast(
+        self,
+        event: Event,
+        futures: list[Future],
+        *,
+        timeout: int = 1800,
+        result_timeout: int = 60,
+    ) -> Result:
         """Job parallel pool futures catching with fail-fast mode. That will
         stop all not done futures if it receive the first exception from all
         running futures.
@@ -509,15 +540,20 @@ class Job(BaseModel):
         :param event: An event manager instance that able to set stopper on the
             observing thread/process.
         :param futures: A list of futures.
+        :param timeout: A timeout to waiting all futures complete.
+        :param result_timeout: A timeout of getting result from the future
+            instance when it was running completely.
         :rtype: Result
         """
+        rs_final: Result = Result()
         context: DictData = {}
+        status: int = 0
 
         # NOTE: Get results from a collection of tasks with a timeout that has
         #   the first exception.
         done, not_done = wait(
             futures,
-            timeout=1800,
+            timeout=timeout,
             return_when=FIRST_EXCEPTION,
         )
         nd: str = (
@@ -531,10 +567,9 @@ class Job(BaseModel):
             event.set()
             for future in futures:
                 future.cancel()
-            else:
-                del future
 
-        status: int = 0
+            del future
+
         for future in done:
             if future.exception():
                 status = 1
@@ -545,36 +580,35 @@ class Job(BaseModel):
             elif future.cancelled():
                 continue
 
-            rs: Result = future.result(timeout=60)
-
             # NOTE: Update the result context to main job context.
-            context.update(rs.context)
+            context.update(future.result(timeout=result_timeout).context)
 
             del future
 
-        return Result(status=status, context=context)
+        return rs_final.catch(status=status, context=context)
 
     def __catch_all_completed(
         self,
         futures: list[Future],
         *,
-        timeout: int = 60,
+        timeout: int = 1800,
+        result_timeout: int = 60,
     ) -> Result:
         """Job parallel pool futures catching with all-completed mode.
 
         :param futures: A list of futures that want to catch all completed
             result.
-        :param timeout: A timeout of getting result from the future instance
-            when it was running completely.
+        :param timeout: A timeout to waiting all futures complete.
+        :param result_timeout: A timeout of getting result from the future
+            instance when it was running completely.
         :rtype: Result
         """
         rs_final: Result = Result()
         context: DictData = {}
         status: int = 0
-        for future in as_completed(futures, timeout=1800):
+        for future in as_completed(futures, timeout=timeout):
             try:
-                rs: Result = future.result(timeout=timeout)
-                context.update(rs.context)
+                context.update(future.result(timeout=result_timeout).context)
             except TimeoutError:
                 status = 1
                 logger.warning(
