@@ -17,7 +17,6 @@ from concurrent.futures import (
     wait,
 )
 from functools import lru_cache
-from pickle import PickleError
 from textwrap import dedent
 from threading import Event
 from typing import Optional
@@ -479,37 +478,6 @@ class Job(BaseModel):
                 context=context,
             )
 
-        # # WARNING: (WF001) I got error that raise when use
-        # #  ``ProcessPoolExecutor``;
-        # #   ---
-        # #   _pickle.PicklingError: Can't pickle
-        # #       <function ??? at 0x000001F0BE80F160>: attribute lookup ???
-        # #       on ddeutil.workflow.stage failed
-        # #
-        # # from multiprocessing import Event, Manager
-        # #
-        # with Manager() as manager:
-        #     event: Event = manager.Event()
-        #
-        #     # NOTE: Start process pool executor for running strategy executor
-        #     #   in parallel mode.
-        #     with ProcessPoolExecutor(
-        #         max_workers=self.strategy.max_parallel
-        #     ) as executor:
-        #         futures: list[Future] = [
-        #             executor.submit(
-        #                 self.execute_strategy,
-        #                 strategy,
-        #                 params=copy.deepcopy(params),
-        #                 event=event,
-        #             )
-        #             for strategy in self.strategy.make()
-        #         ]
-        #         if self.strategy.fail_fast:
-        #             rs = self.__catch_fail_fast(event, futures)
-        #         else:
-        #             rs = self.__catch_all_completed(futures)
-
         # NOTE: Create event for cancel executor stop running.
         event: Event = Event()
 
@@ -594,8 +562,6 @@ class Job(BaseModel):
     ) -> Result:
         """Job parallel pool futures catching with all-completed mode.
 
-        :raise JobException: If a getting future result raise PickleError.
-
         :param futures: A list of futures that want to catch all completed
             result.
         :param timeout: A timeout of getting result from the future instance
@@ -609,14 +575,6 @@ class Job(BaseModel):
             try:
                 rs: Result = future.result(timeout=timeout)
                 context.update(rs.context)
-            except PickleError as err:
-                # NOTE: (WF001) I do not want to fix this issue because
-                #   it does not make sense and over-engineering with
-                #   this bug fix process.
-                raise JobException(
-                    f"PyStage that create object on locals does use "
-                    f"parallel with multiprocess strategy execution;\n\t{err}"
-                ) from None
             except TimeoutError:
                 status = 1
                 logger.warning(
