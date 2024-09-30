@@ -17,19 +17,25 @@ from concurrent.futures import (
     ThreadPoolExecutor,
     as_completed,
 )
-from dataclasses import dataclass, field
+from dataclasses import field
 from datetime import datetime, timedelta
 from functools import wraps
 from heapq import heappush
 from queue import Queue
 from textwrap import dedent
 from threading import Thread
-from typing import Optional
+from typing import Callable, Optional
 from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, Field
+from pydantic.dataclasses import dataclass
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
+
+try:
+    from typing import ParamSpec
+except ImportError:
+    from typing_extensions import ParamSpec
 
 try:
     from schedule import CancelJob
@@ -56,6 +62,7 @@ from .utils import (
     queue2str,
 )
 
+P = ParamSpec("P")
 logger = get_logger("ddeutil.workflow")
 
 # NOTE: Adjust logging level on the schedule package.
@@ -564,6 +571,7 @@ class Workflow(BaseModel):
         #   params and I do not want to create new dict object.
         params: DictData = {} if params is None else params
         ts: float = time.monotonic()
+        rs: Result = Result()
 
         # NOTE: It should not do anything if it does not have job.
         if not self.jobs:
@@ -571,7 +579,7 @@ class Workflow(BaseModel):
                 f"({self.run_id}) [WORKFLOW]: This workflow: {self.name!r} "
                 f"does not have any jobs"
             )
-            return Result(status=0, context=params)
+            return rs.catch(status=0, context=params)
 
         # NOTE: Create a job queue that keep the job that want to running after
         #   it dependency condition.
@@ -583,7 +591,6 @@ class Workflow(BaseModel):
         #   execution dependency.
         context: DictData = self.parameterize(params)
         status: int = 0
-
         try:
             if config.max_job_parallel == 1:
                 self.__exec_non_threading(
@@ -608,7 +615,7 @@ class Workflow(BaseModel):
                 },
             )
             status = 1
-        return Result(status=status, context=context)
+        return rs.catch(status=status, context=context)
 
     def __exec_threading(
         self,
@@ -620,6 +627,9 @@ class Workflow(BaseModel):
         timeout: int = 600,
     ) -> DictData:
         """Workflow execution by threading strategy.
+
+            If a job need dependency, it will check dependency job ID from
+        context data before allow it run.
 
         :param context: A context workflow data that want to downstream passing.
         :param ts: A start timestamp that use for checking execute time should
@@ -665,13 +675,17 @@ class Workflow(BaseModel):
             # NOTE: Wait for all items to finish processing
             job_queue.join()
 
-            for future in as_completed(futures):
+            for future in as_completed(futures, timeout=1800):
                 if err := future.exception():
                     logger.error(f"{err}")
                     raise WorkflowException(f"{err}")
-
-                # NOTE: Update job result to workflow result.
-                context["jobs"].update(future.result(timeout=20).context)
+                try:
+                    # NOTE: Update job result to workflow result.
+                    context["jobs"].update(future.result(timeout=60).context)
+                except TimeoutError as err:
+                    raise WorkflowException(
+                        "Get result from future was timeout"
+                    ) from err
 
         if not_time_out_flag:
             return context
@@ -694,7 +708,10 @@ class Workflow(BaseModel):
         timeout: int = 600,
     ) -> DictData:
         """Workflow execution with non-threading strategy that use sequential
-        job running and waiting previous run successful.
+        job running and waiting previous job was run successful.
+
+            If a job need dependency, it will check dependency job ID from
+        context data before allow it run.
 
         :param context: A context workflow data that want to downstream passing.
         :param ts: A start timestamp that use for checking execute time should
@@ -746,7 +763,11 @@ class Workflow(BaseModel):
 
 
 class ScheduleWorkflow(BaseModel):
-    """Schedule Workflow Pydantic model."""
+    """Schedule Workflow Pydantic model that use to keep workflow model for the
+    Schedule model. it should not use Workflow model directly because on the
+    schedule config it can adjust crontab value that different from the Workflow
+    model.
+    """
 
     name: str = Field(description="A workflow name.")
     on: list[On] = Field(
@@ -760,16 +781,25 @@ class ScheduleWorkflow(BaseModel):
 
     @model_validator(mode="before")
     def __prepare_values(cls, values: DictData) -> DictData:
-        """Prepare incoming values before validating with model fields."""
+        """Prepare incoming values before validating with model fields.
 
+        :rtype: DictData
+        """
         values["name"] = values["name"].replace(" ", "_")
 
         cls.__bypass_on(values)
         return values
 
     @classmethod
-    def __bypass_on(cls, data: DictData, externals: DictData | None = None):
-        """Bypass the on data to loaded config data."""
+    def __bypass_on(
+        cls,
+        data: DictData,
+        externals: DictData | None = None,
+    ) -> DictData:
+        """Bypass the on data to loaded config data.
+
+        :rtype: DictData
+        """
         if on := data.pop("on", []):
 
             if isinstance(on, str):
@@ -888,14 +918,22 @@ class Schedule(BaseModel):
         return workflow_tasks
 
 
-def catch_exceptions(cancel_on_failure=False):
+def catch_exceptions(
+    cancel_on_failure: bool = False,
+) -> Callable[P, Optional[CancelJob]]:
     """Catch exception error from scheduler job that running with schedule
     package and return CancelJob if this function raise an error.
+
+    :param cancel_on_failure: A flag that allow to return the CancelJob or not
+        it will raise.
+    :rtype: Callable[P, Optional[CancelJob]]
     """
 
-    def catch_exceptions_decorator(func):
-
+    def decorator(
+        func: Callable[P, Optional[CancelJob]],
+    ) -> Callable[P, Optional[CancelJob]]:
         try:
+            # NOTE: Check the function that want to handle is method or not.
             if inspect.ismethod(func):
 
                 @wraps(func)
@@ -916,7 +954,7 @@ def catch_exceptions(cancel_on_failure=False):
                 return CancelJob
             raise err
 
-    return catch_exceptions_decorator
+    return decorator
 
 
 @dataclass(frozen=True)
@@ -932,12 +970,21 @@ class WorkflowTaskData:
     running: list[datetime] = field(compare=False, hash=False)
 
     @catch_exceptions(cancel_on_failure=True)
-    def release(self, log: Log | None = None) -> None:
+    def release(
+        self,
+        log: Log | None = None,
+        *,
+        waiting_sec: int = 60,
+        sleep_interval: int = 15,
+    ) -> None:
         """Workflow release, it will use with the same logic of
         `workflow.release` method.
 
         :param log: A log object for saving result logging from workflow
             execution process.
+        :param waiting_sec: A second period value that allow workflow execute.
+        :param sleep_interval: A second value that want to waiting until time
+            to execute.
         """
         log: Log = log or FileLog
         wf: Workflow = self.workflow
@@ -961,7 +1008,7 @@ class WorkflowTaskData:
         )
         heappush(self.running[wf.name], next_time)
 
-        if get_diff_sec(next_time, tz=cron_tz) > 55:
+        if get_diff_sec(next_time, tz=cron_tz) > waiting_sec:
             logger.debug(
                 f"({wf.run_id}) [CORE]: {wf.name!r} : {on.cronjob} "
                 f": Does not closely >> {next_time:%Y-%m-%d %H:%M:%S}"
@@ -981,7 +1028,9 @@ class WorkflowTaskData:
         )
 
         # NOTE: Release when the time is nearly to schedule time.
-        while (duration := get_diff_sec(next_time, tz=config.tz)) > (15 + 5):
+        while (duration := get_diff_sec(next_time, tz=config.tz)) > (
+            sleep_interval + 5
+        ):
             logger.debug(
                 f"({wf.run_id}) [CORE]: {wf.name!r} : {on.cronjob} "
                 f": Sleep until: {duration}"

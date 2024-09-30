@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional, Union
+from typing import ClassVar, Optional, Union
 
 from ddeutil.core import str2bool
 from pydantic import BaseModel, Field
@@ -25,7 +25,10 @@ from .utils import load_config
 
 @lru_cache
 def get_logger(name: str):
-    """Return logger with an input module name."""
+    """Return logger object with an input module name.
+
+    :param name: A module name that want to log.
+    """
     logger = logging.getLogger(name)
     formatter = logging.Formatter(
         fmt=(
@@ -45,7 +48,10 @@ def get_logger(name: str):
 
 
 class BaseLog(BaseModel, ABC):
-    """Base Log Pydantic Model abstraction that implement only model fields."""
+    """Base Log Pydantic Model with abstraction class property that implement
+    only model fields. This model should to use with inherit to logging
+    sub-class like file, sqlite, etc.
+    """
 
     name: str = Field(description="A workflow name.")
     on: str = Field(description="A cronjob string of this piepline schedule.")
@@ -61,7 +67,11 @@ class BaseLog(BaseModel, ABC):
     update: datetime = Field(default_factory=datetime.now)
 
     @model_validator(mode="after")
-    def __model_action(self):
+    def __model_action(self) -> Self:
+        """Do before the Log action with WORKFLOW_LOG_ENABLE_WRITE env variable.
+
+        :rtype: Self
+        """
         if str2bool(os.getenv("WORKFLOW_LOG_ENABLE_WRITE", "false")):
             self.do_before()
         return self
@@ -71,7 +81,7 @@ class BaseLog(BaseModel, ABC):
 
     @abstractmethod
     def save(self, excluded: list[str] | None) -> None:
-        """Save logging"""
+        """Save this model logging to target logging store."""
         raise NotImplementedError("Log should implement ``save`` method.")
 
 
@@ -80,6 +90,10 @@ class FileLog(BaseLog):
     workflow execution. It inherit from BaseLog model that implement the
     ``self.save`` method for file.
     """
+
+    filename: ClassVar[str] = (
+        "./logs/workflow={name}/release={release:%Y%m%d%H%M%S}"
+    )
 
     def do_before(self) -> None:
         """Create directory of release before saving log file."""
@@ -131,9 +145,8 @@ class FileLog(BaseLog):
             return False
 
         # NOTE: create pointer path that use the same logic of pointer method.
-        pointer: Path = (
-            load_config().engine.paths.root
-            / f"./logs/workflow={name}/release={release:%Y%m%d%H%M%S}"
+        pointer: Path = load_config().engine.paths.root / cls.filename.format(
+            name=name, release=release
         )
 
         if not queue:
@@ -145,9 +158,8 @@ class FileLog(BaseLog):
 
         :rtype: Path
         """
-        return (
-            load_config().engine.paths.root
-            / f"./logs/workflow={self.name}/release={self.release:%Y%m%d%H%M%S}"
+        return load_config().engine.paths.root / self.filename.format(
+            name=self.name, release=self.release
         )
 
     def save(self, excluded: list[str] | None) -> Self:

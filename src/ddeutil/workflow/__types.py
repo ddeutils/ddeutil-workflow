@@ -24,10 +24,16 @@ MatrixExclude = list[dict[str, Union[str, int]]]
 
 
 class Re:
-    """Regular expression config."""
+    """Regular expression config for this package."""
 
-    # NOTE: Search caller
-    # \${{\s*(?P<caller>[a-zA-Z0-9_.\s'\"\[\]\(\)\-\{}]+?)\s*(?P<post_filters>(?:\|\s*(?:[a-zA-Z0-9_]{3,}[a-zA-Z0-9_.,-\\%\s'\"[\]()\{}]+)\s*)*)}}
+    # NOTE:
+    #   Regular expression:
+    #   \${{\s*(?P<caller>[a-zA-Z0-9_.\s'\"\[\]\(\)\-\{}]+?)\s*(?P<post_filters>(?:\|\s*(?:[a-zA-Z0-9_]{3,}[a-zA-Z0-9_.,-\\%\s'\"[\]()\{}]+)\s*)*)}}
+    #
+    #   Examples:
+    #       - ${{ params.asat_dt }}
+    #       - ${{ params.source.table }}
+    #
     __re_caller: str = r"""
         \$
         {{
@@ -48,8 +54,12 @@ class Re:
         __re_caller, MULTILINE | IGNORECASE | UNICODE | VERBOSE
     )
 
-    # NOTE: Search task
-    # ^(?P<path>[^/@]+)/(?P<func>[^@]+)@(?P<tag>.+)$
+    # NOTE:
+    #   Regular expression:
+    #   ^(?P<path>[^/@]+)/(?P<func>[^@]+)@(?P<tag>.+)$
+    #
+    #   Examples:
+    #       - tasks/function@dummy
     __re_task_fmt: str = r"""
         ^
             (?P<path>[^/@]+)

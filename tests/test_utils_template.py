@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 
 import pytest
 from ddeutil.workflow.exceptions import UtilException
@@ -12,7 +13,7 @@ from ddeutil.workflow.utils import (
 
 
 def test_param2template():
-    value = param2template(
+    value: dict[str, Any] = param2template(
         {
             "str": "${{ params.src }}",
             "int": "${{ params.value }}",
@@ -44,23 +45,29 @@ def test_param2template():
 
 def test_param2template_with_filter():
     value: int = param2template(
-        "${{ params.value | abs }}", {"params": {"value": -5}}
+        value="${{ params.value | abs }}",
+        params={"params": {"value": -5}},
     )
     assert 5 == value
 
     with pytest.raises(UtilException):
-        param2template("${{ params.value | abs12 }}", {"params": {"value": -5}})
+        param2template(
+            value="${{ params.value | abs12 }}",
+            params={"params": {"value": -5}},
+        )
 
     value: str = param2template(
-        "${{ params.asat-dt | fmt(fmt='%Y%m%d') }}",
-        {"params": {"asat-dt": datetime(2024, 8, 1)}},
+        value="${{ params.asat-dt | fmt(fmt='%Y%m%d') }}",
+        params={"params": {"asat-dt": datetime(2024, 8, 1)}},
     )
     assert "20240801" == value
 
     with pytest.raises(UtilException):
         param2template(
-            "${{ params.asat-dt | fmt(fmt='%Y%m%d) }}",
-            {"params": {"asat-dt": datetime(2024, 8, 1)}},
+            value="${{ params.asat-dt | fmt(fmt='%Y%m%d) }}",
+            params={
+                "params": {"asat-dt": datetime(2024, 8, 1)},
+            },
         )
 
 
@@ -119,6 +126,7 @@ def test_has_template():
     value = {
         "params": {
             "test": "${ matrix.value.test }",
+            "foo": "${{ matrix.value.${ matrix.value } }}",
         },
         "test": [1, False, "{{ stages.foo.matrix }}"],
     }

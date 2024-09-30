@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from ddeutil.workflow import Workflow
 from ddeutil.workflow.on import On
 from ddeutil.workflow.scheduler import Schedule, WorkflowTaskData
@@ -20,8 +22,8 @@ def test_scheduler_loader_find_schedule():
 
 
 def test_scheduler_remove_wf_task():
-    queue = []
-    running = []
+    queue: list[datetime] = []
+    running: list[datetime] = []
     pipeline_tasks: list[WorkflowTaskData] = []
     wf: Workflow = Workflow.from_loader("wf-scheduling", externals={})
     for on in wf.on:
@@ -43,8 +45,8 @@ def test_scheduler_remove_wf_task():
                 workflow=wf,
                 on=on,
                 params={"asat-dt": "${{ release.logical_date }}"},
-                queue=["test"],
-                running=["foo"],
+                queue=[datetime(2024, 1, 1, 12)],
+                running=[datetime(2024, 1, 1, 12)],
             )
         )
 
@@ -66,8 +68,8 @@ def test_scheduler_remove_wf_task():
         workflow=wf,
         on=On.from_loader(name="every_minute_bkk", externals={}),
         params={"asat-dt": "${{ release.logical_date }}"},
-        queue=[1, 2, 3],
-        running=[1],
+        queue=[datetime(2024, 1, 1, 12), datetime(2024, 1, 1, 12)],
+        running=[datetime(2024, 1, 1, 6)],
     )
     pipeline_tasks.remove(remover)
     assert 1 == len(pipeline_tasks)
