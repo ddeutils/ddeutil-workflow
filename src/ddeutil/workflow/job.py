@@ -320,13 +320,15 @@ class Job(BaseModel):
         and want to set on the `to` like;
 
             ... (i)   output: {'strategy01': bar, 'strategy02': bar}
-            ... (ii)  to: {}
+            ... (ii)  to: {'jobs'}
 
         The result of the `to` variable will be;
 
             ... (iii) to: {
-                            'strategies': {
-                                'strategy01': bar, 'strategy02': bar
+                            'jobs': {
+                                'strategies': {
+                                    'strategy01': bar, 'strategy02': bar
+                                }
                             }
                         }
 
@@ -339,7 +341,7 @@ class Job(BaseModel):
                 "This job do not set the ID before setting output."
             )
 
-        to[self.id] = (
+        to["jobs"][self.id] = (
             {"strategies": output}
             if self.strategy.is_set()
             # NOTE:

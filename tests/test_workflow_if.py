@@ -12,7 +12,7 @@ def test_stage_if():
     assert {"name": "foo"} == params
 
 
-def test_pipe_id():
+def test_workflow_if():
     workflow = wf.Workflow.from_loader(name="wf-condition", externals={})
     rs: Result = workflow.execute(params={"name": "bar"})
     assert {

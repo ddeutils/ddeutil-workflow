@@ -513,7 +513,6 @@ class Workflow(BaseModel):
                 f"workflow."
             )
 
-        context: DictData = {}
         logger.info(f"({self.run_id}) [WORKFLOW]: Start execute: {job_id!r}")
 
         # IMPORTANT:
@@ -523,7 +522,7 @@ class Workflow(BaseModel):
             job: Job = self.jobs[job_id].get_running_id(self.run_id)
             job.set_outputs(
                 job.execute(params=params).context,
-                to=context,
+                to=params,
             )
         except JobException as err:
             logger.error(
@@ -536,7 +535,7 @@ class Workflow(BaseModel):
             else:
                 raise NotImplementedError() from None
 
-        return Result(status=0, context=context)
+        return Result(status=0, context=params)
 
     def execute(
         self,
@@ -663,15 +662,23 @@ class Workflow(BaseModel):
                 job: Job = self.jobs[job_id]
 
                 if any(need not in context["jobs"] for need in job.needs):
+                    job_queue.task_done()
                     job_queue.put(job_id)
                     time.sleep(0.25)
                     continue
 
+                # NOTE: Start workflow job execution with deep copy context data
+                #   before release.
+                #
+                #   {
+                #       'params': <input-params>,
+                #       'jobs': {},
+                #   }
                 futures.append(
                     executor.submit(
                         self.execute_job,
                         job_id,
-                        params=copy.deepcopy(context),
+                        params=context,
                     ),
                 )
 
@@ -683,14 +690,13 @@ class Workflow(BaseModel):
 
             for future in as_completed(futures, timeout=1800):
                 if err := future.exception():
-                    logger.error(f"{err}")
+                    logger.error(f"({self.run_id}) [CORE]: {err}")
                     raise WorkflowException(f"{err}")
                 try:
-                    # NOTE: Update job result to workflow result.
-                    context["jobs"].update(future.result(timeout=60).context)
+                    future.result(timeout=60)
                 except TimeoutError as err:
                     raise WorkflowException(
-                        "Get result from future was timeout"
+                        "Timeout when getting result from future"
                     ) from err
 
         if not_time_out_flag:
@@ -737,18 +743,21 @@ class Workflow(BaseModel):
             job_id: str = job_queue.get()
             job: Job = self.jobs[job_id]
 
-            # NOTE:
+            # NOTE: Waiting dependency job run successful before release.
             if any(need not in context["jobs"] for need in job.needs):
+                job_queue.task_done()
                 job_queue.put(job_id)
-                time.sleep(0.25)
+                time.sleep(0.05)
                 continue
 
-            # NOTE: Start workflow job execution.
-            job_rs = self.execute_job(
-                job_id=job_id,
-                params=copy.deepcopy(context),
-            )
-            context["jobs"].update(job_rs.context)
+            # NOTE: Start workflow job execution with deep copy context data
+            #   before release.
+            #
+            #   {
+            #       'params': <input-params>,
+            #       'jobs': {},
+            #   }
+            self.execute_job(job_id=job_id, params=context)
 
             # NOTE: Mark this job queue done.
             job_queue.task_done()

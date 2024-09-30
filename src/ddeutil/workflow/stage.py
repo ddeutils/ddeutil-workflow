@@ -24,6 +24,7 @@ import contextlib
 import inspect
 import subprocess
 import sys
+import time
 import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
@@ -293,6 +294,10 @@ class EmptyStage(BaseStage):
         default=None,
         description="A string statement that want to logging",
     )
+    sleep: float = Field(
+        default=0,
+        description="A second value to sleep before finish execution",
+    )
 
     def execute(self, params: DictData) -> Result:
         """Execution method for the Empty stage that do only logging out to
@@ -310,6 +315,8 @@ class EmptyStage(BaseStage):
             f"({self.run_id}) [STAGE]: Empty-Execute: {self.name!r}: "
             f"( {param2template(self.echo, params=params) or '...'} )"
         )
+        if self.sleep > 0:
+            time.sleep(self.sleep)
         return Result(status=0, context={})
 
 

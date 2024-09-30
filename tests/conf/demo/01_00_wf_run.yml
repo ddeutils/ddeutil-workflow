@@ -133,3 +133,22 @@ wf-run-python-raise:
       stages:
         - name: Echo hello world
           echo: "Hello World"
+
+
+wf-run-depends:
+  type: ddeutil.workflow.Workflow
+  jobs:
+    first-job:
+      needs: ['second-job']
+      stages:
+        - name: Echo next
+          echo: "Wait fist job success full"
+    second-job:
+      stages:
+        - name: Echo hello world
+          echo: "Hello World"
+          sleep: 10
+    final-job:
+      stages:
+        - name: Echo final
+          echo: "This job do not wait the first jon finish"
