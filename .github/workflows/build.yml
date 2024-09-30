@@ -1,7 +1,10 @@
 name: build
 
 on:
+  workflow_dispatch:
   push:
+    tags:
+      - 'v*.*.*'
     paths-ignore:
       - 'docs/**'
       - '*.md'
@@ -47,3 +50,8 @@ jobs:
           uv pip install -U pip
           uv pip install -U -e .[api]
           uv pip list
+
+      - name: Build Docker Image
+        run: |
+          docker build -t ddeutil-workflow:python${{ matrix.python-version }} -f .container/Dockerfile .
+          docker image ls

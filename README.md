@@ -192,3 +192,9 @@ like crontab job but via Python API.
 > [!NOTE]
 > If this package already deploy, it able to use
 > `uvicorn ddeutil.workflow.api:app --host 127.0.0.1 --port 80 --workers 4`
+
+### Docker Container
+
+```shell
+$ docker build -t ddeutil-workflow:latest -f .container/Dockerfile .
+```

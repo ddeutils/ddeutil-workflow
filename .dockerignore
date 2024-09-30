@@ -1,0 +1,6 @@
+.github/
+logs/
+tests/
+docs/
+venv/
+.venv/
