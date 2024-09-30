@@ -2,6 +2,46 @@
 
 ## Latest Changes
 
+## 0.0.14
+
+### :sparkles: Features
+
+- :dart: feat: change regex of caller to new version that catch prefix and last. (_2024-09-30_)
+- :dart: feat: move log filename to class var instead hard code. (_2024-09-30_)
+- :dart: feat: change result class from pydantic basemodel to dataclass instead. (_2024-09-29_)
+- :dart: feat: add start and end time on the result object. (_2024-09-29_)
+- :dart: feat: change name by add suffic Data that use dataclass. (_2024-09-28_)
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: add testcae workflow running with parallel. (_2024-09-29_)
+- :art: styled: change code format. (_2024-09-29_)
+- :test_tube: tests: add mock Config object for override env var. (_2024-09-28_)
+- :art: styled: change position of utils function that create inside main module. (_2024-09-20_)
+- :test_tube: tests: add override env func and add error key on stage result context. (_2024-09-20_)
+
+### :card_file_box: Documents
+
+- :page_facing_up: docs: remove comment for run multiprocess on the job exec. (_2024-09-29_)
+- :page_facing_up: docs: update docs-string on the stage module. (_2024-09-28_)
+- :page_facing_up: docs: update docs-str on schedule module. (_2024-09-28_)
+- :page_facing_up: docs: update features content and readme. (_2024-09-20_)
+- :page_facing_up: docs: add compare with state machine language site. (_2024-09-18_)
+- :page_facing_up: docs: add mkdocs features. (_2024-09-18_)
+
+### :bug: Fix Bugs
+
+- :gear: fixed: change import workflow object on api module (_2024-09-29_)
+
+### :package: Build & Workflow
+
+- :toolbox: build: add python setup id on test and build. (_2024-09-18_)
+- :toolbox: build: add docs workflow for create mkdocs page. (_2024-09-18_)
+
+### :postbox: Dependencies
+
+- :pushpin: deps: update fastapi version to 0.115.0. (_2024-09-20_)
+
 ## 0.0.13
 
 ### :sparkles: Features
