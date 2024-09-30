@@ -45,8 +45,8 @@ def test_scheduler_remove_wf_task():
                 workflow=wf,
                 on=on,
                 params={"asat-dt": "${{ release.logical_date }}"},
-                queue=[datetime(2024, 1, 1, 12)],
-                running=[datetime(2024, 1, 1, 12)],
+                queue={"wf-scheduling": [datetime(2024, 1, 1, 12)]},
+                running={"wf-scheduling": [datetime(2024, 1, 1, 12)]},
             )
         )
 
@@ -68,8 +68,13 @@ def test_scheduler_remove_wf_task():
         workflow=wf,
         on=On.from_loader(name="every_minute_bkk", externals={}),
         params={"asat-dt": "${{ release.logical_date }}"},
-        queue=[datetime(2024, 1, 1, 12), datetime(2024, 1, 1, 12)],
-        running=[datetime(2024, 1, 1, 6)],
+        queue={
+            "wf-scheduling": [
+                datetime(2024, 1, 1, 12),
+                datetime(2024, 1, 1, 12),
+            ]
+        },
+        running={"wf-scheduling": [datetime(2024, 1, 1, 6)]},
     )
     pipeline_tasks.remove(remover)
     assert 1 == len(pipeline_tasks)

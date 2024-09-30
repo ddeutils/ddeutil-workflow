@@ -3,6 +3,9 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
+"""
+The main schedule running is ``workflow_runner`` function.
+"""
 from __future__ import annotations
 
 import copy
@@ -981,8 +984,8 @@ class WorkflowTaskData:
     workflow: Workflow
     on: On
     params: DictData = field(compare=False, hash=False)
-    queue: list[datetime] = field(compare=False, hash=False)
-    running: list[datetime] = field(compare=False, hash=False)
+    queue: dict[str, list[datetime]] = field(compare=False, hash=False)
+    running: dict[str, list[datetime]] = field(compare=False, hash=False)
 
     @catch_exceptions(cancel_on_failure=True)
     def release(
@@ -1062,8 +1065,9 @@ class WorkflowTaskData:
             },
         }
 
-        # WARNING: Re-create workflow object that use new running workflow
-        #   ID.
+        # WARNING:
+        #   Re-create workflow object that use new running workflow ID.
+        #
         runner: Workflow = wf.get_running_id(run_id=wf.new_run_id)
         rs: Result = runner.execute(
             params=param2template(self.params, release_params),
@@ -1275,26 +1279,36 @@ def workflow_control(
         sch: Schedule = Schedule.from_loader(name, externals=externals)
         workflow_tasks.extend(
             sch.tasks(
-                start_date_waiting, wf_queue, wf_running, externals=externals
+                start_date_waiting,
+                queue=wf_queue,
+                running=wf_running,
+                externals=externals,
             ),
         )
 
     # NOTE: This schedule job will start every minute at :02 seconds.
-    schedule.every(1).minutes.at(":02").do(
-        workflow_task,
-        workflow_tasks=workflow_tasks,
-        stop=stop
-        or (
-            start_date
-            + timedelta(
-                **json.loads(
-                    os.getenv("WORKFLOW_APP_STOP_BOUNDARY_DELTA")
-                    or '{"minutes": 5, "seconds": 20}'
+    (
+        schedule.every(1)
+        .minutes.at(":02")
+        .do(
+            workflow_task,
+            workflow_tasks=workflow_tasks,
+            stop=(
+                stop
+                or (
+                    start_date
+                    + timedelta(
+                        **json.loads(
+                            os.getenv("WORKFLOW_APP_STOP_BOUNDARY_DELTA")
+                            or '{"minutes": 5, "seconds": 20}'
+                        )
+                    )
                 )
-            )
-        ),
-        threads=thread_releases,
-    ).tag("control")
+            ),
+            threads=thread_releases,
+        )
+        .tag("control")
+    )
 
     # NOTE: Checking zombie task with schedule job will start every 5 minute.
     schedule.every(5).minutes.at(":10").do(
