@@ -6,7 +6,7 @@ from ddeutil.workflow.conf import Config
 from ddeutil.workflow.utils import Result
 
 
-def test_pipe_run_py():
+def test_workflow_run_py():
     workflow = wf.Workflow.from_loader(
         name="wf-run-python",
         externals={},
@@ -66,7 +66,7 @@ def test_pipe_run_py():
     } == rs.context
 
 
-def test_pipe_run_py_with_parallel():
+def test_workflow_run_py_with_parallel():
     with mock.patch.object(Config, "max_job_parallel", 3):
         workflow = wf.Workflow.from_loader(
             name="wf-run-python",

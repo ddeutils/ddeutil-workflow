@@ -61,6 +61,8 @@ from .utils import (
 )
 
 P = ParamSpec("P")
+ReturnResult = Callable[P, Result]
+DecoratorResult = Callable[[ReturnResult], ReturnResult]
 logger = get_logger("ddeutil.workflow")
 
 
@@ -78,7 +80,7 @@ __all__: TupleStr = (
 )
 
 
-def handler_result(message: str | None = None) -> Callable[P, Result]:
+def handler_result(message: str | None = None) -> DecoratorResult:
     """Decorator function for handler result from the stage execution. This
     function should to use with execution method only.
 
@@ -104,7 +106,7 @@ def handler_result(message: str | None = None) -> Callable[P, Result]:
     #
     message: str = message or ""
 
-    def decorator(func: Callable[P, Result]) -> Callable[P, Result]:
+    def decorator(func: ReturnResult) -> ReturnResult:
 
         @wraps(func)
         def wrapped(self: Stage, *args, **kwargs):

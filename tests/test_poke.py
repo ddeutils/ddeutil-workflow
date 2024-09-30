@@ -8,6 +8,6 @@ def test_pipeline_poke():
         print(rs.context["poking"])
 
 
-def test_pipe_poke_with_release_params():
+def test_workflow_poke_with_release_params():
     wf = Workflow.from_loader(name="wf-scheduling", externals={})
     wf.poke(params={"asat-dt": "${{ release.logical_date }}"})

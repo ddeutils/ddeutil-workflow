@@ -206,6 +206,12 @@ class SimLoad:
         """Find all data that match with object type in config path. This class
         method can use include and exclude list of identity name for filter and
         adds-on.
+
+        :param obj:
+        :param params:
+        :param include:
+        :param exclude:
+        :rtype: Iterator[tuple[str, DictData]]
         """
         exclude: list[str] = exclude or []
         for file in PathSearch(params.engine.paths.conf).files:
@@ -317,10 +323,14 @@ class TagFunc(Protocol):
     name: str
     tag: str
 
-    def __call__(self, *args, **kwargs): ...
+    def __call__(self, *args, **kwargs): ...  # pragma: no cove
 
 
-def tag(name: str, alias: str | None = None) -> Callable[P, TagFunc]:
+ReturnTagFunc = Callable[P, TagFunc]
+DecoratorTagFunc = Callable[[Callable[[...], Any]], ReturnTagFunc]
+
+
+def tag(name: str, alias: str | None = None) -> DecoratorTagFunc:
     """Tag decorator function that set function attributes, ``tag`` and ``name``
     for making registries variable.
 
@@ -330,7 +340,7 @@ def tag(name: str, alias: str | None = None) -> Callable[P, TagFunc]:
     :rtype: Callable[P, TagFunc]
     """
 
-    def func_internal(func: Callable[[...], Any]) -> TagFunc:
+    def func_internal(func: Callable[[...], Any]) -> ReturnTagFunc:
         func.tag = name
         func.name = alias or func.__name__.replace("_", "-")
 
@@ -398,6 +408,10 @@ class BaseParam(BaseModel, ABC):
 
     @field_serializer("type")
     def __serializer_type(self, value: str) -> str:
+        """Serialize the value of the type field.
+
+        :rtype: str
+        """
         return value
 
 

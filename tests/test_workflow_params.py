@@ -3,7 +3,7 @@ from datetime import datetime
 import ddeutil.workflow as wf
 
 
-def test_pipe_params_py():
+def test_workflow_params_py():
     workflow = wf.Workflow.from_loader(
         name="wf-run-hook",
         externals={},

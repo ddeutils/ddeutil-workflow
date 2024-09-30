@@ -19,7 +19,7 @@ def test_stage_trigger():
     } == rs.context["params"]
 
 
-def test_pipe_trigger():
+def test_workflow_trigger():
     workflow = wf.Workflow.from_loader(name="wf-trigger", externals={})
     rs: Result = workflow.execute(params={})
     # import json

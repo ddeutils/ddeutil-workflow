@@ -17,6 +17,7 @@ OUTSIDE_PATH: Path = Path(__file__).parent.parent
 
 
 def dotenv_setting() -> None:
+    """Create .env file if this file in the current path do not exists."""
     env_path: Path = OUTSIDE_PATH / ".env"
     if not env_path.exists():
         logging.warning("Dot env file does not exists")

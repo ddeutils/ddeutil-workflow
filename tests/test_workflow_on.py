@@ -2,7 +2,7 @@ import ddeutil.workflow as wf
 import ddeutil.workflow.on as on
 
 
-def test_pipe_on():
+def test_workflow_on():
     workflow = wf.Workflow.from_loader(
         name="wf-run-common",
         externals={},

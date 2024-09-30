@@ -4,7 +4,7 @@ import ddeutil.workflow as wf
 import ddeutil.workflow.stage as st
 
 
-def test_pipe_stage_task():
+def test_workflow_stage_task():
     workflow = wf.Workflow.from_loader(
         name="ingest_csv_to_parquet",
         externals={},
@@ -23,7 +23,7 @@ def test_pipe_stage_task():
     assert {"records": 1} == rs.context
 
 
-def test_pipe_job_task():
+def test_workflow_job_task():
     workflow = wf.Workflow.from_loader(
         name="ingest_csv_to_parquet",
         externals={},
@@ -46,7 +46,7 @@ def test_pipe_job_task():
     } == rs.context
 
 
-def test_pipe_task():
+def test_workflow_task():
     workflow = wf.Workflow.from_loader(
         name="ingest_csv_to_parquet",
         externals={},

@@ -3,7 +3,7 @@ from ddeutil.workflow import Job, Workflow
 from pydantic import ValidationError
 
 
-def test_pipe_model():
+def test_workflow_model():
     data = {
         "demo-run": {
             "stages": [
@@ -42,7 +42,7 @@ def test_pipe_model():
     assert [{}] == demo_job.strategy.make()
 
 
-def test_pipe_model_name_raise():
+def test_workflow_model_name_raise():
 
     with pytest.raises(ValidationError):
         Workflow(name="manual-workflow-${{ params.test }}")

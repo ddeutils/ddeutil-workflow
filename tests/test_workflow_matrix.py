@@ -1,7 +1,7 @@
 import ddeutil.workflow as wf
 
 
-def test_pipe_strategy_model():
+def test_workflow_strategy_model():
     strategy = wf.Strategy.model_validate(
         obj={
             "matrix": {
@@ -44,7 +44,7 @@ def test_pipe_strategy_model():
     )
 
 
-def test_pipe_job_matrix():
+def test_workflow_job_matrix():
     workflow = wf.Workflow.from_loader(
         name="wf-run-matrix",
         externals={},
@@ -78,7 +78,7 @@ def test_pipe_job_matrix():
     )
 
 
-def test_pipe_matrix():
+def test_workflow_matrix():
     workflow = wf.Workflow.from_loader(
         name="wf-run-matrix",
         externals={},
@@ -150,7 +150,7 @@ def test_pipe_matrix():
     } == rs.context
 
 
-def test_pipe_matrix_fail_fast():
+def test_workflow_matrix_fail_fast():
     workflow = wf.Workflow.from_loader(
         name="wf-run-matrix-fail-fast",
         externals={},
