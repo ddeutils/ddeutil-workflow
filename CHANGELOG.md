@@ -2,6 +2,17 @@
 
 ## Latest Changes
 
+## 0.0.15
+
+### :sparkles: Features
+
+- :dart: feat: remove deep copy context on workflow execution. (_2024-09-30_)
+- :dart: feat: add caller dataclass for keep result from regex. (_2024-09-30_)
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: change test file name from pipeline to workflow. (_2024-09-30_)
+
 ## 0.0.14
 
 ### :sparkles: Features
