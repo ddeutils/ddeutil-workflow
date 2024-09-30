@@ -52,7 +52,9 @@ extra:
 
 nav:
   - index.md
-  - State Machine Language: state_machine.md
+  - Compare:
+    - State Machine Language: state_machine.md
+    - Cloud Workflow: cloud-workflow.md
   - Features:
       - Stage: features/stage.md
       - On: features/on.md

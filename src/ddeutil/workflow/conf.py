@@ -16,6 +16,10 @@ env = os.getenv
 
 
 class Config:
+    """Config object for keeping application configuration on current session
+    without changing when if the application still running.
+    """
+
     # NOTE: Core
     tz: ZoneInfo = ZoneInfo(env("WORKFLOW_CORE_TIMEZONE", "UTC"))
 

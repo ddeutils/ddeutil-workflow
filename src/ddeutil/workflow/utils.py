@@ -793,8 +793,8 @@ def not_in_template(value: Any, *, not_in: str = "matrix.") -> bool:
     elif not isinstance(value, str):
         return False
     return any(
-        (not found.group("caller").strip().startswith(not_in))
-        for found in Re.RE_CALLER.finditer(value.strip())
+        (not found.caller.strip().startswith(not_in))
+        for found in Re.finditer_caller(value.strip())
     )
 
 
@@ -835,18 +835,16 @@ def str2template(
 
     # NOTE: remove space before and after this string value.
     value: str = value.strip()
-    for found in Re.RE_CALLER.finditer(value):
+    for found in Re.finditer_caller(value):
         # NOTE:
         #   Get caller and filter values that setting inside;
         #
         #   ... ``${{ <caller-value> [ | <filter-value>] ... }}``
         #
-        caller: str = found.group("caller")
+        caller: str = found.caller
         pfilter: list[str] = [
             i.strip()
-            for i in (
-                found.group("post_filters").strip().removeprefix("|").split("|")
-            )
+            for i in (found.post_filters.strip().removeprefix("|").split("|"))
             if i != ""
         ]
         if not hasdot(caller, params):
@@ -859,7 +857,7 @@ def str2template(
         #   If type of getter caller is not string type and it does not use to
         #   concat other string value, it will return origin value from the
         #   ``getdot`` function.
-        if value.replace(found.group(0), "", 1) == "":
+        if value.replace(found.full, "", 1) == "":
             return map_post_filter(getter, pfilter, filters=filters)
 
         # NOTE: map post-filter function.
@@ -867,7 +865,7 @@ def str2template(
         if not isinstance(getter, str):
             getter: str = str(getter)
 
-        value: str = value.replace(found.group(0), getter, 1)
+        value: str = value.replace(found.full, getter, 1)
 
     return search_env_replace(value)
 

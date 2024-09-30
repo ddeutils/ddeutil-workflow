@@ -587,8 +587,14 @@ class Workflow(BaseModel):
         for job_id in self.jobs:
             jq.put(job_id)
 
-        # NOTE: Create result context that will pass this context to any
-        #   execution dependency.
+        # NOTE: Create data context that will pass to any job executions
+        #   on this workflow.
+        #
+        #   {
+        #       'params': <input-params>,
+        #       'jobs': {},
+        #   }
+        #
         context: DictData = self.parameterize(params)
         status: int = 0
         try:

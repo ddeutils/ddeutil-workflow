@@ -51,7 +51,7 @@ def test_regex_caller_multiple():
             "${{ listx|join(', ') }}",
             {
                 "caller": "listx",
-                "caller_prefix": None,
+                "caller_prefix": "",
                 "caller_last": "listx",
                 "post_filters": "|join(', ') ",
             },
@@ -60,7 +60,7 @@ def test_regex_caller_multiple():
             "${{listx | abs | test}}",
             {
                 "caller": "listx",
-                "caller_prefix": None,
+                "caller_prefix": "",
                 "caller_last": "listx",
                 "post_filters": "| abs | test",
             },
@@ -71,6 +71,15 @@ def test_regex_caller_multiple():
                 "caller": "listx.data",
                 "caller_prefix": "listx.",
                 "caller_last": "data",
+                "post_filters": "",
+            },
+        ),
+        (
+            "${{ params.data.get('name') }}",
+            {
+                "caller": "params.data.get('name')",
+                "caller_prefix": "params.data.",
+                "caller_last": "get('name')",
                 "post_filters": "",
             },
         ),
