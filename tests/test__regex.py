@@ -30,8 +30,8 @@ def test_regex_caller(value, expected):
 
 def test_regex_caller_multiple():
     assert [
-        ("matrix.table", ""),
-        ("matrix.partition", ""),
+        ("matrix.table", "matrix.", "table", ""),
+        ("matrix.partition", "matrix.", "partition", ""),
     ] == Re.RE_CALLER.findall("${{ matrix.table }}-${{ matrix.partition }}")
 
 
@@ -42,20 +42,37 @@ def test_regex_caller_multiple():
             'test-${{ article.pub_date|datetimeformat("%B %Y") }}',
             {
                 "caller": "article.pub_date",
+                "caller_prefix": "article.",
+                "caller_last": "pub_date",
                 "post_filters": '|datetimeformat("%B %Y") ',
             },
         ),
         (
             "${{ listx|join(', ') }}",
-            {"caller": "listx", "post_filters": "|join(', ') "},
+            {
+                "caller": "listx",
+                "caller_prefix": None,
+                "caller_last": "listx",
+                "post_filters": "|join(', ') ",
+            },
         ),
         (
             "${{listx | abs | test}}",
-            {"caller": "listx", "post_filters": "| abs | test"},
+            {
+                "caller": "listx",
+                "caller_prefix": None,
+                "caller_last": "listx",
+                "post_filters": "| abs | test",
+            },
         ),
         (
             "${{ listx.data }}",
-            {"caller": "listx.data", "post_filters": ""},
+            {
+                "caller": "listx.data",
+                "caller_prefix": "listx.",
+                "caller_last": "data",
+                "post_filters": "",
+            },
         ),
     ],
 )
@@ -68,6 +85,8 @@ def test_regex_caller_filter_with_args():
     rs = Re.RE_CALLER.search("${{ params.asat-dt | fmt('%Y%m%d') }}")
     assert {
         "caller": "params.asat-dt",
+        "caller_prefix": "params.",
+        "caller_last": "asat-dt",
         "post_filters": "| fmt('%Y%m%d') ",
     } == rs.groupdict()
 
