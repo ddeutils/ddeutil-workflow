@@ -4,13 +4,24 @@
 # license information.
 # ------------------------------------------------------------------------------
 """
-The main schedule running is ``workflow_runner`` function.
+The main schedule running is ``workflow_runner`` function that trigger the
+multiprocess of ``workflow_control`` function for listing schedules on the
+config by ``Loader.finds(Schedule)``.
+
+    The ``workflow_control`` is the scheduler function that release 2 schedule
+functions; ``workflow_task``, and ``workflow_monitor``.
+
+    ``workflow_control`` --- Every minute at :02 --> ``workflow_task``
+                         --- Every 5 minutes     --> ``workflow_monitor``
+
+    The ``workflow_task`` will run ``task.release`` method in threading object
+for multithreading strategy. This ``release`` method will run only one crontab
+value with the on field.
 """
 from __future__ import annotations
 
 import copy
 import inspect
-import json
 import logging
 import os
 import time
@@ -78,7 +89,7 @@ __all__: TupleStr = (
     "Schedule",
     "ScheduleWorkflow",
     "workflow_task",
-    "workflow_long_running_task",
+    "workflow_monitor",
     "workflow_control",
     "workflow_runner",
 )
@@ -187,7 +198,7 @@ class Workflow(BaseModel):
         return data
 
     @model_validator(mode="before")
-    def __prepare_params(cls, values: DictData) -> DictData:
+    def __prepare_model_before__(cls, values: DictData) -> DictData:
         """Prepare the params key."""
         # NOTE: Prepare params type if it passing with only type value.
         if params := values.pop("params", {}):
@@ -202,9 +213,10 @@ class Workflow(BaseModel):
         return values
 
     @field_validator("desc", mode="after")
-    def ___prepare_desc(cls, value: str) -> str:
+    def __dedent_desc__(cls, value: str) -> str:
         """Prepare description string that was created on a template.
 
+        :param value: A description string value that want to dedent.
         :rtype: str
         """
         return dedent(value)
@@ -936,9 +948,11 @@ class Schedule(BaseModel):
         return workflow_tasks
 
 
-def catch_exceptions(
-    cancel_on_failure: bool = False,
-) -> Callable[P, Optional[CancelJob]]:
+ReturnCancelJob = Callable[P, Optional[CancelJob]]
+DecoratorCancelJob = Callable[[ReturnCancelJob], ReturnCancelJob]
+
+
+def catch_exceptions(cancel_on_failure: bool = False) -> DecoratorCancelJob:
     """Catch exception error from scheduler job that running with schedule
     package and return CancelJob if this function raise an error.
 
@@ -947,9 +961,7 @@ def catch_exceptions(
     :rtype: Callable[P, Optional[CancelJob]]
     """
 
-    def decorator(
-        func: Callable[P, Optional[CancelJob]],
-    ) -> Callable[P, Optional[CancelJob]]:
+    def decorator(func: ReturnCancelJob) -> ReturnCancelJob:
         try:
             # NOTE: Check the function that want to handle is method or not.
             if inspect.ismethod(func):
@@ -1149,7 +1161,7 @@ def workflow_task(
                 "running in background."
             )
             time.sleep(15)
-            workflow_long_running_task(threads)
+            workflow_monitor(threads)
         return CancelJob
 
     # IMPORTANT:
@@ -1221,7 +1233,7 @@ def workflow_task(
     logger.debug(f"[WORKFLOW]: {'=' * 100}")
 
 
-def workflow_long_running_task(threads: dict[str, Thread]) -> None:
+def workflow_monitor(threads: dict[str, Thread]) -> None:
     """Workflow schedule for monitoring long running thread from the schedule
     control.
 
@@ -1293,18 +1305,7 @@ def workflow_control(
         .do(
             workflow_task,
             workflow_tasks=workflow_tasks,
-            stop=(
-                stop
-                or (
-                    start_date
-                    + timedelta(
-                        **json.loads(
-                            os.getenv("WORKFLOW_APP_STOP_BOUNDARY_DELTA")
-                            or '{"minutes": 5, "seconds": 20}'
-                        )
-                    )
-                )
-            ),
+            stop=(stop or (start_date + config.stop_boundary_delta)),
             threads=thread_releases,
         )
         .tag("control")
@@ -1312,7 +1313,7 @@ def workflow_control(
 
     # NOTE: Checking zombie task with schedule job will start every 5 minute.
     schedule.every(5).minutes.at(":10").do(
-        workflow_long_running_task,
+        workflow_monitor,
         threads=thread_releases,
     ).tag("monitor")
 
@@ -1352,8 +1353,9 @@ def workflow_runner(
     :rtype: list[str]
 
         This function will get all workflows that include on value that was
-    created in config path and chuck it with WORKFLOW_APP_SCHEDULE_PER_PROCESS
-    value to multiprocess executor pool.
+    created in config path and chuck it with application config variable
+    ``WORKFLOW_APP_MAX_SCHEDULE_PER_PROCESS`` env var to multiprocess executor
+    pool.
 
         The current workflow logic that split to process will be below diagram:
 
@@ -1370,7 +1372,7 @@ def workflow_runner(
     excluded: list[str] = excluded or []
 
     with ProcessPoolExecutor(
-        max_workers=int(os.getenv("WORKFLOW_APP_PROCESS_WORKER") or "2"),
+        max_workers=config.max_schedule_process,
     ) as executor:
         futures: list[Future] = [
             executor.submit(
@@ -1381,7 +1383,7 @@ def workflow_runner(
             )
             for loader in batch(
                 Loader.finds(Schedule, excluded=excluded),
-                n=int(os.getenv("WORKFLOW_APP_SCHEDULE_PER_PROCESS") or "100"),
+                n=config.max_schedule_per_process,
             )
         ]
 

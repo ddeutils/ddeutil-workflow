@@ -320,17 +320,17 @@ class Job(BaseModel):
         and want to set on the `to` like;
 
             ... (i)   output: {'strategy01': bar, 'strategy02': bar}
-            ... (ii)  to: {'jobs'}
+            ... (ii)  to: {'jobs': {}}
 
         The result of the `to` variable will be;
 
             ... (iii) to: {
-                            'jobs': {
-                                'strategies': {
-                                    'strategy01': bar, 'strategy02': bar
-                                }
+                        'jobs': {
+                            'strategies': {
+                                'strategy01': bar, 'strategy02': bar
                             }
                         }
+                    }
 
         :param output: An output context.
         :param to: A context data that want to add output result.

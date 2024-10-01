@@ -69,7 +69,7 @@ def delay(second: float = 0) -> None:
 
 
 class Engine(BaseModel):
-    """Engine Model"""
+    """Engine Pydantic Model for keeping application path."""
 
     paths: PathData = Field(default_factory=PathData)
     registry: list[str] = Field(
