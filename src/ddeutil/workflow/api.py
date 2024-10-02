@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import os
 import uuid
 from collections.abc import AsyncIterator
 from datetime import datetime, timedelta
@@ -15,7 +14,6 @@ from queue import Empty, Queue
 from threading import Thread
 from typing import TypedDict
 
-from ddeutil.core import str2bool
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.gzip import GZipMiddleware
@@ -23,6 +21,7 @@ from fastapi.responses import UJSONResponse
 from pydantic import BaseModel
 
 from .__about__ import __version__
+from .conf import config
 from .log import get_logger
 from .repeat import repeat_at, repeat_every
 from .scheduler import WorkflowTaskData
@@ -131,12 +130,12 @@ async def message_upper(payload: Payload):
     return await get_result(request_id)
 
 
-if str2bool(os.getenv("WORKFLOW_API_ENABLE_ROUTE_WORKFLOW", "true")):
+if config.enable_route_workflow:
     from .route import workflow
 
     app.include_router(workflow)
 
-if str2bool(os.getenv("WORKFLOW_API_ENABLE_ROUTE_SCHEDULE", "true")):
+if config.enable_route_schedule:
     from .route import schedule
     from .scheduler import workflow_task
 

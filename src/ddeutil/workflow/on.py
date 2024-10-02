@@ -15,8 +15,8 @@ from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
 from .__types import DictData, DictStr, TupleStr
+from .conf import Loader
 from .cron import WEEKDAYS, CronJob, CronJobYear, CronRunner
-from .utils import Loader
 
 __all__: TupleStr = (
     "On",

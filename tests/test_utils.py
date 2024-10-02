@@ -1,3 +1,4 @@
+import ddeutil.workflow.conf as conf
 import ddeutil.workflow.utils as utils
 
 
@@ -27,11 +28,11 @@ def test_filter_func():
 
 
 def test_config():
-    engine = utils.Engine()
+    engine = conf.Engine()
     assert ["ddeutil.workflow"] == engine.registry
     assert ["ddeutil.workflow.utils"] == engine.registry_filter
 
-    engine = utils.Engine.model_validate(
+    engine = conf.Engine.model_validate(
         obj={
             "registry": "ddeutil.workflow",
             "registry_filter": "ddeutil.workflow.utils",

@@ -23,7 +23,6 @@ from __future__ import annotations
 import copy
 import inspect
 import logging
-import os
 import time
 from concurrent.futures import (
     Future,
@@ -57,14 +56,13 @@ except ImportError:
     CancelJob = None
 
 from .__types import DictData, TupleStr
-from .conf import config
+from .conf import Loader, config
 from .cron import CronRunner
 from .exceptions import JobException, WorkflowException
 from .job import Job
 from .log import FileLog, Log, get_logger
 from .on import On
 from .utils import (
-    Loader,
     Param,
     Result,
     batch,
@@ -473,8 +471,10 @@ class Workflow(BaseModel):
         queue: list[datetime] = []
         results: list[Result] = []
 
-        worker: int = int(os.getenv("WORKFLOW_CORE_MAX_NUM_POKING") or "4")
-        with ThreadPoolExecutor(max_workers=worker) as executor:
+        with ThreadPoolExecutor(
+            max_workers=config.max_poking_pool_worker,
+            thread_name_prefix="poking_",
+        ) as executor:
             futures: list[Future] = []
             for on in self.on:
                 futures.append(
@@ -810,7 +810,7 @@ class ScheduleWorkflow(BaseModel):
     )
 
     @model_validator(mode="before")
-    def __prepare_values(cls, values: DictData) -> DictData:
+    def __prepare_before__(cls, values: DictData) -> DictData:
         """Prepare incoming values before validating with model fields.
 
         :rtype: DictData

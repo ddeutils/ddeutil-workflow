@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import inspect
 import logging
-import os
 import stat
 import time
 from abc import ABC, abstractmethod
@@ -15,7 +14,7 @@ from ast import Call, Constant, Expr, Module, Name, parse
 from collections.abc import Iterator
 from dataclasses import field
 from datetime import date, datetime
-from functools import cached_property, wraps
+from functools import wraps
 from hashlib import md5
 from importlib import import_module
 from inspect import isfunction
@@ -30,17 +29,17 @@ try:
 except ImportError:
     from typing_extensions import ParamSpec
 
-from ddeutil.core import getdot, hasdot, hash_str, import_string, lazy, str2bool
-from ddeutil.io import PathData, PathSearch, YamlFlResolve, search_env_replace
+from ddeutil.core import getdot, hasdot, hash_str, import_string, lazy
+from ddeutil.io import search_env_replace
 from ddeutil.io.models.lineage import dt_now
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 from pydantic.dataclasses import dataclass
 from pydantic.functional_serializers import field_serializer
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
 from .__types import DictData, Matrix, Re
-from .conf import config
+from .conf import config, load_config
 from .exceptions import ParamValueException, UtilException
 
 P = ParamSpec("P")
@@ -68,203 +67,6 @@ def delay(second: float = 0) -> None:
     time.sleep(second + randrange(0, 99, step=10) / 100)
 
 
-class Engine(BaseModel):
-    """Engine Pydantic Model for keeping application path."""
-
-    paths: PathData = Field(default_factory=PathData)
-    registry: list[str] = Field(
-        default_factory=lambda: ["ddeutil.workflow"],  # pragma: no cover
-    )
-    registry_filter: list[str] = Field(
-        default_factory=lambda: ["ddeutil.workflow.utils"],  # pragma: no cover
-    )
-
-    @model_validator(mode="before")
-    def __prepare_registry(cls, values: DictData) -> DictData:
-        """Prepare registry value that passing with string type. It convert the
-        string type to list of string.
-        """
-        if (_regis := values.get("registry")) and isinstance(_regis, str):
-            values["registry"] = [_regis]
-        if (_regis_filter := values.get("registry_filter")) and isinstance(
-            _regis, str
-        ):
-            values["registry_filter"] = [_regis_filter]
-        return values
-
-
-class CoreConf(BaseModel):
-    """Core Config Model"""
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    tz: ZoneInfo = Field(default_factory=lambda: ZoneInfo("UTC"))
-
-
-class ConfParams(BaseModel):
-    """Params Model"""
-
-    engine: Engine = Field(
-        default_factory=Engine,
-        description="A engine mapping values.",
-    )
-    core: CoreConf = Field(
-        default_factory=CoreConf,
-        description="A core config value",
-    )
-
-
-def load_config() -> ConfParams:
-    """Load Config data from ``workflows-conf.yaml`` file.
-
-    Configuration Docs:
-    ---
-    :var engine.registry:
-    :var engine.registry_filter:
-    :var paths.root:
-    :var paths.conf:
-    """
-    root_path: str = os.getenv("WORKFLOW_ROOT_PATH", ".")
-
-    regis: list[str] = ["ddeutil.workflow"]
-    if regis_env := os.getenv("WORKFLOW_CORE_REGISTRY"):
-        regis = [r.strip() for r in regis_env.split(",")]
-
-    regis_filter: list[str] = ["ddeutil.workflow.utils"]
-    if regis_filter_env := os.getenv("WORKFLOW_CORE_REGISTRY_FILTER"):
-        regis_filter = [r.strip() for r in regis_filter_env.split(",")]
-
-    conf_path: str = (
-        f"{root_path}/{conf_env}"
-        if (conf_env := os.getenv("WORKFLOW_CORE_PATH_CONF"))
-        else None
-    )
-    return ConfParams.model_validate(
-        obj={
-            "engine": {
-                "registry": regis,
-                "registry_filter": regis_filter,
-                "paths": {
-                    "root": root_path,
-                    "conf": conf_path,
-                },
-            },
-        }
-    )
-
-
-class SimLoad:
-    """Simple Load Object that will search config data by given some identity
-    value like name of workflow or on.
-
-    :param name: A name of config data that will read by Yaml Loader object.
-    :param params: A Params model object.
-    :param externals: An external parameters
-
-    Noted:
-
-        The config data should have ``type`` key for modeling validation that
-    make this loader know what is config should to do pass to.
-
-        ... <identity-key>:
-        ...     type: <importable-object>
-        ...     <key-data>: <value-data>
-        ...     ...
-
-    """
-
-    def __init__(
-        self,
-        name: str,
-        params: ConfParams,
-        externals: DictData | None = None,
-    ) -> None:
-        self.data: DictData = {}
-        for file in PathSearch(params.engine.paths.conf).files:
-            if any(file.suffix.endswith(s) for s in (".yml", ".yaml")) and (
-                data := YamlFlResolve(file).read().get(name, {})
-            ):
-                self.data = data
-
-        # VALIDATE: check the data that reading should not empty.
-        if not self.data:
-            raise ValueError(f"Config {name!r} does not found on conf path")
-
-        self.conf_params: ConfParams = params
-        self.externals: DictData = externals or {}
-        self.data.update(self.externals)
-
-    @classmethod
-    def finds(
-        cls,
-        obj: object,
-        params: ConfParams,
-        *,
-        include: list[str] | None = None,
-        exclude: list[str] | None = None,
-    ) -> Iterator[tuple[str, DictData]]:
-        """Find all data that match with object type in config path. This class
-        method can use include and exclude list of identity name for filter and
-        adds-on.
-
-        :param obj:
-        :param params:
-        :param include:
-        :param exclude:
-        :rtype: Iterator[tuple[str, DictData]]
-        """
-        exclude: list[str] = exclude or []
-        for file in PathSearch(params.engine.paths.conf).files:
-            if any(file.suffix.endswith(s) for s in (".yml", ".yaml")) and (
-                values := YamlFlResolve(file).read()
-            ):
-                for key, data in values.items():
-                    if key in exclude:
-                        continue
-                    if issubclass(get_type(data["type"], params), obj) and (
-                        include is None or all(i in data for i in include)
-                    ):
-                        yield key, data
-
-    @cached_property
-    def type(self) -> AnyModelType:
-        """Return object of string type which implement on any registry. The
-        object type.
-
-        :rtype: AnyModelType
-        """
-        if not (_typ := self.data.get("type")):
-            raise ValueError(
-                f"the 'type' value: {_typ} does not exists in config data."
-            )
-        return get_type(_typ, self.conf_params)
-
-
-class Loader(SimLoad):
-    """Loader Object that get the config `yaml` file from current path.
-
-    :param name: A name of config data that will read by Yaml Loader object.
-    :param externals: An external parameters
-    """
-
-    @classmethod
-    def finds(
-        cls,
-        obj: object,
-        *,
-        include: list[str] | None = None,
-        exclude: list[str] | None = None,
-        **kwargs,
-    ) -> DictData:
-        """Override the find class method from the Simple Loader object."""
-        return super().finds(
-            obj=obj, params=load_config(), include=include, exclude=exclude
-        )
-
-    def __init__(self, name: str, externals: DictData) -> None:
-        super().__init__(name, load_config(), externals)
-
-
 def gen_id(
     value: Any,
     *,
@@ -272,9 +74,9 @@ def gen_id(
     unique: bool = False,
 ) -> str:
     """Generate running ID for able to tracking. This generate process use `md5`
-    algorithm function if ``WORKFLOW_CORE_PIPELINE_ID_SIMPLE`` set to false.
-    But it will cut this hashing value length to 10 it the setting value set to
-    true.
+    algorithm function if ``WORKFLOW_CORE_WORKFLOW_ID_SIMPLE_MODE`` set to
+    false. But it will cut this hashing value length to 10 it the setting value
+    set to true.
 
     :param value: A value that want to add to prefix before hashing with md5.
     :param sensitive: A flag that convert the value to lower case before hashing
@@ -285,7 +87,7 @@ def gen_id(
     if not isinstance(value, str):
         value: str = str(value)
 
-    if str2bool(os.getenv("WORKFLOW_CORE_PIPELINE_ID_SIMPLE", "true")):
+    if config.workflow_id_simple_mode:
         return hash_str(f"{(value if sensitive else value.lower())}", n=10) + (
             f"{datetime.now(tz=config.tz):%Y%m%d%H%M%S%f}" if unique else ""
         )
@@ -295,26 +97,6 @@ def gen_id(
             + (f"{datetime.now(tz=config.tz):%Y%m%d%H%M%S%f}" if unique else "")
         ).encode()
     ).hexdigest()
-
-
-def get_type(t: str, params: ConfParams) -> AnyModelType:
-    """Return import type from string importable value in the type key.
-
-    :param t: A importable type string.
-    :param params: A config parameters that use registry to search this
-        type.
-    :rtype: AnyModelType
-    """
-    try:
-        # NOTE: Auto adding module prefix if it does not set
-        return import_string(f"ddeutil.workflow.{t}")
-    except ModuleNotFoundError:
-        for registry in params.engine.registry:
-            try:
-                return import_string(f"{registry}.{t}")
-            except ModuleNotFoundError:
-                continue
-        return import_string(f"{t}")
 
 
 class TagFunc(Protocol):

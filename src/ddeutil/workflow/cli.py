@@ -6,15 +6,14 @@
 from __future__ import annotations
 
 import json
-import os
 from datetime import datetime
 from enum import Enum
 from typing import Annotated, Optional
-from zoneinfo import ZoneInfo
 
 from ddeutil.core import str2list
 from typer import Argument, Option, Typer
 
+from .conf import config
 from .log import get_logger
 
 logger = get_logger("ddeutil.workflow")
@@ -73,9 +72,7 @@ def schedule(
     excluded: list[str] = str2list(excluded) if excluded else []
     externals: str = externals or "{}"
     if stop:
-        stop: datetime = stop.astimezone(
-            tz=ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
-        )
+        stop: datetime = stop.astimezone(tz=config.tz)
 
     from .scheduler import workflow_runner
 

@@ -6,14 +6,13 @@
 from __future__ import annotations
 
 import asyncio
-import os
 from asyncio import ensure_future
 from datetime import datetime
 from functools import wraps
-from zoneinfo import ZoneInfo
 
 from starlette.concurrency import run_in_threadpool
 
+from .conf import config
 from .cron import CronJob
 from .log import get_logger
 
@@ -24,9 +23,7 @@ def get_cronjob_delta(cron: str) -> float:
     """This function returns the time delta between now and the next cron
     execution time.
     """
-    now: datetime = datetime.now(
-        tz=ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
-    )
+    now: datetime = datetime.now(tz=config.tz)
     cron = CronJob(cron)
     return (cron.schedule(now).next - now).total_seconds()
 

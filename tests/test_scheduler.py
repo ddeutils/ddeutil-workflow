@@ -1,9 +1,9 @@
 from datetime import datetime
 
 from ddeutil.workflow import Workflow
+from ddeutil.workflow.conf import Loader
 from ddeutil.workflow.on import On
 from ddeutil.workflow.scheduler import Schedule, WorkflowTaskData
-from ddeutil.workflow.utils import Loader
 
 
 def test_scheduler_model():
@@ -22,8 +22,8 @@ def test_scheduler_loader_find_schedule():
 
 
 def test_scheduler_remove_wf_task():
-    queue: list[datetime] = []
-    running: list[datetime] = []
+    queue: dict[str, list[datetime]] = {"wf-scheduling": []}
+    running: dict[str, list[datetime]] = {"wf-scheduling": []}
     pipeline_tasks: list[WorkflowTaskData] = []
     wf: Workflow = Workflow.from_loader("wf-scheduling", externals={})
     for on in wf.on:

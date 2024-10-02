@@ -7,19 +7,18 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from abc import ABC, abstractmethod
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import ClassVar, Optional, Union
 
-from ddeutil.core import str2bool
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
 from .__types import DictData
+from .conf import config
 from .utils import load_config
 
 
@@ -42,8 +41,7 @@ def get_logger(name: str):
     stream.setFormatter(formatter)
     logger.addHandler(stream)
 
-    debug: bool = str2bool(os.getenv("WORKFLOW_LOG_DEBUG_MODE", "true"))
-    logger.setLevel(logging.DEBUG if debug else logging.INFO)
+    logger.setLevel(logging.DEBUG if config.debug else logging.INFO)
     return logger
 
 
@@ -72,7 +70,7 @@ class BaseLog(BaseModel, ABC):
 
         :rtype: Self
         """
-        if str2bool(os.getenv("WORKFLOW_LOG_ENABLE_WRITE", "false")):
+        if config.enable_write_log:
             self.do_before()
         return self
 
@@ -141,7 +139,7 @@ class FileLog(BaseLog):
             future.
         """
         # NOTE: Check environ variable was set for real writing.
-        if not str2bool(os.getenv("WORKFLOW_LOG_ENABLE_WRITE", "false")):
+        if not config.enable_write_log:
             return False
 
         # NOTE: create pointer path that use the same logic of pointer method.
@@ -171,7 +169,7 @@ class FileLog(BaseLog):
         :rtype: Self
         """
         # NOTE: Check environ variable was set for real writing.
-        if not str2bool(os.getenv("WORKFLOW_LOG_ENABLE_WRITE", "false")):
+        if not config.enable_write_log:
             return self
 
         log_file: Path = self.pointer() / f"{self.run_id}.log"

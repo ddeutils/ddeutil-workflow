@@ -6,10 +6,8 @@
 from __future__ import annotations
 
 import copy
-import os
 from datetime import datetime, timedelta
 from typing import Any
-from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi import status as st
@@ -18,6 +16,7 @@ from pydantic import BaseModel
 
 from . import Workflow
 from .__types import DictData
+from .conf import config
 from .log import get_logger
 from .scheduler import Schedule
 from .utils import Loader, Result
@@ -87,12 +86,7 @@ async def execute_workflow(name: str, payload: ExecutePayload) -> DictData:
     # NOTE: Start execute manually
     rs: Result = wf.execute(params=payload.params)
 
-    return rs.model_dump(
-        by_alias=True,
-        exclude_none=True,
-        exclude_unset=True,
-        exclude_defaults=True,
-    )
+    return dict(rs)
 
 
 @workflow.get("/{name}/logs")
@@ -172,8 +166,7 @@ async def add_deploy_scheduler(request: Request, name: str):
 
     request.state.scheduler.append(name)
 
-    tz: ZoneInfo = ZoneInfo(os.getenv("WORKFLOW_CORE_TIMEZONE", "UTC"))
-    start_date: datetime = datetime.now(tz=tz)
+    start_date: datetime = datetime.now(tz=config.tz)
     start_date_waiting: datetime = (start_date + timedelta(minutes=1)).replace(
         second=0, microsecond=0
     )
