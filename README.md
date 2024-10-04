@@ -197,6 +197,14 @@ like crontab job but via Python API.
 
 ### Docker Container
 
+Create Docker image;
+
 ```shell
 $ docker build -t ddeutil-workflow:latest -f .container/Dockerfile .
+```
+
+Run the above Docker image;
+
+```shell
+$ docker run -i ddeutil-workflow:latest
 ```

@@ -1,4 +1,4 @@
-# Manual Execution
+# Getting Started
 
 This execution usecase is getting data from external API and prepare that data
 and aggregate it into daily layer to silver data zone.

@@ -52,6 +52,7 @@ extra:
 
 nav:
   - index.md
+  - Getting Started: getting-started.md
   - Compare:
     - State Machine Language: state_machine.md
     - Cloud Workflow: cloud-workflow.md
@@ -63,7 +64,6 @@ nav:
       - Schedule: features/schedule.md
   - Examples:
       - Hooks: examples/hook_stage.md
-      - Manual Execution: examples/manual_execution.md
 
 plugins:
   - tags
