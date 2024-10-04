@@ -1,5 +1,7 @@
 import ddeutil.workflow.stage as st
 import pytest
+from ddeutil.workflow import Workflow
+from ddeutil.workflow.exceptions import StageException
 from ddeutil.workflow.stage import Stage
 from ddeutil.workflow.utils import Result
 from pydantic import ValidationError
@@ -42,3 +44,23 @@ def test_empty_stage_name_raise():
                 "echo": "hello world",
             }
         )
+
+
+def test_stage_condition_raise():
+    workflow: Workflow = Workflow.from_loader(
+        name="wf-condition-raise", externals={}
+    )
+    stage: Stage = workflow.job("condition-job").stage("condition-stage")
+
+    with pytest.raises(StageException):
+        stage.is_skipped({"params": {"name": "foo"}})
+
+
+def test_stage_condition():
+    params = {"name": "foo"}
+    workflow = Workflow.from_loader(name="wf-condition", externals={})
+    stage = workflow.job("condition-job").stage(stage_id="condition-stage")
+
+    assert not stage.is_skipped(params=workflow.parameterize(params))
+    assert stage.is_skipped(params=workflow.parameterize({"name": "bar"}))
+    assert {"name": "foo"} == params
