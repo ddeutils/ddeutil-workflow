@@ -53,6 +53,11 @@ class Config:
         env("WORKFLOW_CORE_STAGE_DEFAULT_ID", "false")
     )
 
+    # NOTE: Job
+    job_default_id: bool = str2bool(
+        env("WORKFLOW_CORE_JOB_DEFAULT_ID", "false")
+    )
+
     # NOTE: Workflow
     max_job_parallel: int = int(env("WORKFLOW_CORE_MAX_JOB_PARALLEL", "2"))
     max_poking_pool_worker: int = int(
@@ -93,6 +98,7 @@ class Config:
             ) from err
 
     def refresh_dotenv(self):
+        """Reload environment variables from the current stage."""
         self.tz: ZoneInfo = ZoneInfo(env("WORKFLOW_CORE_TIMEZONE", "UTC"))
         self.stage_raise_error: bool = str2bool(
             env("WORKFLOW_CORE_STAGE_RAISE_ERROR", "true")

@@ -3,8 +3,8 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-"""Stage Model that use for getting stage data template from Job Model.
-The stage that handle the minimize task that run in some thread (same thread at
+"""Stage Model that use for getting stage data template from the Job Model.
+The stage handle the minimize task that run in some thread (same thread at
 its job owner) that mean it is the lowest executor of a workflow workflow that
 can tracking logs.
 
@@ -235,7 +235,7 @@ class BaseStage(BaseModel, ABC):
         :param to: A context data that want to add output result.
         :rtype: DictData
         """
-        if not (self.id or config.stage_default_id):
+        if self.id is None and not config.stage_default_id:
             logger.debug(
                 f"({self.run_id}) [STAGE]: Output does not set because this "
                 f"stage does not set ID or default stage ID config flag not be "

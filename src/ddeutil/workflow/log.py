@@ -18,8 +18,7 @@ from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
 from .__types import DictData
-from .conf import config
-from .utils import load_config
+from .conf import config, load_config
 
 
 @lru_cache

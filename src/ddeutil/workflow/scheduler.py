@@ -473,7 +473,7 @@ class Workflow(BaseModel):
 
         with ThreadPoolExecutor(
             max_workers=config.max_poking_pool_worker,
-            thread_name_prefix="poking_",
+            thread_name_prefix="wf_poking_",
         ) as executor:
             futures: list[Future] = []
             for on in self.on:

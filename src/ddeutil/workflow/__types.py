@@ -16,7 +16,7 @@ from re import (
     Match,
     Pattern,
 )
-from typing import Any, Optional, Union
+from typing import Any, Optional, TypedDict, Union
 
 from typing_extensions import Self
 
@@ -24,8 +24,11 @@ TupleStr = tuple[str, ...]
 DictData = dict[str, Any]
 DictStr = dict[str, str]
 Matrix = dict[str, Union[list[str], list[int]]]
-MatrixInclude = list[dict[str, Union[str, int]]]
-MatrixExclude = list[dict[str, Union[str, int]]]
+
+
+class Context(TypedDict):
+    params: dict[str, Any]
+    jobs: dict[str, Any]
 
 
 @dataclass(frozen=True)

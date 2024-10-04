@@ -4,6 +4,9 @@
 # license information.
 # ------------------------------------------------------------------------------
 """Job Model that use for keeping stages and node that running its stages.
+The job handle the lineage of stages and location of execution of stages that
+mean the job model able to define ``runs-on`` key that allow you to run this
+job.
 """
 from __future__ import annotations
 
@@ -19,21 +22,15 @@ from concurrent.futures import (
 from functools import lru_cache
 from textwrap import dedent
 from threading import Event
-from typing import Optional
+from typing import Optional, Union
 
 from ddeutil.core import freeze_args
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
-from .__types import (
-    DictData,
-    DictStr,
-    Matrix,
-    MatrixExclude,
-    MatrixInclude,
-    TupleStr,
-)
+from .__types import DictData, DictStr, Matrix, TupleStr
+from .conf import config
 from .exceptions import (
     JobException,
     StageException,
@@ -51,6 +48,8 @@ from .utils import (
 )
 
 logger = get_logger("ddeutil.workflow")
+MatrixInclude = list[dict[str, Union[str, int]]]
+MatrixExclude = list[dict[str, Union[str, int]]]
 
 
 __all__: TupleStr = (
@@ -319,15 +318,18 @@ class Job(BaseModel):
             For example of setting output method, If you receive execute output
         and want to set on the `to` like;
 
-            ... (i)   output: {'strategy01': bar, 'strategy02': bar}
+            ... (i)   output: {'strategy-01': bar, 'strategy-02': bar}
             ... (ii)  to: {'jobs': {}}
 
         The result of the `to` variable will be;
 
             ... (iii) to: {
                         'jobs': {
-                            'strategies': {
-                                'strategy01': bar, 'strategy02': bar
+                            '<job-id>': {
+                                'strategies': {
+                                    'strategy-01': bar,
+                                    'strategy-02': bar
+                                }
                             }
                         }
                     }
@@ -336,16 +338,23 @@ class Job(BaseModel):
         :param to: A context data that want to add output result.
         :rtype: DictData
         """
-        if self.id is None:
+        if self.id is None and not config.job_default_id:
             raise JobException(
-                "This job do not set the ID before setting output."
+                "This job do not set the ID before setting execution output."
             )
 
-        to["jobs"][self.id] = (
+        # NOTE: Create jobs key to receive an output from the job execution.
+        if "jobs" not in to:
+            to["jobs"] = {}
+
+        # NOTE: If the job ID did not set, it will use index of jobs key
+        #   instead.
+        _id: str = self.id or str(len(to["jobs"]) + 1)
+
+        logger.debug(f"({self.run_id}) [JOB]: Set outputs on: {_id}")
+        to["jobs"][_id] = (
             {"strategies": output}
             if self.strategy.is_set()
-            # NOTE:
-            #   This is the best way to get single key from dict.
             else output[next(iter(output))]
         )
         return to
@@ -384,6 +393,7 @@ class Job(BaseModel):
         #       "params": { ... },      <== Current input params
         #       "jobs": { ... },        <== Current input params
         #       "matrix": { ... }       <== Current strategy value
+        #       "stages": { ... }       <== Catching stage outputs
         #   }
         #
         context: DictData = copy.deepcopy(params)
@@ -491,15 +501,18 @@ class Job(BaseModel):
         :param params: An input parameters that use on job execution.
         :rtype: Result
         """
-        context: DictData = {}
+
+        # NOTE: I use this condition because this method allow passing empty
+        #   params and I do not want to create new dict object.
         params: DictData = {} if params is None else params
+        context: DictData = {}
 
         # NOTE: Normal Job execution without parallel strategy.
         if (not self.strategy.is_set()) or self.strategy.max_parallel == 1:
             for strategy in self.strategy.make():
                 rs: Result = self.execute_strategy(
                     strategy=strategy,
-                    params=copy.deepcopy(params),
+                    params=params,
                 )
                 context.update(rs.context)
             return Result(
@@ -507,11 +520,15 @@ class Job(BaseModel):
                 context=context,
             )
 
-        # NOTE: Create event for cancel executor stop running.
+        # NOTE: Create event for cancel executor by trigger stop running event.
         event: Event = Event()
 
+        # IMPORTANT: Start running strategy execution by multithreading because
+        #   it will running by strategy values without waiting previous
+        #   execution.
         with ThreadPoolExecutor(
-            max_workers=self.strategy.max_parallel
+            max_workers=self.strategy.max_parallel,
+            thread_name_prefix="job_strategy_exec_",
         ) as executor:
             futures: list[Future] = [
                 executor.submit(
