@@ -155,7 +155,7 @@ and do not raise any error to you.
 | `WORKFLOW_CORE_PATH_CONF`               | Core      | conf                             | The config path that keep all template `.yaml` files                                                               |        |
 | `WORKFLOW_CORE_TIMEZONE`                | Core      | Asia/Bangkok                     | A Timezone string value that will pass to `ZoneInfo` object                                                        |        |
 | `WORKFLOW_CORE_STAGE_DEFAULT_ID`        | Core      | true                             | A flag that enable default stage ID that use for catch an execution output                                         |        |
-| `WORKFLOW_CORE_STAGE_RAISE_ERROR`       | Core      | true                             | A flag that all stage raise StageException from stage execution                                                    |        |
+| `WORKFLOW_CORE_STAGE_RAISE_ERROR`       | Core      | false                            | A flag that all stage raise StageException from stage execution                                                    |        |
 | `WORKFLOW_CORE_JOB_DEFAULT_ID`          | Core      | false                            | A flag that enable default job ID that use for catch an execution output. The ID that use will be sequence number. |        |
 | `WORKFLOW_CORE_MAX_NUM_POKING`          | Core      | 4                                |                                                                                                                    |        |
 | `WORKFLOW_CORE_MAX_JOB_PARALLEL`        | Core      | 2                                | The maximum job number that able to run parallel in workflow executor                                              |        |

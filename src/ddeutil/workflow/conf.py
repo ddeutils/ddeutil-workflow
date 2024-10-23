@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo
 from ddeutil.core import import_string, str2bool
 from ddeutil.io import Paths, PathSearch, YamlFlResolve
 from dotenv import load_dotenv
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
 
 load_dotenv()
@@ -47,7 +47,7 @@ class Config:
 
     # NOTE: Stage
     stage_raise_error: bool = str2bool(
-        env("WORKFLOW_CORE_STAGE_RAISE_ERROR", "true")
+        env("WORKFLOW_CORE_STAGE_RAISE_ERROR", "false")
     )
     stage_default_id: bool = str2bool(
         env("WORKFLOW_CORE_STAGE_DEFAULT_ID", "false")
@@ -101,7 +101,7 @@ class Config:
         """Reload environment variables from the current stage."""
         self.tz: ZoneInfo = ZoneInfo(env("WORKFLOW_CORE_TIMEZONE", "UTC"))
         self.stage_raise_error: bool = str2bool(
-            env("WORKFLOW_CORE_STAGE_RAISE_ERROR", "true")
+            env("WORKFLOW_CORE_STAGE_RAISE_ERROR", "false")
         )
 
 
@@ -124,18 +124,10 @@ class Engine(BaseModel):
         if (_regis := values.get("registry")) and isinstance(_regis, str):
             values["registry"] = [_regis]
         if (_regis_filter := values.get("registry_filter")) and isinstance(
-            _regis, str
+            _regis_filter, str
         ):
             values["registry_filter"] = [_regis_filter]
         return values
-
-
-class CoreConf(BaseModel):
-    """Core Config Model"""
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    tz: ZoneInfo = Field(default_factory=lambda: ZoneInfo("UTC"))
 
 
 class ConfParams(BaseModel):
@@ -144,10 +136,6 @@ class ConfParams(BaseModel):
     engine: Engine = Field(
         default_factory=Engine,
         description="A engine mapping values.",
-    )
-    core: CoreConf = Field(
-        default_factory=CoreConf,
-        description="A core config value",
     )
 
 
