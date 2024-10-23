@@ -1132,6 +1132,7 @@ class WorkflowTaskData:
                 self.workflow.name == other.workflow.name
                 and self.on.cronjob == other.on.cronjob
             )
+        return NotImplemented
 
 
 @catch_exceptions(cancel_on_failure=True)
@@ -1143,10 +1144,10 @@ def workflow_task(
     """Workflow task generator that create release pair of workflow and on to
     the threading in background.
 
-        This workflow task will start every minute at :02 second.
+        This workflow task will start every minute at ':02' second.
 
     :param workflow_tasks:
-    :param stop:
+    :param stop: A stop datetime object that force stop running scheduler.
     :param threads:
     :rtype: CancelJob | None
     """
@@ -1347,9 +1348,10 @@ def workflow_runner(
     """Workflow application that running multiprocessing schedule with chunk of
     workflows that exists in config path.
 
-    :param stop:
+    :param stop: A stop datetime object that force stop running scheduler.
     :param excluded:
     :param externals:
+
     :rtype: list[str]
 
         This function will get all workflows that include on value that was

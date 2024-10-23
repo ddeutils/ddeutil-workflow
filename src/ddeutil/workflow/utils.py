@@ -167,7 +167,7 @@ def make_registry(submodule: str) -> dict[str, Registry]:
             importer = import_module(f"{module}.{submodule}")
         except ModuleNotFoundError:
             continue
-        print(importer)
+
         for fstr, func in inspect.getmembers(importer, inspect.isfunction):
             # NOTE: check function attribute that already set tag by
             #   ``utils.tag`` decorator.
@@ -193,9 +193,14 @@ def make_registry(submodule: str) -> dict[str, Registry]:
 class BaseParam(BaseModel, ABC):
     """Base Parameter that use to make Params Model."""
 
-    desc: Optional[str] = None
-    required: bool = True
-    type: str
+    desc: Optional[str] = Field(
+        default=None, description="A description of parameter providing."
+    )
+    required: bool = Field(
+        default=True,
+        description="A require flag that force to pass this parameter value.",
+    )
+    type: str = Field(description="A type of parameter.")
 
     @abstractmethod
     def receive(self, value: Optional[Any] = None) -> Any:
@@ -207,15 +212,21 @@ class BaseParam(BaseModel, ABC):
     def __serializer_type(self, value: str) -> str:
         """Serialize the value of the type field.
 
+        :param value: A type field value.
         :rtype: str
         """
         return value
 
 
 class DefaultParam(BaseParam):
-    """Default Parameter that will check default if it required"""
+    """Default Parameter that will check default if it required. This model do
+    not implement the receive method.
+    """
 
-    default: Optional[str] = None
+    default: Optional[str] = Field(
+        default=None,
+        description="A default value if parameter does not pass.",
+    )
 
     @abstractmethod
     def receive(self, value: Optional[Any] = None) -> Any:
@@ -237,7 +248,6 @@ class DatetimeParam(DefaultParam):
     """Datetime parameter."""
 
     type: Literal["datetime"] = "datetime"
-    required: bool = False
     default: datetime = Field(default_factory=get_dt_now)
 
     def receive(self, value: str | datetime | date | None = None) -> datetime:
@@ -307,10 +317,14 @@ class ChoiceParam(BaseParam):
     """Choice parameter."""
 
     type: Literal["choice"] = "choice"
-    options: list[str]
+    options: list[str] = Field(description="A list of choice parameters.")
 
     def receive(self, value: Optional[str] = None) -> str:
-        """Receive value that match with options."""
+        """Receive value that match with options.
+
+        :param value: A value that want to select from the options field.
+        :rtype: str
+        """
         # NOTE:
         #   Return the first value in options if does not pass any input value
         if value is None:
@@ -374,15 +388,15 @@ class Result:
         :param running_id: A running ID that want to update on this model.
         :rtype: Self
         """
-        self._parent_run_id = running_id
+        self._parent_run_id: str = running_id
         return self
 
     @property
-    def parent_run_id(self):
+    def parent_run_id(self) -> str:
         return self._parent_run_id
 
     @property
-    def run_id(self):
+    def run_id(self) -> str:
         return self._run_id
 
     def catch(self, status: int, context: DictData) -> Self:
@@ -419,8 +433,8 @@ class Result:
         self.__dict__["context"]["jobs"].update(result.context)
 
         # NOTE: Update running ID from an incoming result.
-        self._parent_run_id = result.parent_run_id
-        self._run_id = result.run_id
+        self._parent_run_id: str = result.parent_run_id
+        self._run_id: str = result.run_id
         return self
 
 
