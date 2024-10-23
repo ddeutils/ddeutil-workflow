@@ -125,3 +125,14 @@ def test_workflow_run_py_with_parallel():
                 },
             },
         } == rs.context
+
+
+def test_workflow_run_py_raise():
+    workflow = wf.Workflow.from_loader("wf-run-python-raise", externals={})
+    rs = workflow.execute(params={})
+    print(rs)
+    assert 1 == rs.status
+
+    import json
+
+    print(json.dumps(rs.context, indent=2, default=str))

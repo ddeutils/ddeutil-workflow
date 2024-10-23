@@ -15,7 +15,7 @@ from typing import Any, TypeVar
 from zoneinfo import ZoneInfo
 
 from ddeutil.core import import_string, str2bool
-from ddeutil.io import PathData, PathSearch, YamlFlResolve
+from ddeutil.io import Paths, PathSearch, YamlFlResolve
 from dotenv import load_dotenv
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.functional_validators import model_validator
@@ -108,7 +108,7 @@ class Config:
 class Engine(BaseModel):
     """Engine Pydantic Model for keeping application path."""
 
-    paths: PathData = Field(default_factory=PathData)
+    paths: Paths = Field(default_factory=Paths)
     registry: list[str] = Field(
         default_factory=lambda: ["ddeutil.workflow"],  # pragma: no cover
     )
@@ -293,7 +293,12 @@ class Loader(SimLoad):
         exclude: list[str] | None = None,
         **kwargs,
     ) -> DictData:
-        """Override the find class method from the Simple Loader object."""
+        """Override the find class method from the Simple Loader object.
+
+        :param obj:
+        :param include:
+        :param exclude:
+        """
         return super().finds(
             obj=obj, params=load_config(), include=include, exclude=exclude
         )

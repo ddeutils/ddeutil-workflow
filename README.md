@@ -148,7 +148,7 @@ application. If any configuration values do not set yet, it will use default val
 and do not raise any error to you.
 
 | Environment                             | Component | Default                          | Description                                                                                                        | Remark |
-|-----------------------------------------|-----------|----------------------------------|--------------------------------------------------------------------------------------------------------------------|--------|
+|:----------------------------------------|-----------|----------------------------------|--------------------------------------------------------------------------------------------------------------------|--------|
 | `WORKFLOW_ROOT_PATH`                    | Core      | .                                | The root path of the workflow application                                                                          |        |
 | `WORKFLOW_CORE_REGISTRY`                | Core      | src.ddeutil.workflow,tests.utils | List of importable string for the hook stage                                                                       |        |
 | `WORKFLOW_CORE_REGISTRY_FILTER`         | Core      | ddeutil.workflow.utils           | List of importable string for the filter template                                                                  |        |
@@ -168,10 +168,10 @@ and do not raise any error to you.
 
 **API Application**:
 
-| Environment                          | Component | Default | Description                                                                       | Remark |
-|--------------------------------------|-----------|---------|-----------------------------------------------------------------------------------|--------|
-| `WORKFLOW_API_ENABLE_ROUTE_WORKFLOW` | API       | true    | A flag that enable workflow route to manage execute manually and workflow logging |        |
-| `WORKFLOW_API_ENABLE_ROUTE_SCHEDULE` | API       | true    | A flag that enable run scheduler                                                  |        |
+| Environment                           | Component | Default | Description                                                                       | Remark |
+|:--------------------------------------|-----------|---------|-----------------------------------------------------------------------------------|--------|
+| `WORKFLOW_API_ENABLE_ROUTE_WORKFLOW`  | API       | true    | A flag that enable workflow route to manage execute manually and workflow logging |        |
+| `WORKFLOW_API_ENABLE_ROUTE_SCHEDULE`  | API       | true    | A flag that enable run scheduler                                                  |        |
 
 ## :rocket: Deployment
 

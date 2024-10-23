@@ -59,20 +59,24 @@ class Re:
     #   Regular expression:
     #       - Version 1:
     #         \${{\s*(?P<caller>[a-zA-Z0-9_.\s'\"\[\]\(\)\-\{}]+?)\s*(?P<post_filters>(?:\|\s*(?:[a-zA-Z0-9_]{3,}[a-zA-Z0-9_.,-\\%\s'\"[\]()\{}]+)\s*)*)}}
-    #       - Version 2 (2024-09-30):
+    #       - Version 2: (2024-09-30):
     #         \${{\s*(?P<caller>(?P<caller_prefix>(?:[a-zA-Z_-]+\.)*)(?P<caller_last>[a-zA-Z0-9_\-.'\"(\)[\]{}]+))\s*(?P<post_filters>(?:\|\s*(?:[a-zA-Z0-9_]{3,}[a-zA-Z0-9_.,-\\%\s'\"[\]()\{}]+)\s*)*)}}
+    #       - Version 3: (2024-10-05):
+    #         \${{\s*(?P<caller>(?P<caller_prefix>(?:[a-zA-Z_-]+\??\.)*)(?P<caller_last>[a-zA-Z0-9_\-.'\"(\)[\]{}]+\??))\s*(?P<post_filters>(?:\|\s*(?:[a-zA-Z0-9_]{3,}[a-zA-Z0-9_.,-\\%\s'\"[\]()\{}]+)\s*)*)}}
     #
     #   Examples:
     #       - ${{ params.data_dt }}
     #       - ${{ params.source.table }}
+    #       - ${{ params.datetime | fmt('%Y-%m-%d') }}
+    #       - ${{ params.source?.schema }}
     #
     __re_caller: str = r"""
         \$
         {{
             \s*
             (?P<caller>
-                (?P<caller_prefix>(?:[a-zA-Z_-]+\.)*)
-                (?P<caller_last>[a-zA-Z0-9_\-.'\"(\)[\]{}]+)
+                (?P<caller_prefix>(?:[a-zA-Z_-]+\??\.)*)
+                (?P<caller_last>[a-zA-Z0-9_\-.'\"(\)[\]{}]+\??)
             )
             \s*
             (?P<post_filters>
@@ -112,5 +116,10 @@ class Re:
 
     @classmethod
     def finditer_caller(cls, value) -> Iterator[CallerRe]:
+        """Generate CallerRe object that create from matching object that
+        extract with re.finditer function.
+
+        :rtype: Iterator[CallerRe]
+        """
         for found in cls.RE_CALLER.finditer(value):
             yield CallerRe.from_regex(found)

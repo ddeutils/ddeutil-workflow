@@ -31,7 +31,6 @@ except ImportError:
 
 from ddeutil.core import getdot, hasdot, hash_str, import_string, lazy
 from ddeutil.io import search_env_replace
-from ddeutil.io.models.lineage import dt_now
 from pydantic import BaseModel, Field
 from pydantic.dataclasses import dataclass
 from pydantic.functional_serializers import field_serializer
@@ -49,16 +48,30 @@ AnyModelType = type[AnyModel]
 logger = logging.getLogger("ddeutil.workflow")
 
 
-def get_diff_sec(dt: datetime, tz: ZoneInfo | None = None) -> int:
+def get_dt_now(tz: ZoneInfo | None = None) -> datetime:  # pragma: no cov
+    """Return the current datetime object.
+
+    :param tz:
+    :return: The current datetime object that use an input timezone or UTC.
+    """
+    return datetime.now(tz=(tz or ZoneInfo("UTC")))
+
+
+def get_diff_sec(
+    dt: datetime, tz: ZoneInfo | None = None
+) -> int:  # pragma: no cov
     """Return second value that come from diff of an input datetime and the
     current datetime with specific timezone.
+
+    :param dt:
+    :param tz:
     """
     return round(
         (dt - datetime.now(tz=(tz or ZoneInfo("UTC")))).total_seconds()
     )
 
 
-def delay(second: float = 0) -> None:
+def delay(second: float = 0) -> None:  # pragma: no cov
     """Delay time that use time.sleep with random second value between
     0.00 - 0.99 seconds.
 
@@ -223,7 +236,7 @@ class DatetimeParam(DefaultParam):
 
     type: Literal["datetime"] = "datetime"
     required: bool = False
-    default: datetime = Field(default_factory=dt_now)
+    default: datetime = Field(default_factory=get_dt_now)
 
     def receive(self, value: str | datetime | date | None = None) -> datetime:
         """Receive value that match with datetime. If a input value pass with
@@ -327,7 +340,7 @@ class Result:
 
     status: int = field(default=2)
     context: DictData = field(default_factory=dict)
-    start_at: datetime = field(default_factory=dt_now, compare=False)
+    start_at: datetime = field(default_factory=get_dt_now, compare=False)
     end_at: Optional[datetime] = field(default=None, compare=False)
 
     # NOTE: Ignore this field to compare another result model with __eq__.

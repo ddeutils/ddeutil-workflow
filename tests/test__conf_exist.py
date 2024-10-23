@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from ddeutil.io.__base import YamlFl
+from ddeutil.io import YamlFl
 
 
 def test_read_data(conf_path: Path):
