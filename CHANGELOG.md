@@ -2,6 +2,42 @@
 
 ## Latest Changes
 
+## 0.0.16
+
+### :sparkles: Features
+
+- :dart: feat: add default id of job if it exec standalone without workflow. (_2024-10-05_)
+- :dart: feat: move all getting env var in all code to conf module. (_2024-10-02_)
+- :dart: feat: change getenv config to config module. (_2024-10-01_)
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: add testcase for param objects. (_2024-10-23_)
+- :test_tube: tests: update testcase of stage module. (_2024-10-23_)
+- :test_tube: tests: add testcase for make_registry func. (_2024-10-23_)
+- :test_tube: tests: merge testcase together that create many files. (_2024-10-05_)
+- :construction: refactored: ⬆ bump pypa/gh-action-pypi-publish from 1.10.0 to 1.10.2 (_2024-10-01_)
+
+### :card_file_box: Documents
+
+- :page_facing_up: docs: update desc of model filds. (_2024-10-23_)
+- :page_facing_up: docs: update readme and getting started docs. (_2024-10-05_)
+
+### :bug: Fix Bugs
+
+- :gear: fixed: return None value if bash stage does not receive any stderr or stdout. (_2024-10-23_)
+- :gear: fixed: remove un-use config object. (_2024-10-23_)
+- :gear: fixed: fix type on workflow data. (_2024-10-01_)
+
+### :package: Build & Workflow
+
+- :toolbox: build: add docker command on build workflow. (_2024-09-30_)
+
+### :postbox: Dependencies
+
+- :pushpin: deps: update optional yaml on ddeutil-io. (_2024-10-23_)
+- :pushpin: deps: update version of ddeutil and ddeutil-io. (_2024-10-23_)
+
 ## 0.0.15
 
 ### :sparkles: Features
