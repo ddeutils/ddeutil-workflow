@@ -90,9 +90,16 @@ def handler_result(message: str | None = None) -> DecoratorResult:
     you force catching an output result with error message by specific
     environment variable,`WORKFLOW_CORE_STAGE_RAISE_ERROR`.
 
-        Execution   --> Ok      --> Result with 0
+        Execution   --> Ok      --> Result
+                                        status: 0
+                                        context:
+                                            outputs: ...
                     --> Error   --> Raise StageException
-                                --> Result with 1 (if env var was set)
+                                --> Result (if env var was set)
+                                        status: 1
+                                        context:
+                                            error: ...
+                                            error_message: ...
 
         On the last step, it will set the running ID on a return result object
     from current stage ID before release the final result.
@@ -560,7 +567,9 @@ class HookStage(BaseStage):
     """
 
     uses: str = Field(
-        description="A pointer that want to load function from registry.",
+        description=(
+            "A pointer that want to load function from the hook registry."
+        ),
     )
     args: DictData = Field(
         default_factory=dict,
@@ -621,10 +630,7 @@ class TriggerStage(BaseStage):
         >>> stage = {
         ...     "name": "Trigger workflow stage execution",
         ...     "trigger": 'workflow-name-for-loader',
-        ...     "params": {
-        ...         "run-date": "2024-08-01",
-        ...         "source": "src",
-        ...     },
+        ...     "params": {"run-date": "2024-08-01", "source": "src"},
         ... }
     """
 

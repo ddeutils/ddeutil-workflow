@@ -22,8 +22,6 @@ def test_stage_trigger():
 def test_workflow_trigger():
     workflow = wf.Workflow.from_loader(name="wf-trigger", externals={})
     rs: Result = workflow.execute(params={})
-    # import json
-    # print(json.dumps(rs.context, indent=2, default=str))
     assert {
         "author-run": "Trigger Runner",
         "run-date": datetime(2024, 8, 1),

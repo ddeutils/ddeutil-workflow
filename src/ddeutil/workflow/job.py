@@ -261,7 +261,7 @@ class Job(BaseModel):
     )
 
     @model_validator(mode="before")
-    def __prepare_keys(cls, values: DictData) -> DictData:
+    def __prepare_keys__(cls, values: DictData) -> DictData:
         """Rename key that use dash to underscore because Python does not
         support this character exist in any variable name.
 
@@ -272,12 +272,12 @@ class Job(BaseModel):
         return values
 
     @field_validator("desc", mode="after")
-    def ___prepare_desc(cls, value: str) -> str:
+    def ___prepare_desc__(cls, value: str) -> str:
         """Prepare description string that was created on a template."""
         return dedent(value)
 
     @model_validator(mode="after")
-    def __prepare_running_id(self) -> Self:
+    def __prepare_running_id__(self) -> Self:
         """Prepare the job running ID.
 
         :rtype: Self
