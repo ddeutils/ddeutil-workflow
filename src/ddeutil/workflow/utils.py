@@ -33,7 +33,6 @@ from ddeutil.core import getdot, hasdot, hash_str, import_string, lazy
 from ddeutil.io import search_env_replace
 from pydantic import BaseModel, Field
 from pydantic.dataclasses import dataclass
-from pydantic.functional_serializers import field_serializer
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
@@ -208,21 +207,16 @@ class BaseParam(BaseModel, ABC):
             "Receive value and validate typing before return valid value."
         )
 
-    @field_serializer("type")
-    def __serializer_type(self, value: str) -> str:
-        """Serialize the value of the type field.
-
-        :param value: A type field value.
-        :rtype: str
-        """
-        return value
-
 
 class DefaultParam(BaseParam):
     """Default Parameter that will check default if it required. This model do
     not implement the receive method.
     """
 
+    required: bool = Field(
+        default=False,
+        description="A require flag for the default-able parameter value.",
+    )
     default: Optional[str] = Field(
         default=None,
         description="A default value if parameter does not pass.",
@@ -237,9 +231,9 @@ class DefaultParam(BaseParam):
     @model_validator(mode="after")
     def __check_default(self) -> Self:
         """Check default value should pass when it set required."""
-        if not self.required and self.default is None:
+        if self.required and self.default is None:
             raise ParamValueException(
-                "Default should set when this parameter does not required."
+                "Default should be set when this parameter was required."
             )
         return self
 
@@ -270,7 +264,12 @@ class DatetimeParam(DefaultParam):
                 f"Value that want to convert to datetime does not support for "
                 f"type: {type(value)}"
             )
-        return datetime.fromisoformat(value)
+        try:
+            return datetime.fromisoformat(value)
+        except ValueError:
+            raise ParamValueException(
+                f"Invalid isoformat string: {value!r}"
+            ) from None
 
 
 class StrParam(DefaultParam):
@@ -278,7 +277,7 @@ class StrParam(DefaultParam):
 
     type: Literal["str"] = "str"
 
-    def receive(self, value: Optional[str] = None) -> str | None:
+    def receive(self, value: str | None = None) -> str | None:
         """Receive value that match with str.
 
         :param value: A value that want to validate with string parameter type.
@@ -293,8 +292,12 @@ class IntParam(DefaultParam):
     """Integer parameter."""
 
     type: Literal["int"] = "int"
+    default: Optional[int] = Field(
+        default=None,
+        description="A default value if parameter does not pass.",
+    )
 
-    def receive(self, value: Optional[int] = None) -> int | None:
+    def receive(self, value: int | None = None) -> int | None:
         """Receive value that match with int.
 
         :param value: A value that want to validate with integer parameter type.
@@ -305,10 +308,9 @@ class IntParam(DefaultParam):
         if not isinstance(value, int):
             try:
                 return int(str(value))
-            except TypeError as err:
+            except ValueError as err:
                 raise ParamValueException(
-                    f"Value that want to convert to integer does not support "
-                    f"for type: {type(value)}"
+                    f"Value can not convert to int, {value}, with base 10"
                 ) from err
         return value
 
@@ -319,7 +321,7 @@ class ChoiceParam(BaseParam):
     type: Literal["choice"] = "choice"
     options: list[str] = Field(description="A list of choice parameters.")
 
-    def receive(self, value: Optional[str] = None) -> str:
+    def receive(self, value: str | None = None) -> str:
         """Receive value that match with options.
 
         :param value: A value that want to select from the options field.
@@ -329,7 +331,7 @@ class ChoiceParam(BaseParam):
         #   Return the first value in options if does not pass any input value
         if value is None:
             return self.options[0]
-        if any(value not in self.options):
+        if value not in self.options:
             raise ParamValueException(
                 f"{value!r} does not match any value in choice options."
             )
