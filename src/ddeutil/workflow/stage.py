@@ -469,9 +469,9 @@ class PyStage(BaseStage):
         :rtype: DictData
         """
         # NOTE: The output will fileter unnecessary keys from locals.
-        _locals: DictData = output["locals"]
+        lc: DictData = output["locals"]
         super().set_outputs(
-            {k: _locals[k] for k in _locals if k != "__annotations__"}, to=to
+            {k: lc[k] for k in lc if k != "__annotations__"}, to=to
         )
 
         # NOTE:
@@ -495,15 +495,15 @@ class PyStage(BaseStage):
         _globals: DictData = (
             globals() | params | param2template(self.vars, params)
         )
-        _locals: DictData = {}
+        lc: DictData = {}
 
         # NOTE: Start exec the run statement.
         logger.info(f"({self.run_id}) [STAGE]: Py-Execute: {self.name}")
-        exec(run, _globals, _locals)
+        exec(run, _globals, lc)
 
         return Result(
             status=0,
-            context={"locals": _locals, "globals": _globals},
+            context={"locals": lc, "globals": _globals},
         )
 
 
