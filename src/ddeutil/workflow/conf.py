@@ -244,7 +244,7 @@ class SimLoad:
         method can use include and exclude list of identity name for filter and
         adds-on.
 
-        :param obj:
+        :param obj: A object that want to validate matching before return.
         :param params:
         :param include:
         :param exclude:
@@ -295,7 +295,7 @@ class Loader(SimLoad):
     ) -> DictData:
         """Override the find class method from the Simple Loader object.
 
-        :param obj:
+        :param obj: A object that want to validate matching before return.
         :param include:
         :param exclude:
         """

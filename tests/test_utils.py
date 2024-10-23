@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import ddeutil.workflow.conf as conf
 import ddeutil.workflow.utils as utils
 
@@ -5,6 +7,9 @@ import ddeutil.workflow.utils as utils
 def test_gen_id():
     assert "1354680202" == utils.gen_id("{}")
     assert "1354680202" == utils.gen_id("{}", sensitive=False)
+
+    with patch("ddeutil.workflow.utils.config.workflow_id_simple_mode", False):
+        assert "99914b932bd37a50b983c5e7c90ae93b" == utils.gen_id("{}")
 
 
 def test_filter_func():

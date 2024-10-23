@@ -118,14 +118,16 @@ class TagFunc(Protocol):
     name: str
     tag: str
 
-    def __call__(self, *args, **kwargs): ...  # pragma: no cove
+    def __call__(self, *args, **kwargs): ...  # pragma: no cov
 
 
 ReturnTagFunc = Callable[P, TagFunc]
 DecoratorTagFunc = Callable[[Callable[[...], Any]], ReturnTagFunc]
 
 
-def tag(name: str, alias: str | None = None) -> DecoratorTagFunc:
+def tag(
+    name: str, alias: str | None = None
+) -> DecoratorTagFunc:  # pragma: no cov
     """Tag decorator function that set function attributes, ``tag`` and ``name``
     for making registries variable.
 
@@ -165,7 +167,7 @@ def make_registry(submodule: str) -> dict[str, Registry]:
             importer = import_module(f"{module}.{submodule}")
         except ModuleNotFoundError:
             continue
-
+        print(importer)
         for fstr, func in inspect.getmembers(importer, inspect.isfunction):
             # NOTE: check function attribute that already set tag by
             #   ``utils.tag`` decorator.
