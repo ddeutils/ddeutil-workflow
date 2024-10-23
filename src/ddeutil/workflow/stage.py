@@ -12,11 +12,13 @@ can tracking logs.
 handle stage error on this stage model. I think stage model should have a lot of
 usecase and it does not worry when I want to create a new one.
 
-    Execution   --> Ok    --> Result with 0
-                --> Error --> Raise StageException
+    Execution   --> Ok      --> Result with 0
+                --> Error   --> Raise StageException
+                            --> Result with 1 (if env var was set)
 
-    On the context I/O that pass to stage object at execute process. The execute
-method receive `{"params": {...}}` for mapping to template.
+    On the context I/O that pass to a stage object at execute process. The
+execute method receives a `params={"params": {...}}` value for mapping to
+template searching.
 """
 from __future__ import annotations
 
@@ -96,6 +98,7 @@ def handler_result(message: str | None = None) -> DecoratorResult:
     from current stage ID before release the final result.
 
     :param message: A message that want to add at prefix of exception statement.
+    :type message: str | None (Default=None)
     :rtype: Callable[P, Result]
     """
     # NOTE: The prefix message string that want to add on the first exception
@@ -175,7 +178,7 @@ class BaseStage(BaseModel, ABC):
     )
 
     @model_validator(mode="after")
-    def __prepare_running_id(self) -> Self:
+    def __prepare_running_id__(self) -> Self:
         """Prepare stage running ID that use default value of field and this
         method will validate name and id fields should not contain any template
         parameter (exclude matrix template).
@@ -255,7 +258,7 @@ class BaseStage(BaseModel, ABC):
         )
 
         # NOTE: Set the output to that stage generated ID with ``outputs`` key.
-        logger.debug(f"({self.run_id}) [STAGE]: Set outputs on: {_id}")
+        logger.debug(f"({self.run_id}) [STAGE]: Set outputs to {_id!r}")
         to["stages"][_id] = {"outputs": output}
         return to
 
@@ -299,6 +302,7 @@ class EmptyStage(BaseStage):
     sleep: float = Field(
         default=0,
         description="A second value to sleep before finish execution",
+        ge=0,
     )
 
     def execute(self, params: DictData) -> Result:
@@ -351,7 +355,7 @@ class BashStage(BaseStage):
     )
 
     @contextlib.contextmanager
-    def __prepare_bash(self, bash: str, env: DictStr) -> Iterator[TupleStr]:
+    def prepare_bash(self, bash: str, env: DictStr) -> Iterator[TupleStr]:
         """Return context of prepared bash statement that want to execute. This
         step will write the `.sh` file before giving this file name to context.
         After that, it will auto delete this file automatic.
@@ -394,15 +398,12 @@ class BashStage(BaseStage):
         :rtype: Result
         """
         bash: str = param2template(dedent(self.bash), params)
-        with self.__prepare_bash(
+        with self.prepare_bash(
             bash=bash, env=param2template(self.env, params)
         ) as sh:
             logger.info(f"({self.run_id}) [STAGE]: Shell-Execute: {sh}")
             rs: CompletedProcess = subprocess.run(
-                sh,
-                shell=False,
-                capture_output=True,
-                text=True,
+                sh, shell=False, capture_output=True, text=True
             )
         if rs.returncode > 0:
             # NOTE: Prepare stderr message that returning from subprocess.
