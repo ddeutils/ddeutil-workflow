@@ -7,7 +7,7 @@ from ddeutil.workflow.utils import Result
 from pydantic import ValidationError
 
 
-def test_model_copy():
+def test_stage_model_copy():
     stage: Stage = st.EmptyStage.model_validate(
         {
             "name": "Empty Stage",
@@ -19,14 +19,10 @@ def test_model_copy():
     assert id(stage) != id(new_stage)
 
 
-def test_empty_stage():
+def test_stage_empty():
     stage: Stage = st.EmptyStage.model_validate(
-        {
-            "name": "Empty Stage",
-            "echo": "hello world",
-        }
+        {"name": "Empty Stage", "echo": "hello world"}
     )
-
     rs: Result = stage.execute(params={})
     assert 0 == rs.status
     assert {} == rs.context
@@ -35,7 +31,7 @@ def test_empty_stage():
     assert "demo" == stage.run_id
 
 
-def test_empty_stage_name_raise():
+def test_stage_empty_name_raise():
     with pytest.raises(ValidationError):
         st.EmptyStage.model_validate(
             {
@@ -46,16 +42,6 @@ def test_empty_stage_name_raise():
         )
 
 
-def test_stage_condition_raise():
-    workflow: Workflow = Workflow.from_loader(
-        name="wf-condition-raise", externals={}
-    )
-    stage: Stage = workflow.job("condition-job").stage("condition-stage")
-
-    with pytest.raises(StageException):
-        stage.is_skipped({"params": {"name": "foo"}})
-
-
 def test_stage_condition():
     params = {"name": "foo"}
     workflow = Workflow.from_loader(name="wf-condition", externals={})
@@ -64,3 +50,13 @@ def test_stage_condition():
     assert not stage.is_skipped(params=workflow.parameterize(params))
     assert stage.is_skipped(params=workflow.parameterize({"name": "bar"}))
     assert {"name": "foo"} == params
+
+
+def test_stage_condition_raise():
+    workflow: Workflow = Workflow.from_loader(
+        name="wf-condition-raise", externals={}
+    )
+    stage: Stage = workflow.job("condition-job").stage("condition-stage")
+
+    with pytest.raises(StageException):
+        stage.is_skipped({"params": {"name": "foo"}})

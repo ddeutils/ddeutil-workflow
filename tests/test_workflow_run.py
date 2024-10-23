@@ -57,7 +57,7 @@ def test_workflow_run_py():
                         "outputs": {
                             "return_code": 0,
                             "stdout": "Hello World",
-                            "stderr": "",
+                            "stderr": None,
                         }
                     }
                 },
@@ -118,7 +118,7 @@ def test_workflow_run_py_with_parallel():
                             "outputs": {
                                 "return_code": 0,
                                 "stdout": "Hello World",
-                                "stderr": "",
+                                "stderr": None,
                             }
                         }
                     },

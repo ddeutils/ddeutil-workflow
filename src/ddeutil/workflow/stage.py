@@ -104,7 +104,7 @@ def handler_result(message: str | None = None) -> DecoratorResult:
     # NOTE: The prefix message string that want to add on the first exception
     #   message dialog.
     #
-    #       ... ValueError: {message}
+    #       >>> ValueError: {message}
     #       ...     raise value error from the stage execution process.
     #
     message: str = message or ""
@@ -420,8 +420,8 @@ class BashStage(BaseStage):
             status=0,
             context={
                 "return_code": rs.returncode,
-                "stdout": rs.stdout.rstrip("\n"),
-                "stderr": rs.stderr.rstrip("\n"),
+                "stdout": rs.stdout.rstrip("\n") or None,
+                "stderr": rs.stderr.rstrip("\n") or None,
             },
         )
 
@@ -555,9 +555,7 @@ class HookStage(BaseStage):
         >>> stage = {
         ...     "name": "Task stage execution",
         ...     "uses": "tasks/function-name@tag-name",
-        ...     "args": {
-        ...         "FOO": "BAR",
-        ...     },
+        ...     "args": {"FOO": "BAR"},
         ... }
     """
 
