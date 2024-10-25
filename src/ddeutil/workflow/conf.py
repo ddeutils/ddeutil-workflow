@@ -11,7 +11,7 @@ from collections.abc import Iterator
 from datetime import timedelta
 from functools import cached_property
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import TypeVar
 from zoneinfo import ZoneInfo
 
 from ddeutil.core import import_string, str2bool
@@ -19,12 +19,16 @@ from ddeutil.io import Paths, PathSearch, YamlFlResolve
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
+from typing_extensions import Self
 
-load_dotenv()
-env = os.getenv
-DictData = dict[str, Any]
+from .__types import DictData
+
 AnyModel = TypeVar("AnyModel", bound=BaseModel)
 AnyModelType = type[AnyModel]
+
+load_dotenv()
+
+env = os.getenv
 
 
 class Config:
@@ -37,6 +41,14 @@ class Config:
     tz: ZoneInfo = ZoneInfo(env("WORKFLOW_CORE_TIMEZONE", "UTC"))
     workflow_id_simple_mode: bool = str2bool(
         os.getenv("WORKFLOW_CORE_WORKFLOW_ID_SIMPLE_MODE", "true")
+    )
+
+    # NOTE: Register
+    regis_hook_str: str = os.getenv(
+        "WORKFLOW_CORE_REGISTRY", "ddeutil.workflow"
+    )
+    regis_filter_str: str = os.getenv(
+        "WORKFLOW_CORE_REGISTRY_FILTER", "ddeutil.workflow.utils"
     )
 
     # NOTE: Logging
@@ -97,24 +109,41 @@ class Config:
                 f"timedelta with {self.__stop_boundary_delta}."
             ) from err
 
-    def refresh_dotenv(self):
+    def refresh_dotenv(self) -> Self:
         """Reload environment variables from the current stage."""
         self.tz: ZoneInfo = ZoneInfo(env("WORKFLOW_CORE_TIMEZONE", "UTC"))
         self.stage_raise_error: bool = str2bool(
             env("WORKFLOW_CORE_STAGE_RAISE_ERROR", "false")
         )
+        return self
+
+    @property
+    def conf_path(self) -> Path | None:
+        """Config path that use root_path class argument for this construction.
+
+        :rtype: Path | None
+        """
+        return (
+            f"{self.root_path}/{conf_env}"
+            if (conf_env := os.getenv("WORKFLOW_CORE_PATH_CONF"))
+            else None
+        )
+
+    @property
+    def regis_hook(self) -> list[str]:
+        return [r.strip() for r in self.regis_hook_str.split(",")]
+
+    @property
+    def regis_filter(self) -> list[str]:
+        return [r.strip() for r in self.regis_filter_str.split(",")]
 
 
 class Engine(BaseModel):
     """Engine Pydantic Model for keeping application path."""
 
     paths: Paths = Field(default_factory=Paths)
-    registry: list[str] = Field(
-        default_factory=lambda: ["ddeutil.workflow"],  # pragma: no cover
-    )
-    registry_filter: list[str] = Field(
-        default_factory=lambda: ["ddeutil.workflow.utils"],  # pragma: no cover
-    )
+    registry: list[str]
+    registry_filter: list[str]
 
     @model_validator(mode="before")
     def __prepare_registry(cls, values: DictData) -> DictData:
@@ -130,49 +159,22 @@ class Engine(BaseModel):
         return values
 
 
-class ConfParams(BaseModel):
-    """Params Model"""
-
-    engine: Engine = Field(
-        default_factory=Engine,
-        description="A engine mapping values.",
-    )
-
-
-def load_config() -> ConfParams:
+def load_config() -> Engine:
     """Load Config data from ``workflows-conf.yaml`` file.
 
     Configuration Docs:
-    ---
     :var engine.registry:
     :var engine.registry_filter:
     :var paths.root:
     :var paths.conf:
     """
-    root_path: str = config.root_path
-
-    regis: list[str] = ["ddeutil.workflow"]
-    if regis_env := os.getenv("WORKFLOW_CORE_REGISTRY"):
-        regis = [r.strip() for r in regis_env.split(",")]
-
-    regis_filter: list[str] = ["ddeutil.workflow.utils"]
-    if regis_filter_env := os.getenv("WORKFLOW_CORE_REGISTRY_FILTER"):
-        regis_filter = [r.strip() for r in regis_filter_env.split(",")]
-
-    conf_path: str = (
-        f"{root_path}/{conf_env}"
-        if (conf_env := os.getenv("WORKFLOW_CORE_PATH_CONF"))
-        else None
-    )
-    return ConfParams.model_validate(
+    return Engine.model_validate(
         obj={
-            "engine": {
-                "registry": regis,
-                "registry_filter": regis_filter,
-                "paths": {
-                    "root": root_path,
-                    "conf": conf_path,
-                },
+            "registry": config.regis_hook,
+            "registry_filter": config.regis_filter,
+            "paths": {
+                "root": config.root_path,
+                "conf": config.conf_path,
             },
         }
     )
@@ -201,11 +203,11 @@ class SimLoad:
     def __init__(
         self,
         name: str,
-        params: ConfParams,
+        params: Engine,
         externals: DictData | None = None,
     ) -> None:
         self.data: DictData = {}
-        for file in PathSearch(params.engine.paths.conf).files:
+        for file in PathSearch(params.paths.conf).files:
             if any(file.suffix.endswith(s) for s in (".yml", ".yaml")) and (
                 data := YamlFlResolve(file).read().get(name, {})
             ):
@@ -215,7 +217,7 @@ class SimLoad:
         if not self.data:
             raise ValueError(f"Config {name!r} does not found on conf path")
 
-        self.conf_params: ConfParams = params
+        self.conf_params: Engine = params
         self.externals: DictData = externals or {}
         self.data.update(self.externals)
 
@@ -223,7 +225,7 @@ class SimLoad:
     def finds(
         cls,
         obj: object,
-        params: ConfParams,
+        params: Engine,
         *,
         include: list[str] | None = None,
         exclude: list[str] | None = None,
@@ -239,7 +241,7 @@ class SimLoad:
         :rtype: Iterator[tuple[str, DictData]]
         """
         exclude: list[str] = exclude or []
-        for file in PathSearch(params.engine.paths.conf).files:
+        for file in PathSearch(params.paths.conf).files:
             if any(file.suffix.endswith(s) for s in (".yml", ".yaml")) and (
                 values := YamlFlResolve(file).read()
             ):
@@ -295,7 +297,7 @@ class Loader(SimLoad):
         super().__init__(name, load_config(), externals)
 
 
-def get_type(t: str, params: ConfParams) -> AnyModelType:
+def get_type(t: str, params: Engine) -> AnyModelType:
     """Return import type from string importable value in the type key.
 
     :param t: A importable type string.
@@ -307,7 +309,7 @@ def get_type(t: str, params: ConfParams) -> AnyModelType:
         # NOTE: Auto adding module prefix if it does not set
         return import_string(f"ddeutil.workflow.{t}")
     except ModuleNotFoundError:
-        for registry in params.engine.registry:
+        for registry in params.registry:
             try:
                 return import_string(f"{registry}.{t}")
             except ModuleNotFoundError:

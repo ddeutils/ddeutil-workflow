@@ -13,8 +13,8 @@ handle stage error on this stage model. I think stage model should have a lot of
 usecase and it does not worry when I want to create a new one.
 
     Execution   --> Ok      --> Result with 0
-                --> Error   --> Raise StageException
-                            --> Result with 1 (if env var was set)
+                --> Error   --> Result with 1 (if env var was set)
+                            --> Raise StageException
 
     On the context I/O that pass to a stage object at execute process. The
 execute method receives a `params={"params": {...}}` value for mapping to
@@ -94,12 +94,12 @@ def handler_result(message: str | None = None) -> DecoratorResult:
                                         status: 0
                                         context:
                                             outputs: ...
-                    --> Error   --> Raise StageException
-                                --> Result (if env var was set)
+                    --> Error   --> Result (if env var was set)
                                         status: 1
                                         context:
                                             error: ...
                                             error_message: ...
+                    --> Error   --> Raise StageException
 
         On the last step, it will set the running ID on a return result object
     from current stage ID before release the final result.
@@ -190,6 +190,9 @@ class BaseStage(BaseModel, ABC):
         method will validate name and id fields should not contain any template
         parameter (exclude matrix template).
 
+        :raise ValueError: When the ID and name fields include matrix parameter
+            template with the 'matrix.' string value.
+
         :rtype: Self
         """
         if self.run_id is None:
@@ -199,7 +202,7 @@ class BaseStage(BaseModel, ABC):
         #   template. (allow only matrix)
         if not_in_template(self.id) or not_in_template(self.name):
             raise ValueError(
-                "Stage name and ID should only template with matrix."
+                "Stage name and ID should only template with 'matrix.'"
             )
 
         return self
@@ -272,6 +275,11 @@ class BaseStage(BaseModel, ABC):
     def is_skipped(self, params: DictData | None = None) -> bool:
         """Return true if condition of this stage do not correct. This process
         use build-in eval function to execute the if-condition.
+
+        :raise StageException: When it has any error raise from the eval
+            condition statement.
+        :raise StageException: When return type of the eval condition statement
+            does not return with boolean type.
 
         :param params: A parameters that want to pass to condition template.
         :rtype: bool
@@ -522,6 +530,11 @@ def extract_hook(hook: str) -> Callable[[], TagFunc]:
     """Extract Hook function from string value to hook partial function that
     does run it at runtime.
 
+    :raise NotImplementedError: When the searching hook's function result does
+        not exist in the registry.
+    :raise NotImplementedError: When the searching hook's tag result does not
+        exists in the registry with its function key.
+
     :param hook: A hook value that able to match with Task regex.
     :rtype: Callable[[], TagFunc]
     """
@@ -580,6 +593,11 @@ class HookStage(BaseStage):
     @handler_result()
     def execute(self, params: DictData) -> Result:
         """Execute the Hook function that already in the hook registry.
+
+        :raise ValueError: When the necessary arguments of hook function do not
+            set from the input params argument.
+        :raise TypeError: When the return type of hook function does not be
+            dict type.
 
         :param params: A parameter that want to pass before run any statement.
         :type params: DictData

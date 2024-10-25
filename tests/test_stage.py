@@ -7,12 +7,9 @@ from ddeutil.workflow.utils import Result
 from pydantic import ValidationError
 
 
-def test_stage_model_copy():
+def test_stage():
     stage: Stage = st.EmptyStage.model_validate(
-        {
-            "name": "Empty Stage",
-            "echo": "hello world",
-        }
+        {"name": "Empty Stage", "echo": "hello world"}
     )
     new_stage: Stage = stage.model_copy(update={"run_id": "dummy"})
     assert "dummy" == new_stage.run_id

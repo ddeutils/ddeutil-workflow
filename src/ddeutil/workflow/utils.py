@@ -161,7 +161,7 @@ def make_registry(submodule: str) -> dict[str, Registry]:
     :rtype: dict[str, Registry]
     """
     rs: dict[str, Registry] = {}
-    for module in load_config().engine.registry:
+    for module in load_config().registry:
         # NOTE: try to sequential import task functions
         try:
             importer = import_module(f"{module}.{submodule}")
@@ -498,7 +498,7 @@ def make_filter_registry() -> dict[str, FilterRegistry]:
     :rtype: dict[str, Registry]
     """
     rs: dict[str, Registry] = {}
-    for module in load_config().engine.registry_filter:
+    for module in load_config().registry_filter:
         # NOTE: try to sequential import task functions
         try:
             importer = import_module(module)
@@ -550,12 +550,15 @@ def get_args_const(
     keywords: dict[str, Constant] = {k.arg: k.value for k in caller.keywords}
 
     if any(not isinstance(i, Constant) for i in args):
-        raise UtilException("Argument should be constant.")
+        raise UtilException(f"Argument of {expr} should be constant.")
+
+    if any(not isinstance(i, Constant) for i in keywords.values()):
+        raise UtilException(f"Keyword argument of {expr} should be constant.")
 
     return name.id, args, keywords
 
 
-@custom_filter("fmt")
+@custom_filter("fmt")  # pragma: no cov
 def datetime_format(value: datetime, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
     """Format datetime object to string with the format."""
     if isinstance(value, datetime):
@@ -600,6 +603,8 @@ def map_post_filter(
                     value: Any = func(value)
             else:
                 value: Any = f_func(value, *args, **kwargs)
+        except UtilException:
+            raise
         except Exception as err:
             logger.warning(str(err))
             raise UtilException(
@@ -612,8 +617,8 @@ def map_post_filter(
 def not_in_template(value: Any, *, not_in: str = "matrix.") -> bool:
     """Check value should not pass template with not_in value prefix.
 
-    :param value:
-    :param not_in:
+    :param value: A value that want to find parameter template prefix.
+    :param not_in: The not in string that use in the `.startswith` function.
     :rtype: bool
     """
     if isinstance(value, dict):
@@ -631,7 +636,7 @@ def not_in_template(value: Any, *, not_in: str = "matrix.") -> bool:
 def has_template(value: Any) -> bool:
     """Check value include templating string.
 
-    :param value:
+    :param value: A value that want to find parameter template.
     :rtype: bool
     """
     if isinstance(value, dict):
@@ -787,6 +792,7 @@ def batch(iterable: Iterator[Any], n: int) -> Iterator[Any]:
     """
     if n < 1:
         raise ValueError("n must be at least one")
+
     it: Iterator[Any] = iter(iterable)
     while True:
         chunk_it = islice(it, n)

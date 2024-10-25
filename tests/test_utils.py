@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
-import ddeutil.workflow.conf as conf
 import ddeutil.workflow.utils as utils
+import pytest
 
 
 def test_gen_id():
@@ -32,16 +32,10 @@ def test_filter_func():
     } == rs
 
 
-def test_config():
-    engine = conf.Engine()
-    assert ["ddeutil.workflow"] == engine.registry
-    assert ["ddeutil.workflow.utils"] == engine.registry_filter
+def test_batch():
+    with pytest.raises(ValueError):
+        next(utils.batch(range(10), n=-1))
 
-    engine = conf.Engine.model_validate(
-        obj={
-            "registry": "ddeutil.workflow",
-            "registry_filter": "ddeutil.workflow.utils",
-        },
-    )
-    assert ["ddeutil.workflow"] == engine.registry
-    assert ["ddeutil.workflow.utils"] == engine.registry_filter
+    assert [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9]] == [
+        list(i) for i in utils.batch(range(10), n=2)
+    ]
