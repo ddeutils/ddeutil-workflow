@@ -38,15 +38,14 @@ def test_stage_py_with_vars():
         "params": {"name": "Author"},
         "stages": {"hello-world": {"outputs": {"x": "Foo"}}},
     }
-    rs = stage.execute(params=params)
-    _prepare_rs = stage.set_outputs(rs.context, to=params)
+    rs_out = stage.set_outputs(stage.execute(params=params).context, to=params)
     assert {
         "params": {"name": "Author"},
         "stages": {
             "hello-world": {"outputs": {"x": "Foo"}},
             "run-var": {"outputs": {"x": 1}},
         },
-    } == _prepare_rs
+    } == rs_out
 
 
 def test_stage_py_func():

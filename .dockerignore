@@ -1,6 +1,23 @@
-.github/
-logs/
-tests/
-docs/
+# Exclude virtual environment
 venv/
 .venv/
+
+# Exclude cache, logs, and temporary files
+logs/
+docs/
+__pycache__/
+.github/
+*.log
+*.tmp
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.git
+.gitignore
+README.md
+
+# Exclude model training checkpoints and tensorboard logs
+checkpoints/
+runs/
+tests/

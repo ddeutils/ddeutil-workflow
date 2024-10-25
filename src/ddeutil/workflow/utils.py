@@ -40,6 +40,7 @@ from .__types import DictData, Matrix, Re
 from .conf import config, load_config
 from .exceptions import ParamValueException, UtilException
 
+T = TypeVar("T")
 P = ParamSpec("P")
 AnyModel = TypeVar("AnyModel", bound=BaseModel)
 AnyModelType = type[AnyModel]
@@ -529,11 +530,11 @@ def get_args_const(
         raise UtilException(
             f"Post-filter: {expr} does not valid because it raise syntax error."
         ) from None
-    body: list[Expr] = mod.body
 
+    body: list[Expr] = mod.body
     if len(body) > 1:
         raise UtilException(
-            "Post-filter function should be only one calling per wf"
+            "Post-filter function should be only one calling per workflow."
         )
 
     caller: Union[Name, Call]
@@ -565,16 +566,18 @@ def datetime_format(value: datetime, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
 
 
 def map_post_filter(
-    value: Any,
+    value: T,
     post_filter: list[str],
     filters: dict[str, FilterRegistry],
-) -> Any:
+) -> T:
     """Mapping post-filter to value with sequence list of filter function name
     that will get from the filter registry.
 
     :param value: A string value that want to mapped with filter function.
     :param post_filter: A list of post-filter function name.
     :param filters: A filter registry.
+
+    :rtype: T
     """
     for _filter in post_filter:
         func_name, _args, _kwargs = get_args_const(_filter)
