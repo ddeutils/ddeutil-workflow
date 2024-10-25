@@ -79,10 +79,7 @@ def test_workflow_task():
 
 
 def test_pipe_task_with_prefix():
-    workflow = wf.Workflow.from_loader(
-        name="pipe_hook_mssql_proc",
-        externals={},
-    )
+    workflow = wf.Workflow.from_loader(name="pipe_hook_mssql_proc")
     rs = workflow.execute(
         params={
             "run_date": datetime(2024, 1, 1),

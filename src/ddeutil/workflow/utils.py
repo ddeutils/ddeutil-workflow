@@ -37,7 +37,7 @@ from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
 from .__types import DictData, Matrix, Re
-from .conf import config, load_config
+from .conf import config
 from .exceptions import ParamValueException, UtilException
 
 T = TypeVar("T")
@@ -161,7 +161,7 @@ def make_registry(submodule: str) -> dict[str, Registry]:
     :rtype: dict[str, Registry]
     """
     rs: dict[str, Registry] = {}
-    for module in load_config().registry:
+    for module in config.regis_hook:
         # NOTE: try to sequential import task functions
         try:
             importer = import_module(f"{module}.{submodule}")
@@ -498,7 +498,7 @@ def make_filter_registry() -> dict[str, FilterRegistry]:
     :rtype: dict[str, Registry]
     """
     rs: dict[str, Registry] = {}
-    for module in load_config().registry_filter:
+    for module in config.regis_filter:
         # NOTE: try to sequential import task functions
         try:
             importer = import_module(module)

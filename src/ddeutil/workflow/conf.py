@@ -15,10 +15,9 @@ from typing import TypeVar
 from zoneinfo import ZoneInfo
 
 from ddeutil.core import import_string, str2bool
-from ddeutil.io import Paths, PathSearch, YamlFlResolve
+from ddeutil.io import PathSearch, YamlFlResolve
 from dotenv import load_dotenv
-from pydantic import BaseModel, Field
-from pydantic.functional_validators import model_validator
+from pydantic import BaseModel
 from typing_extensions import Self
 
 from .__types import DictData
@@ -118,16 +117,12 @@ class Config:
         return self
 
     @property
-    def conf_path(self) -> Path | None:
+    def conf_path(self) -> Path:
         """Config path that use root_path class argument for this construction.
 
-        :rtype: Path | None
+        :rtype: Path
         """
-        return (
-            f"{self.root_path}/{conf_env}"
-            if (conf_env := os.getenv("WORKFLOW_CORE_PATH_CONF"))
-            else None
-        )
+        return self.root_path / os.getenv("WORKFLOW_CORE_PATH_CONF", "conf")
 
     @property
     def regis_hook(self) -> list[str]:
@@ -136,48 +131,6 @@ class Config:
     @property
     def regis_filter(self) -> list[str]:
         return [r.strip() for r in self.regis_filter_str.split(",")]
-
-
-class Engine(BaseModel):
-    """Engine Pydantic Model for keeping application path."""
-
-    paths: Paths = Field(default_factory=Paths)
-    registry: list[str]
-    registry_filter: list[str]
-
-    @model_validator(mode="before")
-    def __prepare_registry(cls, values: DictData) -> DictData:
-        """Prepare registry value that passing with string type. It convert the
-        string type to list of string.
-        """
-        if (_regis := values.get("registry")) and isinstance(_regis, str):
-            values["registry"] = [_regis]
-        if (_regis_filter := values.get("registry_filter")) and isinstance(
-            _regis_filter, str
-        ):
-            values["registry_filter"] = [_regis_filter]
-        return values
-
-
-def load_config() -> Engine:
-    """Load Config data from ``workflows-conf.yaml`` file.
-
-    Configuration Docs:
-    :var engine.registry:
-    :var engine.registry_filter:
-    :var paths.root:
-    :var paths.conf:
-    """
-    return Engine.model_validate(
-        obj={
-            "registry": config.regis_hook,
-            "registry_filter": config.regis_filter,
-            "paths": {
-                "root": config.root_path,
-                "conf": config.conf_path,
-            },
-        }
-    )
 
 
 class SimLoad:
@@ -203,11 +156,11 @@ class SimLoad:
     def __init__(
         self,
         name: str,
-        params: Engine,
+        params: Config,
         externals: DictData | None = None,
     ) -> None:
         self.data: DictData = {}
-        for file in PathSearch(params.paths.conf).files:
+        for file in PathSearch(params.conf_path).files:
             if any(file.suffix.endswith(s) for s in (".yml", ".yaml")) and (
                 data := YamlFlResolve(file).read().get(name, {})
             ):
@@ -217,7 +170,7 @@ class SimLoad:
         if not self.data:
             raise ValueError(f"Config {name!r} does not found on conf path")
 
-        self.conf_params: Engine = params
+        self.conf_params: Config = params
         self.externals: DictData = externals or {}
         self.data.update(self.externals)
 
@@ -225,7 +178,7 @@ class SimLoad:
     def finds(
         cls,
         obj: object,
-        params: Engine,
+        params: Config,
         *,
         include: list[str] | None = None,
         exclude: list[str] | None = None,
@@ -241,7 +194,7 @@ class SimLoad:
         :rtype: Iterator[tuple[str, DictData]]
         """
         exclude: list[str] = exclude or []
-        for file in PathSearch(params.paths.conf).files:
+        for file in PathSearch(params.conf_path).files:
             if any(file.suffix.endswith(s) for s in (".yml", ".yaml")) and (
                 values := YamlFlResolve(file).read()
             ):
@@ -290,14 +243,14 @@ class Loader(SimLoad):
         :param exclude:
         """
         return super().finds(
-            obj=obj, params=load_config(), include=include, exclude=exclude
+            obj=obj, params=Config(), include=include, exclude=exclude
         )
 
     def __init__(self, name: str, externals: DictData) -> None:
-        super().__init__(name, load_config(), externals)
+        super().__init__(name, Config(), externals)
 
 
-def get_type(t: str, params: Engine) -> AnyModelType:
+def get_type(t: str, params: Config) -> AnyModelType:
     """Return import type from string importable value in the type key.
 
     :param t: A importable type string.
@@ -309,7 +262,7 @@ def get_type(t: str, params: Engine) -> AnyModelType:
         # NOTE: Auto adding module prefix if it does not set
         return import_string(f"ddeutil.workflow.{t}")
     except ModuleNotFoundError:
-        for registry in params.registry:
+        for registry in params.regis_hook:
             try:
                 return import_string(f"{registry}.{t}")
             except ModuleNotFoundError:
