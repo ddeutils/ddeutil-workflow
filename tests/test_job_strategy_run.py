@@ -27,13 +27,12 @@ def test_job_exec_strategy_raise():
 
 @mock.patch.object(Config, "job_raise_error", True)
 @mock.patch.object(Config, "stage_raise_error", False)
-def test_job_exec_strategy_fail_fast():
+def test_job_exec_strategy():
     workflow: Workflow = Workflow.from_loader(
         name="wf-run-python-raise-for-job"
     )
     job: Job = workflow.job("final-job")
-
-    rs = job.execute({})
+    rs = job.execute_strategy({"name": "foo"}, {})
     print(rs.context)
 
 

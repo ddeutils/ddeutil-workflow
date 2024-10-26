@@ -238,10 +238,10 @@ class BaseStage(BaseModel, ABC):
         The result of the `to` variable will be;
 
             ... (iii) to: {
-                            'stages': {
-                                '<stage-id>': {'outputs': {'foo': 'bar'}}
-                            }
+                        'stages': {
+                            '<stage-id>': {'outputs': {'foo': 'bar'}}
                         }
+                    }
 
         :param output: A output data that want to extract to an output key.
         :param to: A context data that want to add output result.
@@ -478,7 +478,11 @@ class PyStage(BaseStage):
         # NOTE: The output will fileter unnecessary keys from locals.
         lc: DictData = output.get("locals", {})
         super().set_outputs(
-            {k: lc[k] for k in lc if k != "__annotations__"}, to=to
+            (
+                {k: lc[k] for k in lc if k != "__annotations__"}
+                | {k: output[k] for k in output if k.startswith("error")}
+            ),
+            to=to,
         )
 
         # NOTE:

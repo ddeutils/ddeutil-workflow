@@ -273,11 +273,32 @@ class Job(BaseModel):
 
     @field_validator("desc", mode="after")
     def ___prepare_desc__(cls, value: str) -> str:
-        """Prepare description string that was created on a template."""
+        """Prepare description string that was created on a template.
+
+        :rtype: str
+        """
         return dedent(value)
 
+    @field_validator("stages", mode="after")
+    def __validate_stage_id__(cls, value: list[Stage]) -> list[Stage]:
+        """Validate a stage ID of all stage in stages field should not be
+        duplicate.
+
+        :rtype: list[Stage]
+        """
+        # VALIDATE: Validate stage id should not duplicate.
+        rs: list[str] = []
+        for stage in value:
+            name: str = stage.id or stage.name
+            if name in rs:
+                raise ValueError(
+                    "Stage name in jobs object should not be duplicate."
+                )
+            rs.append(name)
+        return value
+
     @model_validator(mode="after")
-    def __prepare_running_id__(self) -> Self:
+    def __prepare_running_id_and_stage_name__(self) -> Self:
         """Prepare the job running ID.
 
         :rtype: Self
@@ -373,8 +394,8 @@ class Job(BaseModel):
         It different with ``self.execute`` because this method run only one
         strategy and return with context of this strategy data.
 
-        :raise JobException: If it has any error from StageException or
-            UtilException.
+        :raise JobException: If it has any error from ``StageException`` or
+            ``UtilException``.
 
         :param strategy: A metrix strategy value.
         :param params: A dynamic parameters.
@@ -384,7 +405,9 @@ class Job(BaseModel):
         """
         strategy_id: str = gen_id(strategy)
 
-        # NOTE: Create strategy execution context and update a matrix and copied
+        # PARAGRAPH:
+        #
+        #       Create strategy execution context and update a matrix and copied
         #   of params. So, the context value will have structure like;
         #
         #   {
@@ -403,14 +426,14 @@ class Job(BaseModel):
             # IMPORTANT: Change any stage running IDs to this job running ID.
             stage: Stage = stage.get_running_id(self.run_id)
 
-            _st_name: str = stage.id or stage.name
+            name: str = stage.id or stage.name
 
             if stage.is_skipped(params=context):
-                logger.info(f"({self.run_id}) [JOB]: Skip stage: {_st_name!r}")
+                logger.info(f"({self.run_id}) [JOB]: Skip stage: {name!r}")
                 continue
 
             logger.info(
-                f"({self.run_id}) [JOB]: Start execute the stage: {_st_name!r}"
+                f"({self.run_id}) [JOB]: Start execute the stage: {name!r}"
             )
 
             # NOTE: Logging a matrix that pass on this stage execution.
@@ -430,7 +453,6 @@ class Job(BaseModel):
                             # ---
                             # "stages": filter_func(context.pop("stages", {})),
                             "stages": context.pop("stages", {}),
-                            # NOTE: Set the error keys.
                             "error": JobException(
                                 "Job strategy was canceled from trigger event "
                                 "that had stopped before execution."
@@ -443,7 +465,8 @@ class Job(BaseModel):
                     },
                 )
 
-            # NOTE:
+            # PARAGRAPH:
+            #
             #       I do not use below syntax because `params` dict be the
             #   reference memory pointer and it was changed when I action
             #   anything like update or re-construct this.
@@ -486,8 +509,8 @@ class Job(BaseModel):
                     },
                 )
 
-            # NOTE: Remove new stage object that was created from
-            #   ``get_running_id`` method.
+            # NOTE: Remove the current stage object that was created from
+            #   ``get_running_id`` method for saving memory.
             del stage
 
         return Result(

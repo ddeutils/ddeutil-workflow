@@ -1,14 +1,13 @@
-import ddeutil.workflow.stage as st
 import pytest
 from ddeutil.workflow import Workflow
 from ddeutil.workflow.exceptions import StageException
-from ddeutil.workflow.stage import Stage
+from ddeutil.workflow.stage import EmptyStage, Stage
 from ddeutil.workflow.utils import Result
 from pydantic import ValidationError
 
 
 def test_stage():
-    stage: Stage = st.EmptyStage.model_validate(
+    stage: Stage = EmptyStage.model_validate(
         {"name": "Empty Stage", "echo": "hello world"}
     )
     new_stage: Stage = stage.model_copy(update={"run_id": "dummy"})
@@ -17,7 +16,7 @@ def test_stage():
 
 
 def test_stage_empty():
-    stage: Stage = st.EmptyStage.model_validate(
+    stage: Stage = EmptyStage.model_validate(
         {"name": "Empty Stage", "echo": "hello world"}
     )
     rs: Result = stage.execute(params={})
@@ -30,7 +29,7 @@ def test_stage_empty():
 
 def test_stage_empty_name_raise():
     with pytest.raises(ValidationError):
-        st.EmptyStage.model_validate(
+        EmptyStage.model_validate(
             {
                 "run_id": "demo",
                 "name": "Empty ${{ params.name }}",

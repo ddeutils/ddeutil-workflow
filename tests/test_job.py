@@ -22,6 +22,18 @@ def test_job():
     assert job.run_id == "some-id"
 
 
+def test_job_stage_id_not_dup():
+    with pytest.raises(ValidationError):
+        Job.model_validate(
+            {
+                "stages": [
+                    {"name": "Empty Stage", "echo": "hello world"},
+                    {"name": "Empty Stage", "echo": "hello foo"},
+                ]
+            }
+        )
+
+
 def test_job_id_raise():
     with pytest.raises(ValidationError):
         Job(id="${{ some-template }}")
