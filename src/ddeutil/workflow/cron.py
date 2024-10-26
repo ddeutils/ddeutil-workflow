@@ -37,7 +37,7 @@ WEEKDAYS: dict[str, int] = {
 class CronYearLimit(Exception): ...
 
 
-def str2cron(value: str) -> str:
+def str2cron(value: str) -> str:  # pragma: no cov
     """Convert Special String with the @ prefix to Crontab value.
 
     :param value: A string value that want to convert to cron value.
@@ -69,6 +69,8 @@ def str2cron(value: str) -> str:
 
 @dataclass(frozen=True)
 class Unit:
+    """Unit dataclass for CronPart object."""
+
     name: str
     range: partial
     min: int
@@ -85,6 +87,8 @@ class Unit:
 
 @dataclass
 class Options:
+    """Options dataclass for config CronPart object."""
+
     output_weekday_names: bool = False
     output_month_names: bool = False
     output_hashes: bool = False
@@ -158,7 +162,12 @@ CRON_UNITS_YEAR: tuple[Unit, ...] = CRON_UNITS + (
 
 @total_ordering
 class CronPart:
-    """Part of Cron object that represent a collection of positive integers."""
+    """Part of Cron object that represent a collection of positive integers.
+
+    :param unit: A Unit dataclass object.
+    :param values: A crontab values that want to validate
+    :param options: A Options dataclass object.
+    """
 
     __slots__: tuple[str, ...] = (
         "unit",

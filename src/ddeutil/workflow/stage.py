@@ -476,15 +476,15 @@ class PyStage(BaseStage):
         :rtype: DictData
         """
         # NOTE: The output will fileter unnecessary keys from locals.
-        lc: DictData = output["locals"]
+        lc: DictData = output.get("locals", {})
         super().set_outputs(
             {k: lc[k] for k in lc if k != "__annotations__"}, to=to
         )
 
         # NOTE:
         #   Override value that changing from the globals that pass via exec.
-        _globals: DictData = output["globals"]
-        to.update({k: _globals[k] for k in to if k in _globals})
+        gb: DictData = output.get("globals", {})
+        to.update({k: gb[k] for k in to if k in gb})
         return to
 
     @handler_result()

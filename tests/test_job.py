@@ -1,18 +1,58 @@
+from unittest import mock
+
 import pytest
-from ddeutil.workflow import Job
+from ddeutil.workflow import Config, Job
+from ddeutil.workflow.exceptions import JobException
+from ddeutil.workflow.scheduler import Workflow
 from pydantic import ValidationError
 
 
-def test_job_model():
+def test_job():
     job = Job()
-
     job.run_id = "demo"
     assert "demo" == job.run_id
 
+    job = Job(desc="\t# Desc\n\tThis is a demo job.")
+    assert job.desc == "# Desc\nThis is a demo job."
 
-def test_job_model_id_raise():
+    job = Job(id="final-job")
+    assert job.run_id is not None
+
+    job = Job(id="final-job", run_id="some-id")
+    assert job.run_id == "some-id"
+
+
+def test_job_id_raise():
     with pytest.raises(ValidationError):
         Job(id="${{ some-template }}")
 
     with pytest.raises(ValidationError):
         Job(id="This is ${{ some-template }}")
+
+
+def test_job_stage_from_workflow():
+    workflow: Workflow = Workflow.from_loader(name="wf-run-common")
+
+    with pytest.raises(ValueError):
+        workflow.job("demo-run").stage("some-stage-id")
+
+
+def test_job_set_outputs():
+    assert Job(id="final-job").set_outputs({}, {}) == {
+        "jobs": {"final-job": {}}
+    }
+    assert Job(id="final-job").set_outputs({}, {"jobs": {}}) == {
+        "jobs": {"final-job": {}}
+    }
+
+    with pytest.raises(JobException):
+        Job().set_outputs({}, {})
+
+    with mock.patch.object(Config, "job_default_id", True):
+        assert Job().set_outputs({}, {"jobs": {}}) == {"jobs": {"1": {}}}
+
+        assert (
+            Job(strategy={"matrix": {"table": ["customer"]}}).set_outputs(
+                {}, {"jobs": {}}
+            )
+        ) == {"jobs": {"1": {"strategies": {}}}}

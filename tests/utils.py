@@ -35,6 +35,7 @@ def dotenv_setting() -> None:
             WORKFLOW_CORE_STAGE_DEFAULT_ID=true
             WORKFLOW_CORE_STAGE_RAISE_ERROR=true
             WORKFLOW_CORE_JOB_DEFAULT_ID=false
+            WORKFLOW_CORE_JOB_RAISE_ERROR=true
             WORKFLOW_CORE_WORKFLOW_ID_SIMPLE_MODE=true
             WORKFLOW_CORE_MAX_NUM_POKING=4
             WORKFLOW_CORE_MAX_JOB_PARALLEL=1

@@ -23,7 +23,7 @@ def test_timezone():
 
 
 def test_cron_cronpart():
-    cpart = cron.CronPart(
+    cron_part = cron.CronPart(
         unit=cron.Unit(
             name="month",
             range=partial(range, 1, 13),
@@ -47,7 +47,24 @@ def test_cron_cronpart():
         values="3,5-8",
         options=cron.Options(),
     )
-    assert [3, 5, 6, 7, 8] == cpart.values
+    assert [3, 5, 6, 7, 8] == cron_part.values
+    assert repr(cron_part) == (
+        "CronPart(unit=<class 'ddeutil.workflow.cron.Unit'>(name='month', "
+        "range=functools.partial(<class 'range'>, 1, 13),min=1, max=12, "
+        "alt=['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', "
+        "'OCT', 'NOV', 'DEC']), values='3,5-8')"
+    )
+
+    cron_part = cron.CronPart(cron.CRON_UNITS[1], [1, 12], cron.Options())
+    assert [1, 12] == cron_part.values
+    assert cron_part > [1]
+    assert cron_part == [1, 12]
+
+    with pytest.raises(ValueError):
+        cron.CronPart(cron.CRON_UNITS[1], [45], cron.Options())
+
+    with pytest.raises(TypeError):
+        cron.CronPart(cron.CRON_UNITS[1], 45, cron.Options())
 
 
 def test_cron_cronjob():

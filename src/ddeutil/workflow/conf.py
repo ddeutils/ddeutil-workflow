@@ -68,6 +68,9 @@ class Config:
     )
 
     # NOTE: Job
+    job_raise_error: bool = str2bool(
+        env("WORKFLOW_CORE_JOB_RAISE_ERROR", "true")
+    )
     job_default_id: bool = str2bool(
         env("WORKFLOW_CORE_JOB_DEFAULT_ID", "false")
     )

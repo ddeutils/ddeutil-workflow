@@ -110,6 +110,7 @@ def make(
             all(inc.get(k) == v for k, v in m.items()) for m in [*final, *add]
         ):
             continue
+
         add.append(inc)
 
     # NOTE: Merge all matrix together.
@@ -354,7 +355,7 @@ class Job(BaseModel):
         to["jobs"][_id] = (
             {"strategies": output}
             if self.strategy.is_set()
-            else output[next(iter(output))]
+            else output.get(next(iter(output), "DUMMY"), {})
         )
         return to
 
@@ -364,7 +365,6 @@ class Job(BaseModel):
         params: DictData,
         *,
         event: Event | None = None,
-        raise_error: bool = True,
     ) -> Result:
         """Job Strategy execution with passing dynamic parameters from the
         workflow execution to strategy matrix.
@@ -379,8 +379,7 @@ class Job(BaseModel):
         :param strategy: A metrix strategy value.
         :param params: A dynamic parameters.
         :param event: An manger event that pass to the PoolThreadExecutor.
-        :param raise_error: A flag that raise error instead catching to result
-            if it get exception from stage execution.
+
         :rtype: Result
         """
         strategy_id: str = gen_id(strategy)
@@ -433,13 +432,13 @@ class Job(BaseModel):
                             "stages": context.pop("stages", {}),
                             # NOTE: Set the error keys.
                             "error": JobException(
-                                "Process Event stopped before execution"
+                                "Job strategy was canceled from trigger event "
+                                "that had stopped before execution."
                             ),
-                            "error_message": {
-                                "message": (
-                                    "Process Event stopped before execution"
-                                ),
-                            },
+                            "error_message": (
+                                "Job strategy was canceled from trigger event "
+                                "that had stopped before execution."
+                            ),
                         },
                     },
                 )
@@ -470,13 +469,22 @@ class Job(BaseModel):
                 logger.error(
                     f"({self.run_id}) [JOB]: {err.__class__.__name__}: {err}"
                 )
-                if raise_error:
+                if config.job_raise_error:
                     raise JobException(
                         f"Get stage execution error: {err.__class__.__name__}: "
                         f"{err}"
                     ) from None
-                else:
-                    raise NotImplementedError() from None
+                return Result(
+                    status=1,
+                    context={
+                        strategy_id: {
+                            "matrix": strategy,
+                            "stages": context.pop("stages", {}),
+                            "error": err,
+                            "error_message": f"{err.__class__.__name__}: {err}",
+                        },
+                    },
+                )
 
             # NOTE: Remove new stage object that was created from
             #   ``get_running_id`` method.
@@ -540,6 +548,7 @@ class Job(BaseModel):
             ]
 
             # NOTE: Dynamic catching futures object with fail-fast flag.
+
             return (
                 self.__catch_fail_fast(event=event, futures=futures)
                 if self.strategy.fail_fast
@@ -584,12 +593,17 @@ class Job(BaseModel):
 
         # NOTE: Stop all running tasks with setting the event manager and cancel
         #   any scheduled tasks.
-        if len(done) != len(futures):
+        #       This case is not common error and not raise when all process
+        #   running normally, so, I will ignore and skip coverage to it.
+        #
+        if len(done) != len(futures):  # pragma: no cov
             event.set()
             for future in futures:
                 future.cancel()
 
             del future
+
+        print("This line")
 
         for future in done:
             if future.exception():

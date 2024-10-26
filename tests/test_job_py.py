@@ -8,9 +8,7 @@ from ddeutil.workflow.utils import Result
 
 
 def test_job_py():
-    workflow: Workflow = Workflow.from_loader(
-        name="wf-run-common", externals={}
-    )
+    workflow: Workflow = Workflow.from_loader(name="wf-run-common")
     job: Job = workflow.job("demo-run")
 
     # NOTE: Job params will change schema structure with {"params": { ... }}

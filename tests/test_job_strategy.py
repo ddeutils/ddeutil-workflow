@@ -1,3 +1,4 @@
+import pytest
 from ddeutil.workflow import Job, Strategy, Workflow
 from ddeutil.workflow.job import make
 
@@ -20,16 +21,24 @@ def test_make():
         {"table": "sales", "system": "csv", "partition": 3},
     ]
 
-    for s in make(
-        matrix={
-            "table": ["customer", "sales"],
-            "system": ["csv"],
-            "partition": [1, 2, 3],
-        },
-        exclude=[],
+    assert make(
+        matrix={"table": ["customer"], "system": ["csv"], "partition": [1]},
+        exclude=[{"table": "customer", "system": "csv", "partition": 1}],
         include=[],
-    ):
-        print("".join(map(str, s.values())))
+    ) == [{}]
+
+    with pytest.raises(ValueError):
+        make(
+            matrix={"table": ["customer"], "system": ["csv"], "partition": [1]},
+            exclude=[],
+            include=[{"table": "sales", "foo": "bar", "index": 1, "name": "a"}],
+        )
+
+    assert make(
+        matrix={"table": ["customer"], "system": ["csv"], "partition": [1]},
+        exclude=[],
+        include=[{"table": "customer", "system": "csv", "partition": 1}],
+    ) == [{"table": "customer", "system": "csv", "partition": 1}]
 
 
 def test_strategy():

@@ -109,7 +109,7 @@ class On(BaseModel):
     def from_loader(
         cls,
         name: str,
-        externals: DictData,
+        externals: DictData | None = None,
     ) -> Self:
         """Constructor from the name of config that will use loader object for
         getting the data.
@@ -117,6 +117,7 @@ class On(BaseModel):
         :param name: A name of config that will getting from loader.
         :param externals: A extras external parameter that will keep in extras.
         """
+        externals: DictData = externals or {}
         loader: Loader = Loader(name, externals=externals)
 
         # NOTE: Validate the config type match with current connection model
@@ -139,7 +140,9 @@ class On(BaseModel):
                 )
             )
         if "cronjob" not in loader_data:
-            raise ValueError("Config does not set ``cronjob`` key")
+            raise ValueError(
+                "Config does not set ``cronjob`` or ``interval`` keys"
+            )
         return cls.model_validate(
             obj=dict(
                 cronjob=loader_data.pop("cronjob"),
@@ -175,17 +178,17 @@ class On(BaseModel):
 
     def generate(self, start: str | datetime) -> CronRunner:
         """Return Cron runner object."""
-        if not isinstance(start, datetime):
+        if isinstance(start, str):
             start: datetime = datetime.fromisoformat(start)
+        elif not isinstance(start, datetime):
+            raise TypeError("start value should be str or datetime type.")
         return self.cronjob.schedule(date=start, tz=self.tz)
 
     def next(self, start: str | datetime) -> datetime:
         """Return a next datetime from Cron runner object that start with any
         date that given from input.
         """
-        if not isinstance(start, datetime):
-            start: datetime = datetime.fromisoformat(start)
-        return self.cronjob.schedule(date=start, tz=self.tz).next
+        return self.generate(start=start).next
 
 
 class YearOn(On):

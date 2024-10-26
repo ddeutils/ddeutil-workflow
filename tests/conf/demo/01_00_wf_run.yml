@@ -135,6 +135,38 @@ wf-run-python-raise:
           echo: "Hello World"
 
 
+wf-run-python-raise-for-job:
+  type: ddeutil.workflow.Workflow
+  jobs:
+    first-job:
+      stages:
+        - name: Raise Error Inside
+          id: raise-error
+          run: |
+            raise ValueError('Testing raise error inside PyStage!!!')
+    second-job:
+      stages:
+        - name: Echo hello world
+          echo: "Hello World"
+          sleep: 3
+        - name: Echo hello world 2
+          echo: "Hello World 2"
+    final-job:
+      strategy:
+        fail-fast: True
+        matrix:
+          name: ['foo', 'bar']
+      stages:
+        - name: Echo hello world
+          echo: "Hello World"
+          sleep: 3
+        - name: Raise Error Inside
+          id: raise-error
+          run: |
+            raise ValueError('Testing raise error inside PyStage!!!')
+        - name: Echo hello world 2
+          echo: "Hello World 2"
+
 wf-run-depends:
   type: ddeutil.workflow.Workflow
   jobs:
