@@ -13,8 +13,7 @@ from typing import Annotated, Optional
 from ddeutil.core import str2list
 from typer import Argument, Option, Typer
 
-from .conf import config
-from .log import get_logger
+from .conf import config, get_logger
 
 logger = get_logger("ddeutil.workflow")
 cli: Typer = Typer()

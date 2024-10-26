@@ -12,9 +12,8 @@ from functools import wraps
 
 from starlette.concurrency import run_in_threadpool
 
-from .conf import config
+from .conf import config, get_logger
 from .cron import CronJob
-from .log import get_logger
 
 logger = get_logger("ddeutil.workflow")
 

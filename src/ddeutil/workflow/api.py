@@ -21,8 +21,7 @@ from fastapi.responses import UJSONResponse
 from pydantic import BaseModel
 
 from .__about__ import __version__
-from .conf import config
-from .log import get_logger
+from .conf import config, get_logger
 from .repeat import repeat_at, repeat_every
 from .scheduler import WorkflowTaskData
 

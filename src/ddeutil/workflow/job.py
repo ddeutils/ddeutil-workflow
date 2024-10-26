@@ -30,13 +30,12 @@ from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
 from .__types import DictData, DictStr, Matrix, TupleStr
-from .conf import config
+from .conf import config, get_logger
 from .exceptions import (
     JobException,
     StageException,
     UtilException,
 )
-from .log import get_logger
 from .stage import Stage
 from .utils import (
     Result,

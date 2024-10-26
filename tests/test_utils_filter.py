@@ -66,9 +66,15 @@ def test_map_post_filter():
         )
 
         with pytest.raises(UtilException):
-            assert "bar" == map_post_filter(
-                "demo", ['rstr(fmt="foo")'], make_filter_registry()
+            map_post_filter(
+                "demo",
+                ['rstr(fmt="foo")'],
+                make_filter_registry(),
             )
 
         with pytest.raises(UtilException):
-            map_post_filter("demo", ["raise_err"], make_filter_registry())
+            map_post_filter(
+                "demo",
+                ["raise_err"],
+                make_filter_registry(),
+            )

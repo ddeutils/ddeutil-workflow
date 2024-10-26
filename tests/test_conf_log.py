@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from ddeutil.workflow.log import FileLog
+from ddeutil.workflow.conf import FileLog
 
 
 def test_log_file():

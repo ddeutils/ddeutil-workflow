@@ -6,18 +6,21 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
+from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from datetime import timedelta
-from functools import cached_property
+from datetime import datetime, timedelta
+from functools import cached_property, lru_cache
 from pathlib import Path
-from typing import TypeVar
+from typing import ClassVar, Optional, TypeVar, Union
 from zoneinfo import ZoneInfo
 
 from ddeutil.core import import_string, str2bool
 from ddeutil.io import PathSearch, YamlFlResolve
 from dotenv import load_dotenv
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
 from .__types import DictData
@@ -80,7 +83,7 @@ class Config:
     max_schedule_per_process: int = int(
         env("WORKFLOW_APP_MAX_SCHEDULE_PER_PROCESS", "100")
     )
-    __stop_boundary_delta: str = env(
+    stop_boundary_delta_str: str = env(
         "WORKFLOW_APP_STOP_BOUNDARY_DELTA", '{"minutes": 5, "seconds": 20}'
     )
 
@@ -100,12 +103,12 @@ class Config:
             )
         try:
             self.stop_boundary_delta: timedelta = timedelta(
-                **json.loads(self.__stop_boundary_delta)
+                **json.loads(self.stop_boundary_delta_str)
             )
         except Exception as err:
             raise ValueError(
                 "Config ``WORKFLOW_APP_STOP_BOUNDARY_DELTA`` can not parsing to"
-                f"timedelta with {self.__stop_boundary_delta}."
+                f"timedelta with {self.stop_boundary_delta_str}."
             ) from err
 
     def refresh_dotenv(self) -> Self:
@@ -138,7 +141,7 @@ class SimLoad:
     value like name of workflow or on.
 
     :param name: A name of config data that will read by Yaml Loader object.
-    :param params: A Params model object.
+    :param conf: A Params model object.
     :param externals: An external parameters
 
     Noted:
@@ -156,21 +159,19 @@ class SimLoad:
     def __init__(
         self,
         name: str,
-        params: Config,
+        conf: Config,
         externals: DictData | None = None,
     ) -> None:
         self.data: DictData = {}
-        for file in PathSearch(params.conf_path).files:
-            if any(file.suffix.endswith(s) for s in (".yml", ".yaml")) and (
-                data := YamlFlResolve(file).read().get(name, {})
-            ):
+        for file in PathSearch(conf.conf_path).files:
+            if data := self.filter_suffix(file, name):
                 self.data = data
 
         # VALIDATE: check the data that reading should not empty.
         if not self.data:
             raise ValueError(f"Config {name!r} does not found on conf path")
 
-        self.conf_params: Config = params
+        self.conf: Config = conf
         self.externals: DictData = externals or {}
         self.data.update(self.externals)
 
@@ -178,7 +179,7 @@ class SimLoad:
     def finds(
         cls,
         obj: object,
-        params: Config,
+        conf: Config,
         *,
         include: list[str] | None = None,
         exclude: list[str] | None = None,
@@ -188,23 +189,31 @@ class SimLoad:
         adds-on.
 
         :param obj: A object that want to validate matching before return.
-        :param params:
+        :param conf: A config object.
         :param include:
         :param exclude:
         :rtype: Iterator[tuple[str, DictData]]
         """
         exclude: list[str] = exclude or []
-        for file in PathSearch(params.conf_path).files:
-            if any(file.suffix.endswith(s) for s in (".yml", ".yaml")) and (
-                values := YamlFlResolve(file).read()
-            ):
-                for key, data in values.items():
-                    if key in exclude:
-                        continue
-                    if issubclass(get_type(data["type"], params), obj) and (
-                        include is None or all(i in data for i in include)
-                    ):
-                        yield key, data
+        for file in PathSearch(conf.conf_path).files:
+            for key, data in cls.filter_suffix(file).items():
+
+                if key in exclude:
+                    continue
+
+                if issubclass(get_type(data["type"], conf), obj):
+                    yield key, (
+                        {k: data[k] for k in data if k in include}
+                        if include
+                        else data
+                    )
+
+    @classmethod
+    def filter_suffix(cls, file: Path, name: str | None = None) -> DictData:
+        if any(file.suffix.endswith(s) for s in (".yml", ".yaml")):
+            values: DictData = YamlFlResolve(file).read()
+            return values.get(name, {}) if name else values
+        return {}
 
     @cached_property
     def type(self) -> AnyModelType:
@@ -213,11 +222,11 @@ class SimLoad:
 
         :rtype: AnyModelType
         """
-        if not (_typ := self.data.get("type")):
-            raise ValueError(
-                f"the 'type' value: {_typ} does not exists in config data."
-            )
-        return get_type(_typ, self.conf_params)
+        if _typ := self.data.get("type"):
+            return get_type(_typ, self.conf)
+        raise ValueError(
+            f"the 'type' value: {_typ} does not exists in config data."
+        )
 
 
 class Loader(SimLoad):
@@ -243,11 +252,11 @@ class Loader(SimLoad):
         :param exclude:
         """
         return super().finds(
-            obj=obj, params=Config(), include=include, exclude=exclude
+            obj=obj, conf=Config(), include=include, exclude=exclude
         )
 
     def __init__(self, name: str, externals: DictData) -> None:
-        super().__init__(name, Config(), externals)
+        super().__init__(name, conf=Config(), externals=externals)
 
 
 def get_type(t: str, params: Config) -> AnyModelType:
@@ -271,3 +280,175 @@ def get_type(t: str, params: Config) -> AnyModelType:
 
 
 config = Config()
+
+
+@lru_cache
+def get_logger(name: str):
+    """Return logger object with an input module name.
+
+    :param name: A module name that want to log.
+    """
+    logger = logging.getLogger(name)
+    formatter = logging.Formatter(
+        fmt=(
+            "%(asctime)s.%(msecs)03d (%(name)-10s, %(process)-5d, "
+            "%(thread)-5d) [%(levelname)-7s] %(message)-120s "
+            "(%(filename)s:%(lineno)s)"
+        ),
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    stream = logging.StreamHandler()
+    stream.setFormatter(formatter)
+    logger.addHandler(stream)
+
+    logger.setLevel(logging.DEBUG if config.debug else logging.INFO)
+    return logger
+
+
+class BaseLog(BaseModel, ABC):
+    """Base Log Pydantic Model with abstraction class property that implement
+    only model fields. This model should to use with inherit to logging
+    sub-class like file, sqlite, etc.
+    """
+
+    name: str = Field(description="A workflow name.")
+    on: str = Field(description="A cronjob string of this piepline schedule.")
+    release: datetime = Field(description="A release datetime.")
+    context: DictData = Field(
+        default_factory=dict,
+        description=(
+            "A context data that receive from a workflow execution result.",
+        ),
+    )
+    parent_run_id: Optional[str] = Field(default=None)
+    run_id: str
+    update: datetime = Field(default_factory=datetime.now)
+
+    @model_validator(mode="after")
+    def __model_action(self) -> Self:
+        """Do before the Log action with WORKFLOW_LOG_ENABLE_WRITE env variable.
+
+        :rtype: Self
+        """
+        if config.enable_write_log:
+            self.do_before()
+        return self
+
+    def do_before(self) -> None:
+        """To something before end up of initial log model."""
+
+    @abstractmethod
+    def save(self, excluded: list[str] | None) -> None:
+        """Save this model logging to target logging store."""
+        raise NotImplementedError("Log should implement ``save`` method.")
+
+
+class FileLog(BaseLog):
+    """File Log Pydantic Model that use to saving log data from result of
+    workflow execution. It inherit from BaseLog model that implement the
+    ``self.save`` method for file.
+    """
+
+    filename: ClassVar[str] = (
+        "./logs/workflow={name}/release={release:%Y%m%d%H%M%S}"
+    )
+
+    def do_before(self) -> None:
+        """Create directory of release before saving log file."""
+        self.pointer().mkdir(parents=True, exist_ok=True)
+
+    @classmethod
+    def find_logs(cls, name: str):
+        pointer: Path = config.root_path / f"./logs/workflow={name}"
+        for file in pointer.glob("./release=*/*.log"):
+            with file.open(mode="r", encoding="utf-8") as f:
+                yield json.load(f)
+
+    @classmethod
+    def find_log(cls, name: str, release: datetime | None = None):
+        if release is not None:
+            pointer: Path = (
+                config.root_path
+                / f"./logs/workflow={name}/release={release:%Y%m%d%H%M%S}"
+            )
+            if not pointer.exists():
+                raise FileNotFoundError(
+                    f"Pointer: ./logs/workflow={name}/"
+                    f"release={release:%Y%m%d%H%M%S} does not found."
+                )
+            return cls.model_validate(
+                obj=json.loads(pointer.read_text(encoding="utf-8"))
+            )
+        raise NotImplementedError("Find latest log does not implement yet.")
+
+    @classmethod
+    def is_pointed(
+        cls,
+        name: str,
+        release: datetime,
+        *,
+        queue: list[datetime] | None = None,
+    ) -> bool:
+        """Check this log already point in the destination.
+
+        :param name: A workflow name.
+        :param release: A release datetime.
+        :param queue: A list of queue of datetime that already run in the
+            future.
+        """
+        # NOTE: Check environ variable was set for real writing.
+        if not config.enable_write_log:
+            return False
+
+        # NOTE: create pointer path that use the same logic of pointer method.
+        pointer: Path = config.root_path / cls.filename.format(
+            name=name, release=release
+        )
+
+        if not queue:
+            return pointer.exists()
+        return pointer.exists() or (release in queue)
+
+    def pointer(self) -> Path:
+        """Return release directory path that was generated from model data.
+
+        :rtype: Path
+        """
+        return config.root_path / self.filename.format(
+            name=self.name, release=self.release
+        )
+
+    def save(self, excluded: list[str] | None) -> Self:
+        """Save logging data that receive a context data from a workflow
+        execution result.
+
+        :param excluded: An excluded list of key name that want to pass in the
+            model_dump method.
+        :rtype: Self
+        """
+        # NOTE: Check environ variable was set for real writing.
+        if not config.enable_write_log:
+            return self
+
+        log_file: Path = self.pointer() / f"{self.run_id}.log"
+        log_file.write_text(
+            json.dumps(
+                self.model_dump(exclude=excluded),
+                default=str,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        return self
+
+
+class SQLiteLog(BaseLog):
+
+    def save(self, excluded: list[str] | None) -> None:
+        raise NotImplementedError("SQLiteLog does not implement yet.")
+
+
+Log = Union[
+    FileLog,
+    SQLiteLog,
+]

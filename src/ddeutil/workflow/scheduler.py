@@ -56,11 +56,10 @@ except ImportError:
     CancelJob = None
 
 from .__types import DictData, TupleStr
-from .conf import Loader, config
+from .conf import FileLog, Loader, Log, config, get_logger
 from .cron import CronRunner
 from .exceptions import JobException, WorkflowException
 from .job import Job
-from .log import FileLog, Log, get_logger
 from .on import On
 from .utils import (
     Param,

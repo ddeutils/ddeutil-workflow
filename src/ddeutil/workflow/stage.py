@@ -48,9 +48,8 @@ from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
 from .__types import DictData, DictStr, Re, TupleStr
-from .conf import config
+from .conf import config, get_logger
 from .exceptions import StageException
-from .log import get_logger
 from .utils import (
     Registry,
     Result,
