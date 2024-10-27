@@ -2,6 +2,26 @@
 
 ## Latest Changes
 
+## 0.0.18
+
+### :sparkles: Features
+
+- :dart: feat: improve object on init file of this package. (_2024-10-27_)
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: updaste testcase that make 100% converage report. (_2024-10-27_)
+- :test_tube: tests: add testcase support the scheduler module. (_2024-10-27_)
+- :test_tube: tests: fixed cong file log testcase. (_2024-10-27_)
+
+### :bug: Fix Bugs
+
+- :gear: fixed: add timezone change on the gh runner. (_2024-10-27_)
+
+### :postbox: Dependencies
+
+- :pushpin: deps: updaste pydantic==2.9.2. (_2024-10-27_)
+
 ## 0.0.17
 
 ### :sparkles: Features
