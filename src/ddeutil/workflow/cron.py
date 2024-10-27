@@ -18,10 +18,7 @@ from ddeutil.core import (
     isinstance_check,
     must_split,
 )
-from ddeutil.core.dtutils import (
-    next_date,
-    replace_date,
-)
+from ddeutil.core.dtutils import next_date, replace_date
 
 WEEKDAYS: dict[str, int] = {
     "Sun": 0,

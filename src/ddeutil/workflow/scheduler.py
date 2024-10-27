@@ -52,7 +52,7 @@ except ImportError:
 
 try:
     from schedule import CancelJob
-except ImportError:
+except ImportError:  # pragma: no cov
     CancelJob = None
 
 from .__types import DictData, TupleStr

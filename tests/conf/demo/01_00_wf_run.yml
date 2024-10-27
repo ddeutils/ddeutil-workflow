@@ -166,6 +166,68 @@ wf-run-python-raise-for-job:
             raise ValueError('Testing raise error inside PyStage!!!')
         - name: Echo hello world 2
           echo: "Hello World 2"
+    job-complete:
+      strategy:
+        fail-fast: False
+        max_parallel: 2
+        matrix:
+          sleep: [ '0.1', '5', '1' ]
+      stages:
+        - name: Raise Error Inside
+          id: success
+          run: |
+            result: str = (
+              'fast-success' if ${{ matrix.sleep }} != 0.1 else 'success'
+            )
+    job-complete-raise:
+      strategy:
+        fail-fast: False
+        max_parallel: 2
+        matrix:
+          sleep: [ '0.1', '4', '1' ]
+      stages:
+        - name: Sleep
+          run: |
+            import time
+            print("Start Sleep ... ${{ matrix.sleep }}")
+            time.sleep(${{ matrix.sleep }})
+        - name: Raise Error Inside
+          id: raise-error
+          run: |
+            if ${{ matrix.sleep }} != 0.1:
+              raise ValueError('Testing raise error inside PyStage!!!')
+            result: str = 'success'
+    job-fail-fast:
+      strategy:
+        fail-fast: True
+        max_parallel: 2
+        matrix:
+          sleep: [ '0.1', '5', '1' ]
+      stages:
+        - name: Raise Error Inside
+          id: success
+          run: |
+            result: str = (
+              'fast-success' if ${{ matrix.sleep }} != 0.1 else 'success'
+            )
+    job-fail-fast-raise:
+      strategy:
+        fail-fast: True
+        max_parallel: 2
+        matrix:
+          sleep: [ '0.1', '4', '1' ]
+      stages:
+        - name: Sleep
+          run: |
+            import time
+            print("Start Sleep ... ${{ matrix.sleep }}")
+            time.sleep(${{ matrix.sleep }})
+        - name: Raise Error Inside
+          id: raise-error
+          run: |
+            if ${{ matrix.sleep }} != 0.1:
+              raise ValueError('Testing raise error inside PyStage!!!')
+            result: str = 'success'
 
 wf-run-depends:
   type: ddeutil.workflow.Workflow

@@ -127,6 +127,7 @@ def handler_result(message: str | None = None) -> DecoratorResult:
                 logger.error(
                     f"({self.run_id}) [STAGE]: {err.__class__.__name__}: {err}"
                 )
+                print("Stage Raise error:", config.stage_raise_error)
                 if config.stage_raise_error:
                     # NOTE: If error that raise from stage execution course by
                     #   itself, it will return that error with previous
@@ -467,6 +468,15 @@ class PyStage(BaseStage):
         ),
     )
 
+    @staticmethod
+    def pick_keys_from_locals(values: DictData) -> Iterator[str]:
+        from inspect import ismodule
+
+        for value in values:
+            if value == "__annotations__" or ismodule(values[value]):
+                continue
+            yield value
+
     def set_outputs(self, output: DictData, to: DictData) -> DictData:
         """Override set an outputs method for the Python execution process that
         extract output from all the locals values.
@@ -479,14 +489,14 @@ class PyStage(BaseStage):
         lc: DictData = output.get("locals", {})
         super().set_outputs(
             (
-                {k: lc[k] for k in lc if k != "__annotations__"}
+                {k: lc[k] for k in self.pick_keys_from_locals(lc)}
                 | {k: output[k] for k in output if k.startswith("error")}
             ),
             to=to,
         )
 
-        # NOTE:
-        #   Override value that changing from the globals that pass via exec.
+        # NOTE: Override value that changing from the globals that pass via the
+        #   exec function.
         gb: DictData = output.get("globals", {})
         to.update({k: gb[k] for k in to if k in gb})
         return to

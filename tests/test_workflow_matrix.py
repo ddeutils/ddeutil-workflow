@@ -79,10 +79,7 @@ def test_workflow_job_matrix():
 
 
 def test_workflow_matrix():
-    workflow = wf.Workflow.from_loader(
-        name="wf-run-matrix",
-        externals={},
-    )
+    workflow = wf.Workflow.from_loader(name="wf-run-matrix")
     rs = workflow.execute(params={"source": "src", "target": "tgt"})
     assert {
         "params": {"source": "src", "target": "tgt"},

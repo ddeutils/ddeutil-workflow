@@ -553,6 +553,8 @@ class Job(BaseModel):
         # NOTE: Create event for cancel executor by trigger stop running event.
         event: Event = Event()
 
+        print("Job Run Fail-Fast:", self.strategy.fail_fast)
+
         # IMPORTANT: Start running strategy execution by multithreading because
         #   it will running by strategy values without waiting previous
         #   execution.
@@ -571,7 +573,6 @@ class Job(BaseModel):
             ]
 
             # NOTE: Dynamic catching futures object with fail-fast flag.
-
             return (
                 self.__catch_fail_fast(event=event, futures=futures)
                 if self.strategy.fail_fast
@@ -614,34 +615,33 @@ class Job(BaseModel):
         )
         logger.debug(f"({self.run_id}) [JOB]: Strategy is set Fail Fast{nd}")
 
-        # NOTE: Stop all running tasks with setting the event manager and cancel
+        # NOTE:
+        #       Stop all running tasks with setting the event manager and cancel
         #   any scheduled tasks.
-        #       This case is not common error and not raise when all process
-        #   running normally, so, I will ignore and skip coverage to it.
         #
-        if len(done) != len(futures):  # pragma: no cov
+        if len(done) != len(futures):
             event.set()
-            for future in futures:
+            for future in not_done:
                 future.cancel()
 
-            del future
-
-        print("This line")
-
+        future: Future
         for future in done:
-            if future.exception():
-                status = 1
+            if err := future.exception():
+                status: int = 1
                 logger.error(
                     f"({self.run_id}) [JOB]: One stage failed with: "
                     f"{future.exception()}, shutting down this future."
                 )
-            elif future.cancelled():
+                context.update(
+                    {
+                        "error": err,
+                        "error_message": f"{err.__class__.__name__}: {err}",
+                    },
+                )
                 continue
 
             # NOTE: Update the result context to main job context.
             context.update(future.result(timeout=result_timeout).context)
-
-            del future
 
         return rs_final.catch(status=status, context=context)
 
@@ -667,7 +667,7 @@ class Job(BaseModel):
         for future in as_completed(futures, timeout=timeout):
             try:
                 context.update(future.result(timeout=result_timeout).context)
-            except TimeoutError:
+            except TimeoutError:  # pragma: no cov
                 status = 1
                 logger.warning(
                     f"({self.run_id}) [JOB]: Task is hanging. Attempting to "
@@ -689,6 +689,10 @@ class Job(BaseModel):
                     f"fail-fast does not set;\n{err.__class__.__name__}:\n\t"
                     f"{err}"
                 )
-            finally:
-                del future
+                context.update(
+                    {
+                        "error": err,
+                        "error_message": f"{err.__class__.__name__}: {err}",
+                    },
+                )
         return rs_final.catch(status=status, context=context)

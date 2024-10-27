@@ -3,6 +3,7 @@ from threading import Event
 from unittest import mock
 
 import pytest
+from ddeutil.core import getdot
 from ddeutil.workflow.conf import Config
 from ddeutil.workflow.exceptions import JobException, StageException
 from ddeutil.workflow.job import Job
@@ -33,7 +34,26 @@ def test_job_exec_strategy():
     )
     job: Job = workflow.job("final-job")
     rs = job.execute_strategy({"name": "foo"}, {})
-    print(rs.context)
+    assert rs.context == {
+        "5027535057": {
+            "matrix": {"name": "foo"},
+            "stages": {
+                "1772094681": {"outputs": {}},
+                "raise-error": {
+                    "outputs": {
+                        "error": getdot(
+                            "5027535057.stages.raise-error.outputs.error",
+                            rs.context,
+                        ),
+                        "error_message": (
+                            "ValueError: Testing raise error inside PyStage!!!"
+                        ),
+                    },
+                },
+                "7761132585": {"outputs": {}},
+            },
+        },
+    }
 
 
 def test_job_exec_strategy_event_set():
