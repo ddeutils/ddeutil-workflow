@@ -2,6 +2,36 @@
 
 ## Latest Changes
 
+## 0.0.17
+
+### :sparkles: Features
+
+- :dart: feat: add validate for stage id that should not be duplicate. (_2024-10-26_)
+- :dart: feat: merge log and config modules together. (_2024-10-26_)
+- :dart: feat: remove config param object and use config instead. (_2024-10-25_)
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: add testcase for the log module. (_2024-10-27_)
+- :test_tube: tests: add testcase on the job module. (_2024-10-27_)
+- :test_tube: tests: add testcase support coverage on on module. (_2024-10-26_)
+- :test_tube: tests: update teatcase on utils module. (_2024-10-25_)
+- :art: styled: change internal variable name on python stage object. (_2024-10-23_)
+
+### :bug: Fix Bugs
+
+- :gear: fixed: move cron module to verdors and ignore it in coverage process. (_2024-10-27_)
+
+### :package: Build & Workflow
+
+- :toolbox: build: add coverage workflow. (_2024-10-27_)
+- :toolbox: build: add dockerignore and docker file multi-stage. (_2024-10-25_)
+- :toolbox: build: add python nogil version on test workflow. (_2024-10-23_)
+
+### :postbox: Dependencies
+
+- :pushpin: deps: add toml deps package on ddeutil-io. (_2024-10-27_)
+
 ## 0.0.16
 
 ### :sparkles: Features
