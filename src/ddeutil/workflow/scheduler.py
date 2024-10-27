@@ -376,7 +376,7 @@ class Workflow(BaseModel):
                 status=0,
                 context={
                     "params": params,
-                    "poking": {"skipped": [str(on.cronjob)], "run": []},
+                    "release": {"status": "skipped", "cron": [str(on.cronjob)]},
                 },
             )
 
@@ -439,7 +439,7 @@ class Workflow(BaseModel):
             status=0,
             context={
                 "params": params,
-                "poking": {"skipped": [], "run": [str(on.cronjob)]},
+                "release": {"status": "run", "cron": [str(on.cronjob)]},
             },
         )
 
@@ -492,7 +492,7 @@ class Workflow(BaseModel):
             for future in as_completed(futures):
                 results.append(future.result(timeout=60))
 
-        if len(queue) > 0:
+        if len(queue) > 0:  # pragma: no cov
             logger.error(
                 f"({self.run_id}) [POKING]: Log Queue does empty when poking "
                 f"process was finishing."
@@ -765,7 +765,8 @@ class Workflow(BaseModel):
                 continue
 
             # NOTE: Start workflow job execution with deep copy context data
-            #   before release.
+            #   before release. This job execution process will running until
+            #   done before checking all execution timeout or not.
             #
             #   {
             #       'params': <input-params>,
@@ -832,12 +833,13 @@ class ScheduleWorkflow(BaseModel):
         if on := data.pop("on", []):
 
             if isinstance(on, str):
-                on = [on]
+                on: list[str] = [on]
 
             if any(not isinstance(n, (dict, str)) for n in on):
                 raise TypeError("The ``on`` key should be list of str or dict")
 
-            # NOTE: Pass on value to Loader and keep on model object to on field
+            # NOTE: Pass on value to Loader and keep on model object to on
+            #   field.
             data["on"] = [
                 (
                     Loader(n, externals=(externals or {})).data
@@ -902,12 +904,14 @@ class Schedule(BaseModel):
         *,
         externals: DictData | None = None,
     ) -> list[WorkflowTaskData]:
-        """Generate Task from the current datetime.
+        """Return the list of WorkflowTaskData object from the specific input
+        datetime that mapping with the on field.
 
         :param start_date: A start date that get from the workflow schedule.
         :param queue: A mapping of name and list of datetime for queue.
         :param running: A mapping of name and list of datetime for running.
         :param externals: An external parameters that pass to the Loader object.
+
         :rtype: list[WorkflowTaskData]
         """
 
@@ -922,12 +926,14 @@ class Schedule(BaseModel):
             queue[wfs.name]: list[datetime] = []
             running[wfs.name]: list[datetime] = []
 
-            # NOTE: Create default on if it does not passing on the Schedule.
+            # NOTE: Create the default on value if it does not passing on the
+            #   Schedule object.
             _ons: list[On] = wf.on.copy() if len(wfs.on) == 0 else wfs.on
 
             for on in _ons:
-                on_gen = on.generate(start_date)
+                on_gen: CronRunner = on.generate(start_date)
                 next_running_date = on_gen.next
+
                 while next_running_date in queue[wfs.name]:
                     next_running_date = on_gen.next
 
@@ -957,7 +963,8 @@ def catch_exceptions(cancel_on_failure: bool = False) -> DecoratorCancelJob:
 
     :param cancel_on_failure: A flag that allow to return the CancelJob or not
         it will raise.
-    :rtype: Callable[P, Optional[CancelJob]]
+
+    :rtype: DecoratorCancelJob
     """
 
     def decorator(func: ReturnCancelJob) -> ReturnCancelJob:

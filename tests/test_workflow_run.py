@@ -1,16 +1,13 @@
 from datetime import datetime
 from unittest import mock
 
-import ddeutil.workflow as wf
+from ddeutil.workflow import Workflow
 from ddeutil.workflow.conf import Config
 from ddeutil.workflow.utils import Result
 
 
 def test_workflow_run_py():
-    workflow = wf.Workflow.from_loader(
-        name="wf-run-python",
-        externals={},
-    )
+    workflow = Workflow.from_loader(name="wf-run-python")
     rs: Result = workflow.execute(
         params={
             "author-run": "Local Workflow",
@@ -68,7 +65,7 @@ def test_workflow_run_py():
 
 def test_workflow_run_py_with_parallel():
     with mock.patch.object(Config, "max_job_parallel", 3):
-        workflow = wf.Workflow.from_loader(
+        workflow = Workflow.from_loader(
             name="wf-run-python",
             externals={},
         )
@@ -128,11 +125,40 @@ def test_workflow_run_py_with_parallel():
 
 
 def test_workflow_run_py_raise():
-    workflow = wf.Workflow.from_loader("wf-run-python-raise", externals={})
+    workflow = Workflow.from_loader("wf-run-python-raise")
     rs = workflow.execute(params={})
-    print(rs)
-    assert 1 == rs.status
+    assert rs.status == 1
+    assert rs.context == {
+        "params": {},
+        "jobs": {},
+        "error": rs.context["error"],
+        "error_message": (
+            "WorkflowException: Get job execution error first-job: "
+            "JobException: Get stage execution error: "
+            "StageException: PyStage: \n\t"
+            "ValueError: Testing raise error inside PyStage!!!"
+        ),
+    }
 
-    import json
 
-    print(json.dumps(rs.context, indent=2, default=str))
+@mock.patch.object(Config, "max_job_parallel", 2)
+def test_workflow_run_py_raise_parallel():
+    workflow = Workflow.from_loader("wf-run-python-raise")
+    rs = workflow.execute(params={})
+    assert rs.status == 1
+    assert rs.context == {
+        "params": {},
+        "jobs": {
+            "second-job": {
+                "matrix": {},
+                "stages": {"1772094681": {"outputs": {}}},
+            }
+        },
+        "error": rs.context["error"],
+        "error_message": (
+            "WorkflowException: Get job execution error first-job: "
+            "JobException: Get stage execution error: "
+            "StageException: PyStage: \n\t"
+            "ValueError: Testing raise error inside PyStage!!!"
+        ),
+    }

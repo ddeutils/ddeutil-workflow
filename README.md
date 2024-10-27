@@ -162,7 +162,7 @@ and do not raise any error to you.
 | `WORKFLOW_CORE_JOB_RAISE_ERROR`         | Core      | true                             | A flag that all job raise JobException from job strategy execution.                                                |        |
 | `WORKFLOW_CORE_MAX_NUM_POKING`          | Core      | 4                                | .                                                                                                                  |        |
 | `WORKFLOW_CORE_MAX_JOB_PARALLEL`        | Core      | 2                                | The maximum job number that able to run parallel in workflow executor.                                             |        |
-| `WORKFLOW_CORE_WORKFLOW_ID_SIMPLE_MODE` | Core      | true                             | .                                                                                                                  |        |
+| `WORKFLOW_CORE_GENERATE_ID_SIMPLE_MODE` | Core      | true                             | A flog that enable generating ID with `md5` algorithm.                                                             |        |
 | `WORKFLOW_LOG_DEBUG_MODE`               | Log       | true                             | A flag that enable logging with debug level mode.                                                                  |        |
 | `WORKFLOW_LOG_ENABLE_WRITE`             | Log       | true                             | A flag that enable logging object saving log to its destination.                                                   |        |
 | `WORKFLOW_APP_MAX_PROCESS`              | Schedule  | 2                                | The maximum process worker number that run in scheduler app module.                                                |        |

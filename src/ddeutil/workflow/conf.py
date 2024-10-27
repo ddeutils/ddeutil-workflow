@@ -41,8 +41,8 @@ class Config:
     # NOTE: Core
     root_path: Path = Path(os.getenv("WORKFLOW_ROOT_PATH", "."))
     tz: ZoneInfo = ZoneInfo(env("WORKFLOW_CORE_TIMEZONE", "UTC"))
-    workflow_id_simple_mode: bool = str2bool(
-        os.getenv("WORKFLOW_CORE_WORKFLOW_ID_SIMPLE_MODE", "true")
+    gen_id_simple_mode: bool = str2bool(
+        os.getenv("WORKFLOW_CORE_GENERATE_ID_SIMPLE_MODE", "true")
     )
 
     # NOTE: Register
