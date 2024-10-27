@@ -1,6 +1,7 @@
 # Workflow
 
 [![test](https://github.com/ddeutils/ddeutil-workflow/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/ddeutils/ddeutil-workflow/actions/workflows/tests.yml)
+[![codecov](https://codecov.io/gh/ddeutils/ddeutil-workflow/graph/badge.svg?token=3NDPN2I0H9)](https://codecov.io/gh/ddeutils/ddeutil-workflow)
 [![pypi version](https://img.shields.io/pypi/v/ddeutil-workflow)](https://pypi.org/project/ddeutil-workflow/)
 [![python support version](https://img.shields.io/pypi/pyversions/ddeutil-workflow)](https://pypi.org/project/ddeutil-workflow/)
 [![size](https://img.shields.io/github/languages/code-size/ddeutils/ddeutil-workflow)](https://github.com/ddeutils/ddeutil-workflow)
@@ -42,8 +43,9 @@ configuration. It called **Metadata Driven Data Workflow**.
 
 ## :round_pushpin: Installation
 
-This project need `ddeutil-io` extension namespace packages. If you want to install
-this package with application add-ons, you should add `app` in installation;
+This project need `ddeutil` and `ddeutil-io` extension namespace packages.
+If you want to install this package with application add-ons, you should add
+`app` in installation;
 
 | Usecase           | Install Optional                         | Support            |
 |-------------------|------------------------------------------|--------------------|
