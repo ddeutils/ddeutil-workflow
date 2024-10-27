@@ -55,9 +55,9 @@ try:
 except ImportError:  # pragma: no cov
     CancelJob = None
 
+from .__cron import CronRunner
 from .__types import DictData, TupleStr
 from .conf import FileLog, Loader, Log, config, get_logger
-from .cron import CronRunner
 from .exceptions import JobException, WorkflowException
 from .job import Job
 from .on import On
@@ -229,8 +229,8 @@ class Workflow(BaseModel):
                 need for need in self.jobs[job].needs if need not in self.jobs
             ]:
                 raise WorkflowException(
-                    f"This needed jobs: {not_exist} do not exist in this "
-                    f"workflow, {self.name!r}"
+                    f"The needed jobs: {not_exist} do not found in "
+                    f"{self.name!r}."
                 )
 
             # NOTE: update a job id with its job id from workflow template
@@ -353,11 +353,11 @@ class Workflow(BaseModel):
         # NOTE: get next schedule time that generate from now.
         next_time: datetime = gen.next
 
-        # NOTE: get next utils it does not logger.
+        # NOTE: While-loop to getting next until it does not logger.
         while log.is_pointed(self.name, next_time, queue=queue):
             next_time: datetime = gen.next
 
-        # NOTE: push this next running time to log queue
+        # NOTE: Heap-push this next running time to log queue list.
         heappush(queue, next_time)
 
         # VALIDATE: Check the different time between the next schedule time and
@@ -708,7 +708,7 @@ class Workflow(BaseModel):
                     raise WorkflowException(f"{err}")
                 try:
                     future.result(timeout=60)
-                except TimeoutError as err:
+                except TimeoutError as err:  # pragma: no cove
                     raise WorkflowException(
                         "Timeout when getting result from future"
                     ) from err

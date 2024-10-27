@@ -246,3 +246,20 @@ wf-run-depends:
       stages:
         - name: Echo final
           echo: "This job do not wait the first jon finish"
+
+
+wf-without-jobs:
+  type: ddeutil.workflow.Workflow
+
+
+wf-params-required:
+  type: ddeutil.workflow.Workflow
+  params:
+    name:
+      type: str
+      required: True
+  jobs:
+    first-job:
+      stages:
+        - name: Echo
+          echo: "Hello World"

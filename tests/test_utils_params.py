@@ -13,9 +13,6 @@ from freezegun import freeze_time
 
 
 def test_param_str():
-    with pytest.raises(ParamValueException):
-        StrParam(required=True)
-
     assert "foo" == StrParam().receive("foo")
     assert "bar" == StrParam(required=True, default="foo").receive("bar")
 

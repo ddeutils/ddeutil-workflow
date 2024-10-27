@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from functools import partial
 from zoneinfo import ZoneInfo
 
-import ddeutil.workflow.cron as cron
+import ddeutil.workflow.__cron as cron
 import pytest
 
 from tests.utils import str2dt
@@ -49,7 +49,7 @@ def test_cron_cronpart():
     )
     assert [3, 5, 6, 7, 8] == cron_part.values
     assert repr(cron_part) == (
-        "CronPart(unit=<class 'ddeutil.workflow.cron.Unit'>(name='month', "
+        "CronPart(unit=<class 'ddeutil.workflow.__cron.Unit'>(name='month', "
         "range=functools.partial(<class 'range'>, 1, 13),min=1, max=12, "
         "alt=['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', "
         "'OCT', 'NOV', 'DEC']), values='3,5-8')"
@@ -84,6 +84,9 @@ def test_cron_cronjob():
 
     cr = cron.CronJob("*/4 */3 1 * 1")
     assert str(cr) == "*/4 */3 1 * 1"
+
+    with pytest.raises(ValueError):
+        cron.CronJob("*/4 */3 1 *")
 
 
 def test_cron_cronjob_to_list():
@@ -175,15 +178,21 @@ def test_cron_next_year():
     sch = cron.CronJob("0 0 1 * *").schedule(
         date=datetime(2024, 10, 1, 12, tzinfo=ZoneInfo("Asia/Bangkok")),
     )
-    print(sch.next)
-    print("=====")
-    # print(sch.next)
-    # print(sch.next)
-    # print(sch.next)
-    # print(sch.next)
+    assert sch.next == str2dt("2024-11-01 00:00:00")
+    assert sch.next == str2dt("2024-12-01 00:00:00")
+    assert sch.next == str2dt("2025-01-01 00:00:00")
 
 
 def test_cron_year_next_year():
+    sch = cron.CronJobYear("0 0 1 * * *").schedule(
+        date=datetime(2024, 10, 1, 12, tzinfo=ZoneInfo("Asia/Bangkok")),
+    )
+    assert sch.next == str2dt("2024-11-01 00:00:00")
+    assert sch.next == str2dt("2024-12-01 00:00:00")
+    assert sch.next == str2dt("2025-01-01 00:00:00")
+
+
+def test_cron_year_next_year_raise():
     sch = cron.CronJobYear("0 0 1 * * 2023").schedule(
         date=datetime(2024, 10, 1, 12, tzinfo=ZoneInfo("Asia/Bangkok")),
     )

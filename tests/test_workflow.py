@@ -1,10 +1,12 @@
 import pytest
-from ddeutil.workflow import Job, Workflow
+import yaml
+from ddeutil.workflow import Workflow
+from ddeutil.workflow.exceptions import WorkflowException
 from ddeutil.workflow.utils import Result
 from pydantic import ValidationError
 
 
-def test_workflow_model():
+def test_workflow():
     data = {
         "demo-run": {
             "stages": [
@@ -32,21 +34,24 @@ def test_workflow_model():
             ]
         },
     }
-    p = Workflow(name="manual-workflow", jobs=data)
-    assert "Run Hello World" == p.jobs.get("demo-run").stages[0].name
+    wf = Workflow(name="manual-workflow", jobs=data)
+    assert "Run Hello World" == wf.jobs.get("demo-run").stages[0].name
     assert (
         "Run Sequence and use var from Above"
-        == p.jobs.get("demo-run").stages[1].name
+        == wf.jobs.get("demo-run").stages[1].name
     )
+    assert "demo-run" == wf.job("demo-run").id
 
-    demo_job: Job = p.job("demo-run")
-    assert [{}] == demo_job.strategy.make()
+    with pytest.raises(ValueError):
+        wf.job("not-found-job-id")
 
 
-def test_workflow_model_name_raise():
-
+def test_workflow_name_raise():
     with pytest.raises(ValidationError):
         Workflow(name="manual-workflow-${{ params.test }}")
+
+    with pytest.raises(ValidationError):
+        Workflow(name="manual-workflow-${{ matrix.name }}")
 
 
 def test_workflow_desc():
@@ -57,6 +62,82 @@ def test_workflow_desc():
     assert workflow.desc == (
         "## Run Python Workflow\n\nThis is a running python workflow\n"
     )
+
+
+def test_workflow_from_loader_without_job():
+    wf = Workflow.from_loader(name="wf-without-jobs")
+    rs = wf.execute({})
+    assert rs.context == {}
+
+
+def test_workflow_from_loader_raise(test_path):
+    test_file = test_path / "conf/demo/01_01_wf_run_raise.yml"
+
+    with test_file.open(mode="w") as f:
+        yaml.dump(
+            {
+                "wf-run-from-loader-raise": {
+                    "type": "ddeutil.workflow.on.On",
+                    "jobs": {
+                        "first-job": {
+                            "stages": [
+                                {"name": "Echo next", "echo": "Hello World"}
+                            ]
+                        }
+                    },
+                }
+            },
+            f,
+        )
+
+    with pytest.raises(ValueError):
+        Workflow.from_loader(name="wf-run-from-loader-raise")
+
+    with test_file.open(mode="w") as f:
+        yaml.dump(
+            {
+                "wf-run-from-loader-raise": {
+                    "type": "ddeutil.workflow.Workflow",
+                    "on": [
+                        ["* * * * *"],
+                        ["* * 1 0 0"],
+                    ],
+                    "jobs": {
+                        "first-job": {
+                            "stages": [
+                                {"name": "Echo next", "echo": "Hello World"}
+                            ]
+                        }
+                    },
+                }
+            },
+            f,
+        )
+
+    with pytest.raises(TypeError):
+        Workflow.from_loader(name="wf-run-from-loader-raise")
+
+    with test_file.open(mode="w") as f:
+        yaml.dump(
+            {
+                "wf-run-from-loader-raise": {
+                    "type": "ddeutil.workflow.Workflow",
+                    "jobs": {
+                        "first-job": {
+                            "needs": ["not-found"],
+                            "stages": [
+                                {"name": "Echo next", "echo": "Hello World"}
+                            ],
+                        }
+                    },
+                }
+            },
+            f,
+        )
+    with pytest.raises(WorkflowException):
+        Workflow.from_loader(name="wf-run-from-loader-raise")
+
+    test_file.unlink(missing_ok=True)
 
 
 def test_workflow_condition():

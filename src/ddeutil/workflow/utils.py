@@ -229,15 +229,6 @@ class DefaultParam(BaseParam):
             "Receive value and validate typing before return valid value."
         )
 
-    @model_validator(mode="after")
-    def __check_default(self) -> Self:
-        """Check default value should pass when it set required."""
-        if self.required and self.default is None:
-            raise ParamValueException(
-                "Default should be set when this parameter was required."
-            )
-        return self
-
 
 class DatetimeParam(DefaultParam):
     """Datetime parameter."""
