@@ -50,7 +50,22 @@ def test_conf_log_file_do_first():
     assert log.name == "wf-demo-logging"
 
 
+@mock.patch.object(Config, "enable_write_log", True)
 def test_conf_log_file_find_logs(root_path):
+    log = FileLog.model_validate(
+        obj={
+            "name": "wf-scheduling",
+            "on": "*/2 * * * *",
+            "release": datetime(2024, 1, 1, 1),
+            "context": {
+                "params": {"name": "foo"},
+            },
+            "parent_run_id": None,
+            "run_id": "558851633820240817184358131811",
+            "update": datetime.now(),
+        },
+    )
+    log.save(excluded=None)
     log = next(FileLog.find_logs(name="wf-scheduling"))
     assert isinstance(log, FileLog)
 
