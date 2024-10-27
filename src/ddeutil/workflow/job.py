@@ -19,6 +19,7 @@ from concurrent.futures import (
     as_completed,
     wait,
 )
+from enum import Enum
 from functools import lru_cache
 from textwrap import dedent
 from threading import Event
@@ -198,6 +199,11 @@ class Strategy(BaseModel):
         return make(self.matrix, self.include, self.exclude)
 
 
+class TriggerRules(str, Enum):
+    all_success: str = "all_success"
+    all_failed: str = "all_failed"
+
+
 class Job(BaseModel):
     """Job Pydantic model object (group of stages).
 
@@ -245,6 +251,11 @@ class Job(BaseModel):
         default_factory=list,
         description="A list of Stage of this job.",
     )
+    trigger_rule: TriggerRules = Field(
+        default=TriggerRules.all_success,
+        description="A trigger rule of tracking needed jobs.",
+        serialization_alias="trigger-rule",
+    )
     needs: list[str] = Field(
         default_factory=list,
         description="A list of the job ID that want to run before this job.",
@@ -269,6 +280,7 @@ class Job(BaseModel):
         :rtype: DictData
         """
         dash2underscore("runs-on", values)
+        dash2underscore("trigger-rule", values)
         return values
 
     @field_validator("desc", mode="after")

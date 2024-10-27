@@ -11,6 +11,7 @@ def test_job():
     job = Job()
     job.run_id = "demo"
     assert "demo" == job.run_id
+    assert "all_success" == job.trigger_rule
 
     job = Job(desc="\t# Desc\n\tThis is a demo job.")
     assert job.desc == "# Desc\nThis is a demo job."
