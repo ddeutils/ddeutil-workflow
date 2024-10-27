@@ -553,8 +553,6 @@ class Job(BaseModel):
         # NOTE: Create event for cancel executor by trigger stop running event.
         event: Event = Event()
 
-        print("Job Run Fail-Fast:", self.strategy.fail_fast)
-
         # IMPORTANT: Start running strategy execution by multithreading because
         #   it will running by strategy values without waiting previous
         #   execution.

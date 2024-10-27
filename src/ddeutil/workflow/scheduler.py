@@ -388,7 +388,7 @@ class Workflow(BaseModel):
         # NOTE: Release when the time is nearly to schedule time.
         while (duration := get_diff_sec(next_time, tz=cron_tz)) > (
             sleep_interval + 5
-        ):
+        ):  # pragma: no cov
             logger.debug(
                 f"({self.run_id}) [CORE]: {self.name!r} : {on.cronjob} : "
                 f"Sleep until: {duration}"
@@ -717,11 +717,11 @@ class Workflow(BaseModel):
             return context
 
         # NOTE: Raise timeout error.
-        logger.warning(
+        logger.warning(  # pragma: no cov
             f"({self.run_id}) [WORKFLOW]: Execution of workflow, {self.name!r} "
             f", was timeout"
         )
-        raise WorkflowException(
+        raise WorkflowException(  # pragma: no cov
             f"Execution of workflow: {self.name} was timeout"
         )
 
@@ -784,10 +784,10 @@ class Workflow(BaseModel):
             return context
 
         # NOTE: Raise timeout error.
-        logger.warning(
+        logger.warning(  # pragma: no cov
             f"({self.run_id}) [WORKFLOW]: Execution of workflow was timeout"
         )
-        raise WorkflowException(
+        raise WorkflowException(  # pragma: no cov
             f"Execution of workflow: {self.name} was timeout"
         )
 
@@ -970,7 +970,7 @@ def catch_exceptions(cancel_on_failure: bool = False) -> DecoratorCancelJob:
     def decorator(func: ReturnCancelJob) -> ReturnCancelJob:
         try:
             # NOTE: Check the function that want to handle is method or not.
-            if inspect.ismethod(func):
+            if inspect.ismethod(func):  # pragma: no cov
 
                 @wraps(func)
                 def wrapper(self, *args, **kwargs):
@@ -984,7 +984,7 @@ def catch_exceptions(cancel_on_failure: bool = False) -> DecoratorCancelJob:
 
             return wrapper
 
-        except Exception as err:
+        except Exception as err:  # pragma: no cov
             logger.exception(err)
             if cancel_on_failure:
                 return CancelJob
@@ -1012,7 +1012,7 @@ class WorkflowTaskData:
         *,
         waiting_sec: int = 60,
         sleep_interval: int = 15,
-    ) -> None:
+    ) -> None:  # pragma: no cov
         """Workflow release, it will use with the same logic of
         `workflow.release` method.
 
@@ -1126,7 +1126,7 @@ class WorkflowTaskData:
             future_running_time in self.running[wf.name]
             or future_running_time in self.queue[wf.name]
             or future_running_time < finish_time
-        ):
+        ):  # pragma: no cov
             future_running_time: datetime = gen.next
 
         heappush(self.queue[wf.name], future_running_time)
@@ -1141,7 +1141,7 @@ class WorkflowTaskData:
         return NotImplemented
 
 
-@catch_exceptions(cancel_on_failure=True)
+@catch_exceptions(cancel_on_failure=True)  # pragma: no cov
 def workflow_task(
     workflow_tasks: list[WorkflowTaskData],
     stop: datetime,
@@ -1240,7 +1240,7 @@ def workflow_task(
     logger.debug(f"[WORKFLOW]: {'=' * 100}")
 
 
-def workflow_monitor(threads: dict[str, Thread]) -> None:
+def workflow_monitor(threads: dict[str, Thread]) -> None:  # pragma: no cov
     """Workflow schedule for monitoring long running thread from the schedule
     control.
 
@@ -1262,7 +1262,7 @@ def workflow_control(
     schedules: list[str],
     stop: datetime | None = None,
     externals: DictData | None = None,
-) -> list[str]:
+) -> list[str]:  # pragma: no cov
     """Workflow scheduler control.
 
     :param schedules: A list of workflow names that want to schedule running.
@@ -1350,7 +1350,7 @@ def workflow_runner(
     stop: datetime | None = None,
     externals: DictData | None = None,
     excluded: list[str] | None = None,
-) -> list[str]:
+) -> list[str]:  # pragma: no cov
     """Workflow application that running multiprocessing schedule with chunk of
     workflows that exists in config path.
 

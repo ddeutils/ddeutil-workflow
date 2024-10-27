@@ -127,7 +127,6 @@ def handler_result(message: str | None = None) -> DecoratorResult:
                 logger.error(
                     f"({self.run_id}) [STAGE]: {err.__class__.__name__}: {err}"
                 )
-                print("Stage Raise error:", config.stage_raise_error)
                 if config.stage_raise_error:
                     # NOTE: If error that raise from stage execution course by
                     #   itself, it will return that error with previous

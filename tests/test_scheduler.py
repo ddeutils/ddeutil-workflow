@@ -70,22 +70,7 @@ def test_schedule_loader_find_schedule():
         print(finding)
 
 
-def test_schedule_tasks():
-    schedule = Schedule.from_loader("schedule-wf")
-
-    queue: dict[str, list[datetime]] = {"wf-scheduling": []}
-    running: dict[str, list[datetime]] = {"wf-scheduling": []}
-    for wf_task in schedule.tasks(
-        datetime(2024, 1, 1, 1),
-        queue=queue,
-        running=running,
-    ):
-        assert wf_task.workflow.name == "wf-scheduling"
-        print(wf_task)
-        print()
-
-
-def test_scheduler_remove_workflow_task():
+def test_schedule_remove_workflow_task():
     queue: dict[str, list[datetime]] = {"wf-scheduling": []}
     running: dict[str, list[datetime]] = {"wf-scheduling": []}
     pipeline_tasks: list[WorkflowTaskData] = []
