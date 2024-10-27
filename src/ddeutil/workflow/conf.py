@@ -337,11 +337,11 @@ class BaseLog(BaseModel, ABC):
             self.do_before()
         return self
 
-    def do_before(self) -> None:
+    def do_before(self) -> None:  # pragma: no cov
         """To something before end up of initial log model."""
 
     @abstractmethod
-    def save(self, excluded: list[str] | None) -> None:
+    def save(self, excluded: list[str] | None) -> None:  # pragma: no cov
         """Save this model logging to target logging store."""
         raise NotImplementedError("Log should implement ``save`` method.")
 
@@ -352,7 +352,7 @@ class FileLog(BaseLog):
     ``self.save`` method for file.
     """
 
-    filename: ClassVar[str] = (
+    filename_fmt: ClassVar[str] = (
         "./logs/workflow={name}/release={release:%Y%m%d%H%M%S}"
     )
 
@@ -361,28 +361,54 @@ class FileLog(BaseLog):
         self.pointer().mkdir(parents=True, exist_ok=True)
 
     @classmethod
-    def find_logs(cls, name: str):
+    def find_logs(cls, name: str) -> Iterator[Self]:
+        """Generate the logging data that found from logs path with specific a
+        workflow name.
+
+        :param name: A workflow name that want to search release logging data.
+        """
         pointer: Path = config.root_path / f"./logs/workflow={name}"
+        if not pointer.exists():
+            raise FileNotFoundError(
+                f"Pointer: ./logs/workflow={name} does not found."
+            )
+
         for file in pointer.glob("./release=*/*.log"):
             with file.open(mode="r", encoding="utf-8") as f:
-                yield json.load(f)
+                yield cls.model_validate(obj=json.load(f))
 
     @classmethod
-    def find_log(cls, name: str, release: datetime | None = None):
-        if release is not None:
-            pointer: Path = (
-                config.root_path
-                / f"./logs/workflow={name}/release={release:%Y%m%d%H%M%S}"
+    def find_log_latest(
+        cls,
+        name: str,
+        release: datetime | None = None,
+    ) -> Self:
+        """Return the logging data that found from logs path with specific
+        workflow name and release values. If a release does not pass to an input
+        argument, it will return the latest release from the current log path.
+
+        :raise FileNotFoundError:
+        :raise NotImplementedError:
+
+        :rtype: Self
+        """
+        if release is None:
+            raise NotImplementedError("Find latest log does not implement yet.")
+
+        pointer: Path = (
+            config.root_path
+            / f"./logs/workflow={name}/release={release:%Y%m%d%H%M%S}"
+        )
+        if not pointer.exists():
+            raise FileNotFoundError(
+                f"Pointer: ./logs/workflow={name}/"
+                f"release={release:%Y%m%d%H%M%S} does not found."
             )
-            if not pointer.exists():
-                raise FileNotFoundError(
-                    f"Pointer: ./logs/workflow={name}/"
-                    f"release={release:%Y%m%d%H%M%S} does not found."
-                )
-            return cls.model_validate(
-                obj=json.loads(pointer.read_text(encoding="utf-8"))
-            )
-        raise NotImplementedError("Find latest log does not implement yet.")
+
+        with max(pointer.glob("./*.log"), key=os.path.getctime).open(
+            mode="r", encoding="utf-8"
+        ) as f:
+            return cls.model_validate(obj=json.load(f))
 
     @classmethod
     def is_pointed(
@@ -404,7 +430,7 @@ class FileLog(BaseLog):
             return False
 
         # NOTE: create pointer path that use the same logic of pointer method.
-        pointer: Path = config.root_path / cls.filename.format(
+        pointer: Path = config.root_path / cls.filename_fmt.format(
             name=name, release=release
         )
 
@@ -417,7 +443,7 @@ class FileLog(BaseLog):
 
         :rtype: Path
         """
-        return config.root_path / self.filename.format(
+        return config.root_path / self.filename_fmt.format(
             name=self.name, release=self.release
         )
 
@@ -445,7 +471,7 @@ class FileLog(BaseLog):
         return self
 
 
-class SQLiteLog(BaseLog):
+class SQLiteLog(BaseLog):  # pragma: no cov
 
     def save(self, excluded: list[str] | None) -> None:
         raise NotImplementedError("SQLiteLog does not implement yet.")
