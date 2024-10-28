@@ -25,7 +25,7 @@ configuration. It called **Metadata Driven Data Workflow**.
 
 **:pushpin: <u>Rules of This Workflow engine</u>**:
 
-1. Minimum frequency unit of scheduling is **1 minute** :warning:
+1. The Minimum frequency unit of scheduling is **1 minute** :warning:
 2. Can not re-run only failed stage and its pending downstream :rotating_light:
 3. All parallel tasks inside workflow engine use Multi-Threading
    (Because Python 3.13 unlock GIL :unlock:)

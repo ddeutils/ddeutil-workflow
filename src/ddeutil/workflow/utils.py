@@ -549,6 +549,30 @@ def get_args_const(
     return name.id, args, keywords
 
 
+def get_args_from_filter(
+    ft: str,
+    filters: dict[str, FilterRegistry],
+) -> tuple[str, FilterRegistry, list[Any], dict[Any, Any]]:  # pragma: no cov
+    """Get arguments and keyword-arguments from filter function calling string.
+    and validate it with the filter functions mapping dict.
+    """
+    func_name, _args, _kwargs = get_args_const(ft)
+    args: list[Any] = [arg.value for arg in _args]
+    kwargs: dict[Any, Any] = {k: v.value for k, v in _kwargs.items()}
+
+    if func_name not in filters:
+        raise UtilException(
+            f"The post-filter: {func_name} does not support yet."
+        )
+
+    if isinstance((f_func := filters[func_name]), list) and (args or kwargs):
+        raise UtilException(
+            "Chain filter function does not support for passing arguments."
+        )
+
+    return func_name, f_func, args, kwargs
+
+
 @custom_filter("fmt")  # pragma: no cov
 def datetime_format(value: datetime, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
     """Format datetime object to string with the format."""
@@ -573,28 +597,16 @@ def map_post_filter(
 
     :rtype: T
     """
-    for _filter in post_filter:
-        func_name, _args, _kwargs = get_args_const(_filter)
-        args: list = [arg.value for arg in _args]
-        kwargs: dict = {k: v.value for k, v in _kwargs.items()}
-
-        if func_name not in filters:
-            raise UtilException(
-                f"The post-filter: {func_name} does not support yet."
-            )
-
+    for ft in post_filter:
+        func_name, f_func, args, kwargs = get_args_from_filter(ft, filters)
         try:
-            if isinstance((f_func := filters[func_name]), list):
-                if args or kwargs:
-                    raise UtilException(
-                        "Chain filter function does not support for passing "
-                        "arguments."
-                    )
+            if isinstance(f_func, list):
                 for func in f_func:
-                    value: Any = func(value)
+                    value: T = func(value)
             else:
-                value: Any = f_func(value, *args, **kwargs)
-        except UtilException:
+                value: T = f_func(value, *args, **kwargs)
+        except UtilException as err:
+            logger.warning(str(err))
             raise
         except Exception as err:
             logger.warning(str(err))

@@ -78,3 +78,10 @@ def test_map_post_filter():
                 ["raise_err"],
                 make_filter_registry(),
             )
+
+        with pytest.raises(UtilException):
+            map_post_filter(
+                "2024",
+                ["fmt"],
+                make_filter_registry(),
+            )
