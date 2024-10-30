@@ -646,6 +646,7 @@ class CronJob:
 
         :param date: An initial date that want to mark as the start point.
         :param tz: A string timezone that want to change on runner.
+
         :rtype: CronRunner
         """
         return CronRunner(self, date, tz=tz)

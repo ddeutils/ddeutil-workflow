@@ -6,6 +6,7 @@ from ddeutil.workflow import Workflow
 from ddeutil.workflow.conf import Loader
 from ddeutil.workflow.on import On
 from ddeutil.workflow.scheduler import Schedule, WorkflowTaskData
+from pydantic import ValidationError
 
 
 def test_schedule():
@@ -72,6 +73,28 @@ def test_schedule_from_loader_raise(test_path):
         )
 
     with pytest.raises(TypeError):
+        Schedule.from_loader("schedule-raise-wf")
+
+    with test_file.open(mode="w") as f:
+        yaml.dump(
+            {
+                "schedule-raise-wf": {
+                    "type": "scheduler.Schedule",
+                    "workflows": [
+                        {
+                            "name": "wf-scheduling",
+                            "on": [
+                                "every_3_minute_bkk",
+                                "every_3_minute_bkk",
+                            ],
+                        },
+                    ],
+                }
+            },
+            f,
+        )
+
+    with pytest.raises(ValidationError):
         Schedule.from_loader("schedule-raise-wf")
 
     test_file.unlink(missing_ok=True)

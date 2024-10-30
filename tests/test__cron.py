@@ -22,7 +22,7 @@ def test_timezone():
     assert timedelta(0) == timezone.utc.utcoffset(jan1_in_utc)
 
 
-def test_cron_cronpart():
+def test_cron_cron_part():
     cron_part = cron.CronPart(
         unit=cron.Unit(
             name="month",
@@ -110,6 +110,8 @@ def test_cron_cronjob_to_list():
         [1, 4, 7, 10],
         [0, 1, 2, 3, 4, 5, 6],
     ]
+
+    cr = cron.CronJob("* * * * *")
 
 
 def test_cron_option():

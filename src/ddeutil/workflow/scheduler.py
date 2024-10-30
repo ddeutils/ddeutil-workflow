@@ -218,6 +218,24 @@ class Workflow(BaseModel):
         """
         return dedent(value)
 
+    @field_validator("on", mode="after")
+    def __on_no_dup__(cls, value: list[On]) -> list[On]:
+        """Validate the on fields should not contain duplicate values and if it
+        contain every minute value, it should has only one on value."""
+        set_ons: set[str] = {str(on.cronjob) for on in value}
+        if len(set_ons) != len(value):
+            raise ValueError(
+                "The on fields should not contain duplicate on value."
+            )
+
+        # WARNING:
+        # if '* * * * *' in set_ons and len(set_ons) > 1:
+        #     raise ValueError(
+        #         "If it has every minute cronjob on value, it should has only "
+        #         "one value in the on field."
+        #     )
+        return value
+
     @model_validator(mode="after")
     def __validate_jobs_need_and_prepare_running_id(self) -> Self:
         """Validate each need job in any jobs should exists.
@@ -872,6 +890,24 @@ class ScheduleWorkflow(BaseModel):
             ]
         return data
 
+    @field_validator("on", mode="after")
+    def __on_no_dup__(cls, value: list[On]) -> list[On]:
+        """Validate the on fields should not contain duplicate values and if it
+        contain every minute value, it should has only one on value."""
+        set_ons: set[str] = {str(on.cronjob) for on in value}
+        if len(set_ons) != len(value):
+            raise ValueError(
+                "The on fields should not contain duplicate on value."
+            )
+
+        # WARNING:
+        # if '* * * * *' in set_ons and len(set_ons) > 1:
+        #     raise ValueError(
+        #         "If it has every minute cronjob on value, it should has only "
+        #         "one value in the on field."
+        #     )
+        return value
+
 
 class Schedule(BaseModel):
     """Schedule Pydantic Model that use to run with scheduler package. It does
@@ -944,6 +980,8 @@ class Schedule(BaseModel):
         :param externals: An external parameters that pass to the Loader object.
 
         :rtype: list[WorkflowTaskData]
+        :return: Return the list of WorkflowTaskData object from the specific
+            input datetime that mapping with the on field.
         """
 
         # NOTE: Create pair of workflow and on.
@@ -1310,7 +1348,7 @@ def workflow_control(
             "Should install schedule package before use this module."
         ) from None
 
-    schedule: Scheduler = Scheduler()
+    scheduler: Scheduler = Scheduler()
     start_date: datetime = datetime.now(tz=config.tz)
 
     # NOTE: Design workflow queue caching.
@@ -1328,11 +1366,11 @@ def workflow_control(
     # NOTE: Create pair of workflow and on from schedule model.
     workflow_tasks: list[WorkflowTaskData] = []
     for name in schedules:
-        sch: Schedule = Schedule.from_loader(name, externals=externals)
+        schedule: Schedule = Schedule.from_loader(name, externals=externals)
 
         # NOTE: Create a workflow task data instance from schedule object.
         workflow_tasks.extend(
-            sch.tasks(
+            schedule.tasks(
                 start_date_waiting,
                 queue=wf_queue,
                 running=wf_running,
@@ -1342,7 +1380,7 @@ def workflow_control(
 
     # NOTE: This schedule job will start every minute at :02 seconds.
     (
-        schedule.every(1)
+        scheduler.every(1)
         .minutes.at(":02")
         .do(
             workflow_task,
@@ -1354,7 +1392,7 @@ def workflow_control(
     )
 
     # NOTE: Checking zombie task with schedule job will start every 5 minute.
-    schedule.every(5).minutes.at(":10").do(
+    scheduler.every(5).minutes.at(":10").do(
         workflow_monitor,
         threads=thread_releases,
     ).tag("monitor")
@@ -1362,10 +1400,10 @@ def workflow_control(
     # NOTE: Start running schedule
     logger.info(f"[WORKFLOW]: Start schedule: {schedules}")
     while True:
-        schedule.run_pending()
+        scheduler.run_pending()
         time.sleep(1)
-        if not schedule.get_jobs("control"):
-            schedule.clear("monitor")
+        if not scheduler.get_jobs("control"):
+            scheduler.clear("monitor")
             logger.warning(
                 f"[WORKFLOW]: Workflow release thread: {thread_releases}"
             )
@@ -1402,14 +1440,14 @@ def workflow_runner(
 
         The current workflow logic that split to process will be below diagram:
 
-        PIPELINES ==> process 01 ==> schedule 1 minute --> thread of release
-                                                           workflow task 01 01
-                                                       --> thread of release
-                                                           workflow task 01 02
-                  ==> process 02 ==> schedule 1 minute --> thread of release
-                                                           workflow task 02 01
-                                                       --> thread of release
-                                                           workflow task 02 02
+        PIPELINES ==> process 01 ==> schedule --> thread of release
+                                                  workflow task 01 01
+                                              --> thread of release
+                                                  workflow task 01 02
+                  ==> process 02 ==> schedule --> thread of release
+                                                  workflow task 02 01
+                                              --> thread of release
+                                                  workflow task 02 02
                   ==> ...
     """
     excluded: list[str] = excluded or []

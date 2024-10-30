@@ -50,6 +50,13 @@ def test_workflow():
         Workflow(name="manual-workflow-${{ matrix.name }}")
 
 
+def test_workflow_on():
+
+    # NOTE: Raise when the on field receive duplicate values.
+    with pytest.raises(ValidationError):
+        Workflow.from_loader(name="wf-scheduling-raise")
+
+
 def test_workflow_desc():
     workflow = Workflow.from_loader(name="wf-run-common")
     assert workflow.desc == (
