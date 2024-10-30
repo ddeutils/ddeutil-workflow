@@ -265,7 +265,7 @@ class Workflow(BaseModel):
         :type name: str
 
         :rtype: Job
-        :returns: A job model that exists on this workflow by input name.
+        :return: A job model that exists on this workflow by input name.
         """
         if name not in self.jobs:
             raise ValueError(
@@ -287,7 +287,13 @@ class Workflow(BaseModel):
 
         :param params: A parameter mapping that receive from workflow execution.
         :type params: DictData
+
+        :raise WorkflowException: If parameter value that want to validate does
+            not include the necessary parameter that had required flag.
+
         :rtype: DictData
+        :return: The parameter value that validate with its parameter fields and
+            adding jobs key to this parameter.
         """
         # VALIDATE: Incoming params should have keys that set on this workflow.
         if check_key := tuple(
@@ -330,6 +336,9 @@ class Workflow(BaseModel):
             This method allow workflow use log object to save the execution
         result to log destination like file log to local `/logs` directory.
 
+            I will add sleep with 0.15 seconds on every step that interact with
+        the queue object.
+
         :param runner: A CronRunner instance.
         :param params: A workflow parameter that pass to execute method.
         :param queue: A list of release time that already running.
@@ -356,6 +365,7 @@ class Workflow(BaseModel):
 
         # NOTE: Heap-push this next running time to log queue list.
         heappush(queue, next_time)
+        time.sleep(0.15)
 
         # VALIDATE: Check the different time between the next schedule time and
         #   now that less than waiting period (second unit).
@@ -395,7 +405,7 @@ class Workflow(BaseModel):
             )
             time.sleep(sleep_interval)
 
-        time.sleep(0.5)
+        time.sleep(0.15)
 
         # NOTE: Release parameter that use to change if params has templating.
         release_params: DictData = {"release": {"logical_date": next_time}}
@@ -428,7 +438,7 @@ class Workflow(BaseModel):
         rs_log.save(excluded=None)
 
         queue.remove(next_time)
-        time.sleep(0.05)
+        time.sleep(0.15)
         return Result(
             status=0,
             context={

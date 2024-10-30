@@ -158,3 +158,15 @@ def test_workflow_condition():
             },
         },
     } == rs.context
+
+
+def test_workflow_parameterize():
+    workflow = Workflow.from_loader(name="wf-params-required")
+
+    assert workflow.parameterize({"name": "foo"}) == {
+        "params": {"name": "foo"},
+        "jobs": {},
+    }
+
+    with pytest.raises(WorkflowException):
+        workflow.parameterize({"foo": "bar"})

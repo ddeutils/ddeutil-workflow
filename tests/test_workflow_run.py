@@ -147,3 +147,72 @@ def test_workflow_run_py_raise_parallel():
             "ValueError: Testing raise error inside PyStage!!!"
         ),
     }
+
+
+def test_workflow_run_with_matrix():
+    workflow: Workflow = Workflow.from_loader(name="wf-run-matrix")
+    rs: Result = workflow.execute(params={"source": "src", "target": "tgt"})
+    assert {
+        "params": {"source": "src", "target": "tgt"},
+        "jobs": {
+            "multiple-system": {
+                "strategies": {
+                    "9696245497": {
+                        "matrix": {
+                            "table": "customer",
+                            "system": "csv",
+                            "partition": 2,
+                        },
+                        "stages": {
+                            "customer-2": {"outputs": {"records": 1}},
+                            "end-stage": {"outputs": {"passing_value": 10}},
+                        },
+                    },
+                    "8141249744": {
+                        "matrix": {
+                            "table": "customer",
+                            "system": "csv",
+                            "partition": 3,
+                        },
+                        "stages": {
+                            "customer-3": {"outputs": {"records": 1}},
+                            "end-stage": {"outputs": {"passing_value": 10}},
+                        },
+                    },
+                    "3590257855": {
+                        "matrix": {
+                            "table": "sales",
+                            "system": "csv",
+                            "partition": 1,
+                        },
+                        "stages": {
+                            "sales-1": {"outputs": {"records": 1}},
+                            "end-stage": {"outputs": {"passing_value": 10}},
+                        },
+                    },
+                    "3698996074": {
+                        "matrix": {
+                            "table": "sales",
+                            "system": "csv",
+                            "partition": 2,
+                        },
+                        "stages": {
+                            "sales-2": {"outputs": {"records": 1}},
+                            "end-stage": {"outputs": {"passing_value": 10}},
+                        },
+                    },
+                    "4390593385": {
+                        "matrix": {
+                            "table": "customer",
+                            "system": "csv",
+                            "partition": 4,
+                        },
+                        "stages": {
+                            "customer-4": {"outputs": {"records": 1}},
+                            "end-stage": {"outputs": {"passing_value": 10}},
+                        },
+                    },
+                },
+            },
+        },
+    } == rs.context
