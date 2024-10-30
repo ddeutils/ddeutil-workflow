@@ -162,7 +162,7 @@ class Workflow(BaseModel):
         loader_data["name"] = name.replace(" ", "_")
 
         # NOTE: Prepare `on` data
-        cls.__bypass_on(loader_data)
+        cls.__bypass_on(loader_data, externals=externals)
         return cls.model_validate(obj=loader_data)
 
     @classmethod
@@ -367,12 +367,11 @@ class Workflow(BaseModel):
 
         :rtype: Result
         """
+        log: Log = log or FileLog
         logger.debug(
             f"({self.run_id}) [CORE]: {self.name!r}: {runner.cron} : run with "
             f"queue id: {id(queue)}"
         )
-        log: Log = log or FileLog
-        cron_tz: ZoneInfo = runner.tz
 
         # NOTE: get next schedule time that generate from now.
         next_time: datetime = runner.next
@@ -387,7 +386,7 @@ class Workflow(BaseModel):
 
         # VALIDATE: Check the different time between the next schedule time and
         #   now that less than waiting period (second unit).
-        if get_diff_sec(next_time, tz=cron_tz) > waiting_sec:
+        if get_diff_sec(next_time, tz=runner.tz) > waiting_sec:
             logger.debug(
                 f"({self.run_id}) [CORE]: {self.name!r} : {runner.cron} : "
                 f"Does not closely >> {next_time:%Y-%m-%d %H:%M:%S}"
@@ -414,7 +413,7 @@ class Workflow(BaseModel):
         )
 
         # NOTE: Release when the time is nearly to schedule time.
-        while (duration := get_diff_sec(next_time, tz=cron_tz)) > (
+        while (duration := get_diff_sec(next_time, tz=runner.tz)) > (
             sleep_interval + 5
         ):  # pragma: no cov
             logger.debug(
@@ -512,7 +511,7 @@ class Workflow(BaseModel):
                 futures.append(
                     executor.submit(
                         self.release,
-                        on.generate(start_date),
+                        runner=on.generate(start_date),
                         params=params,
                         log=log,
                         queue=queue,
@@ -858,15 +857,10 @@ class ScheduleWorkflow(BaseModel):
         return values
 
     @classmethod
-    def __bypass_on(
-        cls,
-        data: DictData,
-        externals: DictData | None = None,
-    ) -> DictData:
+    def __bypass_on(cls, data: DictData) -> DictData:
         """Bypass and prepare the on data to loaded config data.
 
-        :param data:
-        :param externals:
+        :param data: A data that want to validate for model initialization.
 
         :rtype: DictData
         """
@@ -881,11 +875,7 @@ class ScheduleWorkflow(BaseModel):
             # NOTE: Pass on value to Loader and keep on model object to on
             #   field.
             data["on"] = [
-                (
-                    Loader(n, externals=(externals or {})).data
-                    if isinstance(n, str)
-                    else n
-                )
+                Loader(n, externals={}).data if isinstance(n, str) else n
                 for n in on
             ]
         return data
@@ -893,7 +883,10 @@ class ScheduleWorkflow(BaseModel):
     @field_validator("on", mode="after")
     def __on_no_dup__(cls, value: list[On]) -> list[On]:
         """Validate the on fields should not contain duplicate values and if it
-        contain every minute value, it should has only one on value."""
+        contain every minute value, it should has only one on value.
+
+        :rtype: list[On]
+        """
         set_ons: set[str] = {str(on.cronjob) for on in value}
         if len(set_ons) != len(value):
             raise ValueError(
@@ -948,6 +941,7 @@ class Schedule(BaseModel):
         :param name: A schedule name that want to pass to Loader object.
         :param externals: An external parameters that want to pass to Loader
             object.
+
         :rtype: Self
         """
         loader: Loader = Loader(name, externals=(externals or {}))
@@ -1364,12 +1358,12 @@ def workflow_control(
     )
 
     # NOTE: Create pair of workflow and on from schedule model.
-    workflow_tasks: list[WorkflowTaskData] = []
+    wf_tasks: list[WorkflowTaskData] = []
     for name in schedules:
         schedule: Schedule = Schedule.from_loader(name, externals=externals)
 
         # NOTE: Create a workflow task data instance from schedule object.
-        workflow_tasks.extend(
+        wf_tasks.extend(
             schedule.tasks(
                 start_date_waiting,
                 queue=wf_queue,
@@ -1384,7 +1378,7 @@ def workflow_control(
         .minutes.at(":02")
         .do(
             workflow_task,
-            workflow_tasks=workflow_tasks,
+            workflow_tasks=wf_tasks,
             stop=(stop or (start_date + config.stop_boundary_delta)),
             threads=thread_releases,
         )

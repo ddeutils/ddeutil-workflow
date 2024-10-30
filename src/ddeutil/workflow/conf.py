@@ -98,12 +98,14 @@ class Config:
         os.getenv("WORKFLOW_API_ENABLE_ROUTE_SCHEDULE", "true")
     )
 
-    def __init__(self):
+    def __init__(self) -> None:
+        # VALIDATE: the MAX_JOB_PARALLEL value should not less than 0.
         if self.max_job_parallel < 0:
             raise ValueError(
                 f"``MAX_JOB_PARALLEL`` should more than 0 but got "
                 f"{self.max_job_parallel}."
             )
+
         try:
             self.stop_boundary_delta: timedelta = timedelta(
                 **json.loads(self.stop_boundary_delta_str)
