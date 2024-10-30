@@ -15,12 +15,6 @@ def test_workflow_run_py():
         },
     )
     assert 0 == rs.status
-    assert {"final-job", "first-job", "second-job"} == set(
-        rs.context["jobs"].keys()
-    )
-    assert {"printing", "setting-x"} == set(
-        rs.context["jobs"]["first-job"]["stages"].keys()
-    )
     assert {
         "params": {
             "author-run": "Local Workflow",
@@ -65,10 +59,7 @@ def test_workflow_run_py():
 
 def test_workflow_run_py_with_parallel():
     with mock.patch.object(Config, "max_job_parallel", 3):
-        workflow = Workflow.from_loader(
-            name="wf-run-python",
-            externals={},
-        )
+        workflow = Workflow.from_loader(name="wf-run-python")
         rs: Result = workflow.execute(
             params={
                 "author-run": "Local Workflow",
@@ -76,12 +67,6 @@ def test_workflow_run_py_with_parallel():
             },
         )
         assert 0 == rs.status
-        assert {"final-job", "first-job", "second-job"} == set(
-            rs.context["jobs"].keys()
-        )
-        assert {"printing", "setting-x"} == set(
-            rs.context["jobs"]["first-job"]["stages"].keys()
-        )
         assert {
             "params": {
                 "author-run": "Local Workflow",

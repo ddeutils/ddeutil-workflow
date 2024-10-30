@@ -262,4 +262,4 @@ wf-params-required:
     first-job:
       stages:
         - name: Echo
-          echo: "Hello World"
+          echo: "Hello ${{ params.name }}"

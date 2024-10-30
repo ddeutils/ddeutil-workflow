@@ -1,0 +1,27 @@
+wf-condition:
+  type: ddeutil.workflow.Workflow
+  on: 'every_5_minute_bkk'
+  params:
+    name: str
+  jobs:
+    condition-job:
+      stages:
+        - name: "Test if condition"
+          id: condition-stage
+          if: '"${{ params.name }}" == "foo"'
+          run: |
+            message: str = 'Hello World'
+            print(message)
+
+
+wf-condition-raise:
+  type: ddeutil.workflow.Workflow
+  on: 'every_5_minute_bkk'
+  params:
+    name: str
+  jobs:
+    condition-job:
+      stages:
+        - name: "Test if condition failed"
+          id: condition-stage
+          if: '"${{ params.name }}"'

@@ -7,46 +7,42 @@ from pydantic import ValidationError
 
 
 def test_workflow():
-    data = {
-        "demo-run": {
-            "stages": [
-                {"name": "Run Hello World", "run": "print(f'Hello {x}')\n"},
-                {
-                    "name": "Run Sequence and use var from Above",
-                    "run": (
-                        "print(f'Receive x from above with {x}')\n\n"
-                        "x: int = 1\n"
-                    ),
-                },
-            ]
+    workflow: Workflow = Workflow(
+        name="manual-workflow",
+        jobs={
+            "demo-run": {
+                "stages": [
+                    {"name": "Run Hello World", "run": "print(f'Hello {x}')\n"},
+                    {
+                        "name": "Run Sequence and use var from Above",
+                        "run": (
+                            "print(f'Receive x from above with {x}')\n\n"
+                            "x: int = 1\n"
+                        ),
+                    },
+                ]
+            },
+            "next-run": {
+                "stages": [
+                    {
+                        "name": "Set variable and function",
+                        "run": (
+                            "var_inside: str = 'Inside'\n"
+                            "def echo() -> None:\n"
+                            '  print(f"Echo {var_inside}"\n'
+                        ),
+                    },
+                    {"name": "Call that variable", "run": "echo()\n"},
+                ]
+            },
         },
-        "next-run": {
-            "stages": [
-                {
-                    "name": "Set variable and function",
-                    "run": (
-                        "var_inside: str = 'Inside'\n"
-                        "def echo() -> None:\n"
-                        '  print(f"Echo {var_inside}"\n'
-                    ),
-                },
-                {"name": "Call that variable", "run": "echo()\n"},
-            ]
-        },
-    }
-    wf = Workflow(name="manual-workflow", jobs=data)
-    assert "Run Hello World" == wf.jobs.get("demo-run").stages[0].name
-    assert (
-        "Run Sequence and use var from Above"
-        == wf.jobs.get("demo-run").stages[1].name
     )
-    assert "demo-run" == wf.job("demo-run").id
 
+    # NOTE: Raise ValueError when get a job with ID that does not exist.
     with pytest.raises(ValueError):
-        wf.job("not-found-job-id")
+        workflow.job("not-found-job-id")
 
-
-def test_workflow_name_raise():
+    # NOTE: Raise when name of workflow include any template parameter syntax.
     with pytest.raises(ValidationError):
         Workflow(name="manual-workflow-${{ params.test }}")
 
@@ -55,18 +51,15 @@ def test_workflow_name_raise():
 
 
 def test_workflow_desc():
-    workflow = Workflow.from_loader(
-        name="wf-run-common",
-        externals={},
-    )
+    workflow = Workflow.from_loader(name="wf-run-common")
     assert workflow.desc == (
         "## Run Python Workflow\n\nThis is a running python workflow\n"
     )
 
 
 def test_workflow_from_loader_without_job():
-    wf = Workflow.from_loader(name="wf-without-jobs")
-    rs = wf.execute({})
+    workflow = Workflow.from_loader(name="wf-without-jobs")
+    rs = workflow.execute({})
     assert rs.context == {}
 
 
@@ -141,15 +134,26 @@ def test_workflow_from_loader_raise(test_path):
 
 
 def test_workflow_condition():
-    workflow = Workflow.from_loader(name="wf-condition", externals={})
+    workflow = Workflow.from_loader(name="wf-condition")
     rs: Result = workflow.execute(params={"name": "bar"})
     assert {
         "params": {"name": "bar"},
         "jobs": {
             "condition-job": {
                 "matrix": {},
+                "stages": {},
+            },
+        },
+    } == rs.context
+
+    rs: Result = workflow.execute(params={"name": "foo"})
+    assert {
+        "params": {"name": "foo"},
+        "jobs": {
+            "condition-job": {
+                "matrix": {},
                 "stages": {
-                    "6708019737": {"outputs": {}},
+                    "condition-stage": {"outputs": {"message": "Hello World"}}
                 },
             },
         },

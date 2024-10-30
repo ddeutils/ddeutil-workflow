@@ -12,34 +12,6 @@ wf-trigger:
             run-date: '2024-08-01'
 
 
-wf-condition:
-  type: ddeutil.workflow.Workflow
-  on: 'every_5_minute_bkk'
-  params:
-    name: str
-  jobs:
-    condition-job:
-      stages:
-        - name: "Test if condition"
-          id: condition-stage
-          if: '"${{ params.name }}" == "foo"'
-          shell: |
-            echo 'Hello World';
-        - name: "Empty stage"
-
-
-wf-condition-raise:
-  type: ddeutil.workflow.Workflow
-  params:
-    name: str
-  jobs:
-    condition-job:
-      stages:
-        - name: "Test if condition failed"
-          id: condition-stage
-          if: '"${{ params.name }}"'
-
-
 wf-scheduling:
   type: ddeutil.workflow.Workflow
   on:

@@ -1,3 +1,4 @@
+from inspect import isfunction
 from unittest import mock
 
 import pytest
@@ -12,12 +13,12 @@ from ddeutil.workflow.utils import (
 
 
 @custom_filter("foo")
-def foo(_: str) -> str:
+def foo(_: str) -> str:  # pragma: no cov
     return "bar"
 
 
 @custom_filter("raise_err")
-def raise_err(_: str) -> None:
+def raise_err(_: str) -> None:  # pragma: no cov
     raise ValueError("Demo raise error from filter function")
 
 
@@ -27,6 +28,7 @@ def test_make_registry_raise():
         "regis_filter_str",
         "ddeutil.workflow.utils,tests.test_utils_filter,foo.bar",
     ):
+        assert isfunction(make_filter_registry()["foo"])
         assert "bar" == make_filter_registry()["foo"]("")
 
 

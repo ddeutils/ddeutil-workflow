@@ -13,7 +13,7 @@ for easy to make a simple metadata driven for data workflow orchestration.
 It can to use for data operator by a `.yaml` template.
 
 > [!WARNING]
-> This package provide only orchestration workload task. That mean you should not
+> This package provide only orchestration workload. That mean you should not
 > use the workflow stage to process any large volume data which use lot of compute
 > resource. :cold_sweat:
 
