@@ -21,19 +21,22 @@ def test_interval2crontab():
 
 
 def test_on():
-    schedule = On.from_loader(
-        name="every_5_minute_bkk",
-        externals={},
-    )
+    schedule = On.from_loader(name="every_5_minute_bkk", externals={})
     assert "Asia/Bangkok" == schedule.tz
     assert "*/5 * * * *" == str(schedule.cronjob)
 
     start_date: datetime = datetime(2024, 1, 1, 12)
     start_date_bkk: datetime = start_date.astimezone(ZoneInfo(schedule.tz))
+
+    # NOTE: Passing the start datetime object that does not set timezone.
     cron_runner = schedule.generate(start=start_date)
+
+    # NOTE: Check the timezone was changed by schedule object.
     assert cron_runner.date.tzinfo == ZoneInfo(schedule.tz)
 
+    # NOTE: Check the date argument that valid with the input state datetime.
     assert cron_runner.date == start_date_bkk
+
     assert cron_runner.next == start_date_bkk
     assert cron_runner.next == start_date_bkk + timedelta(minutes=5)
     assert cron_runner.next == start_date_bkk + timedelta(minutes=10)

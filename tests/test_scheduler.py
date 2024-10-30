@@ -9,6 +9,23 @@ from ddeutil.workflow.scheduler import Schedule, WorkflowTaskData
 
 
 def test_schedule():
+    schedule = Schedule(
+        desc=(
+            """
+            This is demo schedule description
+                * test
+                * foo
+                * bar
+            """
+        ),
+    )
+    assert schedule.desc == (
+        "\nThis is demo schedule description\n    * test\n    * foo\n"
+        "    * bar\n"
+    )
+
+
+def test_schedule_from_loader():
     schedule = Schedule.from_loader("schedule-wf")
     print(schedule)
 
@@ -62,7 +79,8 @@ def test_schedule_from_loader_raise(test_path):
 
 def test_schedule_model_default_on():
     schedule = Schedule.from_loader("schedule-default-wf")
-    print(schedule)
+    for sch_wf in schedule.workflows:
+        assert sch_wf.on == []
 
 
 def test_schedule_loader_find_schedule():

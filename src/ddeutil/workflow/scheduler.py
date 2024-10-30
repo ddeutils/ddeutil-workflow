@@ -345,10 +345,7 @@ class Workflow(BaseModel):
             f"queue id: {id(queue)}"
         )
         log: Log = log or FileLog
-        gen: CronRunner = on.generate(
-            datetime.now(tz=config.tz).replace(second=0, microsecond=0)
-            + timedelta(seconds=1)
-        )
+        gen: CronRunner = on.generate(on.pop(queue))
         cron_tz: ZoneInfo = gen.tz
 
         # NOTE: get next schedule time that generate from now.
@@ -400,11 +397,7 @@ class Workflow(BaseModel):
 
         # NOTE: Release parameter that use to change if params has
         #   templating.
-        release_params: DictData = {
-            "release": {
-                "logical_date": next_time,
-            },
-        }
+        release_params: DictData = {"release": {"logical_date": next_time}}
 
         # WARNING: Re-create workflow object that use new running workflow
         #   ID.
@@ -457,6 +450,7 @@ class Workflow(BaseModel):
 
         :param params: A parameters that want to pass to the release method.
         :param log: A log object that want to use on this poking process.
+
         :rtype: list[Result]
         """
         logger.info(
@@ -808,7 +802,7 @@ class ScheduleWorkflow(BaseModel):
     )
     params: DictData = Field(
         default_factory=dict,
-        description="A parameters that want to use to workflow execution.",
+        description="A parameters that want to use in workflow execution.",
     )
 
     @model_validator(mode="before")
@@ -828,7 +822,10 @@ class ScheduleWorkflow(BaseModel):
         data: DictData,
         externals: DictData | None = None,
     ) -> DictData:
-        """Bypass the on data to loaded config data.
+        """Bypass and prepare the on data to loaded config data.
+
+        :param data:
+        :param externals:
 
         :rtype: DictData
         """
@@ -869,6 +866,15 @@ class Schedule(BaseModel):
         default_factory=list,
         description="A list of ScheduleWorkflow models.",
     )
+
+    @field_validator("desc", mode="after")
+    def __dedent_desc__(cls, value: str) -> str:
+        """Prepare description string that was created on a template.
+
+        :param value: A description string value that want to dedent.
+        :rtype: str
+        """
+        return dedent(value)
 
     @classmethod
     def from_loader(

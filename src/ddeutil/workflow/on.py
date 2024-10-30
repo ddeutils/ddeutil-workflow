@@ -5,7 +5,7 @@
 # ------------------------------------------------------------------------------
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -16,7 +16,7 @@ from typing_extensions import Self
 
 from .__cron import WEEKDAYS, CronJob, CronJobYear, CronRunner
 from .__types import DictData, DictStr, TupleStr
-from .conf import Loader
+from .conf import Loader, config
 
 __all__: TupleStr = (
     "On",
@@ -189,6 +189,19 @@ class On(BaseModel):
         date that given from input.
         """
         return self.generate(start=start).next
+
+    def pop(self, queue: list[datetime]) -> datetime:
+        """Pop the matching datetime value from list of datetime alias queue."""
+        for dt in queue:
+            if self.next(dt) == dt:
+                return dt
+
+        # NOTE: Add 1 second value to the current datetime for forcing crontab
+        #   runner generate the next datetime instead if current datetime be
+        #   valid because I already replaced second to zero before passing.
+        return datetime.now(tz=config.tz).replace(
+            second=0, microsecond=0
+        ) + timedelta(seconds=1)
 
 
 class YearOn(On):

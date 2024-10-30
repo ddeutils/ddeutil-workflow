@@ -13,6 +13,20 @@ wf-scheduling:
           echo: "Hello ${{ params.asat-dt | fmt('%Y-%m-%d') }}"
 
 
+wf-scheduling-with-name:
+  type: ddeutil.workflow.Workflow
+  on:
+    - 'every_3_minute_bkk'
+    - 'every_minute_bkk'
+  params:
+    name: str
+  jobs:
+    first-job:
+      stages:
+        - name: "Hello stage"
+          echo: "Hello ${{ params.name | title }}"
+
+
 wf-scheduling-common:
   type: ddeutil.workflow.Workflow
   on:

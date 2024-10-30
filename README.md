@@ -28,7 +28,7 @@ configuration. It called **Metadata Driven Data Workflow**.
 1. The Minimum frequency unit of scheduling is **1 minute** :warning:
 2. Can not re-run only failed stage and its pending downstream :rotating_light:
 3. All parallel tasks inside workflow engine use Multi-Threading
-   (Because Python 3.13 unlock GIL :unlock:)
+   (Python 3.13 unlock GIL :unlock:)
 
 > [!NOTE]
 > _Disclaimer_: I inspire the dynamic statement from the [**GitHub Action**](https://github.com/features/actions)
@@ -150,7 +150,7 @@ application. If any configuration values do not set yet, it will use default val
 and do not raise any error to you.
 
 | Environment                             | Component | Default                          | Description                                                                                                        | Remark |
-|:----------------------------------------|-----------|----------------------------------|--------------------------------------------------------------------------------------------------------------------|--------|
+|:----------------------------------------|:----------|:---------------------------------|--------------------------------------------------------------------------------------------------------------------|--------|
 | `WORKFLOW_ROOT_PATH`                    | Core      | .                                | The root path of the workflow application.                                                                         |        |
 | `WORKFLOW_CORE_REGISTRY`                | Core      | src.ddeutil.workflow,tests.utils | List of importable string for the hook stage.                                                                      |        |
 | `WORKFLOW_CORE_REGISTRY_FILTER`         | Core      | ddeutil.workflow.utils           | List of importable string for the filter template.                                                                 |        |

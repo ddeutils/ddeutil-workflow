@@ -445,6 +445,7 @@ FILTERS: dict[str, callable] = {  # pragma: no cov
     "abs": abs,
     "str": str,
     "int": int,
+    "title": lambda x: x.title(),
     "upper": lambda x: x.upper(),
     "lower": lambda x: x.lower(),
     "rstr": [str, repr],

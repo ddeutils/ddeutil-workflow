@@ -195,6 +195,7 @@ class SimLoad:
         :param conf: A config object.
         :param include:
         :param exclude:
+
         :rtype: Iterator[tuple[str, DictData]]
         """
         exclude: list[str] = exclude or []
@@ -247,12 +248,14 @@ class Loader(SimLoad):
         include: list[str] | None = None,
         exclude: list[str] | None = None,
         **kwargs,
-    ) -> DictData:
+    ) -> Iterator[tuple[str, DictData]]:
         """Override the find class method from the Simple Loader object.
 
         :param obj: A object that want to validate matching before return.
         :param include:
         :param exclude:
+
+        :rtype: Iterator[tuple[str, DictData]]
         """
         return super().finds(
             obj=obj, conf=Config(), include=include, exclude=exclude
@@ -268,6 +271,7 @@ def get_type(t: str, params: Config) -> AnyModelType:
     :param t: A importable type string.
     :param params: A config parameters that use registry to search this
         type.
+
     :rtype: AnyModelType
     """
     try:
@@ -366,6 +370,8 @@ class FileLog(BaseLog):
         workflow name.
 
         :param name: A workflow name that want to search release logging data.
+
+        :rtype: Iterator[Self]
         """
         pointer: Path = config.root_path / f"./logs/workflow={name}"
         if not pointer.exists():
@@ -386,6 +392,9 @@ class FileLog(BaseLog):
         """Return the logging data that found from logs path with specific
         workflow name and release values. If a release does not pass to an input
         argument, it will return the latest release from the current log path.
+
+        :param name:
+        :param release:
 
         :raise FileNotFoundError:
         :raise NotImplementedError:
