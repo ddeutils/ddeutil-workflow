@@ -330,7 +330,7 @@ class Workflow(BaseModel):
             This method allow workflow use log object to save the execution
         result to log destination like file log to local `/logs` directory.
 
-        :param runner: An CronRunner instance.
+        :param runner: A CronRunner instance.
         :param params: A workflow parameter that pass to execute method.
         :param queue: A list of release time that already running.
         :param waiting_sec: A second period value that allow workflow execute.
@@ -439,6 +439,7 @@ class Workflow(BaseModel):
 
     def poke(
         self,
+        start_date: datetime | None = None,
         params: DictData | None = None,
         *,
         log: Log | None = None,
@@ -448,6 +449,7 @@ class Workflow(BaseModel):
         This method will observe its schedule that nearing to run with the
         ``self.release()`` method.
 
+        :param start_date: A start datetime object.
         :param params: A parameters that want to pass to the release method.
         :param log: A log object that want to use on this poking process.
 
@@ -466,7 +468,7 @@ class Workflow(BaseModel):
         queue: list[datetime] = []
         results: list[Result] = []
 
-        start_date: datetime = datetime.now(tz=config.tz).replace(
+        start_date: datetime = start_date or datetime.now(tz=config.tz).replace(
             second=0, microsecond=0
         ) + timedelta(seconds=1)
 
@@ -474,7 +476,10 @@ class Workflow(BaseModel):
             max_workers=config.max_poking_pool_worker,
             thread_name_prefix="wf_poking_",
         ) as executor:
+
             futures: list[Future] = []
+
+            # NOTE: For-loop the on values that exists in this workflow object.
             for on in self.on:
                 futures.append(
                     executor.submit(
@@ -485,6 +490,10 @@ class Workflow(BaseModel):
                         queue=queue,
                     )
                 )
+
+                # NOTE: Delay release date because it run so fast and making
+                #   queue object can not handle release date that will duplicate
+                #   by the cron runner object.
                 delay(second=0.15)
 
             # WARNING: This poking method does not allow to use fail-fast logic

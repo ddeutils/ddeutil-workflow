@@ -22,12 +22,24 @@ def test_workflow_release():
 @mock.patch.object(Config, "enable_write_log", False)
 def test_workflow_poke():
     wf = Workflow.from_loader(name="wf-scheduling-with-name", externals={})
+
+    # NOTE: Poking with the current datetime.
     results: list[Result] = wf.poke(params={"name": "FOO"})
     for rs in results:
         assert "status" in rs.context["release"]
         assert "cron" in rs.context["release"]
 
+    # NOTE: Poking with specific start datetime.
+    results: list[Result] = wf.poke(
+        start_date=datetime(2024, 1, 1, 0),
+        params={"name": "FOO"},
+    )
+    for rs in results:
+        assert "status" in rs.context["release"]
+        assert "cron" in rs.context["release"]
 
+
+@mock.patch.object(Config, "enable_write_log", False)
 def test_workflow_poke_no_on():
     workflow = Workflow.from_loader(name="wf-params-required")
     assert [] == workflow.poke(params={"name": "FOO"})
