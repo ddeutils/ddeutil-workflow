@@ -2,6 +2,28 @@
 
 ## Latest Changes
 
+## 0.0.19
+
+### :sparkles: Features
+
+- :dart: feat: add validate on field in workflow and schedule workflow models. (_2024-10-30_)
+- :dart: feat: add start_date argument to workflow poke method. (_2024-10-30_)
+- :dart: feat: change argument on workflow release from on to cronrunner. (_2024-10-30_)
+- :dart: feat: change datatype of queue and running fields on workflow task data obj. (_2024-10-30_)
+- :dart: feat: remove queue args on is_pointed method in log module. (_2024-10-30_)
+- :dart: feat: implement trigger rule on job model object. (_2024-10-28_)
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: improve testcase on workflow module. (_2024-10-30_)
+- :art: styled: change variable name on schedule module. (_2024-10-30_)
+- :test_tube: tests: improve some testcase that do not make coverage. (_2024-10-30_)
+- :art: styled: split long function of map post filter to sub-func. (_2024-10-28_)
+
+### :card_file_box: Documents
+
+- :page_facing_up: docs: update readme file. (_2024-10-30_)
+
 ## 0.0.18
 
 ### :sparkles: Features
