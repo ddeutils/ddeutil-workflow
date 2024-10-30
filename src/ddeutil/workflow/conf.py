@@ -411,21 +411,17 @@ class FileLog(BaseLog):
             return cls.model_validate(obj=json.load(f))
 
     @classmethod
-    def is_pointed(
-        cls,
-        name: str,
-        release: datetime,
-        *,
-        queue: list[datetime] | None = None,
-    ) -> bool:
-        """Check this log already point in the destination.
+    def is_pointed(cls, name: str, release: datetime) -> bool:
+        """Check the release log already pointed or created at the destination
+        log path.
 
         :param name: A workflow name.
         :param release: A release datetime.
-        :param queue: A list of queue of datetime that already run in the
-            future.
+
+        :rtype: bool
+        :return: Return False if the release log was not pointed or created.
         """
-        # NOTE: Check environ variable was set for real writing.
+        # NOTE: Return False if enable writing log flag does not set.
         if not config.enable_write_log:
             return False
 
@@ -434,9 +430,7 @@ class FileLog(BaseLog):
             name=name, release=release
         )
 
-        if not queue:
-            return pointer.exists()
-        return pointer.exists() or (release in queue)
+        return pointer.exists()
 
     def pointer(self) -> Path:
         """Return release directory path that was generated from model data.

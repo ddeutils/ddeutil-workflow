@@ -3,14 +3,34 @@ from unittest import mock
 from zoneinfo import ZoneInfo
 
 from ddeutil.workflow.conf import Config
-from ddeutil.workflow.scheduler import Schedule, WorkflowTaskData
+from ddeutil.workflow.scheduler import Schedule, Workflow, WorkflowTaskData
+
+
+def test_workflow_task_data():
+    workflow: Workflow = Workflow.from_loader(name="wf-scheduling-common")
+    task: WorkflowTaskData = WorkflowTaskData(
+        workflow=workflow,
+        on=workflow.on[0],
+        params={"asat-dt": datetime(2024, 1, 1, 1)},
+        queue={},
+        running={},
+    )
+
+    assert task != datetime(2024, 1, 1, 1)
+    assert task == WorkflowTaskData(
+        workflow=workflow,
+        on=workflow.on[0],
+        params={},
+        queue={},
+        running={},
+    )
 
 
 def test_schedule_tasks():
     schedule = Schedule.from_loader("schedule-wf")
-
     queue: dict[str, list[datetime]] = {"wf-scheduling": []}
     running: dict[str, list[datetime]] = {"wf-scheduling": []}
+
     for wf_task in schedule.tasks(
         datetime(2024, 1, 1, 1),
         queue=queue,
@@ -18,16 +38,15 @@ def test_schedule_tasks():
     ):
         assert wf_task.workflow.name == "wf-scheduling"
 
-    task = schedule.tasks(
+    task: WorkflowTaskData = schedule.tasks(
         datetime(2024, 1, 1, 1),
         queue=queue,
         running=running,
     )[0]
 
     assert task != datetime(2024, 1, 1, 1)
-    assert task == task
     assert task == WorkflowTaskData(
-        workflow=task.workflow,
+        workflow=Workflow.from_loader(name="wf-scheduling"),
         on=task.on,
         params={},
         queue={},

@@ -263,3 +263,17 @@ wf-params-required:
       stages:
         - name: Echo
           echo: "Hello ${{ params.name }}"
+
+
+wf-trigger:
+  type: ddeutil.workflow.Workflow
+  on: 'every_5_minute_bkk'
+  jobs:
+    trigger-job:
+      stages:
+        - name: "Trigger wf-run-python workflow"
+          trigger: wf-run-python
+          id: trigger-stage
+          params:
+            author-run: Trigger Runner
+            run-date: '2024-08-01'

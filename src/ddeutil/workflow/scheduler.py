@@ -337,6 +337,7 @@ class Workflow(BaseModel):
         :param sleep_interval: A second value that want to waiting until time
             to execute.
         :param log: A log object that want to save execution result.
+
         :rtype: Result
         """
         logger.debug(
@@ -354,7 +355,7 @@ class Workflow(BaseModel):
         next_time: datetime = gen.next
 
         # NOTE: While-loop to getting next until it does not logger.
-        while log.is_pointed(self.name, next_time, queue=queue):
+        while log.is_pointed(self.name, next_time) or (next_time in queue):
             next_time: datetime = gen.next
 
         # NOTE: Heap-push this next running time to log queue list.
@@ -449,9 +450,10 @@ class Workflow(BaseModel):
         *,
         log: Log | None = None,
     ) -> list[Result]:
-        """Poke workflow with threading executor pool for executing with all its
-        schedules that was set on the `on` value. This method will observe its
-        schedule that nearing to run with the ``self.release()`` method.
+        """Poke workflow with the ``on`` field with threading executor pool for
+        executing with all its schedules that was set on the `on` value.
+        This method will observe its schedule that nearing to run with the
+        ``self.release()`` method.
 
         :param params: A parameters that want to pass to the release method.
         :param log: A log object that want to use on this poking process.
@@ -1035,7 +1037,9 @@ class WorkflowTaskData:
         next_time: datetime = gen.next
 
         # NOTE: get next utils it does not running.
-        while log.is_pointed(wf.name, next_time, queue=self.running[wf.name]):
+        while log.is_pointed(wf.name, next_time) or (
+            next_time in self.running[wf.name]
+        ):
             next_time: datetime = gen.next
 
         logger.debug(
