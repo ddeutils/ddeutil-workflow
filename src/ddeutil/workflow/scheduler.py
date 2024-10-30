@@ -315,7 +315,7 @@ class Workflow(BaseModel):
 
     def release(
         self,
-        on: On,
+        runner: CronRunner,
         params: DictData,
         queue: list[datetime],
         *,
@@ -330,7 +330,7 @@ class Workflow(BaseModel):
             This method allow workflow use log object to save the execution
         result to log destination like file log to local `/logs` directory.
 
-        :param on: An on schedule value.
+        :param runner: An CronRunner instance.
         :param params: A workflow parameter that pass to execute method.
         :param queue: A list of release time that already running.
         :param waiting_sec: A second period value that allow workflow execute.
@@ -341,19 +341,18 @@ class Workflow(BaseModel):
         :rtype: Result
         """
         logger.debug(
-            f"({self.run_id}) [CORE]: {self.name!r}: {on.cronjob} : run with "
+            f"({self.run_id}) [CORE]: {self.name!r}: {runner.cron} : run with "
             f"queue id: {id(queue)}"
         )
         log: Log = log or FileLog
-        gen: CronRunner = on.generate(on.pop(queue))
-        cron_tz: ZoneInfo = gen.tz
+        cron_tz: ZoneInfo = runner.tz
 
         # NOTE: get next schedule time that generate from now.
-        next_time: datetime = gen.next
+        next_time: datetime = runner.next
 
         # NOTE: While-loop to getting next until it does not logger.
         while log.is_pointed(self.name, next_time) or (next_time in queue):
-            next_time: datetime = gen.next
+            next_time: datetime = runner.next
 
         # NOTE: Heap-push this next running time to log queue list.
         heappush(queue, next_time)
@@ -362,7 +361,7 @@ class Workflow(BaseModel):
         #   now that less than waiting period (second unit).
         if get_diff_sec(next_time, tz=cron_tz) > waiting_sec:
             logger.debug(
-                f"({self.run_id}) [CORE]: {self.name!r} : {on.cronjob} : "
+                f"({self.run_id}) [CORE]: {self.name!r} : {runner.cron} : "
                 f"Does not closely >> {next_time:%Y-%m-%d %H:%M:%S}"
             )
 
@@ -374,12 +373,15 @@ class Workflow(BaseModel):
                 status=0,
                 context={
                     "params": params,
-                    "release": {"status": "skipped", "cron": [str(on.cronjob)]},
+                    "release": {
+                        "status": "skipped",
+                        "cron": [str(runner.cron)],
+                    },
                 },
             )
 
         logger.debug(
-            f"({self.run_id}) [CORE]: {self.name!r} : {on.cronjob} : "
+            f"({self.run_id}) [CORE]: {self.name!r} : {runner.cron} : "
             f"Closely to run >> {next_time:%Y-%m-%d %H:%M:%S}"
         )
 
@@ -388,36 +390,34 @@ class Workflow(BaseModel):
             sleep_interval + 5
         ):  # pragma: no cov
             logger.debug(
-                f"({self.run_id}) [CORE]: {self.name!r} : {on.cronjob} : "
+                f"({self.run_id}) [CORE]: {self.name!r} : {runner.cron} : "
                 f"Sleep until: {duration}"
             )
             time.sleep(sleep_interval)
 
         time.sleep(0.5)
 
-        # NOTE: Release parameter that use to change if params has
-        #   templating.
+        # NOTE: Release parameter that use to change if params has templating.
         release_params: DictData = {"release": {"logical_date": next_time}}
 
-        # WARNING: Re-create workflow object that use new running workflow
-        #   ID.
-        runner: Self = self.get_running_id(run_id=self.new_run_id)
-        rs: Result = runner.execute(
+        # WARNING: Re-create workflow object that use new running workflow ID.
+        workflow: Self = self.get_running_id(run_id=self.new_run_id)
+        rs: Result = workflow.execute(
             params=param2template(params, release_params),
         )
         logger.debug(
-            f"({runner.run_id}) [CORE]: {self.name!r} : {on.cronjob} : "
+            f"({workflow.run_id}) [CORE]: {self.name!r} : {runner.cron} : "
             f"End release {next_time:%Y-%m-%d %H:%M:%S}"
         )
 
         # NOTE: Delete a copied workflow instance for saving memory.
-        del runner
+        del workflow
 
         rs.set_parent_run_id(self.run_id)
         rs_log: Log = log.model_validate(
             {
                 "name": self.name,
-                "on": str(on.cronjob),
+                "on": str(runner.cron),
                 "release": next_time,
                 "context": rs.context,
                 "parent_run_id": rs.run_id,
@@ -433,7 +433,7 @@ class Workflow(BaseModel):
             status=0,
             context={
                 "params": params,
-                "release": {"status": "run", "cron": [str(on.cronjob)]},
+                "release": {"status": "run", "cron": [str(runner.cron)]},
             },
         )
 
@@ -466,6 +466,10 @@ class Workflow(BaseModel):
         queue: list[datetime] = []
         results: list[Result] = []
 
+        start_date: datetime = datetime.now(tz=config.tz).replace(
+            second=0, microsecond=0
+        ) + timedelta(seconds=1)
+
         with ThreadPoolExecutor(
             max_workers=config.max_poking_pool_worker,
             thread_name_prefix="wf_poking_",
@@ -475,7 +479,7 @@ class Workflow(BaseModel):
                 futures.append(
                     executor.submit(
                         self.release,
-                        on,
+                        on.generate(start_date),
                         params=params,
                         log=log,
                         queue=queue,

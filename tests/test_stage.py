@@ -17,6 +17,12 @@ def test_stage():
     stage.run_id = "demo"
     assert "demo" == stage.run_id
 
+    # NOTE: Passing run_id directly to a Stage object.
+    stage: Stage = EmptyStage.model_validate(
+        {"run_id": "dummy", "name": "Empty Stage", "echo": "hello world"}
+    )
+    assert stage.run_id == "dummy"
+
 
 def test_stage_empty_execute():
     stage: Stage = EmptyStage.model_validate(
@@ -34,6 +40,16 @@ def test_stage_empty_raise():
         EmptyStage.model_validate(
             {
                 "name": "Empty ${{ params.name }}",
+                "echo": "hello world",
+            }
+        )
+
+    # NOTE: Raise error when passing template data to the id field.
+    with pytest.raises(ValidationError):
+        EmptyStage.model_validate(
+            {
+                "name": "Empty Stage",
+                "id": "stage-${{ params.name }}",
                 "echo": "hello world",
             }
         )

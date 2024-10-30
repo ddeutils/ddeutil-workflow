@@ -1,8 +1,22 @@
+from datetime import datetime
 from unittest import mock
 
 from ddeutil.workflow import Workflow
 from ddeutil.workflow.conf import Config
 from ddeutil.workflow.utils import Result
+
+
+def test_workflow_release():
+    workflow: Workflow = Workflow.from_loader(name="wf-scheduling-common")
+    start_date: datetime = datetime(2024, 1, 1, 1, 0)
+    queue: list[datetime] = [workflow.on[0].generate(start_date).next]
+    rs: Result = workflow.release(
+        workflow.on[0].generate(start_date),
+        params={"asat-dt": datetime(2024, 10, 1)},
+        queue=queue,
+    )
+    assert rs.status == 0
+    assert len(queue) == 1
 
 
 @mock.patch.object(Config, "enable_write_log", False)

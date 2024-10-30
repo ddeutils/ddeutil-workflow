@@ -29,8 +29,7 @@ wf-scheduling-with-name:
 
 wf-scheduling-common:
   type: ddeutil.workflow.Workflow
-  on:
-    - 'every_3_minute_bkk'
+  on: ['every_3_minute_bkk']
   params:
     asat-dt: datetime
   jobs:

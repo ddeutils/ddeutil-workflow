@@ -66,6 +66,11 @@ def test_conf_log_file_find_logs(root_path):
         },
     )
     log.save(excluded=None)
+
+    assert FileLog.is_pointed(
+        name="wf-scheduling", release=datetime(2024, 1, 1, 1)
+    )
+
     log = next(FileLog.find_logs(name="wf-scheduling"))
     assert isinstance(log, FileLog)
 
