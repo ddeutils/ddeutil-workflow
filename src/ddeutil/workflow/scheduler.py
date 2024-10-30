@@ -917,34 +917,34 @@ class Schedule(BaseModel):
 
         # NOTE: Create pair of workflow and on.
         workflow_tasks: list[WorkflowTaskData] = []
-        externals: DictData = externals or {}
+        extras: DictData = externals or {}
 
-        for wfs in self.workflows:
-            wf: Workflow = Workflow.from_loader(wfs.name, externals=externals)
+        for sch_wf in self.workflows:
+            wf: Workflow = Workflow.from_loader(sch_wf.name, externals=extras)
 
             # NOTE: Create default list of release datetime.
-            queue[wfs.name]: list[datetime] = []
-            running[wfs.name]: list[datetime] = []
+            queue[sch_wf.name]: list[datetime] = []
+            running[sch_wf.name]: list[datetime] = []
 
-            # NOTE: Create the default on value if it does not passing on the
-            #   Schedule object.
-            _ons: list[On] = wf.on.copy() if len(wfs.on) == 0 else wfs.on
+            # IMPORTANT: Create the default 'on' value if it does not passing
+            #   the on field to the Schedule object.
+            ons: list[On] = wf.on.copy() if len(sch_wf.on) == 0 else sch_wf.on
 
-            for on in _ons:
-                on_gen: CronRunner = on.generate(start_date)
-                next_running_date = on_gen.next
+            for on in ons:
+                gen: CronRunner = on.generate(start_date)
+                next_running_date = gen.next
 
-                while next_running_date in queue[wfs.name]:
-                    next_running_date = on_gen.next
+                while next_running_date in queue[sch_wf.name]:
+                    next_running_date = gen.next
 
                 # NOTE: Push the next running date to queue list.
-                heappush(queue[wfs.name], next_running_date)
+                heappush(queue[sch_wf.name], next_running_date)
 
                 workflow_tasks.append(
                     WorkflowTaskData(
                         workflow=wf,
                         on=on,
-                        params=wfs.params,
+                        params=sch_wf.params,
                         queue=queue,
                         running=running,
                     ),
@@ -1013,8 +1013,8 @@ class WorkflowTaskData:
         waiting_sec: int = 60,
         sleep_interval: int = 15,
     ) -> None:  # pragma: no cov
-        """Workflow release, it will use with the same logic of
-        `workflow.release` method.
+        """Workflow task release that use the same logic of `workflow.release`
+        method.
 
         :param log: A log object for saving result logging from workflow
             execution process.
@@ -1296,6 +1296,8 @@ def workflow_control(
     workflow_tasks: list[WorkflowTaskData] = []
     for name in schedules:
         sch: Schedule = Schedule.from_loader(name, externals=externals)
+
+        # NOTE: Create a workflow task data instance from schedule object.
         workflow_tasks.extend(
             sch.tasks(
                 start_date_waiting,

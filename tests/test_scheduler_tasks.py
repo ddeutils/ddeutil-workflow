@@ -53,9 +53,9 @@ def test_schedule_tasks_release():
 @mock.patch.object(Config, "enable_write_log", False)
 def test_schedule_tasks_release_skip():
     schedule = Schedule.from_loader("schedule-common-wf")
-
     queue: dict[str, list[datetime]] = {"wf-scheduling": []}
     running: dict[str, list[datetime]] = {"wf-scheduling": []}
+
     for wf_task in schedule.tasks(
         datetime(2024, 1, 1, 1),
         queue=queue,
