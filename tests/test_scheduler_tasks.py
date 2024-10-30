@@ -12,8 +12,8 @@ def test_workflow_task_data():
         workflow=workflow,
         on=workflow.on[0],
         params={"asat-dt": datetime(2024, 1, 1, 1)},
-        queue={},
-        running={},
+        queue=[],
+        running=[],
     )
 
     assert task != datetime(2024, 1, 1, 1)
@@ -21,8 +21,8 @@ def test_workflow_task_data():
         workflow=workflow,
         on=workflow.on[0],
         params={},
-        queue={},
-        running={},
+        queue=[],
+        running=[],
     )
 
 
@@ -49,8 +49,8 @@ def test_schedule_tasks():
         workflow=Workflow.from_loader(name="wf-scheduling"),
         on=task.on,
         params={},
-        queue={},
-        running={},
+        queue=[],
+        running=[],
     )
 
 

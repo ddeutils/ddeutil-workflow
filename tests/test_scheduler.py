@@ -71,11 +71,11 @@ def test_schedule_loader_find_schedule():
 
 
 def test_schedule_remove_workflow_task():
-    queue: dict[str, list[datetime]] = {"wf-scheduling": []}
-    running: dict[str, list[datetime]] = {"wf-scheduling": []}
+    queue: list[datetime] = []
+    running: list[datetime] = []
     pipeline_tasks: list[WorkflowTaskData] = []
 
-    wf: Workflow = Workflow.from_loader("wf-scheduling", externals={})
+    wf: Workflow = Workflow.from_loader("wf-scheduling")
     for on in wf.on:
         pipeline_tasks.append(
             WorkflowTaskData(
@@ -88,21 +88,21 @@ def test_schedule_remove_workflow_task():
         )
     assert 2 == len(pipeline_tasks)
 
-    wf: Workflow = Workflow.from_loader("wf-scheduling", externals={})
+    wf: Workflow = Workflow.from_loader("wf-scheduling")
     for on in wf.on:
         pipeline_tasks.remove(
             WorkflowTaskData(
                 workflow=wf,
                 on=on,
                 params={"asat-dt": "${{ release.logical_date }}"},
-                queue={"wf-scheduling": [datetime(2024, 1, 1, 12)]},
-                running={"wf-scheduling": [datetime(2024, 1, 1, 12)]},
+                queue=[datetime(2024, 1, 1, 12)],
+                running=[datetime(2024, 1, 1, 12)],
             )
         )
 
     assert 0 == len(pipeline_tasks)
 
-    wf: Workflow = Workflow.from_loader("wf-scheduling", externals={})
+    wf: Workflow = Workflow.from_loader("wf-scheduling")
     for on in wf.on:
         pipeline_tasks.append(
             WorkflowTaskData(
@@ -116,15 +116,13 @@ def test_schedule_remove_workflow_task():
 
     remover = WorkflowTaskData(
         workflow=wf,
-        on=On.from_loader(name="every_minute_bkk", externals={}),
+        on=On.from_loader(name="every_minute_bkk"),
         params={"asat-dt": "${{ release.logical_date }}"},
-        queue={
-            "wf-scheduling": [
-                datetime(2024, 1, 1, 12),
-                datetime(2024, 1, 1, 12),
-            ]
-        },
-        running={"wf-scheduling": [datetime(2024, 1, 1, 6)]},
+        queue=[
+            datetime(2024, 1, 1, 12),
+            datetime(2024, 1, 1, 12),
+        ],
+        running=[datetime(2024, 1, 1, 6)],
     )
     pipeline_tasks.remove(remover)
     assert 1 == len(pipeline_tasks)

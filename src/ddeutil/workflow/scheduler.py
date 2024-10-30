@@ -947,8 +947,8 @@ class Schedule(BaseModel):
                         workflow=wf,
                         on=on,
                         params=sch_wf.params,
-                        queue=queue,
-                        running=running,
+                        queue=queue[sch_wf.name],
+                        running=running[sch_wf.name],
                     ),
                 )
 
@@ -999,13 +999,15 @@ def catch_exceptions(cancel_on_failure: bool = False) -> DecoratorCancelJob:
 class WorkflowTaskData:
     """Workflow task dataclass that use to keep mapping data and objects for
     passing in multithreading task.
+
+        This dataclass will be 1-1 mapping with workflow and on objects.
     """
 
     workflow: Workflow
     on: On
     params: DictData = field(compare=False, hash=False)
-    queue: dict[str, list[datetime]] = field(compare=False, hash=False)
-    running: dict[str, list[datetime]] = field(compare=False, hash=False)
+    queue: list[datetime] = field(compare=False, hash=False)
+    running: list[datetime] = field(compare=False, hash=False)
 
     @catch_exceptions(cancel_on_failure=True)
     def release(
@@ -1037,16 +1039,14 @@ class WorkflowTaskData:
         next_time: datetime = gen.next
 
         # NOTE: get next utils it does not running.
-        while log.is_pointed(wf.name, next_time) or (
-            next_time in self.running[wf.name]
-        ):
+        while log.is_pointed(wf.name, next_time) or (next_time in self.running):
             next_time: datetime = gen.next
 
         logger.debug(
             f"({wf.run_id}) [CORE]: {wf.name!r} : {on.cronjob} : "
             f"{next_time:%Y-%m-%d %H:%M:%S}"
         )
-        heappush(self.running[wf.name], next_time)
+        heappush(self.running, next_time)
 
         if get_diff_sec(next_time, tz=cron_tz) > waiting_sec:
             logger.debug(
@@ -1056,8 +1056,8 @@ class WorkflowTaskData:
 
             # NOTE: Add this next running datetime that not in period to queue
             #   and remove it to running.
-            self.running[wf.name].remove(next_time)
-            heappush(self.queue[wf.name], next_time)
+            self.running.remove(next_time)
+            heappush(self.queue, next_time)
 
             time.sleep(0.2)
             return
@@ -1118,7 +1118,7 @@ class WorkflowTaskData:
         rs_log.save(excluded=None)
 
         # NOTE: remove this release date from running
-        self.running[wf.name].remove(next_time)
+        self.running.remove(next_time)
 
         # IMPORTANT:
         #   Add the next running datetime to workflow queue
@@ -1127,13 +1127,13 @@ class WorkflowTaskData:
         )
         future_running_time: datetime = gen.next
         while (
-            future_running_time in self.running[wf.name]
-            or future_running_time in self.queue[wf.name]
+            future_running_time in self.running
+            or future_running_time in self.queue
             or future_running_time < finish_time
         ):  # pragma: no cov
             future_running_time: datetime = gen.next
 
-        heappush(self.queue[wf.name], future_running_time)
+        heappush(self.queue, future_running_time)
         logger.debug(f"[CORE]: {'-' * 100}")
 
     def __eq__(self, other) -> bool:
