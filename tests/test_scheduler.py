@@ -112,8 +112,6 @@ def test_schedule_loader_find_schedule():
 
 
 def test_schedule_remove_workflow_task():
-    queue: list[datetime] = []
-    running: list[datetime] = []
     pipeline_tasks: list[WorkflowTaskData] = []
     start_date: datetime = datetime(2024, 1, 1, 1)
 
@@ -121,11 +119,10 @@ def test_schedule_remove_workflow_task():
     for on in wf.on:
         pipeline_tasks.append(
             WorkflowTaskData(
+                alias=wf.name,
                 workflow=wf,
                 runner=on.generate(start_date),
                 params={"asat-dt": "${{ release.logical_date }}"},
-                queue=queue,
-                running=running,
             )
         )
     assert 2 == len(pipeline_tasks)
@@ -134,11 +131,10 @@ def test_schedule_remove_workflow_task():
     for on in wf.on:
         pipeline_tasks.remove(
             WorkflowTaskData(
+                alias=wf.name,
                 workflow=wf,
                 runner=on.generate(start_date),
                 params={"asat-dt": "${{ release.logical_date }}"},
-                queue=[datetime(2024, 1, 1, 12)],
-                running=[datetime(2024, 1, 1, 12)],
             )
         )
 
@@ -148,23 +144,18 @@ def test_schedule_remove_workflow_task():
     for on in wf.on:
         pipeline_tasks.append(
             WorkflowTaskData(
+                alias=wf.name,
                 workflow=wf,
                 runner=on.generate(start_date),
                 params={"asat-dt": "${{ release.logical_date }}"},
-                queue=queue,
-                running=running,
             )
         )
 
     remover = WorkflowTaskData(
+        alias=wf.name,
         workflow=wf,
         runner=On.from_loader(name="every_minute_bkk").generate(start_date),
         params={"asat-dt": "${{ release.logical_date }}"},
-        queue=[
-            datetime(2024, 1, 1, 12),
-            datetime(2024, 1, 1, 12),
-        ],
-        running=[datetime(2024, 1, 1, 6)],
     )
     pipeline_tasks.remove(remover)
     assert 1 == len(pipeline_tasks)

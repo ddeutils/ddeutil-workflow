@@ -967,7 +967,6 @@ class Schedule(BaseModel):
         self,
         start_date: datetime,
         queue: dict[str, list[datetime]],
-        running: dict[str, list[datetime]],
         *,
         externals: DictData | None = None,
     ) -> list[WorkflowTaskData]:
@@ -976,7 +975,6 @@ class Schedule(BaseModel):
 
         :param start_date: A start date that get from the workflow schedule.
         :param queue: A mapping of name and list of datetime for queue.
-        :param running: A mapping of name and list of datetime for running.
         :param externals: An external parameters that pass to the Loader object.
 
         :rtype: list[WorkflowTaskData]
@@ -995,9 +993,6 @@ class Schedule(BaseModel):
             if sch_wf.alias not in queue:
                 queue[sch_wf.alias]: list[datetime] = []
 
-            if sch_wf.alias not in running:
-                running[sch_wf.alias]: list[datetime] = []
-
             # IMPORTANT: Create the default 'on' value if it does not passing
             #   the on field to the Schedule object.
             ons: list[On] = wf.on.copy() if len(sch_wf.on) == 0 else sch_wf.on
@@ -1010,9 +1005,6 @@ class Schedule(BaseModel):
 
                 while next_running_date in queue[sch_wf.alias]:
                     next_running_date = runner.next
-
-                # NOTE: Push the next running date to queue list.
-                heappush(queue[sch_wf.alias], next_running_date)
 
                 workflow_tasks.append(
                     WorkflowTaskData(
@@ -1084,7 +1076,6 @@ class WorkflowTaskData:
     def release(
         self,
         queue: dict[str, list[datetime]],
-        running: dict[str, list[datetime]],
         log: Log | None = None,
         *,
         waiting_sec: int = 60,
@@ -1094,7 +1085,6 @@ class WorkflowTaskData:
         method.
 
         :param queue:
-        :param running:
         :param log: A log object for saving result logging from workflow
             execution process.
         :param waiting_sec: A second period value that allow workflow execute.
@@ -1110,7 +1100,7 @@ class WorkflowTaskData:
 
         # NOTE: get next utils it does not running.
         while log.is_pointed(wf.name, next_time) or (
-            next_time in running[self.alias]
+            next_time in queue[self.alias]
         ):
             next_time: datetime = runner.next
 
@@ -1118,7 +1108,7 @@ class WorkflowTaskData:
             f"({wf.run_id}) [CORE]: {wf.name!r} : {runner.cron} : "
             f"{next_time:%Y-%m-%d %H:%M:%S}"
         )
-        heappush(running[self.alias], next_time)
+        heappush(queue[self.alias], next_time)
         start_sec: float = time.monotonic()
 
         if get_diff_sec(next_time, tz=runner.tz) > waiting_sec:
@@ -1129,8 +1119,7 @@ class WorkflowTaskData:
 
             # NOTE: Add this next running datetime that not in period to queue
             #   and remove it to running.
-            running[self.alias].remove(next_time)
-            heappush(queue[self.alias], next_time)
+            queue[self.alias].remove(next_time)
 
             time.sleep(0.2)
             return
@@ -1189,30 +1178,20 @@ class WorkflowTaskData:
         rs_log.save(excluded=None)
 
         # NOTE: Remove the current release date from the running.
-        running[self.alias].remove(next_time)
+        queue[self.alias].remove(next_time)
         total_sec: float = time.monotonic() - start_sec
 
         # IMPORTANT:
         #   Add the next running datetime to workflow task queue.
         future_running_time: datetime = runner.next
 
-        print("Current:", next_time)
-        print("Next:", future_running_time)
-        print(
-            "Period seconds:", (future_running_time - next_time).total_seconds()
-        )
-        print("Execute seconds:", total_sec)
-        print(queue[self.alias])
-        print(running[self.alias])
-
         while (
-            future_running_time in running[self.alias]
-            or future_running_time in queue[self.alias]
+            future_running_time in queue[self.alias]
             or (future_running_time - next_time).total_seconds() < total_sec
         ):  # pragma: no cov
             future_running_time: datetime = runner.next
 
-        heappush(queue[self.alias], future_running_time)
+        # NOTE: Queue next release date.
         logger.debug(f"[CORE]: {'-' * 100}")
 
     def __eq__(self, other) -> bool:
@@ -1369,7 +1348,6 @@ def workflow_control(
     #   {"workflow-name": [<release-datetime>, <release-datetime>, ...]}
     #
     wf_queue: dict[str, list[datetime]] = {}
-    wf_running: dict[str, list[datetime]] = {}
     thread_releases: dict[str, Thread] = {}
 
     start_date_waiting: datetime = (start_date + timedelta(minutes=1)).replace(
@@ -1386,7 +1364,6 @@ def workflow_control(
             schedule.tasks(
                 start_date_waiting,
                 queue=wf_queue,
-                running=wf_running,
                 externals=externals,
             ),
         )
@@ -1400,7 +1377,6 @@ def workflow_control(
             workflow_tasks=workflow_tasks,
             stop=(stop or (start_date + config.stop_boundary_delta)),
             queue=wf_queue,
-            running=wf_running,
             threads=thread_releases,
         )
         .tag("control")
@@ -1429,9 +1405,6 @@ def workflow_control(
 
     logger.warning(
         f"Queue: {[list(queue2str(wf_queue[wf])) for wf in wf_queue]}"
-    )
-    logger.warning(
-        f"Running: {[list(queue2str(wf_running[wf])) for wf in wf_running]}"
     )
     return schedules
 
