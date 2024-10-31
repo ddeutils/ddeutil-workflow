@@ -8,15 +8,29 @@ from ddeutil.workflow.utils import Result
 
 def test_workflow_release():
     workflow: Workflow = Workflow.from_loader(name="wf-scheduling-common")
-    start_date: datetime = datetime(2024, 1, 1, 1, 0)
-    queue: list[datetime] = [workflow.on[0].generate(start_date).next]
+    current_date: datetime = datetime.now().replace(second=0, microsecond=0)
+    queue: list[datetime] = [workflow.on[0].generate(current_date).next]
+    rs: Result = workflow.release(
+        workflow.on[0].generate(current_date),
+        params={"asat-dt": datetime(2024, 10, 1)},
+        queue=queue,
+    )
+    assert rs.status == 0
+    assert len(queue) == 1
+
+
+@mock.patch.object(Config, "enable_write_log", False)
+def test_workflow_release_with_start_date():
+    workflow: Workflow = Workflow.from_loader(name="wf-scheduling-common")
+    start_date: datetime = datetime(2024, 1, 1, 1, 1)
+    queue: list[datetime] = []
     rs: Result = workflow.release(
         workflow.on[0].generate(start_date),
         params={"asat-dt": datetime(2024, 10, 1)},
         queue=queue,
     )
     assert rs.status == 0
-    assert len(queue) == 1
+    assert len(queue) == 0
 
 
 @mock.patch.object(Config, "enable_write_log", False)

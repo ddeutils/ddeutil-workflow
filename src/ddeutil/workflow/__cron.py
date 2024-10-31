@@ -767,7 +767,7 @@ class CronRunner:
                 not self.__shift_date(mode, reverse)
                 for mode in ("year", "month", "day", "hour", "minute")
             ):
-                return copy.deepcopy(self.date.replace(second=0, microsecond=0))
+                return copy.deepcopy(self.date)
 
         raise RecursionError("Unable to find execution time for schedule")
 
@@ -815,6 +815,10 @@ class CronRunner:
 
             # NOTE: Replace date that less than it mode to zero.
             self.date: datetime = replace_date(self.date, mode, reverse=reverse)
+
+            # NOTE: Replace second and microsecond values that change from
+            #   the replace_date func with reverse flag.
+            self.date: datetime = self.date.replace(second=0, microsecond=0)
 
             if current_value != getattr(self.date, switch[mode]):
                 return mode != "month"

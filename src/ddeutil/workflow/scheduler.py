@@ -38,9 +38,8 @@ from queue import Queue
 from textwrap import dedent
 from threading import Thread
 from typing import Callable, Optional
-from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.dataclasses import dataclass
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
@@ -85,7 +84,7 @@ __all__: TupleStr = (
     "WorkflowTaskData",
     "Schedule",
     "ScheduleWorkflow",
-    "workflow_task",
+    "workflow_task_release",
     "workflow_monitor",
     "workflow_control",
     "workflow_runner",
@@ -995,11 +994,13 @@ class Schedule(BaseModel):
             ons: list[On] = wf.on.copy() if len(sch_wf.on) == 0 else sch_wf.on
 
             for on in ons:
-                gen: CronRunner = on.generate(start_date)
-                next_running_date = gen.next
+
+                # NOTE: Create CronRunner instance from the start_date param.
+                runner: CronRunner = on.generate(start_date)
+                next_running_date = runner.next
 
                 while next_running_date in queue[sch_wf.name]:
-                    next_running_date = gen.next
+                    next_running_date = runner.next
 
                 # NOTE: Push the next running date to queue list.
                 heappush(queue[sch_wf.name], next_running_date)
@@ -1007,7 +1008,7 @@ class Schedule(BaseModel):
                 workflow_tasks.append(
                     WorkflowTaskData(
                         workflow=wf,
-                        on=on,
+                        runner=runner,
                         params=sch_wf.params,
                         queue=queue[sch_wf.name],
                         running=running[sch_wf.name],
@@ -1057,16 +1058,17 @@ def catch_exceptions(cancel_on_failure: bool = False) -> DecoratorCancelJob:
     return decorator
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, config=ConfigDict(arbitrary_types_allowed=True))
 class WorkflowTaskData:
     """Workflow task dataclass that use to keep mapping data and objects for
     passing in multithreading task.
 
-        This dataclass will be 1-1 mapping with workflow and on objects.
+        This dataclass will be 1-1 mapping with workflow and cron runner
+    objects.
     """
 
     workflow: Workflow
-    on: On
+    runner: CronRunner
     params: DictData = field(compare=False, hash=False)
     queue: list[datetime] = field(compare=False, hash=False)
     running: list[datetime] = field(compare=False, hash=False)
@@ -1090,29 +1092,25 @@ class WorkflowTaskData:
         """
         log: Log = log or FileLog
         wf: Workflow = self.workflow
-        on: On = self.on
-
-        gen: CronRunner = on.generate(
-            datetime.now(tz=config.tz).replace(second=0, microsecond=0)
-        )
-        cron_tz: ZoneInfo = gen.tz
+        runner: CronRunner = self.runner
 
         # NOTE: get next schedule time that generate from now.
-        next_time: datetime = gen.next
+        next_time: datetime = runner.date
 
         # NOTE: get next utils it does not running.
         while log.is_pointed(wf.name, next_time) or (next_time in self.running):
-            next_time: datetime = gen.next
+            next_time: datetime = runner.next
 
         logger.debug(
-            f"({wf.run_id}) [CORE]: {wf.name!r} : {on.cronjob} : "
+            f"({wf.run_id}) [CORE]: {wf.name!r} : {runner.cron} : "
             f"{next_time:%Y-%m-%d %H:%M:%S}"
         )
         heappush(self.running, next_time)
+        start_sec: float = time.monotonic()
 
-        if get_diff_sec(next_time, tz=cron_tz) > waiting_sec:
+        if get_diff_sec(next_time, tz=runner.tz) > waiting_sec:
             logger.debug(
-                f"({wf.run_id}) [CORE]: {wf.name!r} : {on.cronjob} "
+                f"({wf.run_id}) [CORE]: {wf.name!r} : {runner.cron} "
                 f": Does not closely >> {next_time:%Y-%m-%d %H:%M:%S}"
             )
 
@@ -1125,7 +1123,7 @@ class WorkflowTaskData:
             return
 
         logger.debug(
-            f"({wf.run_id}) [CORE]: {wf.name!r} : {on.cronjob} : "
+            f"({wf.run_id}) [CORE]: {wf.name!r} : {runner.cron} : "
             f"Closely to run >> {next_time:%Y-%m-%d %H:%M:%S}"
         )
 
@@ -1134,7 +1132,7 @@ class WorkflowTaskData:
             sleep_interval + 5
         ):
             logger.debug(
-                f"({wf.run_id}) [CORE]: {wf.name!r} : {on.cronjob} "
+                f"({wf.run_id}) [CORE]: {wf.name!r} : {runner.cron} "
                 f": Sleep until: {duration}"
             )
             time.sleep(15)
@@ -1149,19 +1147,17 @@ class WorkflowTaskData:
             },
         }
 
-        # WARNING:
-        #   Re-create workflow object that use new running workflow ID.
-        #
-        runner: Workflow = wf.get_running_id(run_id=wf.new_run_id)
-        rs: Result = runner.execute(
+        # WARNING: Re-create workflow object that use new running workflow ID.
+        workflow: Workflow = wf.get_running_id(run_id=wf.new_run_id)
+        rs: Result = workflow.execute(
             params=param2template(self.params, release_params),
         )
         logger.debug(
-            f"({runner.run_id}) [CORE]: {wf.name!r} : {on.cronjob} : "
+            f"({workflow.run_id}) [CORE]: {wf.name!r} : {runner.cron} : "
             f"End release - {next_time:%Y-%m-%d %H:%M:%S}"
         )
 
-        del runner
+        del workflow
 
         # NOTE: Set parent ID on this result.
         rs.set_parent_run_id(wf.run_id)
@@ -1170,7 +1166,7 @@ class WorkflowTaskData:
         rs_log: Log = log.model_validate(
             {
                 "name": wf.name,
-                "on": str(on.cronjob),
+                "on": str(runner.cron),
                 "release": next_time,
                 "context": rs.context,
                 "parent_run_id": rs.run_id,
@@ -1179,21 +1175,27 @@ class WorkflowTaskData:
         )
         rs_log.save(excluded=None)
 
-        # NOTE: remove this release date from running
+        # NOTE: Remove the current release date from the running.
         self.running.remove(next_time)
+        total_sec: float = time.monotonic() - start_sec
 
         # IMPORTANT:
-        #   Add the next running datetime to workflow queue
-        finish_time: datetime = datetime.now(tz=cron_tz).replace(
-            second=0, microsecond=0
+        #   Add the next running datetime to workflow task queue.
+        future_running_time: datetime = runner.next
+
+        print("Current:", next_time)
+        print("Next:", future_running_time)
+        print(
+            "Period seconds:", (future_running_time - next_time).total_seconds()
         )
-        future_running_time: datetime = gen.next
+        print("Execute seconds:", total_sec)
+
         while (
             future_running_time in self.running
             or future_running_time in self.queue
-            or future_running_time < finish_time
+            or (future_running_time - next_time).total_seconds() < total_sec
         ):  # pragma: no cov
-            future_running_time: datetime = gen.next
+            future_running_time: datetime = runner.next
 
         heappush(self.queue, future_running_time)
         logger.debug(f"[CORE]: {'-' * 100}")
@@ -1202,13 +1204,13 @@ class WorkflowTaskData:
         if isinstance(other, WorkflowTaskData):
             return (
                 self.workflow.name == other.workflow.name
-                and self.on.cronjob == other.on.cronjob
+                and self.runner.cron == other.runner.cron
             )
         return NotImplemented
 
 
 @catch_exceptions(cancel_on_failure=True)  # pragma: no cov
-def workflow_task(
+def workflow_task_release(
     workflow_tasks: list[WorkflowTaskData],
     stop: datetime,
     threads: dict[str, Thread],
@@ -1223,10 +1225,9 @@ def workflow_task(
     :param threads:
     :rtype: CancelJob | None
     """
-    start_date: datetime = datetime.now(tz=config.tz)
-    start_date_minute: datetime = start_date.replace(second=0, microsecond=0)
+    current_date: datetime = datetime.now(tz=config.tz)
 
-    if start_date > stop.replace(tzinfo=config.tz):
+    if current_date > stop.replace(tzinfo=config.tz):
         logger.info("[WORKFLOW]: Stop this schedule with datetime stopper.")
         while len(threads) > 0:
             logger.warning(
@@ -1257,40 +1258,31 @@ def workflow_task(
             f"{list(queue2str(task.queue[task.workflow.name]))}"
         )
 
-        # NOTE: Create minute unit value for any scheduler datetime that
-        #   checking a workflow task should run in this datetime.
-        current_running_time: datetime = start_date_minute.astimezone(
-            tz=ZoneInfo(task.on.tz)
-        )
-        if (
-            len(task.queue[task.workflow.name]) > 0
-            and current_running_time != task.queue[task.workflow.name][0]
-        ) or (
-            task.on.next(current_running_time)
-            != task.queue[task.workflow.name][0]
-        ):
+        if len(task.queue) > 0 and task.runner.date != task.queue[0]:
             logger.debug(
                 f"[WORKFLOW]: Skip schedule "
-                f"{current_running_time:%Y-%m-%d %H:%M:%S} "
-                f"for : {task.workflow.name!r} : {task.on.cronjob}"
+                f"{task.runner.date:%Y-%m-%d %H:%M:%S} "
+                f"for : {task.workflow.name!r} : {task.runner.cron}"
             )
             continue
-        elif len(task.queue[task.workflow.name]) == 0:
+
+        elif len(task.queue) == 0:
             logger.warning(
                 f"[WORKFLOW]: Queue is empty for : {task.workflow.name!r} : "
-                f"{task.on.cronjob}"
+                f"{task.runner.cron}"
             )
             continue
 
         # NOTE: Remove this datetime from queue.
-        task.queue[task.workflow.name].pop(0)
+        task.queue.pop(0)
 
         # NOTE: Create thread name that able to tracking with observe schedule
         #   job.
         thread_name: str = (
-            f"{task.workflow.name}|{str(task.on.cronjob)}|"
-            f"{current_running_time:%Y%m%d%H%M}"
+            f"{task.workflow.name}|{str(task.runner.cron)}|"
+            f"{task.runner.date:%Y%m%d%H%M}"
         )
+
         wf_thread: Thread = Thread(
             target=task.release,
             name=thread_name,
@@ -1359,12 +1351,12 @@ def workflow_control(
     )
 
     # NOTE: Create pair of workflow and on from schedule model.
-    wf_tasks: list[WorkflowTaskData] = []
+    workflow_tasks: list[WorkflowTaskData] = []
     for name in schedules:
         schedule: Schedule = Schedule.from_loader(name, externals=externals)
 
         # NOTE: Create a workflow task data instance from schedule object.
-        wf_tasks.extend(
+        workflow_tasks.extend(
             schedule.tasks(
                 start_date_waiting,
                 queue=wf_queue,
@@ -1378,8 +1370,8 @@ def workflow_control(
         scheduler.every(1)
         .minutes.at(":02")
         .do(
-            workflow_task,
-            workflow_tasks=wf_tasks,
+            workflow_task_release,
+            workflow_tasks=workflow_tasks,
             stop=(stop or (start_date + config.stop_boundary_delta)),
             threads=thread_releases,
         )
@@ -1397,6 +1389,8 @@ def workflow_control(
     while True:
         scheduler.run_pending()
         time.sleep(1)
+
+        # NOTE: Break the scheduler when the control job does not exists.
         if not scheduler.get_jobs("control"):
             scheduler.clear("monitor")
             logger.warning(

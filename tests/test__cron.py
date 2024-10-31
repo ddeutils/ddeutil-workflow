@@ -111,8 +111,6 @@ def test_cron_cronjob_to_list():
         [0, 1, 2, 3, 4, 5, 6],
     ]
 
-    cr = cron.CronJob("* * * * *")
-
 
 def test_cron_option():
     cr = cron.CronJob(
@@ -155,6 +153,7 @@ def test_cron_next_previous():
     assert sch.prev == str2dt("2023-07-23 12:30:00")
     assert sch.prev == str2dt("2023-07-23 12:00:00")
     assert sch.prev == str2dt("2023-07-23 00:30:00")
+    assert sch.date == str2dt("2023-07-23 00:30:00")
 
     sch.reset()
 

@@ -115,13 +115,14 @@ def test_schedule_remove_workflow_task():
     queue: list[datetime] = []
     running: list[datetime] = []
     pipeline_tasks: list[WorkflowTaskData] = []
+    start_date: datetime = datetime(2024, 1, 1, 1)
 
     wf: Workflow = Workflow.from_loader("wf-scheduling")
     for on in wf.on:
         pipeline_tasks.append(
             WorkflowTaskData(
                 workflow=wf,
-                on=on,
+                runner=on.generate(start_date),
                 params={"asat-dt": "${{ release.logical_date }}"},
                 queue=queue,
                 running=running,
@@ -134,7 +135,7 @@ def test_schedule_remove_workflow_task():
         pipeline_tasks.remove(
             WorkflowTaskData(
                 workflow=wf,
-                on=on,
+                runner=on.generate(start_date),
                 params={"asat-dt": "${{ release.logical_date }}"},
                 queue=[datetime(2024, 1, 1, 12)],
                 running=[datetime(2024, 1, 1, 12)],
@@ -148,7 +149,7 @@ def test_schedule_remove_workflow_task():
         pipeline_tasks.append(
             WorkflowTaskData(
                 workflow=wf,
-                on=on,
+                runner=on.generate(start_date),
                 params={"asat-dt": "${{ release.logical_date }}"},
                 queue=queue,
                 running=running,
@@ -157,7 +158,7 @@ def test_schedule_remove_workflow_task():
 
     remover = WorkflowTaskData(
         workflow=wf,
-        on=On.from_loader(name="every_minute_bkk"),
+        runner=On.from_loader(name="every_minute_bkk").generate(start_date),
         params={"asat-dt": "${{ release.logical_date }}"},
         queue=[
             datetime(2024, 1, 1, 12),
