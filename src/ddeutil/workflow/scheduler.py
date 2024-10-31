@@ -372,7 +372,7 @@ class Workflow(BaseModel):
         )
 
         # NOTE: get next schedule time that generate from now.
-        next_time: datetime = runner.next
+        next_time: datetime = runner.date
 
         # NOTE: While-loop to getting next until it does not logger.
         while log.is_pointed(self.name, next_time) or (next_time in queue):
@@ -400,7 +400,8 @@ class Workflow(BaseModel):
                     "params": params,
                     "release": {
                         "status": "skipped",
-                        "cron": [str(runner.cron)],
+                        "cron": str(runner.cron),
+                        "runner": runner,
                     },
                 },
             )
@@ -453,13 +454,25 @@ class Workflow(BaseModel):
         # NOTE: Saving execution result to destination of the input log object.
         rs_log.save(excluded=None)
 
+        # NOTE: Remove queue.
         queue.remove(next_time)
+
+        future_running_time: datetime = runner.next
+        logger.debug(
+            f"({rs.run_id}) [CORE]: {self.name!r} : {runner.cron} : "
+            f"Next release {future_running_time:%Y-%m-%d %H:%M:%S}"
+        )
+
         time.sleep(0.15)
         return Result(
             status=0,
             context={
                 "params": params,
-                "release": {"status": "run", "cron": [str(runner.cron)]},
+                "release": {
+                    "status": "run",
+                    "cron": str(runner.cron),
+                    "runner": runner,
+                },
             },
         )
 
@@ -507,10 +520,14 @@ class Workflow(BaseModel):
 
             # NOTE: For-loop the on values that exists in this workflow object.
             for on in self.on:
+
+                # NOTE: Shift crontab runner to next running date from the
+                #   current start date.
+                runner: CronRunner = on.next(start_date)
                 futures.append(
                     executor.submit(
                         self.release,
-                        runner=on.generate(start_date),
+                        runner=runner,
                         params=params,
                         log=log,
                         queue=queue,

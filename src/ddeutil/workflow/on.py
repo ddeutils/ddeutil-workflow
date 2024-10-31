@@ -184,11 +184,13 @@ class On(BaseModel):
             raise TypeError("start value should be str or datetime type.")
         return self.cronjob.schedule(date=start, tz=self.tz)
 
-    def next(self, start: str | datetime) -> datetime:
+    def next(self, start: str | datetime) -> CronRunner:
         """Return a next datetime from Cron runner object that start with any
         date that given from input.
         """
-        return self.generate(start=start).next
+        runner: CronRunner = self.generate(start=start)
+        _ = runner.next
+        return runner
 
     # def pop(self, queue: list[datetime]) -> datetime:
     #     """Pop the matching datetime value from list of datetime alias queue."""
