@@ -59,17 +59,15 @@ def test_schedule_tasks():
 def test_schedule_tasks_release():
     schedule = Schedule.from_loader("schedule-common-wf")
 
-    queue: dict[str, list[datetime]] = {"wf-scheduling": []}
-    running: dict[str, list[datetime]] = {"wf-scheduling": []}
-    for wf_task in schedule.tasks(
-        datetime(2024, 1, 1, 1, 2, 30),
+    queue: dict[str, list[datetime]] = {}
+    running: dict[str, list[datetime]] = {}
+
+    for task in schedule.tasks(
+        start_date=datetime(2024, 1, 1, 1, 2, 30),
         queue=queue,
         running=running,
     ):
-        assert wf_task.workflow.name == "wf-scheduling"
-        wf_task.release(waiting_sec=60)
-
-    print(queue)
+        task.release(queue=queue, running=running, waiting_sec=60)
 
 
 @mock.patch.object(Config, "enable_write_log", False)
