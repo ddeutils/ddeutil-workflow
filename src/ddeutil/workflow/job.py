@@ -384,7 +384,7 @@ class Job(BaseModel):
         #   instead.
         _id: str = self.id or str(len(to["jobs"]) + 1)
 
-        logger.debug(f"({self.run_id}) [JOB]: Set outputs on: {_id}")
+        logger.debug(f"({self.run_id}) [JOB]: Set outputs to: {_id!r}")
         to["jobs"][_id] = (
             {"strategies": output}
             if self.strategy.is_set()

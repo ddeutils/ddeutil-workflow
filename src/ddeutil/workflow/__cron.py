@@ -653,6 +653,20 @@ class CronJob:
 
 
 class CronJobYear(CronJob):
+    """The Cron Job Converter with Year extension object that generate datetime
+    dimension of cron job schedule format,
+
+        *  *  *  *  *  *  <command to execute>
+
+        (i)     minute (0 - 59)
+        (ii)    hour (0 - 23)
+        (iii)   day of the month (1 - 31)
+        (iv)    month (1 - 12)
+        (v)     day of the week (0 - 6) (Sunday to Saturday; 7 is also Sunday
+                on some systems)
+        (vi)    year (1990 - 2100)
+    """
+
     cron_length = 6
     cron_units = CRON_UNITS_YEAR
 

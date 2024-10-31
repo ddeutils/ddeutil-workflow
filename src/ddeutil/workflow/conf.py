@@ -33,6 +33,29 @@ load_dotenv()
 env = os.getenv
 
 
+@lru_cache
+def get_logger(name: str):
+    """Return logger object with an input module name.
+
+    :param name: A module name that want to log.
+    """
+    lg = logging.getLogger(name)
+    formatter = logging.Formatter(
+        fmt=(
+            "%(asctime)s.%(msecs)03d (%(name)-10s, %(process)-5d, "
+            "%(thread)-5d) [%(levelname)-7s] %(message)-120s "
+            "(%(filename)s:%(lineno)s)"
+        ),
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    stream = logging.StreamHandler()
+    stream.setFormatter(formatter)
+    lg.addHandler(stream)
+
+    lg.setLevel(logging.DEBUG if config.debug else logging.INFO)
+    return lg
+
+
 class Config:
     """Config object for keeping application configuration on current session
     without changing when if the application still running.
@@ -289,29 +312,7 @@ def get_type(t: str, params: Config) -> AnyModelType:
 
 
 config = Config()
-
-
-@lru_cache
-def get_logger(name: str):
-    """Return logger object with an input module name.
-
-    :param name: A module name that want to log.
-    """
-    logger = logging.getLogger(name)
-    formatter = logging.Formatter(
-        fmt=(
-            "%(asctime)s.%(msecs)03d (%(name)-10s, %(process)-5d, "
-            "%(thread)-5d) [%(levelname)-7s] %(message)-120s "
-            "(%(filename)s:%(lineno)s)"
-        ),
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-    stream = logging.StreamHandler()
-    stream.setFormatter(formatter)
-    logger.addHandler(stream)
-
-    logger.setLevel(logging.DEBUG if config.debug else logging.INFO)
-    return logger
+logger = get_logger("ddeutil.workflow")
 
 
 class BaseLog(BaseModel, ABC):
@@ -464,6 +465,9 @@ class FileLog(BaseLog):
         if not config.enable_write_log:
             return self
 
+        logger.debug(
+            f"({self.run_id}) [LOG]: Start writing log: {self.name!r}."
+        )
         log_file: Path = self.pointer() / f"{self.run_id}.log"
         log_file.write_text(
             json.dumps(

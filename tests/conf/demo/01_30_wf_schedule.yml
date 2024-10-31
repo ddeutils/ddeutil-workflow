@@ -49,8 +49,9 @@ wf-scheduling-common:
   jobs:
     condition-job:
       stages:
-        - name: "Empty stage"
-        - name: "Call-out"
+        - name: "Empty Stage"
+        - name: "Call Out"
+          id: "call-out"
           echo: "Hello ${{ params.asat-dt | fmt('%Y-%m-%d') }}"
 
 

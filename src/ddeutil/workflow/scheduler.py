@@ -451,6 +451,7 @@ class Workflow(BaseModel):
                 "run_id": rs.run_id,
             }
         )
+
         # NOTE: Saving execution result to destination of the input log object.
         rs_log.save(excluded=None)
 
