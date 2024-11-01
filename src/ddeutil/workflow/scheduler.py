@@ -343,7 +343,7 @@ class Workflow(BaseModel):
         *,
         waiting_sec: int = 60,
         sleep_interval: int = 15,
-        log: Log = None,
+        log: type[Log] = None,
     ) -> Result:
         """Start running workflow with the on schedule in period of 30 minutes.
         That mean it will still running at background 30 minutes until the
@@ -361,11 +361,11 @@ class Workflow(BaseModel):
         :param waiting_sec: A second period value that allow workflow execute.
         :param sleep_interval: A second value that want to waiting until time
             to execute.
-        :param log: A log object that want to save execution result.
+        :param log: A log class that want to save the execution result.
 
         :rtype: Result
         """
-        log: Log = log or FileLog
+        log: type[Log] = log or FileLog
         logger.debug(
             f"({self.run_id}) [CORE]: {self.name!r}: {runner.cron} : run with "
             f"queue id: {id(queue)}"
@@ -479,6 +479,7 @@ class Workflow(BaseModel):
     def poke(
         self,
         start_date: datetime | None = None,
+        end_date: datetime | None = None,
         params: DictData | None = None,
         *,
         log: Log | None = None,
@@ -489,6 +490,7 @@ class Workflow(BaseModel):
         ``self.release()`` method.
 
         :param start_date: A start datetime object.
+        :param end_date: A end datetime object.
         :param params: A parameters that want to pass to the release method.
         :param log: A log object that want to use on this poking process.
 
@@ -501,6 +503,10 @@ class Workflow(BaseModel):
         # NOTE: If this workflow does not set the on schedule, it will return
         #   empty result.
         if len(self.on) == 0:
+            logger.info(
+                f"({self.run_id}) [POKING]: {self.name!r} does not have any "
+                f"schedule to run."
+            )
             return []
 
         params: DictData = params or {}
@@ -510,20 +516,30 @@ class Workflow(BaseModel):
         start_date: datetime = start_date or datetime.now(tz=config.tz).replace(
             second=0, microsecond=0
         ) + timedelta(seconds=1)
+        end_date: datetime = end_date or start_date + timedelta(days=1)
+
+        if end_date <= start_date:
+            raise WorkflowException(
+                "end_date of poking should not less or equal than start date."
+            )
+
+        runners: list[CronRunner] = [
+            runner
+            for on in self.on
+            if (runner := on.next(start_date)).date <= end_date
+        ]
 
         with ThreadPoolExecutor(
             max_workers=config.max_poking_pool_worker,
-            thread_name_prefix="wf_poking_",
+            thread_name_prefix="workflow_poking_",
         ) as executor:
 
             futures: list[Future] = []
 
-            # NOTE: For-loop the on values that exists in this workflow object.
-            for on in self.on:
+            # NOTE: For-loop the on values that exists in this workflow
+            #   object.
+            for runner in runners:
 
-                # NOTE: Shift crontab runner to next running date from the
-                #   current start date.
-                runner: CronRunner = on.next(start_date)
                 futures.append(
                     executor.submit(
                         self.release,
@@ -535,12 +551,12 @@ class Workflow(BaseModel):
                 )
 
                 # NOTE: Delay release date because it run so fast and making
-                #   queue object can not handle release date that will duplicate
-                #   by the cron runner object.
+                #   queue object can not handle release date that will
+                #   duplicate by the cron runner object.
                 delay(second=0.15)
 
-            # WARNING: This poking method does not allow to use fail-fast logic
-            #   to catching parallel execution result.
+            # WARNING: This poking method does not allow to use fail-fast
+            #   logic to catching parallel execution result.
             for future in as_completed(futures):
                 results.append(future.result(timeout=60))
 

@@ -10,6 +10,7 @@ def test_workflow_release():
     workflow: Workflow = Workflow.from_loader(name="wf-scheduling-common")
     current_date: datetime = datetime.now().replace(second=0, microsecond=0)
     queue: list[datetime] = [workflow.on[0].generate(current_date).next]
+
     rs: Result = workflow.release(
         workflow.on[0].next(current_date),
         params={"asat-dt": datetime(2024, 10, 1)},

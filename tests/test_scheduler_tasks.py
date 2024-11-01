@@ -1,6 +1,5 @@
 from datetime import datetime
 from unittest import mock
-from zoneinfo import ZoneInfo
 
 from ddeutil.workflow.conf import Config
 from ddeutil.workflow.scheduler import Schedule, Workflow, WorkflowTaskData
@@ -67,17 +66,13 @@ def test_schedule_tasks_release():
 @mock.patch.object(Config, "enable_write_log", False)
 def test_schedule_tasks_release_skip():
     schedule = Schedule.from_loader("schedule-common-wf")
-    queue: dict[str, list[datetime]] = {"wf-scheduling": []}
+    queue: dict[str, list[datetime]] = {}
 
     for wf_task in schedule.tasks(
         datetime(2024, 1, 1, 1),
         queue=queue,
     ):
         assert wf_task.workflow.name == "wf-scheduling"
-        wf_task.release(waiting_sec=0)
+        wf_task.release(queue=queue, waiting_sec=0)
 
-    assert queue == {
-        "wf-scheduling": [
-            datetime(2024, 1, 1, 1, tzinfo=ZoneInfo("Asia/Bangkok")),
-        ]
-    }
+    assert queue == {"wf-scheduling": []}
