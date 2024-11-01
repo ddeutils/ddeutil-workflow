@@ -2,7 +2,7 @@ from datetime import datetime
 from unittest import mock
 
 from ddeutil.workflow import Workflow
-from ddeutil.workflow.conf import Config
+from ddeutil.workflow.conf import Config, config
 from ddeutil.workflow.utils import Result
 
 
@@ -51,7 +51,7 @@ def test_workflow_poke_with_start_date():
 
     # NOTE: Poking with specific start datetime.
     results: list[Result] = workflow.poke(
-        start_date=datetime(2024, 1, 1, 0),
+        start_date=datetime(2024, 1, 1, 0, tzinfo=config.tz),
         params={"name": "FOO"},
     )
     for rs in results:

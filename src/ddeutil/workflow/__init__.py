@@ -24,7 +24,6 @@ from .on import (
 from .scheduler import (
     Schedule,
     ScheduleWorkflow,
-    Workflow,
     WorkflowTaskData,
 )
 from .stage import (
@@ -69,4 +68,7 @@ from .utils import (
     queue2str,
     str2template,
     tag,
+)
+from .workflow import (
+    Workflow,
 )
