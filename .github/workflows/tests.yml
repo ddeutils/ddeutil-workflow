@@ -44,7 +44,7 @@ jobs:
           allow-prereleases: true
 
       - name: Set up Pre-release Python with no GIL
-        uses: deadsnakes/action@v3.1.0
+        uses: deadsnakes/action@v3.2.0
         if: "endsWith(matrix.python-version, '-dev')"
         with:
           python-version: ${{ matrix.python-version }}
