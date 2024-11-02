@@ -2,7 +2,8 @@ from datetime import datetime
 from unittest import mock
 
 from ddeutil.workflow.conf import Config
-from ddeutil.workflow.scheduler import Schedule, Workflow, WorkflowTaskData
+from ddeutil.workflow.scheduler import Schedule
+from ddeutil.workflow.workflow import Workflow, WorkflowTaskData
 
 
 def test_workflow_task_data():

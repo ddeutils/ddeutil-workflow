@@ -15,7 +15,10 @@ from .exceptions import (
     UtilException,
     WorkflowException,
 )
-from .job import Job, Strategy
+from .job import (
+    Job,
+    Strategy,
+)
 from .on import (
     On,
     YearOn,
@@ -24,7 +27,6 @@ from .on import (
 from .scheduler import (
     Schedule,
     ScheduleWorkflow,
-    WorkflowTaskData,
 )
 from .stage import (
     BashStage,
@@ -71,4 +73,5 @@ from .utils import (
 )
 from .workflow import (
     Workflow,
+    WorkflowTaskData,
 )

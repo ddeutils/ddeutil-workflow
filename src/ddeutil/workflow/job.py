@@ -367,8 +367,6 @@ class Job(BaseModel):
         # NOTE: If the job ID did not set, it will use index of jobs key
         #   instead.
         _id: str = self.id or str(len(to["jobs"]) + 1)
-
-        logger.debug(f"Set outputs to: {_id!r}")
         to["jobs"][_id] = (
             {"strategies": output}
             if self.strategy.is_set()

@@ -121,7 +121,7 @@ def handler_result(message: str | None = None) -> DecoratorResult:
         def wrapped(self: Stage, *args, **kwargs):
 
             if not (run_id := kwargs.get("run_id")):
-                run_id = gen_id(self.name + (self.id or ""), unique=True)
+                run_id: str = gen_id(self.name + (self.id or ""), unique=True)
                 kwargs["run_id"] = run_id
 
             try:
@@ -153,7 +153,8 @@ def handler_result(message: str | None = None) -> DecoratorResult:
                         "error": err,
                         "error_message": f"{err.__class__.__name__}: {err}",
                     },
-                ).set_run_id(run_id)
+                    run_id=run_id,
+                )
 
         return wrapped
 
@@ -238,7 +239,7 @@ class BaseStage(BaseModel, ABC):
         :rtype: DictData
         """
         if self.id is None and not config.stage_default_id:
-            logger.debug(
+            logger.warning(
                 "Output does not set because this stage does not set ID or "
                 "default stage ID config flag not be True."
             )
@@ -256,7 +257,6 @@ class BaseStage(BaseModel, ABC):
         )
 
         # NOTE: Set the output to that stage generated ID with ``outputs`` key.
-        logger.debug(f"Set outputs to {_id!r}")
         to["stages"][_id] = {"outputs": output}
         return to
 
@@ -328,7 +328,7 @@ class EmptyStage(BaseStage):
         )
         if self.sleep > 0:
             time.sleep(self.sleep)
-        return Result(status=0, context={}).set_run_id(run_id)
+        return Result(status=0, context={}, run_id=run_id)
 
 
 class BashStage(BaseStage):
@@ -376,6 +376,9 @@ class BashStage(BaseStage):
         run_id: str = run_id or uuid.uuid4()
         f_name: str = f"{run_id}.sh"
         f_shebang: str = "bash" if sys.platform.startswith("win") else "sh"
+
+        logger.debug(f"({run_id}) [STAGE]: Start create `{f_name}` file.")
+
         with open(f"./{f_name}", mode="w", newline="\n") as f:
             # NOTE: write header of `.sh` file
             f.write(f"#!/bin/{f_shebang}\n\n")
@@ -388,11 +391,6 @@ class BashStage(BaseStage):
 
         # NOTE: Make this .sh file able to executable.
         make_exec(f"./{f_name}")
-
-        logger.debug(
-            f"({f_name}) [STAGE]: Start create `.sh` file and running a "
-            f"bash statement."
-        )
 
         yield [f_shebang, f_name]
 
@@ -410,10 +408,11 @@ class BashStage(BaseStage):
         :rtype: Result
         """
         bash: str = param2template(dedent(self.bash), params)
+
+        logger.info(f"({run_id}) [STAGE]: Shell-Execute: {self.name}")
         with self.prepare_bash(
-            bash=bash, env=param2template(self.env, params)
+            bash=bash, env=param2template(self.env, params), run_id=run_id
         ) as sh:
-            logger.info(f"({run_id}) [STAGE]: Shell-Execute: {sh}")
             rs: CompletedProcess = subprocess.run(
                 sh, shell=False, capture_output=True, text=True
             )
@@ -435,7 +434,8 @@ class BashStage(BaseStage):
                 "stdout": rs.stdout.rstrip("\n") or None,
                 "stderr": rs.stderr.rstrip("\n") or None,
             },
-        ).set_run_id(run_id)
+            run_id=run_id,
+        )
 
 
 class PyStage(BaseStage):
@@ -524,7 +524,8 @@ class PyStage(BaseStage):
         return Result(
             status=0,
             context={"locals": lc, "globals": _globals},
-        ).set_run_id(run_id)
+            run_id=run_id,
+        )
 
 
 @dataclass(frozen=True)
@@ -651,7 +652,7 @@ class HookStage(BaseStage):
                 f"Return type: '{t_func.name}@{t_func.tag}' does not serialize "
                 f"to result model, you change return type to `dict`."
             )
-        return Result(status=0, context=rs).set_run_id(run_id)
+        return Result(status=0, context=rs, run_id=run_id)
 
 
 class TriggerStage(BaseStage):
@@ -695,12 +696,11 @@ class TriggerStage(BaseStage):
 
         # NOTE: Set running workflow ID from running stage ID to external
         #   params on Loader object.
-        wf: Workflow = Workflow.from_loader(
-            name=_trigger, externals={"run_id": run_id}
-        )
+        wf: Workflow = Workflow.from_loader(name=_trigger)
         logger.info(f"({run_id}) [STAGE]: Trigger-Execute: {_trigger!r}")
         return wf.execute(
-            params=param2template(self.params, params)
+            params=param2template(self.params, params),
+            run_id=run_id,
         ).set_run_id(run_id)
 
 

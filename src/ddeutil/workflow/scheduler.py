@@ -31,13 +31,11 @@ from concurrent.futures import (
 )
 from datetime import datetime, timedelta
 from functools import wraps
-from heapq import heappush
 from textwrap import dedent
 from threading import Thread
 from typing import Callable, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
-from pydantic.dataclasses import dataclass
+from pydantic import BaseModel, Field
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
@@ -53,19 +51,15 @@ except ImportError:  # pragma: no cov
 
 from .__cron import CronRunner
 from .__types import DictData, TupleStr
-from .conf import FileLog, Loader, Log, config, get_logger
+from .conf import Loader, config, get_logger
 from .exceptions import WorkflowException
 from .on import On
 from .utils import (
-    Result,
     batch,
     delay,
-    gen_id,
-    get_diff_sec,
-    param2template,
     queue2str,
 )
-from .workflow import Workflow
+from .workflow import Workflow, WorkflowTaskData
 
 P = ParamSpec("P")
 logger = get_logger("ddeutil.workflow")
@@ -75,7 +69,6 @@ logging.getLogger("schedule").setLevel(logging.INFO)
 
 
 __all__: TupleStr = (
-    "WorkflowTaskData",
     "Schedule",
     "ScheduleWorkflow",
     "workflow_task_release",
@@ -316,150 +309,6 @@ def catch_exceptions(cancel_on_failure: bool = False) -> DecoratorCancelJob:
     return decorator
 
 
-@dataclass(config=ConfigDict(arbitrary_types_allowed=True))
-class WorkflowTaskData:
-    """Workflow task dataclass that use to keep mapping data and objects for
-    passing in multithreading task.
-
-        This dataclass will be 1-1 mapping with workflow and cron runner
-    objects.
-    """
-
-    alias: str
-    workflow: Workflow
-    runner: CronRunner
-    params: DictData
-
-    @catch_exceptions(cancel_on_failure=True)
-    def release(
-        self,
-        queue: dict[str, list[datetime]],
-        log: Log | None = None,
-        run_id: str | None = None,
-        *,
-        waiting_sec: int = 60,
-        sleep_interval: int = 15,
-    ) -> None:  # pragma: no cov
-        """Workflow task release that use the same logic of `workflow.release`
-        method.
-
-        :param queue:
-        :param log: A log object for saving result logging from workflow
-            execution process.
-        :param run_id: A workflow running ID for this release.
-        :param waiting_sec: A second period value that allow workflow execute.
-        :param sleep_interval: A second value that want to waiting until time
-            to execute.
-        """
-        log: Log = log or FileLog
-        run_id: str = run_id or gen_id(self.workflow.name, unique=True)
-        runner: CronRunner = self.runner
-
-        # NOTE: get next schedule time that generate from now.
-        next_time: datetime = runner.date
-
-        # NOTE: get next utils it does not running.
-        while log.is_pointed(self.workflow.name, next_time) or (
-            next_time in queue[self.alias]
-        ):
-            next_time: datetime = runner.next
-
-        logger.debug(
-            f"({run_id}) [CORE]: {self.workflow.name!r} : {runner.cron} : "
-            f"{next_time:%Y-%m-%d %H:%M:%S}"
-        )
-        heappush(queue[self.alias], next_time)
-        start_sec: float = time.monotonic()
-
-        if get_diff_sec(next_time, tz=runner.tz) > waiting_sec:
-            logger.debug(
-                f"({run_id}) [CORE]: {self.workflow.name!r} : {runner.cron} "
-                f": Does not closely >> {next_time:%Y-%m-%d %H:%M:%S}"
-            )
-
-            # NOTE: Add this next running datetime that not in period to queue
-            #   and remove it to running.
-            queue[self.alias].remove(next_time)
-
-            time.sleep(0.2)
-            return
-
-        logger.debug(
-            f"({run_id}) [CORE]: {self.workflow.name!r} : {runner.cron} : "
-            f"Closely to run >> {next_time:%Y-%m-%d %H:%M:%S}"
-        )
-
-        # NOTE: Release when the time is nearly to schedule time.
-        while (duration := get_diff_sec(next_time, tz=config.tz)) > (
-            sleep_interval + 5
-        ):
-            logger.debug(
-                f"({run_id}) [CORE]: {self.workflow.name!r} : {runner.cron} "
-                f": Sleep until: {duration}"
-            )
-            time.sleep(15)
-
-        time.sleep(0.5)
-
-        # NOTE: Release parameter that use to change if params has
-        #   templating.
-        release_params: DictData = {
-            "release": {
-                "logical_date": next_time,
-            },
-        }
-
-        # WARNING: Re-create workflow object that use new running workflow ID.
-        rs: Result = self.workflow.execute(
-            params=param2template(self.params, release_params),
-        )
-        logger.debug(
-            f"({run_id}) [CORE]: {self.workflow.name!r} : {runner.cron} : "
-            f"End release - {next_time:%Y-%m-%d %H:%M:%S}"
-        )
-
-        # NOTE: Set parent ID on this result.
-        rs.set_parent_run_id(run_id)
-
-        # NOTE: Save result to log object saving.
-        rs_log: Log = log.model_validate(
-            {
-                "name": self.workflow.name,
-                "on": str(runner.cron),
-                "release": next_time,
-                "context": rs.context,
-                "parent_run_id": rs.run_id,
-                "run_id": rs.run_id,
-            }
-        )
-        rs_log.save(excluded=None)
-
-        # NOTE: Remove the current release date from the running.
-        queue[self.alias].remove(next_time)
-        total_sec: float = time.monotonic() - start_sec
-
-        # IMPORTANT:
-        #   Add the next running datetime to workflow task queue.
-        future_running_time: datetime = runner.next
-
-        while (
-            future_running_time in queue[self.alias]
-            or (future_running_time - next_time).total_seconds() < total_sec
-        ):  # pragma: no cov
-            future_running_time: datetime = runner.next
-
-        # NOTE: Queue next release date.
-        logger.debug(f"[CORE]: {'-' * 100}")
-
-    def __eq__(self, other) -> bool:
-        if isinstance(other, WorkflowTaskData):
-            return (
-                self.workflow.name == other.workflow.name
-                and self.runner.cron == other.runner.cron
-            )
-        return NotImplemented
-
-
 @catch_exceptions(cancel_on_failure=True)  # pragma: no cov
 def workflow_task_release(
     workflow_tasks: list[WorkflowTaskData],
@@ -542,7 +391,7 @@ def workflow_task_release(
         )
 
         wf_thread: Thread = Thread(
-            target=task.release,
+            target=catch_exceptions(cancel_on_failure=True)(task.release),
             kwargs={
                 "queue": queue,
                 "running": running,

@@ -354,8 +354,8 @@ class Result:
     end_at: Optional[datetime] = field(default=None, compare=False)
 
     # NOTE: Ignore this field to compare another result model with __eq__.
-    _run_id: Optional[str] = field(default=None)
-    _parent_run_id: Optional[str] = field(default=None, compare=False)
+    run_id: Optional[str] = field(default=None)
+    parent_run_id: Optional[str] = field(default=None, compare=False)
 
     @model_validator(mode="after")
     def __prepare_run_id(self) -> Self:
@@ -373,7 +373,7 @@ class Result:
         :param running_id: A running ID that want to update on this model.
         :rtype: Self
         """
-        self._run_id = running_id
+        self.run_id = running_id
         return self
 
     def set_parent_run_id(self, running_id: str) -> Self:
@@ -382,16 +382,8 @@ class Result:
         :param running_id: A running ID that want to update on this model.
         :rtype: Self
         """
-        self._parent_run_id: str = running_id
+        self.parent_run_id: str = running_id
         return self
-
-    @property
-    def parent_run_id(self) -> str:
-        return self._parent_run_id
-
-    @property
-    def run_id(self) -> str:
-        return self._run_id
 
     def catch(self, status: int, context: DictData) -> Self:
         """Catch the status and context to current data."""
@@ -408,8 +400,8 @@ class Result:
         self.__dict__["context"].update(result.context)
 
         # NOTE: Update running ID from an incoming result.
-        self._parent_run_id = result.parent_run_id
-        self._run_id = result.run_id
+        self.parent_run_id = result.parent_run_id
+        self.run_id = result.run_id
         return self
 
     def receive_jobs(self, result: Result) -> Self:
@@ -427,8 +419,8 @@ class Result:
         self.__dict__["context"]["jobs"].update(result.context)
 
         # NOTE: Update running ID from an incoming result.
-        self._parent_run_id: str = result.parent_run_id
-        self._run_id: str = result.run_id
+        self.parent_run_id: str = result.parent_run_id
+        self.run_id: str = result.run_id
         return self
 
 
