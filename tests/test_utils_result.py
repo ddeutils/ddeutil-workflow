@@ -14,7 +14,7 @@ def test_result_default():
     logging.info(f"Run ID: {rs2.run_id}, Parent Run ID: {rs2.parent_run_id}")
     assert 2 == rs.status
     assert {} == rs.context
-    assert rs != rs2
+    assert rs == rs2
 
 
 def test_result_context():

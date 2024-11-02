@@ -614,7 +614,7 @@ class Workflow(BaseModel):
         # NOTE: I use this condition because this method allow passing empty
         #   params and I do not want to create new dict object.
         ts: float = time.monotonic()
-        rs: Result = Result()
+        rs: Result = Result(run_id=run_id)
 
         # NOTE: It should not do anything if it does not have job.
         if not self.jobs:

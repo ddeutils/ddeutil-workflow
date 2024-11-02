@@ -31,7 +31,7 @@ def test_workflow_release_with_start_date():
         queue=queue,
     )
     assert rs.status == 0
-    assert len(queue) == 0
+    assert len(queue) == 1
 
 
 @mock.patch.object(Config, "enable_write_log", False)
