@@ -5,7 +5,7 @@ from ddeutil.workflow.stage import Stage
 from ddeutil.workflow.utils import Result
 
 
-def test_stage_hook():
+def test_stage_exec_hook():
     workflow: Workflow = Workflow.from_loader(name="wf-hook-return-type")
     stage: Stage = workflow.job("second-job").stage("extract-load")
     rs: Result = stage.execute({})
@@ -14,7 +14,7 @@ def test_stage_hook():
     assert {"records": 1} == rs.context
 
 
-def test_stage_hook_raise_return_type():
+def test_stage_exec_hook_raise_return_type():
     workflow: Workflow = Workflow.from_loader(name="wf-hook-return-type")
     stage: Stage = workflow.job("first-job").stage("valid-type")
 
@@ -22,7 +22,7 @@ def test_stage_hook_raise_return_type():
         stage.execute({})
 
 
-def test_stage_hook_raise_args():
+def test_stage_exec_hook_raise_args():
     workflow: Workflow = Workflow.from_loader(name="wf-hook-return-type")
     stage: Stage = workflow.job("first-job").stage("args-necessary")
 
@@ -30,7 +30,7 @@ def test_stage_hook_raise_args():
         stage.execute({})
 
 
-def test_stage_hook_not_valid():
+def test_stage_exec_hook_not_valid():
     workflow: Workflow = Workflow.from_loader(name="wf-hook-return-type")
     stage: Stage = workflow.job("first-job").stage("hook-not-valid")
 
@@ -38,7 +38,7 @@ def test_stage_hook_not_valid():
         stage.execute({})
 
 
-def test_stage_hook_not_register():
+def test_stage_exec_hook_not_register():
     workflow: Workflow = Workflow.from_loader(name="wf-hook-return-type")
     stage: Stage = workflow.job("first-job").stage("hook-not-register")
 

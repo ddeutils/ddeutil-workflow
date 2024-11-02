@@ -7,8 +7,8 @@ from ddeutil.core import getdot
 from ddeutil.workflow.conf import Config
 from ddeutil.workflow.exceptions import JobException, StageException
 from ddeutil.workflow.job import Job
-from ddeutil.workflow.scheduler import Workflow
 from ddeutil.workflow.utils import Result
+from ddeutil.workflow.workflow import Workflow
 
 
 def test_job_exec_strategy_raise():

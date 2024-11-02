@@ -10,18 +10,14 @@ def test_stage():
     stage: Stage = EmptyStage.model_validate(
         {"name": "Empty Stage", "echo": "hello world"}
     )
-    new_stage: Stage = stage.model_copy(update={"run_id": "dummy"})
-    assert "dummy" == new_stage.run_id
+    new_stage: Stage = stage.model_copy(update={"id": "stage-empty"})
     assert id(stage) != id(new_stage)
-
-    stage.run_id = "demo"
-    assert "demo" == stage.run_id
 
     # NOTE: Passing run_id directly to a Stage object.
     stage: Stage = EmptyStage.model_validate(
-        {"run_id": "dummy", "name": "Empty Stage", "echo": "hello world"}
+        {"id": "dummy", "name": "Empty Stage", "echo": "hello world"}
     )
-    assert stage.run_id == "dummy"
+    assert stage.id == "dummy"
 
 
 def test_stage_empty_execute():

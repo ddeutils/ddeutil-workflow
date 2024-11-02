@@ -3,24 +3,19 @@ from unittest import mock
 import pytest
 from ddeutil.workflow import Config, Job
 from ddeutil.workflow.exceptions import JobException
-from ddeutil.workflow.scheduler import Workflow
+from ddeutil.workflow.workflow import Workflow
 from pydantic import ValidationError
 
 
 def test_job():
     job = Job()
-    job.run_id = "demo"
-    assert "demo" == job.run_id
     assert "all_success" == job.trigger_rule
 
     job = Job(desc="\t# Desc\n\tThis is a demo job.")
     assert job.desc == "# Desc\nThis is a demo job."
 
     job = Job(id="final-job")
-    assert job.run_id is not None
-
-    job = Job(id="final-job", run_id="some-id")
-    assert job.run_id == "some-id"
+    assert job.id == "final-job"
 
 
 def test_job_stage_id_not_dup():

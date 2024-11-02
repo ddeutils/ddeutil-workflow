@@ -10,7 +10,7 @@ from ddeutil.workflow.stage import Stage
 from ddeutil.workflow.utils import Result
 
 
-def test_stage_py_raise():
+def test_stage_exec_py_raise():
     with mock.patch.object(Config, "stage_raise_error", True):
         workflow: Workflow = Workflow.from_loader(name="wf-run-common")
         stage: Stage = workflow.job("raise-run").stage(stage_id="raise-error")
@@ -18,7 +18,7 @@ def test_stage_py_raise():
             stage.execute(params={"x": "Foo"})
 
 
-def test_stage_py_not_raise():
+def test_stage_exec_py_not_raise():
     with mock.patch.object(Config, "stage_raise_error", False):
         workflow: Workflow = Workflow.from_loader(name="wf-run-common")
         stage: Stage = workflow.job("raise-run").stage(stage_id="raise-error")
@@ -55,7 +55,7 @@ def test_stage_py_not_raise():
         }
 
 
-def test_stage_py_with_vars():
+def test_stage_exec_py_with_vars():
     workflow: Workflow = Workflow.from_loader(name="wf-run-common")
     stage: Stage = workflow.job("demo-run").stage(stage_id="run-var")
     assert stage.id == "run-var"
@@ -74,7 +74,7 @@ def test_stage_py_with_vars():
     } == rs_out
 
 
-def test_stage_py_func():
+def test_stage_exec_py_func():
     workflow: Workflow = Workflow.from_loader(name="wf-run-python")
     stage: Stage = workflow.job("second-job").stage(stage_id="create-func")
     rs: Result = stage.execute(params={})

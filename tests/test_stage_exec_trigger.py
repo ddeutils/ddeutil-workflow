@@ -6,7 +6,7 @@ from ddeutil.core import getdot
 from ddeutil.workflow.utils import Result
 
 
-def test_stage_trigger():
+def test_stage_exec_trigger():
     workflow = wf.Workflow.from_loader(name="wf-trigger", externals={})
     stage: st.Stage = workflow.job("trigger-job").stage(
         stage_id="trigger-stage"
@@ -19,7 +19,7 @@ def test_stage_trigger():
     } == rs.context["params"]
 
 
-def test_workflow_trigger():
+def test_stage_exec_trigger_from_workflow():
     workflow = wf.Workflow.from_loader(name="wf-trigger", externals={})
     rs: Result = workflow.execute(params={})
     assert {

@@ -213,7 +213,7 @@ class BaseStage(BaseModel, ABC):
         return self.model_copy(update={"run_id": run_id})
 
     @abstractmethod
-    def execute(self, params: DictData, *, run_id: str | None) -> Result:
+    def execute(self, params: DictData, *, run_id: str | None = None) -> Result:
         """Execute abstraction method that action something by sub-model class.
         This is important method that make this class is able to be the stage.
 
@@ -316,7 +316,8 @@ class EmptyStage(BaseStage):
         ge=0,
     )
 
-    def execute(self, params: DictData, *, run_id: str | None) -> Result:
+    @handler_result()
+    def execute(self, params: DictData, *, run_id: str | None = None) -> Result:
         """Execution method for the Empty stage that do only logging out to
         stdout. This method does not use the `handler_result` decorator because
         it does not get any error from logging function.
@@ -408,7 +409,7 @@ class BashStage(BaseStage):
         Path(f"./{f_name}").unlink()
 
     @handler_result()
-    def execute(self, params: DictData, *, run_id: str | None) -> Result:
+    def execute(self, params: DictData, *, run_id: str | None = None) -> Result:
         """Execute the Bash statement with the Python build-in ``subprocess``
         package.
 
@@ -507,7 +508,7 @@ class PyStage(BaseStage):
         return to
 
     @handler_result()
-    def execute(self, params: DictData, *, run_id: str | None) -> Result:
+    def execute(self, params: DictData, *, run_id: str | None = None) -> Result:
         """Execute the Python statement that pass all globals and input params
         to globals argument on ``exec`` build-in function.
 
@@ -611,7 +612,7 @@ class HookStage(BaseStage):
     )
 
     @handler_result()
-    def execute(self, params: DictData, *, run_id: str | None) -> Result:
+    def execute(self, params: DictData, *, run_id: str | None = None) -> Result:
         """Execute the Hook function that already in the hook registry.
 
         :raise ValueError: When the necessary arguments of hook function do not
@@ -686,7 +687,7 @@ class TriggerStage(BaseStage):
     )
 
     @handler_result("Raise from TriggerStage")
-    def execute(self, params: DictData, *, run_id: str | None) -> Result:
+    def execute(self, params: DictData, *, run_id: str | None = None) -> Result:
         """Trigger another workflow execution. It will waiting the trigger
         workflow running complete before catching its result.
 
