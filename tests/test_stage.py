@@ -10,6 +10,8 @@ def test_stage():
     stage: Stage = EmptyStage.model_validate(
         {"name": "Empty Stage", "echo": "hello world"}
     )
+    assert stage.iden == "Empty Stage"
+
     new_stage: Stage = stage.model_copy(update={"id": "stage-empty"})
     assert id(stage) != id(new_stage)
 
@@ -18,6 +20,7 @@ def test_stage():
         {"id": "dummy", "name": "Empty Stage", "echo": "hello world"}
     )
     assert stage.id == "dummy"
+    assert stage.iden == "dummy"
 
 
 def test_stage_empty_execute():

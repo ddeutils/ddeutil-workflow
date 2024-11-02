@@ -183,6 +183,15 @@ class BaseStage(BaseModel, ABC):
         alias="if",
     )
 
+    @property
+    def iden(self) -> str:
+        """Return identity of this stage object that return the id field first.
+        If the id does not set, it will use name field instead.
+
+        :rtype: str
+        """
+        return self.id or self.name
+
     @model_validator(mode="after")
     def __prepare_running_id__(self) -> Self:
         """Prepare stage running ID that use default value of field and this

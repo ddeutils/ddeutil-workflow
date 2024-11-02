@@ -378,8 +378,8 @@ class Job(BaseModel):
         self,
         strategy: DictData,
         params: DictData,
-        *,
         run_id: str | None = None,
+        *,
         event: Event | None = None,
     ) -> Result:
         """Job Strategy execution with passing dynamic parameters from the
@@ -420,13 +420,13 @@ class Job(BaseModel):
         # IMPORTANT: The stage execution only run sequentially one-by-one.
         for stage in self.stages:
 
-            name: str = stage.id or stage.name
-
             if stage.is_skipped(params=context):
-                logger.info(f"({run_id}) [JOB]: Skip stage: {name!r}")
+                logger.info(f"({run_id}) [JOB]: Skip stage: {stage.iden!r}")
                 continue
 
-            logger.info(f"({run_id}) [JOB]: Start execute the stage: {name!r}")
+            logger.info(
+                f"({run_id}) [JOB]: Start execute the stage: {stage.iden!r}"
+            )
 
             # NOTE: Logging a matrix that pass on this stage execution.
             if strategy:
@@ -455,7 +455,8 @@ class Job(BaseModel):
                             ),
                         },
                     },
-                ).set_run_id(run_id)
+                    run_id=run_id,
+                )
 
             # PARAGRAPH:
             #
@@ -499,7 +500,8 @@ class Job(BaseModel):
                             "error_message": f"{err.__class__.__name__}: {err}",
                         },
                     },
-                ).set_run_id(run_id)
+                    run_id=run_id,
+                )
 
             # NOTE: Remove the current stage object.
             del stage
@@ -512,7 +514,8 @@ class Job(BaseModel):
                     "stages": filter_func(context.pop("stages", {})),
                 },
             },
-        ).set_run_id(run_id)
+            run_id=run_id,
+        )
 
     def execute(self, params: DictData, run_id: str | None = None) -> Result:
         """Job execution with passing dynamic parameters from the workflow
