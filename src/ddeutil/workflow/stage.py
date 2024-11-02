@@ -119,13 +119,18 @@ def handler_result(message: str | None = None) -> DecoratorResult:
 
         @wraps(func)
         def wrapped(self: Stage, *args, **kwargs):
+
+            if not (run_id := kwargs.get("run_id")):
+                run_id = gen_id(self.name + (self.id or ""), unique=True)
+                kwargs["run_id"] = run_id
+
             try:
                 # NOTE: Start calling origin function with a passing args.
-                return func(self, *args, **kwargs).set_run_id(self.run_id)
+                return func(self, *args, **kwargs)
             except Exception as err:
                 # NOTE: Start catching error from the stage execution.
                 logger.error(
-                    f"({self.run_id}) [STAGE]: {err.__class__.__name__}: {err}"
+                    f"({run_id}) [STAGE]: {err.__class__.__name__}: {err}"
                 )
                 if config.stage_raise_error:
                     # NOTE: If error that raise from stage execution course by
@@ -148,7 +153,7 @@ def handler_result(message: str | None = None) -> DecoratorResult:
                         "error": err,
                         "error_message": f"{err.__class__.__name__}: {err}",
                     },
-                ).set_run_id(self.run_id)
+                ).set_run_id(run_id)
 
         return wrapped
 
@@ -176,12 +181,6 @@ class BaseStage(BaseModel, ABC):
         description="A stage condition statement to allow stage executable.",
         alias="if",
     )
-    run_id: Optional[str] = Field(
-        default=None,
-        description="A running stage ID.",
-        repr=False,
-        exclude=True,
-    )
 
     @model_validator(mode="after")
     def __prepare_running_id__(self) -> Self:
@@ -194,8 +193,6 @@ class BaseStage(BaseModel, ABC):
 
         :rtype: Self
         """
-        if self.run_id is None:
-            self.run_id = gen_id(self.name + (self.id or ""), unique=True)
 
         # VALIDATE: Validate stage id and name should not dynamic with params
         #   template. (allow only matrix)
@@ -216,11 +213,13 @@ class BaseStage(BaseModel, ABC):
         return self.model_copy(update={"run_id": run_id})
 
     @abstractmethod
-    def execute(self, params: DictData) -> Result:
+    def execute(self, params: DictData, *, run_id: str | None) -> Result:
         """Execute abstraction method that action something by sub-model class.
         This is important method that make this class is able to be the stage.
 
         :param params: A parameter data that want to use in this execution.
+        :param run_id: A running stage ID for this execution.
+
         :rtype: Result
         """
         raise NotImplementedError("Stage should implement ``execute`` method.")
@@ -249,9 +248,8 @@ class BaseStage(BaseModel, ABC):
         """
         if self.id is None and not config.stage_default_id:
             logger.debug(
-                f"({self.run_id}) [STAGE]: Output does not set because this "
-                f"stage does not set ID or default stage ID config flag not be "
-                f"True."
+                "Output does not set because this stage does not set ID or "
+                "default stage ID config flag not be True."
             )
             return to
 
@@ -267,7 +265,7 @@ class BaseStage(BaseModel, ABC):
         )
 
         # NOTE: Set the output to that stage generated ID with ``outputs`` key.
-        logger.debug(f"({self.run_id}) [STAGE]: Set outputs to {_id!r}")
+        logger.debug(f"Set outputs to {_id!r}")
         to["stages"][_id] = {"outputs": output}
         return to
 
@@ -294,7 +292,6 @@ class BaseStage(BaseModel, ABC):
                 raise TypeError("Return type of condition does not be boolean")
             return not rs
         except Exception as err:
-            logger.error(f"({self.run_id}) [STAGE]: {err}")
             raise StageException(f"{err.__class__.__name__}: {err}") from err
 
 
@@ -319,7 +316,7 @@ class EmptyStage(BaseStage):
         ge=0,
     )
 
-    def execute(self, params: DictData) -> Result:
+    def execute(self, params: DictData, *, run_id: str | None) -> Result:
         """Execution method for the Empty stage that do only logging out to
         stdout. This method does not use the `handler_result` decorator because
         it does not get any error from logging function.
@@ -329,15 +326,17 @@ class EmptyStage(BaseStage):
 
         :param params: A context data that want to add output result. But this
             stage does not pass any output.
+        :param run_id: A running stage ID for this execution.
+
         :rtype: Result
         """
         logger.info(
-            f"({self.run_id}) [STAGE]: Empty-Execute: {self.name!r}: "
+            f"({run_id}) [STAGE]: Empty-Execute: {self.name!r}: "
             f"( {param2template(self.echo, params=params) or '...'} )"
         )
         if self.sleep > 0:
             time.sleep(self.sleep)
-        return Result(status=0, context={})
+        return Result(status=0, context={}).set_run_id(run_id)
 
 
 class BashStage(BaseStage):
@@ -369,16 +368,21 @@ class BashStage(BaseStage):
     )
 
     @contextlib.contextmanager
-    def prepare_bash(self, bash: str, env: DictStr) -> Iterator[TupleStr]:
+    def prepare_bash(
+        self, bash: str, env: DictStr, run_id: str | None = None
+    ) -> Iterator[TupleStr]:
         """Return context of prepared bash statement that want to execute. This
         step will write the `.sh` file before giving this file name to context.
         After that, it will auto delete this file automatic.
 
         :param bash: A bash statement that want to execute.
         :param env: An environment variable that use on this bash statement.
+        :param run_id: A running stage ID that use for writing sh file instead
+            generate by UUID4.
         :rtype: Iterator[TupleStr]
         """
-        f_name: str = f"{uuid.uuid4()}.sh"
+        run_id: str = run_id or uuid.uuid4()
+        f_name: str = f"{run_id}.sh"
         f_shebang: str = "bash" if sys.platform.startswith("win") else "sh"
         with open(f"./{f_name}", mode="w", newline="\n") as f:
             # NOTE: write header of `.sh` file
@@ -394,7 +398,7 @@ class BashStage(BaseStage):
         make_exec(f"./{f_name}")
 
         logger.debug(
-            f"({self.run_id}) [STAGE]: Start create `.sh` file and running a "
+            f"({f_name}) [STAGE]: Start create `.sh` file and running a "
             f"bash statement."
         )
 
@@ -404,18 +408,20 @@ class BashStage(BaseStage):
         Path(f"./{f_name}").unlink()
 
     @handler_result()
-    def execute(self, params: DictData) -> Result:
+    def execute(self, params: DictData, *, run_id: str | None) -> Result:
         """Execute the Bash statement with the Python build-in ``subprocess``
         package.
 
         :param params: A parameter data that want to use in this execution.
+        :param run_id: A running stage ID for this execution.
+
         :rtype: Result
         """
         bash: str = param2template(dedent(self.bash), params)
         with self.prepare_bash(
             bash=bash, env=param2template(self.env, params)
         ) as sh:
-            logger.info(f"({self.run_id}) [STAGE]: Shell-Execute: {sh}")
+            logger.info(f"({run_id}) [STAGE]: Shell-Execute: {sh}")
             rs: CompletedProcess = subprocess.run(
                 sh, shell=False, capture_output=True, text=True
             )
@@ -437,7 +443,7 @@ class BashStage(BaseStage):
                 "stdout": rs.stdout.rstrip("\n") or None,
                 "stderr": rs.stderr.rstrip("\n") or None,
             },
-        )
+        ).set_run_id(run_id)
 
 
 class PyStage(BaseStage):
@@ -501,11 +507,13 @@ class PyStage(BaseStage):
         return to
 
     @handler_result()
-    def execute(self, params: DictData) -> Result:
+    def execute(self, params: DictData, *, run_id: str | None) -> Result:
         """Execute the Python statement that pass all globals and input params
         to globals argument on ``exec`` build-in function.
 
         :param params: A parameter that want to pass before run any statement.
+        :param run_id: A running stage ID for this execution.
+
         :rtype: Result
         """
         # NOTE: Replace the run statement that has templating value.
@@ -518,13 +526,13 @@ class PyStage(BaseStage):
         lc: DictData = {}
 
         # NOTE: Start exec the run statement.
-        logger.info(f"({self.run_id}) [STAGE]: Py-Execute: {self.name}")
+        logger.info(f"({run_id}) [STAGE]: Py-Execute: {self.name}")
         exec(run, _globals, lc)
 
         return Result(
             status=0,
             context={"locals": lc, "globals": _globals},
-        )
+        ).set_run_id(run_id)
 
 
 @dataclass(frozen=True)
@@ -603,7 +611,7 @@ class HookStage(BaseStage):
     )
 
     @handler_result()
-    def execute(self, params: DictData) -> Result:
+    def execute(self, params: DictData, *, run_id: str | None) -> Result:
         """Execute the Hook function that already in the hook registry.
 
         :raise ValueError: When the necessary arguments of hook function do not
@@ -613,6 +621,9 @@ class HookStage(BaseStage):
 
         :param params: A parameter that want to pass before run any statement.
         :type params: DictData
+        :param run_id: A running stage ID for this execution.
+        :type: str | None
+
         :rtype: Result
         """
         t_func_hook: str = param2template(self.uses, params)
@@ -637,7 +648,7 @@ class HookStage(BaseStage):
                 args[k] = args.pop(k.removeprefix("_"))
 
         logger.info(
-            f"({self.run_id}) [STAGE]: Hook-Execute: {t_func.name}@{t_func.tag}"
+            f"({run_id}) [STAGE]: Hook-Execute: {t_func.name}@{t_func.tag}"
         )
         rs: DictData = t_func(**param2template(args, params))
 
@@ -648,7 +659,7 @@ class HookStage(BaseStage):
                 f"Return type: '{t_func.name}@{t_func.tag}' does not serialize "
                 f"to result model, you change return type to `dict`."
             )
-        return Result(status=0, context=rs)
+        return Result(status=0, context=rs).set_run_id(run_id)
 
 
 class TriggerStage(BaseStage):
@@ -675,11 +686,13 @@ class TriggerStage(BaseStage):
     )
 
     @handler_result("Raise from TriggerStage")
-    def execute(self, params: DictData) -> Result:
+    def execute(self, params: DictData, *, run_id: str | None) -> Result:
         """Trigger another workflow execution. It will waiting the trigger
         workflow running complete before catching its result.
 
         :param params: A parameter data that want to use in this execution.
+        :param run_id: A running stage ID for this execution.
+
         :rtype: Result
         """
         # NOTE: Lazy import this workflow object.
@@ -691,10 +704,12 @@ class TriggerStage(BaseStage):
         # NOTE: Set running workflow ID from running stage ID to external
         #   params on Loader object.
         wf: Workflow = Workflow.from_loader(
-            name=_trigger, externals={"run_id": self.run_id}
+            name=_trigger, externals={"run_id": run_id}
         )
-        logger.info(f"({self.run_id}) [STAGE]: Trigger-Execute: {_trigger!r}")
-        return wf.execute(params=param2template(self.params, params))
+        logger.info(f"({run_id}) [STAGE]: Trigger-Execute: {_trigger!r}")
+        return wf.execute(
+            params=param2template(self.params, params)
+        ).set_run_id(run_id)
 
 
 # NOTE:
