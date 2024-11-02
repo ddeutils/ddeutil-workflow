@@ -4,7 +4,7 @@ import ddeutil.workflow as wf
 import ddeutil.workflow.stage as st
 
 
-def test_workflow_stage_task():
+def test_workflow_exec_hook_from_stage():
     workflow = wf.Workflow.from_loader(
         name="ingest_csv_to_parquet",
         externals={},
@@ -23,7 +23,7 @@ def test_workflow_stage_task():
     assert {"records": 1} == rs.context
 
 
-def test_workflow_job_task():
+def test_workflow_exec_hook_from_job():
     workflow = wf.Workflow.from_loader(
         name="ingest_csv_to_parquet",
         externals={},
@@ -46,7 +46,7 @@ def test_workflow_job_task():
     } == rs.context
 
 
-def test_workflow_task():
+def test_workflow_exec_hook():
     workflow = wf.Workflow.from_loader(
         name="ingest_csv_to_parquet",
         externals={},
@@ -78,7 +78,7 @@ def test_workflow_task():
     } == rs.context
 
 
-def test_pipe_task_with_prefix():
+def test_workflow_exec_hook_with_prefix():
     workflow = wf.Workflow.from_loader(name="pipe_hook_mssql_proc")
     rs = workflow.execute(
         params={

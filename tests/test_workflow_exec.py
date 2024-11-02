@@ -6,7 +6,7 @@ from ddeutil.workflow.conf import Config
 from ddeutil.workflow.utils import Result
 
 
-def test_workflow_run_py():
+def test_workflow_exec_py():
     workflow = Workflow.from_loader(name="wf-run-python")
     rs: Result = workflow.execute(
         params={
@@ -57,7 +57,7 @@ def test_workflow_run_py():
     } == rs.context
 
 
-def test_workflow_run_py_with_parallel():
+def test_workflow_exec_py_with_parallel():
     with mock.patch.object(Config, "max_job_parallel", 3):
         workflow = Workflow.from_loader(name="wf-run-python")
         rs: Result = workflow.execute(
@@ -109,7 +109,7 @@ def test_workflow_run_py_with_parallel():
         } == rs.context
 
 
-def test_workflow_run_py_raise():
+def test_workflow_exec_py_raise():
     workflow = Workflow.from_loader("wf-run-python-raise")
     rs = workflow.execute(params={})
     assert rs.status == 1
@@ -127,7 +127,7 @@ def test_workflow_run_py_raise():
 
 
 @mock.patch.object(Config, "max_job_parallel", 2)
-def test_workflow_run_py_raise_parallel():
+def test_workflow_exec_py_raise_parallel():
     workflow = Workflow.from_loader("wf-run-python-raise")
     rs = workflow.execute(params={})
     assert rs.status == 1
@@ -149,7 +149,7 @@ def test_workflow_run_py_raise_parallel():
     }
 
 
-def test_workflow_run_with_matrix():
+def test_workflow_exec_with_matrix():
     workflow: Workflow = Workflow.from_loader(name="wf-run-matrix")
     rs: Result = workflow.execute(params={"source": "src", "target": "tgt"})
     assert {

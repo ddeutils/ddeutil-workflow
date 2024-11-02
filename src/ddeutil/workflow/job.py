@@ -317,15 +317,6 @@ class Job(BaseModel):
 
         return self
 
-    def get_running_id(self, run_id: str) -> Self:
-        """Return Job model object that changing job running ID with an
-        input running ID.
-
-        :param run_id: A replace job running ID.
-        :rtype: Self
-        """
-        return self.model_copy(update={"run_id": run_id})
-
     def stage(self, stage_id: str) -> Stage:
         """Return stage model that match with an input stage ID.
 
@@ -512,8 +503,7 @@ class Job(BaseModel):
                     },
                 ).set_run_id(run_id)
 
-            # NOTE: Remove the current stage object that was created from
-            #   ``get_running_id`` method for saving memory.
+            # NOTE: Remove the current stage object.
             del stage
 
         return Result(

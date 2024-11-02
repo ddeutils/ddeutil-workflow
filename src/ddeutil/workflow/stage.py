@@ -203,15 +203,6 @@ class BaseStage(BaseModel, ABC):
 
         return self
 
-    def get_running_id(self, run_id: str) -> Self:
-        """Return Stage model object that changing stage running ID with an
-        input running ID.
-
-        :param run_id: A replace stage running ID.
-        :rtype: Self
-        """
-        return self.model_copy(update={"run_id": run_id})
-
     @abstractmethod
     def execute(self, params: DictData, *, run_id: str | None = None) -> Result:
         """Execute abstraction method that action something by sub-model class.

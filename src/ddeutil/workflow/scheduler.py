@@ -60,6 +60,7 @@ from .utils import (
     Result,
     batch,
     delay,
+    gen_id,
     get_diff_sec,
     param2template,
     queue2str,
@@ -334,6 +335,7 @@ class WorkflowTaskData:
         self,
         queue: dict[str, list[datetime]],
         log: Log | None = None,
+        run_id: str | None = None,
         *,
         waiting_sec: int = 60,
         sleep_interval: int = 15,
@@ -344,25 +346,26 @@ class WorkflowTaskData:
         :param queue:
         :param log: A log object for saving result logging from workflow
             execution process.
+        :param run_id: A workflow running ID for this release.
         :param waiting_sec: A second period value that allow workflow execute.
         :param sleep_interval: A second value that want to waiting until time
             to execute.
         """
         log: Log = log or FileLog
-        wf: Workflow = self.workflow
+        run_id: str = run_id or gen_id(self.workflow.name, unique=True)
         runner: CronRunner = self.runner
 
         # NOTE: get next schedule time that generate from now.
         next_time: datetime = runner.date
 
         # NOTE: get next utils it does not running.
-        while log.is_pointed(wf.name, next_time) or (
+        while log.is_pointed(self.workflow.name, next_time) or (
             next_time in queue[self.alias]
         ):
             next_time: datetime = runner.next
 
         logger.debug(
-            f"({wf.run_id}) [CORE]: {wf.name!r} : {runner.cron} : "
+            f"({run_id}) [CORE]: {self.workflow.name!r} : {runner.cron} : "
             f"{next_time:%Y-%m-%d %H:%M:%S}"
         )
         heappush(queue[self.alias], next_time)
@@ -370,7 +373,7 @@ class WorkflowTaskData:
 
         if get_diff_sec(next_time, tz=runner.tz) > waiting_sec:
             logger.debug(
-                f"({wf.run_id}) [CORE]: {wf.name!r} : {runner.cron} "
+                f"({run_id}) [CORE]: {self.workflow.name!r} : {runner.cron} "
                 f": Does not closely >> {next_time:%Y-%m-%d %H:%M:%S}"
             )
 
@@ -382,7 +385,7 @@ class WorkflowTaskData:
             return
 
         logger.debug(
-            f"({wf.run_id}) [CORE]: {wf.name!r} : {runner.cron} : "
+            f"({run_id}) [CORE]: {self.workflow.name!r} : {runner.cron} : "
             f"Closely to run >> {next_time:%Y-%m-%d %H:%M:%S}"
         )
 
@@ -391,7 +394,7 @@ class WorkflowTaskData:
             sleep_interval + 5
         ):
             logger.debug(
-                f"({wf.run_id}) [CORE]: {wf.name!r} : {runner.cron} "
+                f"({run_id}) [CORE]: {self.workflow.name!r} : {runner.cron} "
                 f": Sleep until: {duration}"
             )
             time.sleep(15)
@@ -407,24 +410,21 @@ class WorkflowTaskData:
         }
 
         # WARNING: Re-create workflow object that use new running workflow ID.
-        workflow: Workflow = wf.get_running_id(run_id=wf.new_run_id)
-        rs: Result = workflow.execute(
+        rs: Result = self.workflow.execute(
             params=param2template(self.params, release_params),
         )
         logger.debug(
-            f"({workflow.run_id}) [CORE]: {wf.name!r} : {runner.cron} : "
+            f"({run_id}) [CORE]: {self.workflow.name!r} : {runner.cron} : "
             f"End release - {next_time:%Y-%m-%d %H:%M:%S}"
         )
 
-        del workflow
-
         # NOTE: Set parent ID on this result.
-        rs.set_parent_run_id(wf.run_id)
+        rs.set_parent_run_id(run_id)
 
         # NOTE: Save result to log object saving.
         rs_log: Log = log.model_validate(
             {
-                "name": wf.name,
+                "name": self.workflow.name,
                 "on": str(runner.cron),
                 "release": next_time,
                 "context": rs.context,

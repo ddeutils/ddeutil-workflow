@@ -5,7 +5,7 @@ from ddeutil.workflow.conf import Config
 from ddeutil.workflow.utils import Result
 
 
-def test_workflow_needs():
+def test_workflow_exec_needs():
     workflow = Workflow.from_loader(name="wf-run-depends", externals={})
     rs: Result = workflow.execute(params={"name": "bar"})
     assert {
@@ -39,7 +39,7 @@ def test_workflow_needs():
     } == rs.context
 
 
-def test_workflow_needs_parallel():
+def test_workflow_exec_needs_parallel():
     with mock.patch.object(Config, "max_job_parallel", 3):
         workflow = Workflow.from_loader(name="wf-run-depends", externals={})
         rs: Result = workflow.execute(params={"name": "bar"})

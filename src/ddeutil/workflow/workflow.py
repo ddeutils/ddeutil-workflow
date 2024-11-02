@@ -100,22 +100,6 @@ class Workflow(BaseModel):
         default_factory=dict,
         description="A mapping of job ID and job model that already loaded.",
     )
-    run_id: Optional[str] = Field(
-        default=None,
-        description=(
-            "A running workflow ID that is able to change after initialize."
-        ),
-        repr=False,
-        exclude=True,
-    )
-
-    @property
-    def new_run_id(self) -> str:
-        """Running ID of this workflow that always generate new unique value.
-
-        :rtype: str
-        """
-        return gen_id(self.name, unique=True)
 
     @classmethod
     def from_loader(
@@ -219,7 +203,7 @@ class Workflow(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def __validate_jobs_need_and_prepare_running_id(self) -> Self:
+    def __validate_jobs_need__(self) -> Self:
         """Validate each need job in any jobs should exists.
 
         :rtype: Self
@@ -236,9 +220,6 @@ class Workflow(BaseModel):
             # NOTE: update a job id with its job id from workflow template
             self.jobs[job].id = job
 
-        if self.run_id is None:
-            self.run_id = self.new_run_id
-
         # VALIDATE: Validate workflow name should not dynamic with params
         #   template.
         if has_template(self.name):
@@ -248,15 +229,6 @@ class Workflow(BaseModel):
             )
 
         return self
-
-    def get_running_id(self, run_id: str) -> Self:
-        """Return Workflow model object that changing workflow running ID with
-        an input running ID.
-
-        :param run_id: A replace workflow running ID.
-        :rtype: Self
-        """
-        return self.model_copy(update={"run_id": run_id})
 
     def job(self, name: str) -> Job:
         """Return this workflow's job that already created on this job field.
@@ -324,6 +296,7 @@ class Workflow(BaseModel):
         runner: CronRunner,
         params: DictData,
         queue: list[datetime],
+        run_id: str | None = None,
         *,
         waiting_sec: int = 60,
         sleep_interval: int = 15,
@@ -342,6 +315,7 @@ class Workflow(BaseModel):
         :param runner: A CronRunner instance.
         :param params: A workflow parameter that pass to execute method.
         :param queue: A list of release time that already running.
+        :param run_id: A workflow running ID for this release.
         :param waiting_sec: A second period value that allow workflow execute.
         :param sleep_interval: A second value that want to waiting until time
             to execute.
@@ -350,8 +324,9 @@ class Workflow(BaseModel):
         :rtype: Result
         """
         log: type[Log] = log or FileLog
+        run_id: str = run_id or gen_id(self.name, unique=True)
         logger.debug(
-            f"({self.run_id}) [CORE]: {self.name!r}: {runner.cron} : run with "
+            f"({run_id}) [CORE]: {self.name!r}: {runner.cron} : run with "
             f"queue id: {id(queue)}"
         )
 
@@ -370,7 +345,7 @@ class Workflow(BaseModel):
         #   now that less than waiting period (second unit).
         if get_diff_sec(next_time, tz=runner.tz) > waiting_sec:
             logger.debug(
-                f"({self.run_id}) [CORE]: {self.name!r} : {runner.cron} : "
+                f"({run_id}) [CORE]: {self.name!r} : {runner.cron} : "
                 f"Does not closely >> {next_time:%Y-%m-%d %H:%M:%S}"
             )
 
@@ -388,10 +363,10 @@ class Workflow(BaseModel):
                         "runner": runner,
                     },
                 },
-            )
+            ).set_run_id(run_id)
 
         logger.debug(
-            f"({self.run_id}) [CORE]: {self.name!r} : {runner.cron} : "
+            f"({run_id}) [CORE]: {self.name!r} : {runner.cron} : "
             f"Closely to run >> {next_time:%Y-%m-%d %H:%M:%S}"
         )
 
@@ -400,7 +375,7 @@ class Workflow(BaseModel):
             sleep_interval + 5
         ):  # pragma: no cov
             logger.debug(
-                f"({self.run_id}) [CORE]: {self.name!r} : {runner.cron} : "
+                f"({run_id}) [CORE]: {self.name!r} : {runner.cron} : "
                 f"Sleep until: {duration}"
             )
             time.sleep(sleep_interval)
@@ -411,26 +386,22 @@ class Workflow(BaseModel):
         release_params: DictData = {"release": {"logical_date": next_time}}
 
         # WARNING: Re-create workflow object that use new running workflow ID.
-        workflow: Self = self.get_running_id(run_id=self.new_run_id)
-        rs: Result = workflow.execute(
+        rs: Result = self.execute(
             params=param2template(params, release_params),
         )
         logger.debug(
-            f"({workflow.run_id}) [CORE]: {self.name!r} : {runner.cron} : "
+            f"({run_id}) [CORE]: {self.name!r} : {runner.cron} : "
             f"End release {next_time:%Y-%m-%d %H:%M:%S}"
         )
 
-        # NOTE: Delete a copied workflow instance for saving memory.
-        del workflow
-
-        rs.set_parent_run_id(self.run_id)
+        rs.set_parent_run_id(run_id)
         rs_log: Log = log.model_validate(
             {
                 "name": self.name,
                 "on": str(runner.cron),
                 "release": next_time,
                 "context": rs.context,
-                "parent_run_id": rs.run_id,
+                "parent_run_id": rs.parent_run_id,
                 "run_id": rs.run_id,
             }
         )
@@ -458,13 +429,14 @@ class Workflow(BaseModel):
                     "runner": runner,
                 },
             },
-        )
+        ).set_run_id(run_id)
 
     def poke(
         self,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         params: DictData | None = None,
+        run_id: str | None = None,
         *,
         log: Log | None = None,
     ) -> list[Result]:
@@ -476,19 +448,19 @@ class Workflow(BaseModel):
         :param start_date: A start datetime object.
         :param end_date: A end datetime object.
         :param params: A parameters that want to pass to the release method.
+        :param run_id: A workflow running ID for this poke.
         :param log: A log object that want to use on this poking process.
 
         :rtype: list[Result]
         """
-        logger.info(
-            f"({self.run_id}) [POKING]: Start Poking: {self.name!r} ..."
-        )
+        run_id: str = run_id or gen_id(self.name, unique=True)
+        logger.info(f"({run_id}) [POKING]: Start Poking: {self.name!r} ...")
 
         # NOTE: If this workflow does not set the on schedule, it will return
         #   empty result.
         if len(self.on) == 0:
             logger.info(
-                f"({self.run_id}) [POKING]: {self.name!r} does not have any "
+                f"({run_id}) [POKING]: {self.name!r} does not have any "
                 f"schedule to run."
             )
             return []
@@ -529,6 +501,7 @@ class Workflow(BaseModel):
                         self.release,
                         runner=runner,
                         params=params,
+                        run_id=run_id,
                         log=log,
                         queue=queue,
                     )
@@ -546,7 +519,7 @@ class Workflow(BaseModel):
 
         if len(queue) > 0:  # pragma: no cov
             logger.error(
-                f"({self.run_id}) [POKING]: Log Queue does empty when poking "
+                f"({run_id}) [POKING]: Log Queue does empty when poking "
                 f"process was finishing."
             )
 
@@ -556,6 +529,7 @@ class Workflow(BaseModel):
         self,
         job_id: str,
         params: DictData,
+        run_id: str | None = None,
         *,
         raise_error: bool = True,
     ) -> Result:
@@ -568,10 +542,14 @@ class Workflow(BaseModel):
 
         :param job_id: A job ID that want to execute.
         :param params: A params that was parameterized from workflow execution.
+        :param run_id: A workflow running ID for this job execution.
         :param raise_error: A flag that raise error instead catching to result
             if it get exception from job execution.
+
         :rtype: Result
         """
+        run_id: str = run_id or gen_id(self.name, unique=True)
+
         # VALIDATE: check a job ID that exists in this workflow or not.
         if job_id not in self.jobs:
             raise WorkflowException(
@@ -579,20 +557,20 @@ class Workflow(BaseModel):
                 f"workflow."
             )
 
-        logger.info(f"({self.run_id}) [WORKFLOW]: Start execute: {job_id!r}")
+        logger.info(f"({run_id}) [WORKFLOW]: Start execute: {job_id!r}")
 
         # IMPORTANT:
         #   Change any job running IDs to this workflow running ID.
         #
         try:
-            job: Job = self.jobs[job_id].get_running_id(self.run_id)
+            job: Job = self.jobs[job_id]
             job.set_outputs(
-                job.execute(params=params).context,
+                job.execute(params=params, run_id=run_id).context,
                 to=params,
             )
         except JobException as err:
             logger.error(
-                f"({self.run_id}) [WORKFLOW]: {err.__class__.__name__}: {err}"
+                f"({run_id}) [WORKFLOW]: {err.__class__.__name__}: {err}"
             )
             if raise_error:
                 raise WorkflowException(
@@ -601,11 +579,12 @@ class Workflow(BaseModel):
             else:
                 raise NotImplementedError() from None
 
-        return Result(status=0, context=params)
+        return Result(status=0, context=params).set_run_id(run_id)
 
     def execute(
         self,
-        params: DictData | None = None,
+        params: DictData,
+        run_id: str | None = None,
         *,
         timeout: int = 60,
     ) -> Result:
@@ -624,24 +603,27 @@ class Workflow(BaseModel):
         :param params: An input parameters that use on workflow execution that
             will parameterize before using it. Default is None.
         :type params: DictData | None
+        :param run_id: A workflow running ID for this job execution.
+        :type run_id: str | None
         :param timeout: A workflow execution time out in second unit that use
             for limit time of execution and waiting job dependency. Default is
             60 seconds.
         :type timeout: int
+
         :rtype: Result
         """
-        logger.info(f"({self.run_id}) [CORE]: Start Execute: {self.name!r} ...")
+        run_id: str = run_id or gen_id(self.name, unique=True)
+        logger.info(f"({run_id}) [CORE]: Start Execute: {self.name!r} ...")
 
         # NOTE: I use this condition because this method allow passing empty
         #   params and I do not want to create new dict object.
-        params: DictData = {} if params is None else params
         ts: float = time.monotonic()
         rs: Result = Result()
 
         # NOTE: It should not do anything if it does not have job.
         if not self.jobs:
             logger.warning(
-                f"({self.run_id}) [WORKFLOW]: This workflow: {self.name!r} "
+                f"({run_id}) [WORKFLOW]: This workflow: {self.name!r} "
                 f"does not have any jobs"
             )
             return rs.catch(status=0, context=params)
@@ -665,6 +647,7 @@ class Workflow(BaseModel):
         try:
             if config.max_job_parallel == 1:
                 self.__exec_non_threading(
+                    run_id=run_id,
                     context=context,
                     ts=ts,
                     job_queue=jq,
@@ -672,6 +655,7 @@ class Workflow(BaseModel):
                 )
             else:
                 self.__exec_threading(
+                    run_id=run_id,
                     context=context,
                     ts=ts,
                     job_queue=jq,
@@ -690,6 +674,7 @@ class Workflow(BaseModel):
 
     def __exec_threading(
         self,
+        run_id: str,
         context: DictData,
         ts: float,
         job_queue: Queue,
@@ -712,7 +697,7 @@ class Workflow(BaseModel):
         """
         not_time_out_flag: bool = True
         logger.debug(
-            f"({self.run_id}): [CORE]: Run {self.name} with threading job "
+            f"({run_id}): [CORE]: Run {self.name} with threading job "
             f"executor"
         )
 
@@ -756,7 +741,7 @@ class Workflow(BaseModel):
 
             for future in as_completed(futures, timeout=1800):
                 if err := future.exception():
-                    logger.error(f"({self.run_id}) [CORE]: {err}")
+                    logger.error(f"({run_id}) [CORE]: {err}")
                     raise WorkflowException(f"{err}")
                 try:
                     future.result(timeout=60)
@@ -770,7 +755,7 @@ class Workflow(BaseModel):
 
         # NOTE: Raise timeout error.
         logger.warning(  # pragma: no cov
-            f"({self.run_id}) [WORKFLOW]: Execution of workflow, {self.name!r} "
+            f"({run_id}) [WORKFLOW]: Execution of workflow, {self.name!r} "
             f", was timeout"
         )
         raise WorkflowException(  # pragma: no cov
@@ -779,6 +764,7 @@ class Workflow(BaseModel):
 
     def __exec_non_threading(
         self,
+        run_id: str,
         context: DictData,
         ts: float,
         job_queue: Queue,
@@ -799,7 +785,7 @@ class Workflow(BaseModel):
         """
         not_time_out_flag: bool = True
         logger.debug(
-            f"({self.run_id}) [CORE]: Run {self.name} with non-threading job "
+            f"({run_id}) [CORE]: Run {self.name} with non-threading job "
             f"executor"
         )
 
@@ -824,7 +810,7 @@ class Workflow(BaseModel):
             #       'params': <input-params>,
             #       'jobs': {},
             #   }
-            self.execute_job(job_id=job_id, params=context)
+            self.execute_job(job_id=job_id, params=context, run_id=run_id)
 
             # NOTE: Mark this job queue done.
             job_queue.task_done()
@@ -837,7 +823,7 @@ class Workflow(BaseModel):
 
         # NOTE: Raise timeout error.
         logger.warning(  # pragma: no cov
-            f"({self.run_id}) [WORKFLOW]: Execution of workflow was timeout"
+            f"({run_id}) [WORKFLOW]: Execution of workflow was timeout"
         )
         raise WorkflowException(  # pragma: no cov
             f"Execution of workflow: {self.name} was timeout"
