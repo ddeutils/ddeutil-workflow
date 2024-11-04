@@ -323,6 +323,7 @@ class BaseLog(BaseModel, ABC):
 
     name: str = Field(description="A workflow name.")
     release: datetime = Field(description="A release datetime.")
+    type: str = Field(description="A running type before logging.")
     context: DictData = Field(
         default_factory=dict,
         description=(

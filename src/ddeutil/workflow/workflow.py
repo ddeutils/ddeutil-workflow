@@ -70,34 +70,36 @@ __all__: TupleStr = (
 class WorkflowRelease:
     """Workflow release data dataclass object."""
 
-    release_date: datetime
+    date: datetime
     offset: float
     end_date: datetime
     runner: CronRunner
+    type: str
 
     def __repr__(self) -> str:
-        return repr(f"{self.release_date:%Y-%m-%d %H:%M:%S}")
+        return repr(f"{self.date:%Y-%m-%d %H:%M:%S}")
 
     def __str__(self) -> str:
-        return f"{self.release_date:%Y-%m-%d %H:%M:%S}"
+        return f"{self.date:%Y-%m-%d %H:%M:%S}"
 
     @classmethod
-    def from_datetime(cls, dt: datetime) -> Self:
+    def from_dt(cls, dt: datetime) -> Self:
         return cls(
-            release_date=dt,
+            date=dt,
             offset=0,
             end_date=dt + timedelta(days=1),
             runner=CronJob("* * * * *").schedule(dt.replace(tzinfo=config.tz)),
+            type="manual",
         )
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         if isinstance(other, self.__class__):
-            return self.release_date == other.release_date
+            return self.date == other.date
         return NotImplemented
 
-    def __lt__(self, other):
+    def __lt__(self, other) -> bool:
         if isinstance(other, self.__class__):
-            return self.release_date < other.release_date
+            return self.date < other.date
         return NotImplemented
 
 
@@ -350,7 +352,7 @@ class Workflow(BaseModel):
 
     def release(
         self,
-        release_date: datetime,
+        release: datetime | WorkflowRelease,
         params: DictData,
         run_id: str | None = None,
         *,
@@ -367,7 +369,7 @@ class Workflow(BaseModel):
             I will add sleep with 0.15 seconds on every step that interact with
         the queue object.
 
-        :param release_date: A release datetime.
+        :param release: A release datetime.
         :param params: A workflow parameter that pass to execute method.
         :param queue: A list of release time that already queue.
         :param run_id: A workflow running ID for this release.
@@ -379,20 +381,25 @@ class Workflow(BaseModel):
         log: type[Log] = log or FileLog
         run_id: str = run_id or gen_id(self.name, unique=True)
 
+        # VALIDATE: Change queue value to WorkflowQueue object.
         if queue is None:
             queue: WorkflowQueue = WorkflowQueue()
         elif isinstance(queue, list):
             queue: WorkflowQueue = WorkflowQueue(queue=queue)
 
+        # VALIDATE: Change release value to WorkflowRelease object.
+        if isinstance(release, datetime):
+            release: WorkflowRelease = WorkflowRelease.from_dt(release)
+
         logger.debug(
             f"({run_id}) [RELEASE]: {self.name!r} : "
-            f"Closely to run >> {release_date:%Y-%m-%d %H:%M:%S}"
+            f"Closely to run >> {release.date:%Y-%m-%d %H:%M:%S}"
         )
 
         # NOTE: Release parameter that use to change if params has templating.
         release_params: DictData = {
             "release": {
-                "logical_date": release_date,
+                "logical_date": release.date,
                 "execute_date": datetime.now(tz=config.tz),
                 "run_id": run_id,
                 "timezone": config.tz,
@@ -406,14 +413,15 @@ class Workflow(BaseModel):
         )
         logger.debug(
             f"({run_id}) [RELEASE]: {self.name!r} : "
-            f"End release {release_date:%Y-%m-%d %H:%M:%S}"
+            f"End release {release.date:%Y-%m-%d %H:%M:%S}"
         )
 
         rs.set_parent_run_id(run_id)
         rs_log: Log = log.model_validate(
             {
                 "name": self.name,
-                "release": release_date,
+                "release": release.date,
+                "type": release.type,
                 "context": rs.context,
                 "parent_run_id": rs.parent_run_id,
                 "run_id": rs.run_id,
@@ -424,9 +432,8 @@ class Workflow(BaseModel):
         rs_log.save(excluded=None)
 
         # NOTE: Remove this release from running.
-        release_data = WorkflowRelease.from_datetime(release_date)
-        queue.remove_running(release_data)
-        heappush(queue.complete, release_data)
+        queue.remove_running(release)
+        heappush(queue.complete, release)
 
         return Result(
             status=0,
@@ -434,7 +441,7 @@ class Workflow(BaseModel):
                 "params": params,
                 "release": {
                     "status": "success",
-                    "logical_date": release_date,
+                    "logical_date": release.date,
                 },
             },
             run_id=run_id,
@@ -449,6 +456,11 @@ class Workflow(BaseModel):
     ) -> WorkflowQueue:
         """Generate queue of datetime from the cron runner that initialize from
         the on field. with offset value.
+
+        :param offset:
+        :param end_date:
+        :param queue:
+        :param log:
         """
         for on in self.on:
 
@@ -460,22 +472,22 @@ class Workflow(BaseModel):
                 continue
 
             workflow_release = WorkflowRelease(
-                release_date=runner.date,
+                date=runner.date,
                 offset=offset,
                 end_date=end_date,
                 runner=runner,
+                type="poking",
             )
 
             while queue.check_queue(data=workflow_release) or (
-                log.is_pointed(
-                    name=self.name, release=workflow_release.release_date
-                )
+                log.is_pointed(name=self.name, release=workflow_release.date)
             ):
                 workflow_release = WorkflowRelease(
-                    release_date=runner.next,
+                    date=runner.next,
                     offset=offset,
                     end_date=end_date,
                     runner=runner,
+                    type="poking",
                 )
 
             if runner.date > end_date:
