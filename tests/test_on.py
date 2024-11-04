@@ -173,6 +173,12 @@ def test_on_every_minute():
     print(f"{gen.next:%Y-%m-%d %H:%M:%S}")
 
 
+def test_on_every_minute_with_second():
+    schedule = On.from_loader(name="every_minute_bkk")
+    gen = schedule.next(datetime(2024, 1, 1, 0, 0, 1))
+    print(gen.date)
+
+
 def test_on_every_5_minute_bkk():
     schedule = On.from_loader(name="every_5_minute_bkk")
     schedule.generate("2024-01-01 01:12:00")

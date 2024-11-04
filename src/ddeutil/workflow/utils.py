@@ -13,7 +13,7 @@ from abc import ABC, abstractmethod
 from ast import Call, Constant, Expr, Module, Name, parse
 from collections.abc import Iterator
 from dataclasses import field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from functools import wraps
 from hashlib import md5
 from importlib import import_module
@@ -48,26 +48,34 @@ AnyModelType = type[AnyModel]
 logger = logging.getLogger("ddeutil.workflow")
 
 
-def get_dt_now(tz: ZoneInfo | None = None) -> datetime:  # pragma: no cov
+def get_dt_now(
+    tz: ZoneInfo | None = None, offset: float = 0.0
+) -> datetime:  # pragma: no cov
     """Return the current datetime object.
 
     :param tz:
+    :param offset:
     :return: The current datetime object that use an input timezone or UTC.
     """
-    return datetime.now(tz=(tz or ZoneInfo("UTC")))
+    return datetime.now(tz=(tz or ZoneInfo("UTC"))) - timedelta(seconds=offset)
 
 
 def get_diff_sec(
-    dt: datetime, tz: ZoneInfo | None = None
+    dt: datetime, tz: ZoneInfo | None = None, offset: float = 0.0
 ) -> int:  # pragma: no cov
     """Return second value that come from diff of an input datetime and the
     current datetime with specific timezone.
 
     :param dt:
     :param tz:
+    :param offset:
     """
     return round(
-        (dt - datetime.now(tz=(tz or ZoneInfo("UTC")))).total_seconds()
+        (
+            dt
+            - datetime.now(tz=(tz or ZoneInfo("UTC")))
+            - timedelta(seconds=offset)
+        ).total_seconds()
     )
 
 
@@ -350,8 +358,8 @@ class Result:
 
     status: int = field(default=2)
     context: DictData = field(default_factory=dict)
-    start_at: datetime = field(default_factory=get_dt_now, compare=False)
-    end_at: Optional[datetime] = field(default=None, compare=False)
+    # start_at: datetime = field(default_factory=get_dt_now, compare=False)
+    # end_at: Optional[datetime] = field(default=None, compare=False)
 
     # NOTE: Ignore this field to compare another result model with __eq__.
     run_id: Optional[str] = field(default=None)

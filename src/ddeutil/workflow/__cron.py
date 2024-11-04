@@ -719,9 +719,17 @@ class CronRunner:
         else:
             self.date: datetime = datetime.now(tz=self.tz)
 
+        # NOTE: Add one second if the microsecond value more than 0.
+        if self.date.microsecond > 0:
+            self.date: datetime = self.date.replace(microsecond=0) + timedelta(
+                seconds=1
+            )
+
         # NOTE: Add one minute if the second value more than 0.
         if self.date.second > 0:
-            self.date: datetime = self.date + timedelta(minutes=1)
+            self.date: datetime = self.date.replace(second=0) + timedelta(
+                minutes=1
+            )
 
         self.__start_date: datetime = self.date
         self.cron: CronJob | CronJobYear = cron
@@ -815,10 +823,6 @@ class CronRunner:
 
             # NOTE: Replace date that less than it mode to zero.
             self.date: datetime = replace_date(self.date, mode, reverse=reverse)
-
-            # NOTE: Replace second and microsecond values that change from
-            #   the replace_date func with reverse flag.
-            self.date: datetime = self.date.replace(second=0, microsecond=0)
 
             if current_value != getattr(self.date, switch[mode]):
                 return mode != "month"

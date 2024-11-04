@@ -192,19 +192,6 @@ class On(BaseModel):
         _ = runner.next
         return runner
 
-    # def pop(self, queue: list[datetime]) -> datetime:
-    #     """Pop the matching datetime value from list of datetime alias queue."""
-    #     for dt in queue:
-    #         if self.next(dt) == dt:
-    #             return dt
-    #
-    #     # NOTE: Add 1 second value to the current datetime for forcing crontab
-    #     #   runner generate the next datetime instead if current datetime be
-    #     #   valid because I already replaced second to zero before passing.
-    #     return datetime.now(tz=config.tz).replace(
-    #         second=0, microsecond=0
-    #     ) + timedelta(seconds=1)
-
 
 class YearOn(On):
     """Implement On Year Schedule Model for limit year matrix that use by some

@@ -322,7 +322,6 @@ class BaseLog(BaseModel, ABC):
     """
 
     name: str = Field(description="A workflow name.")
-    on: str = Field(description="A cronjob string of this piepline schedule.")
     release: datetime = Field(description="A release datetime.")
     context: DictData = Field(
         default_factory=dict,

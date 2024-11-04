@@ -27,8 +27,10 @@ from concurrent.futures import (
     ThreadPoolExecutor,
     as_completed,
 )
+from dataclasses import field
 from datetime import datetime, timedelta
-from heapq import heappush
+from functools import total_ordering
+from heapq import heappop, heappush
 from queue import Queue
 from textwrap import dedent
 from typing import Optional
@@ -38,7 +40,7 @@ from pydantic.dataclasses import dataclass
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
-from .__cron import CronRunner
+from .__cron import CronJob, CronRunner
 from .__types import DictData, TupleStr
 from .conf import FileLog, Loader, Log, config, get_logger
 from .exceptions import JobException, WorkflowException
@@ -50,6 +52,7 @@ from .utils import (
     delay,
     gen_id,
     get_diff_sec,
+    get_dt_now,
     has_template,
     param2template,
 )
@@ -60,6 +63,72 @@ __all__: TupleStr = (
     "Workflow",
     "WorkflowTaskData",
 )
+
+
+@total_ordering
+@dataclass(config=ConfigDict(arbitrary_types_allowed=True))
+class WorkflowRelease:
+    """Workflow release data dataclass object."""
+
+    release_date: datetime
+    offset: float
+    end_date: datetime
+    runner: CronRunner
+
+    def __repr__(self) -> str:
+        return repr(f"{self.release_date:%Y-%m-%d %H:%M:%S}")
+
+    def __str__(self) -> str:
+        return f"{self.release_date:%Y-%m-%d %H:%M:%S}"
+
+    @classmethod
+    def from_datetime(cls, dt: datetime) -> Self:
+        return cls(
+            release_date=dt,
+            offset=0,
+            end_date=dt + timedelta(days=1),
+            runner=CronJob("* * * * *").schedule(dt.replace(tzinfo=config.tz)),
+        )
+
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return self.release_date == other.release_date
+        return NotImplemented
+
+    def __lt__(self, other):
+        if isinstance(other, self.__class__):
+            return self.release_date < other.release_date
+        return NotImplemented
+
+
+@dataclass
+class WorkflowQueue:
+    queue: list[WorkflowRelease] = field(default_factory=list)
+    running: list[WorkflowRelease] = field(default_factory=list)
+    complete: list[WorkflowRelease] = field(default_factory=list)
+
+    @property
+    def is_queued(self) -> bool:
+        return len(self.queue) > 0
+
+    def check_queue(self, data: WorkflowRelease) -> bool:
+        return (
+            (data in self.queue)
+            or (data in self.running)
+            or (data in self.complete)
+        )
+
+    def push_queue(self, data: WorkflowRelease) -> Self:
+        heappush(self.queue, data)
+        return self
+
+    def push_running(self, data: WorkflowRelease) -> Self:
+        heappush(self.running, data)
+        return self
+
+    def remove_running(self, data: WorkflowRelease) -> Self:
+        if data in self.running:
+            self.running.remove(data)
 
 
 class Workflow(BaseModel):
@@ -219,7 +288,7 @@ class Workflow(BaseModel):
         return self
 
     def job(self, name: str) -> Job:
-        """Return this workflow's job that already created on this job field.
+        """Return this workflow's jobs that passing with the Job model.
 
         :param name: A job name that want to get from a mapping of job models.
         :type name: str
@@ -281,18 +350,16 @@ class Workflow(BaseModel):
 
     def release(
         self,
-        runner: CronRunner,
+        release_date: datetime,
         params: DictData,
-        queue: list[datetime] = None,
         run_id: str | None = None,
         *,
-        waiting_sec: int = 60,
-        sleep_interval: int = 15,
         log: type[Log] = None,
+        queue: WorkflowQueue | None = None,
     ) -> Result:
-        """Start running workflow with the on schedule in period of 30 minutes.
-        That mean it will still running at background 30 minutes until the
-        schedule matching with its time.
+        """Release the workflow execution with overriding parameter with the
+        release templating that include logical date (release date), execution
+        date, or running id to the params.
 
             This method allow workflow use log object to save the execution
         result to log destination like file log to local `/logs` directory.
@@ -300,80 +367,36 @@ class Workflow(BaseModel):
             I will add sleep with 0.15 seconds on every step that interact with
         the queue object.
 
-        :param runner: A CronRunner instance.
+        :param release_date: A release datetime.
         :param params: A workflow parameter that pass to execute method.
-        :param queue: A list of release time that already running.
+        :param queue: A list of release time that already queue.
         :param run_id: A workflow running ID for this release.
-        :param waiting_sec: A second period value that allow workflow execute.
-        :param sleep_interval: A second value that want to waiting until time
-            to execute.
         :param log: A log class that want to save the execution result.
+        :param queue: A WorkflowQueue object.
 
         :rtype: Result
         """
         log: type[Log] = log or FileLog
         run_id: str = run_id or gen_id(self.name, unique=True)
-        queue: list[datetime] = [] if queue is None else queue
-        logger.debug(
-            f"({run_id}) [CORE]: {self.name!r}: {runner.cron} : run with "
-            f"queue id: {id(queue)}"
-        )
 
-        # NOTE: get next schedule time that generate from now.
-        next_time: datetime = runner.date
-
-        # NOTE: While-loop to getting next until it does not logger.
-        while log.is_pointed(self.name, next_time) or (next_time in queue):
-            next_time: datetime = runner.next
-
-        # NOTE: Heap-push this next running time to log queue list.
-        heappush(queue, next_time)
-        time.sleep(0.05)
-
-        # VALIDATE: Check the different time between the next schedule time and
-        #   now that less than waiting period (second unit).
-        if get_diff_sec(next_time, tz=runner.tz) > waiting_sec:
-            logger.debug(
-                f"({run_id}) [CORE]: {self.name!r} : {runner.cron} : "
-                f"Does not closely >> {next_time:%Y-%m-%d %H:%M:%S}"
-            )
-
-            # NOTE: Remove next datetime from queue.
-            queue.remove(next_time)
-
-            time.sleep(0.15)
-            return Result(
-                status=0,
-                context={
-                    "params": params,
-                    "release": {
-                        "status": "skipped",
-                        "cron": str(runner.cron),
-                        "runner": runner,
-                    },
-                },
-            ).set_run_id(run_id)
+        if queue is None:
+            queue: WorkflowQueue = WorkflowQueue()
+        elif isinstance(queue, list):
+            queue: WorkflowQueue = WorkflowQueue(queue=queue)
 
         logger.debug(
-            f"({run_id}) [CORE]: {self.name!r} : {runner.cron} : "
-            f"Closely to run >> {next_time:%Y-%m-%d %H:%M:%S}"
+            f"({run_id}) [RELEASE]: {self.name!r} : "
+            f"Closely to run >> {release_date:%Y-%m-%d %H:%M:%S}"
         )
-
-        # NOTE: Release when the time is nearly to schedule time.
-        while (duration := get_diff_sec(next_time, tz=runner.tz)) > (
-            sleep_interval + 5
-        ):  # pragma: no cov
-            logger.debug(
-                f"({run_id}) [CORE]: {self.name!r} : {runner.cron} : "
-                f"Sleep until: {duration}"
-            )
-            time.sleep(sleep_interval)
-
-        time.sleep(0.05)
 
         # NOTE: Release parameter that use to change if params has templating.
         release_params: DictData = {
-            "release": {"logical_date": next_time, "run_id": run_id}
+            "release": {
+                "logical_date": release_date,
+                "execute_date": datetime.now(tz=config.tz),
+                "run_id": run_id,
+                "timezone": config.tz,
+            }
         }
 
         # WARNING: Re-create workflow object that use new running workflow ID.
@@ -382,16 +405,15 @@ class Workflow(BaseModel):
             run_id=run_id,
         )
         logger.debug(
-            f"({run_id}) [CORE]: {self.name!r} : {runner.cron} : "
-            f"End release {next_time:%Y-%m-%d %H:%M:%S}"
+            f"({run_id}) [RELEASE]: {self.name!r} : "
+            f"End release {release_date:%Y-%m-%d %H:%M:%S}"
         )
 
         rs.set_parent_run_id(run_id)
         rs_log: Log = log.model_validate(
             {
                 "name": self.name,
-                "on": str(runner.cron),
-                "release": next_time,
+                "release": release_date,
                 "context": rs.context,
                 "parent_run_id": rs.parent_run_id,
                 "run_id": rs.run_id,
@@ -401,15 +423,10 @@ class Workflow(BaseModel):
         # NOTE: Saving execution result to destination of the input log object.
         rs_log.save(excluded=None)
 
-        # NOTE: Remove queue.
-        queue.remove(next_time)
-
-        future_running_time: datetime = runner.next
-        logger.debug(
-            f"({rs.run_id}) [CORE]: {self.name!r} : {runner.cron} : "
-            f"Next release {future_running_time:%Y-%m-%d %H:%M:%S}"
-        )
-        heappush(queue, future_running_time)
+        # NOTE: Remove this release from running.
+        release_data = WorkflowRelease.from_datetime(release_date)
+        queue.remove_running(release_data)
+        heappush(queue.complete, release_data)
 
         return Result(
             status=0,
@@ -417,11 +434,55 @@ class Workflow(BaseModel):
                 "params": params,
                 "release": {
                     "status": "success",
-                    "cron": str(runner.cron),
-                    "runner": runner,
+                    "logical_date": release_date,
                 },
             },
-        ).set_run_id(run_id)
+            run_id=run_id,
+        )
+
+    def queue_poking(
+        self,
+        offset: float,
+        end_date: datetime,
+        queue: WorkflowQueue,
+        log: type[Log],
+    ) -> WorkflowQueue:
+        """Generate queue of datetime from the cron runner that initialize from
+        the on field. with offset value.
+        """
+        for on in self.on:
+
+            runner: CronRunner = on.next(
+                get_dt_now(tz=config.tz, offset=offset).replace(microsecond=0)
+            )
+
+            if runner.date > end_date:
+                continue
+
+            workflow_release = WorkflowRelease(
+                release_date=runner.date,
+                offset=offset,
+                end_date=end_date,
+                runner=runner,
+            )
+
+            while queue.check_queue(data=workflow_release) or (
+                log.is_pointed(
+                    name=self.name, release=workflow_release.release_date
+                )
+            ):
+                workflow_release = WorkflowRelease(
+                    release_date=runner.next,
+                    offset=offset,
+                    end_date=end_date,
+                    runner=runner,
+                )
+
+            if runner.date > end_date:
+                continue
+
+            queue.push_queue(workflow_release)
+        return queue
 
     def poke(
         self,
@@ -440,19 +501,11 @@ class Workflow(BaseModel):
         :param start_date: A start datetime object.
         :param params: A parameters that want to pass to the release method.
         :param run_id: A workflow running ID for this poke.
-        :param periods: A periods of day value to running poke.
+        :param periods: A periods of minutes value to running poke.
         :param log: A log object that want to use on this poking process.
 
         :rtype: list[Result]
         """
-        if periods <= 0:
-            raise WorkflowException(
-                "The period of poking should grater or equal than 1"
-            )
-
-        run_id: str = run_id or gen_id(self.name, unique=True)
-        logger.info(f"({run_id}) [POKING]: Start Poking: {self.name!r} ...")
-
         # NOTE: If this workflow does not set the on schedule, it will return
         #   empty result.
         if len(self.on) == 0:
@@ -462,62 +515,98 @@ class Workflow(BaseModel):
             )
             return []
 
+        if periods <= 0:
+            raise WorkflowException(
+                "The period of poking should be int and grater or equal than 1."
+            )
+
+        # NOTE: Create start_date and offset variables.
+        current_date: datetime = datetime.now(tz=config.tz)
+
+        if start_date and start_date <= current_date:
+            start_date = start_date.replace(tzinfo=config.tz)
+            offset: float = (current_date - start_date).total_seconds()
+        else:
+            start_date: datetime = current_date
+            offset: float = 0
+
+        end_date: datetime = start_date + timedelta(minutes=periods)
+
+        log: type[Log] = log or FileLog
+        run_id: str = run_id or gen_id(self.name, unique=True)
+        logger.info(
+            f"({run_id}) [POKING]: Start Poking: {self.name!r} from "
+            f"{start_date:%Y-%m-%d %H:%M:%S} to {end_date:%Y-%m-%d %H:%M:%S}"
+        )
+
         params: DictData = params or {}
-        queue: list[datetime] = []
+        workflow_queue: WorkflowQueue = WorkflowQueue()
         results: list[Result] = []
         futures: list[Future] = []
 
-        start_date: datetime = (
-            start_date.replace(tzinfo=config.tz)
-            if start_date
-            else (
-                datetime.now(tz=config.tz).replace(second=0, microsecond=0)
-                + timedelta(seconds=1)
-            )
+        self.queue_poking(
+            offset, end_date=end_date, queue=workflow_queue, log=log
         )
-        end_date: datetime = start_date + timedelta(days=periods)
 
-        runners: list[CronRunner] = [
-            runner
-            for on in self.on
-            if (runner := on.next(start_date)).date <= end_date
-        ]
+        if len(workflow_queue.queue) == 0:
+            logger.info(
+                f"({run_id}) [POKING]: {self.name!r} does not have any "
+                f"queue to run."
+            )
+            return []
 
         with ThreadPoolExecutor(
             max_workers=config.max_poking_pool_worker,
             thread_name_prefix="workflow_poking_",
         ) as executor:
 
-            # NOTE: For-loop the on values that exists in this workflow
-            #   object.
-            for runner in runners:
+            while workflow_queue.is_queued:
+
+                wf_release = heappop(workflow_queue.queue)
+                if (
+                    wf_release.release_date
+                    - get_dt_now(tz=config.tz, offset=offset)
+                ).total_seconds() > 60:
+                    logger.debug(
+                        f"({run_id}) [POKING]: Waiting because the latest "
+                        f"release has diff time more than 60 seconds "
+                    )
+                    heappush(workflow_queue.queue, wf_release)
+                    delay(60)
+                    self.queue_poking(
+                        offset, end_date, queue=workflow_queue, log=log
+                    )
+                    continue
+
+                # NOTE: Push the workflow release to running queue
+                workflow_queue.push_running(wf_release)
 
                 futures.append(
                     executor.submit(
                         self.release,
-                        runner=runner,
+                        release_date=wf_release.release_date,
                         params=params,
-                        run_id=run_id,
                         log=log,
-                        queue=queue,
+                        queue=workflow_queue,
                     )
                 )
 
-                # NOTE: Delay release date because it run so fast and making
-                #   queue object can not handle release date that will
-                #   duplicate by the cron runner object.
-                delay(second=0.15)
+                self.queue_poking(
+                    offset, end_date, queue=workflow_queue, log=log
+                )
 
             # WARNING: This poking method does not allow to use fail-fast
             #   logic to catching parallel execution result.
             for future in as_completed(futures):
-                results.append(future.result(timeout=60))
+                rs: Result = future.result(timeout=60)
+                results.append(rs.set_parent_run_id(run_id))
 
-        if len(queue) > 0:  # pragma: no cov
-            logger.error(
-                f"({run_id}) [POKING]: Log Queue does empty when poking "
+        while len(workflow_queue.running) > 0:  # pragma: no cov
+            logger.warning(
+                f"({run_id}) [POKING]: Running does empty when poking "
                 f"process was finishing."
             )
+            delay(10)
 
         return results
 
