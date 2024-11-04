@@ -238,6 +238,7 @@ class Schedule(BaseModel):
         extras: DictData = externals or {}
 
         for sch_wf in self.workflows:
+
             wf: Workflow = Workflow.from_loader(sch_wf.name, externals=extras)
 
             # NOTE: Create default list of release datetime.

@@ -824,6 +824,10 @@ class CronRunner:
             # NOTE: Replace date that less than it mode to zero.
             self.date: datetime = replace_date(self.date, mode, reverse=reverse)
 
+            # NOTE: Replace second and microsecond values that change from
+            #   the replace_date func with reverse flag.
+            self.date: datetime = self.date.replace(second=0, microsecond=0)
+
             if current_value != getattr(self.date, switch[mode]):
                 return mode != "month"
 

@@ -10,7 +10,7 @@ def test_conf_log_file():
     log = FileLog.model_validate(
         obj={
             "name": "wf-scheduling",
-            "on": "*/2 * * * *",
+            "type": "manual",
             "release": datetime(2024, 1, 1, 1),
             "context": {
                 "params": {"name": "foo"},
@@ -32,7 +32,7 @@ def test_conf_log_file_do_first():
     log = FileLog.model_validate(
         obj={
             "name": "wf-demo-logging",
-            "on": "*/2 * * * *",
+            "type": "manual",
             "release": datetime(2024, 1, 1, 1),
             "context": {
                 "params": {"name": "logging"},
@@ -55,7 +55,7 @@ def test_conf_log_file_find_logs(root_path):
     log = FileLog.model_validate(
         obj={
             "name": "wf-scheduling",
-            "on": "*/2 * * * *",
+            "type": "manual",
             "release": datetime(2024, 1, 1, 1),
             "context": {
                 "params": {"name": "foo"},

@@ -1,8 +1,10 @@
 from datetime import datetime
 from unittest import mock
 
+import pytest
 from ddeutil.workflow import Workflow
 from ddeutil.workflow.conf import Config, config
+from ddeutil.workflow.exceptions import WorkflowException
 from ddeutil.workflow.utils import Result
 
 
@@ -15,6 +17,12 @@ def test_workflow_poke():
         params={"asat-dt": datetime(2024, 1, 1)}
     )
     print(results)
+
+
+def test_workflow_poke_raise():
+    workflow = Workflow.from_loader(name="wf-scheduling-common")
+    with pytest.raises(WorkflowException):
+        workflow.poke(periods=-1)
 
 
 @mock.patch.object(Config, "enable_write_log", False)

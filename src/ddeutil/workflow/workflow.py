@@ -61,6 +61,8 @@ logger = get_logger("ddeutil.workflow")
 
 __all__: TupleStr = (
     "Workflow",
+    "WorkflowRelease",
+    "WorkflowQueue",
     "WorkflowTaskData",
 )
 
@@ -92,28 +94,40 @@ class WorkflowRelease:
             type="manual",
         )
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: WorkflowRelease | datetime) -> bool:
         if isinstance(other, self.__class__):
             return self.date == other.date
+        elif isinstance(other, datetime):
+            return self.date == other
         return NotImplemented
 
-    def __lt__(self, other) -> bool:
+    def __lt__(self, other: WorkflowRelease | datetime) -> bool:
         if isinstance(other, self.__class__):
             return self.date < other.date
+        elif isinstance(other, datetime):
+            return self.date < other
         return NotImplemented
 
 
 @dataclass
 class WorkflowQueue:
+    """Workflow Queue object."""
+
     queue: list[WorkflowRelease] = field(default_factory=list)
     running: list[WorkflowRelease] = field(default_factory=list)
     complete: list[WorkflowRelease] = field(default_factory=list)
 
     @property
     def is_queued(self) -> bool:
+        """Return True if it has data in the queue."""
         return len(self.queue) > 0
 
     def check_queue(self, data: WorkflowRelease) -> bool:
+        """Check a WorkflowRelease value already exists in list of tracking
+        queues.
+
+        :param data:
+        """
         return (
             (data in self.queue)
             or (data in self.running)
@@ -357,7 +371,7 @@ class Workflow(BaseModel):
         run_id: str | None = None,
         *,
         log: type[Log] = None,
-        queue: WorkflowQueue | None = None,
+        queue: WorkflowQueue | list[datetime] | None = None,
     ) -> Result:
         """Release the workflow execution with overriding parameter with the
         release templating that include logical date (release date), execution
@@ -574,10 +588,9 @@ class Workflow(BaseModel):
 
             while workflow_queue.is_queued:
 
-                wf_release = heappop(workflow_queue.queue)
+                wf_release: WorkflowRelease = heappop(workflow_queue.queue)
                 if (
-                    wf_release.release_date
-                    - get_dt_now(tz=config.tz, offset=offset)
+                    wf_release.date - get_dt_now(tz=config.tz, offset=offset)
                 ).total_seconds() > 60:
                     logger.debug(
                         f"({run_id}) [POKING]: Waiting because the latest "
@@ -596,7 +609,7 @@ class Workflow(BaseModel):
                 futures.append(
                     executor.submit(
                         self.release,
-                        release_date=wf_release.release_date,
+                        release=wf_release,
                         params=params,
                         log=log,
                         queue=workflow_queue,
@@ -1036,7 +1049,7 @@ class WorkflowTaskData:
         rs_log: Log = log.model_validate(
             {
                 "name": self.workflow.name,
-                "on": str(runner.cron),
+                "type": "schedule",
                 "release": next_time,
                 "context": rs.context,
                 "parent_run_id": rs.run_id,

@@ -1,20 +1,31 @@
 from datetime import datetime
 from unittest import mock
 
-from ddeutil.workflow import Workflow
+import pytest
 from ddeutil.workflow.conf import Config
 from ddeutil.workflow.utils import Result
+from ddeutil.workflow.workflow import Workflow, WorkflowRelease
+
+
+def test_workflow_release_dataclass():
+    workflow_release = WorkflowRelease.from_dt(dt=datetime(2024, 1, 1, 1))
+    assert repr(workflow_release) == repr("2024-01-01 01:00:00")
+    assert str(workflow_release) == "2024-01-01 01:00:00"
+
+    assert workflow_release == datetime(2024, 1, 1, 1)
+    assert not workflow_release < datetime(2024, 1, 1, 1)
+    assert not workflow_release == 2024010101
+
+    with pytest.raises(TypeError):
+        _ = workflow_release < 1
 
 
 def test_workflow_release():
     workflow: Workflow = Workflow.from_loader(name="wf-scheduling-common")
     current_date: datetime = datetime.now().replace(second=0, microsecond=0)
-    queue: list[datetime] = [workflow.on[0].generate(current_date).next]
-
     rs: Result = workflow.release(
         workflow.on[0].next(current_date).date,
         params={"asat-dt": datetime(2024, 10, 1)},
-        queue=queue,
     )
     print(rs)
 
@@ -23,7 +34,8 @@ def test_workflow_release():
 def test_workflow_release_with_start_date():
     workflow: Workflow = Workflow.from_loader(name="wf-scheduling-common")
     start_date: datetime = datetime(2024, 1, 1, 1, 1)
-    queue: list[datetime] = []
+    queue: list[WorkflowRelease] = []
+
     rs: Result = workflow.release(
         workflow.on[0].next(start_date).date,
         params={"asat-dt": datetime(2024, 10, 1)},
