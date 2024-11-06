@@ -284,10 +284,10 @@ def catch_exceptions(cancel_on_failure: bool = False) -> DecoratorCancelJob:
     :rtype: DecoratorCancelJob
     """
 
-    def decorator(func: ReturnCancelJob) -> ReturnCancelJob:
+    def decorator(func: ReturnCancelJob) -> ReturnCancelJob:  # pragma: no cov
         try:
             # NOTE: Check the function that want to handle is method or not.
-            if inspect.ismethod(func):  # pragma: no cov
+            if inspect.ismethod(func):
 
                 @wraps(func)
                 def wrapper(self, *args, **kwargs):
@@ -301,7 +301,7 @@ def catch_exceptions(cancel_on_failure: bool = False) -> DecoratorCancelJob:
 
             return wrapper
 
-        except Exception as err:  # pragma: no cov
+        except Exception as err:
             logger.exception(err)
             if cancel_on_failure:
                 return CancelJob
