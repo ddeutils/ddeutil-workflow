@@ -68,7 +68,7 @@ jobs:
           echo "event type is:" ${{ github.event.action }}
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@v1.11.0
+        uses: pypa/gh-action-pypi-publish@v1.12.2
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
 
@@ -96,7 +96,7 @@ jobs:
           echo "event type is:" ${{ github.event.action }}
 
       - name: Publish to Test PyPI
-        uses: pypa/gh-action-pypi-publish@v1.11.0
+        uses: pypa/gh-action-pypi-publish@v1.12.2
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
           repository-url: ${{ vars.PYPI_REPO_URL }}
