@@ -30,7 +30,7 @@ dependencies = [
     "ddeutil-io[yaml,toml]>=0.2.3",
     "pydantic==2.10.2",
     "python-dotenv==1.0.1",
-    "typer==0.14.0",
+    "typer==0.15.1",
     "schedule==1.2.2,<2.0.0",
 ]
 dynamic = ["version"]
