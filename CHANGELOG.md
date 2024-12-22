@@ -2,6 +2,50 @@
 
 ## Latest Changes
 
+## 0.0.20
+
+### :sparkles: Features
+
+- :dart: feat: prepare argument of release method of workflow object. (_2024-11-04_)
+- :dart: feat: revision release and poke method on workflow object. (_2024-11-04_)
+- :dart: feat: add iden property on stage model. (_2024-11-02_)
+- :dart: feat: move workflow data dataclass from schedule module to workflow. (_2024-11-02_)
+- :dart: feat: remove run_id field from workflow model. (_2024-11-02_)
+- :dart: feat: remove run_id field from job model. (_2024-11-02_)
+- :dart: feat: remove run_id field from stage model. (_2024-11-02_)
+- :dart: feat: split workflow object from schedule module. (_2024-11-01_)
+- :dart: feat: add end date in poke method. (_2024-11-01_)
+- :dart: feat: adjust result from workflow release. (_2024-10-31_)
+- :dart: feat: remove running queue on workflow control function. (_2024-10-31_)
+- :dart: feat: prepare logic of workflow task data. (_2024-10-31_)
+- :dart: feat: add logger instance on conf module. (_2024-10-31_)
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: update the stage testcase. (_2024-12-22_)
+- :construction: refactored: rename create sh file on the bash stage object. (_2024-12-22_)
+- :construction: refactored: 📦 bump typer from 0.14.0 to 0.15.1 (_2024-12-10_)
+- :construction: refactored: ⬆ bump pypa/gh-action-pypi-publish from 1.11.0 to 1.12.2 (_2024-12-01_)
+- :construction: refactored: ⬆ bump codecov/codecov-action from 4 to 5 (_2024-12-01_)
+- :construction: refactored: 📦 update typer requirement from <1.0.0,==0.12.5 to ==0.14.0 (_2024-12-01_)
+- :construction: refactored: 📦 bump pydantic from 2.9.2 to 2.10.2 (_2024-12-01_)
+- :test_tube: tests: update testcase for schedule. (_2024-11-06_)
+- :test_tube: tests: fix testcase for workflow object. (_2024-11-04_)
+- :construction: refactored: ⬆ bump pypa/gh-action-pypi-publish from 1.10.2 to 1.11.0 (_2024-11-01_)
+- :construction: refactored: ⬆ bump deadsnakes/action from 3.1.0 to 3.2.0 (_2024-11-01_)
+- :art: styled: change valiable name on schedule module. (_2024-10-30_)
+
+### :card_file_box: Documents
+
+- :page_facing_up: docs: update docs for stage topic. (_2024-12-22_)
+- :page_facing_up: docs: add quote on the nav for the on topic. (_2024-12-22_)
+
+### :bug: Fix Bugs
+
+- :gear: fixed: merge branch 'main' of https://github.com/ddeutils/ddeutil-workflow. (_2024-12-22_)
+- :gear: fixed: fix run_id of workflow execute. (_2024-11-02_)
+- :gear: fixed: fix list does not valid when passing to dataclass. (_2024-10-31_)
+
 ## 0.0.19
 
 ### :sparkles: Features
