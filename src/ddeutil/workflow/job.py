@@ -69,10 +69,14 @@ def make(
     """Make a list of product of matrix values that already filter with
     exclude matrix and add specific matrix with include.
 
+        This function use the `lru_cache` decorator function increase
+    performance for duplicate matrix value scenario.
+
     :param matrix: A matrix values that want to cross product to possible
         parallelism values.
     :param include: A list of additional matrix that want to adds-in.
     :param exclude: A list of exclude matrix that want to filter-out.
+
     :rtype: list[DictStr]
     """
     # NOTE: If it does not set matrix, it will return list of an empty dict.
@@ -204,6 +208,11 @@ class TriggerRules(str, Enum):
 
     all_success: str = "all_success"
     all_failed: str = "all_failed"
+    all_done: str = "all_done"
+    one_failed: str = "one_failed"
+    one_success: str = "one_success"
+    none_failed: str = "none_failed"
+    none_skipped: str = "none_skipped"
 
 
 class Job(BaseModel):

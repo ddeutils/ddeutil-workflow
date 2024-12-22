@@ -54,14 +54,14 @@ nav:
   - index.md
   - Getting Started: getting-started.md
   - Compare:
-    - State Machine Language: state_machine.md
+    - State Machine Language: state-machine.md
     - Cloud Workflow: cloud-workflow.md
-  - Features:
-      - 'Stage': features/stage.md
-      - 'On': features/on.md
-      - 'Job': features/job.md
-      - 'Workflow': features/workflow.md
-      - 'Schedule': features/schedule.md
+  - Modules:
+      - 'Stage': modules/stage.md
+      - 'On': modules/on.md
+      - 'Job': modules/job.md
+      - 'Workflow': modules/workflow.md
+      - 'Schedule': modules/schedule.md
   - Examples:
       - Hooks: examples/hook_stage.md
 

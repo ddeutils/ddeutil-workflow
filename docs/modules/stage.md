@@ -4,6 +4,10 @@
 
     This feature already made 100% coverage.
 
+A stage is the minimum object for this package that use to do a task with it
+propose such as the empty stage is do nothing without printing custom statement
+to stdout.
+
 ## Empty Stage
 
 ```python
