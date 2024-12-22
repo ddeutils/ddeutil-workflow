@@ -13,8 +13,9 @@ handle stage error on this stage model. I think stage model should have a lot of
 usecase and it does not worry when I want to create a new one.
 
     Execution   --> Ok      --> Result with 0
+
                 --> Error   --> Result with 1 (if env var was set)
-                            --> Raise StageException
+                            --> Raise StageException(...)
 
     On the context I/O that pass to a stage object at execute process. The
 execute method receives a `params={"params": {...}}` value for mapping to
@@ -90,15 +91,17 @@ def handler_result(message: str | None = None) -> DecoratorResult:
     environment variable,`WORKFLOW_CORE_STAGE_RAISE_ERROR`.
 
         Execution   --> Ok      --> Result
-                                        status: 0
-                                        context:
-                                            outputs: ...
+                                    |-status: 0
+                                    |-context:
+                                        |-outputs: ...
+
                     --> Error   --> Result (if env var was set)
-                                        status: 1
-                                        context:
-                                            error: ...
-                                            error_message: ...
-                    --> Error   --> Raise StageException
+                                    |-status: 1
+                                    |-context:
+                                        |-error: ...
+                                        |-error_message: ...
+
+                    --> Error   --> Raise StageException(...)
 
         On the last step, it will set the running ID on a return result object
     from current stage ID before release the final result.
@@ -369,7 +372,7 @@ class BashStage(BaseStage):
     )
 
     @contextlib.contextmanager
-    def prepare_bash(
+    def create_sh_file(
         self, bash: str, env: DictStr, run_id: str | None = None
     ) -> Iterator[TupleStr]:
         """Return context of prepared bash statement that want to execute. This
@@ -419,7 +422,7 @@ class BashStage(BaseStage):
         bash: str = param2template(dedent(self.bash), params)
 
         logger.info(f"({run_id}) [STAGE]: Shell-Execute: {self.name}")
-        with self.prepare_bash(
+        with self.create_sh_file(
             bash=bash, env=param2template(self.env, params), run_id=run_id
         ) as sh:
             rs: CompletedProcess = subprocess.run(

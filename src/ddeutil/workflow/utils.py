@@ -358,8 +358,6 @@ class Result:
 
     status: int = field(default=2)
     context: DictData = field(default_factory=dict)
-    # start_at: datetime = field(default_factory=get_dt_now, compare=False)
-    # end_at: Optional[datetime] = field(default=None, compare=False)
 
     # NOTE: Ignore this field to compare another result model with __eq__.
     run_id: Optional[str] = field(default=None)
@@ -576,7 +574,14 @@ def get_args_from_filter(
 
 @custom_filter("fmt")  # pragma: no cov
 def datetime_format(value: datetime, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
-    """Format datetime object to string with the format."""
+    """Format datetime object to string with the format.
+
+    :param value: A datetime value that want to format to string value.
+    :param fmt: A format string pattern that passing to the `dt.strftime`
+        method.
+
+    :rtype: str
+    """
     if isinstance(value, datetime):
         return value.strftime(fmt)
     raise UtilException(

@@ -12,8 +12,10 @@ def test_stage():
     )
     assert stage.iden == "Empty Stage"
 
+    # NOTE: Copy the stage model with adding the id field.
     new_stage: Stage = stage.model_copy(update={"id": "stage-empty"})
     assert id(stage) != id(new_stage)
+    assert new_stage.iden == "stage-empty"
 
     # NOTE: Passing run_id directly to a Stage object.
     stage: Stage = EmptyStage.model_validate(
@@ -24,10 +26,9 @@ def test_stage():
 
 
 def test_stage_empty_execute():
-    stage: Stage = EmptyStage.model_validate(
-        {"name": "Empty Stage", "echo": "hello world"}
-    )
+    stage: Stage = EmptyStage(name="Empty Stage", echo="hello world")
     rs: Result = stage.execute(params={})
+    assert isinstance(rs, Result)
     assert 0 == rs.status
     assert {} == rs.context
 
