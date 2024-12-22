@@ -14,3 +14,11 @@ stage: Stage = EmptyStage(name="Empty Stage", echo="hello world")
 rs: Result = stage.execute(params={})
 assert {} == rs.context
 ```
+
+## Bash Stage
+
+## Python Stage
+
+## Hook Stage
+
+## Trigger Stage

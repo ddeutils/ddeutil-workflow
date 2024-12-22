@@ -69,16 +69,13 @@ logger = get_logger("ddeutil.workflow")
 
 
 __all__: TupleStr = (
-    "BaseStage",
     "EmptyStage",
     "BashStage",
     "PyStage",
     "HookStage",
     "TriggerStage",
     "Stage",
-    "HookSearchData",
     "extract_hook",
-    "handler_result",
 )
 
 
@@ -168,6 +165,8 @@ class BaseStage(BaseModel, ABC):
     """Base Stage Model that keep only id and name fields for the stage
     metadata. If you want to implement any custom stage, you can use this class
     to parent and implement ``self.execute()`` method only.
+
+        This class is the abstraction class for any stage class.
     """
 
     id: Optional[str] = Field(
@@ -284,13 +283,18 @@ class BaseStage(BaseModel, ABC):
         :param params: A parameters that want to pass to condition template.
         :rtype: bool
         """
+        # NOTE: Return false result if condition does not set.
         if self.condition is None:
             return False
 
         params: DictData = {} if params is None else params
-        _g: DictData = globals() | params
+
         try:
-            rs: bool = eval(param2template(self.condition, params), _g, {})
+            # WARNING: The eval build-in function is vary dangerous. So, it
+            #   should us the re module to validate eval-string before running.
+            rs: bool = eval(
+                param2template(self.condition, params), globals() | params, {}
+            )
             if not isinstance(rs, bool):
                 raise TypeError("Return type of condition does not be boolean")
             return not rs
@@ -531,6 +535,9 @@ class PyStage(BaseStage):
 
         # NOTE: Start exec the run statement.
         logger.info(f"({run_id}) [STAGE]: Py-Execute: {self.name}")
+
+        # WARNING: The exec build-in function is vary dangerous. So, it
+        #   should us the re module to validate exec-string before running.
         exec(run, _globals, lc)
 
         return Result(

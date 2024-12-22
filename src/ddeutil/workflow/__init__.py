@@ -35,7 +35,7 @@ from .stage import (
     PyStage,
     Stage,
     TriggerStage,
-    handler_result,
+    extract_hook,
 )
 from .utils import (
     FILTERS,

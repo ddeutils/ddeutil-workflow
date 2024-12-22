@@ -23,6 +23,7 @@ def test_stage():
     )
     assert stage.id == "dummy"
     assert stage.iden == "dummy"
+    assert not stage.is_skipped()
 
 
 def test_stage_empty_execute():

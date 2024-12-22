@@ -3,6 +3,10 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
+"""Exception objects for this package do not do anything because I want to
+create the lightweight workflow package. So, this module do just a exception
+annotate for handle error only.
+"""
 from __future__ import annotations
 
 
