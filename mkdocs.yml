@@ -57,11 +57,11 @@ nav:
     - State Machine Language: state_machine.md
     - Cloud Workflow: cloud-workflow.md
   - Features:
-      - Stage: features/stage.md
-      - On: features/on.md
-      - Job: features/job.md
-      - Workflow: features/workflow.md
-      - Schedule: features/schedule.md
+      - 'Stage': features/stage.md
+      - 'On': features/on.md
+      - 'Job': features/job.md
+      - 'Workflow': features/workflow.md
+      - 'Schedule': features/schedule.md
   - Examples:
       - Hooks: examples/hook_stage.md
 
