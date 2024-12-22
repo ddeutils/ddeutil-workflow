@@ -70,6 +70,7 @@ def test_stage_if_condition_raise():
     stage: Stage = workflow.job("condition-job").stage(
         stage_id="condition-stage"
     )
+
     # NOTE: Raise error because output of if-condition does not be boolean type.
     with pytest.raises(StageException):
         stage.is_skipped({"params": {"name": "foo"}})

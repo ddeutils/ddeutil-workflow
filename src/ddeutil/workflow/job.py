@@ -204,7 +204,7 @@ class Strategy(BaseModel):
 
 
 class TriggerRules(str, Enum):
-    """Trigger Rules enum object."""
+    """Trigger rules enum object."""
 
     all_success: str = "all_success"
     all_failed: str = "all_failed"
@@ -216,7 +216,7 @@ class TriggerRules(str, Enum):
 
 
 class Job(BaseModel):
-    """Job Pydantic model object (group of stages).
+    """Job Pydantic model object (short descripte: a group of stages).
 
         This job model allow you to use for-loop that call matrix strategy. If
     you pass matrix mapping and it able to generate, you will see it running
@@ -327,7 +327,10 @@ class Job(BaseModel):
         return self
 
     def stage(self, stage_id: str) -> Stage:
-        """Return stage model that match with an input stage ID.
+        """Return stage instance that exists in this job via passing an input
+        stage ID.
+
+        :raise ValueError: If an input stage ID does not found on this job.
 
         :param stage_id: A stage ID that want to extract from this job.
         :rtype: Stage
@@ -360,8 +363,12 @@ class Job(BaseModel):
                         }
                     }
 
+        :raise JobException: If the job's ID does not set and the setting
+            default job ID flag does not set.
+
         :param output: An output context.
         :param to: A context data that want to add output result.
+
         :rtype: DictData
         """
         if self.id is None and not config.job_default_id:
@@ -387,8 +394,8 @@ class Job(BaseModel):
         self,
         strategy: DictData,
         params: DictData,
-        run_id: str | None = None,
         *,
+        run_id: str | None = None,
         event: Event | None = None,
     ) -> Result:
         """Job Strategy execution with passing dynamic parameters from the
@@ -566,6 +573,7 @@ class Job(BaseModel):
             max_workers=self.strategy.max_parallel,
             thread_name_prefix="job_strategy_exec_",
         ) as executor:
+
             futures: list[Future] = [
                 executor.submit(
                     self.execute_strategy,
@@ -675,6 +683,7 @@ class Job(BaseModel):
         rs_final: Result = Result()
         context: DictData = {}
         status: int = 0
+
         for future in as_completed(futures, timeout=timeout):
             try:
                 context.update(future.result(timeout=result_timeout).context)
@@ -706,4 +715,5 @@ class Job(BaseModel):
                         "error_message": f"{err.__class__.__name__}: {err}",
                     },
                 )
+
         return rs_final.catch(status=status, context=context)

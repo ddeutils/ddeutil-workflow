@@ -10,6 +10,13 @@ to stdout.
 
 ## Empty Stage
 
+## Fields
+
+| field | data type   | default | description |
+|-------|-------------|---------|-------------|
+| echo  | str \| None | None    |             |
+| sleep | float       | 0       |             |
+
 ```python
 from ddeutil.workflow.stage import EmptyStage, Stage
 from ddeutil.workflow.utils import Result

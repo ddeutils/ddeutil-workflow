@@ -496,6 +496,7 @@ class PyStage(BaseStage):
 
         :param output: A output data that want to extract to an output key.
         :param to: A context data that want to add output result.
+
         :rtype: DictData
         """
         # NOTE: The output will fileter unnecessary keys from locals.
