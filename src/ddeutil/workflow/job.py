@@ -214,6 +214,13 @@ class TriggerRules(str, Enum):
     none_skipped: str = "none_skipped"
 
 
+class RunsOn(str, Enum):
+    """Runs-On enum object."""
+
+    local: str = "local"
+    docker: str = "docker"
+
+
 class Job(BaseModel):
     """Job Pydantic model object (short descripte: a group of stages).
 
@@ -549,7 +556,8 @@ class Job(BaseModel):
         run_id: str = run_id or gen_id(self.id or "", unique=True)
         context: DictData = {}
 
-        # NOTE: Normal Job execution without parallel strategy.
+        # NOTE: Normal Job execution without parallel strategy matrix. It use
+        #   for-loop to control strategy execution sequentially.
         if (not self.strategy.is_set()) or self.strategy.max_parallel == 1:
             for strategy in self.strategy.make():
                 rs: Result = self.execute_strategy(
@@ -585,7 +593,6 @@ class Job(BaseModel):
                 for strategy in self.strategy.make()
             ]
 
-            # NOTE: Dynamic catching futures object with fail-fast flag.
             return (
                 self.__catch_fail_fast(event, futures=futures, run_id=run_id)
                 if self.strategy.fail_fast

@@ -131,7 +131,7 @@ class WorkflowQueue:
 
     @property
     def is_queued(self) -> bool:
-        """Return True if it has data in the queue.
+        """Return True if it has workflow release object in the queue.
 
         :rtype: bool
         """
@@ -168,10 +168,12 @@ class WorkflowQueue:
 
 
 class Workflow(BaseModel):
-    """Workflow Pydantic model this is the main future of this project because
-    it use to be workflow data for running everywhere that you want or using it
-    to scheduler task in background. It use lightweight coding line from
-    Pydantic Model and enhance execute method on it.
+    """Workflow Pydantic model.
+
+        This is the main future of this project because it use to be workflow
+    data for running everywhere that you want or using it to scheduler task in
+    background. It use lightweight coding line from Pydantic Model and enhance
+    execute method on it.
     """
 
     name: str = Field(description="A workflow name.")
@@ -207,6 +209,7 @@ class Workflow(BaseModel):
         :param name: A workflow name that want to pass to Loader object.
         :param externals: An external parameters that want to pass to Loader
             object.
+
         :rtype: Self
         """
         loader: Loader = Loader(name, externals=(externals or {}))
@@ -280,7 +283,10 @@ class Workflow(BaseModel):
     @field_validator("on", mode="after")
     def __on_no_dup__(cls, value: list[On]) -> list[On]:
         """Validate the on fields should not contain duplicate values and if it
-        contain every minute value, it should has only one on value.
+        contain the every minute value more than one value, it will remove to
+        only one value.
+
+        :raise ValueError: If it has some duplicate value.
 
         :rtype: list[On]
         """
@@ -646,8 +652,7 @@ class Workflow(BaseModel):
             # WARNING: This poking method does not allow to use fail-fast
             #   logic to catching parallel execution result.
             for future in as_completed(futures):
-                rs: Result = future.result(timeout=60)
-                results.append(rs.set_parent_run_id(run_id))
+                results.append(future.result().set_parent_run_id(run_id))
 
         while len(workflow_queue.running) > 0:  # pragma: no cov
             logger.warning(
@@ -719,7 +724,7 @@ class Workflow(BaseModel):
         params: DictData,
         run_id: str | None = None,
         *,
-        timeout: int = 60,
+        timeout: int = -1,
     ) -> Result:
         """Execute workflow with passing a dynamic parameters to all jobs that
         included in this workflow model with ``jobs`` field.
@@ -740,7 +745,7 @@ class Workflow(BaseModel):
         :type run_id: str | None
         :param timeout: A workflow execution time out in second unit that use
             for limit time of execution and waiting job dependency. Default is
-            60 seconds.
+            600 seconds.
         :type timeout: int
 
         :rtype: Result
@@ -792,17 +797,16 @@ class Workflow(BaseModel):
                     context=context,
                     ts=ts,
                     job_queue=jq,
-                    worker=config.max_job_parallel,
                     timeout=timeout,
                 )
         except WorkflowException as err:
+            status: int = 1
             context.update(
                 {
                     "error": err,
                     "error_message": f"{err.__class__.__name__}: {err}",
                 },
             )
-            status = 1
         return rs.catch(status=status, context=context)
 
     def __exec_threading(
@@ -812,8 +816,7 @@ class Workflow(BaseModel):
         ts: float,
         job_queue: Queue,
         *,
-        worker: int = 2,
-        timeout: int = 600,
+        timeout: int = -1,
     ) -> DictData:
         """Workflow execution by threading strategy.
 
@@ -825,18 +828,21 @@ class Workflow(BaseModel):
             timeout.
         :param job_queue: A job queue object.
         :param timeout: A second value unit that bounding running time.
-        :param worker: A number of threading executor pool size.
+
         :rtype: DictData
         """
         not_time_out_flag: bool = True
+        timeout: int = config.max_job_exec_timeout if timeout == -1 else timeout
         logger.debug(
-            f"({run_id}): [WORKFLOW]: Run {self.name} with threading job "
-            f"executor"
+            f"({run_id}): [WORKFLOW]: Run {self.name} with threading executor."
         )
 
         # IMPORTANT: The job execution can run parallel and waiting by
         #   needed.
-        with ThreadPoolExecutor(max_workers=worker) as executor:
+        with ThreadPoolExecutor(
+            max_workers=config.max_job_parallel,
+            thread_name_prefix="workflow_exec_threading_",
+        ) as executor:
             futures: list[Future] = []
 
             while not job_queue.empty() and (
@@ -876,12 +882,9 @@ class Workflow(BaseModel):
                 if err := future.exception():
                     logger.error(f"({run_id}) [WORKFLOW]: {err}")
                     raise WorkflowException(f"{err}")
-                try:
-                    future.result(timeout=60)
-                except TimeoutError as err:  # pragma: no cove
-                    raise WorkflowException(
-                        "Timeout when getting result from future"
-                    ) from err
+
+                # NOTE: This getting result does not do anything.
+                future.result()
 
         if not_time_out_flag:
             return context
@@ -902,7 +905,7 @@ class Workflow(BaseModel):
         ts: float,
         job_queue: Queue,
         *,
-        timeout: int = 600,
+        timeout: int = -1,
     ) -> DictData:
         """Workflow execution with non-threading strategy that use sequential
         job running and waiting previous job was run successful.
@@ -914,12 +917,14 @@ class Workflow(BaseModel):
         :param ts: A start timestamp that use for checking execute time should
             timeout.
         :param timeout: A second value unit that bounding running time.
+
         :rtype: DictData
         """
         not_time_out_flag: bool = True
+        timeout: int = config.max_job_exec_timeout if timeout == -1 else timeout
         logger.debug(
-            f"({run_id}) [WORKFLOW]: Run {self.name} with non-threading job "
-            f"executor"
+            f"({run_id}) [WORKFLOW]: Run {self.name} with non-threading "
+            f"executor."
         )
 
         while not job_queue.empty() and (

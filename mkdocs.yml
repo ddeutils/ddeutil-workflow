@@ -53,9 +53,7 @@ extra:
 nav:
   - index.md
   - Getting Started: getting-started.md
-  - Compare:
-    - State Machine Language: state-machine.md
-    - Cloud Workflow: cloud-workflow.md
+  - Configuration: configuration.md
   - Modules:
       - 'Stage': modules/stage.md
       - 'On': modules/on.md

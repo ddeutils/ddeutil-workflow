@@ -100,6 +100,9 @@ class Config:
 
     # NOTE: Workflow
     max_job_parallel: int = int(env("WORKFLOW_CORE_MAX_JOB_PARALLEL", "2"))
+    max_job_exec_timeout: int = int(
+        env("WORKFLOW_CORE_MAX_JOB_EXEC_TIMEOUT", "600")
+    )
     max_poking_pool_worker: int = int(
         os.getenv("WORKFLOW_CORE_MAX_NUM_POKING", "4")
     )

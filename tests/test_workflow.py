@@ -2,26 +2,27 @@ import pytest
 import yaml
 from ddeutil.workflow import Workflow
 from ddeutil.workflow.exceptions import WorkflowException
+from ddeutil.workflow.job import Job
 from ddeutil.workflow.utils import Result
 from pydantic import ValidationError
 
 
 def test_workflow():
+    job: Job = Job(
+        stages=[
+            {"name": "Run Hello World", "run": "print(f'Hello {x}')\n"},
+            {
+                "name": "Run Sequence and use var from Above",
+                "run": (
+                    "print(f'Receive x from above with {x}')\n\n" "x: int = 1\n"
+                ),
+            },
+        ],
+    )
     workflow: Workflow = Workflow(
         name="manual-workflow",
         jobs={
-            "demo-run": {
-                "stages": [
-                    {"name": "Run Hello World", "run": "print(f'Hello {x}')\n"},
-                    {
-                        "name": "Run Sequence and use var from Above",
-                        "run": (
-                            "print(f'Receive x from above with {x}')\n\n"
-                            "x: int = 1\n"
-                        ),
-                    },
-                ]
-            },
+            "demo-run": job,
             "next-run": {
                 "stages": [
                     {
@@ -37,6 +38,9 @@ def test_workflow():
             },
         },
     )
+
+    assert workflow.name == "manual-workflow"
+    assert workflow.job("demo-run") == job
 
     # NOTE: Raise ValueError when get a job with ID that does not exist.
     with pytest.raises(ValueError):
@@ -73,6 +77,7 @@ def test_workflow_from_loader_without_job():
 def test_workflow_from_loader_raise(test_path):
     test_file = test_path / "conf/demo/01_01_wf_run_raise.yml"
 
+    # NOTE: Raise for type of workflow does not valid.
     with test_file.open(mode="w") as f:
         yaml.dump(
             {
@@ -93,6 +98,7 @@ def test_workflow_from_loader_raise(test_path):
     with pytest.raises(ValueError):
         Workflow.from_loader(name="wf-run-from-loader-raise")
 
+    # NOTE: Raise if type of the on field does not valid with str or dict.
     with test_file.open(mode="w") as f:
         yaml.dump(
             {
@@ -117,6 +123,7 @@ def test_workflow_from_loader_raise(test_path):
     with pytest.raises(TypeError):
         Workflow.from_loader(name="wf-run-from-loader-raise")
 
+    # NOTE: Raise if value of the on field does not parsing to the CronJob obj.
     with test_file.open(mode="w") as f:
         yaml.dump(
             {
@@ -137,6 +144,7 @@ def test_workflow_from_loader_raise(test_path):
     with pytest.raises(WorkflowException):
         Workflow.from_loader(name="wf-run-from-loader-raise")
 
+    # NOTE: Remove the testing file on the demo path.
     test_file.unlink(missing_ok=True)
 
 
@@ -175,5 +183,6 @@ def test_workflow_parameterize():
         "jobs": {},
     }
 
+    # NOTE: Raise if passing parameter that does not set on the workflow.
     with pytest.raises(WorkflowException):
         workflow.parameterize({"foo": "bar"})
