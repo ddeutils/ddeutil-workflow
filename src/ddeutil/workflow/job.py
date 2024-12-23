@@ -405,11 +405,15 @@ class Job(BaseModel):
         It different with ``self.execute`` because this method run only one
         strategy and return with context of this strategy data.
 
+            The result of this execution will return result with strategy ID
+        that generated from the `gen_id` function with a input strategy value.
+
         :raise JobException: If it has any error from ``StageException`` or
             ``UtilException``.
 
-        :param strategy: A metrix strategy value.
-        :param params: A dynamic parameters.
+        :param strategy: A strategy metrix value that use on this execution.
+            This value will pass to the `matrix` key for templating.
+        :param params: A dynamic parameters that will deepcopy to the context.
         :param run_id: A job running ID for this strategy execution.
         :param event: An manger event that pass to the PoolThreadExecutor.
 
@@ -440,17 +444,19 @@ class Job(BaseModel):
                 logger.info(f"({run_id}) [JOB]: Skip stage: {stage.iden!r}")
                 continue
 
-            logger.info(
-                f"({run_id}) [JOB]: Start execute the stage: {stage.iden!r}"
-            )
+            logger.info(f"({run_id}) [JOB]: Execute stage: {stage.iden!r}")
 
             # NOTE: Logging a matrix that pass on this stage execution.
             if strategy:
-                logger.info(f"({run_id}) [JOB]: Matrix: {strategy}")
+                logger.info(f"({run_id}) [JOB]: ... Matrix: {strategy}")
 
             # NOTE: Force stop this execution if event was set from main
             #   execution.
             if event and event.is_set():
+                error_msg: str = (
+                    "Job strategy was canceled from event that had set before "
+                    "strategy execution."
+                )
                 return Result(
                     status=1,
                     context={
@@ -460,15 +466,10 @@ class Job(BaseModel):
                             #   it will not filter function object from context.
                             # ---
                             # "stages": filter_func(context.pop("stages", {})),
+                            #
                             "stages": context.pop("stages", {}),
-                            "error": JobException(
-                                "Job strategy was canceled from trigger event "
-                                "that had stopped before execution."
-                            ),
-                            "error_message": (
-                                "Job strategy was canceled from trigger event "
-                                "that had stopped before execution."
-                            ),
+                            "error": JobException(error_msg),
+                            "error_message": error_msg,
                         },
                     },
                     run_id=run_id,
@@ -519,7 +520,7 @@ class Job(BaseModel):
                     run_id=run_id,
                 )
 
-            # NOTE: Remove the current stage object.
+            # NOTE: Remove the current stage object for saving memory.
             del stage
 
         return Result(
@@ -587,9 +588,7 @@ class Job(BaseModel):
 
             # NOTE: Dynamic catching futures object with fail-fast flag.
             return (
-                self.__catch_fail_fast(
-                    event=event, futures=futures, run_id=run_id
-                )
+                self.__catch_fail_fast(event, futures=futures, run_id=run_id)
                 if self.strategy.fail_fast
                 else self.__catch_all_completed(futures=futures, run_id=run_id)
             )
