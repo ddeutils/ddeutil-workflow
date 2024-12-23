@@ -11,7 +11,6 @@ job.
 from __future__ import annotations
 
 import copy
-import time
 from concurrent.futures import (
     FIRST_EXCEPTION,
     Future,
@@ -600,19 +599,17 @@ class Job(BaseModel):
         run_id: str,
         *,
         timeout: int = 1800,
-        result_timeout: int = 60,
     ) -> Result:
         """Job parallel pool futures catching with fail-fast mode. That will
-        stop all not done futures if it receive the first exception from all
-        running futures.
+        stop and set event on all not done futures if it receive the first
+        exception from all running futures.
 
         :param event: An event manager instance that able to set stopper on the
-            observing thread/process.
+            observing multithreading.
         :param futures: A list of futures.
         :param run_id: A job running ID from execution.
         :param timeout: A timeout to waiting all futures complete.
-        :param result_timeout: A timeout of getting result from the future
-            instance when it was running completely.
+
         :rtype: Result
         """
         rs_final: Result = Result()
@@ -622,9 +619,7 @@ class Job(BaseModel):
         # NOTE: Get results from a collection of tasks with a timeout that has
         #   the first exception.
         done, not_done = wait(
-            futures,
-            timeout=timeout,
-            return_when=FIRST_EXCEPTION,
+            futures, timeout=timeout, return_when=FIRST_EXCEPTION
         )
         nd: str = (
             f", the strategies do not run is {not_done}" if not_done else ""
@@ -642,11 +637,13 @@ class Job(BaseModel):
 
         future: Future
         for future in done:
+
+            # NOTE: Handle the first exception from feature
             if err := future.exception():
                 status: int = 1
                 logger.error(
-                    f"({run_id}) [JOB]: One stage failed with: "
-                    f"{future.exception()}, shutting down this future."
+                    f"({run_id}) [JOB]: Fail-fast catching:\n\t"
+                    f"{future.exception()}"
                 )
                 context.update(
                     {
@@ -657,7 +654,7 @@ class Job(BaseModel):
                 continue
 
             # NOTE: Update the result context to main job context.
-            context.update(future.result(timeout=result_timeout).context)
+            context.update(future.result().context)
 
         return rs_final.catch(status=status, context=context)
 
@@ -667,16 +664,13 @@ class Job(BaseModel):
         run_id: str,
         *,
         timeout: int = 1800,
-        result_timeout: int = 60,
     ) -> Result:
         """Job parallel pool futures catching with all-completed mode.
 
-        :param futures: A list of futures that want to catch all completed
-            result.
+        :param futures: A list of futures.
         :param run_id: A job running ID from execution.
         :param timeout: A timeout to waiting all futures complete.
-        :param result_timeout: A timeout of getting result from the future
-            instance when it was running completely.
+
         :rtype: Result
         """
         rs_final: Result = Result()
@@ -685,28 +679,12 @@ class Job(BaseModel):
 
         for future in as_completed(futures, timeout=timeout):
             try:
-                context.update(future.result(timeout=result_timeout).context)
-            except TimeoutError:  # pragma: no cov
-                status = 1
-                logger.warning(
-                    f"({run_id}) [JOB]: Task is hanging. Attempting to "
-                    f"kill."
-                )
-                future.cancel()
-                time.sleep(0.1)
-
-                stmt: str = (
-                    "Failed to cancel the task."
-                    if not future.cancelled()
-                    else "Task canceled successfully."
-                )
-                logger.warning(f"({run_id}) [JOB]: {stmt}")
+                context.update(future.result().context)
             except JobException as err:
                 status = 1
                 logger.error(
-                    f"({run_id}) [JOB]: Get stage exception with "
-                    f"fail-fast does not set;\n{err.__class__.__name__}:\n\t"
-                    f"{err}"
+                    f"({run_id}) [JOB]: All-completed catching:\n\t"
+                    f"{err.__class__.__name__}:\n\t{err}"
                 )
                 context.update(
                     {

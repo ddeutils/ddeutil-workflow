@@ -1,5 +1,9 @@
 # Job
 
+!!! note
+
+    This feature already made 100% coverage.
+
 This job module include Strategy and Job objects.
 
 ## Strategy

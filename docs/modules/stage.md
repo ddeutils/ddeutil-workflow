@@ -12,10 +12,10 @@ to stdout.
 
 ### Fields
 
-| field | data type   | default | description |
-|-------|-------------|---------|-------------|
-| echo  | str \| None | None    |             |
-| sleep | float       | 0       |             |
+| field | data type   | default  | description |
+|-------|-------------|:--------:|-------------|
+| echo  | str \| None |   None   |             |
+| sleep | float       |    0     |             |
 
 !!! example
 
@@ -32,34 +32,34 @@ to stdout.
 
 ### Fields
 
-| field   | data type      | default | description |
-|---------|----------------|---------|-------------|
-| bash    | str            |         |             |
-| env     | dict[str, Any] | dict()  |             |
+| field   | data type      | default  | description |
+|---------|----------------|:--------:|-------------|
+| bash    | str            |          |             |
+| env     | dict[str, Any] |  dict()  |             |
 
 ## Python Stage
 
 ### Fields
 
-| field | data type      | default | description |
-|-------|----------------|---------|-------------|
-| run   | str            |         |             |
-| vars  | dict[str, Any] | dict()  |             |
+| field | data type      | default  | description |
+|-------|----------------|:--------:|-------------|
+| run   | str            |          |             |
+| vars  | dict[str, Any] |  dict()  |             |
 
 ## Hook Stage
 
 ### Fields
 
-| field  | data type           | default | description |
-|--------|---------------------|---------|-------------|
-| uses   | str                 |         |             |
-| args   | dict[str, Any]      | dict()  |             |
+| field  | data type           | default  | description |
+|--------|---------------------|:--------:|-------------|
+| uses   | str                 |          |             |
+| args   | dict[str, Any]      |  dict()  |             |
 
 ## Trigger Stage
 
 ### Fields
 
-| field     | data type      | default | description |
-|-----------|----------------|---------|-------------|
-| trigger   | str            |         |             |
-| params    | dict[str, Any] | dict()  |             |
+| field     | data type      | default  | description |
+|-----------|----------------|:--------:|-------------|
+| trigger   | str            |          |             |
+| params    | dict[str, Any] |  dict()  |             |

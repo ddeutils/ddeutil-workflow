@@ -92,7 +92,7 @@ def test_job_exec_strategy_event_set():
 
     return_value: Result = future.result()
     assert return_value.context["1354680202"]["error_message"] == (
-        "Job strategy was canceled from trigger event that had stopped before "
+        "Job strategy was canceled from event that had set before strategy "
         "execution."
     )
 
