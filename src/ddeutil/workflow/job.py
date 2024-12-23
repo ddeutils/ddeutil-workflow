@@ -123,7 +123,7 @@ def make(
 
 
 class Strategy(BaseModel):
-    """Strategy Model that will combine a matrix together for running the
+    """Strategy model that will combine a matrix together for running the
     special job with combination of matrix data.
 
         This model does not be the part of job only because you can use it to

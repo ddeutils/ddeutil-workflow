@@ -3,8 +3,7 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-"""
-The main schedule running is ``workflow_runner`` function that trigger the
+"""The main schedule running is ``workflow_runner`` function that trigger the
 multiprocess of ``workflow_control`` function for listing schedules on the
 config by ``Loader.finds(Schedule)``.
 
@@ -12,6 +11,7 @@ config by ``Loader.finds(Schedule)``.
 functions; ``workflow_task``, and ``workflow_monitor``.
 
     ``workflow_control`` --- Every minute at :02 --> ``workflow_task``
+
                          --- Every 5 minutes     --> ``workflow_monitor``
 
     The ``workflow_task`` will run ``task.release`` method in threading object
@@ -70,7 +70,7 @@ __all__: TupleStr = (
 @total_ordering
 @dataclass(config=ConfigDict(arbitrary_types_allowed=True))
 class WorkflowRelease:
-    """Workflow release data dataclass object."""
+    """Workflow release Pydantic dataclass object."""
 
     date: datetime
     offset: float
@@ -86,6 +86,12 @@ class WorkflowRelease:
 
     @classmethod
     def from_dt(cls, dt: datetime) -> Self:
+        """Construct WorkflowRelease via datetime object only.
+
+        :param dt: A datetime object.
+
+        :rtype: Self
+        """
         return cls(
             date=dt,
             offset=0,
@@ -95,6 +101,9 @@ class WorkflowRelease:
         )
 
     def __eq__(self, other: WorkflowRelease | datetime) -> bool:
+        """Override equal property that will compare only the same type or
+        datetime.
+        """
         if isinstance(other, self.__class__):
             return self.date == other.date
         elif isinstance(other, datetime):
@@ -102,6 +111,9 @@ class WorkflowRelease:
         return NotImplemented
 
     def __lt__(self, other: WorkflowRelease | datetime) -> bool:
+        """Override equal property that will compare only the same type or
+        datetime.
+        """
         if isinstance(other, self.__class__):
             return self.date < other.date
         elif isinstance(other, datetime):
@@ -119,14 +131,19 @@ class WorkflowQueue:
 
     @property
     def is_queued(self) -> bool:
-        """Return True if it has data in the queue."""
+        """Return True if it has data in the queue.
+
+        :rtype: bool
+        """
         return len(self.queue) > 0
 
     def check_queue(self, data: WorkflowRelease) -> bool:
         """Check a WorkflowRelease value already exists in list of tracking
         queues.
 
-        :param data:
+        :param data: A workflow release object.
+
+        :rtype: bool
         """
         return (
             (data in self.queue)
@@ -135,20 +152,23 @@ class WorkflowQueue:
         )
 
     def push_queue(self, data: WorkflowRelease) -> Self:
+        """Push data to the queue."""
         heappush(self.queue, data)
         return self
 
     def push_running(self, data: WorkflowRelease) -> Self:
+        """Push data to the running."""
         heappush(self.running, data)
         return self
 
     def remove_running(self, data: WorkflowRelease) -> Self:
+        """Remove data on the running if it exists."""
         if data in self.running:
             self.running.remove(data)
 
 
 class Workflow(BaseModel):
-    """Workflow Pydantic Model this is the main future of this project because
+    """Workflow Pydantic model this is the main future of this project because
     it use to be workflow data for running everywhere that you want or using it
     to scheduler task in background. It use lightweight coding line from
     Pydantic Model and enhance execute method on it.
@@ -260,7 +280,10 @@ class Workflow(BaseModel):
     @field_validator("on", mode="after")
     def __on_no_dup__(cls, value: list[On]) -> list[On]:
         """Validate the on fields should not contain duplicate values and if it
-        contain every minute value, it should has only one on value."""
+        contain every minute value, it should has only one on value.
+
+        :rtype: list[On]
+        """
         set_ons: set[str] = {str(on.cronjob) for on in value}
         if len(set_ons) != len(value):
             raise ValueError(
@@ -909,7 +932,7 @@ class Workflow(BaseModel):
             if any(need not in context["jobs"] for need in job.needs):
                 job_queue.task_done()
                 job_queue.put(job_id)
-                time.sleep(0.05)
+                time.sleep(0.075)
                 continue
 
             # NOTE: Start workflow job execution with deep copy context data
@@ -942,10 +965,10 @@ class Workflow(BaseModel):
 
 @dataclass(config=ConfigDict(arbitrary_types_allowed=True))
 class WorkflowTaskData:
-    """Workflow task dataclass that use to keep mapping data and objects for
-    passing in multithreading task.
+    """Workflow task Pydantic dataclass object that use to keep mapping data and
+    workflow model for passing to the multithreading task.
 
-        This dataclass will be 1-1 mapping with workflow and cron runner
+        This dataclass object is mapping 1-to-1 with workflow and cron runner
     objects.
     """
 
@@ -1075,7 +1098,8 @@ class WorkflowTaskData:
         # NOTE: Queue next release date.
         logger.debug(f"[CORE]: {'-' * 100}")
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: WorkflowTaskData) -> bool:
+        """Override equal property that will compare only the same type."""
         if isinstance(other, WorkflowTaskData):
             return (
                 self.workflow.name == other.workflow.name

@@ -40,3 +40,11 @@ wf.execute(params={'author-run': 'Local Workflow', 'run-date': '2024-01-01'})
 >
 > And for the type, you can remove `ddeutil.workflow` prefix because we can find
 > it by looping search from `WORKFLOW_CORE_REGISTRY` value.
+
+## Workflow
+
+## WorkflowRelease
+
+## WorkflowQueue
+
+## WorkflowTaskData

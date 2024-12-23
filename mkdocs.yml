@@ -61,7 +61,7 @@ nav:
       - 'On': modules/on.md
       - 'Job': modules/job.md
       - 'Workflow': modules/workflow.md
-      - 'Schedule': modules/schedule.md
+      - 'Scheduler': modules/scheduler.md
   - Examples:
       - Hooks: examples/hook_stage.md
 
