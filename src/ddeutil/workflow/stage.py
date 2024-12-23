@@ -639,8 +639,7 @@ class HookStage(BaseStage):
 
         :rtype: Result
         """
-        t_func_hook: str = param2template(self.uses, params)
-        t_func: TagFunc = extract_hook(t_func_hook)()
+        t_func: TagFunc = extract_hook(param2template(self.uses, params))()
 
         # VALIDATE: check input task caller parameters that exists before
         #   calling.

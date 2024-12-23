@@ -101,6 +101,7 @@ class Re:
     #
     #   Examples:
     #       - tasks/function@dummy
+    #
     __re_task_fmt: str = r"""
         ^
             (?P<path>[^/@]+)

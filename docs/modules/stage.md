@@ -10,26 +10,56 @@ to stdout.
 
 ## Empty Stage
 
-## Fields
+### Fields
 
 | field | data type   | default | description |
 |-------|-------------|---------|-------------|
 | echo  | str \| None | None    |             |
 | sleep | float       | 0       |             |
 
-```python
-from ddeutil.workflow.stage import EmptyStage, Stage
-from ddeutil.workflow.utils import Result
+!!! example
 
-stage: Stage = EmptyStage(name="Empty Stage", echo="hello world")
-rs: Result = stage.execute(params={})
-assert {} == rs.context
-```
+    ```python
+    from ddeutil.workflow.stage import EmptyStage, Stage
+    from ddeutil.workflow.utils import Result
+
+    stage: Stage = EmptyStage(name="Empty Stage", echo="hello world")
+    rs: Result = stage.execute(params={})
+    assert {} == rs.context
+    ```
 
 ## Bash Stage
 
+### Fields
+
+| field   | data type      | default | description |
+|---------|----------------|---------|-------------|
+| bash    | str            |         |             |
+| env     | dict[str, Any] | dict()  |             |
+
 ## Python Stage
+
+### Fields
+
+| field | data type      | default | description |
+|-------|----------------|---------|-------------|
+| run   | str            |         |             |
+| vars  | dict[str, Any] | dict()  |             |
 
 ## Hook Stage
 
+### Fields
+
+| field  | data type           | default | description |
+|--------|---------------------|---------|-------------|
+| uses   | str                 |         |             |
+| args   | dict[str, Any]      | dict()  |             |
+
 ## Trigger Stage
+
+### Fields
+
+| field     | data type      | default | description |
+|-----------|----------------|---------|-------------|
+| trigger   | str            |         |             |
+| params    | dict[str, Any] | dict()  |             |

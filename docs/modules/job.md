@@ -1,5 +1,7 @@
 # Job
 
+This job module include Strategy and Job objects.
+
 ## Strategy
 
 ### Fields
@@ -9,8 +11,8 @@
 | fail_fast    | bool           | False   |             |
 | max_parallel | int            | 1       |             |
 | matrix       | Matrix         | dict()  |             |
-| include      | MatrixInclude  | list()  |             |
-| exclude      | MatrixExclude  | list()  |             |
+| include      | MatrixFilter   | list()  |             |
+| exclude      | MatrixFilter   | list()  |             |
 
 ## Job
 

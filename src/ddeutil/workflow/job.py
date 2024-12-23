@@ -48,13 +48,13 @@ from .utils import (
 )
 
 logger = get_logger("ddeutil.workflow")
-MatrixInclude = list[dict[str, Union[str, int]]]
-MatrixExclude = list[dict[str, Union[str, int]]]
+MatrixFilter = list[dict[str, Union[str, int]]]
 
 
 __all__: TupleStr = (
     "Strategy",
     "Job",
+    "TriggerRules",
     "make",
 )
 
@@ -63,8 +63,8 @@ __all__: TupleStr = (
 @lru_cache
 def make(
     matrix: Matrix,
-    include: MatrixInclude,
-    exclude: MatrixExclude,
+    include: MatrixFilter,
+    exclude: MatrixFilter,
 ) -> list[DictStr]:
     """Make a list of product of matrix values that already filter with
     exclude matrix and add specific matrix with include.
@@ -166,11 +166,11 @@ class Strategy(BaseModel):
             "A matrix values that want to cross product to possible strategies."
         ),
     )
-    include: MatrixInclude = Field(
+    include: MatrixFilter = Field(
         default_factory=list,
         description="A list of additional matrix that want to adds-in.",
     )
-    exclude: MatrixExclude = Field(
+    exclude: MatrixFilter = Field(
         default_factory=list,
         description="A list of exclude matrix that want to filter-out.",
     )
