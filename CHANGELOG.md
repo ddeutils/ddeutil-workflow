@@ -2,6 +2,26 @@
 
 ## Latest Changes
 
+## 0.0.21
+
+### :sparkles: Features
+
+- :dart: feat: add testcase for workflow exec timeout scenario. (_2024-12-24_)
+- :dart: feat: revise doc-string and default value on workflow module. (_2024-12-24_)
+- :dart: feat: add WORKFLOW_CORE_MAX_JOB_EXEC_TIMEOUT env variable. (_2024-12-23_)
+- :dart: feat: remove result timeout from job execution method. (_2024-12-23_)
+- :dart: feat: update code on job module. (_2024-12-23_)
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: revise testcase on job module. (_2024-12-23_)
+- :test_tube: tests: update job testcase on execute_strategy method. (_2024-12-23_)
+
+### :card_file_box: Documents
+
+- :page_facing_up: docs: add utils module for showing result context data. (_2024-12-24_)
+- :page_facing_up: docs: update workflow doc-string and update mkdocs content. (_2024-12-23_)
+
 ## 0.0.20
 
 ### :sparkles: Features
