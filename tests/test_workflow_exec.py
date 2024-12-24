@@ -26,7 +26,10 @@ def test_workflow_exec_timeout():
     workflow: Workflow = Workflow(
         name="demo-workflow", jobs={"sleep-run": job, "sleep-again-run": job}
     )
-    workflow.execute(params={}, timeout=1)
+    rs: Result = workflow.execute(params={}, timeout=1)
+    assert rs.context["error_message"] == (
+        "WorkflowException: Execution of workflow: demo-workflow was timeout"
+    )
 
 
 def test_workflow_exec_py():
