@@ -28,9 +28,8 @@ def test_workflow():
                     {
                         "name": "Set variable and function",
                         "run": (
-                            "var_inside: str = 'Inside'\n"
-                            "def echo() -> None:\n"
-                            '  print(f"Echo {var_inside}"\n'
+                            "var: str = 'Foo'\n"
+                            "def echo() -> None:\n\tprint(f'Echo {var}')\n"
                         ),
                     },
                     {"name": "Call that variable", "run": "echo()\n"},

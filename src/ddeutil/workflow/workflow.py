@@ -685,6 +685,8 @@ class Workflow(BaseModel):
         model. It different with ``self.execute`` because this method run only
         one job and return with context of this job data.
 
+        :raise WorkflowException: If execute with not exist job's ID.
+        :raise WorkflowException: If the job execution raise JobException.
         :raise NotImplementedError: If set raise_error argument to False.
 
         :param job_id: A job ID that want to execute.
@@ -707,7 +709,9 @@ class Workflow(BaseModel):
         logger.info(f"({run_id}) [WORKFLOW]: Start execute job: {job_id!r}")
 
         # IMPORTANT:
-        #   Change any job running IDs to this workflow running ID.
+        #   This execution change all job running IDs to the current workflow
+        #   execution running ID (with passing run_id to the job execution
+        #   argument).
         #
         try:
             job: Job = self.jobs[job_id]
