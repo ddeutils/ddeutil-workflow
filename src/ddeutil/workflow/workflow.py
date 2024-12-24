@@ -206,6 +206,8 @@ class Workflow(BaseModel):
         an input workflow name. The loader object will use this workflow name to
         searching configuration data of this workflow model in conf path.
 
+        :raise ValueError: If the type does not match with current object.
+
         :param name: A workflow name that want to pass to Loader object.
         :param externals: An external parameters that want to pass to Loader
             object.
@@ -258,7 +260,7 @@ class Workflow(BaseModel):
 
     @model_validator(mode="before")
     def __prepare_model_before__(cls, values: DictData) -> DictData:
-        """Prepare the params key."""
+        """Prepare the params key in the data model before validating."""
         # NOTE: Prepare params type if it passing with only type value.
         if params := values.pop("params", {}):
             values["params"] = {
@@ -288,6 +290,8 @@ class Workflow(BaseModel):
 
         :raise ValueError: If it has some duplicate value.
 
+        :param value: A list of on object.
+
         :rtype: list[On]
         """
         set_ons: set[str] = {str(on.cronjob) for on in value}
@@ -307,6 +311,9 @@ class Workflow(BaseModel):
     @model_validator(mode="after")
     def __validate_jobs_need__(self) -> Self:
         """Validate each need job in any jobs should exists.
+
+        :raise WorkflowException: If it has not exists need value in this
+            workflow job.
 
         :rtype: Self
         """
@@ -667,16 +674,18 @@ class Workflow(BaseModel):
         self,
         job_id: str,
         params: DictData,
-        run_id: str | None = None,
         *,
+        run_id: str | None = None,
         raise_error: bool = True,
     ) -> Result:
-        """Workflow Job execution with passing dynamic parameters from the
-        workflow execution to the target job.
+        """Job execution with passing dynamic parameters from the main workflow
+        execution to the target job object via job's ID.
 
             This execution is the minimum level of execution of this workflow
         model. It different with ``self.execute`` because this method run only
         one job and return with context of this job data.
+
+        :raise NotImplementedError: If set raise_error argument to False.
 
         :param job_id: A job ID that want to execute.
         :param params: A params that was parameterized from workflow execution.
@@ -691,11 +700,11 @@ class Workflow(BaseModel):
         # VALIDATE: check a job ID that exists in this workflow or not.
         if job_id not in self.jobs:
             raise WorkflowException(
-                f"The job ID: {job_id} does not exists in {self.name!r} "
+                f"The job: {job_id!r} does not exists in {self.name!r} "
                 f"workflow."
             )
 
-        logger.info(f"({run_id}) [WORKFLOW]: Start execute: {job_id!r}")
+        logger.info(f"({run_id}) [WORKFLOW]: Start execute job: {job_id!r}")
 
         # IMPORTANT:
         #   Change any job running IDs to this workflow running ID.
@@ -714,17 +723,18 @@ class Workflow(BaseModel):
                 raise WorkflowException(
                     f"Get job execution error {job_id}: JobException: {err}"
                 ) from None
-            else:
-                raise NotImplementedError() from None
+            raise NotImplementedError(
+                "Handle error from the job execution does not support yet."
+            ) from None
 
         return Result(status=0, context=params).set_run_id(run_id)
 
     def execute(
         self,
         params: DictData,
-        run_id: str | None = None,
         *,
-        timeout: int = -1,
+        run_id: str | None = None,
+        timeout: int = 0,
     ) -> Result:
         """Execute workflow with passing a dynamic parameters to all jobs that
         included in this workflow model with ``jobs`` field.
@@ -740,13 +750,13 @@ class Workflow(BaseModel):
 
         :param params: An input parameters that use on workflow execution that
             will parameterize before using it. Default is None.
-        :type params: DictData | None
+        :type params: DictData
+
         :param run_id: A workflow running ID for this job execution.
-        :type run_id: str | None
+        :type run_id: str | None (default: None)
         :param timeout: A workflow execution time out in second unit that use
-            for limit time of execution and waiting job dependency. Default is
-            600 seconds.
-        :type timeout: int
+            for limit time of execution and waiting job dependency.
+        :type timeout: int (default: 0)
 
         :rtype: Result
         """
@@ -816,9 +826,10 @@ class Workflow(BaseModel):
         ts: float,
         job_queue: Queue,
         *,
-        timeout: int = -1,
+        timeout: int = 0,
+        thread_timeout: int = 1800,
     ) -> DictData:
-        """Workflow execution by threading strategy.
+        """Workflow execution by threading strategy that use multithreading.
 
             If a job need dependency, it will check dependency job ID from
         context data before allow it run.
@@ -828,13 +839,14 @@ class Workflow(BaseModel):
             timeout.
         :param job_queue: A job queue object.
         :param timeout: A second value unit that bounding running time.
+        :param thread_timeout: A timeout to waiting all futures complete.
 
         :rtype: DictData
         """
-        not_time_out_flag: bool = True
-        timeout: int = config.max_job_exec_timeout if timeout == -1 else timeout
+        not_timeout_flag: bool = True
+        timeout: int = timeout or config.max_job_exec_timeout
         logger.debug(
-            f"({run_id}): [WORKFLOW]: Run {self.name} with threading executor."
+            f"({run_id}) [WORKFLOW]: Run {self.name} with threading executor."
         )
 
         # IMPORTANT: The job execution can run parallel and waiting by
@@ -846,7 +858,7 @@ class Workflow(BaseModel):
             futures: list[Future] = []
 
             while not job_queue.empty() and (
-                not_time_out_flag := ((time.monotonic() - ts) < timeout)
+                not_timeout_flag := ((time.monotonic() - ts) < timeout)
             ):
                 job_id: str = job_queue.get()
                 job: Job = self.jobs[job_id]
@@ -875,10 +887,11 @@ class Workflow(BaseModel):
                 # NOTE: Mark this job queue done.
                 job_queue.task_done()
 
-            # NOTE: Wait for all items to finish processing
+            # NOTE: Wait for all items to finish processing by `task_done()`
+            #   method.
             job_queue.join()
 
-            for future in as_completed(futures, timeout=1800):
+            for future in as_completed(futures, timeout=thread_timeout):
                 if err := future.exception():
                     logger.error(f"({run_id}) [WORKFLOW]: {err}")
                     raise WorkflowException(f"{err}")
@@ -886,7 +899,7 @@ class Workflow(BaseModel):
                 # NOTE: This getting result does not do anything.
                 future.result()
 
-        if not_time_out_flag:
+        if not_timeout_flag:
             return context
 
         # NOTE: Raise timeout error.
@@ -905,7 +918,7 @@ class Workflow(BaseModel):
         ts: float,
         job_queue: Queue,
         *,
-        timeout: int = -1,
+        timeout: int = 0,
     ) -> DictData:
         """Workflow execution with non-threading strategy that use sequential
         job running and waiting previous job was run successful.
@@ -920,15 +933,15 @@ class Workflow(BaseModel):
 
         :rtype: DictData
         """
-        not_time_out_flag: bool = True
-        timeout: int = config.max_job_exec_timeout if timeout == -1 else timeout
+        not_timeout_flag: bool = True
+        timeout: int = timeout or config.max_job_exec_timeout
         logger.debug(
             f"({run_id}) [WORKFLOW]: Run {self.name} with non-threading "
             f"executor."
         )
 
         while not job_queue.empty() and (
-            not_time_out_flag := ((time.monotonic() - ts) < timeout)
+            not_timeout_flag := ((time.monotonic() - ts) < timeout)
         ):
             job_id: str = job_queue.get()
             job: Job = self.jobs[job_id]
@@ -953,10 +966,10 @@ class Workflow(BaseModel):
             # NOTE: Mark this job queue done.
             job_queue.task_done()
 
-        # NOTE: Wait for all items to finish processing
+        # NOTE: Wait for all items to finish processing by `task_done()` method.
         job_queue.join()
 
-        if not_time_out_flag:
+        if not_timeout_flag:
             return context
 
         # NOTE: Raise timeout error.

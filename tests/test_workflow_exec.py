@@ -3,7 +3,17 @@ from unittest import mock
 
 from ddeutil.workflow import Workflow
 from ddeutil.workflow.conf import Config
+from ddeutil.workflow.job import Job
 from ddeutil.workflow.utils import Result
+
+
+@mock.patch.object(Config, "max_job_parallel", 1)
+def test_workflow_exec():
+    job: Job = Job(
+        stages=[{"name": "Sleep", "run": "import time\ntime.sleep(2)"}],
+    )
+    workflow: Workflow = Workflow(name="demo-workflow", jobs={"sleep-run": job})
+    workflow.execute(params={})
 
 
 def test_workflow_exec_py():
@@ -55,6 +65,15 @@ def test_workflow_exec_py():
             },
         },
     } == rs.context
+
+
+@mock.patch.object(Config, "max_job_parallel", 2)
+def test_workflow_exec_parallel():
+    job: Job = Job(
+        stages=[{"name": "Sleep", "run": "import time\ntime.sleep(2)"}],
+    )
+    workflow: Workflow = Workflow(name="demo-workflow", jobs={"sleep-run": job})
+    workflow.execute(params={})
 
 
 def test_workflow_exec_py_with_parallel():
