@@ -12,8 +12,21 @@ def test_workflow_exec():
     job: Job = Job(
         stages=[{"name": "Sleep", "run": "import time\ntime.sleep(2)"}],
     )
-    workflow: Workflow = Workflow(name="demo-workflow", jobs={"sleep-run": job})
+    workflow: Workflow = Workflow(
+        name="demo-workflow", jobs={"sleep-run": job, "sleep-again-run": job}
+    )
     workflow.execute(params={})
+
+
+@mock.patch.object(Config, "max_job_parallel", 1)
+def test_workflow_exec_timeout():
+    job: Job = Job(
+        stages=[{"name": "Sleep", "run": "import time\ntime.sleep(2)"}],
+    )
+    workflow: Workflow = Workflow(
+        name="demo-workflow", jobs={"sleep-run": job, "sleep-again-run": job}
+    )
+    workflow.execute(params={}, timeout=1)
 
 
 def test_workflow_exec_py():
@@ -72,8 +85,25 @@ def test_workflow_exec_parallel():
     job: Job = Job(
         stages=[{"name": "Sleep", "run": "import time\ntime.sleep(2)"}],
     )
-    workflow: Workflow = Workflow(name="demo-workflow", jobs={"sleep-run": job})
+    workflow: Workflow = Workflow(
+        name="demo-workflow", jobs={"sleep-run": job, "sleep-again-run": job}
+    )
     workflow.execute(params={})
+
+
+@mock.patch.object(Config, "max_job_parallel", 2)
+def test_workflow_exec_parallel_timeout():
+    job: Job = Job(
+        stages=[{"name": "Sleep", "run": "import time\ntime.sleep(2)"}],
+    )
+    workflow: Workflow = Workflow(
+        name="demo-workflow",
+        jobs={
+            "sleep-run": job,
+            "sleep-again-run": job.model_copy(update={"needs": ["sleep-run"]}),
+        },
+    )
+    workflow.execute(params={}, timeout=1)
 
 
 def test_workflow_exec_py_with_parallel():

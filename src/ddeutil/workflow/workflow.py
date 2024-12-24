@@ -887,27 +887,31 @@ class Workflow(BaseModel):
                 # NOTE: Mark this job queue done.
                 job_queue.task_done()
 
-            # NOTE: Wait for all items to finish processing by `task_done()`
-            #   method.
-            job_queue.join()
+            if not_timeout_flag:
 
-            for future in as_completed(futures, timeout=thread_timeout):
-                if err := future.exception():
-                    logger.error(f"({run_id}) [WORKFLOW]: {err}")
-                    raise WorkflowException(f"{err}")
+                # NOTE: Wait for all items to finish processing by `task_done()`
+                #   method.
+                job_queue.join()
 
-                # NOTE: This getting result does not do anything.
-                future.result()
+                for future in as_completed(futures, timeout=thread_timeout):
+                    if err := future.exception():
+                        logger.error(f"({run_id}) [WORKFLOW]: {err}")
+                        raise WorkflowException(f"{err}")
 
-        if not_timeout_flag:
-            return context
+                    # NOTE: This getting result does not do anything.
+                    future.result()
+
+                return context
+
+            for future in futures:
+                future.cancel()
 
         # NOTE: Raise timeout error.
-        logger.warning(  # pragma: no cov
-            f"({run_id}) [WORKFLOW]: Execution of workflow, {self.name!r} "
-            f", was timeout"
+        logger.warning(
+            f"({run_id}) [WORKFLOW]: Execution of workflow, {self.name!r}, "
+            f"was timeout"
         )
-        raise WorkflowException(  # pragma: no cov
+        raise WorkflowException(
             f"Execution of workflow: {self.name} was timeout"
         )
 
@@ -966,17 +970,19 @@ class Workflow(BaseModel):
             # NOTE: Mark this job queue done.
             job_queue.task_done()
 
-        # NOTE: Wait for all items to finish processing by `task_done()` method.
-        job_queue.join()
-
         if not_timeout_flag:
+
+            # NOTE: Wait for all items to finish processing by `task_done()`
+            #   method.
+            job_queue.join()
+
             return context
 
         # NOTE: Raise timeout error.
-        logger.warning(  # pragma: no cov
+        logger.warning(
             f"({run_id}) [WORKFLOW]: Execution of workflow was timeout"
         )
-        raise WorkflowException(  # pragma: no cov
+        raise WorkflowException(
             f"Execution of workflow: {self.name} was timeout"
         )
 
