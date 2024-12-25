@@ -696,6 +696,8 @@ class Workflow(BaseModel):
             if it get exception from job execution.
 
         :rtype: Result
+        :return: Return the result object that receive the job execution result
+            context.
         """
         run_id: str = run_id or gen_id(self.name, unique=True)
 
@@ -731,7 +733,7 @@ class Workflow(BaseModel):
                 "Handle error from the job execution does not support yet."
             ) from None
 
-        return Result(status=0, context=params).set_run_id(run_id)
+        return Result(status=0, context=params, run_id=run_id)
 
     def execute(
         self,
@@ -867,7 +869,7 @@ class Workflow(BaseModel):
                 job_id: str = job_queue.get()
                 job: Job = self.jobs[job_id]
 
-                if any(need not in context["jobs"] for need in job.needs):
+                if not job.check_needs(context["jobs"]):
                     job_queue.task_done()
                     job_queue.put(job_id)
                     time.sleep(0.25)
@@ -876,10 +878,13 @@ class Workflow(BaseModel):
                 # NOTE: Start workflow job execution with deep copy context data
                 #   before release.
                 #
+                #   Context:
+                #   ---
                 #   {
                 #       'params': <input-params>,
-                #       'jobs': {},
+                #       'jobs': { <job's-id>: ... },
                 #   }
+                #
                 futures.append(
                     executor.submit(
                         self.execute_job,
@@ -912,12 +917,9 @@ class Workflow(BaseModel):
 
         # NOTE: Raise timeout error.
         logger.warning(
-            f"({run_id}) [WORKFLOW]: Execution of workflow, {self.name!r}, "
-            f"was timeout"
+            f"({run_id}) [WORKFLOW]: Execution: {self.name!r} was timeout."
         )
-        raise WorkflowException(
-            f"Execution of workflow: {self.name} was timeout"
-        )
+        raise WorkflowException(f"Execution: {self.name!r} was timeout.")
 
     def __exec_non_threading(
         self,
@@ -955,7 +957,7 @@ class Workflow(BaseModel):
             job: Job = self.jobs[job_id]
 
             # NOTE: Waiting dependency job run successful before release.
-            if any(need not in context["jobs"] for need in job.needs):
+            if not job.check_needs(context["jobs"]):
                 job_queue.task_done()
                 job_queue.put(job_id)
                 time.sleep(0.075)
@@ -984,11 +986,9 @@ class Workflow(BaseModel):
 
         # NOTE: Raise timeout error.
         logger.warning(
-            f"({run_id}) [WORKFLOW]: Execution of workflow was timeout"
+            f"({run_id}) [WORKFLOW]: Execution: {self.name!r} was timeout."
         )
-        raise WorkflowException(
-            f"Execution of workflow: {self.name} was timeout"
-        )
+        raise WorkflowException(f"Execution: {self.name!r} was timeout.")
 
 
 @dataclass(config=ConfigDict(arbitrary_types_allowed=True))

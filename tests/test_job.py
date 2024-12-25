@@ -15,8 +15,12 @@ def test_job():
     job = Job(desc="\t# Desc\n\tThis is a demo job.")
     assert job.desc == "# Desc\nThis is a demo job."
 
-    job = Job(id="final-job")
+    job = Job(id="final-job", needs=["job-before"])
     assert job.id == "final-job"
+
+    # NOTE: Validate the `check_needs` method
+    assert job.check_needs({"job-before": "foo"})
+    assert not job.check_needs({"job-after": "foo"})
 
 
 def test_job_raise():

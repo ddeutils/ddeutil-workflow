@@ -22,7 +22,7 @@ from enum import Enum
 from functools import lru_cache
 from textwrap import dedent
 from threading import Event
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 from ddeutil.core import freeze_args
 from pydantic import BaseModel, Field
@@ -345,6 +345,13 @@ class Job(BaseModel):
             if stage_id == (stage.id or ""):
                 return stage
         raise ValueError(f"Stage ID {stage_id} does not exists")
+
+    def check_needs(self, jobs: dict[str, Any]) -> bool:
+        """Return True if job's need exists in an input list of job's ID.
+
+        :rtype: bool
+        """
+        return all(need in jobs for need in self.needs)
 
     def set_outputs(self, output: DictData, to: DictData) -> DictData:
         """Set an outputs from execution process to the receive context. The
