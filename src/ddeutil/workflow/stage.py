@@ -124,6 +124,8 @@ def handler_result(message: str | None = None) -> DecoratorResult:
                 run_id: str = gen_id(self.name + (self.id or ""), unique=True)
                 kwargs["run_id"] = run_id
 
+            rs_raise: Result = Result(status=1, run_id=run_id)
+
             try:
                 # NOTE: Start calling origin function with a passing args.
                 return func(self, *args, **kwargs)
@@ -147,13 +149,12 @@ def handler_result(message: str | None = None) -> DecoratorResult:
 
                 # NOTE: Catching exception error object to result with
                 #   error_message and error keys.
-                return Result(
+                return rs_raise.catch(
                     status=1,
                     context={
                         "error": err,
                         "error_message": f"{err.__class__.__name__}: {err}",
                     },
-                    run_id=run_id,
                 )
 
         return wrapped

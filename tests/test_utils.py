@@ -1,3 +1,4 @@
+from pathlib import Path
 from unittest.mock import patch
 
 import ddeutil.workflow.utils as utils
@@ -39,3 +40,14 @@ def test_batch():
     assert [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9]] == [
         list(i) for i in utils.batch(range(10), n=2)
     ]
+
+
+def test_make_exec():
+    test_file: str = "./tmp_test_exec.txt"
+
+    with open(test_file, mode="w") as f:
+        f.write("Hello world")
+
+    utils.make_exec(test_file)
+
+    Path(test_file).unlink()

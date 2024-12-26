@@ -700,6 +700,7 @@ class Workflow(BaseModel):
             context.
         """
         run_id: str = run_id or gen_id(self.name, unique=True)
+        rs: Result = Result(run_id=run_id)
 
         # VALIDATE: check a job ID that exists in this workflow or not.
         if job_id not in self.jobs:
@@ -733,7 +734,7 @@ class Workflow(BaseModel):
                 "Handle error from the job execution does not support yet."
             ) from None
 
-        return Result(status=0, context=params, run_id=run_id)
+        return rs.catch(status=0, context=params)
 
     def execute(
         self,
@@ -905,7 +906,7 @@ class Workflow(BaseModel):
                 for future in as_completed(futures, timeout=thread_timeout):
                     if err := future.exception():
                         logger.error(f"({run_id}) [WORKFLOW]: {err}")
-                        raise WorkflowException(f"{err}")
+                        raise WorkflowException(str(err))
 
                     # NOTE: This getting result does not do anything.
                     future.result()

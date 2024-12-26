@@ -434,6 +434,7 @@ class Job(BaseModel):
         """
         run_id: str = run_id or gen_id(self.id or "", unique=True)
         strategy_id: str = gen_id(strategy)
+        rs: Result = Result(run_id=run_id)
 
         # PARAGRAPH:
         #
@@ -470,7 +471,7 @@ class Job(BaseModel):
                     "Job strategy was canceled from event that had set before "
                     "strategy execution."
                 )
-                return Result(
+                return rs.catch(
                     status=1,
                     context={
                         strategy_id: {
@@ -485,7 +486,6 @@ class Job(BaseModel):
                             "error_message": error_msg,
                         },
                     },
-                    run_id=run_id,
                 )
 
             # PARAGRAPH:
@@ -520,7 +520,7 @@ class Job(BaseModel):
                         f"Get stage execution error: {err.__class__.__name__}: "
                         f"{err}"
                     ) from None
-                return Result(
+                return rs.catch(
                     status=1,
                     context={
                         strategy_id: {
@@ -530,13 +530,12 @@ class Job(BaseModel):
                             "error_message": f"{err.__class__.__name__}: {err}",
                         },
                     },
-                    run_id=run_id,
                 )
 
             # NOTE: Remove the current stage object for saving memory.
             del stage
 
-        return Result(
+        return rs.catch(
             status=0,
             context={
                 strategy_id: {
@@ -544,7 +543,6 @@ class Job(BaseModel):
                     "stages": filter_func(context.pop("stages", {})),
                 },
             },
-            run_id=run_id,
         )
 
     def execute(self, params: DictData, run_id: str | None = None) -> Result:
@@ -626,7 +624,7 @@ class Job(BaseModel):
 
         :rtype: Result
         """
-        rs_final: Result = Result()
+        rs_final: Result = Result(run_id=run_id)
         context: DictData = {}
         status: int = 0
 
@@ -687,7 +685,7 @@ class Job(BaseModel):
 
         :rtype: Result
         """
-        rs_final: Result = Result()
+        rs_final: Result = Result(run_id=run_id)
         context: DictData = {}
         status: int = 0
 

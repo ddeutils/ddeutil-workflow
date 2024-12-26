@@ -430,7 +430,7 @@ class Result:
         return self
 
 
-def make_exec(path: str | Path) -> None:  # pragma: no cov
+def make_exec(path: str | Path) -> None:
     """Change mode of file to be executable file.
 
     :param path: A file path that want to make executable permission.
@@ -451,7 +451,9 @@ FILTERS: dict[str, callable] = {  # pragma: no cov
 
 
 class FilterFunc(Protocol):
-    """Tag Function Protocol"""
+    """Tag Function Protocol. This protocol that use to represent any callable
+    object that able to access the name attribute.
+    """
 
     name: str
 
