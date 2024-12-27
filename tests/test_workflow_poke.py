@@ -10,7 +10,7 @@ from ddeutil.workflow.utils import Result
 
 @mock.patch.object(Config, "enable_write_log", False)
 def test_workflow_poke():
-    workflow = Workflow.from_loader(name="wf-scheduling-common")
+    workflow = Workflow.from_loader(name="wf-scheduling-minute")
 
     # NOTE: Poking with the current datetime.
     results: list[Result] = workflow.poke(
@@ -19,8 +19,21 @@ def test_workflow_poke():
     print(results)
 
 
+@mock.patch.object(Config, "enable_write_log", False)
+def test_workflow_poke_no_schedule():
+    workflow = Workflow.from_loader(name="wf-scheduling-daily")
+
+    # NOTE: Poking with the current datetime.
+    results: list[Result] = workflow.poke(
+        params={"asat-dt": datetime(2024, 1, 1)}
+    )
+    assert results == []
+
+
 def test_workflow_poke_raise():
     workflow = Workflow.from_loader(name="wf-scheduling-common")
+
+    # Raise: If a period value is lower than 0.
     with pytest.raises(WorkflowException):
         workflow.poke(periods=-1)
 

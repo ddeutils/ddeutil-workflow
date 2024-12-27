@@ -404,8 +404,8 @@ class Workflow(BaseModel):
         self,
         release: datetime | WorkflowRelease,
         params: DictData,
-        run_id: str | None = None,
         *,
+        run_id: str | None = None,
         log: type[Log] = None,
         queue: WorkflowQueue | list[datetime] | None = None,
     ) -> Result:
@@ -507,10 +507,12 @@ class Workflow(BaseModel):
         """Generate queue of datetime from the cron runner that initialize from
         the on field. with offset value.
 
-        :param offset:
+        :param offset: A offset in second unit for time travel.
         :param end_date:
         :param queue:
         :param log:
+
+        :rtype: WorkflowQueue
         """
         for on in self.on:
 
@@ -550,23 +552,26 @@ class Workflow(BaseModel):
         self,
         start_date: datetime | None = None,
         params: DictData | None = None,
+        *,
         run_id: str | None = None,
         periods: int = 1,
-        *,
         log: Log | None = None,
     ) -> list[Result]:
-        """Poke workflow with the ``on`` field with threading executor pool for
-        executing with all its schedules that was set on the `on` value.
-        This method will observe its schedule that nearing to run with the
+        """Poke this workflow with start datetime value that passing to its
+        ``on`` field with threading executor pool for executing with all its
+        schedules that was set on the `on` value.
+
+            This method will observe its schedule that nearing to run with the
         ``self.release()`` method.
 
         :param start_date: A start datetime object.
         :param params: A parameters that want to pass to the release method.
         :param run_id: A workflow running ID for this poke.
-        :param periods: A periods of minutes value to running poke.
+        :param periods: A periods in minutes value that use to run this poking.
         :param log: A log object that want to use on this poking process.
 
         :rtype: list[Result]
+        :return: A list of all results that return from ``self.release`` method.
         """
         # NOTE: If this workflow does not set the on schedule, it will return
         #   empty result.
@@ -592,6 +597,8 @@ class Workflow(BaseModel):
             start_date: datetime = current_date
             offset: float = 0
 
+        # NOTE: End date is use to stop generate queue with an input periods
+        #   value.
         end_date: datetime = start_date + timedelta(minutes=periods)
 
         log: type[Log] = log or FileLog
@@ -601,19 +608,16 @@ class Workflow(BaseModel):
             f"{start_date:%Y-%m-%d %H:%M:%S} to {end_date:%Y-%m-%d %H:%M:%S}"
         )
 
-        params: DictData = params or {}
-        workflow_queue: WorkflowQueue = WorkflowQueue()
+        params: DictData = {} if params is None else params
+        wf_queue: WorkflowQueue = WorkflowQueue()
         results: list[Result] = []
         futures: list[Future] = []
 
-        self.queue_poking(
-            offset, end_date=end_date, queue=workflow_queue, log=log
-        )
-
-        if len(workflow_queue.queue) == 0:
+        # NOTE: Make queue to the workflow queue object.
+        self.queue_poking(offset, end_date=end_date, queue=wf_queue, log=log)
+        if not wf_queue.is_queued:
             logger.info(
-                f"({run_id}) [POKING]: {self.name!r} does not have any "
-                f"queue to run."
+                f"({run_id}) [POKING]: {self.name!r} does not have any queue."
             )
             return []
 
@@ -622,9 +626,11 @@ class Workflow(BaseModel):
             thread_name_prefix="workflow_poking_",
         ) as executor:
 
-            while workflow_queue.is_queued:
+            while wf_queue.is_queued:
 
-                wf_release: WorkflowRelease = heappop(workflow_queue.queue)
+                # NOTE: Pop the latest workflow release object from queue.
+                wf_release: WorkflowRelease = heappop(wf_queue.queue)
+
                 if (
                     wf_release.date - get_dt_now(tz=config.tz, offset=offset)
                 ).total_seconds() > 60:
@@ -632,15 +638,13 @@ class Workflow(BaseModel):
                         f"({run_id}) [POKING]: Waiting because the latest "
                         f"release has diff time more than 60 seconds "
                     )
-                    heappush(workflow_queue.queue, wf_release)
+                    heappush(wf_queue.queue, wf_release)
                     delay(60)
-                    self.queue_poking(
-                        offset, end_date, queue=workflow_queue, log=log
-                    )
+                    self.queue_poking(offset, end_date, queue=wf_queue, log=log)
                     continue
 
                 # NOTE: Push the workflow release to running queue
-                workflow_queue.push_running(wf_release)
+                wf_queue.push_running(wf_release)
 
                 futures.append(
                     executor.submit(
@@ -648,20 +652,18 @@ class Workflow(BaseModel):
                         release=wf_release,
                         params=params,
                         log=log,
-                        queue=workflow_queue,
+                        queue=wf_queue,
                     )
                 )
 
-                self.queue_poking(
-                    offset, end_date, queue=workflow_queue, log=log
-                )
+                self.queue_poking(offset, end_date, queue=wf_queue, log=log)
 
             # WARNING: This poking method does not allow to use fail-fast
             #   logic to catching parallel execution result.
-            for future in as_completed(futures):
+            for future in as_completed(futures, timeout=1800):
                 results.append(future.result().set_parent_run_id(run_id))
 
-        while len(workflow_queue.running) > 0:  # pragma: no cov
+        while len(wf_queue.running) > 0:  # pragma: no cov
             logger.warning(
                 f"({run_id}) [POKING]: Running does empty when poking "
                 f"process was finishing."

@@ -68,3 +68,14 @@ wf-scheduling-minute:
         - name: "Empty stage"
         - name: "Call-out"
           echo: "Hello ${{ params.asat-dt | fmt('%Y-%m-%d') }}"
+
+
+wf-scheduling-daily:
+  type: ddeutil.workflow.Workflow
+  on:
+    - cronjob: "30 3 * * *"
+      timezone: "Asia/Bangkok"
+  jobs:
+    do-nothing:
+      stages:
+        - name: "Empty stage"
