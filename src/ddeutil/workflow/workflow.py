@@ -130,6 +130,32 @@ class WorkflowQueue:
     running: list[WorkflowRelease] = field(default_factory=list)
     complete: list[WorkflowRelease] = field(default_factory=list)
 
+    @classmethod
+    def from_list(
+        cls, queue: list[datetime] | list[WorkflowRelease] | None
+    ) -> Self:
+        """Construct WorkflowQueue object from an input queue value that passing
+        with list of datetime or list of WorkflowRelease.
+
+        :raise TypeError: If the type of an input queue does not valid.
+
+        :rtype: Self
+        """
+        if queue is None:
+            return cls()
+        elif isinstance(queue, list):
+
+            if all(isinstance(q, datetime) for q in queue):
+                return cls(queue=[WorkflowRelease.from_dt(q) for q in queue])
+
+            elif all(isinstance(q, WorkflowRelease) for q in queue):
+                return cls(queue=queue)
+
+        raise TypeError(
+            "Type of the queue does not valid with WorkflowQueue "
+            "or list of datetime or list of WorkflowRelease."
+        )
+
     @property
     def is_queued(self) -> bool:
         """Return True if it has workflow release object in the queue.
@@ -407,38 +433,6 @@ class Workflow(BaseModel):
             "jobs": {},
         }
 
-    @staticmethod
-    def __validate_release_with_queue(
-        queue: (
-            WorkflowQueue | list[datetime] | list[WorkflowRelease] | None
-        ) = None,
-    ) -> WorkflowQueue:  # pragma: no cov
-        """Validate method for the queue argument that passing to the release
-        method.
-
-        :raise TypeError: If the type of an input queue does not valid.
-
-        :rtype: WorkflowQueue
-        """
-        if isinstance(queue, WorkflowQueue):
-            return queue
-        elif queue is None:
-            return WorkflowQueue()
-        elif isinstance(queue, list):
-
-            if all(isinstance(q, datetime) for q in queue):
-                return WorkflowQueue(
-                    queue=[WorkflowRelease.from_dt(q) for q in queue]
-                )
-
-            elif all(isinstance(q, WorkflowRelease) for q in queue):
-                return WorkflowQueue(queue=queue)
-
-        raise TypeError(
-            "Type of the queue argument does not valid with WorkflowQueue "
-            "or list of datetime or list of WorkflowRelease."
-        )
-
     def release(
         self,
         release: datetime | WorkflowRelease,
@@ -471,7 +465,8 @@ class Workflow(BaseModel):
         rs_release: Result = Result(run_id=run_id)
 
         # VALIDATE: Change queue value to WorkflowQueue object.
-        queue: WorkflowQueue = self.__validate_release_with_queue(queue)
+        if queue is None or isinstance(queue, list):
+            queue: WorkflowQueue = WorkflowQueue.from_list(queue)
 
         # VALIDATE: Change release value to WorkflowRelease object.
         if isinstance(release, datetime):
