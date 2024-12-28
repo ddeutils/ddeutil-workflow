@@ -106,6 +106,9 @@ class Config:
     max_poking_pool_worker: int = int(
         os.getenv("WORKFLOW_CORE_MAX_NUM_POKING", "4")
     )
+    max_on_per_workflow: int = int(
+        env("WORKFLOW_CORE_MAX_ON_PER_WORKFLOW", "5")
+    )
 
     # NOTE: Schedule App
     max_schedule_process: int = int(env("WORKFLOW_APP_MAX_PROCESS", "2"))

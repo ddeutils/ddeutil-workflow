@@ -189,7 +189,10 @@ class On(BaseModel):
         date that given from input.
         """
         runner: CronRunner = self.generate(start=start)
+
+        # NOTE: ship the next date of runner object that create from start.
         _ = runner.next
+
         return runner
 
 

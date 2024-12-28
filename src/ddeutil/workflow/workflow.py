@@ -124,7 +124,7 @@ class WorkflowRelease:
 
 @dataclass
 class WorkflowQueue:
-    """Workflow Queue object."""
+    """Workflow Queue object that is management of WorkflowRelease objects."""
 
     queue: list[WorkflowRelease] = field(default_factory=list)
     running: list[WorkflowRelease] = field(default_factory=list)
@@ -138,34 +138,34 @@ class WorkflowQueue:
         """
         return len(self.queue) > 0
 
-    def check_queue(self, data: WorkflowRelease) -> bool:
+    def check_queue(self, value: WorkflowRelease) -> bool:
         """Check a WorkflowRelease value already exists in list of tracking
         queues.
 
-        :param data: A workflow release object.
+        :param value: A workflow release object.
 
         :rtype: bool
         """
         return (
-            (data in self.queue)
-            or (data in self.running)
-            or (data in self.complete)
+            (value in self.queue)
+            or (value in self.running)
+            or (value in self.complete)
         )
 
-    def push_queue(self, data: WorkflowRelease) -> Self:
+    def push_queue(self, value: WorkflowRelease) -> Self:
         """Push data to the queue."""
-        heappush(self.queue, data)
+        heappush(self.queue, value)
         return self
 
-    def push_running(self, data: WorkflowRelease) -> Self:
+    def push_running(self, value: WorkflowRelease) -> Self:
         """Push data to the running."""
-        heappush(self.running, data)
+        heappush(self.running, value)
         return self
 
-    def remove_running(self, data: WorkflowRelease) -> Self:
+    def remove_running(self, value: WorkflowRelease) -> Self:
         """Remove data on the running if it exists."""
-        if data in self.running:
-            self.running.remove(data)
+        if value in self.running:
+            self.running.remove(value)
 
 
 class Workflow(BaseModel):
@@ -284,7 +284,7 @@ class Workflow(BaseModel):
         return dedent(value)
 
     @field_validator("on", mode="after")
-    def __on_no_dup__(cls, value: list[On]) -> list[On]:
+    def __on_no_dup_and_reach_limit__(cls, value: list[On]) -> list[On]:
         """Validate the on fields should not contain duplicate values and if it
         contain the every minute value more than one value, it will remove to
         only one value.
@@ -307,6 +307,12 @@ class Workflow(BaseModel):
         #         "If it has every minute cronjob on value, it should has only "
         #         "one value in the on field."
         #     )
+
+        if len(set_ons) > config.max_on_per_workflow:
+            raise ValueError(
+                f"The number of the on should not more than "
+                f"{config.max_on_per_workflow} crontab."
+            )
         return value
 
     @model_validator(mode="after")
@@ -531,6 +537,8 @@ class Workflow(BaseModel):
         end_date: datetime,
         queue: WorkflowQueue,
         log: type[Log],
+        *,
+        force_run: bool = False,
     ) -> WorkflowQueue:
         """Generate queue of datetime from the cron runner that initialize from
         the on field. with offset value.
@@ -539,6 +547,8 @@ class Workflow(BaseModel):
         :param end_date: An end datetime object.
         :param queue: A workflow queue object.
         :param log: A log class that want to making log object.
+        :param force_run: A flag that allow to release workflow if the log with
+            that release was pointed.
 
         :rtype: WorkflowQueue
         """
@@ -548,6 +558,7 @@ class Workflow(BaseModel):
                 get_dt_now(tz=config.tz, offset=offset).replace(microsecond=0)
             )
 
+            # NOTE: Skip this runner date if it more than the end date.
             if runner.date > end_date:
                 continue
 
@@ -559,8 +570,9 @@ class Workflow(BaseModel):
                 type="poking",
             )
 
-            while queue.check_queue(data=workflow_release) or (
+            while queue.check_queue(workflow_release) or (
                 log.is_pointed(name=self.name, release=workflow_release.date)
+                and not force_run
             ):
                 workflow_release = WorkflowRelease(
                     date=runner.next,
@@ -573,7 +585,9 @@ class Workflow(BaseModel):
             if runner.date > end_date:
                 continue
 
+            # NOTE: Push the WorkflowRelease object to queue.
             queue.push_queue(workflow_release)
+
         return queue
 
     def poke(
@@ -584,6 +598,7 @@ class Workflow(BaseModel):
         run_id: str | None = None,
         periods: int = 1,
         log: Log | None = None,
+        force_run: bool = False,
     ) -> list[Result]:
         """Poke this workflow with start datetime value that passing to its
         ``on`` field with threading executor pool for executing with all its
@@ -597,6 +612,8 @@ class Workflow(BaseModel):
         :param run_id: A workflow running ID for this poke.
         :param periods: A periods in minutes value that use to run this poking.
         :param log: A log object that want to use on this poking process.
+        :param force_run: A flag that allow to release workflow if the log with
+            that release was pointed.
 
         :rtype: list[Result]
         :return: A list of all results that return from ``self.release`` method.
@@ -643,7 +660,13 @@ class Workflow(BaseModel):
         futures: list[Future] = []
 
         # NOTE: Make queue to the workflow queue object.
-        self.queue_poking(offset, end_date=end_date, queue=wf_queue, log=log)
+        self.queue_poking(
+            offset,
+            end_date=end_date,
+            queue=wf_queue,
+            log=log,
+            force_run=force_run,
+        )
         if not wf_queue.is_queued:
             logger.info(
                 f"({cut_id(run_id)}) [POKING]: {self.name!r} does not have "
@@ -670,7 +693,13 @@ class Workflow(BaseModel):
                     )
                     heappush(wf_queue.queue, wf_release)
                     delay(60)
-                    self.queue_poking(offset, end_date, queue=wf_queue, log=log)
+                    self.queue_poking(
+                        offset,
+                        end_date,
+                        queue=wf_queue,
+                        log=log,
+                        force_run=force_run,
+                    )
                     continue
 
                 # NOTE: Push the workflow release to running queue
@@ -686,7 +715,13 @@ class Workflow(BaseModel):
                     )
                 )
 
-                self.queue_poking(offset, end_date, queue=wf_queue, log=log)
+                self.queue_poking(
+                    offset,
+                    end_date,
+                    queue=wf_queue,
+                    log=log,
+                    force_run=force_run,
+                )
 
             # WARNING: This poking method does not allow to use fail-fast
             #   logic to catching parallel execution result.
