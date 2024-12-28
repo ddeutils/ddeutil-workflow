@@ -732,13 +732,6 @@ class Workflow(BaseModel):
             for future in as_completed(futures, timeout=timeout):
                 results.append(future.result().set_parent_run_id(run_id))
 
-        while len(wf_queue.running) > 0:  # pragma: no cov
-            logger.warning(
-                f"({cut_id(run_id)}) [POKING]: Running does empty when poking "
-                f"process was finishing."
-            )
-            delay(10)
-
         return results
 
     def execute_job(
