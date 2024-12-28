@@ -406,7 +406,7 @@ class Workflow(BaseModel):
         queue: (
             WorkflowQueue | list[datetime] | list[WorkflowRelease] | None
         ) = None,
-    ) -> WorkflowQueue:
+    ) -> WorkflowQueue:  # pragma: no cov
         """Validate method for the queue argument that passing to the release
         method.
 
@@ -417,23 +417,21 @@ class Workflow(BaseModel):
         if isinstance(queue, WorkflowQueue):
             return queue
         elif queue is None:
-            queue: WorkflowQueue = WorkflowQueue()
-        elif isinstance(queue, list) and all(
-            isinstance(q, datetime) for q in queue
-        ):
-            queue: WorkflowQueue = WorkflowQueue(
-                queue=[WorkflowRelease.from_dt(q) for q in queue]
-            )
-        elif isinstance(queue, list) and all(
-            isinstance(q, WorkflowRelease) for q in queue
-        ):
-            queue: WorkflowQueue = WorkflowQueue(queue=queue)
-        else:
-            raise TypeError(
-                "Type of the queue argument does not valid with WorkflowQueue "
-                "or list of datetime or list of WorkflowRelease."
-            )
-        return queue
+            return WorkflowQueue()
+        elif isinstance(queue, list):
+
+            if all(isinstance(q, datetime) for q in queue):
+                return WorkflowQueue(
+                    queue=[WorkflowRelease.from_dt(q) for q in queue]
+                )
+
+            elif all(isinstance(q, WorkflowRelease) for q in queue):
+                return WorkflowQueue(queue=queue)
+
+        raise TypeError(
+            "Type of the queue argument does not valid with WorkflowQueue "
+            "or list of datetime or list of WorkflowRelease."
+        )
 
     def release(
         self,
@@ -451,10 +449,7 @@ class Workflow(BaseModel):
         date, or running id to the params.
 
             This method allow workflow use log object to save the execution
-        result to log destination like file log to local `/logs` directory.
-
-            I will add sleep with 0.15 seconds on every step that interact with
-        the queue object.
+        result to log destination like file log to the local `/logs` directory.
 
         :param release: A release datetime or WorkflowRelease object.
         :param params: A workflow parameter that pass to execute method.

@@ -462,6 +462,7 @@ class FileLog(BaseLog):
 
         :param excluded: An excluded list of key name that want to pass in the
             model_dump method.
+
         :rtype: Self
         """
         # NOTE: Check environ variable was set for real writing.
