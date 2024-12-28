@@ -51,3 +51,7 @@ def test_make_exec():
     utils.make_exec(test_file)
 
     Path(test_file).unlink()
+
+
+def test_cut_id():
+    assert utils.cut_id(run_id="668931127320241228100331254567") == "254567"

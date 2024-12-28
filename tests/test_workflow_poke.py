@@ -16,7 +16,11 @@ def test_workflow_poke():
     results: list[Result] = workflow.poke(
         params={"asat-dt": datetime(2024, 1, 1)}
     )
+
     print(results)
+
+    # NOTE: Check datatype of results should be list of Result.
+    assert isinstance(results[0], Result)
 
 
 @mock.patch.object(Config, "enable_write_log", False)

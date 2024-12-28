@@ -816,3 +816,17 @@ def batch(iterable: Iterator[Any], n: int) -> Iterator[Any]:
 
 def queue2str(queue: list[datetime]) -> Iterator[str]:  # pragma: no cov
     return (f"{q:%Y-%m-%d %H:%M:%S}" for q in queue)
+
+
+def cut_id(run_id: str, *, num: int = 6):
+    """Cutting running ID with length.
+
+    Example:
+        >>> cut_id(run_id='668931127320241228100331254567')
+        '254567'
+
+    :param run_id:
+    :param num:
+    :return:
+    """
+    return run_id[-num:]

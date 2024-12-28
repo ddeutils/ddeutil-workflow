@@ -55,6 +55,7 @@ from .utils import (
     Registry,
     Result,
     TagFunc,
+    cut_id,
     gen_id,
     make_exec,
     make_registry,
@@ -132,7 +133,8 @@ def handler_result(message: str | None = None) -> DecoratorResult:
             except Exception as err:
                 # NOTE: Start catching error from the stage execution.
                 logger.error(
-                    f"({run_id}) [STAGE]: {err.__class__.__name__}: {err}"
+                    f"({cut_id(run_id)}) [STAGE]: {err.__class__.__name__}: "
+                    f"{err}"
                 )
                 if config.stage_raise_error:
                     # NOTE: If error that raise from stage execution course by
@@ -340,7 +342,7 @@ class EmptyStage(BaseStage):
         :rtype: Result
         """
         logger.info(
-            f"({run_id}) [STAGE]: Empty-Execute: {self.name!r}: "
+            f"({cut_id(run_id)}) [STAGE]: Empty-Execute: {self.name!r}: "
             f"( {param2template(self.echo, params=params) or '...'} )"
         )
         if self.sleep > 0:
@@ -394,7 +396,9 @@ class BashStage(BaseStage):
         f_name: str = f"{run_id}.sh"
         f_shebang: str = "bash" if sys.platform.startswith("win") else "sh"
 
-        logger.debug(f"({run_id}) [STAGE]: Start create `{f_name}` file.")
+        logger.debug(
+            f"({cut_id(run_id)}) [STAGE]: Start create `{f_name}` file."
+        )
 
         with open(f"./{f_name}", mode="w", newline="\n") as f:
             # NOTE: write header of `.sh` file
@@ -426,7 +430,7 @@ class BashStage(BaseStage):
         """
         bash: str = param2template(dedent(self.bash), params)
 
-        logger.info(f"({run_id}) [STAGE]: Shell-Execute: {self.name}")
+        logger.info(f"({cut_id(run_id)}) [STAGE]: Shell-Execute: {self.name}")
         with self.create_sh_file(
             bash=bash, env=param2template(self.env, params), run_id=run_id
         ) as sh:
@@ -536,7 +540,7 @@ class PyStage(BaseStage):
         lc: DictData = {}
 
         # NOTE: Start exec the run statement.
-        logger.info(f"({run_id}) [STAGE]: Py-Execute: {self.name}")
+        logger.info(f"({cut_id(run_id)}) [STAGE]: Py-Execute: {self.name}")
 
         # WARNING: The exec build-in function is vary dangerous. So, it
         #   should us the re module to validate exec-string before running.
@@ -661,7 +665,8 @@ class HookStage(BaseStage):
                 args[k] = args.pop(k.removeprefix("_"))
 
         logger.info(
-            f"({run_id}) [STAGE]: Hook-Execute: {t_func.name}@{t_func.tag}"
+            f"({cut_id(run_id)}) [STAGE]: Hook-Execute: "
+            f"{t_func.name}@{t_func.tag}"
         )
         rs: DictData = t_func(**param2template(args, params))
 
@@ -717,7 +722,9 @@ class TriggerStage(BaseStage):
         # NOTE: Set running workflow ID from running stage ID to external
         #   params on Loader object.
         wf: Workflow = Workflow.from_loader(name=_trigger)
-        logger.info(f"({run_id}) [STAGE]: Trigger-Execute: {_trigger!r}")
+        logger.info(
+            f"({cut_id(run_id)}) [STAGE]: Trigger-Execute: {_trigger!r}"
+        )
         return wf.execute(
             params=param2template(self.params, params),
             run_id=run_id,

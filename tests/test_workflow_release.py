@@ -20,11 +20,14 @@ def test_workflow_release_dataclass():
         _ = workflow_release < 1
 
 
+@mock.patch.object(Config, "enable_write_log", False)
 def test_workflow_release():
     workflow: Workflow = Workflow.from_loader(name="wf-scheduling-common")
     current_date: datetime = datetime.now().replace(second=0, microsecond=0)
+    release_date: datetime = workflow.on[0].next(current_date).date
+
     rs: Result = workflow.release(
-        workflow.on[0].next(current_date).date,
+        release=release_date,
         params={"asat-dt": datetime(2024, 10, 1)},
     )
     print(rs)

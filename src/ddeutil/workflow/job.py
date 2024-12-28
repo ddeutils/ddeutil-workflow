@@ -40,6 +40,7 @@ from .stage import Stage
 from .utils import (
     Result,
     cross_product,
+    cut_id,
     dash2underscore,
     filter_func,
     gen_id,
@@ -455,14 +456,18 @@ class Job(BaseModel):
         for stage in self.stages:
 
             if stage.is_skipped(params=context):
-                logger.info(f"({run_id}) [JOB]: Skip stage: {stage.iden!r}")
+                logger.info(
+                    f"({cut_id(run_id)}) [JOB]: Skip stage: {stage.iden!r}"
+                )
                 continue
 
-            logger.info(f"({run_id}) [JOB]: Execute stage: {stage.iden!r}")
+            logger.info(
+                f"({cut_id(run_id)}) [JOB]: Execute stage: {stage.iden!r}"
+            )
 
             # NOTE: Logging a matrix that pass on this stage execution.
             if strategy:
-                logger.info(f"({run_id}) [JOB]: ... Matrix: {strategy}")
+                logger.info(f"({cut_id(run_id)}) [JOB]: ... Matrix: {strategy}")
 
             # NOTE: Force stop this execution if event was set from main
             #   execution.
@@ -513,7 +518,7 @@ class Job(BaseModel):
                 )
             except (StageException, UtilException) as err:
                 logger.error(
-                    f"({run_id}) [JOB]: {err.__class__.__name__}: {err}"
+                    f"({cut_id(run_id)}) [JOB]: {err.__class__.__name__}: {err}"
                 )
                 if config.job_raise_error:
                     raise JobException(
@@ -636,7 +641,7 @@ class Job(BaseModel):
         nd: str = (
             f", the strategies do not run is {not_done}" if not_done else ""
         )
-        logger.debug(f"({run_id}) [JOB]: Strategy is set Fail Fast{nd}")
+        logger.debug(f"({cut_id(run_id)}) [JOB]: Strategy is set Fail Fast{nd}")
 
         # NOTE:
         #       Stop all running tasks with setting the event manager and cancel
@@ -654,7 +659,7 @@ class Job(BaseModel):
             if err := future.exception():
                 status: int = 1
                 logger.error(
-                    f"({run_id}) [JOB]: Fail-fast catching:\n\t"
+                    f"({cut_id(run_id)}) [JOB]: Fail-fast catching:\n\t"
                     f"{future.exception()}"
                 )
                 context.update(
@@ -695,7 +700,7 @@ class Job(BaseModel):
             except JobException as err:
                 status = 1
                 logger.error(
-                    f"({run_id}) [JOB]: All-completed catching:\n\t"
+                    f"({cut_id(run_id)}) [JOB]: All-completed catching:\n\t"
                     f"{err.__class__.__name__}:\n\t{err}"
                 )
                 context.update(

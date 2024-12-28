@@ -49,6 +49,7 @@ from .on import On
 from .utils import (
     Param,
     Result,
+    cut_id,
     delay,
     gen_id,
     get_diff_sec,
@@ -419,7 +420,7 @@ class Workflow(BaseModel):
             I will add sleep with 0.15 seconds on every step that interact with
         the queue object.
 
-        :param release: A release datetime.
+        :param release: A release datetime or workflow release object.
         :param params: A workflow parameter that pass to execute method.
         :param queue: A list of release time that already queue.
         :param run_id: A workflow running ID for this release.
@@ -430,6 +431,7 @@ class Workflow(BaseModel):
         """
         log: type[Log] = log or FileLog
         run_id: str = run_id or gen_id(self.name, unique=True)
+        rs_release: Result = Result(run_id=run_id)
 
         # VALIDATE: Change queue value to WorkflowQueue object.
         if queue is None:
@@ -442,11 +444,12 @@ class Workflow(BaseModel):
             release: WorkflowRelease = WorkflowRelease.from_dt(release)
 
         logger.debug(
-            f"({run_id}) [RELEASE]: {self.name!r} : "
-            f"Closely to run >> {release.date:%Y-%m-%d %H:%M:%S}"
+            f"({cut_id(run_id)}) [RELEASE]: {self.name!r} : Start release - "
+            f"{release.date:%Y-%m-%d %H:%M:%S}"
         )
 
-        # NOTE: Release parameter that use to change if params has templating.
+        # NOTE: Release parameters that use to templating on the schedule
+        #   config data.
         release_params: DictData = {
             "release": {
                 "logical_date": release.date,
@@ -456,14 +459,14 @@ class Workflow(BaseModel):
             }
         }
 
-        # WARNING: Re-create workflow object that use new running workflow ID.
+        # NOTE: Execute workflow with templating params from release mapping.
         rs: Result = self.execute(
             params=param2template(params, release_params),
             run_id=run_id,
         )
         logger.debug(
-            f"({run_id}) [RELEASE]: {self.name!r} : "
-            f"End release {release.date:%Y-%m-%d %H:%M:%S}"
+            f"({cut_id(run_id)}) [RELEASE]: {self.name!r} : End release - "
+            f"{release.date:%Y-%m-%d %H:%M:%S}"
         )
 
         rs.set_parent_run_id(run_id)
@@ -485,7 +488,7 @@ class Workflow(BaseModel):
         queue.remove_running(release)
         heappush(queue.complete, release)
 
-        return Result(
+        return rs_release.catch(
             status=0,
             context={
                 "params": params,
@@ -494,7 +497,6 @@ class Workflow(BaseModel):
                     "logical_date": release.date,
                 },
             },
-            run_id=run_id,
         )
 
     def queue_poking(
@@ -508,9 +510,9 @@ class Workflow(BaseModel):
         the on field. with offset value.
 
         :param offset: A offset in second unit for time travel.
-        :param end_date:
-        :param queue:
-        :param log:
+        :param end_date: An end datetime object.
+        :param queue: A workflow queue object.
+        :param log: A log class that want to making log object.
 
         :rtype: WorkflowQueue
         """
@@ -577,7 +579,7 @@ class Workflow(BaseModel):
         #   empty result.
         if len(self.on) == 0:
             logger.info(
-                f"({run_id}) [POKING]: {self.name!r} does not have any "
+                f"({cut_id(run_id)}) [POKING]: {self.name!r} does not have any "
                 f"schedule to run."
             )
             return []
@@ -604,7 +606,7 @@ class Workflow(BaseModel):
         log: type[Log] = log or FileLog
         run_id: str = run_id or gen_id(self.name, unique=True)
         logger.info(
-            f"({run_id}) [POKING]: Start Poking: {self.name!r} from "
+            f"({cut_id(run_id)}) [POKING]: Start Poking: {self.name!r} from "
             f"{start_date:%Y-%m-%d %H:%M:%S} to {end_date:%Y-%m-%d %H:%M:%S}"
         )
 
@@ -617,7 +619,8 @@ class Workflow(BaseModel):
         self.queue_poking(offset, end_date=end_date, queue=wf_queue, log=log)
         if not wf_queue.is_queued:
             logger.info(
-                f"({run_id}) [POKING]: {self.name!r} does not have any queue."
+                f"({cut_id(run_id)}) [POKING]: {self.name!r} does not have "
+                f"any queue."
             )
             return []
 
@@ -635,8 +638,8 @@ class Workflow(BaseModel):
                     wf_release.date - get_dt_now(tz=config.tz, offset=offset)
                 ).total_seconds() > 60:
                     logger.debug(
-                        f"({run_id}) [POKING]: Waiting because the latest "
-                        f"release has diff time more than 60 seconds "
+                        f"({cut_id(run_id)}) [POKING]: Waiting because the "
+                        f"latest release has diff time more than 60 seconds."
                     )
                     heappush(wf_queue.queue, wf_release)
                     delay(60)
@@ -665,7 +668,7 @@ class Workflow(BaseModel):
 
         while len(wf_queue.running) > 0:  # pragma: no cov
             logger.warning(
-                f"({run_id}) [POKING]: Running does empty when poking "
+                f"({cut_id(run_id)}) [POKING]: Running does empty when poking "
                 f"process was finishing."
             )
             delay(10)
@@ -711,7 +714,9 @@ class Workflow(BaseModel):
                 f"workflow."
             )
 
-        logger.info(f"({run_id}) [WORKFLOW]: Start execute job: {job_id!r}")
+        logger.info(
+            f"({cut_id(run_id)}) [WORKFLOW]: Start execute job: {job_id!r}"
+        )
 
         # IMPORTANT:
         #   This execution change all job running IDs to the current workflow
@@ -726,7 +731,8 @@ class Workflow(BaseModel):
             )
         except JobException as err:
             logger.error(
-                f"({run_id}) [WORKFLOW]: {err.__class__.__name__}: {err}"
+                f"({cut_id(run_id)}) [WORKFLOW]: {err.__class__.__name__}: "
+                f"{err}"
             )
             if raise_error:
                 raise WorkflowException(
@@ -770,7 +776,9 @@ class Workflow(BaseModel):
         :rtype: Result
         """
         run_id: str = run_id or gen_id(self.name, unique=True)
-        logger.info(f"({run_id}) [WORKFLOW]: Start Execute: {self.name!r} ...")
+        logger.info(
+            f"({cut_id(run_id)}) [WORKFLOW]: Start Execute: {self.name!r} ..."
+        )
 
         # NOTE: I use this condition because this method allow passing empty
         #   params and I do not want to create new dict object.
@@ -780,7 +788,7 @@ class Workflow(BaseModel):
         # NOTE: It should not do anything if it does not have job.
         if not self.jobs:
             logger.warning(
-                f"({run_id}) [WORKFLOW]: This workflow: {self.name!r} "
+                f"({cut_id(run_id)}) [WORKFLOW]: This workflow: {self.name!r} "
                 f"does not have any jobs"
             )
             return rs.catch(status=0, context=params)
@@ -855,7 +863,8 @@ class Workflow(BaseModel):
         not_timeout_flag: bool = True
         timeout: int = timeout or config.max_job_exec_timeout
         logger.debug(
-            f"({run_id}) [WORKFLOW]: Run {self.name} with threading executor."
+            f"({cut_id(run_id)}) [WORKFLOW]: Run {self.name} with threading "
+            f"executor."
         )
 
         # IMPORTANT: The job execution can run parallel and waiting by
@@ -907,7 +916,7 @@ class Workflow(BaseModel):
 
                 for future in as_completed(futures, timeout=thread_timeout):
                     if err := future.exception():
-                        logger.error(f"({run_id}) [WORKFLOW]: {err}")
+                        logger.error(f"({cut_id(run_id)}) [WORKFLOW]: {err}")
                         raise WorkflowException(str(err))
 
                     # NOTE: This getting result does not do anything.
@@ -920,7 +929,8 @@ class Workflow(BaseModel):
 
         # NOTE: Raise timeout error.
         logger.warning(
-            f"({run_id}) [WORKFLOW]: Execution: {self.name!r} was timeout."
+            f"({cut_id(run_id)}) [WORKFLOW]: Execution: {self.name!r} "
+            f"was timeout."
         )
         raise WorkflowException(f"Execution: {self.name!r} was timeout.")
 
@@ -949,8 +959,8 @@ class Workflow(BaseModel):
         not_timeout_flag: bool = True
         timeout: int = timeout or config.max_job_exec_timeout
         logger.debug(
-            f"({run_id}) [WORKFLOW]: Run {self.name} with non-threading "
-            f"executor."
+            f"({cut_id(run_id)}) [WORKFLOW]: Run {self.name} with "
+            f"non-threading executor."
         )
 
         while not job_queue.empty() and (
@@ -989,7 +999,8 @@ class Workflow(BaseModel):
 
         # NOTE: Raise timeout error.
         logger.warning(
-            f"({run_id}) [WORKFLOW]: Execution: {self.name!r} was timeout."
+            f"({cut_id(run_id)}) [WORKFLOW]: Execution: {self.name!r} "
+            f"was timeout."
         )
         raise WorkflowException(f"Execution: {self.name!r} was timeout.")
 
@@ -1042,15 +1053,15 @@ class WorkflowTaskData:
             next_time: datetime = runner.next
 
         logger.debug(
-            f"({run_id}) [CORE]: {self.workflow.name!r} : {runner.cron} : "
-            f"{next_time:%Y-%m-%d %H:%M:%S}"
+            f"({cut_id(run_id)}) [CORE]: {self.workflow.name!r} : "
+            f"{runner.cron} : {next_time:%Y-%m-%d %H:%M:%S}"
         )
         heappush(queue[self.alias], next_time)
         start_sec: float = time.monotonic()
 
         if get_diff_sec(next_time, tz=runner.tz) > waiting_sec:
             logger.debug(
-                f"({run_id}) [WORKFLOW]: {self.workflow.name!r} : "
+                f"({cut_id(run_id)}) [WORKFLOW]: {self.workflow.name!r} : "
                 f"{runner.cron} "
                 f": Does not closely >> {next_time:%Y-%m-%d %H:%M:%S}"
             )
@@ -1063,8 +1074,8 @@ class WorkflowTaskData:
             return
 
         logger.debug(
-            f"({run_id}) [CORE]: {self.workflow.name!r} : {runner.cron} : "
-            f"Closely to run >> {next_time:%Y-%m-%d %H:%M:%S}"
+            f"({cut_id(run_id)}) [CORE]: {self.workflow.name!r} : "
+            f"{runner.cron} : Closely to run >> {next_time:%Y-%m-%d %H:%M:%S}"
         )
 
         # NOTE: Release when the time is nearly to schedule time.
@@ -1072,8 +1083,8 @@ class WorkflowTaskData:
             sleep_interval + 5
         ):
             logger.debug(
-                f"({run_id}) [CORE]: {self.workflow.name!r} : {runner.cron} "
-                f": Sleep until: {duration}"
+                f"({cut_id(run_id)}) [CORE]: {self.workflow.name!r} : "
+                f"{runner.cron} : Sleep until: {duration}"
             )
             time.sleep(15)
 
@@ -1092,8 +1103,8 @@ class WorkflowTaskData:
             params=param2template(self.params, release_params),
         )
         logger.debug(
-            f"({run_id}) [CORE]: {self.workflow.name!r} : {runner.cron} : "
-            f"End release - {next_time:%Y-%m-%d %H:%M:%S}"
+            f"({cut_id(run_id)}) [CORE]: {self.workflow.name!r} : "
+            f"{runner.cron} : End release - {next_time:%Y-%m-%d %H:%M:%S}"
         )
 
         # NOTE: Set parent ID on this result.
