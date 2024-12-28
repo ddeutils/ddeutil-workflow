@@ -2,6 +2,32 @@
 
 ## Latest Changes
 
+## 0.0.22
+
+### :sparkles: Features
+
+- :dart: feat: remove checking running queue on the poke method. (_2024-12-28_)
+- :dart: feat: add force run flag on the poke method. (_2024-12-28_)
+- :dart: feat: split queue argument validation from the release method. (_2024-12-28_)
+- :dart: feat: add cutting running id func. (_2024-12-28_)
+- :dart: feat: revise create result dataclass object on exec methods. (_2024-12-26_)
+- :dart: feat: add check_needs method on job object for planing trigger rule. (_2024-12-25_)
+
+### :black_nib: Code Changes
+
+- :construction: refactored: revise result creation on workflow module. (_2024-12-27_)
+- :test_tube: tests: update workflow job exec testcase. (_2024-12-24_)
+
+### :card_file_box: Documents
+
+- :page_facing_up: docs: update docs-string on workflow module. (_2024-12-28_)
+
+### :bug: Fix Bugs
+
+- :gear: fixed: move validate queue args of release method to construct method. (_2024-12-28_)
+- :gear: fixed: revise validate queue arg logic. (_2024-12-28_)
+- :gear: fixed: reorder code on the poke method. (_2024-12-28_)
+
 ## 0.0.21
 
 ### :sparkles: Features
