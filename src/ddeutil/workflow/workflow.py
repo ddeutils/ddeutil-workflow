@@ -168,7 +168,8 @@ class WorkflowQueue:
         """Check a WorkflowRelease value already exists in list of tracking
         queues.
 
-        :param value: A workflow release object.
+        :param value: A WorkflowRelease object that want to check it already in
+            queues.
 
         :rtype: bool
         """
@@ -594,6 +595,7 @@ class Workflow(BaseModel):
         periods: int = 1,
         log: Log | None = None,
         force_run: bool = False,
+        timeout: int = 1800,
     ) -> list[Result]:
         """Poke this workflow with start datetime value that passing to its
         ``on`` field with threading executor pool for executing with all its
@@ -609,6 +611,8 @@ class Workflow(BaseModel):
         :param log: A log object that want to use on this poking process.
         :param force_run: A flag that allow to release workflow if the log with
             that release was pointed.
+        :param timeout: A second value for timeout while waiting all futures
+            run completely.
 
         :rtype: list[Result]
         :return: A list of all results that return from ``self.release`` method.
@@ -669,25 +673,30 @@ class Workflow(BaseModel):
             )
             return []
 
+        # NOTE: Start create the thread pool executor for running this poke
+        #   process.
         with ThreadPoolExecutor(
             max_workers=config.max_poking_pool_worker,
-            thread_name_prefix="workflow_poking_",
+            thread_name_prefix="wf_poking_",
         ) as executor:
 
             while wf_queue.is_queued:
 
-                # NOTE: Pop the latest workflow release object from queue.
-                wf_release: WorkflowRelease = heappop(wf_queue.queue)
+                # NOTE: Pop the latest WorkflowRelease object from queue.
+                release: WorkflowRelease = heappop(wf_queue.queue)
 
                 if (
-                    wf_release.date - get_dt_now(tz=config.tz, offset=offset)
+                    release.date - get_dt_now(tz=config.tz, offset=offset)
                 ).total_seconds() > 60:
                     logger.debug(
-                        f"({cut_id(run_id)}) [POKING]: Waiting because the "
-                        f"latest release has diff time more than 60 seconds."
+                        f"({cut_id(run_id)}) [POKING]: Wait because the latest "
+                        f"release has diff time more than 60 seconds ..."
                     )
-                    heappush(wf_queue.queue, wf_release)
+                    heappush(wf_queue.queue, release)
                     delay(60)
+
+                    # WARNING: I already call queue poking again because issue
+                    #   about the every minute crontab.
                     self.queue_poking(
                         offset,
                         end_date,
@@ -697,13 +706,13 @@ class Workflow(BaseModel):
                     )
                     continue
 
-                # NOTE: Push the workflow release to running queue
-                wf_queue.push_running(wf_release)
+                # NOTE: Push the latest WorkflowRelease to the running queue.
+                wf_queue.push_running(release)
 
                 futures.append(
                     executor.submit(
                         self.release,
-                        release=wf_release,
+                        release=release,
                         params=params,
                         log=log,
                         queue=wf_queue,
@@ -720,7 +729,7 @@ class Workflow(BaseModel):
 
             # WARNING: This poking method does not allow to use fail-fast
             #   logic to catching parallel execution result.
-            for future in as_completed(futures, timeout=1800):
+            for future in as_completed(futures, timeout=timeout):
                 results.append(future.result().set_parent_run_id(run_id))
 
         while len(wf_queue.running) > 0:  # pragma: no cov
@@ -927,7 +936,7 @@ class Workflow(BaseModel):
         #   needed.
         with ThreadPoolExecutor(
             max_workers=config.max_job_parallel,
-            thread_name_prefix="workflow_exec_threading_",
+            thread_name_prefix="wf_exec_threading_",
         ) as executor:
             futures: list[Future] = []
 
