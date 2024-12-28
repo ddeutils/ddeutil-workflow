@@ -401,6 +401,40 @@ class Workflow(BaseModel):
             "jobs": {},
         }
 
+    @staticmethod
+    def __validate_release_with_queue(
+        queue: (
+            WorkflowQueue | list[datetime] | list[WorkflowRelease] | None
+        ) = None,
+    ) -> WorkflowQueue:
+        """Validate method for the queue argument that passing to the release
+        method.
+
+        :raise TypeError: If the type of an input queue does not valid.
+
+        :rtype: WorkflowQueue
+        """
+        if isinstance(queue, WorkflowQueue):
+            return queue
+        elif queue is None:
+            queue: WorkflowQueue = WorkflowQueue()
+        elif isinstance(queue, list) and all(
+            isinstance(q, datetime) for q in queue
+        ):
+            queue: WorkflowQueue = WorkflowQueue(
+                queue=[WorkflowRelease.from_dt(q) for q in queue]
+            )
+        elif isinstance(queue, list) and all(
+            isinstance(q, WorkflowRelease) for q in queue
+        ):
+            queue: WorkflowQueue = WorkflowQueue(queue=queue)
+        else:
+            raise TypeError(
+                "Type of the queue argument does not valid with WorkflowQueue "
+                "or list of datetime or list of WorkflowRelease."
+            )
+        return queue
+
     def release(
         self,
         release: datetime | WorkflowRelease,
@@ -408,7 +442,9 @@ class Workflow(BaseModel):
         *,
         run_id: str | None = None,
         log: type[Log] = None,
-        queue: WorkflowQueue | list[datetime] | None = None,
+        queue: (
+            WorkflowQueue | list[datetime] | list[WorkflowRelease] | None
+        ) = None,
     ) -> Result:
         """Release the workflow execution with overriding parameter with the
         release templating that include logical date (release date), execution
@@ -420,7 +456,7 @@ class Workflow(BaseModel):
             I will add sleep with 0.15 seconds on every step that interact with
         the queue object.
 
-        :param release: A release datetime or workflow release object.
+        :param release: A release datetime or WorkflowRelease object.
         :param params: A workflow parameter that pass to execute method.
         :param queue: A list of release time that already queue.
         :param run_id: A workflow running ID for this release.
@@ -434,10 +470,7 @@ class Workflow(BaseModel):
         rs_release: Result = Result(run_id=run_id)
 
         # VALIDATE: Change queue value to WorkflowQueue object.
-        if queue is None:
-            queue: WorkflowQueue = WorkflowQueue()
-        elif isinstance(queue, list):
-            queue: WorkflowQueue = WorkflowQueue(queue=queue)
+        queue: WorkflowQueue = self.__validate_release_with_queue(queue)
 
         # VALIDATE: Change release value to WorkflowRelease object.
         if isinstance(release, datetime):
@@ -492,10 +525,8 @@ class Workflow(BaseModel):
             status=0,
             context={
                 "params": params,
-                "release": {
-                    "status": "success",
-                    "logical_date": release.date,
-                },
+                "release": {"status": "success", "logical_date": release.date},
+                "outputs": rs.context,
             },
         )
 
@@ -864,8 +895,7 @@ class Workflow(BaseModel):
         not_timeout_flag: bool = True
         timeout: int = timeout or config.max_job_exec_timeout
         logger.debug(
-            f"({cut_id(run_id)}) [WORKFLOW]: Run {self.name} with threading "
-            f"executor."
+            f"({cut_id(run_id)}) [WORKFLOW]: Run {self.name!r} with threading."
         )
 
         # IMPORTANT: The job execution can run parallel and waiting by
@@ -961,7 +991,7 @@ class Workflow(BaseModel):
         timeout: int = timeout or config.max_job_exec_timeout
         logger.debug(
             f"({cut_id(run_id)}) [WORKFLOW]: Run {self.name} with "
-            f"non-threading executor."
+            f"non-threading."
         )
 
         while not job_queue.empty() and (

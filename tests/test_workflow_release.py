@@ -26,10 +26,27 @@ def test_workflow_release():
     current_date: datetime = datetime.now().replace(second=0, microsecond=0)
     release_date: datetime = workflow.on[0].next(current_date).date
 
+    # NOTE: Start call workflow release method.
     rs: Result = workflow.release(
         release=release_date,
         params={"asat-dt": datetime(2024, 10, 1)},
     )
+    assert rs.status == 0
+    print(rs)
+
+
+@mock.patch.object(Config, "enable_write_log", False)
+def test_workflow_release_with_queue():
+    workflow: Workflow = Workflow.from_loader(name="wf-scheduling-common")
+    current_date: datetime = datetime.now().replace(second=0, microsecond=0)
+    release_date: datetime = workflow.on[0].next(current_date).date
+
+    # NOTE: Start call workflow release method.
+    rs: Result = workflow.release(
+        release=release_date,
+        params={"asat-dt": datetime(2024, 10, 1)},
+    )
+    assert rs.status == 0
     print(rs)
 
 
