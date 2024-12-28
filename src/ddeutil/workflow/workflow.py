@@ -575,6 +575,9 @@ class Workflow(BaseModel):
         :rtype: list[Result]
         :return: A list of all results that return from ``self.release`` method.
         """
+        log: type[Log] = log or FileLog
+        run_id: str = run_id or gen_id(self.name, unique=True)
+
         # NOTE: If this workflow does not set the on schedule, it will return
         #   empty result.
         if len(self.on) == 0:
@@ -603,8 +606,6 @@ class Workflow(BaseModel):
         #   value.
         end_date: datetime = start_date + timedelta(minutes=periods)
 
-        log: type[Log] = log or FileLog
-        run_id: str = run_id or gen_id(self.name, unique=True)
         logger.info(
             f"({cut_id(run_id)}) [POKING]: Start Poking: {self.name!r} from "
             f"{start_date:%Y-%m-%d %H:%M:%S} to {end_date:%Y-%m-%d %H:%M:%S}"
