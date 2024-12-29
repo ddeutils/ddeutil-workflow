@@ -152,7 +152,7 @@
 
 ### :bug: Fix Bugs
 
-- :gear: fixed: move cron module to verdors and ignore it in coverage process. (_2024-10-27_)
+- :gear: fixed: move cron module to vendors and ignore it in coverage process. (_2024-10-27_)
 
 ### :package: Build & Workflow
 
@@ -182,7 +182,7 @@
 
 ### :card_file_box: Documents
 
-- :page_facing_up: docs: update desc of model filds. (_2024-10-23_)
+- :page_facing_up: docs: update desc of model fields. (_2024-10-23_)
 - :page_facing_up: docs: update readme and getting started docs. (_2024-10-05_)
 
 ### :bug: Fix Bugs

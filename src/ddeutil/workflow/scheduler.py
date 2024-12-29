@@ -70,7 +70,7 @@ logging.getLogger("schedule").setLevel(logging.INFO)
 
 __all__: TupleStr = (
     "Schedule",
-    "ScheduleWorkflow",
+    "WorkflowSchedule",
     "workflow_task_release",
     "workflow_monitor",
     "workflow_control",
@@ -78,21 +78,21 @@ __all__: TupleStr = (
 )
 
 
-class ScheduleWorkflow(BaseModel):
-    """Schedule Workflow Pydantic model that use to keep workflow model for the
-    Schedule model. it should not use Workflow model directly because on the
+class WorkflowSchedule(BaseModel):
+    """Workflow Schedule Pydantic model that use to keep workflow model for
+    the Schedule model. it should not use Workflow model directly because on the
     schedule config it can adjust crontab value that different from the Workflow
     model.
     """
 
     alias: Optional[str] = Field(
         default=None,
-        description="An alias name of workflow.",
+        description="An alias name of workflow that use for schedule model.",
     )
     name: str = Field(description="A workflow name.")
     on: list[On] = Field(
         default_factory=list,
-        description="An override On instance value.",
+        description="An override the list of On object values.",
     )
     params: DictData = Field(
         default_factory=dict,
@@ -171,9 +171,9 @@ class Schedule(BaseModel):
             "A schedule description that can be string of markdown content."
         ),
     )
-    workflows: list[ScheduleWorkflow] = Field(
+    workflows: list[WorkflowSchedule] = Field(
         default_factory=list,
-        description="A list of ScheduleWorkflow models.",
+        description="A list of WorkflowSchedule models.",
     )
 
     @field_validator("desc", mode="after")
@@ -181,6 +181,7 @@ class Schedule(BaseModel):
         """Prepare description string that was created on a template.
 
         :param value: A description string value that want to dedent.
+
         :rtype: str
         """
         return dedent(value)

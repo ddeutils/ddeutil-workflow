@@ -5,7 +5,7 @@ import yaml
 from ddeutil.workflow import Workflow
 from ddeutil.workflow.conf import Loader
 from ddeutil.workflow.on import On
-from ddeutil.workflow.scheduler import Schedule, ScheduleWorkflow
+from ddeutil.workflow.scheduler import Schedule, WorkflowSchedule
 from ddeutil.workflow.workflow import WorkflowTaskData
 from pydantic import ValidationError
 
@@ -28,13 +28,13 @@ def test_schedule():
 
 
 def test_schedule_workflow():
-    schedule_wf = ScheduleWorkflow(
+    schedule_wf = WorkflowSchedule(
         name="wf-scheduling",
         on=["every_3_minute_bkk", "every_minute_bkk"],
     )
     assert schedule_wf.alias == "wf-scheduling"
 
-    schedule_wf = ScheduleWorkflow(
+    schedule_wf = WorkflowSchedule(
         alias="wf-scheduling-morning",
         name="wf-scheduling",
         on=["every_3_minute_bkk", "every_minute_bkk"],

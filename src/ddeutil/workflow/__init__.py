@@ -26,7 +26,7 @@ from .on import (
 )
 from .scheduler import (
     Schedule,
-    ScheduleWorkflow,
+    WorkflowSchedule,
 )
 from .stage import (
     BashStage,
