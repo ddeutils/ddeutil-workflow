@@ -51,9 +51,9 @@ from typing_extensions import Self
 from .__types import DictData, DictStr, Re, TupleStr
 from .conf import config, get_logger
 from .exceptions import StageException
+from .result import Result
 from .utils import (
     Registry,
-    Result,
     TagFunc,
     cut_id,
     gen_id,

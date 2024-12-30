@@ -23,7 +23,7 @@ from pydantic import BaseModel
 from .__about__ import __version__
 from .conf import config, get_logger
 from .repeat import repeat_at, repeat_every
-from .scheduler import WorkflowTaskData
+from .workflow import WorkflowTaskData
 
 load_dotenv()
 logger = get_logger("ddeutil.workflow")

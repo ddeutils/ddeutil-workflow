@@ -61,6 +61,7 @@ nav:
       - 'Workflow': modules/workflow.md
       - 'Scheduler': modules/scheduler.md
   - Examples:
+      - examples/index.md
       - Hooks: examples/hook_stage.md
 
 plugins:

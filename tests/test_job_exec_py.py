@@ -4,7 +4,7 @@ import pytest
 from ddeutil.workflow import Job, Workflow
 from ddeutil.workflow.conf import Config
 from ddeutil.workflow.exceptions import JobException
-from ddeutil.workflow.utils import Result
+from ddeutil.workflow.result import Result
 
 
 def test_job_py():

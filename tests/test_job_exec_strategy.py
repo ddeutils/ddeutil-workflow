@@ -7,7 +7,7 @@ from ddeutil.core import getdot
 from ddeutil.workflow.conf import Config
 from ddeutil.workflow.exceptions import JobException, StageException
 from ddeutil.workflow.job import Job
-from ddeutil.workflow.utils import Result
+from ddeutil.workflow.result import Result
 from ddeutil.workflow.workflow import Workflow
 
 

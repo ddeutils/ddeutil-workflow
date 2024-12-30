@@ -32,6 +32,7 @@ from .params import (
     Param,
     StrParam,
 )
+from .result import Result
 from .scheduler import (
     Schedule,
     WorkflowSchedule,
@@ -49,7 +50,6 @@ from .utils import (
     FILTERS,
     FilterFunc,
     FilterRegistry,
-    Result,
     ReturnTagFunc,
     TagFunc,
     batch,

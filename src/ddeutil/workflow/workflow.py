@@ -47,8 +47,8 @@ from .exceptions import JobException, WorkflowException
 from .job import Job
 from .on import On
 from .params import Param
+from .result import Result
 from .utils import (
-    Result,
     cut_id,
     delay,
     gen_id,
@@ -86,13 +86,16 @@ class WorkflowRelease:
         return f"{self.date:%Y-%m-%d %H:%M:%S}"
 
     @classmethod
-    def from_dt(cls, dt: datetime) -> Self:
+    def from_dt(cls, dt: datetime | str) -> Self:
         """Construct WorkflowRelease via datetime object only.
 
         :param dt: A datetime object.
 
         :rtype: Self
         """
+        if isinstance(dt, str):
+            dt: datetime = datetime.fromisoformat(dt)
+
         return cls(
             date=dt,
             offset=0,

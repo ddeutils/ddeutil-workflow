@@ -5,7 +5,7 @@ import pytest
 from ddeutil.workflow import Workflow
 from ddeutil.workflow.conf import Config, config
 from ddeutil.workflow.exceptions import WorkflowException
-from ddeutil.workflow.utils import Result
+from ddeutil.workflow.result import Result
 
 from .utils import dump_yaml_context
 

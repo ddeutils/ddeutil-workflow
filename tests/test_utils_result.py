@@ -1,7 +1,7 @@
 import logging
 import time
 
-from ddeutil.workflow.utils import Result
+from ddeutil.workflow.result import Result
 
 
 def test_result_default():

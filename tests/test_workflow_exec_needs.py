@@ -2,7 +2,7 @@ from unittest import mock
 
 from ddeutil.workflow import Workflow
 from ddeutil.workflow.conf import Config
-from ddeutil.workflow.utils import Result
+from ddeutil.workflow.result import Result
 
 
 def test_workflow_exec_needs():

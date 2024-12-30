@@ -1,8 +1,8 @@
 import pytest
 from ddeutil.workflow import Workflow
 from ddeutil.workflow.exceptions import StageException
+from ddeutil.workflow.result import Result
 from ddeutil.workflow.stage import Stage
-from ddeutil.workflow.utils import Result
 
 
 def test_stage_exec_hook():

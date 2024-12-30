@@ -3,7 +3,7 @@ from datetime import datetime
 import ddeutil.workflow as wf
 import ddeutil.workflow.stage as st
 from ddeutil.core import getdot
-from ddeutil.workflow.utils import Result
+from ddeutil.workflow.result import Result
 
 
 def test_stage_exec_trigger():

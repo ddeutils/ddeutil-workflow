@@ -36,9 +36,9 @@ from .exceptions import (
     StageException,
     UtilException,
 )
+from .result import Result
 from .stage import Stage
 from .utils import (
-    Result,
     cross_product,
     cut_id,
     dash2underscore,

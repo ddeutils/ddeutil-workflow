@@ -4,7 +4,7 @@ from unittest import mock
 from ddeutil.workflow import Workflow
 from ddeutil.workflow.conf import Config
 from ddeutil.workflow.job import Job
-from ddeutil.workflow.utils import Result
+from ddeutil.workflow.result import Result
 
 
 @mock.patch.object(Config, "max_job_parallel", 1)

@@ -2,7 +2,7 @@ import pytest
 from ddeutil.workflow import Workflow
 from ddeutil.workflow.exceptions import WorkflowException
 from ddeutil.workflow.job import Job
-from ddeutil.workflow.utils import Result
+from ddeutil.workflow.result import Result
 from pydantic import ValidationError
 
 from .utils import dump_yaml, dump_yaml_context

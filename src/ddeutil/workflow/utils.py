@@ -11,7 +11,6 @@ import stat
 import time
 from ast import Call, Constant, Expr, Module, Name, parse
 from collections.abc import Iterator
-from dataclasses import field
 from datetime import datetime, timedelta
 from functools import wraps
 from hashlib import md5
@@ -20,7 +19,7 @@ from inspect import isfunction
 from itertools import chain, islice, product
 from pathlib import Path
 from random import randrange
-from typing import Any, Callable, Optional, Protocol, TypeVar, Union
+from typing import Any, Callable, Protocol, TypeVar, Union
 from zoneinfo import ZoneInfo
 
 try:
@@ -31,9 +30,6 @@ except ImportError:
 from ddeutil.core import getdot, hasdot, hash_str, import_string, lazy
 from ddeutil.io import search_env_replace
 from pydantic import BaseModel
-from pydantic.dataclasses import dataclass
-from pydantic.functional_validators import model_validator
-from typing_extensions import Self
 
 from .__types import DictData, Matrix, Re
 from .conf import config
@@ -195,90 +191,6 @@ def make_registry(submodule: str) -> dict[str, Registry]:
             rs[func.name][func.tag] = lazy(f"{module}.{submodule}.{fstr}")
 
     return rs
-
-
-@dataclass
-class Result:
-    """Result Pydantic Model for passing and receiving data context from any
-    module execution process like stage execution, job execution, or workflow
-    execution.
-
-        For comparison property, this result will use ``status``, ``context``,
-    and ``_run_id`` fields to comparing with other result instance.
-    """
-
-    status: int = field(default=2)
-    context: DictData = field(default_factory=dict)
-
-    # NOTE: Ignore this field to compare another result model with __eq__.
-    run_id: Optional[str] = field(default=None)
-    parent_run_id: Optional[str] = field(default=None, compare=False)
-
-    @model_validator(mode="after")
-    def __prepare_run_id(self) -> Self:
-        """Prepare running ID which use default ID if it initialize at the first
-        time
-
-        :rtype: Self
-        """
-        self._run_id = gen_id("manual", unique=True)
-        return self
-
-    def set_run_id(self, running_id: str) -> Self:
-        """Set a running ID.
-
-        :param running_id: A running ID that want to update on this model.
-        :rtype: Self
-        """
-        self.run_id = running_id
-        return self
-
-    def set_parent_run_id(self, running_id: str) -> Self:
-        """Set a parent running ID.
-
-        :param running_id: A running ID that want to update on this model.
-        :rtype: Self
-        """
-        self.parent_run_id: str = running_id
-        return self
-
-    def catch(self, status: int, context: DictData) -> Self:
-        """Catch the status and context to current data."""
-        self.__dict__["status"] = status
-        self.__dict__["context"].update(context)
-        return self
-
-    def receive(self, result: Result) -> Self:
-        """Receive context from another result object.
-
-        :rtype: Self
-        """
-        self.__dict__["status"] = result.status
-        self.__dict__["context"].update(result.context)
-
-        # NOTE: Update running ID from an incoming result.
-        self.parent_run_id = result.parent_run_id
-        self.run_id = result.run_id
-        return self
-
-    def receive_jobs(self, result: Result) -> Self:
-        """Receive context from another result object that use on the workflow
-        execution which create a ``jobs`` keys on the context if it do not
-        exist.
-
-        :rtype: Self
-        """
-        self.__dict__["status"] = result.status
-
-        # NOTE: Check the context has jobs key.
-        if "jobs" not in self.__dict__["context"]:
-            self.__dict__["context"]["jobs"] = {}
-        self.__dict__["context"]["jobs"].update(result.context)
-
-        # NOTE: Update running ID from an incoming result.
-        self.parent_run_id: str = result.parent_run_id
-        self.run_id: str = result.run_id
-        return self
 
 
 def make_exec(path: str | Path) -> None:

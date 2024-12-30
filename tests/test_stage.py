@@ -1,8 +1,8 @@
 import pytest
 from ddeutil.workflow import Workflow
 from ddeutil.workflow.exceptions import StageException
+from ddeutil.workflow.result import Result
 from ddeutil.workflow.stage import EmptyStage, PyStage, Stage
-from ddeutil.workflow.utils import Result
 from pydantic import ValidationError
 
 from .utils import dump_yaml_context

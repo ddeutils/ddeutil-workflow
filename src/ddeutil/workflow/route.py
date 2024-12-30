@@ -17,8 +17,8 @@ from pydantic import BaseModel
 from . import Workflow
 from .__types import DictData
 from .conf import Loader, config, get_logger
+from .result import Result
 from .scheduler import Schedule
-from .utils import Result
 
 logger = get_logger("ddeutil.workflow")
 workflow = APIRouter(
