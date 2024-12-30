@@ -1,5 +1,7 @@
 # Configuration
 
+## Package Config
+
 The main configuration that use to dynamic changing with your propose of this
 application. If any configuration values do not set yet, it will use default value
 and do not raise any error to you.

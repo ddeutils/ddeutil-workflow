@@ -46,8 +46,8 @@ from .conf import FileLog, Loader, Log, config, get_logger
 from .exceptions import JobException, WorkflowException
 from .job import Job
 from .on import On
+from .params import Param
 from .utils import (
-    Param,
     Result,
     cut_id,
     delay,

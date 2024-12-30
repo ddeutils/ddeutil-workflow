@@ -41,10 +41,13 @@ workflow pipeline exec -p "{\"asat-dt\": \"2024-08-01\"}"
 
 ```python
 from ddeutil.workflow import Workflow
+from ddeutil.workflow.utils import Result
 
-wf = Workflow.from_loader('pipe-run-manual').execute(params={
-    "asat-dt": "2024-08-01",
-})
+result: Result = (
+    Workflow
+    .from_loader('pipe-run-manual')
+    .execute(params={"asat-dt": "2024-08-01"})
+)
 ```
 
 ### Via Application

@@ -9,11 +9,10 @@ import inspect
 import logging
 import stat
 import time
-from abc import ABC, abstractmethod
 from ast import Call, Constant, Expr, Module, Name, parse
 from collections.abc import Iterator
 from dataclasses import field
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from functools import wraps
 from hashlib import md5
 from importlib import import_module
@@ -21,7 +20,7 @@ from inspect import isfunction
 from itertools import chain, islice, product
 from pathlib import Path
 from random import randrange
-from typing import Any, Callable, Literal, Optional, Protocol, TypeVar, Union
+from typing import Any, Callable, Optional, Protocol, TypeVar, Union
 from zoneinfo import ZoneInfo
 
 try:
@@ -31,14 +30,14 @@ except ImportError:
 
 from ddeutil.core import getdot, hasdot, hash_str, import_string, lazy
 from ddeutil.io import search_env_replace
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from pydantic.dataclasses import dataclass
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
 from .__types import DictData, Matrix, Re
 from .conf import config
-from .exceptions import ParamValueException, UtilException
+from .exceptions import UtilException
 
 T = TypeVar("T")
 P = ParamSpec("P")
@@ -196,154 +195,6 @@ def make_registry(submodule: str) -> dict[str, Registry]:
             rs[func.name][func.tag] = lazy(f"{module}.{submodule}.{fstr}")
 
     return rs
-
-
-class BaseParam(BaseModel, ABC):
-    """Base Parameter that use to make Params Model."""
-
-    desc: Optional[str] = Field(
-        default=None, description="A description of parameter providing."
-    )
-    required: bool = Field(
-        default=True,
-        description="A require flag that force to pass this parameter value.",
-    )
-    type: str = Field(description="A type of parameter.")
-
-    @abstractmethod
-    def receive(self, value: Optional[Any] = None) -> Any:
-        raise NotImplementedError(
-            "Receive value and validate typing before return valid value."
-        )
-
-
-class DefaultParam(BaseParam):
-    """Default Parameter that will check default if it required. This model do
-    not implement the receive method.
-    """
-
-    required: bool = Field(
-        default=False,
-        description="A require flag for the default-able parameter value.",
-    )
-    default: Optional[str] = Field(
-        default=None,
-        description="A default value if parameter does not pass.",
-    )
-
-    @abstractmethod
-    def receive(self, value: Optional[Any] = None) -> Any:
-        raise NotImplementedError(
-            "Receive value and validate typing before return valid value."
-        )
-
-
-class DatetimeParam(DefaultParam):
-    """Datetime parameter."""
-
-    type: Literal["datetime"] = "datetime"
-    default: datetime = Field(default_factory=get_dt_now)
-
-    def receive(self, value: str | datetime | date | None = None) -> datetime:
-        """Receive value that match with datetime. If a input value pass with
-        None, it will use default value instead.
-
-        :param value: A value that want to validate with datetime parameter
-            type.
-        :rtype: datetime
-        """
-        if value is None:
-            return self.default
-
-        if isinstance(value, datetime):
-            return value
-        elif isinstance(value, date):
-            return datetime(value.year, value.month, value.day)
-        elif not isinstance(value, str):
-            raise ParamValueException(
-                f"Value that want to convert to datetime does not support for "
-                f"type: {type(value)}"
-            )
-        try:
-            return datetime.fromisoformat(value)
-        except ValueError:
-            raise ParamValueException(
-                f"Invalid isoformat string: {value!r}"
-            ) from None
-
-
-class StrParam(DefaultParam):
-    """String parameter."""
-
-    type: Literal["str"] = "str"
-
-    def receive(self, value: str | None = None) -> str | None:
-        """Receive value that match with str.
-
-        :param value: A value that want to validate with string parameter type.
-        :rtype: str | None
-        """
-        if value is None:
-            return self.default
-        return str(value)
-
-
-class IntParam(DefaultParam):
-    """Integer parameter."""
-
-    type: Literal["int"] = "int"
-    default: Optional[int] = Field(
-        default=None,
-        description="A default value if parameter does not pass.",
-    )
-
-    def receive(self, value: int | None = None) -> int | None:
-        """Receive value that match with int.
-
-        :param value: A value that want to validate with integer parameter type.
-        :rtype: int | None
-        """
-        if value is None:
-            return self.default
-        if not isinstance(value, int):
-            try:
-                return int(str(value))
-            except ValueError as err:
-                raise ParamValueException(
-                    f"Value can not convert to int, {value}, with base 10"
-                ) from err
-        return value
-
-
-class ChoiceParam(BaseParam):
-    """Choice parameter."""
-
-    type: Literal["choice"] = "choice"
-    options: list[str] = Field(description="A list of choice parameters.")
-
-    def receive(self, value: str | None = None) -> str:
-        """Receive value that match with options.
-
-        :param value: A value that want to select from the options field.
-        :rtype: str
-        """
-        # NOTE:
-        #   Return the first value in options if does not pass any input value
-        if value is None:
-            return self.options[0]
-        if value not in self.options:
-            raise ParamValueException(
-                f"{value!r} does not match any value in choice options."
-            )
-        return value
-
-
-Param = Union[
-    ChoiceParam,
-    DatetimeParam,
-    IntParam,
-    StrParam,
-]
 
 
 @dataclass
