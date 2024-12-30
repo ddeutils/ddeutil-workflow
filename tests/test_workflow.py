@@ -1,10 +1,11 @@
 import pytest
-import yaml
 from ddeutil.workflow import Workflow
 from ddeutil.workflow.exceptions import WorkflowException
 from ddeutil.workflow.job import Job
 from ddeutil.workflow.utils import Result
 from pydantic import ValidationError
+
+from .utils import dump_yaml, dump_yaml_context
 
 
 def test_workflow():
@@ -77,69 +78,63 @@ def test_workflow_from_loader_raise(test_path):
     test_file = test_path / "conf/demo/01_01_wf_run_raise.yml"
 
     # NOTE: Raise for type of workflow does not valid.
-    with test_file.open(mode="w") as f:
-        yaml.dump(
-            {
-                "wf-run-from-loader-raise": {
-                    "type": "ddeutil.workflow.on.On",
-                    "jobs": {
-                        "first-job": {
-                            "stages": [
-                                {"name": "Echo next", "echo": "Hello World"}
-                            ]
-                        }
-                    },
-                }
-            },
-            f,
-        )
+    dump_yaml(
+        test_file,
+        data={
+            "wf-run-from-loader-raise": {
+                "type": "ddeutil.workflow.on.On",
+                "jobs": {
+                    "first-job": {
+                        "stages": [{"name": "Echo next", "echo": "Hello World"}]
+                    }
+                },
+            }
+        },
+    )
 
     with pytest.raises(ValueError):
         Workflow.from_loader(name="wf-run-from-loader-raise")
 
     # NOTE: Raise if type of the on field does not valid with str or dict.
-    with test_file.open(mode="w") as f:
-        yaml.dump(
-            {
-                "wf-run-from-loader-raise": {
-                    "type": "ddeutil.workflow.Workflow",
-                    "on": [
-                        ["* * * * *"],
-                        ["* * 1 0 0"],
-                    ],
-                    "jobs": {
-                        "first-job": {
-                            "stages": [
-                                {"name": "Echo next", "echo": "Hello World"}
-                            ]
-                        }
-                    },
-                }
-            },
-            f,
-        )
+    dump_yaml(
+        test_file,
+        data={
+            "wf-run-from-loader-raise": {
+                "type": "ddeutil.workflow.Workflow",
+                "on": [
+                    ["* * * * *"],
+                    ["* * 1 0 0"],
+                ],
+                "jobs": {
+                    "first-job": {
+                        "stages": [{"name": "Echo next", "echo": "Hello World"}]
+                    }
+                },
+            }
+        },
+    )
 
     with pytest.raises(TypeError):
         Workflow.from_loader(name="wf-run-from-loader-raise")
 
     # NOTE: Raise if value of the on field does not parsing to the CronJob obj.
-    with test_file.open(mode="w") as f:
-        yaml.dump(
-            {
-                "wf-run-from-loader-raise": {
-                    "type": "ddeutil.workflow.Workflow",
-                    "jobs": {
-                        "first-job": {
-                            "needs": ["not-found"],
-                            "stages": [
-                                {"name": "Echo next", "echo": "Hello World"}
-                            ],
-                        }
-                    },
-                }
-            },
-            f,
-        )
+    dump_yaml(
+        test_file,
+        data={
+            "wf-run-from-loader-raise": {
+                "type": "ddeutil.workflow.Workflow",
+                "jobs": {
+                    "first-job": {
+                        "needs": ["not-found"],
+                        "stages": [
+                            {"name": "Echo next", "echo": "Hello World"}
+                        ],
+                    }
+                },
+            }
+        },
+    )
+
     with pytest.raises(WorkflowException):
         Workflow.from_loader(name="wf-run-from-loader-raise")
 
@@ -174,14 +169,30 @@ def test_workflow_condition():
     } == rs.context
 
 
-def test_workflow_parameterize():
-    workflow = Workflow.from_loader(name="wf-params-required")
+def test_workflow_parameterize(test_path):
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_parameterize.yml",
+        data="""
+        tmp-wf-params-required:
+          type: ddeutil.workflow.Workflow
+          params:
+            name:
+              type: str
+              required: True
+          jobs:
+            first-job:
+              stages:
+                - name: Echo
+                  echo: "Hello ${{ params.name }}"
+        """,
+    ):
+        workflow: Workflow = Workflow.from_loader(name="tmp-wf-params-required")
 
-    assert workflow.parameterize({"name": "foo"}) == {
-        "params": {"name": "foo"},
-        "jobs": {},
-    }
+        assert workflow.parameterize({"name": "foo"}) == {
+            "params": {"name": "foo"},
+            "jobs": {},
+        }
 
-    # NOTE: Raise if passing parameter that does not set on the workflow.
-    with pytest.raises(WorkflowException):
-        workflow.parameterize({"foo": "bar"})
+        # NOTE: Raise if passing parameter that does not set on the workflow.
+        with pytest.raises(WorkflowException):
+            workflow.parameterize({"foo": "bar"})

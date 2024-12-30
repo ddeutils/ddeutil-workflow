@@ -6,11 +6,14 @@
 from __future__ import annotations
 
 import logging
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from textwrap import dedent
+from typing import Any
 from zoneinfo import ZoneInfo
 
+import yaml
 from dotenv import load_dotenv
 
 OUTSIDE_PATH: Path = Path(__file__).parent.parent
@@ -57,3 +60,32 @@ def dotenv_setting() -> None:
 def str2dt(value: str) -> datetime:  # pragma: no cov
     """Convert string value to datetime object with ``fromisoformat`` method."""
     return datetime.fromisoformat(value).astimezone(ZoneInfo("Asia/Bangkok"))
+
+
+def dump_yaml(
+    filename: str | Path, data: dict[str, Any] | str
+) -> None:  # pragma: no cov
+    """Dump the context data to the target yaml file."""
+    with Path(filename).open(mode="w") as f:
+        if isinstance(data, str):
+            f.write(dedent(data.strip("\n")))
+        else:
+            yaml.dump(data, f)
+
+
+@contextmanager
+def dump_yaml_context(
+    filename: str | Path, data: dict[str, Any] | str
+) -> None:  # pragma: no cov
+    """Dump the context data to the target yaml file."""
+    test_file: Path = Path(filename) if isinstance(filename, str) else filename
+    with test_file.open(mode="w") as f:
+        if isinstance(data, str):
+            f.write(dedent(data.strip("\n")))
+        else:
+            yaml.dump(data, f)
+
+    yield test_file
+
+    # NOTE: Remove the testing file.
+    test_file.unlink(missing_ok=True)

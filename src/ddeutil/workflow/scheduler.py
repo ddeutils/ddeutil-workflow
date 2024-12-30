@@ -105,10 +105,13 @@ class WorkflowSchedule(BaseModel):
 
         :rtype: DictData
         """
-        values["name"] = values["name"].replace(" ", "_")
+        # VALIDATE: Prepare a workflow name that should not include space.
+        if name := values.get("name"):
+            values["name"] = name.replace(" ", "_")
 
+        # VALIDATE: Add default the alias field with the name.
         if not values.get("alias"):
-            values["alias"] = values["name"]
+            values["alias"] = values.get("name")
 
         cls.__bypass_on(values)
         return values
@@ -135,6 +138,7 @@ class WorkflowSchedule(BaseModel):
                 Loader(n, externals={}).data if isinstance(n, str) else n
                 for n in on
             ]
+
         return data
 
     @field_validator("on", mode="after")
