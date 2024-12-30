@@ -33,7 +33,7 @@ from functools import total_ordering
 from heapq import heappop, heappush
 from queue import Queue
 from textwrap import dedent
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.dataclasses import dataclass
@@ -522,12 +522,15 @@ class Workflow(BaseModel):
         queue.remove_running(release)
         heappush(queue.complete, release)
 
+        context: dict[str, Any] = rs.context
+        context.pop("params")
+
         return rs_release.catch(
             status=0,
             context={
                 "params": params,
                 "release": {"status": "success", "logical_date": release.date},
-                "outputs": rs.context,
+                "outputs": context,
             },
         )
 

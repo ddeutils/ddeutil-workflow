@@ -20,6 +20,7 @@ def test_workflow_poke():
     )
 
     print(results)
+    assert len(results) == 1
 
     # NOTE: Check datatype of results should be list of Result.
     assert isinstance(results[0], Result)
