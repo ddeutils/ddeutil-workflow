@@ -8,22 +8,12 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from datetime import date, datetime
-from typing import Any, Literal, Optional, TypeVar, Union
-
-try:
-    from typing import ParamSpec
-except ImportError:
-    from typing_extensions import ParamSpec
+from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
 from .exceptions import ParamValueException
 from .utils import get_dt_now
-
-T = TypeVar("T")
-P = ParamSpec("P")
-AnyModel = TypeVar("AnyModel", bound=BaseModel)
-AnyModelType = type[AnyModel]
 
 logger = logging.getLogger("ddeutil.workflow")
 

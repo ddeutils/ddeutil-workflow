@@ -313,7 +313,7 @@ class Job(BaseModel):
         # VALIDATE: Validate stage id should not duplicate.
         rs: list[str] = []
         for stage in value:
-            name: str = stage.id or stage.name
+            name: str = stage.iden
             if name in rs:
                 raise ValueError(
                     "Stage name in jobs object should not be duplicate."

@@ -132,7 +132,7 @@ class WorkflowQueue:
 
     @classmethod
     def from_list(
-        cls, queue: list[datetime] | list[WorkflowRelease] | None
+        cls, queue: list[datetime] | list[WorkflowRelease] | None = None
     ) -> Self:
         """Construct WorkflowQueue object from an input queue value that passing
         with list of datetime or list of WorkflowRelease.
@@ -143,12 +143,13 @@ class WorkflowQueue:
         """
         if queue is None:
             return cls()
-        elif isinstance(queue, list):
+
+        if isinstance(queue, list):
 
             if all(isinstance(q, datetime) for q in queue):
                 return cls(queue=[WorkflowRelease.from_dt(q) for q in queue])
 
-            elif all(isinstance(q, WorkflowRelease) for q in queue):
+            if all(isinstance(q, WorkflowRelease) for q in queue):
                 return cls(queue=queue)
 
         raise TypeError(

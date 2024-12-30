@@ -54,11 +54,38 @@ def test_workflow():
         Workflow(name="manual-workflow-${{ matrix.name }}")
 
 
-def test_workflow_on():
+def test_workflow_on(test_path):
 
     # NOTE: Raise when the on field receive duplicate values.
     with pytest.raises(ValidationError):
         Workflow.from_loader(name="wf-scheduling-raise")
+
+    # NOTE: Raise if values on the on field reach the maximum value.
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_on_reach_max_values.yml",
+        data="""
+        tmp-wf-on-reach-max-value:
+          type: ddeutil.workflow.Workflow
+          on:
+            - cronjob: '2 * * * *'
+            - cronjob: '3 * * * *'
+            - cronjob: '4 * * * *'
+            - cronjob: '5 * * * *'
+            - cronjob: '6 * * * *'
+            - cronjob: '7 * * * *'
+          jobs:
+            condition-job:
+              stages:
+                - name: "Test if condition"
+                  id: condition-stage
+                  if: '"${{ params.name }}" == "foo"'
+                  run: |
+                    message: str = 'Hello World'
+                    print(message)
+        """,
+    ):
+        with pytest.raises(ValidationError):
+            Workflow.from_loader(name="tmp-wf-on-reach-max-value")
 
 
 def test_workflow_desc():

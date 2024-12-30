@@ -4,7 +4,41 @@ from unittest import mock
 import pytest
 from ddeutil.workflow.conf import Config
 from ddeutil.workflow.utils import Result
-from ddeutil.workflow.workflow import Workflow, WorkflowRelease
+from ddeutil.workflow.workflow import Workflow, WorkflowQueue, WorkflowRelease
+
+
+def test_workflow_queue():
+    wf_queue = WorkflowQueue()
+
+    assert not wf_queue.is_queued
+
+
+def test_workflow_queue_from_list():
+    wf_queue = WorkflowQueue.from_list()
+
+    assert not wf_queue.is_queued
+
+    wf_queue = WorkflowQueue.from_list([])
+
+    assert not wf_queue.is_queued
+
+    wf_queue = WorkflowQueue.from_list(
+        [datetime(2024, 1, 1, 1), datetime(2024, 1, 2, 1)]
+    )
+
+    assert wf_queue.is_queued
+
+    wf_queue = WorkflowQueue.from_list(
+        [WorkflowRelease.from_dt(datetime(2024, 1, 1, 1))]
+    )
+
+    assert wf_queue.is_queued
+
+    with pytest.raises(TypeError):
+        WorkflowQueue.from_list(["20240101"])
+
+    with pytest.raises(TypeError):
+        WorkflowQueue.from_list("20240101")
 
 
 def test_workflow_release_dataclass():
