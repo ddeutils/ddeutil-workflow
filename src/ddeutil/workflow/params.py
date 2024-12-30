@@ -29,7 +29,8 @@ logger = logging.getLogger("ddeutil.workflow")
 
 
 class BaseParam(BaseModel, ABC):
-    """Base Parameter that use to make Params Model."""
+    """Base Parameter that use to make any Params Model. The type will dynamic
+    with the type field that made from literal string."""
 
     desc: Optional[str] = Field(
         default=None, description="A description of parameter providing."

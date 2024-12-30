@@ -142,31 +142,45 @@ def test_workflow_from_loader_raise(test_path):
     test_file.unlink(missing_ok=True)
 
 
-def test_workflow_condition():
-    workflow = Workflow.from_loader(name="wf-condition")
-    rs: Result = workflow.execute(params={"name": "bar"})
-    assert {
-        "params": {"name": "bar"},
-        "jobs": {
-            "condition-job": {
-                "matrix": {},
-                "stages": {},
-            },
-        },
-    } == rs.context
+def test_workflow_condition(test_path):
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_condition.yml",
+        data="""
+        tmp-wf-condition:
+          type: ddeutil.workflow.Workflow
+          params: {name: str}
+          jobs:
+            condition-job:
+              stages:
+                - name: "Test if condition"
+                  id: condition-stage
+                  if: '"${{ params.name }}" == "foo"'
+                  run: |
+                    message: str = 'Hello World'
+                    print(message)
+                    """,
+    ):
+        workflow = Workflow.from_loader(name="tmp-wf-condition")
+        rs: Result = workflow.execute(params={"name": "bar"})
+        assert {
+            "params": {"name": "bar"},
+            "jobs": {"condition-job": {"matrix": {}, "stages": {}}},
+        } == rs.context
 
-    rs: Result = workflow.execute(params={"name": "foo"})
-    assert {
-        "params": {"name": "foo"},
-        "jobs": {
-            "condition-job": {
-                "matrix": {},
-                "stages": {
-                    "condition-stage": {"outputs": {"message": "Hello World"}}
+        rs: Result = workflow.execute(params={"name": "foo"})
+        assert {
+            "params": {"name": "foo"},
+            "jobs": {
+                "condition-job": {
+                    "matrix": {},
+                    "stages": {
+                        "condition-stage": {
+                            "outputs": {"message": "Hello World"}
+                        }
+                    },
                 },
             },
-        },
-    } == rs.context
+        } == rs.context
 
 
 def test_workflow_parameterize(test_path):
@@ -176,9 +190,7 @@ def test_workflow_parameterize(test_path):
         tmp-wf-params-required:
           type: ddeutil.workflow.Workflow
           params:
-            name:
-              type: str
-              required: True
+            name: {type: str, required: True}
           jobs:
             first-job:
               stages:

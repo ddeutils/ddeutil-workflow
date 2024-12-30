@@ -7,6 +7,8 @@ from ddeutil.workflow.conf import Config, config
 from ddeutil.workflow.exceptions import WorkflowException
 from ddeutil.workflow.utils import Result
 
+from .utils import dump_yaml_context
+
 
 @mock.patch.object(Config, "enable_write_log", False)
 def test_workflow_poke():
@@ -56,9 +58,22 @@ def test_workflow_poke_with_start_date():
 
 
 @mock.patch.object(Config, "enable_write_log", False)
-def test_workflow_poke_no_on():
-    workflow = Workflow.from_loader(name="wf-params-required")
-    assert [] == workflow.poke(params={"name": "FOO"})
+def test_workflow_poke_no_on(test_path):
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_poke_no_on.yml",
+        data="""
+        tmp-wf-poke-no-on:
+          type: ddeutil.workflow.Workflow
+          params: {name: str}
+          jobs:
+            first-job:
+              stages:
+                - name: Echo
+                  echo: "Hello ${{ params.name }}"
+        """,
+    ):
+        workflow = Workflow.from_loader(name="tmp-wf-poke-no-on")
+        assert [] == workflow.poke(params={"name": "FOO"})
 
 
 @mock.patch.object(Config, "enable_write_log", False)

@@ -1,9 +1,11 @@
 import pytest
 from ddeutil.workflow import Workflow
 from ddeutil.workflow.exceptions import StageException
-from ddeutil.workflow.stage import EmptyStage, Stage
+from ddeutil.workflow.stage import EmptyStage, PyStage, Stage
 from ddeutil.workflow.utils import Result
 from pydantic import ValidationError
+
+from .utils import dump_yaml_context
 
 
 def test_stage():
@@ -57,20 +59,40 @@ def test_stage_empty_raise():
 
 
 def test_stage_if_condition():
-    workflow = Workflow.from_loader(name="wf-condition")
-    stage: Stage = workflow.job("condition-job").stage(
-        stage_id="condition-stage"
+    stage: PyStage = PyStage.model_validate(
+        {
+            "name": "Test if condition",
+            "id": "condition - stage",
+            "if": '"${{ params.name }}" == "foo"',
+            "run": """message: str = 'Hello World'\nprint(message)""",
+        }
     )
-    assert not stage.is_skipped(params=workflow.parameterize({"name": "foo"}))
-    assert stage.is_skipped(params=workflow.parameterize({"name": "bar"}))
+    assert not stage.is_skipped(params={"params": {"name": "foo"}})
+    assert stage.is_skipped(params={"params": {"name": "bar"}})
 
 
-def test_stage_if_condition_raise():
-    workflow = Workflow.from_loader(name="wf-condition-raise")
-    stage: Stage = workflow.job("condition-job").stage(
-        stage_id="condition-stage"
-    )
+def test_stage_if_condition_raise(test_path):
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_condition_raise.yml",
+        data="""
+        tmp-wf-condition-raise:
+          type: ddeutil.workflow.Workflow
+          on: 'every_5_minute_bkk'
+          params: {name: str}
+          jobs:
+            condition-job:
+              stages:
+                - name: "Test if condition failed"
+                  id: condition-stage
+                  if: '"${{ params.name }}"'
+        """,
+    ):
+        workflow = Workflow.from_loader(name="tmp-wf-condition-raise")
+        stage: Stage = workflow.job("condition-job").stage(
+            stage_id="condition-stage"
+        )
 
-    # NOTE: Raise error because output of if-condition does not be boolean type.
-    with pytest.raises(StageException):
-        stage.is_skipped({"params": {"name": "foo"}})
+        # NOTE: Raise error because output of if-condition does not be boolean
+        #   type.
+        with pytest.raises(StageException):
+            stage.is_skipped({"params": {"name": "foo"}})
