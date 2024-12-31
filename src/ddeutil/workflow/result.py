@@ -12,8 +12,10 @@ from pydantic.dataclasses import dataclass
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
-from .__types import DictData
+from .__types import DictData, TupleStr
 from .utils import gen_id
+
+__all__: TupleStr = ("Result",)
 
 
 @dataclass
@@ -28,9 +30,9 @@ class Result:
 
     status: int = field(default=2)
     context: DictData = field(default_factory=dict)
+    run_id: Optional[str] = field(default=None)
 
     # NOTE: Ignore this field to compare another result model with __eq__.
-    run_id: Optional[str] = field(default=None)
     parent_run_id: Optional[str] = field(default=None, compare=False)
 
     @model_validator(mode="after")

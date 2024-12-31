@@ -27,7 +27,6 @@ from .on import (
 from .params import (
     ChoiceParam,
     DatetimeParam,
-    DefaultParam,
     IntParam,
     Param,
     StrParam,

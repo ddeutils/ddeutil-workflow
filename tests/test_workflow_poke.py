@@ -11,19 +11,38 @@ from .utils import dump_yaml_context
 
 
 @mock.patch.object(Config, "enable_write_log", False)
-def test_workflow_poke():
-    workflow = Workflow.from_loader(name="wf-scheduling-minute")
+def test_workflow_poke(test_path):
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_poke.yml",
+        data="""
+        tmp-wf-scheduling-minute:
+          type: ddeutil.workflow.Workflow
+          on:
+            - cronjob: '* * * * *'
+              timezone: "Asia/Bangkok"
+          params: {asat-dt: datetime}
+          jobs:
+            condition-job:
+              stages:
+                - name: "Empty stage"
+                - name: "Call-out"
+                  echo: "Hello ${{ params.asat-dt | fmt('%Y-%m-%d') }}"
+        """,
+    ):
+        workflow = Workflow.from_loader(name="tmp-wf-scheduling-minute")
 
-    # NOTE: Poking with the current datetime.
-    results: list[Result] = workflow.poke(
-        params={"asat-dt": datetime(2024, 1, 1)}
-    )
+        # NOTE: Poking with the current datetime.
+        results: list[Result] = workflow.poke(
+            params={"asat-dt": datetime(2024, 1, 1)}
+        )
 
-    print(results)
-    assert len(results) == 1
+        print(results)
 
-    # NOTE: Check datatype of results should be list of Result.
-    assert isinstance(results[0], Result)
+        # NOTE: Respec the result from poking should has only 1 result.
+        assert len(results) == 1
+
+        # NOTE: Check datatype of results should be list of Result.
+        assert isinstance(results[0], Result)
 
 
 @mock.patch.object(Config, "enable_write_log", False)

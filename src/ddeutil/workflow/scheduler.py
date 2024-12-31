@@ -94,9 +94,13 @@ class WorkflowSchedule(BaseModel):
         default_factory=list,
         description="An override the list of On object values.",
     )
-    params: DictData = Field(
+    values: DictData = Field(
         default_factory=dict,
-        description="A parameters that want to use in workflow execution.",
+        description=(
+            "A value that want to pass to the workflow parameters when "
+            "calling release method."
+        ),
+        alias="params",
     )
 
     @model_validator(mode="before")
@@ -164,9 +168,10 @@ class WorkflowSchedule(BaseModel):
 
 
 class Schedule(BaseModel):
-    """Schedule Pydantic Model that use to run with scheduler package. It does
-    not equal the on value in Workflow model but it use same logic to running
-    release date with crontab interval.
+    """Schedule Pydantic model that use to run with any scheduler package.
+
+        It does not equal the on value in Workflow model but it use same logic
+    to running release date with crontab interval.
     """
 
     desc: Optional[str] = Field(
@@ -229,6 +234,9 @@ class Schedule(BaseModel):
         """Return the list of WorkflowTaskData object from the specific input
         datetime that mapping with the on field.
 
+            This task creation need queue to tracking release date already
+        mapped or not.
+
         :param start_date: A start date that get from the workflow schedule.
         :param queue: A mapping of name and list of datetime for queue.
         :param externals: An external parameters that pass to the Loader object.
@@ -237,22 +245,21 @@ class Schedule(BaseModel):
         :return: Return the list of WorkflowTaskData object from the specific
             input datetime that mapping with the on field.
         """
-
-        # NOTE: Create pair of workflow and on.
         workflow_tasks: list[WorkflowTaskData] = []
         extras: DictData = externals or {}
 
         for sch_wf in self.workflows:
 
+            # NOTE: Loading workflow model from the name of workflow.
             wf: Workflow = Workflow.from_loader(sch_wf.name, externals=extras)
 
-            # NOTE: Create default list of release datetime.
+            # NOTE: Create default list of release datetime by empty list.
             if sch_wf.alias not in queue:
                 queue[sch_wf.alias]: list[datetime] = []
 
             # IMPORTANT: Create the default 'on' value if it does not passing
             #   the on field to the Schedule object.
-            ons: list[On] = wf.on.copy() if len(sch_wf.on) == 0 else sch_wf.on
+            ons: list[On] = sch_wf.on or wf.on.copy()
 
             for on in ons:
 
@@ -268,7 +275,7 @@ class Schedule(BaseModel):
                         alias=sch_wf.alias,
                         workflow=wf,
                         runner=runner,
-                        params=sch_wf.params,
+                        params=sch_wf.values,
                     ),
                 )
 

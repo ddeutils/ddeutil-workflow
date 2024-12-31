@@ -1024,7 +1024,7 @@ class Workflow(BaseModel):
         not_timeout_flag: bool = True
         timeout: int = timeout or config.max_job_exec_timeout
         logger.debug(
-            f"({cut_id(run_id)}) [WORKFLOW]: Run {self.name} with "
+            f"({cut_id(run_id)}) [WORKFLOW]: Run {self.name!r} with "
             f"non-threading."
         )
 
@@ -1082,7 +1082,7 @@ class WorkflowTaskData:
     alias: str
     workflow: Workflow
     runner: CronRunner
-    params: DictData
+    params: DictData = field(default_factory=dict)
 
     def release(
         self,

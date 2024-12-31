@@ -55,21 +55,6 @@ wf-scheduling-common:
           echo: "Hello ${{ params.asat-dt | fmt('%Y-%m-%d') }}"
 
 
-wf-scheduling-minute:
-  type: ddeutil.workflow.Workflow
-  on:
-    - cronjob: '* * * * *'
-      timezone: "Asia/Bangkok"
-  params:
-    asat-dt: datetime
-  jobs:
-    condition-job:
-      stages:
-        - name: "Empty stage"
-        - name: "Call-out"
-          echo: "Hello ${{ params.asat-dt | fmt('%Y-%m-%d') }}"
-
-
 wf-scheduling-daily:
   type: ddeutil.workflow.Workflow
   on:

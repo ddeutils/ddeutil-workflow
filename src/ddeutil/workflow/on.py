@@ -61,7 +61,7 @@ def interval2crontab(
 
 
 class On(BaseModel):
-    """On Model (Schedule)
+    """On Pydantic model (Warped crontab object by model).
 
     See Also:
         * ``generate()`` is the main usecase of this schedule object.
@@ -197,8 +197,8 @@ class On(BaseModel):
 
 
 class YearOn(On):
-    """Implement On Year Schedule Model for limit year matrix that use by some
-    data schedule tools like AWS Glue.
+    """On with enhance Year Pydantic model for limit year matrix that use by
+    some data schedule tools like AWS Glue.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
