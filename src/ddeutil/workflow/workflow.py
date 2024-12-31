@@ -1095,20 +1095,24 @@ class WorkflowTaskData:
         *,
         waiting_sec: int = 60,
         sleep_interval: int = 15,
-    ) -> None:  # pragma: no cov
-        """Workflow task release that use the same logic of `workflow.release`
-        method.
+    ) -> Result:  # pragma: no cov
+        """Release the workflow task data that use the same logic of
+        `workflow.release` method but use different the queue object for
+        tracking release datetime to run.
 
-        :param queue:
+        :param queue: A mapping of alias name and list of release datetime.
         :param log: A log object for saving result logging from workflow
             execution process.
         :param run_id: A workflow running ID for this release.
         :param waiting_sec: A second period value that allow workflow execute.
         :param sleep_interval: A second value that want to waiting until time
             to execute.
+
+        :rtype: Result
         """
-        log: Log = log or FileLog
-        run_id: str = run_id or gen_id(self.workflow.name, unique=True)
+        log: type[Log] = log or FileLog
+        run_id: str = run_id or gen_id(self.alias, unique=True)
+        rs_release: Result = Result(run_id=run_id)
         runner: CronRunner = self.runner
 
         # NOTE: get next schedule time that generate from now.
@@ -1139,7 +1143,7 @@ class WorkflowTaskData:
             queue[self.alias].remove(next_time)
 
             time.sleep(0.2)
-            return
+            return rs_release.catch(status=0, context={})
 
         logger.debug(
             f"({cut_id(run_id)}) [CORE]: {self.workflow.name!r} : "
@@ -1163,6 +1167,9 @@ class WorkflowTaskData:
         release_params: DictData = {
             "release": {
                 "logical_date": next_time,
+                "execute_date": datetime.now(tz=config.tz),
+                "run_id": run_id,
+                "timezone": runner.tz,
             },
         }
 
@@ -1207,6 +1214,18 @@ class WorkflowTaskData:
 
         # NOTE: Queue next release date.
         logger.debug(f"[CORE]: {'-' * 100}")
+
+        context: dict[str, Any] = rs.context
+        context.pop("params")
+
+        return rs_release.catch(
+            status=0,
+            context={
+                "params": self.params,
+                "release": {"status": "success", "logical_date": next_time},
+                "outputs": context,
+            },
+        )
 
     def __eq__(self, other: WorkflowTaskData) -> bool:
         """Override equal property that will compare only the same type."""

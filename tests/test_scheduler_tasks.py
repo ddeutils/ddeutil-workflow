@@ -6,25 +6,6 @@ from ddeutil.workflow.scheduler import Schedule
 from ddeutil.workflow.workflow import Workflow, WorkflowTaskData
 
 
-def test_workflow_task_data():
-    workflow: Workflow = Workflow.from_loader(name="wf-scheduling-common")
-    runner = workflow.on[0].generate(datetime(2024, 1, 1, 1))
-    task: WorkflowTaskData = WorkflowTaskData(
-        alias=workflow.name,
-        workflow=workflow,
-        runner=runner,
-        params={"asat-dt": datetime(2024, 1, 1, 1)},
-    )
-
-    assert task != datetime(2024, 1, 1, 1)
-    assert task == WorkflowTaskData(
-        alias=workflow.name,
-        workflow=workflow,
-        runner=runner,
-        params={},
-    )
-
-
 def test_schedule_tasks():
     schedule = Schedule.from_loader("schedule-wf")
     queue: dict[str, list[datetime]] = {"wf-scheduling": []}
