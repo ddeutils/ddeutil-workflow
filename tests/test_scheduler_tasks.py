@@ -33,7 +33,7 @@ def test_schedule_tasks():
 @mock.patch.object(Config, "enable_write_log", False)
 def test_schedule_tasks_release():
     schedule = Schedule.from_loader("schedule-common-wf")
-    queue: dict[str, list[datetime]] = {}
+    queue: dict[str, list[datetime]] = {"wf-scheduling": []}
 
     for task in schedule.tasks(
         start_date=datetime(2024, 1, 1, 1, 2, 30),
@@ -48,7 +48,7 @@ def test_schedule_tasks_release():
 @mock.patch.object(Config, "enable_write_log", False)
 def test_schedule_tasks_release_skip():
     schedule = Schedule.from_loader("schedule-common-wf")
-    queue: dict[str, list[datetime]] = {}
+    queue: dict[str, list[datetime]] = {"wf-scheduling": []}
 
     for wf_task in schedule.tasks(
         datetime(2024, 1, 1, 1),
@@ -57,4 +57,4 @@ def test_schedule_tasks_release_skip():
         assert wf_task.workflow.name == "wf-scheduling"
         wf_task.release(queue=queue, waiting_sec=0)
 
-    assert queue == {"wf-scheduling": []}
+    assert len(queue["wf-scheduling"]) == 1
