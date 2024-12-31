@@ -54,6 +54,7 @@ def test_workflow_task_data_release(test_path):
                 datetime(2024, 1, 1, 1, 0, tzinfo=runner.tz),
                 datetime(2024, 1, 1, 1, 1, tzinfo=runner.tz),
                 datetime(2024, 1, 1, 1, 2, tzinfo=runner.tz),
+                datetime(2024, 1, 1, 1, 4, tzinfo=runner.tz),
             ]
         }
 
@@ -84,4 +85,6 @@ def test_workflow_task_data_release(test_path):
 
         # NOTE: Validate len of queue should added next running date from the
         #   release method.
-        assert len(queue["demo"]) == 4
+        assert len(queue["demo"]) == 5
+        assert datetime(2024, 1, 1, 1, 5, tzinfo=runner.tz) in queue["demo"]
+        print(queue)

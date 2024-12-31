@@ -166,6 +166,57 @@ class WorkflowSchedule(BaseModel):
 
         return value
 
+    def tasks(
+        self,
+        start_date: datetime,
+        queue: dict[str, list[datetime]],
+        *,
+        externals: DictData | None = None,
+    ) -> list[WorkflowTaskData]:
+        """Return the list of WorkflowTaskData object from the specific input
+        datetime that mapping with the on field.
+
+            This task creation need queue to tracking release date already
+        mapped or not.
+
+        :param start_date: A start date that get from the workflow schedule.
+        :param queue: A mapping of name and list of datetime for queue.
+        :param externals: An external parameters that pass to the Loader object.
+
+        :rtype: list[WorkflowTaskData]
+        :return: Return the list of WorkflowTaskData object from the specific
+            input datetime that mapping with the on field.
+        """
+        workflow_tasks: list[WorkflowTaskData] = []
+        extras: DictData = externals or {}
+
+        # NOTE: Loading workflow model from the name of workflow.
+        wf: Workflow = Workflow.from_loader(self.name, externals=extras)
+
+        # IMPORTANT: Create the default 'on' value if it does not passing
+        #   the on field to the Schedule object.
+        ons: list[On] = self.on or wf.on.copy()
+
+        for on in ons:
+
+            # NOTE: Create CronRunner instance from the start_date param.
+            runner: CronRunner = on.generate(start_date)
+            next_running_date = runner.next
+
+            while next_running_date in queue[self.alias]:
+                next_running_date = runner.next
+
+            workflow_tasks.append(
+                WorkflowTaskData(
+                    alias=self.alias,
+                    workflow=wf,
+                    runner=runner,
+                    params=self.values,
+                ),
+            )
+
+        return workflow_tasks
+
 
 class Schedule(BaseModel):
     """Schedule Pydantic model that use to run with any scheduler package.
@@ -232,7 +283,7 @@ class Schedule(BaseModel):
         externals: DictData | None = None,
     ) -> list[WorkflowTaskData]:
         """Return the list of WorkflowTaskData object from the specific input
-        datetime that mapping with the on field.
+        datetime that mapping with the on field from workflow schedule model.
 
             This task creation need queue to tracking release date already
         mapped or not.
@@ -246,38 +297,11 @@ class Schedule(BaseModel):
             input datetime that mapping with the on field.
         """
         workflow_tasks: list[WorkflowTaskData] = []
-        extras: DictData = externals or {}
 
-        for sch_wf in self.workflows:
-
-            # NOTE: Loading workflow model from the name of workflow.
-            wf: Workflow = Workflow.from_loader(sch_wf.name, externals=extras)
-
-            # NOTE: Create default list of release datetime by empty list.
-            if sch_wf.alias not in queue:
-                queue[sch_wf.alias]: list[datetime] = []
-
-            # IMPORTANT: Create the default 'on' value if it does not passing
-            #   the on field to the Schedule object.
-            ons: list[On] = sch_wf.on or wf.on.copy()
-
-            for on in ons:
-
-                # NOTE: Create CronRunner instance from the start_date param.
-                runner: CronRunner = on.generate(start_date)
-                next_running_date = runner.next
-
-                while next_running_date in queue[sch_wf.alias]:
-                    next_running_date = runner.next
-
-                workflow_tasks.append(
-                    WorkflowTaskData(
-                        alias=sch_wf.alias,
-                        workflow=wf,
-                        runner=runner,
-                        params=sch_wf.values,
-                    ),
-                )
+        for wf in self.workflows:
+            workflow_tasks.extend(
+                wf.tasks(start_date, queue=queue, externals=externals or {})
+            )
 
         return workflow_tasks
 
