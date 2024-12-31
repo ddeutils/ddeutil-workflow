@@ -36,24 +36,59 @@ def test_workflow_poke(test_path):
             params={"asat-dt": datetime(2024, 1, 1)}
         )
 
-        print(results)
-
         # NOTE: Respec the result from poking should has only 1 result.
         assert len(results) == 1
 
         # NOTE: Check datatype of results should be list of Result.
         assert isinstance(results[0], Result)
+        assert results[0].status == 0
+        assert results[0].context == {
+            "params": {"asat-dt": datetime(2024, 1, 1)},
+            "release": {
+                "status": "success",
+                # NOTE: This value return with the current datetime.
+                "logical_date": results[0].context["release"]["logical_date"],
+            },
+            "outputs": {
+                "jobs": {
+                    "condition-job": {
+                        "matrix": {},
+                        "stages": {
+                            "6708019737": {"outputs": {}},
+                            "0663452000": {"outputs": {}},
+                        },
+                    },
+                },
+            },
+        }
+
+        # NOTE: Respec the run_id does not equal to the parent_run_id.
+        assert results[0].run_id != results[0].parent_run_id
 
 
 @mock.patch.object(Config, "enable_write_log", False)
-def test_workflow_poke_no_schedule():
-    workflow = Workflow.from_loader(name="wf-scheduling-daily")
+def test_workflow_poke_no_queue(test_path):
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_poke_no_schedule.yml",
+        data="""
+        tmp-wf-scheduling-daily:
+          type: ddeutil.workflow.Workflow
+          on:
+            - cronjob: "30 3 * * *"
+              timezone: "Asia/Bangkok"
+          jobs:
+            do-nothing:
+              stages:
+                - name: "Empty stage"
+        """,
+    ):
+        workflow = Workflow.from_loader(name="tmp-wf-scheduling-daily")
 
-    # NOTE: Poking with the current datetime.
-    results: list[Result] = workflow.poke(
-        params={"asat-dt": datetime(2024, 1, 1)}
-    )
-    assert results == []
+        # NOTE: Poking with the current datetime.
+        results: list[Result] = workflow.poke(
+            params={"asat-dt": datetime(2024, 1, 1)}
+        )
+        assert results == []
 
 
 def test_workflow_poke_raise():
@@ -65,16 +100,36 @@ def test_workflow_poke_raise():
 
 
 @mock.patch.object(Config, "enable_write_log", False)
-def test_workflow_poke_with_start_date():
-    workflow = Workflow.from_loader(name="wf-scheduling-with-name")
+def test_workflow_poke_with_start_date_and_period(test_path):
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_poke_with_start_date.yml",
+        data="""
+        tmp-wf-scheduling-with-name:
+          type: ddeutil.workflow.Workflow
+          on:
+            - 'every_minute_bkk'
+          params: {name: str}
+          jobs:
+            first-job:
+              stages:
+                - name: "Hello stage"
+                  echo: "Hello ${{ params.name | title }}"
+        """,
+    ):
+        workflow = Workflow.from_loader(name="tmp-wf-scheduling-with-name")
 
-    # NOTE: Poking with specific start datetime.
-    results: list[Result] = workflow.poke(
-        start_date=datetime(2024, 1, 1, 0, 0, 15, tzinfo=config.tz),
-        periods=2,
-        params={"name": "FOO"},
-    )
-    print(results)
+        # NOTE: Poking with specific start datetime.
+        results: list[Result] = workflow.poke(
+            start_date=datetime(2024, 1, 1, 0, 0, 15, tzinfo=config.tz),
+            periods=2,
+            params={"name": "FOO"},
+        )
+
+        print(results)
+
+        assert len(results) == 2
+
+        assert results[0].parent_run_id == results[1].parent_run_id
 
 
 @mock.patch.object(Config, "enable_write_log", False)
@@ -94,9 +149,3 @@ def test_workflow_poke_no_on(test_path):
     ):
         workflow = Workflow.from_loader(name="tmp-wf-poke-no-on")
         assert [] == workflow.poke(params={"name": "FOO"})
-
-
-@mock.patch.object(Config, "enable_write_log", False)
-def test_workflow_poke_with_release_params():
-    wf = Workflow.from_loader(name="wf-scheduling", externals={})
-    wf.poke(params={"asat-dt": "${{ release.logical_date }}"})

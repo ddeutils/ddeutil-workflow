@@ -57,8 +57,25 @@ def test_workflow():
 def test_workflow_on(test_path):
 
     # NOTE: Raise when the on field receive duplicate values.
-    with pytest.raises(ValidationError):
-        Workflow.from_loader(name="wf-scheduling-raise")
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_on_raise.yml",
+        data="""
+        tmp-wf-scheduling-raise:
+          type: ddeutil.workflow.Workflow
+          on:
+            - 'every_3_minute_bkk'
+            - 'every_3_minute_bkk'
+          params:
+            name: str
+          jobs:
+            first-job:
+              stages:
+                - name: "Hello stage"
+                  echo: "Hello ${{ params.name | title }}"
+        """,
+    ):
+        with pytest.raises(ValidationError):
+            Workflow.from_loader(name="tmp-wf-scheduling-raise")
 
     # NOTE: Raise if values on the on field reach the maximum value.
     with dump_yaml_context(

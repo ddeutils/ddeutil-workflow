@@ -661,9 +661,10 @@ class Workflow(BaseModel):
         )
 
         params: DictData = {} if params is None else params
-        wf_queue: WorkflowQueue = WorkflowQueue()
         results: list[Result] = []
-        futures: list[Future] = []
+
+        # NOTE: Create empty WorkflowQueue object.
+        wf_queue: WorkflowQueue = WorkflowQueue()
 
         # NOTE: Make queue to the workflow queue object.
         self.queue_poking(
@@ -686,6 +687,8 @@ class Workflow(BaseModel):
             max_workers=config.max_poking_pool_worker,
             thread_name_prefix="wf_poking_",
         ) as executor:
+
+            futures: list[Future] = []
 
             while wf_queue.is_queued:
 

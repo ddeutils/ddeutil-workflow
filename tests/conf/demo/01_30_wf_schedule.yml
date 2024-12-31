@@ -13,34 +13,6 @@ wf-scheduling:
           echo: "Hello ${{ params.asat-dt | fmt('%Y-%m-%d') }}"
 
 
-wf-scheduling-raise:
-  type: ddeutil.workflow.Workflow
-  on:
-    - 'every_3_minute_bkk'
-    - 'every_3_minute_bkk'
-  params:
-    name: str
-  jobs:
-    first-job:
-      stages:
-        - name: "Hello stage"
-          echo: "Hello ${{ params.name | title }}"
-
-
-wf-scheduling-with-name:
-  type: ddeutil.workflow.Workflow
-  on:
-    - 'every_3_minute_bkk'
-    - 'every_minute_bkk'
-  params:
-    name: str
-  jobs:
-    first-job:
-      stages:
-        - name: "Hello stage"
-          echo: "Hello ${{ params.name | title }}"
-
-
 wf-scheduling-common:
   type: ddeutil.workflow.Workflow
   on: ['every_3_minute_bkk']
@@ -53,14 +25,3 @@ wf-scheduling-common:
         - name: "Call Out"
           id: "call-out"
           echo: "Hello ${{ params.asat-dt | fmt('%Y-%m-%d') }}"
-
-
-wf-scheduling-daily:
-  type: ddeutil.workflow.Workflow
-  on:
-    - cronjob: "30 3 * * *"
-      timezone: "Asia/Bangkok"
-  jobs:
-    do-nothing:
-      stages:
-        - name: "Empty stage"
