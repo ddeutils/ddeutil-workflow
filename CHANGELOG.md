@@ -2,6 +2,28 @@
 
 ## Latest Changes
 
+## 0.0.23
+
+### :sparkles: Features
+
+- :dart: feat: rename schedule workflow object to workflow schedule. (_2024-12-29_)
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: update workflow task data testcase. (_2024-12-31_)
+- :test_tube: tests: update workflow schedule testcase. (_2024-12-31_)
+- :test_tube: tests: update workflow poking testcase. (_2024-12-31_)
+- :art: styled: add docs-string and change code format. (_2024-12-31_)
+- :test_tube: tests: update testcase on workflow release. (_2024-12-31_)
+- :construction: refactored: move result from utils to result module. (_2024-12-30_)
+- :test_tube: tests: add more testcase for workflow. (_2024-12-30_)
+- :construction: refactored: move param object from utils to params module. (_2024-12-30_)
+- :test_tube: tests: add dump yaml file utils func. (_2024-12-30_)
+
+### :bug: Fix Bugs
+
+- :gear: fixed: remove some demo config that use on test only. (_2024-12-30_)
+
 ## 0.0.22
 
 ### :sparkles: Features
