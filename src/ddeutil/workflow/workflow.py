@@ -1095,7 +1095,7 @@ class WorkflowTaskData:
         *,
         waiting_sec: int = 60,
         sleep_interval: int = 15,
-    ) -> Result:  # pragma: no cov
+    ) -> Result:
         """Release the workflow task data that use the same logic of
         `workflow.release` method but use different the queue object for
         tracking release datetime to run.
@@ -1125,17 +1125,17 @@ class WorkflowTaskData:
             next_time: datetime = runner.next
 
         logger.debug(
-            f"({cut_id(run_id)}) [CORE]: {self.workflow.name!r} : "
-            f"{runner.cron} : {next_time:%Y-%m-%d %H:%M:%S}"
+            f"({cut_id(run_id)}) [RELEASE]: {self.workflow.name!r} : "
+            f"{runner.cron} : Start release - {next_time:%Y-%m-%d %H:%M:%S}"
         )
         heappush(queue[self.alias], next_time)
         start_sec: float = time.monotonic()
 
         if get_diff_sec(next_time, tz=runner.tz) > waiting_sec:
             logger.debug(
-                f"({cut_id(run_id)}) [WORKFLOW]: {self.workflow.name!r} : "
+                f"({cut_id(run_id)}) [RELEASE]: {self.workflow.name!r} : "
                 f"{runner.cron} "
-                f": Does not closely >> {next_time:%Y-%m-%d %H:%M:%S}"
+                f": Skip >> {next_time:%Y-%m-%d %H:%M:%S}"
             )
 
             # NOTE: Add this next running datetime that not in period to queue
@@ -1146,8 +1146,8 @@ class WorkflowTaskData:
             return rs_release.catch(status=0, context={})
 
         logger.debug(
-            f"({cut_id(run_id)}) [CORE]: {self.workflow.name!r} : "
-            f"{runner.cron} : Closely to run >> {next_time:%Y-%m-%d %H:%M:%S}"
+            f"({cut_id(run_id)}) [RELEASE]: {self.workflow.name!r} : "
+            f"{runner.cron} : Closely >> {next_time:%Y-%m-%d %H:%M:%S}"
         )
 
         # NOTE: Release when the time is nearly to schedule time.
@@ -1155,7 +1155,7 @@ class WorkflowTaskData:
             sleep_interval + 5
         ):
             logger.debug(
-                f"({cut_id(run_id)}) [CORE]: {self.workflow.name!r} : "
+                f"({cut_id(run_id)}) [RELEASE]: {self.workflow.name!r} : "
                 f"{runner.cron} : Sleep until: {duration}"
             )
             time.sleep(15)
@@ -1178,7 +1178,7 @@ class WorkflowTaskData:
             params=param2template(self.params, release_params),
         )
         logger.debug(
-            f"({cut_id(run_id)}) [CORE]: {self.workflow.name!r} : "
+            f"({cut_id(run_id)}) [RELEASE]: {self.workflow.name!r} : "
             f"{runner.cron} : End release - {next_time:%Y-%m-%d %H:%M:%S}"
         )
 
@@ -1209,11 +1209,12 @@ class WorkflowTaskData:
         while (
             future_running_time in queue[self.alias]
             or (future_running_time - next_time).total_seconds() < total_sec
-        ):  # pragma: no cov
+        ):
             future_running_time: datetime = runner.next
 
         # NOTE: Queue next release date.
-        logger.debug(f"[CORE]: {'-' * 100}")
+        heappush(queue[self.alias], future_running_time)
+        logger.debug(f"[RELEASE]: {'-' * 100}")
 
         context: dict[str, Any] = rs.context
         context.pop("params")

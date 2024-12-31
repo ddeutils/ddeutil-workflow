@@ -4,6 +4,7 @@ from unittest import mock
 from ddeutil.workflow.__cron import CronRunner
 from ddeutil.workflow.conf import Config
 from ddeutil.workflow.on import On
+from ddeutil.workflow.result import Result
 from ddeutil.workflow.workflow import Workflow, WorkflowTaskData
 
 from .utils import dump_yaml_context
@@ -63,7 +64,7 @@ def test_workflow_task_data_release(test_path):
             params={"name": "foo"},
         )
 
-        rs = task.release(queue=queue)
+        rs: Result = task.release(queue=queue)
         assert rs.status == 0
         assert rs.context == {
             "params": {"name": "foo"},
@@ -80,3 +81,7 @@ def test_workflow_task_data_release(test_path):
                 },
             },
         }
+
+        # NOTE: Validate len of queue should added next running date from the
+        #   release method.
+        assert len(queue["demo"]) == 4
