@@ -64,7 +64,7 @@ from .workflow import Workflow, WorkflowTaskData
 P = ParamSpec("P")
 logger = get_logger("ddeutil.workflow")
 
-# NOTE: Adjust logging level on the schedule package.
+# NOTE: Adjust logging level on the `schedule` package.
 logging.getLogger("schedule").setLevel(logging.INFO)
 
 
@@ -284,9 +284,6 @@ class Schedule(BaseModel):
     ) -> list[WorkflowTaskData]:
         """Return the list of WorkflowTaskData object from the specific input
         datetime that mapping with the on field from workflow schedule model.
-
-            This task creation need queue to tracking release date already
-        mapped or not.
 
         :param start_date: A start date that get from the workflow schedule.
         :param queue: A mapping of name and list of datetime for queue.

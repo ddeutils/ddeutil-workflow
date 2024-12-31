@@ -88,3 +88,44 @@ def test_workflow_task_data_release(test_path):
         assert len(queue["demo"]) == 5
         assert datetime(2024, 1, 1, 1, 5, tzinfo=runner.tz) in queue["demo"]
         print(queue)
+
+
+@mock.patch.object(Config, "enable_write_log", False)
+def test_workflow_task_data_release_long_running(test_path):
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_task_data_release_long_run.yml",
+        data="""
+        tmp-wf-task-data-release-long-run:
+          type: ddeutil.workflow.Workflow
+          params: {name: str}
+          jobs:
+            first-job:
+              stages:
+                - name: "Hello stage"
+                  echo: "Hello ${{ params.name | title }}"
+                  sleep: 60
+        """,
+    ):
+        workflow = Workflow.from_loader(
+            name="tmp-wf-task-data-release-long-run"
+        )
+        runner: CronRunner = On.from_loader("every_minute_bkk").generate(
+            datetime(2024, 1, 1, 1)
+        )
+        queue = {
+            "demo": [
+                datetime(2024, 1, 1, 1, 0, tzinfo=runner.tz),
+                datetime(2024, 1, 1, 1, 2, tzinfo=runner.tz),
+            ]
+        }
+
+        task: WorkflowTaskData = WorkflowTaskData(
+            alias="demo",
+            workflow=workflow,
+            runner=runner,
+            params={"name": "foo"},
+        )
+
+        rs: Result = task.release(queue=queue)
+        assert rs.status == 0
+        print(queue)

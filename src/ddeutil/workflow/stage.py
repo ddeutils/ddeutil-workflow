@@ -346,6 +346,11 @@ class EmptyStage(BaseStage):
             f"( {param2template(self.echo, params=params) or '...'} )"
         )
         if self.sleep > 0:
+            if self.sleep > 30:
+                logger.info(
+                    f"({cut_id(run_id)}) [STAGE]: ... sleep "
+                    f"({self.sleep} seconds)"
+                )
             time.sleep(self.sleep)
         return Result(status=0, context={}, run_id=run_id)
 
