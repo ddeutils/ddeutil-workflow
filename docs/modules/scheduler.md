@@ -1,5 +1,5 @@
 # Scheduler
 
-## Schedule
+## WorkflowSchedule
 
-## ScheduleWorkflow
+## Schedule

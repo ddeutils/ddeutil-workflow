@@ -158,12 +158,12 @@ class WorkflowSchedule(BaseModel):
                 "The on fields should not contain duplicate on value."
             )
 
-        # WARNING:
-        # if '* * * * *' in set_ons and len(set_ons) > 1:
-        #     raise ValueError(
-        #         "If it has every minute cronjob on value, it should has only "
-        #         "one value in the on field."
-        #     )
+        if len(set_ons) > config.max_on_per_workflow:
+            raise ValueError(
+                f"The number of the on should not more than "
+                f"{config.max_on_per_workflow} crontab."
+            )
+
         return value
 
 
