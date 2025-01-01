@@ -31,6 +31,7 @@ from concurrent.futures import (
 )
 from datetime import datetime, timedelta
 from functools import wraps
+from heapq import heappop
 from textwrap import dedent
 from threading import Thread
 from typing import Callable, Optional
@@ -51,7 +52,7 @@ except ImportError:  # pragma: no cov
 
 from .__cron import CronRunner
 from .__types import DictData, TupleStr
-from .conf import Loader, config, get_logger
+from .conf import FileLog, Loader, Log, config, get_logger
 from .exceptions import WorkflowException
 from .on import On
 from .utils import (
@@ -356,6 +357,7 @@ def workflow_task_release(
     stop: datetime,
     queue: dict[str, WorkflowQueue],
     threads: dict[str, Thread],
+    log: type[Log],
 ) -> CancelJob | None:
     """Workflow task generator that create release pair of workflow and on to
     the threading in background.
@@ -366,15 +368,17 @@ def workflow_task_release(
     :param stop: A stop datetime object that force stop running scheduler.
     :param queue:
     :param threads:
+    :param log:
+
     :rtype: CancelJob | None
     """
     current_date: datetime = datetime.now(tz=config.tz)
 
     if current_date > stop.replace(tzinfo=config.tz):
-        logger.info("[WORKFLOW]: Stop this schedule with datetime stopper.")
+        logger.info("[SCHEDULE]: Stop this schedule with datetime stopper.")
         while len(threads) > 0:
             logger.warning(
-                "[WORKFLOW]: Waiting workflow release thread that still "
+                "[SCHEDULE]: Waiting workflow release thread that still "
                 "running in background."
             )
             time.sleep(15)
@@ -401,27 +405,26 @@ def workflow_task_release(
             f"{list(queue2str(queue[task.alias]))}"
         )
 
-        if (
-            len(queue[task.alias])
-            > 0
-            # and task.runner.date != queue[task.alias][0]
-        ):
+        if queue[task.alias].is_first_queue(task.runner.date):
             logger.debug(
                 f"[WORKFLOW]: Skip schedule "
                 f"{task.runner.date:%Y-%m-%d %H:%M:%S} "
                 f"for : {task.workflow.name!r} : {task.runner.cron}"
             )
+            task.queue(stop, queue[task.alias], log=log)
             continue
 
-        elif len(queue[task.alias]) == 0:
+        elif not queue[task.alias].is_queued:
             logger.warning(
                 f"[WORKFLOW]: Queue is empty for : {task.workflow.name!r} : "
                 f"{task.runner.cron}"
             )
+            task.queue(stop, queue[task.alias], log=log)
             continue
 
-        # NOTE: Remove this datetime from queue.
-        # queue[task.alias].pop(0)
+        # NOTE: Pop the latest release and push it to running.
+        release = heappop(queue[task.alias].queue)
+        queue[task.alias].push_running(release)
 
         # NOTE: Create thread name that able to tracking with observe schedule
         #   job.
@@ -441,6 +444,7 @@ def workflow_task_release(
 
         wf_thread.start()
 
+        task.queue(stop, queue[task.alias], log=log)
         delay()
 
     logger.debug(f"[WORKFLOW]: {'=' * 100}")
@@ -469,12 +473,15 @@ def schedule_control(
     schedules: list[str],
     stop: datetime | None = None,
     externals: DictData | None = None,
+    *,
+    log: type[Log] | None = None,
 ) -> list[str]:  # pragma: no cov
     """Scheduler control.
 
     :param schedules: A list of workflow names that want to schedule running.
     :param stop: An datetime value that use to stop running schedule.
     :param externals: An external parameters that pass to Loader.
+    :param log:
 
     :rtype: list[str]
     """
@@ -486,6 +493,7 @@ def schedule_control(
             "Should install schedule package before use this module."
         ) from None
 
+    log: type[Log] = log or FileLog
     scheduler: Scheduler = Scheduler()
     start_date: datetime = datetime.now(tz=config.tz)
     queue: dict[str, WorkflowQueue] = {}
@@ -517,6 +525,7 @@ def schedule_control(
             stop=(stop or (start_date + config.stop_boundary_delta)),
             queue=queue,
             threads=thread_releases,
+            log=log,
         )
         .tag("control")
     )
