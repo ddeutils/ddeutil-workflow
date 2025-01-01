@@ -60,6 +60,8 @@ nav:
       - 'Job': modules/job.md
       - 'Workflow': modules/workflow.md
       - 'Scheduler': modules/scheduler.md
+      - 'Params': modules/params.md
+      - 'Result': modules/result.md
   - Examples:
       - examples/index.md
       - Hooks: examples/hook_stage.md
