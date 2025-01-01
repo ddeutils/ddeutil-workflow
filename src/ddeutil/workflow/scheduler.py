@@ -4,7 +4,7 @@
 # license information.
 # ------------------------------------------------------------------------------
 """
-The main schedule running is ``workflow_runner`` function that trigger the
+The main schedule running is ``schedule_runner`` function that trigger the
 multiprocess of ``workflow_control`` function for listing schedules on the
 config by ``Loader.finds(Schedule)``.
 
@@ -72,9 +72,9 @@ __all__: TupleStr = (
     "Schedule",
     "WorkflowSchedule",
     "workflow_task_release",
-    "workflow_monitor",
-    "workflow_control",
-    "workflow_runner",
+    "monitor",
+    "schedule_control",
+    "schedule_runner",
 )
 
 
@@ -192,6 +192,7 @@ class WorkflowSchedule(BaseModel):
 
         # NOTE: Loading workflow model from the name of workflow.
         wf: Workflow = Workflow.from_loader(self.name, externals=extras)
+        wf_queue: WorkflowQueue = queue[self.alias]
 
         # IMPORTANT: Create the default 'on' value if it does not passing
         #   the on field to the Schedule object.
@@ -203,7 +204,7 @@ class WorkflowSchedule(BaseModel):
             runner: CronRunner = on.generate(start_date)
             next_running_date = runner.next
 
-            while queue[self.alias].check_queue(next_running_date):
+            while wf_queue.check_queue(next_running_date):
                 next_running_date = runner.next
 
             workflow_tasks.append(
@@ -347,10 +348,9 @@ def catch_exceptions(cancel_on_failure: bool = False) -> DecoratorCancelJob:
 
 @catch_exceptions(cancel_on_failure=True)  # pragma: no cov
 def workflow_task_release(
-    workflow_tasks: list[WorkflowTaskData],
+    tasks: list[WorkflowTaskData],
     stop: datetime,
-    queue,
-    running,
+    queue: dict[str, WorkflowQueue],
     threads: dict[str, Thread],
 ) -> CancelJob | None:
     """Workflow task generator that create release pair of workflow and on to
@@ -358,10 +358,9 @@ def workflow_task_release(
 
         This workflow task will start every minute at ':02' second.
 
-    :param workflow_tasks:
+    :param tasks: A list of WorkflowTaskData object.
     :param stop: A stop datetime object that force stop running scheduler.
     :param queue:
-    :param running:
     :param threads:
     :rtype: CancelJob | None
     """
@@ -375,7 +374,7 @@ def workflow_task_release(
                 "running in background."
             )
             time.sleep(15)
-            workflow_monitor(threads)
+            monitor(threads)
         return CancelJob
 
     # IMPORTANT:
@@ -390,7 +389,7 @@ def workflow_task_release(
     #   '00:02:00'  --> '*/2 * * * *'   --> running
     #               --> '*/35 * * * *'  --> skip
     #
-    for task in workflow_tasks:
+    for task in tasks:
 
         # NOTE: Get incoming datetime queue.
         logger.debug(
@@ -399,8 +398,9 @@ def workflow_task_release(
         )
 
         if (
-            len(queue[task.alias]) > 0
-            and task.runner.date != queue[task.alias][0]
+            len(queue[task.alias])
+            > 0
+            # and task.runner.date != queue[task.alias][0]
         ):
             logger.debug(
                 f"[WORKFLOW]: Skip schedule "
@@ -417,7 +417,7 @@ def workflow_task_release(
             continue
 
         # NOTE: Remove this datetime from queue.
-        queue[task.alias].pop(0)
+        # queue[task.alias].pop(0)
 
         # NOTE: Create thread name that able to tracking with observe schedule
         #   job.
@@ -428,10 +428,7 @@ def workflow_task_release(
 
         wf_thread: Thread = Thread(
             target=catch_exceptions(cancel_on_failure=True)(task.release),
-            kwargs={
-                "queue": queue,
-                "running": running,
-            },
+            kwargs={"queue": queue},
             name=thread_name,
             daemon=True,
         )
@@ -445,7 +442,7 @@ def workflow_task_release(
     logger.debug(f"[WORKFLOW]: {'=' * 100}")
 
 
-def workflow_monitor(threads: dict[str, Thread]) -> None:  # pragma: no cov
+def monitor(threads: dict[str, Thread]) -> None:  # pragma: no cov
     """Workflow schedule for monitoring long running thread from the schedule
     control.
 
@@ -455,7 +452,8 @@ def workflow_monitor(threads: dict[str, Thread]) -> None:  # pragma: no cov
     logger.debug(
         "[MONITOR]: Start checking long running workflow release task."
     )
-    snapshot_threads = list(threads.keys())
+
+    snapshot_threads: list[str] = list(threads.keys())
     for t_name in snapshot_threads:
 
         # NOTE: remove the thread that running success.
@@ -463,12 +461,12 @@ def workflow_monitor(threads: dict[str, Thread]) -> None:  # pragma: no cov
             threads.pop(t_name)
 
 
-def workflow_control(
+def schedule_control(
     schedules: list[str],
     stop: datetime | None = None,
     externals: DictData | None = None,
 ) -> list[str]:  # pragma: no cov
-    """Workflow scheduler control.
+    """Scheduler control.
 
     :param schedules: A list of workflow names that want to schedule running.
     :param stop: An datetime value that use to stop running schedule.
@@ -486,25 +484,17 @@ def workflow_control(
 
     scheduler: Scheduler = Scheduler()
     start_date: datetime = datetime.now(tz=config.tz)
-
-    # NOTE: Design workflow queue caching.
-    #   ---
-    #   {"workflow-name": [<release-datetime>, <release-datetime>, ...]}
-    #
     queue: dict[str, WorkflowQueue] = {}
     thread_releases: dict[str, Thread] = {}
-    workflow_tasks: list[WorkflowTaskData] = []
 
     start_date_waiting: datetime = start_date.replace(
         second=0, microsecond=0
     ) + timedelta(minutes=1)
 
+    # NOTE: Start create workflow tasks from list of schedule name.
+    workflow_tasks: list[WorkflowTaskData] = []
     for name in schedules:
-
-        # NOTE: Loading schedule model from config path.
         schedule: Schedule = Schedule.from_loader(name, externals=externals)
-
-        # NOTE: Create a workflow task data instance from schedule object.
         workflow_tasks.extend(
             schedule.tasks(
                 start_date_waiting,
@@ -528,13 +518,19 @@ def workflow_control(
     )
 
     # NOTE: Checking zombie task with schedule job will start every 5 minute.
-    scheduler.every(5).minutes.at(":10").do(
-        workflow_monitor,
-        threads=thread_releases,
-    ).tag("monitor")
+    (
+        scheduler.every(5)
+        .minutes.at(":10")
+        .do(
+            monitor,
+            threads=thread_releases,
+        )
+        .tag("monitor")
+    )
 
     # NOTE: Start running schedule
-    logger.info(f"[WORKFLOW]: Start schedule: {schedules}")
+    logger.info(f"[SCHEDULE]: Start schedule: {schedules}")
+
     while True:
         scheduler.run_pending()
         time.sleep(1)
@@ -543,26 +539,29 @@ def workflow_control(
         if not scheduler.get_jobs("control"):
             scheduler.clear("monitor")
             logger.warning(
-                f"[WORKFLOW]: Workflow release thread: {thread_releases}"
+                f"[SCHEDULE]: Workflow release thread: {thread_releases}"
             )
-            logger.warning("[WORKFLOW]: Does not have any schedule jobs !!!")
+            logger.warning("[SCHEDULE]: Does not have any schedule jobs !!!")
             break
 
-    logger.warning(f"Queue: {[list(queue2str(queue[wf])) for wf in queue]}")
+    logger.warning(
+        f"[SCHEDULE]: Queue: {[list(queue2str(queue[wf])) for wf in queue]}"
+    )
     return schedules
 
 
-def workflow_runner(
+def schedule_runner(
     stop: datetime | None = None,
     externals: DictData | None = None,
     excluded: list[str] | None = None,
 ) -> list[str]:  # pragma: no cov
-    """Workflow application that running multiprocessing schedule with chunk of
-    workflows that exists in config path.
+    """Schedule runner function for start submit the ``schedule_control`` func
+    in multiprocessing pool with chunk of schedule config that exists in config
+    path by ``WORKFLOW_APP_MAX_SCHEDULE_PER_PROCESS``.
 
     :param stop: A stop datetime object that force stop running scheduler.
-    :param excluded:
     :param externals:
+    :param excluded: A list of schedule name that want to excluded from finding.
 
     :rtype: list[str]
 
@@ -583,7 +582,6 @@ def workflow_runner(
                                                   workflow task 02 02
                   ==> ...
     """
-    excluded: list[str] = excluded or []
     results: list[str] = []
 
     with ProcessPoolExecutor(
@@ -592,7 +590,7 @@ def workflow_runner(
 
         futures: list[Future] = [
             executor.submit(
-                workflow_control,
+                schedule_control,
                 schedules=[load[0] for load in loader],
                 stop=stop,
                 externals=(externals or {}),
@@ -604,9 +602,12 @@ def workflow_runner(
         ]
 
         for future in as_completed(futures):
+
+            # NOTE: Raise error when it has any error from schedule_control.
             if err := future.exception():
                 logger.error(str(err))
                 raise WorkflowException(str(err)) from err
+
             results.extend(future.result(timeout=1))
 
     return results

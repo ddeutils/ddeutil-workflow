@@ -82,8 +82,8 @@ def test_workflow_schedule_raise_on(test_path):
 
 @mock.patch.object(Config, "enable_write_log", False)
 def test_workflow_schedule_tasks(test_path):
-    release_date = datetime(2024, 1, 1, 1)
-    queue = {
+    release_date: datetime = datetime(2024, 1, 1, 1)
+    queue: dict[str, WorkflowQueue] = {
         "tmp-wf-schedule-tasks": WorkflowQueue(
             running=[WorkflowRelease.from_dt(release_date)]
         )
@@ -107,10 +107,12 @@ def test_workflow_schedule_tasks(test_path):
             on=[{"cronjob": "* * * * *", "timezone": "Asia/Bangkok"}],
             params={"name": "Foo"},
         )
-        tasks = wf_schedule.tasks(
-            start_date=release_date,
-            queue=queue,
-        )
+        tasks = wf_schedule.tasks(start_date=release_date, queue=queue)
+
         assert len(tasks) == 1
+
         task = tasks[0]
-        task.release()
+        print(task)
+        task.release(queue=queue["tmp-wf-schedule-tasks"])
+        _ = task.runner.next
+        print(task)

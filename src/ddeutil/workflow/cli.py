@@ -73,10 +73,10 @@ def schedule(
     if stop:
         stop: datetime = stop.astimezone(tz=config.tz)
 
-    from .scheduler import workflow_runner
+    from .scheduler import schedule_runner
 
     # NOTE: Start running workflow scheduler application.
-    workflow_rs: list[str] = workflow_runner(
+    workflow_rs: list[str] = schedule_runner(
         stop=stop, excluded=excluded, externals=json.loads(externals)
     )
     logger.info(f"Application run success: {workflow_rs}")

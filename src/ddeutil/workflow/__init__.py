@@ -36,6 +36,7 @@ from .result import Result
 from .scheduler import (
     Schedule,
     WorkflowSchedule,
+    schedule_runner,
 )
 from .stage import (
     BashStage,
