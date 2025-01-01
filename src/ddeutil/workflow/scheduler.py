@@ -298,9 +298,13 @@ class Schedule(BaseModel):
         """
         workflow_tasks: list[WorkflowTaskData] = []
 
-        for wf in self.workflows:
+        for workflow in self.workflows:
+
+            if workflow.alias not in queue:
+                queue[workflow.alias] = WorkflowQueue()
+
             workflow_tasks.extend(
-                wf.tasks(start_date, queue=queue, externals=externals or {})
+                workflow.tasks(start_date, queue=queue, externals=externals)
             )
 
         return workflow_tasks

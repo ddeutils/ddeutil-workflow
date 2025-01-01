@@ -9,6 +9,8 @@ from ddeutil.workflow.scheduler import Schedule
 from ddeutil.workflow.workflow import WorkflowTaskData
 from pydantic import ValidationError
 
+from .utils import dump_yaml_context
+
 
 def test_schedule():
     schedule = Schedule(
@@ -25,14 +27,6 @@ def test_schedule():
         "\nThis is demo schedule description\n    * test\n    * foo\n"
         "    * bar\n"
     )
-
-
-def test_schedule_from_loader():
-    schedule = Schedule.from_loader("schedule-wf")
-    print(schedule)
-
-    schedule = Schedule.from_loader("schedule-common-wf")
-    print(schedule)
 
 
 def test_schedule_from_loader_raise(test_path):
@@ -101,10 +95,21 @@ def test_schedule_from_loader_raise(test_path):
     test_file.unlink(missing_ok=True)
 
 
-def test_schedule_default_on():
-    schedule = Schedule.from_loader("schedule-default-wf")
-    for sch_wf in schedule.workflows:
-        assert sch_wf.on == []
+def test_schedule_default_on(test_path):
+    with dump_yaml_context(
+        test_path / "conf/demo/03_99_schedule_default_on.yml",
+        data="""
+        tmp-schedule-default-wf:
+          type: scheduler.Schedule
+          workflows:
+            - name: 'wf-scheduling'
+              params:
+                asat-dt: "${{ release.logical_date }}"
+        """,
+    ):
+        schedule = Schedule.from_loader("tmp-schedule-default-wf")
+        for sch_wf in schedule.workflows:
+            assert sch_wf.on == []
 
 
 def test_schedule_loader_find_schedule():

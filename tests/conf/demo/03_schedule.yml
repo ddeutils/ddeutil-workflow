@@ -11,19 +11,10 @@ schedule-wf:
       params:
         asat-dt: "${{ release.logical_date }}"
 
-
 schedule-common-wf:
   type: scheduler.Schedule
   workflows:
     - name: 'wf-scheduling'
       on: 'every_3_minute_bkk'
-      params:
-        asat-dt: "${{ release.logical_date }}"
-
-
-schedule-default-wf:
-  type: scheduler.Schedule
-  workflows:
-    - name: 'wf-scheduling'
       params:
         asat-dt: "${{ release.logical_date }}"
