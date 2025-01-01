@@ -59,7 +59,7 @@ from .utils import (
     delay,
     queue2str,
 )
-from .workflow import Workflow, WorkflowTaskData
+from .workflow import Workflow, WorkflowQueue, WorkflowTaskData
 
 P = ParamSpec("P")
 logger = get_logger("ddeutil.workflow")
@@ -169,7 +169,7 @@ class WorkflowSchedule(BaseModel):
     def tasks(
         self,
         start_date: datetime,
-        queue: dict[str, list[datetime]],
+        queue: dict[str, WorkflowQueue],
         *,
         externals: DictData | None = None,
     ) -> list[WorkflowTaskData]:
@@ -203,7 +203,7 @@ class WorkflowSchedule(BaseModel):
             runner: CronRunner = on.generate(start_date)
             next_running_date = runner.next
 
-            while next_running_date in queue[self.alias]:
+            while queue[self.alias].check_queue(next_running_date):
                 next_running_date = runner.next
 
             workflow_tasks.append(
@@ -211,7 +211,7 @@ class WorkflowSchedule(BaseModel):
                     alias=self.alias,
                     workflow=wf,
                     runner=runner,
-                    params=self.values,
+                    values=self.values,
                 ),
             )
 
@@ -278,7 +278,7 @@ class Schedule(BaseModel):
     def tasks(
         self,
         start_date: datetime,
-        queue: dict[str, list[datetime]],
+        queue: dict[str, WorkflowQueue],
         *,
         externals: DictData | None = None,
     ) -> list[WorkflowTaskData]:
@@ -287,7 +287,9 @@ class Schedule(BaseModel):
 
         :param start_date: A start date that get from the workflow schedule.
         :param queue: A mapping of name and list of datetime for queue.
+        :type queue: dict[str, WorkflowQueue]
         :param externals: An external parameters that pass to the Loader object.
+        :type externals: DictData | None
 
         :rtype: list[WorkflowTaskData]
         :return: Return the list of WorkflowTaskData object from the specific
@@ -471,8 +473,10 @@ def workflow_control(
     :param schedules: A list of workflow names that want to schedule running.
     :param stop: An datetime value that use to stop running schedule.
     :param externals: An external parameters that pass to Loader.
+
     :rtype: list[str]
     """
+    # NOTE: Lazy import Scheduler object from the schedule package.
     try:
         from schedule import Scheduler
     except ImportError:
@@ -487,23 +491,24 @@ def workflow_control(
     #   ---
     #   {"workflow-name": [<release-datetime>, <release-datetime>, ...]}
     #
-    wf_queue: dict[str, list[datetime]] = {}
+    queue: dict[str, WorkflowQueue] = {}
     thread_releases: dict[str, Thread] = {}
-
-    start_date_waiting: datetime = (start_date + timedelta(minutes=1)).replace(
-        second=0, microsecond=0
-    )
-
-    # NOTE: Create pair of workflow and on from schedule model.
     workflow_tasks: list[WorkflowTaskData] = []
+
+    start_date_waiting: datetime = start_date.replace(
+        second=0, microsecond=0
+    ) + timedelta(minutes=1)
+
     for name in schedules:
+
+        # NOTE: Loading schedule model from config path.
         schedule: Schedule = Schedule.from_loader(name, externals=externals)
 
         # NOTE: Create a workflow task data instance from schedule object.
         workflow_tasks.extend(
             schedule.tasks(
                 start_date_waiting,
-                queue=wf_queue,
+                queue=queue,
                 externals=externals,
             ),
         )
@@ -516,7 +521,7 @@ def workflow_control(
             workflow_task_release,
             workflow_tasks=workflow_tasks,
             stop=(stop or (start_date + config.stop_boundary_delta)),
-            queue=wf_queue,
+            queue=queue,
             threads=thread_releases,
         )
         .tag("control")
@@ -543,9 +548,7 @@ def workflow_control(
             logger.warning("[WORKFLOW]: Does not have any schedule jobs !!!")
             break
 
-    logger.warning(
-        f"Queue: {[list(queue2str(wf_queue[wf])) for wf in wf_queue]}"
-    )
+    logger.warning(f"Queue: {[list(queue2str(queue[wf])) for wf in queue]}")
     return schedules
 
 
@@ -581,10 +584,12 @@ def workflow_runner(
                   ==> ...
     """
     excluded: list[str] = excluded or []
+    results: list[str] = []
 
     with ProcessPoolExecutor(
         max_workers=config.max_schedule_process,
     ) as executor:
+
         futures: list[Future] = [
             executor.submit(
                 workflow_control,
@@ -598,10 +603,10 @@ def workflow_runner(
             )
         ]
 
-        results: list[str] = []
         for future in as_completed(futures):
             if err := future.exception():
                 logger.error(str(err))
                 raise WorkflowException(str(err)) from err
             results.extend(future.result(timeout=1))
-        return results
+
+    return results

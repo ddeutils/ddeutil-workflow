@@ -1,6 +1,13 @@
+from datetime import datetime
+from unittest import mock
+
 import pytest
+from ddeutil.workflow.conf import Config
 from ddeutil.workflow.scheduler import WorkflowSchedule
+from ddeutil.workflow.workflow import WorkflowQueue, WorkflowRelease
 from pydantic import ValidationError
+
+from .utils import dump_yaml_context
 
 
 def test_workflow_schedule():
@@ -20,6 +27,21 @@ def test_workflow_schedule():
     # NOTE: Raise if do not pass any data to WorkflowSchedule
     with pytest.raises(ValidationError):
         WorkflowSchedule.model_validate({})
+
+
+def test_workflow_schedule_pass_on_loader():
+    wf_schedule = WorkflowSchedule(
+        name="wf-scheduling",
+        on=["every_3_minute_bkk", "every_minute_bkk"],
+    )
+    assert wf_schedule.alias == "wf-scheduling"
+
+    wf_schedule = WorkflowSchedule(
+        alias="wf-scheduling-morning",
+        name="wf-scheduling",
+        on=["every_3_minute_bkk", "every_minute_bkk"],
+    )
+    assert wf_schedule.alias == "wf-scheduling-morning"
 
 
 def test_workflow_schedule_raise_on(test_path):
@@ -56,3 +78,39 @@ def test_workflow_schedule_raise_on(test_path):
                 20240101,
             ],
         )
+
+
+@mock.patch.object(Config, "enable_write_log", False)
+def test_workflow_schedule_tasks(test_path):
+    release_date = datetime(2024, 1, 1, 1)
+    queue = {
+        "tmp-wf-schedule-tasks": WorkflowQueue(
+            running=[WorkflowRelease.from_dt(release_date)]
+        )
+    }
+
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_schedule_tasks.yml",
+        data="""
+        tmp-wf-schedule-tasks:
+          type: ddeutil.workflow.Workflow
+          params: {name: str}
+          jobs:
+            first-job:
+              stages:
+                - name: Echo
+                  echo: "Hello ${{ params.name }}"
+        """,
+    ):
+        wf_schedule = WorkflowSchedule(
+            name="tmp-wf-schedule-tasks",
+            on=[{"cronjob": "* * * * *", "timezone": "Asia/Bangkok"}],
+            params={"name": "Foo"},
+        )
+        tasks = wf_schedule.tasks(
+            start_date=release_date,
+            queue=queue,
+        )
+        assert len(tasks) == 1
+        task = tasks[0]
+        task.release()

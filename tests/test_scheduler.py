@@ -5,7 +5,7 @@ import yaml
 from ddeutil.workflow import Workflow
 from ddeutil.workflow.conf import Loader
 from ddeutil.workflow.on import On
-from ddeutil.workflow.scheduler import Schedule, WorkflowSchedule
+from ddeutil.workflow.scheduler import Schedule
 from ddeutil.workflow.workflow import WorkflowTaskData
 from pydantic import ValidationError
 
@@ -25,21 +25,6 @@ def test_schedule():
         "\nThis is demo schedule description\n    * test\n    * foo\n"
         "    * bar\n"
     )
-
-
-def test_schedule_workflow():
-    schedule_wf = WorkflowSchedule(
-        name="wf-scheduling",
-        on=["every_3_minute_bkk", "every_minute_bkk"],
-    )
-    assert schedule_wf.alias == "wf-scheduling"
-
-    schedule_wf = WorkflowSchedule(
-        alias="wf-scheduling-morning",
-        name="wf-scheduling",
-        on=["every_3_minute_bkk", "every_minute_bkk"],
-    )
-    assert schedule_wf.alias == "wf-scheduling-morning"
 
 
 def test_schedule_from_loader():
@@ -116,7 +101,7 @@ def test_schedule_from_loader_raise(test_path):
     test_file.unlink(missing_ok=True)
 
 
-def test_schedule_model_default_on():
+def test_schedule_default_on():
     schedule = Schedule.from_loader("schedule-default-wf")
     for sch_wf in schedule.workflows:
         assert sch_wf.on == []
@@ -138,7 +123,7 @@ def test_schedule_remove_workflow_task():
                 alias=wf.name,
                 workflow=wf,
                 runner=on.generate(start_date),
-                params={"asat-dt": "${{ release.logical_date }}"},
+                values={"asat-dt": "${{ release.logical_date }}"},
             )
         )
     assert 2 == len(pipeline_tasks)
@@ -150,7 +135,7 @@ def test_schedule_remove_workflow_task():
                 alias=wf.name,
                 workflow=wf,
                 runner=on.generate(start_date),
-                params={"asat-dt": "${{ release.logical_date }}"},
+                values={"asat-dt": "${{ release.logical_date }}"},
             )
         )
 
@@ -163,7 +148,7 @@ def test_schedule_remove_workflow_task():
                 alias=wf.name,
                 workflow=wf,
                 runner=on.generate(start_date),
-                params={"asat-dt": "${{ release.logical_date }}"},
+                values={"asat-dt": "${{ release.logical_date }}"},
             )
         )
 
@@ -171,7 +156,7 @@ def test_schedule_remove_workflow_task():
         alias=wf.name,
         workflow=wf,
         runner=On.from_loader(name="every_minute_bkk").generate(start_date),
-        params={"asat-dt": "${{ release.logical_date }}"},
+        values={"asat-dt": "${{ release.logical_date }}"},
     )
     pipeline_tasks.remove(remover)
     assert 1 == len(pipeline_tasks)

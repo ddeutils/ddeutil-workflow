@@ -52,7 +52,6 @@ from .utils import (
     cut_id,
     delay,
     gen_id,
-    get_diff_sec,
     get_dt_now,
     has_template,
     param2template,
@@ -168,7 +167,7 @@ class WorkflowQueue:
         """
         return len(self.queue) > 0
 
-    def check_queue(self, value: WorkflowRelease) -> bool:
+    def check_queue(self, value: WorkflowRelease | datetime) -> bool:
         """Check a WorkflowRelease value already exists in list of tracking
         queues.
 
@@ -177,6 +176,9 @@ class WorkflowQueue:
 
         :rtype: bool
         """
+        if isinstance(value, datetime):
+            value = WorkflowRelease.from_dt(value)
+
         return (
             (value in self.queue)
             or (value in self.running)
@@ -1085,147 +1087,170 @@ class WorkflowTaskData:
     alias: str
     workflow: Workflow
     runner: CronRunner
-    params: DictData = field(default_factory=dict)
+    values: DictData = field(default_factory=dict)
 
     def release(
         self,
-        queue: dict[str, list[datetime]],
-        log: Log | None = None,
         run_id: str | None = None,
-        *,
-        waiting_sec: int = 60,
-        sleep_interval: int = 15,
+        log: type[Log] = None,
+        queue: (
+            WorkflowQueue | list[datetime] | list[WorkflowRelease] | None
+        ) = None,
     ) -> Result:
-        """Release the workflow task data that use the same logic of
-        `workflow.release` method but use different the queue object for
-        tracking release datetime to run.
-
-        :param queue: A mapping of alias name and list of release datetime.
-        :param log: A log object for saving result logging from workflow
-            execution process.
-        :param run_id: A workflow running ID for this release.
-        :param waiting_sec: A second period value that allow workflow execute.
-        :param sleep_interval: A second value that want to waiting until time
-            to execute.
-
-        :rtype: Result
-        """
-        log: type[Log] = log or FileLog
-        run_id: str = run_id or gen_id(self.alias, unique=True)
-        rs_release: Result = Result(run_id=run_id)
-        runner: CronRunner = self.runner
-
-        # NOTE: get next schedule time that generate from now.
-        next_time: datetime = runner.date
-
-        # NOTE: get next utils it does not running.
-        while log.is_pointed(self.workflow.name, next_time) or (
-            next_time in queue[self.alias]
-        ):
-            next_time: datetime = runner.next
-
-        logger.debug(
-            f"({cut_id(run_id)}) [RELEASE]: {self.workflow.name!r} : "
-            f"{runner.cron} : Start release - {next_time:%Y-%m-%d %H:%M:%S}"
-        )
-        heappush(queue[self.alias], next_time)
-        start_sec: float = time.monotonic()
-
-        if get_diff_sec(next_time, tz=runner.tz) > waiting_sec:
-            logger.debug(
-                f"({cut_id(run_id)}) [RELEASE]: {self.workflow.name!r} : "
-                f"{runner.cron} "
-                f": Skip >> {next_time:%Y-%m-%d %H:%M:%S}"
-            )
-
-            # NOTE: Add this next running datetime that not in period to queue
-            #   and remove it to running.
-            queue[self.alias].remove(next_time)
-
-            time.sleep(0.2)
-            return rs_release.catch(status=0, context={})
-
-        logger.debug(
-            f"({cut_id(run_id)}) [RELEASE]: {self.workflow.name!r} : "
-            f"{runner.cron} : Closely >> {next_time:%Y-%m-%d %H:%M:%S}"
+        return self.workflow.release(
+            release=self.runner.date,
+            params=self.values,
+            run_id=run_id,
+            log=log,
+            queue=queue,
         )
 
-        # NOTE: Release when the time is nearly to schedule time.
-        while (duration := get_diff_sec(next_time, tz=config.tz)) > (
-            sleep_interval + 5
-        ):
-            logger.debug(
-                f"({cut_id(run_id)}) [RELEASE]: {self.workflow.name!r} : "
-                f"{runner.cron} : Sleep until: {duration}"
-            )
-            time.sleep(15)
+    # def release(
+    #     self,
+    #     queue: dict[str, list[datetime]],
+    #     log: Log | None = None,
+    #     run_id: str | None = None,
+    #     *,
+    #     waiting_sec: int = 60,
+    #     sleep_interval: int = 15,
+    # ) -> Result:
+    #     """Release the workflow task data that use the same logic of
+    #     `workflow.release` method but use different the queue object for
+    #     tracking release datetime to run.
+    #
+    #     :param queue: A mapping of alias name and list of release datetime.
+    #     :param log: A log object for saving result logging from workflow
+    #         execution process.
+    #     :param run_id: A workflow running ID for this release.
+    #     :param waiting_sec: A second period value that allow workflow execute.
+    #     :param sleep_interval: A second value that want to waiting until time
+    #         to execute.
+    #
+    #     :rtype: Result
+    #     """
+    #     log: type[Log] = log or FileLog
+    #     run_id: str = run_id or gen_id(self.alias, unique=True)
+    #     rs_release: Result = Result(run_id=run_id)
+    #     runner: CronRunner = self.runner
+    #
+    #     # NOTE: get next schedule time that generate from now.
+    #     next_time: datetime = runner.date
+    #
+    #     # NOTE: get next utils it does not running.
+    #     while log.is_pointed(self.workflow.name, next_time) or (
+    #         next_time in queue[self.alias]
+    #     ):
+    #         next_time: datetime = runner.next
+    #
+    #     logger.debug(
+    #         f"({cut_id(run_id)}) [RELEASE]: {self.workflow.name!r} : "
+    #         f"{runner.cron} : Start release - {next_time:%Y-%m-%d %H:%M:%S}"
+    #     )
+    #     heappush(queue[self.alias], next_time)
+    #     start_sec: float = time.monotonic()
+    #
+    #     if get_diff_sec(next_time, tz=runner.tz) > waiting_sec:
+    #         logger.debug(
+    #             f"({cut_id(run_id)}) [RELEASE]: {self.workflow.name!r} : "
+    #             f"{runner.cron} "
+    #             f": Skip >> {next_time:%Y-%m-%d %H:%M:%S}"
+    #         )
+    #
+    #         # NOTE: Add this next running datetime that not in period to queue
+    #         #   and remove it to running.
+    #         queue[self.alias].remove(next_time)
+    #
+    #         time.sleep(0.2)
+    #         return rs_release.catch(status=0, context={})
+    #
+    #     logger.debug(
+    #         f"({cut_id(run_id)}) [RELEASE]: {self.workflow.name!r} : "
+    #         f"{runner.cron} : Closely >> {next_time:%Y-%m-%d %H:%M:%S}"
+    #     )
+    #
+    #     # NOTE: Release when the time is nearly to schedule time.
+    #     while (duration := get_diff_sec(next_time, tz=config.tz)) > (
+    #         sleep_interval + 5
+    #     ):
+    #         logger.debug(
+    #             f"({cut_id(run_id)}) [RELEASE]: {self.workflow.name!r} : "
+    #             f"{runner.cron} : Sleep until: {duration}"
+    #         )
+    #         time.sleep(15)
+    #
+    #     time.sleep(0.5)
+    #
+    #     # NOTE: Release parameter that use to change if params has
+    #     #   templating.
+    #     release_params: DictData = {
+    #         "release": {
+    #             "logical_date": next_time,
+    #             "execute_date": datetime.now(tz=config.tz),
+    #             "run_id": run_id,
+    #             "timezone": runner.tz,
+    #         },
+    #     }
+    #
+    #     # WARNING: Re-create workflow object that use new running workflow ID.
+    #     rs: Result = self.workflow.execute(
+    #         params=param2template(self.params, release_params),
+    #     )
+    #     logger.debug(
+    #         f"({cut_id(run_id)}) [RELEASE]: {self.workflow.name!r} : "
+    #         f"{runner.cron} : End release - {next_time:%Y-%m-%d %H:%M:%S}"
+    #     )
+    #
+    #     # NOTE: Set parent ID on this result.
+    #     rs.set_parent_run_id(run_id)
+    #
+    #     # NOTE: Save result to log object saving.
+    #     rs_log: Log = log.model_validate(
+    #         {
+    #             "name": self.workflow.name,
+    #             "type": "schedule",
+    #             "release": next_time,
+    #             "context": rs.context,
+    #             "parent_run_id": rs.run_id,
+    #             "run_id": rs.run_id,
+    #         }
+    #     )
+    #     rs_log.save(excluded=None)
+    #
+    #     # NOTE: Remove the current release date from the running.
+    #     queue[self.alias].remove(next_time)
+    #     total_sec: float = time.monotonic() - start_sec
+    #
+    #     # IMPORTANT:
+    #     #   Add the next running datetime to workflow task queue.
+    #     future_running_time: datetime = runner.next
+    #
+    #     while (
+    #         future_running_time in queue[self.alias]
+    #         or (future_running_time - next_time).total_seconds() < total_sec
+    #     ):
+    #         future_running_time: datetime = runner.next
+    #
+    #     # NOTE: Queue next release date.
+    #     heappush(queue[self.alias], future_running_time)
+    #     logger.debug(f"[RELEASE]: {'-' * 100}")
+    #
+    #     context: dict[str, Any] = rs.context
+    #     context.pop("params")
+    #
+    #     return rs_release.catch(
+    #         status=0,
+    #         context={
+    #             "params": self.params,
+    #             "release": {"status": "success", "logical_date": next_time},
+    #             "outputs": context,
+    #         },
+    #     )
 
-        time.sleep(0.5)
-
-        # NOTE: Release parameter that use to change if params has
-        #   templating.
-        release_params: DictData = {
-            "release": {
-                "logical_date": next_time,
-                "execute_date": datetime.now(tz=config.tz),
-                "run_id": run_id,
-                "timezone": runner.tz,
-            },
-        }
-
-        # WARNING: Re-create workflow object that use new running workflow ID.
-        rs: Result = self.workflow.execute(
-            params=param2template(self.params, release_params),
-        )
-        logger.debug(
-            f"({cut_id(run_id)}) [RELEASE]: {self.workflow.name!r} : "
-            f"{runner.cron} : End release - {next_time:%Y-%m-%d %H:%M:%S}"
-        )
-
-        # NOTE: Set parent ID on this result.
-        rs.set_parent_run_id(run_id)
-
-        # NOTE: Save result to log object saving.
-        rs_log: Log = log.model_validate(
-            {
-                "name": self.workflow.name,
-                "type": "schedule",
-                "release": next_time,
-                "context": rs.context,
-                "parent_run_id": rs.run_id,
-                "run_id": rs.run_id,
-            }
-        )
-        rs_log.save(excluded=None)
-
-        # NOTE: Remove the current release date from the running.
-        queue[self.alias].remove(next_time)
-        total_sec: float = time.monotonic() - start_sec
-
-        # IMPORTANT:
-        #   Add the next running datetime to workflow task queue.
-        future_running_time: datetime = runner.next
-
-        while (
-            future_running_time in queue[self.alias]
-            or (future_running_time - next_time).total_seconds() < total_sec
-        ):
-            future_running_time: datetime = runner.next
-
-        # NOTE: Queue next release date.
-        heappush(queue[self.alias], future_running_time)
-        logger.debug(f"[RELEASE]: {'-' * 100}")
-
-        context: dict[str, Any] = rs.context
-        context.pop("params")
-
-        return rs_release.catch(
-            status=0,
-            context={
-                "params": self.params,
-                "release": {"status": "success", "logical_date": next_time},
-                "outputs": context,
-            },
+    def __repr__(self):
+        return (
+            f"{self.__class__.__name__}(alias={self.alias!r}, "
+            f"workflow={self.workflow.name!r}, runner={self.runner!r}, "
+            f"values={self.values})"
         )
 
     def __eq__(self, other: WorkflowTaskData) -> bool:

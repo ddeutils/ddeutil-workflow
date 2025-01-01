@@ -736,6 +736,12 @@ class CronRunner:
         self.is_year: bool = isinstance(cron, CronJobYear)
         self.reset_flag: bool = True
 
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}(CronJob('{self.cron}'), "
+            f"{self.date:%Y-%m-%d %H:%M:%S}, tz='{self.tz}')"
+        )
+
     def reset(self) -> None:
         """Resets the iterator to start time."""
         self.date: datetime = self.__start_date

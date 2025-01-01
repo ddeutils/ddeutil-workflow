@@ -26,7 +26,7 @@ def test_schedule_tasks():
         alias="wf-scheduling",
         workflow=Workflow.from_loader(name="wf-scheduling"),
         runner=task.runner,
-        params={},
+        values={},
     )
 
 

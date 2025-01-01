@@ -18,7 +18,7 @@ def test_workflow_task_data():
         alias=workflow.name,
         workflow=workflow,
         runner=runner,
-        params={"asat-dt": datetime(2024, 1, 1, 1)},
+        values={"asat-dt": datetime(2024, 1, 1, 1)},
     )
 
     assert task != datetime(2024, 1, 1, 1)
@@ -26,7 +26,7 @@ def test_workflow_task_data():
         alias=workflow.name,
         workflow=workflow,
         runner=runner,
-        params={},
+        values={},
     )
 
 
@@ -62,7 +62,7 @@ def test_workflow_task_data_release(test_path):
             alias="demo",
             workflow=workflow,
             runner=runner,
-            params={"name": "foo"},
+            values={"name": "foo"},
         )
 
         rs: Result = task.release(queue=queue)
@@ -123,7 +123,7 @@ def test_workflow_task_data_release_long_running(test_path):
             alias="demo",
             workflow=workflow,
             runner=runner,
-            params={"name": "foo"},
+            values={"name": "foo"},
         )
 
         rs: Result = task.release(queue=queue)
