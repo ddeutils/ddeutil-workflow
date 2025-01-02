@@ -70,7 +70,6 @@ from .utils import (
     map_post_filter,
     not_in_template,
     param2template,
-    queue2str,
     str2template,
     tag,
 )

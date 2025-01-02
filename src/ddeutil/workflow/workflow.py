@@ -1127,6 +1127,16 @@ class WorkflowTaskData:
         *,
         force_run: bool = False,
     ):
+        """Generate WorkflowRelease to WorkflowQueue object.
+
+        :param end_date: An end datetime object.
+        :param queue: A workflow queue object.
+        :param log: A log class that want to making log object.
+        :param force_run: A flag that allow to release workflow if the log with
+            that release was pointed.
+
+        :rtype: WorkflowQueue
+        """
         if self.runner.date > end_date:
             return queue
 

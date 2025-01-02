@@ -58,7 +58,6 @@ from .on import On
 from .utils import (
     batch,
     delay,
-    queue2str,
 )
 from .workflow import Workflow, WorkflowQueue, WorkflowTaskData
 
@@ -366,9 +365,9 @@ def workflow_task_release(
 
     :param tasks: A list of WorkflowTaskData object.
     :param stop: A stop datetime object that force stop running scheduler.
-    :param queue:
-    :param threads:
-    :param log:
+    :param queue: A mapping of alias name and WorkflowQueue object.
+    :param threads: A mapping of alias name and Thread object.
+    :param log: A log class that want to making log object.
 
     :rtype: CancelJob | None
     """
@@ -402,7 +401,7 @@ def workflow_task_release(
         # NOTE: Get incoming datetime queue.
         logger.debug(
             f"[WORKFLOW]: Current queue: {task.workflow.name!r} : "
-            f"{list(queue2str(queue[task.alias]))}"
+            f"{list(queue[task.alias].queue)}"
         )
 
         if queue[task.alias].is_first_queue(task.runner.date):
@@ -447,7 +446,7 @@ def workflow_task_release(
         task.queue(stop, queue[task.alias], log=log)
         delay()
 
-    logger.debug(f"[WORKFLOW]: {'=' * 100}")
+    logger.debug(f"[WORKFLOW]: End workflow release {'=' * 80}")
 
 
 def monitor(threads: dict[str, Thread]) -> None:  # pragma: no cov
@@ -496,6 +495,8 @@ def schedule_control(
     log: type[Log] = log or FileLog
     scheduler: Scheduler = Scheduler()
     start_date: datetime = datetime.now(tz=config.tz)
+
+    # IMPORTANT: Create main mapping of queue and thread object.
     queue: dict[str, WorkflowQueue] = {}
     thread_releases: dict[str, Thread] = {}
 
@@ -504,10 +505,10 @@ def schedule_control(
     ) + timedelta(minutes=1)
 
     # NOTE: Start create workflow tasks from list of schedule name.
-    workflow_tasks: list[WorkflowTaskData] = []
+    tasks: list[WorkflowTaskData] = []
     for name in schedules:
         schedule: Schedule = Schedule.from_loader(name, externals=externals)
-        workflow_tasks.extend(
+        tasks.extend(
             schedule.tasks(
                 start_date_waiting,
                 queue=queue,
@@ -521,7 +522,7 @@ def schedule_control(
         .minutes.at(":02")
         .do(
             workflow_task_release,
-            workflow_tasks=workflow_tasks,
+            tasks=tasks,
             stop=(stop or (start_date + config.stop_boundary_delta)),
             queue=queue,
             threads=thread_releases,
@@ -558,7 +559,7 @@ def schedule_control(
             break
 
     logger.warning(
-        f"[SCHEDULE]: Queue: {[list(queue2str(queue[wf])) for wf in queue]}"
+        f"[SCHEDULE]: Queue: {[list(queue[wf].queue) for wf in queue]}"
     )
     return schedules
 
