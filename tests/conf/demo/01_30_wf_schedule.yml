@@ -25,3 +25,16 @@ wf-scheduling-common:
         - name: "Call Out"
           id: "call-out"
           echo: "Hello ${{ params.asat-dt | fmt('%Y-%m-%d') }}"
+
+
+wf-scheduling-agent:
+  type: ddeutil.workflow.Workflow
+  params:
+    name: str
+    asat-dt: datetime
+  jobs:
+    condition-job:
+      stages:
+        - name: "Call Out"
+          id: "call-out"
+          echo: "Hello ${{ params.name }}: ${{ params.asat-dt | fmt('%Y-%m-%d') }}"

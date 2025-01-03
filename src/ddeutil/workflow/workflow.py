@@ -169,14 +169,14 @@ class WorkflowQueue:
 
     def is_first_queue(self, value: WorkflowRelease | datetime) -> bool:
 
-        if not self.is_queued:
-            return False
-
         if isinstance(value, datetime):
             value = WorkflowRelease.from_dt(value)
 
         first_value: WorkflowRelease = heappop(self.queue)
         heappush(self.queue, first_value)
+
+        logger.debug(f"First value: {first_value}")
+        logger.debug(f"Current value: {value}")
 
         return first_value == value
 

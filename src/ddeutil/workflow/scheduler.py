@@ -21,7 +21,6 @@ value with the on field.
 from __future__ import annotations
 
 import copy
-import inspect
 import logging
 import time
 from concurrent.futures import (
@@ -326,14 +325,6 @@ def catch_exceptions(cancel_on_failure: bool = False) -> DecoratorCancelJob:
 
     def decorator(func: ReturnCancelJob) -> ReturnCancelJob:  # pragma: no cov
         try:
-            # NOTE: Check the function that want to handle is method or not.
-            if inspect.ismethod(func):
-
-                @wraps(func)
-                def wrapper(self, *args, **kwargs):
-                    return func(self, *args, **kwargs)
-
-                return wrapper
 
             @wraps(func)
             def wrapper(*args, **kwargs):
@@ -404,7 +395,17 @@ def workflow_task_release(
             f"{list(queue[task.alias].queue)}"
         )
 
-        if queue[task.alias].is_first_queue(task.runner.date):
+        # VALIDATE: Check the queue is empty or not.
+        if not queue[task.alias].is_queued:
+            logger.warning(
+                f"[WORKFLOW]: Queue is empty for : {task.workflow.name!r} : "
+                f"{task.runner.cron}"
+            )
+            task.queue(stop, queue[task.alias], log=log)
+            continue
+
+        # VALIDATE: Check this task is the first release in the queue or not.
+        if not queue[task.alias].is_first_queue(task.runner.date):
             logger.debug(
                 f"[WORKFLOW]: Skip schedule "
                 f"{task.runner.date:%Y-%m-%d %H:%M:%S} "
@@ -413,13 +414,11 @@ def workflow_task_release(
             task.queue(stop, queue[task.alias], log=log)
             continue
 
-        elif not queue[task.alias].is_queued:
-            logger.warning(
-                f"[WORKFLOW]: Queue is empty for : {task.workflow.name!r} : "
-                f"{task.runner.cron}"
-            )
-            task.queue(stop, queue[task.alias], log=log)
-            continue
+        logger.info(
+            f"[WORKFLOW]: Start create thread: "
+            f"{task.workflow.name}|{str(task.runner.cron)}|"
+            f"{task.runner.date:%Y%m%d%H%M}"
+        )
 
         # NOTE: Pop the latest release and push it to running.
         release = heappop(queue[task.alias].queue)
@@ -434,7 +433,7 @@ def workflow_task_release(
 
         wf_thread: Thread = Thread(
             target=catch_exceptions(cancel_on_failure=True)(task.release),
-            kwargs={"queue": queue},
+            kwargs={"queue": queue[task.alias], "log": log},
             name=thread_name,
             daemon=True,
         )

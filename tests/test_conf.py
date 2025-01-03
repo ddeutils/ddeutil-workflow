@@ -8,7 +8,8 @@ from zoneinfo import ZoneInfo
 import pytest
 import toml
 import yaml
-from ddeutil.workflow.conf import Config, SimLoad
+from ddeutil.workflow.conf import Config, Loader, SimLoad
+from ddeutil.workflow.scheduler import Schedule
 
 
 def test_config():
@@ -98,3 +99,8 @@ def test_simple_load_finds_raise(target_path: Path):
     with mock.patch.object(Config, "conf_path", target_path):
         with pytest.raises(ValueError):
             _ = SimLoad("test_simple_load_config", Config()).type
+
+
+def test_loader_find_schedule():
+    for finding in Loader.finds(Schedule, excluded=[]):
+        print(finding)

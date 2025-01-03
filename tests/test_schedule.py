@@ -3,7 +3,6 @@ from datetime import datetime
 import pytest
 import yaml
 from ddeutil.workflow import Workflow
-from ddeutil.workflow.conf import Loader
 from ddeutil.workflow.on import On
 from ddeutil.workflow.scheduler import Schedule
 from ddeutil.workflow.workflow import WorkflowTaskData
@@ -110,11 +109,6 @@ def test_schedule_default_on(test_path):
         schedule = Schedule.from_loader("tmp-schedule-default-wf")
         for sch_wf in schedule.workflows:
             assert sch_wf.on == []
-
-
-def test_schedule_loader_find_schedule():
-    for finding in Loader.finds(Schedule, excluded=[]):
-        print(finding)
 
 
 def test_schedule_remove_workflow_task():
