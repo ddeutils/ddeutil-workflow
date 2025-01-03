@@ -213,6 +213,22 @@ class WorkflowQueue:
         if value in self.running:
             self.running.remove(value)
 
+    def push_complete(self, value: WorkflowRelease) -> Self:
+        heappush(self.complete, value)
+
+        # NOTE: Remove complete queue on workflow that keep more than the
+        #   maximum config.
+        if (
+            num_complete_delete := (
+                len(self.complete) - config.max_queue_complete_hist
+            )
+            > 0
+        ):
+            for _ in range(num_complete_delete):
+                heappop(self.complete)
+
+        return self
+
 
 class Workflow(BaseModel):
     """Workflow Pydantic model.
@@ -463,6 +479,7 @@ class Workflow(BaseModel):
         queue: (
             WorkflowQueue | list[datetime] | list[WorkflowRelease] | None
         ) = None,
+        override_log_name: str | None = None,
     ) -> Result:
         """Release the workflow execution with overriding parameter with the
         release templating that include logical date (release date), execution
@@ -477,11 +494,14 @@ class Workflow(BaseModel):
         :param run_id: A workflow running ID for this release.
         :param log: A log class that want to save the execution result.
         :param queue: A WorkflowQueue object.
+        :param override_log_name: An override logging name that use instead
+            the workflow name.
 
         :rtype: Result
         """
         log: type[Log] = log or FileLog
-        run_id: str = run_id or gen_id(self.name, unique=True)
+        name: str = override_log_name or self.name
+        run_id: str = run_id or gen_id(name, unique=True)
         rs_release: Result = Result(run_id=run_id)
 
         # VALIDATE: Change queue value to WorkflowQueue object.
@@ -493,7 +513,7 @@ class Workflow(BaseModel):
             release: WorkflowRelease = WorkflowRelease.from_dt(release)
 
         logger.debug(
-            f"({cut_id(run_id)}) [RELEASE]: {self.name!r} : Start release - "
+            f"({cut_id(run_id)}) [RELEASE]: {name!r} : Start release - "
             f"{release.date:%Y-%m-%d %H:%M:%S}"
         )
 
@@ -514,14 +534,14 @@ class Workflow(BaseModel):
             run_id=run_id,
         )
         logger.debug(
-            f"({cut_id(run_id)}) [RELEASE]: {self.name!r} : End release - "
+            f"({cut_id(run_id)}) [RELEASE]: {name!r} : End release - "
             f"{release.date:%Y-%m-%d %H:%M:%S}"
         )
 
         rs.set_parent_run_id(run_id)
         rs_log: Log = log.model_validate(
             {
-                "name": self.name,
+                "name": name,
                 "release": release.date,
                 "type": release.type,
                 "context": rs.context,
@@ -535,7 +555,7 @@ class Workflow(BaseModel):
 
         # NOTE: Remove this release from running.
         queue.remove_running(release)
-        heappush(queue.complete, release)
+        queue.push_complete(release)
 
         context: dict[str, Any] = rs.context
         context.pop("params")
@@ -1117,6 +1137,7 @@ class WorkflowTaskData:
             run_id=run_id,
             log=log,
             queue=queue,
+            override_log_name=self.alias,
         )
 
     def queue(
@@ -1149,9 +1170,7 @@ class WorkflowTaskData:
         )
 
         while queue.check_queue(workflow_release) or (
-            log.is_pointed(
-                name=self.workflow.name, release=workflow_release.date
-            )
+            log.is_pointed(name=self.alias, release=workflow_release.date)
             and not force_run
         ):
             workflow_release = WorkflowRelease(

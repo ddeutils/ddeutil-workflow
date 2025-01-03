@@ -28,3 +28,20 @@ schedule-every-minute-wf:
       params:
         name: "Foo"
         asat-dt: "${{ release.logical_date }}"
+
+
+schedule-every-minute-wf-parallel:
+  type: scheduler.Schedule
+  workflows:
+    - alias: 'agent-01'
+      name: 'wf-scheduling-agent'
+      on: 'every_minute_bkk'
+      params:
+        name: "First"
+        asat-dt: "${{ release.logical_date }}"
+    - alias: 'agent-02'
+      name: 'wf-scheduling-agent'
+      on: 'every_minute_bkk'
+      params:
+        name: "Second"
+        asat-dt: "${{ release.logical_date }}"

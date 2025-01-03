@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
-from .__types import DictData
+from .__types import DictData, TupleStr
 
 AnyModel = TypeVar("AnyModel", bound=BaseModel)
 AnyModelType = type[AnyModel]
@@ -31,6 +31,19 @@ AnyModelType = type[AnyModel]
 load_dotenv()
 
 env = os.getenv
+
+__all__: TupleStr = (
+    "get_logger",
+    "Config",
+    "SimLoad",
+    "Loader",
+    "get_type",
+    "config",
+    "logger",
+    "FileLog",
+    "SQLiteLog",
+    "Log",
+)
 
 
 @lru_cache
@@ -108,6 +121,9 @@ class Config:
     )
     max_on_per_workflow: int = int(
         env("WORKFLOW_CORE_MAX_ON_PER_WORKFLOW", "5")
+    )
+    max_queue_complete_hist: int = int(
+        os.getenv("WORKFLOW_CORE_MAX_QUEUE_COMPLETE_HIST", "360")
     )
 
     # NOTE: Schedule App
