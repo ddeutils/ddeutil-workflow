@@ -12,6 +12,13 @@ def test_schedule_control():
     print(rs)
 
 
+@mock.patch.object(config, "stop_boundary_delta", timedelta(minutes=5))
+@mock.patch.object(Config, "enable_write_log", False)
+def test_schedule_control_multi_on():
+    rs = schedule_control(["schedule-multi-on-wf"])
+    print(rs)
+
+
 @mock.patch.object(config, "stop_boundary_delta", timedelta(minutes=1))
 @mock.patch.object(Config, "enable_write_log", False)
 def test_schedule_control_stop():

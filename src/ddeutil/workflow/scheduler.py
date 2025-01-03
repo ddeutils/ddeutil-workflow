@@ -379,17 +379,16 @@ def schedule_task(
     #
     for task in tasks:
 
+        q: WorkflowQueue = queue[task.alias]
+
         # NOTE: Start adding queue.
-        task.queue(stop, queue[task.alias], log=log)
+        task.queue(stop, q, log=log)
 
         # NOTE: Get incoming datetime queue.
-        logger.debug(
-            f"[WORKFLOW]: Current queue: {task.alias!r} : "
-            f"{list(queue[task.alias].queue)}"
-        )
+        logger.debug(f"[WORKFLOW]: Queue: {task.alias!r} : {list(q.queue)}")
 
         # VALIDATE: Check the queue is empty or not.
-        if not queue[task.alias].is_queued:
+        if not q.is_queued:
             logger.warning(
                 f"[WORKFLOW]: Queue is empty for : {task.alias!r} : "
                 f"{task.runner.cron}"
@@ -397,7 +396,7 @@ def schedule_task(
             continue
 
         # VALIDATE: Check this task is the first release in the queue or not.
-        if not queue[task.alias].is_first_queue(task.runner.date):
+        if not q.is_first_queue(task.runner.date):
             logger.debug(
                 f"[WORKFLOW]: Skip schedule "
                 f"{task.runner.date:%Y-%m-%d %H:%M:%S} "
@@ -412,8 +411,8 @@ def schedule_task(
         )
 
         # NOTE: Pop the latest release and push it to running.
-        release = heappop(queue[task.alias].queue)
-        queue[task.alias].push_running(release)
+        release = heappop(q.queue)
+        q.push_running(release)
 
         # NOTE: Create thread name that able to tracking with observe schedule
         #   job.
@@ -424,7 +423,7 @@ def schedule_task(
 
         wf_thread: Thread = Thread(
             target=catch_exceptions(cancel_on_failure=True)(task.release),
-            kwargs={"queue": queue[task.alias], "log": log},
+            kwargs={"queue": q, "log": log},
             name=thread_name,
             daemon=True,
         )
@@ -434,7 +433,7 @@ def schedule_task(
         wf_thread.start()
         delay()
 
-    logger.debug(f"[WORKFLOW]: End workflow release {'=' * 80}")
+    logger.debug(f"[SCHEDULE]: End schedule release {'=' * 80}")
 
 
 def monitor(threads: dict[str, Thread]) -> None:  # pragma: no cov

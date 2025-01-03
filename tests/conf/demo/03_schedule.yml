@@ -20,6 +20,16 @@ schedule-common-wf:
         asat-dt: "${{ release.logical_date }}"
 
 
+schedule-multi-on-wf:
+  type: scheduler.Schedule
+  workflows:
+    - name: 'wf-scheduling-agent'
+      on: ['every_minute_bkk', 'every_3_minute_bkk']
+      params:
+        name: "Foo"
+        asat-dt: "${{ release.logical_date }}"
+
+
 schedule-every-minute-wf:
   type: scheduler.Schedule
   workflows:
