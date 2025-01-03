@@ -70,7 +70,7 @@ logging.getLogger("schedule").setLevel(logging.INFO)
 __all__: TupleStr = (
     "Schedule",
     "WorkflowSchedule",
-    "workflow_task_release",
+    "schedule_task",
     "monitor",
     "schedule_control",
     "schedule_runner",
@@ -342,7 +342,7 @@ def catch_exceptions(cancel_on_failure: bool = False) -> DecoratorCancelJob:
 
 
 @catch_exceptions(cancel_on_failure=True)  # pragma: no cov
-def workflow_task_release(
+def schedule_task(
     tasks: list[WorkflowTaskData],
     stop: datetime,
     queue: dict[str, WorkflowQueue],
@@ -389,19 +389,21 @@ def workflow_task_release(
     #
     for task in tasks:
 
+        # NOTE: Start adding queue.
+        task.queue(stop, queue[task.alias], log=log)
+
         # NOTE: Get incoming datetime queue.
         logger.debug(
-            f"[WORKFLOW]: Current queue: {task.workflow.name!r} : "
+            f"[WORKFLOW]: Current queue: {task.alias!r} : "
             f"{list(queue[task.alias].queue)}"
         )
 
         # VALIDATE: Check the queue is empty or not.
         if not queue[task.alias].is_queued:
             logger.warning(
-                f"[WORKFLOW]: Queue is empty for : {task.workflow.name!r} : "
+                f"[WORKFLOW]: Queue is empty for : {task.alias!r} : "
                 f"{task.runner.cron}"
             )
-            task.queue(stop, queue[task.alias], log=log)
             continue
 
         # VALIDATE: Check this task is the first release in the queue or not.
@@ -409,14 +411,13 @@ def workflow_task_release(
             logger.debug(
                 f"[WORKFLOW]: Skip schedule "
                 f"{task.runner.date:%Y-%m-%d %H:%M:%S} "
-                f"for : {task.workflow.name!r} : {task.runner.cron}"
+                f"for : {task.alias!r} : {task.runner.cron}"
             )
-            task.queue(stop, queue[task.alias], log=log)
             continue
 
         logger.info(
             f"[WORKFLOW]: Start create thread: "
-            f"{task.workflow.name}|{str(task.runner.cron)}|"
+            f"{task.alias}|{str(task.runner.cron)}|"
             f"{task.runner.date:%Y%m%d%H%M}"
         )
 
@@ -427,7 +428,7 @@ def workflow_task_release(
         # NOTE: Create thread name that able to tracking with observe schedule
         #   job.
         thread_name: str = (
-            f"{task.workflow.name}|{str(task.runner.cron)}|"
+            f"{task.alias}|{str(task.runner.cron)}|"
             f"{task.runner.date:%Y%m%d%H%M}"
         )
 
@@ -441,8 +442,6 @@ def workflow_task_release(
         threads[thread_name] = wf_thread
 
         wf_thread.start()
-
-        task.queue(stop, queue[task.alias], log=log)
         delay()
 
     logger.debug(f"[WORKFLOW]: End workflow release {'=' * 80}")
@@ -520,7 +519,7 @@ def schedule_control(
         scheduler.every(1)
         .minutes.at(":02")
         .do(
-            workflow_task_release,
+            schedule_task,
             tasks=tasks,
             stop=(stop or (start_date + config.stop_boundary_delta)),
             queue=queue,

@@ -123,7 +123,7 @@ class Config:
         env("WORKFLOW_CORE_MAX_ON_PER_WORKFLOW", "5")
     )
     max_queue_complete_hist: int = int(
-        os.getenv("WORKFLOW_CORE_MAX_QUEUE_COMPLETE_HIST", "360")
+        os.getenv("WORKFLOW_CORE_MAX_QUEUE_COMPLETE_HIST", "16")
     )
 
     # NOTE: Schedule App
