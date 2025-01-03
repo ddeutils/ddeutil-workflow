@@ -362,17 +362,7 @@ def schedule_task(
 
     :rtype: CancelJob | None
     """
-    current_date: datetime = datetime.now(tz=config.tz)
-
-    if current_date > stop.replace(tzinfo=config.tz):
-        logger.info("[SCHEDULE]: Stop this schedule with datetime stopper.")
-        while len(threads) > 0:
-            logger.warning(
-                "[SCHEDULE]: Waiting workflow release thread that still "
-                "running in background."
-            )
-            time.sleep(15)
-            monitor(threads)
+    if datetime.now(tz=config.tz) > stop.replace(tzinfo=config.tz):
         return CancelJob
 
     # IMPORTANT:
@@ -448,11 +438,11 @@ def schedule_task(
 
 
 def monitor(threads: dict[str, Thread]) -> None:  # pragma: no cov
-    """Workflow schedule for monitoring long running thread from the schedule
-    control.
+    """Monitoring function that running every five minute for track long running
+    thread instance from the schedule_control function that run every minute.
 
     :param threads: A mapping of Thread object and its name.
-    :rtype: None
+    :type threads: dict[str, Thread]
     """
     logger.debug(
         "[MONITOR]: Start checking long running workflow release task."
@@ -473,7 +463,7 @@ def schedule_control(
     *,
     log: type[Log] | None = None,
 ) -> list[str]:  # pragma: no cov
-    """Scheduler control.
+    """Scheduler control function that running every minute.
 
     :param schedules: A list of workflow names that want to schedule running.
     :param stop: An datetime value that use to stop running schedule.
@@ -496,7 +486,7 @@ def schedule_control(
 
     # IMPORTANT: Create main mapping of queue and thread object.
     queue: dict[str, WorkflowQueue] = {}
-    thread_releases: dict[str, Thread] = {}
+    threads: dict[str, Thread] = {}
 
     start_date_waiting: datetime = start_date.replace(
         second=0, microsecond=0
@@ -523,7 +513,7 @@ def schedule_control(
             tasks=tasks,
             stop=(stop or (start_date + config.stop_boundary_delta)),
             queue=queue,
-            threads=thread_releases,
+            threads=threads,
             log=log,
         )
         .tag("control")
@@ -535,7 +525,7 @@ def schedule_control(
         .minutes.at(":10")
         .do(
             monitor,
-            threads=thread_releases,
+            threads=threads,
         )
         .tag("monitor")
     )
@@ -550,10 +540,15 @@ def schedule_control(
         # NOTE: Break the scheduler when the control job does not exists.
         if not scheduler.get_jobs("control"):
             scheduler.clear("monitor")
-            logger.warning(
-                f"[SCHEDULE]: Workflow release thread: {thread_releases}"
-            )
-            logger.warning("[SCHEDULE]: Does not have any schedule jobs !!!")
+
+            while len(threads) > 0:
+                logger.warning(
+                    "[SCHEDULE]: Waiting schedule release thread that still "
+                    "running in background."
+                )
+                delay(15)
+                monitor(threads)
+
             break
 
     logger.warning(
@@ -584,15 +579,11 @@ def schedule_runner(
 
         The current workflow logic that split to process will be below diagram:
 
-        PIPELINES ==> process 01 ==> schedule --> thread of release
-                                                  workflow task 01 01
-                                              --> thread of release
-                                                  workflow task 01 02
-                  ==> process 02 ==> schedule --> thread of release
-                                                  workflow task 02 01
-                                              --> thread of release
-                                                  workflow task 02 02
-                  ==> ...
+        MAIN ==> process 01 ==> schedule --> thread of release task 01 01
+                                        --> thread of release task 01 02
+                            ==> schedule --> thread of release task 02 01
+                                        --> thread of release task 02 02
+            ==> process 02
     """
     results: list[str] = []
 

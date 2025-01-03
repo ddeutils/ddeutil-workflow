@@ -12,6 +12,13 @@ def test_schedule_control():
     print(rs)
 
 
+@mock.patch.object(config, "stop_boundary_delta", timedelta(minutes=1))
+@mock.patch.object(Config, "enable_write_log", False)
+def test_schedule_control_stop():
+    rs = schedule_control(["schedule-every-minute-wf"])
+    print(rs)
+
+
 @mock.patch.object(config, "stop_boundary_delta", timedelta(minutes=2))
 @mock.patch.object(Config, "enable_write_log", False)
 def test_schedule_control_parallel():

@@ -175,9 +175,6 @@ class WorkflowQueue:
         first_value: WorkflowRelease = heappop(self.queue)
         heappush(self.queue, first_value)
 
-        logger.debug(f"First value: {first_value}")
-        logger.debug(f"Current value: {value}")
-
         return first_value == value
 
     def check_queue(self, value: WorkflowRelease | datetime) -> bool:
@@ -199,21 +196,22 @@ class WorkflowQueue:
         )
 
     def push_queue(self, value: WorkflowRelease) -> Self:
-        """Push data to the queue."""
+        """Push data to the waiting queue."""
         heappush(self.queue, value)
         return self
 
     def push_running(self, value: WorkflowRelease) -> Self:
-        """Push data to the running."""
+        """Push WorkflowRelease to the running queue."""
         heappush(self.running, value)
         return self
 
     def remove_running(self, value: WorkflowRelease) -> Self:
-        """Remove data on the running if it exists."""
+        """Remove WorkflowRelease in the running queue if it exists."""
         if value in self.running:
             self.running.remove(value)
 
     def push_complete(self, value: WorkflowRelease) -> Self:
+        """Push WorkflowRelease to the complete queue."""
         heappush(self.complete, value)
 
         # NOTE: Remove complete queue on workflow that keep more than the
