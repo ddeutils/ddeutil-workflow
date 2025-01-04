@@ -59,9 +59,13 @@ nav:
       - 'Cron': modules/cron.md
       - 'Job': modules/job.md
       - 'Workflow': modules/workflow.md
-      - 'Scheduler': modules/scheduler.md
       - 'Params': modules/params.md
       - 'Result': modules/result.md
+      - 'Scheduler': modules/scheduler.md
+  - API:
+      - Main: api/main.md
+      - Workflow: api/workflow.md
+      - Schedule: api/schedule.md
   - Examples:
       - examples/index.md
       - Hooks: examples/hook_stage.md

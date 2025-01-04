@@ -1,5 +1,6 @@
 from datetime import datetime
 from unittest import mock
+from zoneinfo import ZoneInfo
 
 import pytest
 from ddeutil.workflow.conf import Config
@@ -82,10 +83,15 @@ def test_workflow_schedule_raise_on(test_path):
 
 @mock.patch.object(Config, "enable_write_log", False)
 def test_workflow_schedule_tasks(test_path):
-    release_date: datetime = datetime(2024, 1, 1, 1)
+    tz: ZoneInfo = ZoneInfo("Asia/Bangkok")
+    release_date: datetime = datetime(2024, 1, 1, 1, tzinfo=tz)
     queue: dict[str, WorkflowQueue] = {
         "tmp-wf-schedule-tasks": WorkflowQueue(
-            running=[WorkflowRelease.from_dt(release_date)]
+            complete=[
+                WorkflowRelease.from_dt(datetime(2024, 1, 1, 1, 0, tzinfo=tz)),
+                WorkflowRelease.from_dt(datetime(2024, 1, 1, 1, 1, tzinfo=tz)),
+                WorkflowRelease.from_dt(datetime(2024, 1, 1, 1, 3, tzinfo=tz)),
+            ]
         )
     }
 
@@ -112,7 +118,9 @@ def test_workflow_schedule_tasks(test_path):
         assert len(tasks) == 1
 
         task = tasks[0]
-        print(task)
+
         task.release(queue=queue["tmp-wf-schedule-tasks"])
-        _ = task.runner.next
-        print(task)
+
+        task.release(queue=queue["tmp-wf-schedule-tasks"])
+
+        assert task.runner.date == datetime(2024, 1, 1, 1, 4, tzinfo=tz)

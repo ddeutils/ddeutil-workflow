@@ -70,6 +70,8 @@ def schedule(
     """
     excluded: list[str] = str2list(excluded) if excluded else []
     externals: str = externals or "{}"
+
+    # NOTE: Convert timezone on the stop date.
     if stop:
         stop: datetime = stop.astimezone(tz=config.tz)
 
@@ -79,7 +81,7 @@ def schedule(
     workflow_rs: list[str] = schedule_runner(
         stop=stop, excluded=excluded, externals=json.loads(externals)
     )
-    logger.info(f"Application run success: {workflow_rs}")
+    logger.info(f"Schedule with CLI run success with: {workflow_rs}")
 
 
 @cli_log.command("workflow-get")

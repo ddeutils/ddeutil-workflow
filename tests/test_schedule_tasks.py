@@ -70,3 +70,13 @@ def test_schedule_tasks_release(test_path):
             task.release(queue=queue["wf-scheduling"])
 
             assert len(queue["wf-scheduling"].complete) == 2
+
+        queue: dict[str, WorkflowQueue] = {"wf-scheduling": WorkflowQueue()}
+
+        for task in schedule.tasks(
+            start_date=datetime(2024, 1, 1, 1, 2, 30),
+            queue=queue,
+        ):
+            task.release(queue=queue["wf-scheduling"])
+
+            assert len(queue["wf-scheduling"].complete) == 1

@@ -1145,8 +1145,18 @@ class WorkflowTask:
         :rtype: Result
         """
         log: type[Log] = log or FileLog
+
+        if release is None:
+            if queue.check_queue(self.runner.date):
+                release = self.runner.next
+
+                while queue.check_queue(release):
+                    release = self.runner.next
+            else:
+                release = self.runner.date
+
         return self.workflow.release(
-            release=release or self.runner.next,
+            release=release,
             params=self.values,
             run_id=run_id,
             log=log,

@@ -23,7 +23,7 @@ from pydantic import BaseModel
 from .__about__ import __version__
 from .conf import config, get_logger
 from .repeat import repeat_at, repeat_every
-from .workflow import WorkflowTask
+from .workflow import WorkflowQueue, WorkflowTask
 
 load_dotenv()
 logger = get_logger("ddeutil.workflow")
@@ -35,8 +35,7 @@ class State(TypedDict):
     scheduler: list[str]
     workflow_threads: dict[str, Thread]
     workflow_tasks: list[WorkflowTask]
-    workflow_queue: dict[str, list[datetime]]
-    workflow_running: dict[str, list[datetime]]
+    workflow_queue: dict[str, WorkflowQueue]
 
 
 @contextlib.asynccontextmanager
@@ -65,7 +64,6 @@ async def lifespan(a: FastAPI) -> AsyncIterator[State]:
         #
         "scheduler": a.state.scheduler,
         "workflow_queue": a.state.workflow_queue,
-        "workflow_running": a.state.workflow_running,
         "workflow_threads": a.state.workflow_threads,
         "workflow_tasks": a.state.workflow_tasks,
     }
@@ -129,14 +127,17 @@ async def message_upper(payload: Payload):
     return await get_result(request_id)
 
 
+# NOTE: Enable the workflow route.
 if config.enable_route_workflow:
     from .route import workflow
 
     app.include_router(workflow)
 
+
+# NOTE: Enable the schedule route.
 if config.enable_route_schedule:
     from .route import schedule
-    from .scheduler import workflow_task
+    from .scheduler import schedule_task
 
     app.include_router(schedule)
 
@@ -148,7 +149,7 @@ if config.enable_route_schedule:
             f"{app.state.scheduler}"
         )
         if app.state.workflow_tasks:
-            workflow_task(
+            schedule_task(
                 app.state.workflow_tasks,
                 stop=datetime.now() + timedelta(minutes=1),
                 threads=app.state.workflow_threads,

@@ -172,7 +172,7 @@ async def add_deploy_scheduler(request: Request, name: str):
 
     # NOTE: Create pair of workflow and on from schedule model.
     try:
-        sch = Schedule.from_loader(name)
+        _schedule = Schedule.from_loader(name)
     except ValueError as e:
         request.state.scheduler.remove(name)
         logger.exception(e)
@@ -180,11 +180,11 @@ async def add_deploy_scheduler(request: Request, name: str):
             status_code=st.HTTP_404_NOT_FOUND,
             detail=str(e),
         ) from None
+
     request.state.workflow_tasks.extend(
-        sch.tasks(
+        _schedule.tasks(
             start_date_waiting,
             queue=request.state.workflow_queue,
-            running=request.state.workflow_running,
         ),
     )
     return {"message": f"adding {name!r} to schedule listener."}
@@ -193,12 +193,14 @@ async def add_deploy_scheduler(request: Request, name: str):
 @schedule.delete("/deploy/{name}")
 async def del_deploy_scheduler(request: Request, name: str):
     if name in request.state.scheduler:
+
         request.state.scheduler.remove(name)
-        sche = Schedule.from_loader(name)
-        for workflow_task in sche.tasks(datetime.now(), {}, {}):
+
+        _schedule: Schedule = Schedule.from_loader(name)
+        for workflow_task in _schedule.tasks(datetime.now(), queue={}):
             request.state.workflow_tasks.remove(workflow_task)
 
-        for wf in sche.workflows:
+        for wf in _schedule.workflows:
             if wf in request.state.workflow_queue:
                 request.state.workflow_queue.pop(wf, {})
 
