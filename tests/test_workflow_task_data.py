@@ -3,7 +3,7 @@ from unittest import mock
 
 from ddeutil.workflow.__cron import CronRunner
 from ddeutil.workflow.conf import Config
-from ddeutil.workflow.on import On
+from ddeutil.workflow.cron import On
 from ddeutil.workflow.result import Result
 from ddeutil.workflow.workflow import Workflow, WorkflowTaskData
 

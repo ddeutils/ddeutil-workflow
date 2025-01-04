@@ -120,7 +120,7 @@ class Config:
         os.getenv("WORKFLOW_CORE_MAX_NUM_POKING", "4")
     )
     max_on_per_workflow: int = int(
-        env("WORKFLOW_CORE_MAX_ON_PER_WORKFLOW", "5")
+        env("WORKFLOW_CORE_MAX_CRON_PER_WORKFLOW", "5")
     )
     max_queue_complete_hist: int = int(
         os.getenv("WORKFLOW_CORE_MAX_QUEUE_COMPLETE_HIST", "16")

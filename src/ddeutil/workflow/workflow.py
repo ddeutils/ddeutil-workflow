@@ -43,9 +43,9 @@ from typing_extensions import Self
 from .__cron import CronJob, CronRunner
 from .__types import DictData, TupleStr
 from .conf import FileLog, Loader, Log, config, get_logger
+from .cron import On
 from .exceptions import JobException, WorkflowException
 from .job import Job
-from .on import On
 from .params import Param
 from .result import Result
 from .utils import (

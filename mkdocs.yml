@@ -56,7 +56,7 @@ nav:
   - Configuration: configuration.md
   - Modules:
       - 'Stage': modules/stage.md
-      - 'On': modules/on.md
+      - 'Cron': modules/cron.md
       - 'Job': modules/job.md
       - 'Workflow': modules/workflow.md
       - 'Scheduler': modules/scheduler.md

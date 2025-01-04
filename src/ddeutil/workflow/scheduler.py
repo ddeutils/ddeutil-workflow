@@ -52,8 +52,8 @@ except ImportError:  # pragma: no cov
 from .__cron import CronRunner
 from .__types import DictData, TupleStr
 from .conf import FileLog, Loader, Log, config, get_logger
+from .cron import On
 from .exceptions import WorkflowException
-from .on import On
 from .utils import (
     batch,
     delay,

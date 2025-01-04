@@ -1,4 +1,4 @@
-# On
+# Cron
 
 The **On** is schedule object that receive crontab value and able to generate
 datetime value with next or previous with any start point of an input datetime.
@@ -11,7 +11,7 @@ on_every_5_min:
 ```
 
 ```python
-from ddeutil.workflow.on import On
+from ddeutil.workflow.cron import On
 
 # NOTE: Start load the on data from `.yaml` template file with this key.
 schedule = On.from_loader(name='on_every_5_min', externals={})

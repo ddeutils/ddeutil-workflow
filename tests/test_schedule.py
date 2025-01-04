@@ -3,7 +3,7 @@ from datetime import datetime
 import pytest
 import yaml
 from ddeutil.workflow import Workflow
-from ddeutil.workflow.on import On
+from ddeutil.workflow.cron import On
 from ddeutil.workflow.scheduler import Schedule
 from ddeutil.workflow.workflow import WorkflowTaskData
 from pydantic import ValidationError
