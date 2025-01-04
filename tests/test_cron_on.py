@@ -99,7 +99,7 @@ def test_on_from_loader_raise(test_path):
     with test_file.open(mode="w") as f:
         yaml.dump(
             {
-                "every_day_noon_raise": {
+                "every_day_no_cron_raise": {
                     "type": "scheduler.Workflow",
                     "interval": "monthly",
                     "day": "monday",
@@ -111,15 +111,15 @@ def test_on_from_loader_raise(test_path):
 
     with pytest.raises(ValueError):
         On.from_loader(
-            name="every_day_noon_raise",
+            name="every_day_no_cron_raise",
             externals={},
         )
 
     with test_file.open(mode="w") as f:
         yaml.dump(
             {
-                "every_day_noon_raise": {
-                    "type": "on.On",
+                "every_day_no_cron_raise": {
+                    "type": "cron.On",
                 }
             },
             f,
@@ -127,15 +127,15 @@ def test_on_from_loader_raise(test_path):
 
     with pytest.raises(ValueError):
         On.from_loader(
-            name="every_day_noon_raise",
+            name="every_day_no_cron_raise",
             externals={},
         )
 
     with test_file.open(mode="w") as f:
         yaml.dump(
             {
-                "every_day_noon_raise": {
-                    "type": "on.On",
+                "every_day_no_cron_raise": {
+                    "type": "cron.On",
                     "cronjob": "* * * * *",
                     "timezone": "NotExists",
                 }
@@ -145,7 +145,7 @@ def test_on_from_loader_raise(test_path):
 
     with pytest.raises(ValidationError):
         On.from_loader(
-            name="every_day_noon_raise",
+            name="every_day_no_cron_raise",
             externals={},
         )
 

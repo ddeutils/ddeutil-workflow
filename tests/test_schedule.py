@@ -35,7 +35,7 @@ def test_schedule_from_loader_raise(test_path):
         yaml.dump(
             {
                 "schedule-raise-wf": {
-                    "type": "ddeutil.workflow.on.On",
+                    "type": "ddeutil.workflow.cron.On",
                     "workflows": [
                         {"name": "wf-scheduling"},
                     ],

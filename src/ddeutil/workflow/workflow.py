@@ -222,12 +222,12 @@ class WorkflowQueue:
 
         # NOTE: Remove complete queue on workflow that keep more than the
         #   maximum config.
-        if (
-            num_complete_delete := (
-                len(self.complete) - config.max_queue_complete_hist
-            )
-            > 0
-        ):
+        num_complete_delete: int = (
+            len(self.complete) - config.max_queue_complete_hist
+        )
+
+        if num_complete_delete > 0:
+            print(num_complete_delete)
             for _ in range(num_complete_delete):
                 heappop(self.complete)
 
@@ -1128,6 +1128,7 @@ class WorkflowTask:
 
     def release(
         self,
+        release: datetime | WorkflowRelease,
         run_id: str | None = None,
         log: type[Log] = None,
         queue: (
@@ -1136,7 +1137,7 @@ class WorkflowTask:
     ) -> Result:
         """Release the workflow task data."""
         return self.workflow.release(
-            release=self.runner.date,
+            release=release,
             params=self.values,
             run_id=run_id,
             log=log,
@@ -1193,7 +1194,7 @@ class WorkflowTask:
 
         return queue
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             f"{self.__class__.__name__}(alias={self.alias!r}, "
             f"workflow={self.workflow.name!r}, runner={self.runner!r}, "

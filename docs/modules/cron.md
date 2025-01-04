@@ -1,12 +1,14 @@
 # Cron
 
+## On
+
 The **On** is schedule object that receive crontab value and able to generate
 datetime value with next or previous with any start point of an input datetime.
 
 ```yaml
 # This file should keep under this path: `./root-path/conf-path/*`
 on_every_5_min:
-  type: on.On
+  type: cron.On
   cron: "*/5 * * * *"
 ```
 
@@ -24,7 +26,5 @@ assert "2022-01-01 00:05:00" f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
 assert "2022-01-01 00:10:00" f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
 assert "2022-01-01 00:15:00" f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
 ```
-
-## On
 
 ## YearOn

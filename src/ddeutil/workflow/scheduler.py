@@ -424,7 +424,7 @@ def schedule_task(
 
         wf_thread: Thread = Thread(
             target=catch_exceptions(cancel_on_failure=True)(task.release),
-            kwargs={"queue": q, "log": log},
+            kwargs={"release": release, "queue": q, "log": log},
             name=thread_name,
             daemon=True,
         )

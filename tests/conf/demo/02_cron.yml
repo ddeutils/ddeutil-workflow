@@ -1,35 +1,35 @@
 every_5_minute_bkk:
-  type: on.On
+  type: cron.On
   cronjob: "*/5 * * * *"
   timezone: "Asia/Bangkok"
 
 
 every_minute_bkk:
-  type: on.On
+  type: cron.On
   cronjob: "* * * * *"
   timezone: "Asia/Bangkok"
 
 
 every_2_minute_bkk:
-  type: on.On
+  type: cron.On
   cronjob: "*/2 * * * *"
   timezone: "Asia/Bangkok"
 
 
 every_3_minute_bkk:
-  type: on.On
+  type: cron.On
   cronjob: "*/3 * * * *"
   timezone: "Asia/Bangkok"
 
 
 every_hour_bkk:
-  type: on.On
+  type: cron.On
   cronjob: "0 * * * *"
   timezone: "Asia/Bangkok"
 
 
 every_day_noon:
-  type: on.On
+  type: cron.On
   interval: "monthly"
   day: "monday"
   time: "12:00"
@@ -37,6 +37,6 @@ every_day_noon:
 
 
 aws_every_5_minute_bkk:
-  type: on.YearOn
+  type: cron.YearOn
   cronjob: "*/5 * * * * 2024"
   timezone: "Asia/Bangkok"
