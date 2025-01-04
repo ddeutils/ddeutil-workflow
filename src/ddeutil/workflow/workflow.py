@@ -1128,16 +1128,25 @@ class WorkflowTask:
 
     def release(
         self,
-        release: datetime | WorkflowRelease,
+        release: datetime | WorkflowRelease | None = None,
         run_id: str | None = None,
         log: type[Log] = None,
         queue: (
             WorkflowQueue | list[datetime] | list[WorkflowRelease] | None
         ) = None,
     ) -> Result:
-        """Release the workflow task data."""
+        """Release the workflow task data.
+
+        :param release: A release datetime or WorkflowRelease object.
+        :param run_id: A workflow running ID for this release.
+        :param log: A log class that want to save the execution result.
+        :param queue: A WorkflowQueue object.
+
+        :rtype: Result
+        """
+        log: type[Log] = log or FileLog
         return self.workflow.release(
-            release=release,
+            release=release or self.runner.next,
             params=self.values,
             run_id=run_id,
             log=log,

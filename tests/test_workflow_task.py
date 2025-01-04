@@ -29,6 +29,14 @@ def test_workflow_task():
         values={},
     )
 
+    assert repr(task) == (
+        "WorkflowTask(alias='wf-scheduling-common', "
+        "workflow='wf-scheduling-common', "
+        "runner=CronRunner(CronJob('*/3 * * * *'), 2024-01-01 01:00:00, "
+        "tz='Asia/Bangkok'), values={'asat-dt': "
+        "datetime.datetime(2024, 1, 1, 1, 0)})"
+    )
+
 
 @mock.patch.object(Config, "enable_write_log", False)
 def test_workflow_task_queue(test_path):

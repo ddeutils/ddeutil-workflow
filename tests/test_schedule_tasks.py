@@ -64,6 +64,9 @@ def test_schedule_tasks_release(test_path):
             queue=queue,
         ):
             task.release(queue=queue["wf-scheduling"])
-            print(task.runner.date)
 
-        print(queue)
+            assert len(queue["wf-scheduling"].complete) == 1
+
+            task.release(queue=queue["wf-scheduling"])
+
+            assert len(queue["wf-scheduling"].complete) == 2
