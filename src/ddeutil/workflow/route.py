@@ -40,7 +40,7 @@ async def get_workflows():
     """Return all workflow workflows that exists in config path."""
     workflows: DictData = Loader.finds(Workflow)
     return {
-        "message": f"getting all workflows: {workflows}",
+        "message": f"getting all workflows: {dict(workflows)}",
     }
 
 

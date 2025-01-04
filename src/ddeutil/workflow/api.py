@@ -30,6 +30,8 @@ logger = get_logger("ddeutil.workflow")
 
 
 class State(TypedDict):
+    """TypeDict for State of FastAPI application."""
+
     upper_queue: Queue
     upper_result: dict[str, str]
     scheduler: list[str]
@@ -40,13 +42,13 @@ class State(TypedDict):
 
 @contextlib.asynccontextmanager
 async def lifespan(a: FastAPI) -> AsyncIterator[State]:
+    """Lifespan function for the FastAPI application."""
     a.state.upper_queue = Queue()
     a.state.upper_result = {}
     a.state.scheduler = []
     a.state.workflow_threads = {}
     a.state.workflow_tasks = []
     a.state.workflow_queue = {}
-    a.state.workflow_running = {}
 
     await asyncio.create_task(broker_upper_messages())
 
@@ -112,12 +114,11 @@ async def get_result(request_id: str) -> dict[str, str]:
 
 
 @app.get("/")
-@app.get("/api")
 async def health():
     return {"message": "Workflow API already start up"}
 
 
-@app.post("/api")
+@app.post("/api/upper")
 async def message_upper(payload: Payload):
     """Convert message from any case to the upper case."""
     request_id: str = str(uuid.uuid4())

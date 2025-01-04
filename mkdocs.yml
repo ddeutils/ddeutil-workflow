@@ -63,7 +63,7 @@ nav:
       - 'Result': modules/result.md
       - 'Scheduler': modules/scheduler.md
   - API:
-      - Main: api/main.md
+      - api/index.md
       - Workflow: api/workflow.md
       - Schedule: api/schedule.md
   - Examples:

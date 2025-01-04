@@ -201,22 +201,12 @@ class WorkflowQueue:
             or (value in self.complete)
         )
 
-    def push_queue(self, value: WorkflowRelease) -> Self:
-        """Push data to the waiting queue."""
-        heappush(self.queue, value)
-        return self
-
-    def push_running(self, value: WorkflowRelease) -> Self:
-        """Push WorkflowRelease to the running queue."""
-        heappush(self.running, value)
-        return self
-
     def remove_running(self, value: WorkflowRelease) -> Self:
         """Remove WorkflowRelease in the running queue if it exists."""
         if value in self.running:
             self.running.remove(value)
 
-    def push_complete(self, value: WorkflowRelease) -> Self:
+    def mark_complete(self, value: WorkflowRelease) -> Self:
         """Push WorkflowRelease to the complete queue."""
         heappush(self.complete, value)
 
@@ -492,6 +482,14 @@ class Workflow(BaseModel):
             This method allow workflow use log object to save the execution
         result to log destination like file log to the local `/logs` directory.
 
+        :Steps:
+            - Initialize WorkflowQueue and WorkflowRelease if they do not pass.
+            - Create release data for pass to parameter templating function.
+            - Execute this workflow with mapping release data to its parameters.
+            - Writing log
+            - Remove this release on the running queue
+            - Push this release to complete queue
+
         :param release: A release datetime or WorkflowRelease object.
         :param params: A workflow parameter that pass to execute method.
         :param queue: A list of release time that already queue.
@@ -507,6 +505,7 @@ class Workflow(BaseModel):
         name: str = override_log_name or self.name
         run_id: str = run_id or gen_id(name, unique=True)
         rs_release: Result = Result(run_id=run_id)
+        rs_release_type: str = "release"
 
         # VALIDATE: Change queue value to WorkflowQueue object.
         if queue is None or isinstance(queue, list):
@@ -514,6 +513,7 @@ class Workflow(BaseModel):
 
         # VALIDATE: Change release value to WorkflowRelease object.
         if isinstance(release, datetime):
+            rs_release_type: str = "datetime"
             release: WorkflowRelease = WorkflowRelease.from_dt(release)
 
         logger.debug(
@@ -559,8 +559,9 @@ class Workflow(BaseModel):
 
         # NOTE: Remove this release from running.
         queue.remove_running(release)
-        queue.push_complete(release)
+        queue.mark_complete(release)
 
+        # NOTE: Remove the params key from the result context for deduplicate.
         context: dict[str, Any] = rs.context
         context.pop("params")
 
@@ -568,7 +569,12 @@ class Workflow(BaseModel):
             status=0,
             context={
                 "params": params,
-                "release": {"status": "success", "logical_date": release.date},
+                "release": {
+                    "status": "success",
+                    "type": rs_release_type,
+                    "logical_date": release.date,
+                    "release": release,
+                },
                 "outputs": context,
             },
         )
@@ -628,7 +634,7 @@ class Workflow(BaseModel):
                 continue
 
             # NOTE: Push the WorkflowRelease object to queue.
-            queue.push_queue(workflow_release)
+            heappush(queue.queue, workflow_release)
 
         return queue
 
@@ -756,7 +762,7 @@ class Workflow(BaseModel):
                     continue
 
                 # NOTE: Push the latest WorkflowRelease to the running queue.
-                wf_queue.push_running(release)
+                heappush(wf_queue.running, release)
 
                 futures.append(
                     executor.submit(
@@ -1209,7 +1215,7 @@ class WorkflowTask:
             return queue
 
         # NOTE: Push the WorkflowRelease object to queue.
-        queue.push_queue(workflow_release)
+        heappush(queue.queue, workflow_release)
 
         return queue
 

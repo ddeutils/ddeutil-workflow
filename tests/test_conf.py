@@ -10,6 +10,7 @@ import toml
 import yaml
 from ddeutil.workflow.conf import Config, Loader, SimLoad
 from ddeutil.workflow.scheduler import Schedule
+from ddeutil.workflow.workflow import Workflow
 
 
 def test_config():
@@ -103,4 +104,9 @@ def test_simple_load_finds_raise(target_path: Path):
 
 def test_loader_find_schedule():
     for finding in Loader.finds(Schedule, excluded=[]):
+        print(finding)
+
+
+def test_loader_find_workflow():
+    for finding in Loader.finds(Workflow, excluded=[]):
         print(finding)

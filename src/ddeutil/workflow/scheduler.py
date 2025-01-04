@@ -30,7 +30,7 @@ from concurrent.futures import (
 )
 from datetime import datetime, timedelta
 from functools import wraps
-from heapq import heappop
+from heapq import heappop, heappush
 from textwrap import dedent
 from threading import Thread
 from typing import Callable, Optional
@@ -408,7 +408,7 @@ def schedule_task(
 
         # NOTE: Pop the latest release and push it to running.
         release: WorkflowRelease = heappop(q.queue)
-        q.push_running(release)
+        heappush(q.running, release)
 
         logger.info(
             f"[WORKFLOW]: Start thread: '{task.alias}|{str(task.runner.cron)}|"

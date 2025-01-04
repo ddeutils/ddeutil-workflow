@@ -17,7 +17,7 @@ to stdout.
 | echo  | str \| None |   None   |             |
 | sleep | float       |    0     |             |
 
-!!! example
+!!! example "Python"
 
     ```python
     from ddeutil.workflow.stage import EmptyStage, Stage
@@ -27,6 +27,35 @@ to stdout.
     rs: Result = stage.execute(params={})
     assert {} == rs.context
     ```
+
+!!! example "YAML"
+
+    === "Echo"
+
+        ```yaml
+        stages:
+          - name: Echo hello world
+            echo: "Hello World"
+        ```
+
+    === "Echo with ID"
+
+        ```yaml
+        stages:
+          - name: Echo hello world
+            id: echo-stage
+            echo: "Hello World"
+        ```
+
+    === "Sleep"
+
+        ```yaml
+        stages:
+          - name: Echo hello world
+            id: echo-sleep-stage
+            echo: "Hello World and Sleep 10 seconds"
+            sleep: 10
+        ```
 
 ## Bash Stage
 
