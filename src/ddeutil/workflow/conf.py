@@ -231,8 +231,8 @@ class SimLoad:
         obj: object,
         conf: Config,
         *,
-        include: list[str] | None = None,
-        exclude: list[str] | None = None,
+        included: list[str] | None = None,
+        excluded: list[str] | None = None,
     ) -> Iterator[tuple[str, DictData]]:
         """Find all data that match with object type in config path. This class
         method can use include and exclude list of identity name for filter and
@@ -240,12 +240,12 @@ class SimLoad:
 
         :param obj: A object that want to validate matching before return.
         :param conf: A config object.
-        :param include:
-        :param exclude:
+        :param included:
+        :param excluded:
 
         :rtype: Iterator[tuple[str, DictData]]
         """
-        exclude: list[str] = exclude or []
+        exclude: list[str] = excluded or []
         for file in PathSearch(conf.conf_path).files:
             for key, data in cls.filter_suffix(file).items():
 
@@ -254,8 +254,8 @@ class SimLoad:
 
                 if issubclass(get_type(data["type"], conf), obj):
                     yield key, (
-                        {k: data[k] for k in data if k in include}
-                        if include
+                        {k: data[k] for k in data if k in included}
+                        if included
                         else data
                     )
 
@@ -292,20 +292,20 @@ class Loader(SimLoad):
         cls,
         obj: object,
         *,
-        include: list[str] | None = None,
-        exclude: list[str] | None = None,
+        included: list[str] | None = None,
+        excluded: list[str] | None = None,
         **kwargs,
     ) -> Iterator[tuple[str, DictData]]:
         """Override the find class method from the Simple Loader object.
 
         :param obj: A object that want to validate matching before return.
-        :param include:
-        :param exclude:
+        :param included:
+        :param excluded:
 
         :rtype: Iterator[tuple[str, DictData]]
         """
         return super().finds(
-            obj=obj, conf=Config(), include=include, exclude=exclude
+            obj=obj, conf=Config(), included=included, excluded=excluded
         )
 
     def __init__(self, name: str, externals: DictData) -> None:

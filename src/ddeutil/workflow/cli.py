@@ -42,7 +42,8 @@ def run(
     to receive with workflow params config.
     """
     logger.info(f"Running workflow name: {workflow}")
-    logger.info(f"... with Parameters: {json.dumps(json.loads(params))}")
+    logger.info(f"... with Parameters: {params!r}")
+    logger.info(f"... with JSON Parameters: {json.dumps(json.loads(params))}")
 
 
 @cli.command()
@@ -69,6 +70,7 @@ def schedule(
     module.
     """
     excluded: list[str] = str2list(excluded) if excluded else []
+    logger.info(f"... with Excluded Parameters: {excluded!r}")
     externals: str = externals or "{}"
 
     # NOTE: Convert timezone on the stop date.

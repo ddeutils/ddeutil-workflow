@@ -106,6 +106,17 @@ def test_loader_find_schedule():
     for finding in Loader.finds(Schedule, excluded=[]):
         print(finding)
 
+    for finding in Loader.finds(
+        Schedule,
+        excluded=[
+            "schedule-common-wf",
+            "schedule-multi-on-wf",
+            "schedule-every-minute-wf",
+            "schedule-every-minute-wf-parallel",
+        ],
+    ):
+        print(finding[0])
+
 
 def test_loader_find_workflow():
     for finding in Loader.finds(Workflow, excluded=[]):
