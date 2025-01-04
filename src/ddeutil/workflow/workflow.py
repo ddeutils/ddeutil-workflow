@@ -50,11 +50,11 @@ from .params import Param
 from .result import Result
 from .utils import (
     cut_id,
-    delay,
     gen_id,
     get_dt_now,
     has_template,
     param2template,
+    wait_a_minute,
 )
 
 logger = get_logger("ddeutil.workflow")
@@ -748,7 +748,7 @@ class Workflow(BaseModel):
                         f"release has diff time more than 60 seconds ..."
                     )
                     heappush(wf_queue.queue, release)
-                    delay(60)
+                    wait_a_minute(get_dt_now(tz=config.tz, offset=offset))
 
                     # WARNING: I already call queue poking again because issue
                     #   about the every minute crontab.

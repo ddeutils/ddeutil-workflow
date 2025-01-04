@@ -48,13 +48,13 @@ def test_workflow_queue_from_list():
 
 
 @mock.patch.object(Config, "max_queue_complete_hist", 4)
-def test_workflow_queue_push():
+def test_workflow_queue_mark_complete():
     wf_queue = WorkflowQueue(
         complete=[
             WorkflowRelease.from_dt(datetime(2024, 1, 1, i)) for i in range(5)
         ],
     )
-    wf_queue.push_complete(WorkflowRelease.from_dt(datetime(2024, 1, 1, 10)))
+    wf_queue.mark_complete(WorkflowRelease.from_dt(datetime(2024, 1, 1, 10)))
     assert len(wf_queue.complete) == 4
 
 

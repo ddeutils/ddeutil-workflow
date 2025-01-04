@@ -99,3 +99,7 @@ jobs:
       - name: Test with Pytest
         run: |
           pytest -vv
+
+      - name: Test CLI
+        run: |
+          ddeutil-workflow --help

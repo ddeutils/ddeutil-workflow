@@ -341,7 +341,7 @@ def catch_exceptions(cancel_on_failure: bool = False) -> DecoratorCancelJob:
     return decorator
 
 
-@catch_exceptions(cancel_on_failure=True)  # pragma: no cov
+@catch_exceptions(cancel_on_failure=True)
 def schedule_task(
     tasks: list[WorkflowTask],
     stop: datetime,

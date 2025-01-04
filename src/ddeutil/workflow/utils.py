@@ -74,6 +74,12 @@ def get_diff_sec(
     )
 
 
+def wait_a_minute(now: datetime, second: float = 2) -> None:  # pragma: no cov
+    """Wait with sleep to the next minute with an offset second value."""
+    future = now.replace(second=0, microsecond=0) + timedelta(minutes=1)
+    time.sleep((future - now).total_seconds() + second)
+
+
 def delay(second: float = 0) -> None:  # pragma: no cov
     """Delay time that use time.sleep with random second value between
     0.00 - 0.99 seconds.

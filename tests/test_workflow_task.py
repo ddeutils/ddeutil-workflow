@@ -5,7 +5,12 @@ from ddeutil.workflow.__cron import CronRunner
 from ddeutil.workflow.conf import Config, FileLog
 from ddeutil.workflow.cron import On
 from ddeutil.workflow.result import Result
-from ddeutil.workflow.workflow import Workflow, WorkflowQueue, WorkflowTask
+from ddeutil.workflow.workflow import (
+    Workflow,
+    WorkflowQueue,
+    WorkflowRelease,
+    WorkflowTask,
+)
 
 from .utils import dump_yaml_context
 
@@ -118,6 +123,10 @@ def test_workflow_task_release(test_path):
             "params": {"name": "foo"},
             "release": {
                 "status": "success",
+                "type": "datetime",
+                "release": WorkflowRelease.from_dt(
+                    datetime(2024, 1, 1, 1, tzinfo=runner.tz)
+                ),
                 "logical_date": datetime(2024, 1, 1, 1, tzinfo=runner.tz),
             },
             "outputs": {

@@ -46,8 +46,10 @@ def test_workflow_poke(test_path):
             "params": {"asat-dt": datetime(2024, 1, 1)},
             "release": {
                 "status": "success",
+                "type": "release",
                 # NOTE: This value return with the current datetime.
                 "logical_date": results[0].context["release"]["logical_date"],
+                "release": results[0].context["release"]["release"],
             },
             "outputs": {
                 "jobs": {
