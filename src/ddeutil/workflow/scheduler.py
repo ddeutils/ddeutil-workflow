@@ -33,7 +33,7 @@ from functools import wraps
 from heapq import heappop, heappush
 from textwrap import dedent
 from threading import Thread
-from typing import Callable, Optional
+from typing import Callable, Optional, TypedDict
 
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import field_validator, model_validator
@@ -341,12 +341,20 @@ def catch_exceptions(cancel_on_failure: bool = False) -> DecoratorCancelJob:
     return decorator
 
 
+class ReleaseThread(TypedDict):
+    thread: Thread
+    start_date: datetime
+
+
+ReleaseThreads = dict[str, ReleaseThread]
+
+
 @catch_exceptions(cancel_on_failure=True)
 def schedule_task(
     tasks: list[WorkflowTask],
     stop: datetime,
     queue: dict[str, WorkflowQueue],
-    threads: dict[str, Thread],
+    threads: ReleaseThreads,
     log: type[Log],
 ) -> CancelJob | None:
     """Workflow task generator that create release pair of workflow and on to
@@ -397,8 +405,10 @@ def schedule_task(
             continue
 
         # VALIDATE: Check this task is the first release in the queue or not.
-        current_date: datetime = current_date.replace(second=0, microsecond=0)
-        if (first_date := q.first_queue.date) != current_date:
+        current_release: datetime = current_date.replace(
+            second=0, microsecond=0
+        )
+        if (first_date := q.first_queue.date) != current_release:
             logger.debug(
                 f"[WORKFLOW]: Skip schedule "
                 f"{first_date:%Y-%m-%d %H:%M:%S} "
@@ -422,28 +432,31 @@ def schedule_task(
             f"{release.date:%Y%m%d%H%M}"
         )
 
-        wf_thread: Thread = Thread(
+        thread: Thread = Thread(
             target=catch_exceptions(cancel_on_failure=True)(task.release),
             kwargs={"release": release, "queue": q, "log": log},
             name=thread_name,
             daemon=True,
         )
 
-        threads[thread_name] = wf_thread
+        threads[thread_name] = {
+            "thread": thread,
+            "start_date": datetime.now(tz=config.tz),
+        }
 
-        wf_thread.start()
+        thread.start()
 
         delay()
 
     logger.debug(f"[SCHEDULE]: End schedule release {'=' * 80}")
 
 
-def monitor(threads: dict[str, Thread]) -> None:  # pragma: no cov
+def monitor(threads: ReleaseThreads) -> None:  # pragma: no cov
     """Monitoring function that running every five minute for track long running
     thread instance from the schedule_control function that run every minute.
 
     :param threads: A mapping of Thread object and its name.
-    :type threads: dict[str, Thread]
+    :type threads: ReleaseThreads
     """
     logger.debug(
         "[MONITOR]: Start checking long running workflow release task."
@@ -452,8 +465,10 @@ def monitor(threads: dict[str, Thread]) -> None:  # pragma: no cov
     snapshot_threads: list[str] = list(threads.keys())
     for t_name in snapshot_threads:
 
+        thread_release: ReleaseThread = threads[t_name]
+
         # NOTE: remove the thread that running success.
-        if not threads[t_name].is_alive():
+        if not thread_release["thread"].is_alive():
             threads.pop(t_name)
 
 
@@ -488,7 +503,7 @@ def schedule_control(
 
     # IMPORTANT: Create main mapping of queue and thread object.
     queue: dict[str, WorkflowQueue] = {}
-    threads: dict[str, Thread] = {}
+    threads: ReleaseThreads = {}
 
     start_date_waiting: datetime = start_date.replace(
         second=0, microsecond=0
