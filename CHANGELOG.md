@@ -2,6 +2,41 @@
 
 ## Latest Changes
 
+## 0.0.24
+
+### :sparkles: Features
+
+- :dart: feat: add release object on workflow task release method. (_2025-01-04_)
+- :dart: feat: change stop and waiting logic to schedule control func. (_2025-01-03_)
+- :dart: feat: rename workflow task release func to schedule task. (_2025-01-03_)
+- :dart: feat: add override_log_name argument on the workflow release method. (_2025-01-03_)
+- :dart: feat: update workflow task release func. (_2025-01-03_)
+- :dart: feat: change name of queue_poking method to queue. (_2025-01-01_)
+- :dart: feat: rename runner function to schedule_runner. (_2025-01-01_)
+- :dart: feat: change logic of workflow task data release method. (_2025-01-01_)
+- :dart: feat: add logging when sleep more than 30 sec. (_2024-12-31_)
+- :dart: feat: add tasks method on the workflow schedule model. (_2024-12-31_)
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: update schedule control testcase. (_2025-01-04_)
+- :construction: refactored: ⬆ bump pypa/gh-action-pypi-publish from 1.12.2 to 1.12.3 (_2025-01-01_)
+- :construction: refactored: 📦 bump pydantic from 2.10.2 to 2.10.4 (_2025-01-01_)
+- :test_tube: tests: update schedule tasks testcase. (_2025-01-01_)
+
+### :card_file_box: Documents
+
+- :page_facing_up: docs: add result and params module on mkdocs. (_2025-01-01_)
+
+### :bug: Fix Bugs
+
+- :gear: fixed: rename WorkflowTaskData to WorkflowTask. (_2025-01-04_)
+- :gear: fixed: rename on module to cron. (_2025-01-04_)
+- :gear: fixed: change variable name of queue workflow. (_2025-01-03_)
+- :gear: fixed: change argument name that change on workflow_release. (_2025-01-02_)
+- :gear: fixed: add queue data on scheduler task testcase. (_2024-12-31_)
+- :gear: fixed: remove no cove on workflow task data. (_2024-12-31_)
+
 ## 0.0.23
 
 ### :sparkles: Features
