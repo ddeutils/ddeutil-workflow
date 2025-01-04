@@ -105,6 +105,8 @@ jobs:
           ddeutil-workflow --help
 
           stop_date=$(date -d "$(date '+%Y-%m-%d %H:%M:%S')+1minutes" '+%Y-%m-%d %H:%M:%S')
-          ddeutil-workflow schedule $stop_date
+          ddeutil-workflow schedule \
+            --stop $stop_date \
+            --excluded "[\"schedule-common-wf\", \"schedule-multi-on-wf\", \"schedule-every-minute-wf\", \"schedule-every-minute-wf-parallel\"]"
 
           ddeutil-workflow run "wf-scheduling-agent" "{\"name\": \"Foo\", \"asat-dt\": \"2024-01-01\"}"
