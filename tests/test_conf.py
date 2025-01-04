@@ -76,9 +76,9 @@ def test_simple_load_finds(target_path: Path):
                 "test_simple_load_config",
                 {"type": "ddeutil.workflow.conf.Config"},
             )
-        ] == list(SimLoad.finds(Config, Config(), include="type"))
+        ] == list(SimLoad.finds(Config, Config(), included="type"))
         assert [] == list(
-            SimLoad.finds(Config, Config(), exclude="test_simple_load_config")
+            SimLoad.finds(Config, Config(), excluded="test_simple_load_config")
         )
 
     dummy_file.unlink()
