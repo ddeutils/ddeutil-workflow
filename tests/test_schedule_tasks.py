@@ -3,7 +3,7 @@ from unittest import mock
 
 from ddeutil.workflow.conf import Config
 from ddeutil.workflow.scheduler import Schedule
-from ddeutil.workflow.workflow import Workflow, WorkflowQueue, WorkflowTaskData
+from ddeutil.workflow.workflow import Workflow, WorkflowQueue, WorkflowTask
 
 from .utils import dump_yaml_context
 
@@ -31,10 +31,10 @@ def test_schedule_tasks(test_path):
         for task in tasks:
             assert task.workflow.name == "wf-scheduling"
 
-        task: WorkflowTaskData = tasks[0]
+        task: WorkflowTask = tasks[0]
 
         assert task != datetime(2024, 1, 1, 1)
-        assert task == WorkflowTaskData(
+        assert task == WorkflowTask(
             alias="wf-scheduling",
             workflow=Workflow.from_loader(name="wf-scheduling"),
             runner=task.runner,

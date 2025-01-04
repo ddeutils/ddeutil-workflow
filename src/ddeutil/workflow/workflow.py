@@ -63,7 +63,7 @@ __all__: TupleStr = (
     "Workflow",
     "WorkflowRelease",
     "WorkflowQueue",
-    "WorkflowTaskData",
+    "WorkflowTask",
 )
 
 
@@ -167,15 +167,21 @@ class WorkflowQueue:
         """
         return len(self.queue) > 0
 
-    def is_first_queue(self, value: WorkflowRelease | datetime) -> bool:
+    @property
+    def first_queue(self) -> WorkflowRelease:
+        """Check an input WorkflowRelease object is the first value of the
+        waiting queue.
 
-        if isinstance(value, datetime):
-            value = WorkflowRelease.from_dt(value)
-
-        first_value: WorkflowRelease = heappop(self.queue)
-        heappush(self.queue, first_value)
-
-        return first_value == value
+        :rtype: bool
+        """
+        # NOTE: Old logic to peeking the first release from waiting queue.
+        #
+        # first_value: WorkflowRelease = heappop(self.queue)
+        # heappush(self.queue, first_value)
+        #
+        # return first_value
+        #
+        return self.queue[0]
 
     def check_queue(self, value: WorkflowRelease | datetime) -> bool:
         """Check a WorkflowRelease value already exists in list of tracking
@@ -511,7 +517,7 @@ class Workflow(BaseModel):
             release: WorkflowRelease = WorkflowRelease.from_dt(release)
 
         logger.debug(
-            f"({cut_id(run_id)}) [RELEASE]: {name!r} : Start release - "
+            f"({cut_id(run_id)}) [RELEASE]: Start release - {name!r} : "
             f"{release.date:%Y-%m-%d %H:%M:%S}"
         )
 
@@ -532,7 +538,7 @@ class Workflow(BaseModel):
             run_id=run_id,
         )
         logger.debug(
-            f"({cut_id(run_id)}) [RELEASE]: {name!r} : End release - "
+            f"({cut_id(run_id)}) [RELEASE]: End release - {name!r} : "
             f"{release.date:%Y-%m-%d %H:%M:%S}"
         )
 
@@ -1107,7 +1113,7 @@ class Workflow(BaseModel):
 
 
 @dataclass(config=ConfigDict(arbitrary_types_allowed=True))
-class WorkflowTaskData:
+class WorkflowTask:
     """Workflow task Pydantic dataclass object that use to keep mapping data and
     workflow model for passing to the multithreading task.
 
@@ -1194,9 +1200,9 @@ class WorkflowTaskData:
             f"values={self.values})"
         )
 
-    def __eq__(self, other: WorkflowTaskData) -> bool:
+    def __eq__(self, other: WorkflowTask) -> bool:
         """Override equal property that will compare only the same type."""
-        if isinstance(other, WorkflowTaskData):
+        if isinstance(other, WorkflowTask):
             return (
                 self.workflow.name == other.workflow.name
                 and self.runner.cron == other.runner.cron

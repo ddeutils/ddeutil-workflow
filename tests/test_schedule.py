@@ -5,7 +5,7 @@ import yaml
 from ddeutil.workflow import Workflow
 from ddeutil.workflow.cron import On
 from ddeutil.workflow.scheduler import Schedule
-from ddeutil.workflow.workflow import WorkflowTaskData
+from ddeutil.workflow.workflow import WorkflowTask
 from pydantic import ValidationError
 
 from .utils import dump_yaml_context
@@ -112,13 +112,13 @@ def test_schedule_default_on(test_path):
 
 
 def test_schedule_remove_workflow_task():
-    pipeline_tasks: list[WorkflowTaskData] = []
+    pipeline_tasks: list[WorkflowTask] = []
     start_date: datetime = datetime(2024, 1, 1, 1)
 
     wf: Workflow = Workflow.from_loader("wf-scheduling")
     for on in wf.on:
         pipeline_tasks.append(
-            WorkflowTaskData(
+            WorkflowTask(
                 alias=wf.name,
                 workflow=wf,
                 runner=on.generate(start_date),
@@ -130,7 +130,7 @@ def test_schedule_remove_workflow_task():
     wf: Workflow = Workflow.from_loader("wf-scheduling")
     for on in wf.on:
         pipeline_tasks.remove(
-            WorkflowTaskData(
+            WorkflowTask(
                 alias=wf.name,
                 workflow=wf,
                 runner=on.generate(start_date),
@@ -143,7 +143,7 @@ def test_schedule_remove_workflow_task():
     wf: Workflow = Workflow.from_loader("wf-scheduling")
     for on in wf.on:
         pipeline_tasks.append(
-            WorkflowTaskData(
+            WorkflowTask(
                 alias=wf.name,
                 workflow=wf,
                 runner=on.generate(start_date),
@@ -151,7 +151,7 @@ def test_schedule_remove_workflow_task():
             )
         )
 
-    remover = WorkflowTaskData(
+    remover = WorkflowTask(
         alias=wf.name,
         workflow=wf,
         runner=On.from_loader(name="every_minute_bkk").generate(start_date),

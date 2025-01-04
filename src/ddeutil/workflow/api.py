@@ -23,7 +23,7 @@ from pydantic import BaseModel
 from .__about__ import __version__
 from .conf import config, get_logger
 from .repeat import repeat_at, repeat_every
-from .workflow import WorkflowTaskData
+from .workflow import WorkflowTask
 
 load_dotenv()
 logger = get_logger("ddeutil.workflow")
@@ -34,7 +34,7 @@ class State(TypedDict):
     upper_result: dict[str, str]
     scheduler: list[str]
     workflow_threads: dict[str, Thread]
-    workflow_tasks: list[WorkflowTaskData]
+    workflow_tasks: list[WorkflowTask]
     workflow_queue: dict[str, list[datetime]]
     workflow_running: dict[str, list[datetime]]
 

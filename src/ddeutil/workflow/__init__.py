@@ -75,5 +75,5 @@ from .utils import (
 )
 from .workflow import (
     Workflow,
-    WorkflowTaskData,
+    WorkflowTask,
 )

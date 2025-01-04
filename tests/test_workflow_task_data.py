@@ -5,7 +5,7 @@ from ddeutil.workflow.__cron import CronRunner
 from ddeutil.workflow.conf import Config
 from ddeutil.workflow.cron import On
 from ddeutil.workflow.result import Result
-from ddeutil.workflow.workflow import Workflow, WorkflowTaskData
+from ddeutil.workflow.workflow import Workflow, WorkflowTask
 
 from .utils import dump_yaml_context
 
@@ -14,7 +14,7 @@ def test_workflow_task_data():
     workflow: Workflow = Workflow.from_loader(name="wf-scheduling-common")
     runner = workflow.on[0].generate(datetime(2024, 1, 1, 1))
 
-    task: WorkflowTaskData = WorkflowTaskData(
+    task: WorkflowTask = WorkflowTask(
         alias=workflow.name,
         workflow=workflow,
         runner=runner,
@@ -22,7 +22,7 @@ def test_workflow_task_data():
     )
 
     assert task != datetime(2024, 1, 1, 1)
-    assert task == WorkflowTaskData(
+    assert task == WorkflowTask(
         alias=workflow.name,
         workflow=workflow,
         runner=runner,
@@ -58,7 +58,7 @@ def test_workflow_task_data_release(test_path):
             ]
         }
 
-        task: WorkflowTaskData = WorkflowTaskData(
+        task: WorkflowTask = WorkflowTask(
             alias="demo",
             workflow=workflow,
             runner=runner,
@@ -119,7 +119,7 @@ def test_workflow_task_data_release_long_running(test_path):
             ]
         }
 
-        task: WorkflowTaskData = WorkflowTaskData(
+        task: WorkflowTask = WorkflowTask(
             alias="demo",
             workflow=workflow,
             runner=runner,

@@ -58,7 +58,7 @@ from .utils import (
     batch,
     delay,
 )
-from .workflow import Workflow, WorkflowQueue, WorkflowTaskData
+from .workflow import Workflow, WorkflowQueue, WorkflowRelease, WorkflowTask
 
 P = ParamSpec("P")
 logger = get_logger("ddeutil.workflow")
@@ -171,8 +171,8 @@ class WorkflowSchedule(BaseModel):
         queue: dict[str, WorkflowQueue],
         *,
         externals: DictData | None = None,
-    ) -> list[WorkflowTaskData]:
-        """Return the list of WorkflowTaskData object from the specific input
+    ) -> list[WorkflowTask]:
+        """Return the list of WorkflowTask object from the specific input
         datetime that mapping with the on field.
 
             This task creation need queue to tracking release date already
@@ -182,11 +182,11 @@ class WorkflowSchedule(BaseModel):
         :param queue: A mapping of name and list of datetime for queue.
         :param externals: An external parameters that pass to the Loader object.
 
-        :rtype: list[WorkflowTaskData]
-        :return: Return the list of WorkflowTaskData object from the specific
+        :rtype: list[WorkflowTask]
+        :return: Return the list of WorkflowTask object from the specific
             input datetime that mapping with the on field.
         """
-        workflow_tasks: list[WorkflowTaskData] = []
+        workflow_tasks: list[WorkflowTask] = []
         extras: DictData = externals or {}
 
         # NOTE: Loading workflow model from the name of workflow.
@@ -207,7 +207,7 @@ class WorkflowSchedule(BaseModel):
                 next_running_date = runner.next
 
             workflow_tasks.append(
-                WorkflowTaskData(
+                WorkflowTask(
                     alias=self.alias,
                     workflow=wf,
                     runner=runner,
@@ -281,8 +281,8 @@ class Schedule(BaseModel):
         queue: dict[str, WorkflowQueue],
         *,
         externals: DictData | None = None,
-    ) -> list[WorkflowTaskData]:
-        """Return the list of WorkflowTaskData object from the specific input
+    ) -> list[WorkflowTask]:
+        """Return the list of WorkflowTask object from the specific input
         datetime that mapping with the on field from workflow schedule model.
 
         :param start_date: A start date that get from the workflow schedule.
@@ -291,11 +291,11 @@ class Schedule(BaseModel):
         :param externals: An external parameters that pass to the Loader object.
         :type externals: DictData | None
 
-        :rtype: list[WorkflowTaskData]
-        :return: Return the list of WorkflowTaskData object from the specific
+        :rtype: list[WorkflowTask]
+        :return: Return the list of WorkflowTask object from the specific
             input datetime that mapping with the on field.
         """
-        workflow_tasks: list[WorkflowTaskData] = []
+        workflow_tasks: list[WorkflowTask] = []
 
         for workflow in self.workflows:
 
@@ -343,7 +343,7 @@ def catch_exceptions(cancel_on_failure: bool = False) -> DecoratorCancelJob:
 
 @catch_exceptions(cancel_on_failure=True)  # pragma: no cov
 def schedule_task(
-    tasks: list[WorkflowTaskData],
+    tasks: list[WorkflowTask],
     stop: datetime,
     queue: dict[str, WorkflowQueue],
     threads: dict[str, Thread],
@@ -354,7 +354,7 @@ def schedule_task(
 
         This workflow task will start every minute at ':02' second.
 
-    :param tasks: A list of WorkflowTaskData object.
+    :param tasks: A list of WorkflowTask object.
     :param stop: A stop datetime object that force stop running scheduler.
     :param queue: A mapping of alias name and WorkflowQueue object.
     :param threads: A mapping of alias name and Thread object.
@@ -362,7 +362,8 @@ def schedule_task(
 
     :rtype: CancelJob | None
     """
-    if datetime.now(tz=config.tz) > stop.replace(tzinfo=config.tz):
+    current_date: datetime = datetime.now(tz=config.tz)
+    if current_date > stop.replace(tzinfo=config.tz):
         return CancelJob
 
     # IMPORTANT:
@@ -381,7 +382,7 @@ def schedule_task(
 
         q: WorkflowQueue = queue[task.alias]
 
-        # NOTE: Start adding queue.
+        # NOTE: Start adding queue and move the runner date in the WorkflowTask.
         task.queue(stop, q, log=log)
 
         # NOTE: Get incoming datetime queue.
@@ -396,29 +397,29 @@ def schedule_task(
             continue
 
         # VALIDATE: Check this task is the first release in the queue or not.
-        if not q.is_first_queue(task.runner.date):
+        current_date: datetime = current_date.replace(second=0, microsecond=0)
+        if (first_date := q.first_queue.date) != current_date:
             logger.debug(
                 f"[WORKFLOW]: Skip schedule "
-                f"{task.runner.date:%Y-%m-%d %H:%M:%S} "
+                f"{first_date:%Y-%m-%d %H:%M:%S} "
                 f"for : {task.alias!r} : {task.runner.cron}"
             )
             continue
 
-        logger.info(
-            f"[WORKFLOW]: Start create thread: "
-            f"{task.alias}|{str(task.runner.cron)}|"
-            f"{task.runner.date:%Y%m%d%H%M}"
-        )
-
         # NOTE: Pop the latest release and push it to running.
-        release = heappop(q.queue)
+        release: WorkflowRelease = heappop(q.queue)
         q.push_running(release)
+
+        logger.info(
+            f"[WORKFLOW]: Start thread: '{task.alias}|{str(task.runner.cron)}|"
+            f"{release.date:%Y%m%d%H%M}'"
+        )
 
         # NOTE: Create thread name that able to tracking with observe schedule
         #   job.
         thread_name: str = (
             f"{task.alias}|{str(task.runner.cron)}|"
-            f"{task.runner.date:%Y%m%d%H%M}"
+            f"{release.date:%Y%m%d%H%M}"
         )
 
         wf_thread: Thread = Thread(
@@ -431,6 +432,7 @@ def schedule_task(
         threads[thread_name] = wf_thread
 
         wf_thread.start()
+
         delay()
 
     logger.debug(f"[SCHEDULE]: End schedule release {'=' * 80}")
@@ -482,6 +484,7 @@ def schedule_control(
     log: type[Log] = log or FileLog
     scheduler: Scheduler = Scheduler()
     start_date: datetime = datetime.now(tz=config.tz)
+    stop_date: datetime = stop or (start_date + config.stop_boundary_delta)
 
     # IMPORTANT: Create main mapping of queue and thread object.
     queue: dict[str, WorkflowQueue] = {}
@@ -492,7 +495,7 @@ def schedule_control(
     ) + timedelta(minutes=1)
 
     # NOTE: Start create workflow tasks from list of schedule name.
-    tasks: list[WorkflowTaskData] = []
+    tasks: list[WorkflowTask] = []
     for name in schedules:
         schedule: Schedule = Schedule.from_loader(name, externals=externals)
         tasks.extend(
@@ -510,7 +513,7 @@ def schedule_control(
         .do(
             schedule_task,
             tasks=tasks,
-            stop=(stop or (start_date + config.stop_boundary_delta)),
+            stop=stop_date,
             queue=queue,
             threads=threads,
             log=log,
@@ -530,7 +533,10 @@ def schedule_control(
     )
 
     # NOTE: Start running schedule
-    logger.info(f"[SCHEDULE]: Start schedule: {schedules}")
+    logger.info(
+        f"[SCHEDULE]: Schedule: {schedules} with stopper: "
+        f"{stop_date:%Y-%m-%d %H:%M:%S}"
+    )
 
     while True:
         scheduler.run_pending()

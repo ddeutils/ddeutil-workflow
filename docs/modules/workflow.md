@@ -58,4 +58,4 @@
 
 ## WorkflowQueue
 
-## WorkflowTaskData
+## WorkflowTask
