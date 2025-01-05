@@ -83,7 +83,7 @@ class Config:
 
     # NOTE: Register
     regis_hook_str: str = os.getenv(
-        "WORKFLOW_CORE_REGISTRY", "ddeutil.workflow"
+        "WORKFLOW_CORE_REGISTRY", "src,src.ddeutil.workflow,tests.utils"
     )
     regis_filter_str: str = os.getenv(
         "WORKFLOW_CORE_REGISTRY_FILTER", "ddeutil.workflow.utils"
@@ -136,11 +136,12 @@ class Config:
     )
 
     # NOTE: API
+    prefix_path: str = env("WORKFLOW_API_PREFIX_PATH", "/api/v1")
     enable_route_workflow: bool = str2bool(
-        os.getenv("WORKFLOW_API_ENABLE_ROUTE_WORKFLOW", "true")
+        env("WORKFLOW_API_ENABLE_ROUTE_WORKFLOW", "true")
     )
     enable_route_schedule: bool = str2bool(
-        os.getenv("WORKFLOW_API_ENABLE_ROUTE_SCHEDULE", "true")
+        env("WORKFLOW_API_ENABLE_ROUTE_SCHEDULE", "true")
     )
 
     def __init__(self) -> None:
@@ -247,6 +248,7 @@ class SimLoad:
         """
         exclude: list[str] = excluded or []
         for file in PathSearch(conf.conf_path).files:
+
             for key, data in cls.filter_suffix(file).items():
 
                 if key in exclude:

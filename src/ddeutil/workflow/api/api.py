@@ -20,10 +20,10 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import UJSONResponse
 from pydantic import BaseModel
 
-from .__about__ import __version__
-from .conf import config, get_logger
-from .repeat import repeat_at, repeat_every
-from .workflow import WorkflowQueue, WorkflowTask
+from ..__about__ import __version__
+from ..api.repeat import repeat_at, repeat_every
+from ..conf import config, get_logger
+from ..workflow import WorkflowQueue, WorkflowTask
 
 load_dotenv()
 logger = get_logger("ddeutil.workflow")
@@ -118,7 +118,7 @@ async def health():
     return {"message": "Workflow API already start up"}
 
 
-@app.post("/api/upper")
+@app.post(f"{config.prefix_path}/upper")
 async def message_upper(payload: Payload):
     """Convert message from any case to the upper case."""
     request_id: str = str(uuid.uuid4())
@@ -130,19 +130,19 @@ async def message_upper(payload: Payload):
 
 # NOTE: Enable the workflow route.
 if config.enable_route_workflow:
-    from .route import workflow
+    from .route import workflow_route
 
-    app.include_router(workflow)
+    app.include_router(workflow_route, prefix=config.prefix_path)
 
 
 # NOTE: Enable the schedule route.
 if config.enable_route_schedule:
-    from .route import schedule
-    from .scheduler import schedule_task
+    from ..scheduler import schedule_task
+    from .route import schedule_route
 
-    app.include_router(schedule)
+    app.include_router(schedule_route, prefix=config.prefix_path)
 
-    @schedule.on_event("startup")
+    @schedule_route.on_event("startup")
     @repeat_at(cron="* * * * *", delay=2)
     def schedule_broker_up():
         logger.debug(

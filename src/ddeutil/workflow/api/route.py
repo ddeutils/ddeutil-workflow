@@ -14,37 +14,39 @@ from fastapi import status as st
 from fastapi.responses import UJSONResponse
 from pydantic import BaseModel
 
-from . import Workflow
-from .__types import DictData
-from .conf import Loader, config, get_logger
-from .result import Result
-from .scheduler import Schedule
+from ..__types import DictData
+from ..conf import Loader, config, get_logger
+from ..result import Result
+from ..scheduler import Schedule
+from ..workflow import Workflow
 
 logger = get_logger("ddeutil.workflow")
-workflow = APIRouter(
-    prefix="/api/workflow",
-    tags=["workflow"],
-    default_response_class=UJSONResponse,
-)
-schedule = APIRouter(
-    prefix="/api/schedule",
-    tags=["schedule"],
+
+workflow_route = APIRouter(
+    prefix="/workflows",
+    tags=["workflows"],
     default_response_class=UJSONResponse,
 )
 
-ListDate = list[datetime]
+schedule_route = APIRouter(
+    prefix="/schedules",
+    tags=["schedules"],
+    default_response_class=UJSONResponse,
+)
 
 
-@workflow.get("/")
-async def get_workflows():
+@workflow_route.get(path="/")
+async def get_workflows() -> DictData:
     """Return all workflow workflows that exists in config path."""
-    workflows: DictData = Loader.finds(Workflow)
+    workflows: DictData = dict(Loader.finds(Workflow))
     return {
-        "message": f"getting all workflows: {dict(workflows)}",
+        "message": f"getting all workflows: {len(workflows)}",
+        "count": len(workflows),
+        "workflows": workflows,
     }
 
 
-@workflow.get("/{name}")
+@workflow_route.get(path="/{name}")
 async def get_workflow(name: str) -> DictData:
     """Return model of workflow that passing an input workflow name."""
     try:
@@ -69,7 +71,7 @@ class ExecutePayload(BaseModel):
     params: dict[str, Any]
 
 
-@workflow.post("/{name}/execute", status_code=st.HTTP_202_ACCEPTED)
+@workflow_route.post(path="/{name}/execute", status_code=st.HTTP_202_ACCEPTED)
 async def execute_workflow(name: str, payload: ExecutePayload) -> DictData:
     """Return model of workflow that passing an input workflow name."""
     try:
@@ -88,22 +90,25 @@ async def execute_workflow(name: str, payload: ExecutePayload) -> DictData:
     return dict(rs)
 
 
-@workflow.get("/{name}/logs")
+@workflow_route.get(path="/{name}/logs")
 async def get_workflow_logs(name: str):
     return {"message": f"getting workflow {name!r} logs"}
 
 
-@workflow.get("/{name}/logs/{release}")
+@workflow_route.get(path="/{name}/logs/{release}")
 async def get_workflow_release_log(name: str, release: str):
     return {"message": f"getting workflow {name!r} log in release {release}"}
 
 
-@workflow.delete("/{name}/logs/{release}", status_code=st.HTTP_204_NO_CONTENT)
+@workflow_route.delete(
+    path="/{name}/logs/{release}",
+    status_code=st.HTTP_204_NO_CONTENT,
+)
 async def del_workflow_release_log(name: str, release: str):
     return {"message": f"deleted workflow {name!r} log in release {release}"}
 
 
-@schedule.get("/{name}")
+@schedule_route.get(path="/{name}")
 async def get_schedule(name: str):
     try:
         sch: Schedule = Schedule.from_loader(name=name, externals={})
@@ -120,13 +125,13 @@ async def get_schedule(name: str):
     )
 
 
-@schedule.get("/deploy")
+@schedule_route.get(path="/deploy")
 async def get_deploy_schedulers(request: Request):
     snapshot = copy.deepcopy(request.state.scheduler)
     return {"schedule": snapshot}
 
 
-@schedule.get("/deploy/{name}")
+@schedule_route.get(path="/deploy/{name}")
 async def get_deploy_scheduler(request: Request, name: str):
     if name in request.state.scheduler:
         sch = Schedule.from_loader(name)
@@ -154,7 +159,7 @@ async def get_deploy_scheduler(request: Request, name: str):
     )
 
 
-@schedule.post("/deploy/{name}")
+@schedule_route.post(path="/deploy/{name}")
 async def add_deploy_scheduler(request: Request, name: str):
     """Adding schedule name to application state store."""
     if name in request.state.scheduler:
@@ -190,7 +195,7 @@ async def add_deploy_scheduler(request: Request, name: str):
     return {"message": f"adding {name!r} to schedule listener."}
 
 
-@schedule.delete("/deploy/{name}")
+@schedule_route.delete(path="/deploy/{name}")
 async def del_deploy_scheduler(request: Request, name: str):
     if name in request.state.scheduler:
 
