@@ -126,7 +126,7 @@ def test_workflow_from_loader_raise(test_path):
         test_file,
         data={
             "wf-run-from-loader-raise": {
-                "type": "ddeutil.workflow.cron.On",
+                "type": "On",
                 "jobs": {
                     "first-job": {
                         "stages": [{"name": "Echo next", "echo": "Hello World"}]
@@ -144,7 +144,7 @@ def test_workflow_from_loader_raise(test_path):
         test_file,
         data={
             "wf-run-from-loader-raise": {
-                "type": "ddeutil.workflow.Workflow",
+                "type": "Workflow",
                 "on": [
                     ["* * * * *"],
                     ["* * 1 0 0"],
@@ -166,7 +166,7 @@ def test_workflow_from_loader_raise(test_path):
         test_file,
         data={
             "wf-run-from-loader-raise": {
-                "type": "ddeutil.workflow.Workflow",
+                "type": "Workflow",
                 "jobs": {
                     "first-job": {
                         "needs": ["not-found"],

@@ -66,6 +66,7 @@ omit = [
     "src/ddeutil/workflow/__about__.py",
     "src/ddeutil/workflow/__cron.py",
     "src/ddeutil/workflow/cli.py",
+    "src/ddeutil/workflow/api/__init__.py",
     "src/ddeutil/workflow/api/api.py",
     "src/ddeutil/workflow/api/repeat.py",
     "src/ddeutil/workflow/api/route.py",

@@ -68,13 +68,13 @@ def test_simple_load_finds(target_path: Path):
         assert [
             (
                 "test_simple_load_config",
-                {"type": "ddeutil.workflow.conf.Config", "foo": "bar"},
+                {"type": "Config", "foo": "bar"},
             )
         ] == list(SimLoad.finds(Config, Config()))
         assert [
             (
                 "test_simple_load_config",
-                {"type": "ddeutil.workflow.conf.Config"},
+                {"type": "Config"},
             )
         ] == list(SimLoad.finds(Config, Config(), included="type"))
         assert [] == list(

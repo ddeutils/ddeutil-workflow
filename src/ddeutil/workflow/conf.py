@@ -82,7 +82,7 @@ class Config:
 
     # NOTE: Register
     regis_hook_str: str = os.getenv(
-        "WORKFLOW_CORE_REGISTRY", "src,src.ddeutil.workflow,tests.utils"
+        "WORKFLOW_CORE_REGISTRY", "src,src.ddeutil.workflow,tests,tests.utils"
     )
     regis_filter_str: str = os.getenv(
         "WORKFLOW_CORE_REGISTRY_FILTER", "ddeutil.workflow.utils"
