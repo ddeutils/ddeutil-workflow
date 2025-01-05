@@ -332,7 +332,7 @@ def get_args_from_filter(
 
     if func_name not in filters:
         raise UtilException(
-            f"The post-filter: {func_name} does not support yet."
+            f"The post-filter: {func_name!r} does not support yet."
         )
 
     if isinstance((f_func := filters[func_name]), list) and (args or kwargs):

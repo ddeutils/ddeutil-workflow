@@ -11,7 +11,6 @@ import uuid
 from collections.abc import AsyncIterator
 from datetime import datetime, timedelta
 from queue import Empty, Queue
-from threading import Thread
 from typing import TypedDict
 
 from dotenv import load_dotenv
@@ -21,9 +20,10 @@ from fastapi.responses import UJSONResponse
 from pydantic import BaseModel
 
 from ..__about__ import __version__
-from ..api.repeat import repeat_at, repeat_every
 from ..conf import config, get_logger
+from ..scheduler import ReleaseThread, ReleaseThreads
 from ..workflow import WorkflowQueue, WorkflowTask
+from .repeat import repeat_at, repeat_every
 
 load_dotenv()
 logger = get_logger("ddeutil.workflow")
@@ -32,10 +32,13 @@ logger = get_logger("ddeutil.workflow")
 class State(TypedDict):
     """TypeDict for State of FastAPI application."""
 
+    # NOTE: For upper queue route.
     upper_queue: Queue
     upper_result: dict[str, str]
+
+    # NOTE: For schedule listener.
     scheduler: list[str]
-    workflow_threads: dict[str, Thread]
+    workflow_threads: ReleaseThreads
     workflow_tasks: list[WorkflowTask]
     workflow_queue: dict[str, WorkflowQueue]
 
@@ -137,6 +140,7 @@ if config.enable_route_workflow:
 
 # NOTE: Enable the schedule route.
 if config.enable_route_schedule:
+    from ..conf import FileLog
     from ..scheduler import schedule_task
     from .route import schedule_route
 
@@ -144,7 +148,8 @@ if config.enable_route_schedule:
 
     @schedule_route.on_event("startup")
     @repeat_at(cron="* * * * *", delay=2)
-    def schedule_broker_up():
+    def scheduler_listener():
+        """Schedule broker every minute at 02 second."""
         logger.debug(
             f"[SCHEDULER]: Start listening schedule from queue "
             f"{app.state.scheduler}"
@@ -152,6 +157,21 @@ if config.enable_route_schedule:
         if app.state.workflow_tasks:
             schedule_task(
                 app.state.workflow_tasks,
-                stop=datetime.now() + timedelta(minutes=1),
+                stop=datetime.now(config.tz) + timedelta(minutes=1),
+                queue=app.state.workflow_queue,
                 threads=app.state.workflow_threads,
+                log=FileLog,
             )
+
+    @schedule_route.on_event("startup")
+    @repeat_at(cron="*/5 * * * *")
+    def monitoring():
+        logger.debug("[MONITOR]: Start monitoring threading.")
+        snapshot_threads: list[str] = list(app.state.workflow_threads.keys())
+        for t_name in snapshot_threads:
+
+            thread_release: ReleaseThread = app.state.workflow_threads[t_name]
+
+            # NOTE: remove the thread that running success.
+            if not thread_release["thread"].is_alive():
+                app.state.workflow_threads.pop(t_name)

@@ -74,6 +74,8 @@ __all__: TupleStr = (
     "monitor",
     "schedule_control",
     "schedule_runner",
+    "ReleaseThreads",
+    "ReleaseThread",
 )
 
 
@@ -411,8 +413,7 @@ def schedule_task(
         if (first_date := q.first_queue.date) != current_release:
             logger.debug(
                 f"[WORKFLOW]: Skip schedule "
-                f"{first_date:%Y-%m-%d %H:%M:%S} "
-                f"for : {task.alias!r} : {task.runner.cron}"
+                f"{first_date:%Y-%m-%d %H:%M:%S} for : {task.alias!r}"
             )
             continue
 
@@ -421,17 +422,13 @@ def schedule_task(
         heappush(q.running, release)
 
         logger.info(
-            f"[WORKFLOW]: Start thread: '{task.alias}|{str(task.runner.cron)}|"
+            f"[WORKFLOW]: Start thread: '{task.alias}|"
             f"{release.date:%Y%m%d%H%M}'"
         )
 
         # NOTE: Create thread name that able to tracking with observe schedule
         #   job.
-        thread_name: str = (
-            f"{task.alias}|{str(task.runner.cron)}|"
-            f"{release.date:%Y%m%d%H%M}"
-        )
-
+        thread_name: str = f"{task.alias}|{release.date:%Y%m%d%H%M}"
         thread: Thread = Thread(
             target=catch_exceptions(cancel_on_failure=True)(task.release),
             kwargs={"release": release, "queue": q, "log": log},

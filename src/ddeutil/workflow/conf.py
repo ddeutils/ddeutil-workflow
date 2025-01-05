@@ -468,9 +468,6 @@ class FileLog(BaseLog):
         if not config.enable_write_log:
             return self
 
-        logger.debug(
-            f"({self.run_id}) [LOG]: Start writing log: {self.name!r}."
-        )
         log_file: Path = self.pointer() / f"{self.run_id}.log"
         log_file.write_text(
             json.dumps(

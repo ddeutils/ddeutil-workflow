@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import copy
+from dataclasses import asdict
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -47,10 +48,10 @@ async def get_workflows() -> DictData:
 
 
 @workflow_route.get(path="/{name}")
-async def get_workflow(name: str) -> DictData:
+async def get_workflow_by_name(name: str) -> DictData:
     """Return model of workflow that passing an input workflow name."""
     try:
-        wf: Workflow = Workflow.from_loader(name=name, externals={})
+        workflow: Workflow = Workflow.from_loader(name=name, externals={})
     except ValueError as err:
         logger.exception(err)
         raise HTTPException(
@@ -59,7 +60,7 @@ async def get_workflow(name: str) -> DictData:
                 f"Workflow workflow name: {name!r} does not found in /conf path"
             ),
         ) from None
-    return wf.model_dump(
+    return workflow.model_dump(
         by_alias=True,
         exclude_none=True,
         exclude_unset=True,
@@ -75,7 +76,7 @@ class ExecutePayload(BaseModel):
 async def execute_workflow(name: str, payload: ExecutePayload) -> DictData:
     """Return model of workflow that passing an input workflow name."""
     try:
-        wf: Workflow = Workflow.from_loader(name=name, externals={})
+        workflow: Workflow = Workflow.from_loader(name=name, externals={})
     except ValueError:
         raise HTTPException(
             status_code=st.HTTP_404_NOT_FOUND,
@@ -85,19 +86,25 @@ async def execute_workflow(name: str, payload: ExecutePayload) -> DictData:
         ) from None
 
     # NOTE: Start execute manually
-    rs: Result = wf.execute(params=payload.params)
+    try:
+        result: Result = workflow.execute(params=payload.params)
+    except Exception as err:
+        raise HTTPException(
+            status_code=st.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"{type(err)}: {err}",
+        ) from None
 
-    return dict(rs)
+    return asdict(result)
 
 
 @workflow_route.get(path="/{name}/logs")
 async def get_workflow_logs(name: str):
-    return {"message": f"getting workflow {name!r} logs"}
+    return {"message": f"Getting workflow {name!r} logs"}
 
 
 @workflow_route.get(path="/{name}/logs/{release}")
 async def get_workflow_release_log(name: str, release: str):
-    return {"message": f"getting workflow {name!r} log in release {release}"}
+    return {"message": f"Getting workflow {name!r} log in release {release}"}
 
 
 @workflow_route.delete(
@@ -105,19 +112,19 @@ async def get_workflow_release_log(name: str, release: str):
     status_code=st.HTTP_204_NO_CONTENT,
 )
 async def del_workflow_release_log(name: str, release: str):
-    return {"message": f"deleted workflow {name!r} log in release {release}"}
+    return {"message": f"Deleted workflow {name!r} log in release {release}"}
 
 
 @schedule_route.get(path="/{name}")
-async def get_schedule(name: str):
+async def get_schedules(name: str):
     try:
-        sch: Schedule = Schedule.from_loader(name=name, externals={})
+        schedule: Schedule = Schedule.from_loader(name=name, externals={})
     except ValueError:
         raise HTTPException(
             status_code=st.HTTP_404_NOT_FOUND,
             detail=f"Schedule name: {name!r} does not found in /conf path",
         ) from None
-    return sch.model_dump(
+    return schedule.model_dump(
         by_alias=True,
         exclude_none=True,
         exclude_unset=True,
@@ -136,21 +143,21 @@ async def get_deploy_scheduler(request: Request, name: str):
     if name in request.state.scheduler:
         sch = Schedule.from_loader(name)
         getter: list[dict[str, dict[str, list[datetime]]]] = []
-        for wf in sch.workflows:
+        for workflow in sch.workflows:
             getter.append(
                 {
-                    wf.name: {
+                    workflow.name: {
                         "queue": copy.deepcopy(
-                            request.state.workflow_queue[wf.name]
+                            request.state.workflow_queue[workflow.name]
                         ),
                         "running": copy.deepcopy(
-                            request.state.workflow_running[wf.name]
+                            request.state.workflow_running[workflow.name]
                         ),
                     }
                 }
             )
         return {
-            "message": f"getting {name!r} to schedule listener.",
+            "message": f"Getting {name!r} to schedule listener.",
             "scheduler": getter,
         }
     raise HTTPException(
@@ -165,7 +172,7 @@ async def add_deploy_scheduler(request: Request, name: str):
     if name in request.state.scheduler:
         raise HTTPException(
             status_code=st.HTTP_302_FOUND,
-            detail="This schedule already exists in scheduler list.",
+            detail=f"This schedule {name!r} already exists in scheduler list.",
         )
 
     request.state.scheduler.append(name)
@@ -177,44 +184,49 @@ async def add_deploy_scheduler(request: Request, name: str):
 
     # NOTE: Create pair of workflow and on from schedule model.
     try:
-        _schedule = Schedule.from_loader(name)
-    except ValueError as e:
+        schedule: Schedule = Schedule.from_loader(name)
+    except ValueError as err:
         request.state.scheduler.remove(name)
-        logger.exception(e)
+        logger.exception(err)
         raise HTTPException(
             status_code=st.HTTP_404_NOT_FOUND,
-            detail=str(e),
+            detail=str(err),
         ) from None
 
     request.state.workflow_tasks.extend(
-        _schedule.tasks(
+        schedule.tasks(
             start_date_waiting,
             queue=request.state.workflow_queue,
+            externals={},
         ),
     )
-    return {"message": f"adding {name!r} to schedule listener."}
+    return {
+        "message": f"Adding {name!r} to schedule listener.",
+        "start_date": start_date_waiting,
+    }
 
 
 @schedule_route.delete(path="/deploy/{name}")
 async def del_deploy_scheduler(request: Request, name: str):
+    """Delete workflow task on the schedule listener."""
     if name in request.state.scheduler:
 
+        # NOTE: Remove current schedule name from the state.
         request.state.scheduler.remove(name)
 
-        _schedule: Schedule = Schedule.from_loader(name)
-        for workflow_task in _schedule.tasks(datetime.now(), queue={}):
-            request.state.workflow_tasks.remove(workflow_task)
+        schedule: Schedule = Schedule.from_loader(name)
 
-        for wf in _schedule.workflows:
-            if wf in request.state.workflow_queue:
-                request.state.workflow_queue.pop(wf, {})
+        for task in schedule.tasks(datetime.now(tz=config.tz), queue={}):
+            if task in request.state.workflow_tasks:
+                request.state.workflow_tasks.remove(task)
 
-            if wf in request.state.workflow_running:
-                request.state.workflow_running.pop(wf, {})
+        for workflow in schedule.workflows:
+            if workflow.alias in request.state.workflow_queue:
+                request.state.workflow_queue.pop(workflow.alias)
 
-        return {"message": f"deleted {name!r} to schedule listener."}
+        return {"message": f"Deleted schedule {name!r} in listener."}
 
     raise HTTPException(
         status_code=st.HTTP_404_NOT_FOUND,
-        detail=f"Does not found {name!r} in schedule listener",
+        detail=f"Does not found schedule {name!r} in listener",
     )

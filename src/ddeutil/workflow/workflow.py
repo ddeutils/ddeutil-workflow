@@ -555,6 +555,7 @@ class Workflow(BaseModel):
         )
 
         # NOTE: Saving execution result to destination of the input log object.
+        logger.debug(f"({cut_id(run_id)}) [LOG]: Writing log: {name!r}.")
         rs_log.save(excluded=None)
 
         # NOTE: Remove this release from running.
