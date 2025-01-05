@@ -61,7 +61,7 @@ def test_workflow_on(test_path):
         test_path / "conf/demo/01_99_wf_test_wf_on_raise.yml",
         data="""
         tmp-wf-scheduling-raise:
-          type: ddeutil.workflow.Workflow
+          type: Workflow
           on:
             - 'every_3_minute_bkk'
             - 'every_3_minute_bkk'
@@ -82,7 +82,7 @@ def test_workflow_on(test_path):
         test_path / "conf/demo/01_99_wf_test_wf_on_reach_max_values.yml",
         data="""
         tmp-wf-on-reach-max-value:
-          type: ddeutil.workflow.Workflow
+          type: Workflow
           on:
             - cronjob: '2 * * * *'
             - cronjob: '3 * * * *'
@@ -191,7 +191,7 @@ def test_workflow_condition(test_path):
         test_path / "conf/demo/01_99_wf_test_wf_condition.yml",
         data="""
         tmp-wf-condition:
-          type: ddeutil.workflow.Workflow
+          type: Workflow
           params: {name: str}
           jobs:
             condition-job:
@@ -232,7 +232,7 @@ def test_workflow_parameterize(test_path):
         test_path / "conf/demo/01_99_wf_test_wf_parameterize.yml",
         data="""
         tmp-wf-params-required:
-          type: ddeutil.workflow.Workflow
+          type: Workflow
           params:
             name: {type: str, required: True}
           jobs:

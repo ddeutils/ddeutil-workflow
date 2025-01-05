@@ -76,7 +76,7 @@ def test_stage_if_condition_raise(test_path):
         test_path / "conf/demo/01_99_wf_test_wf_condition_raise.yml",
         data="""
         tmp-wf-condition-raise:
-          type: ddeutil.workflow.Workflow
+          type: Workflow
           on: 'every_5_minute_bkk'
           params: {name: str}
           jobs:

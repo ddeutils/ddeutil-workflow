@@ -6,23 +6,16 @@
 from __future__ import annotations
 
 import json
+import sys
 from datetime import datetime
-from enum import Enum
 from typing import Annotated, Optional
 
 from ddeutil.core import str2list
-from typer import Argument, Option, Typer
+from typer import Argument, Typer, echo
 
-from .conf import config, get_logger
+from .conf import config
 
-logger = get_logger("ddeutil.workflow")
 cli: Typer = Typer()
-cli_log: Typer = Typer()
-cli.add_typer(
-    cli_log,
-    name="log",
-    help="Logging of workflow CLI",
-)
 
 
 @cli.command()
@@ -34,16 +27,28 @@ def run(
     params: Annotated[
         str,
         Argument(
-            help="A json string for parameters of this workflow execution."
+            help="A json string for parameters of this workflow execution.",
         ),
     ],
 ):
     """Run workflow workflow manually with an input custom parameters that able
     to receive with workflow params config.
     """
-    logger.info(f"Running workflow name: {workflow}")
-    logger.info(f"... with Parameters: {params!r}")
-    logger.info(f"... with JSON Parameters: {json.dumps(json.loads(params))}")
+    echo(f"Running workflow name: ({type(workflow)}) {workflow!r}")
+    echo(f"... with Parameters: ({type(params)}) {params!r}")
+
+    from .result import Result
+    from .workflow import Workflow
+
+    try:
+        wf: Workflow = Workflow.from_loader(name=workflow)
+        rs: Result = wf.execute(params=json.loads(params))
+    except Exception as err:
+        echo(str(err))
+        sys.exit(1)
+
+    echo(f"Result: {rs}")
+    sys.exit(0)
 
 
 @cli.command()
@@ -70,7 +75,7 @@ def schedule(
     module.
     """
     excluded: list[str] = str2list(excluded) if excluded else []
-    logger.info(f"... with Excluded Parameters: {excluded!r}")
+    echo(f"... with Excluded Parameters: {excluded!r}")
     externals: str = externals or "{}"
 
     # NOTE: Convert timezone on the stop date.
@@ -79,48 +84,17 @@ def schedule(
 
     from .scheduler import schedule_runner
 
-    # NOTE: Start running workflow scheduler application.
-    workflow_rs: list[str] = schedule_runner(
-        stop=stop, excluded=excluded, externals=json.loads(externals)
-    )
-    logger.info(f"Schedule with CLI run success with: {workflow_rs}")
+    try:
+        # NOTE: Start running workflow scheduler application.
+        workflow_rs: list[str] = schedule_runner(
+            stop=stop, excluded=excluded, externals=json.loads(externals)
+        )
+        echo(f"Schedule with CLI run success with: {workflow_rs}")
+    except Exception as err:
+        echo(str(err))
+        sys.exit(1)
 
-
-@cli_log.command("workflow-get")
-def workflow_log_get(
-    name: Annotated[
-        str,
-        Argument(help="A workflow name that want to getting log"),
-    ],
-    limit: Annotated[
-        int,
-        Argument(help="A number of the limitation of logging"),
-    ] = 100,
-    desc: Annotated[
-        bool,
-        Option(
-            "--desc",
-            help="A descending flag that order by logging release datetime.",
-        ),
-    ] = True,
-):
-    logger.info(f"{name} : limit {limit} : desc: {desc}")
-    return [""]
-
-
-class LogMode(str, Enum):
-    get = "get"
-    delete = "delete"
-
-
-@cli_log.command("workflow-delete")
-def workflow_log_delete(
-    mode: Annotated[
-        LogMode,
-        Argument(case_sensitive=True),
-    ]
-):
-    logger.info(mode)
+    sys.exit(0)
 
 
 @cli.callback()

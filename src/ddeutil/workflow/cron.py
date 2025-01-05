@@ -121,7 +121,7 @@ class On(BaseModel):
         loader: Loader = Loader(name, externals=externals)
 
         # NOTE: Validate the config type match with current connection model
-        if loader.type != cls:
+        if loader.type != cls.__name__:
             raise ValueError(f"Type {loader.type} does not match with {cls}")
 
         loader_data: DictData = loader.data

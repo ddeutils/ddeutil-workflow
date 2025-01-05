@@ -1,5 +1,5 @@
 wf-run-matrix:
-  type: ddeutil.workflow.Workflow
+  type: Workflow
   params:
     source: str
     target: str
@@ -41,7 +41,7 @@ wf-run-matrix:
 
 
 wf-run-matrix-parallel:
-  type: ddeutil.workflow.Workflow
+  type: Workflow
   params:
     source: str
     target: str
@@ -82,7 +82,7 @@ wf-run-matrix-parallel:
             passing_value: int = 10
 
 wf-run-matrix-raise:
-  type: ddeutil.workflow.Workflow
+  type: Workflow
   on:
     - 'every_2_minute_bkk'
   params:
@@ -114,9 +114,8 @@ wf-run-matrix-raise:
 
 
 wf-run-matrix-fail-fast:
-  type: ddeutil.workflow.Workflow
+  type: Workflow
   on:
-#    - 'every_5_minute_bkk'
     - cronjob: '* * * * *'
       timezone: "Asia/Bangkok"
     - 'every_2_minute_bkk'

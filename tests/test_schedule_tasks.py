@@ -13,7 +13,7 @@ def test_schedule_tasks(test_path):
         test_path / "conf/demo/03_99_schedule_tasks.yml",
         data="""
         tmp-schedule-wf-tasks:
-          type: scheduler.Schedule
+          type: Schedule
           workflows:
             - name: 'wf-scheduling'
               on: ['every_3_minute_bkk', 'every_minute_bkk']
@@ -48,7 +48,7 @@ def test_schedule_tasks_release(test_path):
         test_path / "conf/demo/03_99_schedule_tasks_release.yml",
         data="""
         tmp-schedule-common-wf:
-          type: scheduler.Schedule
+          type: Schedule
           workflows:
             - name: 'wf-scheduling'
               on: 'every_3_minute_bkk'

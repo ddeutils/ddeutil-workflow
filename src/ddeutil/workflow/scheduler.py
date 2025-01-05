@@ -265,7 +265,7 @@ class Schedule(BaseModel):
         loader: Loader = Loader(name, externals=(externals or {}))
 
         # NOTE: Validate the config type match with current connection model
-        if loader.type != cls:
+        if loader.type != cls.__name__:
             raise ValueError(f"Type {loader.type} does not match with {cls}")
 
         loader_data: DictData = copy.deepcopy(loader.data)

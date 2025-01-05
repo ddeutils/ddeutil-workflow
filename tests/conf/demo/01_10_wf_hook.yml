@@ -1,5 +1,5 @@
 wf-run-hook:
-  type: ddeutil.workflow.Workflow
+  type: Workflow
   desc: Extract and download data from Postgres to Azure Data Lake
   params:
     run-date: datetime
@@ -29,7 +29,7 @@ wf-run-hook:
 
 
 ingest_csv_to_parquet:
-  type: ddeutil.workflow.Workflow
+  type: Workflow
   params:
     run-date: datetime
     source: str
@@ -46,7 +46,7 @@ ingest_csv_to_parquet:
 
 
 pipe_hook_mssql_proc:
-  type: ddeutil.workflow.Workflow
+  type: Workflow
   params:
     run_date: datetime
     sp_name: str
@@ -68,7 +68,7 @@ pipe_hook_mssql_proc:
 
 
 wf-hook-return-type:
-  type: ddeutil.workflow.Workflow
+  type: Workflow
   jobs:
     first-job:
       stages:

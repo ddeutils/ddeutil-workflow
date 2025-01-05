@@ -100,7 +100,7 @@ def test_on_from_loader_raise(test_path):
         yaml.dump(
             {
                 "every_day_no_cron_raise": {
-                    "type": "scheduler.Workflow",
+                    "type": "Workflow",
                     "interval": "monthly",
                     "day": "monday",
                     "time": "12:00",
@@ -119,7 +119,7 @@ def test_on_from_loader_raise(test_path):
         yaml.dump(
             {
                 "every_day_no_cron_raise": {
-                    "type": "cron.On",
+                    "type": "On",
                 }
             },
             f,
@@ -135,7 +135,7 @@ def test_on_from_loader_raise(test_path):
         yaml.dump(
             {
                 "every_day_no_cron_raise": {
-                    "type": "cron.On",
+                    "type": "On",
                     "cronjob": "* * * * *",
                     "timezone": "NotExists",
                 }

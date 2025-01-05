@@ -56,10 +56,10 @@ def test_simple_load_finds(target_path: Path):
         yaml.dump(
             {
                 "test_simple_load_config": {
-                    "type": "ddeutil.workflow.conf.Config",
+                    "type": "Config",
                     "foo": "bar",
                 },
-                "test_simple_load": {"type": "ddeutil.workflow.Workflow"},
+                "test_simple_load": {"type": "Workflow"},
             },
             f,
         )
@@ -92,7 +92,7 @@ def test_simple_load_finds_raise(target_path: Path):
                 "test_simple_load_config": {
                     "foo": "bar",
                 },
-                "test_simple_load": {"type": "ddeutil.workflow.Workflow"},
+                "test_simple_load": {"type": "Workflow"},
             },
             f,
         )

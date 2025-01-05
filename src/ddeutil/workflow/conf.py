@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import ClassVar, Optional, TypeVar, Union
 from zoneinfo import ZoneInfo
 
-from ddeutil.core import import_string, str2bool
+from ddeutil.core import str2bool
 from ddeutil.io import PathSearch, YamlFlResolve
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
@@ -37,7 +37,6 @@ __all__: TupleStr = (
     "Config",
     "SimLoad",
     "Loader",
-    "get_type",
     "config",
     "logger",
     "FileLog",
@@ -254,7 +253,7 @@ class SimLoad:
                 if key in exclude:
                     continue
 
-                if issubclass(get_type(data["type"], conf), obj):
+                if data["type"] == obj.__name__:
                     yield key, (
                         {k: data[k] for k in data if k in included}
                         if included
@@ -269,14 +268,14 @@ class SimLoad:
         return {}
 
     @cached_property
-    def type(self) -> AnyModelType:
+    def type(self) -> str:
         """Return object of string type which implement on any registry. The
         object type.
 
         :rtype: AnyModelType
         """
         if _typ := self.data.get("type"):
-            return get_type(_typ, self.conf)
+            return _typ
         raise ValueError(
             f"the 'type' value: {_typ} does not exists in config data."
         )
@@ -312,27 +311,6 @@ class Loader(SimLoad):
 
     def __init__(self, name: str, externals: DictData) -> None:
         super().__init__(name, conf=Config(), externals=externals)
-
-
-def get_type(t: str, params: Config) -> AnyModelType:
-    """Return import type from string importable value in the type key.
-
-    :param t: A importable type string.
-    :param params: A config parameters that use registry to search this
-        type.
-
-    :rtype: AnyModelType
-    """
-    try:
-        # NOTE: Auto adding module prefix if it does not set
-        return import_string(f"ddeutil.workflow.{t}")
-    except ModuleNotFoundError:
-        for registry in params.regis_hook:
-            try:
-                return import_string(f"{registry}.{t}")
-            except ModuleNotFoundError:
-                continue
-        return import_string(f"{t}")
 
 
 config = Config()

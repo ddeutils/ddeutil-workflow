@@ -35,7 +35,7 @@ def test_schedule_from_loader_raise(test_path):
         yaml.dump(
             {
                 "schedule-raise-wf": {
-                    "type": "ddeutil.workflow.cron.On",
+                    "type": "On",
                     "workflows": [
                         {"name": "wf-scheduling"},
                     ],
@@ -51,7 +51,7 @@ def test_schedule_from_loader_raise(test_path):
         yaml.dump(
             {
                 "schedule-raise-wf": {
-                    "type": "scheduler.Schedule",
+                    "type": "Schedule",
                     "workflows": [
                         {
                             "name": "wf-scheduling",
@@ -73,7 +73,7 @@ def test_schedule_from_loader_raise(test_path):
         yaml.dump(
             {
                 "schedule-raise-wf": {
-                    "type": "scheduler.Schedule",
+                    "type": "Schedule",
                     "workflows": [
                         {
                             "name": "wf-scheduling",
@@ -99,7 +99,7 @@ def test_schedule_default_on(test_path):
         test_path / "conf/demo/03_99_schedule_default_on.yml",
         data="""
         tmp-schedule-default-wf:
-          type: scheduler.Schedule
+          type: Schedule
           workflows:
             - name: 'wf-scheduling'
               params:

@@ -16,7 +16,7 @@ def test_workflow_poke(test_path):
         test_path / "conf/demo/01_99_wf_test_wf_poke.yml",
         data="""
         tmp-wf-scheduling-minute:
-          type: ddeutil.workflow.Workflow
+          type: Workflow
           on:
             - cronjob: '* * * * *'
               timezone: "Asia/Bangkok"
@@ -74,7 +74,7 @@ def test_workflow_poke_no_queue(test_path):
         test_path / "conf/demo/01_99_wf_test_wf_poke_no_schedule.yml",
         data="""
         tmp-wf-scheduling-daily:
-          type: ddeutil.workflow.Workflow
+          type: Workflow
           on:
             - cronjob: "30 3 * * *"
               timezone: "Asia/Bangkok"
@@ -107,7 +107,7 @@ def test_workflow_poke_with_start_date_and_period(test_path):
         test_path / "conf/demo/01_99_wf_test_wf_poke_with_start_date.yml",
         data="""
         tmp-wf-scheduling-with-name:
-          type: ddeutil.workflow.Workflow
+          type: Workflow
           on:
             - 'every_minute_bkk'
           params: {name: str}
@@ -140,7 +140,7 @@ def test_workflow_poke_no_on(test_path):
         test_path / "conf/demo/01_99_wf_test_wf_poke_no_on.yml",
         data="""
         tmp-wf-poke-no-on:
-          type: ddeutil.workflow.Workflow
+          type: Workflow
           params: {name: str}
           jobs:
             first-job:

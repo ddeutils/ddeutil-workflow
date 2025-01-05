@@ -49,7 +49,7 @@ def test_workflow_task_queue(test_path):
         test_path / "conf/demo/01_99_wf_test_wf_task_data_release.yml",
         data="""
         tmp-wf-task-data-release:
-          type: ddeutil.workflow.Workflow
+          type: Workflow
           params: {name: str}
           jobs:
             first-job:
@@ -95,7 +95,7 @@ def test_workflow_task_release(test_path):
         test_path / "conf/demo/01_99_wf_test_wf_task_data_release.yml",
         data="""
         tmp-wf-task-data-release:
-          type: ddeutil.workflow.Workflow
+          type: Workflow
           params: {name: str}
           jobs:
             first-job:
@@ -146,7 +146,7 @@ def test_workflow_task_release_long_running(test_path):
         test_path / "conf/demo/01_99_wf_test_wf_task_data_release_long_run.yml",
         data="""
         tmp-wf-task-data-release-long-run:
-          type: ddeutil.workflow.Workflow
+          type: Workflow
           params: {name: str}
           jobs:
             first-job:

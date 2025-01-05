@@ -99,7 +99,7 @@ def test_workflow_schedule_tasks(test_path):
         test_path / "conf/demo/01_99_wf_test_wf_schedule_tasks.yml",
         data="""
         tmp-wf-schedule-tasks:
-          type: ddeutil.workflow.Workflow
+          type: Workflow
           params: {name: str}
           jobs:
             first-job:
