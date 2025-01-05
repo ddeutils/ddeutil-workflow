@@ -2,6 +2,32 @@
 
 ## Latest Changes
 
+## 0.0.25
+
+### :sparkles: Features
+
+- :dart: feat: update code on api component. (_2025-01-05_)
+- :dart: feat: add default registry path on tests. (_2025-01-05_)
+- :dart: feat: update cli command. (_2025-01-05_)
+- :dart: feat: add release thread type for support thread timeout. (_2025-01-04_)
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: remove cli testcase on github action. (_2025-01-04_)
+- :test_tube: tests: add test cli on the github action. (_2025-01-04_)
+- :test_tube: tests: update testcase for workflow release and queue object. (_2025-01-04_)
+- :test_tube: test: update workflow schedule testcase to make 100 coverage. (_2025-01-04_)
+
+### :bug: Fix Bugs
+
+- :gear: fixed: rename of path that change on api component. (_2025-01-05_)
+- :gear: fixed: change default config path that does not import when start fastapi. (_2025-01-05_)
+- :gear: fixed: change name of include parameter to included. (_2025-01-04_)
+- :gear: fixed: change name of exclude parameter to excluded. (_2025-01-04_)
+- :gear: fixed: add double qoute on test cli command. (_2025-01-04_)
+- :gear: fixed: add excluded schedule name on cli testcase. (_2025-01-04_)
+- :gear: fixed: remove not use or useless methods. (_2025-01-04_)
+
 ## 0.0.24
 
 ### :sparkles: Features
