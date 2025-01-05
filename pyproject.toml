@@ -65,11 +65,10 @@ source = ["ddeutil.workflow"]
 omit = [
     "src/ddeutil/workflow/__about__.py",
     "src/ddeutil/workflow/__cron.py",
-    # NOTE: Omit this files because it does not ready to production.
-    "src/ddeutil/workflow/api.py",
     "src/ddeutil/workflow/cli.py",
-    "src/ddeutil/workflow/repeat.py",
-    "src/ddeutil/workflow/route.py",
+    "src/ddeutil/workflow/api/api.py",
+    "src/ddeutil/workflow/api/repeat.py",
+    "src/ddeutil/workflow/api/route.py",
 ]
 
 [tool.coverage.report]
