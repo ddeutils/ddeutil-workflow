@@ -14,6 +14,8 @@ def test_cli_workflow():
             '{"name": "Foo", "asat-dt": "2024-01-01"}',
         ],
     )
+    print(result.stderr)
+    print(result.stdout)
     assert result.exit_code == 0
     assert (
         "Running workflow name: (<class 'str'>) " "'wf-scheduling-agent'"
@@ -40,5 +42,6 @@ def test_cli_schedule():
             ),
         ],
     )
-    assert result.exit_code == 0
+    print(result.stderr)
     print(result.stdout)
+    assert result.exit_code == 0

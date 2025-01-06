@@ -45,18 +45,6 @@ this package with application add-ons, you should add `app` in installation;
 | Python & CLI      | `pip install ddeutil-workflow`           | :heavy_check_mark: |
 | FastAPI Server    | `pip install ddeutil-workflow[api]`      | :heavy_check_mark: |
 
-> I added this feature to the main milestone.
->
-> :egg: **Docker Images** supported:
->
-> | Docker Image                | Python Version | Support |
-> |-----------------------------|----------------|---------|
-> | ddeutil-workflow:latest     | `3.9`          | :x:     |
-> | ddeutil-workflow:python3.10 | `3.10`         | :x:     |
-> | ddeutil-workflow:python3.11 | `3.11`         | :x:     |
-> | ddeutil-workflow:python3.12 | `3.12`         | :x:     |
-> | ddeutil-workflow:python3.12 | `3.13`         | :x:     |
-
 ## :beers: Usage
 
 This is examples that use workflow file for running common Data Engineering
