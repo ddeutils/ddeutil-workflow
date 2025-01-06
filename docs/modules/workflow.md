@@ -4,31 +4,34 @@
 
 ### Fields
 
-| field    | data type        | default | description |
-|----------|------------------|:-------:|-------------|
-| name     | str              |         |             |
-| desc     | str \| None      |  None   |             |
-| params   | dict[str, Param] | dict()  |             |
-| on       | list[On]         | list()  |             |
-| jobs     | dict[str, Job]   | dict()  |             |
+| field    | data type        | default  | description |
+|----------|------------------|:--------:|-------------|
+| name     | str              |          |             |
+| desc     | str \| None      |  `None`  |             |
+| params   | dict[str, Param] | `dict()` |             |
+| on       | list[On]         | `list()` |             |
+| jobs     | dict[str, Job]   | `dict()` |             |
 
-!!! example
+!!! example "YAML"
 
-    ```yaml
-    # This file should keep under this path: `./root-path/conf-path/*`
-    wf-name:
-      type: Workflow
-      on: 'on_every_5_min'
-      params:
-        author-run:
-          type: str
-        run-date:
-          type: datetime
-      jobs:
-        first-job:
-          stages:
-            - name: "Empty stage do logging to console only!!"
-    ```
+    === "Workflow"
+
+        ```yaml
+        wf-name:
+          type: Workflow
+          on: 'on_every_5_min'
+          params:
+            author-run:
+              type: str
+            run-date:
+              type: datetime
+          jobs:
+            first-job:
+              stages:
+                - name: "Empty stage do logging to console only!!"
+        ```
+
+!!! example "Python"
 
     ```python
     from ddeutil.workflow import Workflow

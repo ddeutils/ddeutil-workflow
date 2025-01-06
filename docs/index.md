@@ -61,7 +61,7 @@ use-case.
 run-py-local:
 
    # Validate model that use to parsing exists for template file
-   type: ddeutil.workflow.Workflow
+   type: Workflow
    on:
       # If workflow deploy to schedule, it will running every 5 minutes
       # with Asia/Bangkok timezone.
@@ -112,7 +112,7 @@ So, this package provide the `Schedule` template for this action.
 schedule-run-local-wf:
 
    # Validate model that use to parsing exists for template file
-   type: ddeutil.workflow.scheduler.Schedule
+   type: Schedule
    workflows:
 
       # Map existing workflow that want to deploy with scheduler application.
