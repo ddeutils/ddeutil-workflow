@@ -14,4 +14,4 @@ RUN pip install --no-cache-dir -U ddeutil-workflow[app]
 
 USER workflow
 
-ENTRYPOINT ["ddeutil-workflow", "--help"]
+ENTRYPOINT ["python", "--version"]
