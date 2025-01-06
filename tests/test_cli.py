@@ -5,7 +5,7 @@ from typer.testing import CliRunner, Result
 
 
 def test_cli_workflow():
-    runner = CliRunner()
+    runner = CliRunner(mix_stderr=False)
     result: Result = runner.invoke(
         cli,
         [
@@ -23,7 +23,7 @@ def test_cli_workflow():
 
 
 def test_cli_schedule():
-    runner = CliRunner()
+    runner = CliRunner(mix_stderr=False)
     stop_date: datetime = datetime.now().replace(
         second=0, microsecond=0
     ) + timedelta(minutes=2)
