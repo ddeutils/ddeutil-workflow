@@ -30,7 +30,6 @@ dependencies = [
     "ddeutil-io[yaml,toml]>=0.2.3",
     "pydantic==2.10.4",
     "python-dotenv==1.0.1",
-    "typer==0.15.1",
     "schedule==1.2.2,<2.0.0",
 ]
 dynamic = ["version"]
@@ -43,9 +42,6 @@ api = [
 [project.urls]
 Homepage = "https://github.com/ddeutils/ddeutil-workflow/"
 "Source Code" = "https://github.com/ddeutils/ddeutil-workflow/"
-
-[project.scripts]
-ddeutil-workflow = "ddeutil.workflow.cli:cli"
 
 [tool.setuptools.dynamic]
 version = {attr = "ddeutil.workflow.__about__.__version__"}
@@ -65,7 +61,6 @@ source = ["ddeutil.workflow"]
 omit = [
     "src/ddeutil/workflow/__about__.py",
     "src/ddeutil/workflow/__cron.py",
-    "src/ddeutil/workflow/cli.py",
     "src/ddeutil/workflow/api/__init__.py",
     "src/ddeutil/workflow/api/api.py",
     "src/ddeutil/workflow/api/repeat.py",

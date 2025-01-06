@@ -31,17 +31,11 @@ wf-run-manual:
 
 That has ...
 
-### Via CLI
-
-```shell
-workflow pipeline exec -p "{\"asat-dt\": \"2024-08-01\"}"
-```
-
 ### Via Python
 
 ```python
 from ddeutil.workflow import Workflow
-from ddeutil.workflow.utils import Result
+from ddeutil.workflow.result import Result
 
 result: Result = (
     Workflow

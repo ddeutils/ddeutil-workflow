@@ -40,10 +40,10 @@ configuration. It called **Metadata Driven Data Workflow**.
 This project need `ddeutil-io` extension namespace packages. If you want to install
 this package with application add-ons, you should add `app` in installation;
 
-| Usecase           | Install Optional                         | Support            |
-|-------------------|------------------------------------------|--------------------|
-| Python & CLI      | `pip install ddeutil-workflow`           | :heavy_check_mark: |
-| FastAPI Server    | `pip install ddeutil-workflow[api]`      | :heavy_check_mark: |
+| Usecase        | Install Optional                         | Support            |
+|----------------|------------------------------------------|--------------------|
+| Python         | `pip install ddeutil-workflow`           | :heavy_check_mark: |
+| FastAPI Server | `pip install ddeutil-workflow[api]`      | :heavy_check_mark: |
 
 ## :beers: Usage
 
