@@ -2,6 +2,20 @@
 
 ## Latest Changes
 
+## 0.0.26
+
+### :sparkles: Features
+
+- :dart: feat: remove cli feature. (_2025-01-06_)
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: add mix_stderr on the cli testcase. (_2025-01-06_)
+
+### :card_file_box: Documents
+
+- :page_facing_up: docs: remove docker image support. (_2025-01-06_)
+
 ## 0.0.25
 
 ### :sparkles: Features
