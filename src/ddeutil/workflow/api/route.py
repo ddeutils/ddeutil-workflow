@@ -16,7 +16,7 @@ from fastapi.responses import UJSONResponse
 from pydantic import BaseModel
 
 from ..__types import DictData
-from ..conf import Loader, config, get_logger
+from ..conf import FileLog, Loader, config, get_logger
 from ..result import Result
 from ..scheduler import Schedule
 from ..workflow import Workflow
@@ -99,12 +99,49 @@ async def execute_workflow(name: str, payload: ExecutePayload) -> DictData:
 
 @workflow_route.get(path="/{name}/logs")
 async def get_workflow_logs(name: str):
-    return {"message": f"Getting workflow {name!r} logs"}
+    try:
+        return {
+            "message": f"Getting workflow {name!r} logs",
+            "logs": [
+                log.model_dump(
+                    by_alias=True,
+                    exclude_none=True,
+                    exclude_unset=True,
+                    exclude_defaults=True,
+                )
+                for log in FileLog.find_logs(name=name)
+            ],
+        }
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=st.HTTP_404_NOT_FOUND,
+            detail=f"Does not found log for workflow {name!r}",
+        ) from None
 
 
 @workflow_route.get(path="/{name}/logs/{release}")
 async def get_workflow_release_log(name: str, release: str):
-    return {"message": f"Getting workflow {name!r} log in release {release}"}
+    try:
+        log: FileLog = FileLog.find_log_with_release(
+            name=name, release=datetime.strptime(release, "%Y%m%d%H%M%S")
+        )
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=st.HTTP_404_NOT_FOUND,
+            detail=(
+                f"Does not found log for workflow {name!r} "
+                f"with release {release!r}"
+            ),
+        ) from None
+    return {
+        "message": f"Getting workflow {name!r} log in release {release}",
+        "log": log.model_dump(
+            by_alias=True,
+            exclude_none=True,
+            exclude_unset=True,
+            exclude_defaults=True,
+        ),
+    }
 
 
 @workflow_route.delete(

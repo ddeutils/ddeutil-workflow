@@ -93,6 +93,7 @@ class Config:
     enable_write_log: bool = str2bool(
         os.getenv("WORKFLOW_LOG_ENABLE_WRITE", "false")
     )
+    log_path: Path = Path(os.getenv("WORKFLOW_LOG_PATH", "./logs"))
 
     # NOTE: Stage
     stage_raise_error: bool = str2bool(
@@ -362,7 +363,7 @@ class FileLog(BaseLog):
     """
 
     filename_fmt: ClassVar[str] = (
-        "./logs/workflow={name}/release={release:%Y%m%d%H%M%S}"
+        "workflow={name}/release={release:%Y%m%d%H%M%S}"
     )
 
     def do_before(self) -> None:
@@ -378,18 +379,16 @@ class FileLog(BaseLog):
 
         :rtype: Iterator[Self]
         """
-        pointer: Path = config.root_path / f"./logs/workflow={name}"
+        pointer: Path = config.log_path / f"workflow={name}"
         if not pointer.exists():
-            raise FileNotFoundError(
-                f"Pointer: ./logs/workflow={name} does not found."
-            )
+            raise FileNotFoundError(f"Pointer: {pointer.absolute()}.")
 
         for file in pointer.glob("./release=*/*.log"):
             with file.open(mode="r", encoding="utf-8") as f:
                 yield cls.model_validate(obj=json.load(f))
 
     @classmethod
-    def find_log_latest(
+    def find_log_with_release(
         cls,
         name: str,
         release: datetime | None = None,
@@ -410,8 +409,7 @@ class FileLog(BaseLog):
             raise NotImplementedError("Find latest log does not implement yet.")
 
         pointer: Path = (
-            config.root_path
-            / f"./logs/workflow={name}/release={release:%Y%m%d%H%M%S}"
+            config.log_path / f"workflow={name}/release={release:%Y%m%d%H%M%S}"
         )
         if not pointer.exists():
             raise FileNotFoundError(
@@ -440,7 +438,7 @@ class FileLog(BaseLog):
             return False
 
         # NOTE: create pointer path that use the same logic of pointer method.
-        pointer: Path = config.root_path / cls.filename_fmt.format(
+        pointer: Path = config.log_path / cls.filename_fmt.format(
             name=name, release=release
         )
 
@@ -451,7 +449,7 @@ class FileLog(BaseLog):
 
         :rtype: Path
         """
-        return config.root_path / self.filename_fmt.format(
+        return config.log_path / self.filename_fmt.format(
             name=self.name, release=self.release
         )
 

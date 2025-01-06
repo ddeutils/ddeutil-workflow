@@ -43,7 +43,7 @@ def test_conf_log_file_do_first():
         },
     )
     log.save(excluded=None)
-    log = FileLog.find_log_latest(
+    log = FileLog.find_log_with_release(
         name="wf-demo-logging",
         release=datetime(2024, 1, 1, 1),
     )
@@ -79,6 +79,12 @@ def test_conf_log_file_find_logs(root_path):
 
     for log in FileLog.find_logs(name="wf-no-release-log"):
         assert isinstance(log, FileLog)
+        log.model_dump(
+            by_alias=True,
+            exclude_none=True,
+            exclude_unset=True,
+            exclude_defaults=True,
+        )
 
 
 def test_conf_log_file_find_logs_raise():
@@ -86,9 +92,9 @@ def test_conf_log_file_find_logs_raise():
         next(FileLog.find_logs(name="wf-file-not-found"))
 
 
-def test_conf_log_file_find_log_latest():
+def test_conf_log_file_find_log_with_release():
     with pytest.raises(FileNotFoundError):
-        FileLog.find_log_latest(
+        FileLog.find_log_with_release(
             name="wf-file-not-found",
             release=datetime(2024, 1, 1, 1),
         )
