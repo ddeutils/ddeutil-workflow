@@ -17,7 +17,7 @@ from typing import ClassVar, Optional, TypeVar, Union
 from zoneinfo import ZoneInfo
 
 from ddeutil.core import str2bool
-from ddeutil.io import PathSearch, YamlFlResolve
+from ddeutil.io import YamlFlResolve
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
@@ -162,14 +162,6 @@ class Config:
                 f"timedelta with {self.stop_boundary_delta_str}."
             ) from err
 
-    def refresh_dotenv(self) -> Self:
-        """Reload environment variables from the current stage."""
-        self.tz: ZoneInfo = ZoneInfo(env("WORKFLOW_CORE_TIMEZONE", "UTC"))
-        self.stage_raise_error: bool = str2bool(
-            env("WORKFLOW_CORE_STAGE_RAISE_ERROR", "false")
-        )
-        return self
-
     @property
     def conf_path(self) -> Path:
         """Config path that use root_path class argument for this construction.
@@ -214,8 +206,14 @@ class SimLoad:
         externals: DictData | None = None,
     ) -> None:
         self.data: DictData = {}
-        for file in PathSearch(conf.conf_path).files:
-            if data := self.filter_suffix(file, name):
+        for file in conf.conf_path.rglob("*"):
+            if not file.is_file():
+                continue
+
+            if data := self.filter_suffix(
+                file,
+                name,
+            ):
                 self.data = data
 
         # VALIDATE: check the data that reading should not empty.
@@ -247,7 +245,10 @@ class SimLoad:
         :rtype: Iterator[tuple[str, DictData]]
         """
         exclude: list[str] = excluded or []
-        for file in PathSearch(conf.conf_path).files:
+        for file in conf.conf_path.rglob("*"):
+
+            if not file.is_file():
+                continue
 
             for key, data in cls.filter_suffix(file).items():
 
