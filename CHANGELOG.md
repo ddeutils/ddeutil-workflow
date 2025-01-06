@@ -2,6 +2,21 @@
 
 ## Latest Changes
 
+## 0.0.26.post0
+
+### :sparkles: Features
+
+- :dart: feat: add get log route on api component. (_2025-01-06_)
+
+### :card_file_box: Documents
+
+- :page_facing_up: docs: add more document on mkdocs. (_2025-01-06_)
+
+### :bug: Fix Bugs
+
+- :gear: fixed: change entrypoint in docker file. (_2025-01-06_)
+- :gear: fixed: remove use PathSearch from ddeutil-io. (_2025-01-06_)
+
 ## 0.0.26
 
 ### :sparkles: Features
