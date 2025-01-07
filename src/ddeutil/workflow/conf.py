@@ -37,7 +37,9 @@ def glob_files(path: Path) -> Iterator[Path]:  # pragma: no cov
 
 
 __all__: TupleStr = (
+    "env",
     "get_logger",
+    "get_log",
     "Config",
     "SimLoad",
     "Loader",

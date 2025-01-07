@@ -42,7 +42,7 @@ from typing_extensions import Self
 
 from .__cron import CronJob, CronRunner
 from .__types import DictData, TupleStr
-from .conf import FileLog, Loader, Log, config, get_logger
+from .conf import Loader, Log, config, get_log, get_logger
 from .cron import On
 from .exceptions import JobException, WorkflowException
 from .job import Job
@@ -501,7 +501,7 @@ class Workflow(BaseModel):
 
         :rtype: Result
         """
-        log: type[Log] = log or FileLog
+        log: type[Log] = log or get_log()
         name: str = override_log_name or self.name
         run_id: str = run_id or gen_id(name, unique=True)
         rs_release: Result = Result(run_id=run_id)
@@ -670,7 +670,7 @@ class Workflow(BaseModel):
         :rtype: list[Result]
         :return: A list of all results that return from ``self.release`` method.
         """
-        log: type[Log] = log or FileLog
+        log: type[Log] = log or get_log()
         run_id: str = run_id or gen_id(self.name, unique=True)
 
         # NOTE: If this workflow does not set the on schedule, it will return
@@ -1151,7 +1151,7 @@ class WorkflowTask:
 
         :rtype: Result
         """
-        log: type[Log] = log or FileLog
+        log: type[Log] = log or get_log()
 
         if release is None:
             if queue.check_queue(self.runner.date):

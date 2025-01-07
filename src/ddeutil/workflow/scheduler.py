@@ -51,7 +51,7 @@ except ImportError:  # pragma: no cov
 
 from .__cron import CronRunner
 from .__types import DictData, TupleStr
-from .conf import FileLog, Loader, Log, config, get_logger
+from .conf import Loader, Log, config, get_log, get_logger
 from .cron import On
 from .exceptions import WorkflowException
 from .utils import (
@@ -493,7 +493,7 @@ def schedule_control(
             "Should install schedule package before use this module."
         ) from None
 
-    log: type[Log] = log or FileLog
+    log: type[Log] = log or get_log()
     scheduler: Scheduler = Scheduler()
     start_date: datetime = datetime.now(tz=config.tz)
     stop_date: datetime = stop or (start_date + config.stop_boundary_delta)
