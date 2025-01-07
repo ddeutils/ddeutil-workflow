@@ -13,14 +13,26 @@ from ddeutil.workflow.scheduler import Schedule
 from ddeutil.workflow.workflow import Workflow
 
 
-def test_config():
-    with mock.patch.object(Config, "max_job_parallel", -1):
-        with pytest.raises(ValueError):
-            Config()
+@pytest.fixture(scope="function")
+def adjust_config():
+    origin_max_job = os.getenv("WORKFLOW_CORE_MAX_JOB_PARALLEL")
+    origin_stop = os.getenv("WORKFLOW_APP_STOP_BOUNDARY_DELTA")
+    os.environ["WORKFLOW_CORE_MAX_JOB_PARALLEL"] = "-1"
+    os.environ["WORKFLOW_APP_STOP_BOUNDARY_DELTA"] = "{"
 
-    with mock.patch.object(Config, "stop_boundary_delta_str", "{"):
-        with pytest.raises(ValueError):
-            Config()
+    yield
+
+    os.environ["WORKFLOW_CORE_MAX_JOB_PARALLEL"] = origin_max_job
+    os.environ["WORKFLOW_APP_STOP_BOUNDARY_DELTA"] = origin_stop
+
+
+def test_config(adjust_config):
+
+    with pytest.raises(ValueError):
+        _ = Config().max_job_parallel
+
+    with pytest.raises(ValueError):
+        _ = Config().stop_boundary_delta
 
     conf = Config()
     os.environ["WORKFLOW_CORE_TIMEZONE"] = "Asia/Bangkok"

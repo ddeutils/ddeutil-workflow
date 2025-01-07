@@ -55,6 +55,7 @@ def dotenv_setting() -> None:
             """
         ).strip()
         env_path.write_text(env_str)
+
     load_dotenv(env_path)
 
 

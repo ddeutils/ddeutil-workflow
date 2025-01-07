@@ -18,7 +18,6 @@ from zoneinfo import ZoneInfo
 
 from ddeutil.core import str2bool
 from ddeutil.io import YamlFlResolve
-from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
@@ -28,11 +27,13 @@ from .__types import DictData, TupleStr
 AnyModel = TypeVar("AnyModel", bound=BaseModel)
 AnyModelType = type[AnyModel]
 
-load_dotenv()
-
 
 def env(var: str, default: str | None = None) -> str | None:  # pragma: no cov
     return os.getenv(f"WORKFLOW_{var}", default)
+
+
+def glob_files(path: Path) -> Iterator[Path]:  # pragma: no cov
+    yield from (file for file in path.rglob("*") if file.is_file())
 
 
 __all__: TupleStr = (
@@ -152,7 +153,7 @@ class Config:
         if max_job_parallel < 0:
             raise ValueError(
                 f"``WORKFLOW_MAX_JOB_PARALLEL`` should more than 0 but got "
-                f"{self.max_job_parallel}."
+                f"{max_job_parallel}."
             )
         return max_job_parallel
 
@@ -235,14 +236,9 @@ class SimLoad:
         externals: DictData | None = None,
     ) -> None:
         self.data: DictData = {}
-        for file in conf.conf_path.rglob("*"):
-            if not file.is_file():
-                continue
+        for file in glob_files(conf.conf_path):
 
-            if data := self.filter_suffix(
-                file,
-                name,
-            ):
+            if data := self.filter_suffix(file, name):
                 self.data = data
 
         # VALIDATE: check the data that reading should not empty.
@@ -274,10 +270,7 @@ class SimLoad:
         :rtype: Iterator[tuple[str, DictData]]
         """
         exclude: list[str] = excluded or []
-        for file in conf.conf_path.rglob("*"):
-
-            if not file.is_file():
-                continue
+        for file in glob_files(conf.conf_path):
 
             for key, data in cls.filter_suffix(file).items():
 
