@@ -80,7 +80,7 @@ def get_logger(name: str):
     return lg
 
 
-class Config:
+class Config:  # pragma: no cov
     """Config object for keeping application configuration on current session
     without changing when if the application still running.
     """
@@ -512,7 +512,7 @@ class FileLog(BaseLog):
 class SQLiteLog(BaseLog):  # pragma: no cov
 
     table: str = "workflow_log"
-    schema: str = """
+    ddl: str = """
         workflow        str,
         release         int,
         type            str,

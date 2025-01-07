@@ -1,16 +1,27 @@
+import os
 from pathlib import Path
-from unittest.mock import patch
 
 import ddeutil.workflow.utils as utils
 import pytest
+
+
+@pytest.fixture(scope="function")
+def adjust_config_gen_id():
+    origin_simple = os.getenv("WORKFLOW_CORE_GENERATE_ID_SIMPLE_MODE")
+    os.environ["WORKFLOW_CORE_GENERATE_ID_SIMPLE_MODE"] = "false"
+
+    yield
+
+    os.environ["WORKFLOW_CORE_GENERATE_ID_SIMPLE_MODE"] = origin_simple
 
 
 def test_gen_id():
     assert "1354680202" == utils.gen_id("{}")
     assert "1354680202" == utils.gen_id("{}", sensitive=False)
 
-    with patch("ddeutil.workflow.utils.config.gen_id_simple_mode", False):
-        assert "99914b932bd37a50b983c5e7c90ae93b" == utils.gen_id("{}")
+
+def test_gen_id_not_simple(adjust_config_gen_id):
+    assert "99914b932bd37a50b983c5e7c90ae93b" == utils.gen_id("{}")
 
 
 def test_filter_func():

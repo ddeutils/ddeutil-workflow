@@ -25,8 +25,8 @@ def raise_err(_: str) -> None:  # pragma: no cov
 def test_make_registry_raise():
     with mock.patch.object(
         Config,
-        "regis_filter_str",
-        "ddeutil.workflow.utils,tests.test_utils_filter,foo.bar",
+        "regis_filter",
+        ["ddeutil.workflow.utils", "tests.test_utils_filter", "foo.bar"],
     ):
         assert isfunction(make_filter_registry()["foo"])
         assert "bar" == make_filter_registry()["foo"]("")
@@ -59,8 +59,8 @@ def test_get_args_const():
 def test_map_post_filter():
     with mock.patch.object(
         Config,
-        "regis_filter_str",
-        "ddeutil.workflow.utils,tests.test_utils_filter,foo.bar",
+        "regis_filter",
+        ["ddeutil.workflow.utils", "tests.test_utils_filter", "foo.bar"],
     ):
         assert "bar" == map_post_filter("demo", ["foo"], make_filter_registry())
         assert "'bar'" == map_post_filter(
