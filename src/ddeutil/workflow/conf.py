@@ -13,7 +13,7 @@ from collections.abc import Iterator
 from datetime import datetime, timedelta
 from functools import cached_property, lru_cache
 from pathlib import Path
-from typing import ClassVar, Optional, TypeVar, Union
+from typing import ClassVar, Optional, Union
 from zoneinfo import ZoneInfo
 
 from ddeutil.core import str2bool
@@ -23,9 +23,6 @@ from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
 from .__types import DictData, TupleStr
-
-AnyModel = TypeVar("AnyModel", bound=BaseModel)
-AnyModelType = type[AnyModel]
 
 
 def env(var: str, default: str | None = None) -> str | None:  # pragma: no cov
@@ -306,7 +303,7 @@ class SimLoad:
         """Return object of string type which implement on any registry. The
         object type.
 
-        :rtype: AnyModelType
+        :rtype: str
         """
         if _typ := self.data.get("type"):
             return _typ
