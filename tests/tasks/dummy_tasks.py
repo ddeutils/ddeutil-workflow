@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from ddeutil.workflow.utils import tag
+from ddeutil.workflow.hook import tag
 
 
 @tag("polars-dir", alias="el-csv-to-parquet")

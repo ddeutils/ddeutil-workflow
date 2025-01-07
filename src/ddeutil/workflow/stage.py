@@ -31,7 +31,6 @@ import time
 import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from dataclasses import dataclass
 from functools import wraps
 from inspect import Parameter
 from pathlib import Path
@@ -48,19 +47,16 @@ from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
-from .__types import DictData, DictStr, Re, TupleStr
+from .__types import DictData, DictStr, TupleStr
 from .conf import config, get_logger
 from .exceptions import StageException
+from .hook import TagFunc, extract_hook
 from .result import Result
+from .templates import not_in_template, param2template
 from .utils import (
-    Registry,
-    TagFunc,
     cut_id,
     gen_id,
     make_exec,
-    make_registry,
-    not_in_template,
-    param2template,
 )
 
 P = ParamSpec("P")
@@ -76,7 +72,6 @@ __all__: TupleStr = (
     "HookStage",
     "TriggerStage",
     "Stage",
-    "extract_hook",
 )
 
 
@@ -556,53 +551,6 @@ class PyStage(BaseStage):
             context={"locals": lc, "globals": _globals},
             run_id=run_id,
         )
-
-
-@dataclass(frozen=True)
-class HookSearchData:
-    """Hook Search dataclass that use for receive regular expression grouping
-    dict from searching hook string value.
-    """
-
-    path: str
-    func: str
-    tag: str
-
-
-def extract_hook(hook: str) -> Callable[[], TagFunc]:
-    """Extract Hook function from string value to hook partial function that
-    does run it at runtime.
-
-    :raise NotImplementedError: When the searching hook's function result does
-        not exist in the registry.
-    :raise NotImplementedError: When the searching hook's tag result does not
-        exists in the registry with its function key.
-
-    :param hook: A hook value that able to match with Task regex.
-    :rtype: Callable[[], TagFunc]
-    """
-    if not (found := Re.RE_TASK_FMT.search(hook)):
-        raise ValueError(
-            f"Hook {hook!r} does not match with hook format regex."
-        )
-
-    # NOTE: Pass the searching hook string to `path`, `func`, and `tag`.
-    hook: HookSearchData = HookSearchData(**found.groupdict())
-
-    # NOTE: Registry object should implement on this package only.
-    rgt: dict[str, Registry] = make_registry(f"{hook.path}")
-    if hook.func not in rgt:
-        raise NotImplementedError(
-            f"``REGISTER-MODULES.{hook.path}.registries`` does not "
-            f"implement registry: {hook.func!r}."
-        )
-
-    if hook.tag not in rgt[hook.func]:
-        raise NotImplementedError(
-            f"tag: {hook.tag!r} does not found on registry func: "
-            f"``REGISTER-MODULES.{hook.path}.registries.{hook.func}``"
-        )
-    return rgt[hook.func][hook.tag]
 
 
 class HookStage(BaseStage):

@@ -1,3 +1,4 @@
+import shutil
 from datetime import datetime
 from unittest import mock
 
@@ -28,7 +29,7 @@ def test_conf_log_file():
 
 
 @mock.patch.object(Config, "enable_write_log", True)
-def test_conf_log_file_do_first():
+def test_conf_log_file_do_first(root_path):
     log = FileLog.model_validate(
         obj={
             "name": "wf-demo-logging",
@@ -43,11 +44,15 @@ def test_conf_log_file_do_first():
         },
     )
     log.save(excluded=None)
+    pointer = log.pointer()
+
     log = FileLog.find_log_with_release(
         name="wf-demo-logging",
         release=datetime(2024, 1, 1, 1),
     )
     assert log.name == "wf-demo-logging"
+
+    shutil.rmtree((root_path / pointer).parent)
 
 
 @mock.patch.object(Config, "enable_write_log", True)

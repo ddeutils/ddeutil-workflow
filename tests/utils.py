@@ -32,7 +32,7 @@ def dotenv_setting() -> None:
             f"""
             WORKFLOW_ROOT_PATH={OUTSIDE_PATH.absolute()}
             WORKFLOW_CORE_REGISTRY=tests
-            WORKFLOW_CORE_REGISTRY_FILTER=src.ddeutil.workflow.utils
+            WORKFLOW_CORE_REGISTRY_FILTER=src.ddeutil.workflow.templates
             WORKFLOW_CORE_PATH_CONF=tests/conf
             WORKFLOW_CORE_PATH_CONF=tests/conf
             WORKFLOW_CORE_TIMEZONE=Asia/Bangkok

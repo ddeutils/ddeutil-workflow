@@ -3,7 +3,7 @@ from pathlib import Path
 from textwrap import dedent
 
 import pytest
-from ddeutil.workflow.utils import make_registry
+from ddeutil.workflow.hook import make_registry
 
 
 @pytest.fixture(scope="module")
@@ -18,11 +18,13 @@ def hook_function(test_path: Path):
         f.write(
             dedent(
                 """
-            from ddeutil.workflow.utils import tag\n\n
+            from ddeutil.workflow.hook import tag
+
             @tag("polars-dir", alias="el-csv-to-parquet")
             def dummy_task(source: str, sink: str) -> dict[str, int]:
                 return {"records": 1}
-            @tag("polars-dir", alias="el-csv-to-parquet")\n\n
+
+            @tag("polars-dir", alias="el-csv-to-parquet")
             def dummy_task_override(source: str, sink: str) -> dict[str, int]:
                 return {"records": 1}
             """.strip(

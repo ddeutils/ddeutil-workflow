@@ -8,6 +8,7 @@ from .conf import (
     Config,
     Loader,
     Log,
+    config,
     env,
     get_log,
     get_logger,
@@ -23,6 +24,13 @@ from .exceptions import (
     StageException,
     UtilException,
     WorkflowException,
+)
+from .hook import (
+    ReturnTagFunc,
+    TagFunc,
+    extract_hook,
+    make_registry,
+    tag,
 )
 from .job import (
     Job,
@@ -48,33 +56,30 @@ from .stage import (
     PyStage,
     Stage,
     TriggerStage,
-    extract_hook,
 )
-from .utils import (
+from .templates import (
     FILTERS,
     FilterFunc,
     FilterRegistry,
-    ReturnTagFunc,
-    TagFunc,
-    batch,
-    cross_product,
     custom_filter,
-    dash2underscore,
-    delay,
-    filter_func,
-    gen_id,
     get_args_const,
-    get_diff_sec,
-    get_dt_now,
     has_template,
-    make_exec,
     make_filter_registry,
-    make_registry,
     map_post_filter,
     not_in_template,
     param2template,
     str2template,
-    tag,
+)
+from .utils import (
+    batch,
+    cross_product,
+    dash2underscore,
+    delay,
+    filter_func,
+    gen_id,
+    get_diff_sec,
+    get_dt_now,
+    make_exec,
 )
 from .workflow import (
     Workflow,

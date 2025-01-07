@@ -5,12 +5,15 @@
 The **On** is schedule object that receive crontab value and able to generate
 datetime value with next or previous with any start point of an input datetime.
 
-```yaml
-# This file should keep under this path: `./root-path/conf-path/*`
-on_every_5_min:
-  type: cron.On
-  cron: "*/5 * * * *"
-```
+!!! example "YAML"
+
+    === "Corn"
+
+        ```yaml
+        on_every_5_min:
+          type: cron.On
+          cron: "*/5 * * * *"
+        ```
 
 ```python
 from ddeutil.workflow.cron import On

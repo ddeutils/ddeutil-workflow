@@ -48,12 +48,11 @@ from .exceptions import JobException, WorkflowException
 from .job import Job
 from .params import Param
 from .result import Result
+from .templates import has_template, param2template
 from .utils import (
     cut_id,
     gen_id,
     get_dt_now,
-    has_template,
-    param2template,
     wait_a_minute,
 )
 
@@ -486,7 +485,7 @@ class Workflow(BaseModel):
             - Initialize WorkflowQueue and WorkflowRelease if they do not pass.
             - Create release data for pass to parameter templating function.
             - Execute this workflow with mapping release data to its parameters.
-            - Writing log
+            - Writing result log
             - Remove this release on the running queue
             - Push this release to complete queue
 

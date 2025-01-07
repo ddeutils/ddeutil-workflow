@@ -114,7 +114,7 @@ class Config:  # pragma: no cov
     @property
     def regis_filter(self) -> list[str]:
         regis_filter_str: str = env(
-            "CORE_REGISTRY_FILTER", "ddeutil.workflow.utils"
+            "CORE_REGISTRY_FILTER", "ddeutil.workflow.templates"
         )
         return [r.strip() for r in regis_filter_str.split(",")]
 
@@ -310,6 +310,10 @@ class SimLoad:
         )
 
 
+config = Config()
+logger = get_logger("ddeutil.workflow")
+
+
 class Loader(SimLoad):
     """Loader Object that get the config `yaml` file from current path.
 
@@ -335,15 +339,11 @@ class Loader(SimLoad):
         :rtype: Iterator[tuple[str, DictData]]
         """
         return super().finds(
-            obj=obj, conf=Config(), included=included, excluded=excluded
+            obj=obj, conf=config, included=included, excluded=excluded
         )
 
     def __init__(self, name: str, externals: DictData) -> None:
-        super().__init__(name, conf=Config(), externals=externals)
-
-
-config = Config()
-logger = get_logger("ddeutil.workflow")
+        super().__init__(name, conf=config, externals=externals)
 
 
 class BaseLog(BaseModel, ABC):
@@ -425,8 +425,8 @@ class FileLog(BaseLog):
         workflow name and release values. If a release does not pass to an input
         argument, it will return the latest release from the current log path.
 
-        :param name:
-        :param release:
+        :param name: A workflow name that want to search log.
+        :param release: A release datetime that want to search log.
 
         :raise FileNotFoundError:
         :raise NotImplementedError:
@@ -490,8 +490,14 @@ class FileLog(BaseLog):
 
         :rtype: Self
         """
+        from .utils import cut_id
+
         # NOTE: Check environ variable was set for real writing.
         if not config.enable_write_log:
+            logger.debug(
+                f"({cut_id(self.run_id)}) [LOG]: Skip writing log cause "
+                f"config was set"
+            )
             return self
 
         log_file: Path = self.pointer() / f"{self.run_id}.log"
@@ -521,6 +527,19 @@ class SQLiteLog(BaseLog):  # pragma: no cov
         """
 
     def save(self, excluded: list[str] | None) -> None:
+        """Save logging data that receive a context data from a workflow
+        execution result.
+        """
+        from .utils import cut_id
+
+        # NOTE: Check environ variable was set for real writing.
+        if not config.enable_write_log:
+            logger.debug(
+                f"({cut_id(self.run_id)}) [LOG]: Skip writing log cause "
+                f"config was set"
+            )
+            return self
+
         raise NotImplementedError("SQLiteLog does not implement yet.")
 
 

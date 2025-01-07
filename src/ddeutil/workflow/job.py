@@ -38,13 +38,13 @@ from .exceptions import (
 )
 from .result import Result
 from .stage import Stage
+from .templates import has_template
 from .utils import (
     cross_product,
     cut_id,
     dash2underscore,
     filter_func,
     gen_id,
-    has_template,
 )
 
 logger = get_logger("ddeutil.workflow")

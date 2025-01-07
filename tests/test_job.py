@@ -1,7 +1,7 @@
 from unittest import mock
 
 import pytest
-from ddeutil.workflow import Config
+from ddeutil.workflow.conf import Config
 from ddeutil.workflow.exceptions import JobException
 from ddeutil.workflow.job import Job, TriggerRules
 from pydantic import ValidationError
