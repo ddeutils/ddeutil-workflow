@@ -108,9 +108,7 @@ class Config:  # pragma: no cov
     # NOTE: Register
     @property
     def regis_hook(self) -> list[str]:
-        regis_hook_str: str = env(
-            "CORE_REGISTRY", "src,src.ddeutil.workflow,tests,tests.utils"
-        )
+        regis_hook_str: str = env("CORE_REGISTRY", "src")
         return [r.strip() for r in regis_hook_str.split(",")]
 
     @property
