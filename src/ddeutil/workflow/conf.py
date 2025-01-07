@@ -511,6 +511,18 @@ class FileLog(BaseLog):
 
 class SQLiteLog(BaseLog):  # pragma: no cov
 
+    table: str = "workflow_log"
+    schema: str = """
+        workflow        str,
+        release         int,
+        type            str,
+        context         json,
+        parent_run_id   int,
+        run_id          int,
+        update          datetime
+        primary key ( run_id )
+        """
+
     def save(self, excluded: list[str] | None) -> None:
         raise NotImplementedError("SQLiteLog does not implement yet.")
 
@@ -519,3 +531,9 @@ Log = Union[
     FileLog,
     SQLiteLog,
 ]
+
+
+def get_log() -> Log:  # pragma: no cov
+    if config.log_path.is_file():
+        return SQLiteLog
+    return FileLog
