@@ -5,48 +5,92 @@ and aggregate it into daily layer to silver data zone.
 
 ## Prerequisite
 
-I will use only core package of the workflow because I will run with manual
-action.
+I will use only the core package of the workflow and run with manual action.
 
 ```shell
-pip install ddeutil-workflow
+pip install uv
+uv pip install -U ddeutil-workflow
 ```
 
-Create the first pipeline template:
+Project structure:
+
+```text
+root/
+ ├─ conf/
+ │   ╰─ manual-workflow.yml
+ ├─ logs/
+ ├─ src/
+ │   ╰─ hooks/
+ │       ├─ __init__.py
+ │       ╰─ https_hook.py
+ ├─ main.py
+ ╰─ .env
+```
+
+Create initial config path at `.env`:
+
+```text
+WORKFLOW_LOG_ENABLE_WRITE=true
+WORKFLOW_CORE_REGISTRY=src
+WORKFLOW_CORE_TIMEZONE=Asia/Bangkok
+```
+
+Create the first pipeline template at `./conf/manual-workflow.yml`:
 
 ```yaml
 wf-run-manual:
   type: Workflow
+  params:
+    run_date: datetime
   jobs:
     stage-to-curated:
       stages:
         - name: "Extract data from external API"
           uses: tasks/https-external@httpx
           with:
-            url: "https://"
+            url: "https://some-endpoint/api/v1/extract"
             auth: "http_conn_id"
+            incremental: {{ params.run_date }}
 ```
 
-## Getting Started
+Create the hook function that use on your stage.
 
-That has ...
+At `./src/__init__.py`:
 
-### Via Python
+```python
+from .https_hook import *
+```
+
+At `./src/https_hook.py`:
+
+```python
+from ddeutil.workflow.hook import tag
+
+
+@tag("httpx", alias="https-external")
+def dummy_task_polars_dir(url: str, auth: str) -> dict[str, int]:
+    print(f"Start POST: {url} with auth: {auth}")
+    return {"counts": 0}
+```
+
+## Run Workflow
+
+At the `main.py` file:
 
 ```python
 from ddeutil.workflow import Workflow
 from ddeutil.workflow.result import Result
 
-result: Result = (
-    Workflow
-    .from_loader('pipe-run-manual')
-    .execute(params={"asat-dt": "2024-08-01"})
-)
-```
 
-### Via Application
+def call_manual():
+    result: Result = (
+        Workflow
+        .from_loader('wf-run-manual')
+        .execute(params={"run_date": "2024-08-01"})
+    )
+    print(result)
 
-```shell
-workflow start -h 127.0.0.1 -p 7070
-curl POST http://127.0.0.1:7070/workflow/pipeline/pipe-run-manual/exec/?asat-dt=2024-08-01
+
+if __name__ == '__main__':
+    call_manual()
 ```

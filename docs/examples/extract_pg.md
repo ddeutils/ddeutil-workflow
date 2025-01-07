@@ -1,4 +1,4 @@
-# Hook Stage
+# Extract Postgres
 
 The hook stage is the hook Python function from any registry location.
 

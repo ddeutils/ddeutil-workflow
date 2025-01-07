@@ -68,7 +68,8 @@ nav:
       - Schedule: api/schedule.md
   - Examples:
       - examples/index.md
-      - Hooks: examples/hook_stage.md
+      - Extract API: examples/extract_api.md
+      - Extract Postgres: example/extract_pg.md
 
 plugins:
   - tags
