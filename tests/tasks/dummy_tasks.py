@@ -10,6 +10,8 @@ from typing import Any
 
 from ddeutil.workflow.hook import tag
 
+logger = logging.getLogger("ddeutil.workflow")
+
 
 @tag("polars-dir", alias="el-csv-to-parquet")
 def dummy_task_polars_dir(
@@ -17,14 +19,14 @@ def dummy_task_polars_dir(
     sink: str,
     conversion: dict[str, Any] | None = None,
 ) -> dict[str, int]:
-    logging.info("[HOOK]: el-csv-to-parquet@polars-dir")
-    logging.debug("... Start EL for CSV to Parquet with Polars Engine")
-    logging.debug(f"... Reading data from {source}")
+    logger.info("[HOOK]: el-csv-to-parquet@polars-dir")
+    logger.debug("... Start EL for CSV to Parquet with Polars Engine")
+    logger.debug(f"... Reading data from {source}")
 
     conversion: dict[str, Any] = conversion or {}
     if conversion:
-        logging.debug("... Start Schema Conversion ...")
-    logging.debug(f"... Writing data to {sink}")
+        logger.debug("... Start Schema Conversion ...")
+    logger.debug(f"... Writing data to {sink}")
     return {"records": 1}
 
 
@@ -34,15 +36,15 @@ def dummy_task_polars_dir_scan(
     sink: str,
     conversion: dict[str, Any] | None = None,
 ) -> dict[str, int]:
-    logging.info("[HOOK]: el-csv-to-parquet@polars-dir-scan")
-    logging.debug("... Start EL for CSV to Parquet with Polars Engine")
-    logging.debug("... ---")
-    logging.debug(f"... Reading data from {source}")
+    logger.info("[HOOK]: el-csv-to-parquet@polars-dir-scan")
+    logger.debug("... Start EL for CSV to Parquet with Polars Engine")
+    logger.debug("... ---")
+    logger.debug(f"... Reading data from {source}")
 
     conversion: dict[str, Any] = conversion or {}
     if conversion:
-        logging.debug("... Start Schema Conversion ...")
-    logging.debug(f"... Writing data to {sink}")
+        logger.debug("... Start Schema Conversion ...")
+    logger.debug(f"... Writing data to {sink}")
     return {"records": 1}
 
 

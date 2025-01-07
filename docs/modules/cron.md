@@ -11,7 +11,7 @@ datetime value with next or previous with any start point of an input datetime.
 
         ```yaml
         on_every_5_min:
-          type: cron.On
+          type: On
           cron: "*/5 * * * *"
         ```
 

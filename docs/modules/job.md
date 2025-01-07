@@ -30,3 +30,42 @@ job execution.
 | trigger_rule | TriggerRules | `TriggerRules.all_success` |             |
 | needs        | list[str]    |          `list()`          |             |
 | strategy     | Strategy     |        `Strategy()`        |             |
+
+
+!!! example "YAML"
+
+    === "Job"
+
+        ```yaml
+        ```
+
+    === "Job Matrix"
+
+        ```yaml
+        ...
+        jobs:
+          multiple-system:
+            strategy:
+              max-parallel: 4
+              fail-fast: true
+              matrix:
+                table: [ 'customer', 'sales' ]
+                system: [ 'csv' ]
+                partition: [ 1, 2, 3 ]
+              exclude:
+                - table: customer
+                  system: csv
+                  partition: 1
+                - table: sales
+                  partition: 3
+              include:
+                - table: customer
+                  system: csv
+                  partition: 4
+            stages:
+              - name: Extract & Load Multi-System
+                run: |
+                  if ${{ matrix.partition }} == 1:
+                    raise ValueError('Value of partition matrix was equaled 1.')
+        ...
+        ```

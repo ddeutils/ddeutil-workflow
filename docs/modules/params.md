@@ -11,6 +11,18 @@ Param = Union[
 
 ## StrParam
 
+!!! example
+
+    === "Str"
+
+        ```yaml
+        ```
+
+    === "Str Default"
+
+        ```yaml
+        ```
+
 ## IntParam
 
 ## DatetimeParam

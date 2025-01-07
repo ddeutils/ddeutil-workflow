@@ -79,6 +79,20 @@ to stdout.
 | run   | str            |          |             |
 | vars  | dict[str, Any] |  dict()  |             |
 
+!!! example "YAML"
+
+    === "Python"
+
+        ```yaml
+        ...
+        stages:
+            - name: Call Python
+              run: |
+                import sys
+                print(sys.version_info)
+        ...
+        ```
+
 ## Hook Stage
 
 ### Fields
@@ -88,6 +102,17 @@ to stdout.
 | uses   | str                 |          |             |
 | args   | dict[str, Any]      |  dict()  |             |
 
+!!! example "YAML"
+
+    === "Hook"
+
+        ```yaml
+        ...
+        stages:
+            - name: Call hook task
+        ...
+        ```
+
 ## Trigger Stage
 
 ### Fields
@@ -96,3 +121,15 @@ to stdout.
 |-----------|----------------|:--------:|-------------|
 | trigger   | str            |          |             |
 | params    | dict[str, Any] |  dict()  |             |
+
+
+!!! example "YAML"
+
+    === "Trigger"
+
+        ```yaml
+        ...
+        stages:
+            - name: Call trigger
+        ...
+        ```

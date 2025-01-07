@@ -1,8 +1,14 @@
 import os
 from pathlib import Path
 
-import ddeutil.workflow.utils as utils
 import pytest
+from ddeutil.workflow.utils import (
+    batch,
+    cut_id,
+    filter_func,
+    gen_id,
+    make_exec,
+)
 
 
 @pytest.fixture(scope="function")
@@ -16,12 +22,12 @@ def adjust_config_gen_id():
 
 
 def test_gen_id():
-    assert "1354680202" == utils.gen_id("{}")
-    assert "1354680202" == utils.gen_id("{}", sensitive=False)
+    assert "1354680202" == gen_id("{}")
+    assert "1354680202" == gen_id("{}", sensitive=False)
 
 
 def test_gen_id_not_simple(adjust_config_gen_id):
-    assert "99914b932bd37a50b983c5e7c90ae93b" == utils.gen_id("{}")
+    assert "99914b932bd37a50b983c5e7c90ae93b" == gen_id("{}")
 
 
 def test_filter_func():
@@ -36,7 +42,7 @@ def test_filter_func():
             "echo": _extract_func,
         },
     }
-    rs = utils.filter_func(raw_rs)
+    rs = filter_func(raw_rs)
     assert {
         "echo": "echo",
         "list": ["1", 2, "echo"],
@@ -46,10 +52,10 @@ def test_filter_func():
 
 def test_batch():
     with pytest.raises(ValueError):
-        next(utils.batch(range(10), n=-1))
+        next(batch(range(10), n=-1))
 
     assert [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9]] == [
-        list(i) for i in utils.batch(range(10), n=2)
+        list(i) for i in batch(range(10), n=2)
     ]
 
 
@@ -59,10 +65,10 @@ def test_make_exec():
     with open(test_file, mode="w") as f:
         f.write("Hello world")
 
-    utils.make_exec(test_file)
+    make_exec(test_file)
 
     Path(test_file).unlink()
 
 
 def test_cut_id():
-    assert utils.cut_id(run_id="668931127320241228100331254567") == "254567"
+    assert cut_id(run_id="668931127320241228100331254567") == "254567"
