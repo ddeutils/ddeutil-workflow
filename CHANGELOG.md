@@ -2,6 +2,20 @@
 
 ## Latest Changes
 
+## 0.0.27
+
+### :sparkles: Features
+
+- :dart: feat: adjust default value on registry config. (_2025-01-07_)
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: add testcase for filter function. (_2025-01-07_)
+
+### :bug: Fix Bugs
+
+- :gear: fixed: revise log and config object. (_2025-01-07_)
+
 ## 0.0.26.post1
 
 ### :sparkles: Features
