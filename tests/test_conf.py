@@ -24,7 +24,6 @@ def test_config():
 
     conf = Config()
     os.environ["WORKFLOW_CORE_TIMEZONE"] = "Asia/Bangkok"
-    conf = conf.refresh_dotenv()
     assert conf.tz == ZoneInfo("Asia/Bangkok")
 
 

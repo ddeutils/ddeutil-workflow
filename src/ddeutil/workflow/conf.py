@@ -30,7 +30,10 @@ AnyModelType = type[AnyModel]
 
 load_dotenv()
 
-env = os.getenv
+
+def env(var: str, default: str | None = None) -> str | None:  # pragma: no cov
+    return os.getenv(f"WORKFLOW_{var}", default)
+
 
 __all__: TupleStr = (
     "get_logger",
@@ -74,93 +77,9 @@ class Config:
     """
 
     # NOTE: Core
-    root_path: Path = Path(os.getenv("WORKFLOW_ROOT_PATH", "."))
-    tz: ZoneInfo = ZoneInfo(env("WORKFLOW_CORE_TIMEZONE", "UTC"))
-    gen_id_simple_mode: bool = str2bool(
-        os.getenv("WORKFLOW_CORE_GENERATE_ID_SIMPLE_MODE", "true")
-    )
-
-    # NOTE: Register
-    regis_hook_str: str = os.getenv(
-        "WORKFLOW_CORE_REGISTRY", "src,src.ddeutil.workflow,tests,tests.utils"
-    )
-    regis_filter_str: str = os.getenv(
-        "WORKFLOW_CORE_REGISTRY_FILTER", "ddeutil.workflow.utils"
-    )
-
-    # NOTE: Logging
-    debug: bool = str2bool(os.getenv("WORKFLOW_LOG_DEBUG_MODE", "true"))
-    enable_write_log: bool = str2bool(
-        os.getenv("WORKFLOW_LOG_ENABLE_WRITE", "false")
-    )
-    log_path: Path = Path(os.getenv("WORKFLOW_LOG_PATH", "./logs"))
-
-    # NOTE: Stage
-    stage_raise_error: bool = str2bool(
-        env("WORKFLOW_CORE_STAGE_RAISE_ERROR", "false")
-    )
-    stage_default_id: bool = str2bool(
-        env("WORKFLOW_CORE_STAGE_DEFAULT_ID", "false")
-    )
-
-    # NOTE: Job
-    job_raise_error: bool = str2bool(
-        env("WORKFLOW_CORE_JOB_RAISE_ERROR", "true")
-    )
-    job_default_id: bool = str2bool(
-        env("WORKFLOW_CORE_JOB_DEFAULT_ID", "false")
-    )
-
-    # NOTE: Workflow
-    max_job_parallel: int = int(env("WORKFLOW_CORE_MAX_JOB_PARALLEL", "2"))
-    max_job_exec_timeout: int = int(
-        env("WORKFLOW_CORE_MAX_JOB_EXEC_TIMEOUT", "600")
-    )
-    max_poking_pool_worker: int = int(
-        os.getenv("WORKFLOW_CORE_MAX_NUM_POKING", "4")
-    )
-    max_on_per_workflow: int = int(
-        env("WORKFLOW_CORE_MAX_CRON_PER_WORKFLOW", "5")
-    )
-    max_queue_complete_hist: int = int(
-        os.getenv("WORKFLOW_CORE_MAX_QUEUE_COMPLETE_HIST", "16")
-    )
-
-    # NOTE: Schedule App
-    max_schedule_process: int = int(env("WORKFLOW_APP_MAX_PROCESS", "2"))
-    max_schedule_per_process: int = int(
-        env("WORKFLOW_APP_MAX_SCHEDULE_PER_PROCESS", "100")
-    )
-    stop_boundary_delta_str: str = env(
-        "WORKFLOW_APP_STOP_BOUNDARY_DELTA", '{"minutes": 5, "seconds": 20}'
-    )
-
-    # NOTE: API
-    prefix_path: str = env("WORKFLOW_API_PREFIX_PATH", "/api/v1")
-    enable_route_workflow: bool = str2bool(
-        env("WORKFLOW_API_ENABLE_ROUTE_WORKFLOW", "true")
-    )
-    enable_route_schedule: bool = str2bool(
-        env("WORKFLOW_API_ENABLE_ROUTE_SCHEDULE", "true")
-    )
-
-    def __init__(self) -> None:
-        # VALIDATE: the MAX_JOB_PARALLEL value should not less than 0.
-        if self.max_job_parallel < 0:
-            raise ValueError(
-                f"``MAX_JOB_PARALLEL`` should more than 0 but got "
-                f"{self.max_job_parallel}."
-            )
-
-        try:
-            self.stop_boundary_delta: timedelta = timedelta(
-                **json.loads(self.stop_boundary_delta_str)
-            )
-        except Exception as err:
-            raise ValueError(
-                "Config ``WORKFLOW_APP_STOP_BOUNDARY_DELTA`` can not parsing to"
-                f"timedelta with {self.stop_boundary_delta_str}."
-            ) from err
+    @property
+    def root_path(self) -> Path:
+        return Path(env("ROOT_PATH", "."))
 
     @property
     def conf_path(self) -> Path:
@@ -168,15 +87,125 @@ class Config:
 
         :rtype: Path
         """
-        return self.root_path / os.getenv("WORKFLOW_CORE_PATH_CONF", "conf")
+        return self.root_path / env("CORE_PATH_CONF", "conf")
 
     @property
+    def tz(self) -> ZoneInfo:
+        return ZoneInfo(env("CORE_TIMEZONE", "UTC"))
+
+    @property
+    def gen_id_simple_mode(self) -> bool:
+        return str2bool(env("CORE_GENERATE_ID_SIMPLE_MODE", "true"))
+
+    # NOTE: Register
+    @property
     def regis_hook(self) -> list[str]:
-        return [r.strip() for r in self.regis_hook_str.split(",")]
+        regis_hook_str: str = env(
+            "CORE_REGISTRY", "src,src.ddeutil.workflow,tests,tests.utils"
+        )
+        return [r.strip() for r in regis_hook_str.split(",")]
 
     @property
     def regis_filter(self) -> list[str]:
-        return [r.strip() for r in self.regis_filter_str.split(",")]
+        regis_filter_str: str = env(
+            "CORE_REGISTRY_FILTER", "ddeutil.workflow.utils"
+        )
+        return [r.strip() for r in regis_filter_str.split(",")]
+
+    # NOTE: Logging
+    @property
+    def log_path(self) -> Path:
+        return Path(env("LOG_PATH", "./logs"))
+
+    @property
+    def debug(self) -> bool:
+        return str2bool(env("LOG_DEBUG_MODE", "true"))
+
+    @property
+    def enable_write_log(self) -> bool:
+        return str2bool(env("LOG_ENABLE_WRITE", "false"))
+
+    # NOTE: Stage
+    @property
+    def stage_raise_error(self) -> bool:
+        return str2bool(env("CORE_STAGE_RAISE_ERROR", "false"))
+
+    @property
+    def stage_default_id(self) -> bool:
+        return str2bool(env("CORE_STAGE_DEFAULT_ID", "false"))
+
+    # NOTE: Job
+    @property
+    def job_raise_error(self) -> bool:
+        return str2bool(env("CORE_JOB_RAISE_ERROR", "true"))
+
+    @property
+    def job_default_id(self) -> bool:
+        return str2bool(env("CORE_JOB_DEFAULT_ID", "false"))
+
+    # NOTE: Workflow
+    @property
+    def max_job_parallel(self) -> int:
+        max_job_parallel = int(env("CORE_MAX_JOB_PARALLEL", "2"))
+
+        # VALIDATE: the MAX_JOB_PARALLEL value should not less than 0.
+        if max_job_parallel < 0:
+            raise ValueError(
+                f"``WORKFLOW_MAX_JOB_PARALLEL`` should more than 0 but got "
+                f"{self.max_job_parallel}."
+            )
+        return max_job_parallel
+
+    @property
+    def max_job_exec_timeout(self) -> int:
+        return int(env("CORE_MAX_JOB_EXEC_TIMEOUT", "600"))
+
+    @property
+    def max_poking_pool_worker(self) -> int:
+        return int(env("CORE_MAX_NUM_POKING", "4"))
+
+    @property
+    def max_on_per_workflow(self) -> int:
+        return int(env("CORE_MAX_CRON_PER_WORKFLOW", "5"))
+
+    @property
+    def max_queue_complete_hist(self) -> int:
+        return int(env("CORE_MAX_QUEUE_COMPLETE_HIST", "16"))
+
+    # NOTE: Schedule App
+    @property
+    def max_schedule_process(self) -> int:
+        return int(env("APP_MAX_PROCESS", "2"))
+
+    @property
+    def max_schedule_per_process(self) -> int:
+        return int(env("APP_MAX_SCHEDULE_PER_PROCESS", "100"))
+
+    @property
+    def stop_boundary_delta(self) -> timedelta:
+        stop_boundary_delta_str: str = env(
+            "APP_STOP_BOUNDARY_DELTA", '{"minutes": 5, "seconds": 20}'
+        )
+        try:
+            return timedelta(**json.loads(stop_boundary_delta_str))
+        except Exception as err:
+            raise ValueError(
+                "Config ``WORKFLOW_APP_STOP_BOUNDARY_DELTA`` can not parsing to"
+                f"timedelta with {stop_boundary_delta_str}."
+            ) from err
+
+    # NOTE: API
+    @property
+    def prefix_path(self) -> str:
+        return env("API_PREFIX_PATH", "/api/v1")
+
+    @property
+    def enable_route_workflow(self) -> bool:
+        return str2bool(env("API_ENABLE_ROUTE_WORKFLOW", "true"))
+
+    @property
+    def enable_route_schedule(self) -> bool:
+        return str2bool(env("API_ENABLE_ROUTE_SCHEDULE", "true"))
 
 
 class SimLoad:
