@@ -2,6 +2,24 @@
 
 ## Latest Changes
 
+## 0.0.26.post1
+
+### :sparkles: Features
+
+- :dart: feat: add code for sqlite logging. (_2025-01-07_)
+- :dart: feat: add null handler for dev can propagate this logging. (_2025-01-07_)
+- :dart: feat: change clas attrs on config object to property. (_2025-01-07_)
+
+### :black_nib: Code Changes
+
+- :art: styled: format code on config module. (_2025-01-07_)
+- :test_tube: tests: edit testcase for change config attrs. (_2025-01-07_)
+- :test_tube: tests: update testcase for config module. (_2025-01-07_)
+
+### :bug: Fix Bugs
+
+- :gear: fixed: change default log object from file to dynamic with env. (_2025-01-07_)
+
 ## 0.0.26.post0
 
 ### :sparkles: Features
