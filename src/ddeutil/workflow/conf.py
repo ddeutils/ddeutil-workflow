@@ -56,6 +56,14 @@ def get_logger(name: str):
     :param name: A module name that want to log.
     """
     lg = logging.getLogger(name)
+
+    # NOTE: Developers using this package can then disable all logging just for
+    #   this package by;
+    #
+    #   `logging.getLogger('ddeutil.workflow').propagate = False`
+    #
+    lg.addHandler(logging.NullHandler())
+
     formatter = logging.Formatter(
         fmt=(
             "%(asctime)s.%(msecs)03d (%(name)-10s, %(process)-5d, "
