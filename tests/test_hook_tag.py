@@ -38,6 +38,11 @@ def hook_function(test_path: Path):
     shutil.rmtree(new_tasks_path)
 
 
+def test_make_registry_not_found():
+    rs = make_registry("not_found")
+    assert rs == {}
+
+
 def test_make_registry_raise(hook_function):
 
     with pytest.raises(ValueError):

@@ -166,23 +166,6 @@ def get_args_from_filter(
     return func_name, f_func, args, kwargs
 
 
-@custom_filter("fmt")  # pragma: no cov
-def datetime_format(value: datetime, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
-    """Format datetime object to string with the format.
-
-    :param value: A datetime value that want to format to string value.
-    :param fmt: A format string pattern that passing to the `dt.strftime`
-        method.
-
-    :rtype: str
-    """
-    if isinstance(value, datetime):
-        return value.strftime(fmt)
-    raise UtilException(
-        "This custom function should pass input value with datetime type."
-    )
-
-
 def map_post_filter(
     value: T,
     post_filter: list[str],
@@ -222,6 +205,7 @@ def not_in_template(value: Any, *, not_in: str = "matrix.") -> bool:
 
     :param value: A value that want to find parameter template prefix.
     :param not_in: The not in string that use in the `.startswith` function.
+
     :rtype: bool
     """
     if isinstance(value, dict):
@@ -240,6 +224,7 @@ def has_template(value: Any) -> bool:
     """Check value include templating string.
 
     :param value: A value that want to find parameter template.
+
     :rtype: bool
     """
     if isinstance(value, dict):
@@ -330,3 +315,20 @@ def param2template(
     elif not isinstance(value, str):
         return value
     return str2template(value, params, filters=filters)
+
+
+@custom_filter("fmt")  # pragma: no cov
+def datetime_format(value: datetime, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
+    """Format datetime object to string with the format.
+
+    :param value: A datetime value that want to format to string value.
+    :param fmt: A format string pattern that passing to the `dt.strftime`
+        method.
+
+    :rtype: str
+    """
+    if isinstance(value, datetime):
+        return value.strftime(fmt)
+    raise UtilException(
+        "This custom function should pass input value with datetime type."
+    )

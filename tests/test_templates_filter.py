@@ -22,6 +22,11 @@ def raise_err(_: str) -> None:  # pragma: no cov
     raise ValueError("Demo raise error from filter function")
 
 
+@custom_filter("raise_util_exception")
+def raise_util(_: str) -> None:  # pragma: no cov
+    raise UtilException("Demo raise error from filter function")
+
+
 def test_make_registry_raise():
     with mock.patch.object(
         Config,
@@ -85,5 +90,13 @@ def test_map_post_filter():
             map_post_filter(
                 "2024",
                 ["fmt"],
+                make_filter_registry(),
+            )
+
+        # NOTE: Raise util exception inside filter function
+        with pytest.raises(UtilException):
+            map_post_filter(
+                "foo",
+                ["raise_util_exception"],
                 make_filter_registry(),
             )
