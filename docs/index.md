@@ -52,10 +52,10 @@ use-case.
 
 !!! important
 
-   I recommend you to use the `hook` stage for all actions that you want to do
-   with workflow activity that you want to orchestrate. Because it able to dynamic
-   an input argument with the same hook function that make you use less time to
-   maintenance your data workflows.
+    I recommend you to use the `hook` stage for all actions that you want to do
+    with workflow activity that you want to orchestrate. Because it able to dynamic
+    an input argument with the same hook function that make you use less time to
+    maintenance your data workflows.
 
 ```yaml
 run-py-local:
