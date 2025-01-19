@@ -10,11 +10,11 @@
 
 The **Lightweight workflow orchestration** with less dependencies the was created
 for easy to make a simple metadata driven for data workflow orchestration.
-It can to use for data operator by a `.yaml` template.
+It can use for data operator by a `.yaml` template.
 
 > [!WARNING]
 > This package provide only orchestration workload. That mean you should not
-> use the workflow stage to process any large volume data which use lot of compute
+> use the workflow stage to process any large volume data which use a lot of compute
 > resource. :cold_sweat:
 
 In my opinion, I think it should not create duplicate workflow codes if I can
@@ -32,7 +32,7 @@ configuration. It called **Metadata Driven Data Workflow**.
 
 > [!NOTE]
 > _Disclaimer_: I inspire the dynamic statement from the [**GitHub Action**](https://github.com/features/actions)
-> with `.yml` files and all of config file from several data orchestration framework
+> with `.yml` files and all configs file from several data orchestration framework
 > tools from my experience on Data Engineer. :grimacing:
 >
 > Other workflow tools that I interest on them and pick some interested feature
@@ -47,10 +47,10 @@ This project need `ddeutil` and `ddeutil-io` extension namespace packages.
 If you want to install this package with application add-ons, you should add
 `app` in installation;
 
-| Usecase        | Install Optional                         | Support            |
-|----------------|------------------------------------------|--------------------|
-| Python         | `pip install ddeutil-workflow`           | :heavy_check_mark: |
-| FastAPI Server | `pip install ddeutil-workflow[api]`      | :heavy_check_mark: |
+| Usecase        | Install Optional         | Support            |
+|----------------|--------------------------|--------------------|
+| Python         | `ddeutil-workflow`       | :heavy_check_mark: |
+| FastAPI Server | `ddeutil-workflow[api]`  | :heavy_check_mark: |
 
 ## :beers: Usage
 
@@ -180,7 +180,7 @@ like crontab job but via Python API.
 ```
 
 > [!NOTE]
-> If this package already deploy, it able to use multiprocess;
+> If this package already deploy, it is able to use multiprocess;
 > `uvicorn ddeutil.workflow.api:app --host 127.0.0.1 --port 80 --workers 4`
 
 ### Docker Container
