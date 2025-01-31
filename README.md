@@ -69,12 +69,12 @@ run-py-local:
    # Validate model that use to parsing exists for template file
    type: Workflow
    on:
-      # If workflow deploy to schedule, it will running every 5 minutes
+      # If workflow deploy to schedule, it will run every 5 minutes
       # with Asia/Bangkok timezone.
       - cronjob: '*/5 * * * *'
         timezone: "Asia/Bangkok"
    params:
-      # Incoming execution parameters will validate with this type. It allow
+      # Incoming execution parameters will validate with this type. It allows
       # to set default value or templating.
       source-extract: str
       run-date: datetime
@@ -98,7 +98,7 @@ run-py-local:
                     type: bearer
                     keys: ${API_ACCESS_REFRESH_TOKEN}
 
-                 # Arguments of target data that want to landing.
+                 # Arguments of target data that want to land.
                  writing_mode: flatten
                  aws_s3_path: my-data/open-data/${{ params.source-extract }}
 
@@ -122,7 +122,7 @@ schedule-run-local-wf:
    workflows:
 
       # Map existing workflow that want to deploy with scheduler application.
-      # It allow you to passing release parameter that dynamic change depend the
+      # It allows you to pass release parameter that dynamic change depend on the
       # current context of this scheduler application releasing that time.
       - name: run-py-local
         params:
@@ -132,7 +132,7 @@ schedule-run-local-wf:
 
 ## :cookie: Configuration
 
-The main configuration that use to dynamic changing with your propose of this
+The main configuration that use to dynamic changing with your objective of this
 application. If any configuration values do not set yet, it will use default value
 and do not raise any error to you.
 
@@ -176,7 +176,10 @@ like crontab job but via Python API.
 ### API Server
 
 ```shell
-(venv) $ uvicorn src.ddeutil.workflow.api:app --host 127.0.0.1 --port 80
+(venv) $ uvicorn src.ddeutil.workflow.api:app \
+  --host 127.0.0.1 \
+  --port 80 \
+  --no-access-log
 ```
 
 > [!NOTE]
@@ -196,3 +199,10 @@ Run the above Docker image;
 ```shell
 $ docker run -i ddeutil-workflow:latest
 ```
+
+## :speech_balloon: Contribute
+
+I do not think this project will go around the world because it has specific propose,
+and you can create by your coding without this project dependency for long term
+solution. So, on this time, you can open [the GitHub issue on this project :raised_hands:](https://github.com/ddeutils/ddeutil-workflow/issues)
+for fix bug or request new feature if you want it.
