@@ -86,7 +86,7 @@ def gen_id(
     sensitive: bool = True,
     unique: bool = False,
 ) -> str:
-    """Generate running ID for able to tracking. This generate process use `md5`
+    """Generate running ID for able to tracking. This generates process use `md5`
     algorithm function if ``WORKFLOW_CORE_WORKFLOW_ID_SIMPLE_MODE`` set to
     false. But it will cut this hashing value length to 10 it the setting value
     set to true.
@@ -127,7 +127,7 @@ def filter_func(value: Any) -> Any:
     have any changing.
 
     :param value: A value context data that want to filter out function value.
-    :type: The same type of an input ``value``.
+    :type: The same type of input ``value``.
     """
     if isinstance(value, dict):
         return {k: filter_func(value[k]) for k in value}
@@ -135,8 +135,8 @@ def filter_func(value: Any) -> Any:
         return type(value)([filter_func(i) for i in value])
 
     if isfunction(value):
-        # NOTE: If it want to improve to get this function, it able to save to
-        #   some global memory storage.
+        # NOTE: If it wants to improve to get this function, it is able to save
+        # to some global memory storage.
         #   ---
         #   >>> GLOBAL_DICT[value.__name__] = value
         #

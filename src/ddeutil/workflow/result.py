@@ -37,8 +37,8 @@ class Result:
 
     @model_validator(mode="after")
     def __prepare_run_id(self) -> Self:
-        """Prepare running ID which use default ID if it initialize at the first
-        time
+        """Prepare running ID which use default ID if it initializes at the
+        first time.
 
         :rtype: Self
         """
@@ -84,7 +84,7 @@ class Result:
 
     def receive_jobs(self, result: Result) -> Self:
         """Receive context from another result object that use on the workflow
-        execution which create a ``jobs`` keys on the context if it do not
+        execution which create a ``jobs`` keys on the context if it does not
         exist.
 
         :rtype: Self

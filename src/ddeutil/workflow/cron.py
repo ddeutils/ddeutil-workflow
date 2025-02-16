@@ -32,10 +32,10 @@ def interval2crontab(
 ) -> str:
     """Return the crontab string that was generated from specific values.
 
-    :param interval: A interval value that is one of 'daily', 'weekly', or
+    :param interval: An interval value that is one of 'daily', 'weekly', or
         'monthly'.
     :param day: A day value that will be day of week. The default value is
-        monday if it be weekly interval.
+        monday if it is weekly interval.
     :param time: A time value that passing with format '%H:%M'.
 
     Examples:
@@ -50,9 +50,9 @@ def interval2crontab(
     """
     d: str = "*"
     if interval == "weekly":
-        d = WEEKDAYS[(day or "monday")[:3].title()]
+        d = str(WEEKDAYS[(day or "monday")[:3].title()])
     elif interval == "monthly" and day:
-        d = WEEKDAYS[day[:3].title()]
+        d = str(WEEKDAYS[day[:3].title()])
 
     h, m = tuple(
         i.lstrip("0") if i != "00" else "0" for i in time.split(":", maxsplit=1)
@@ -95,7 +95,7 @@ class On(BaseModel):
 
         :param value: A mapping value that will generate crontab before create
             schedule model.
-        :param externals: A extras external parameter that will keep in extras.
+        :param externals: An extras external parameter that will keep in extras.
         """
         passing: DictStr = {}
         if "timezone" in value:
@@ -114,8 +114,8 @@ class On(BaseModel):
         """Constructor from the name of config that will use loader object for
         getting the data.
 
-        :param name: A name of config that will getting from loader.
-        :param externals: A extras external parameter that will keep in extras.
+        :param name: A name of config that will get from loader.
+        :param externals: An extras external parameter that will keep in extras.
         """
         externals: DictData = externals or {}
         loader: Loader = Loader(name, externals=externals)

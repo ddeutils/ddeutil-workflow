@@ -149,7 +149,7 @@ class WorkflowSchedule(BaseModel):
     @field_validator("on", mode="after")
     def __on_no_dup__(cls, value: list[On]) -> list[On]:
         """Validate the on fields should not contain duplicate values and if it
-        contain every minute value, it should has only one on value.
+        contains every minute value, it should have only one on value.
 
         :rtype: list[On]
         """
@@ -195,8 +195,8 @@ class WorkflowSchedule(BaseModel):
         wf: Workflow = Workflow.from_loader(self.name, externals=extras)
         wf_queue: WorkflowQueue = queue[self.alias]
 
-        # IMPORTANT: Create the default 'on' value if it does not passing
-        #   the on field to the Schedule object.
+        # IMPORTANT: Create the default 'on' value if it does not pass the `on`
+        #   field to the Schedule object.
         ons: list[On] = self.on or wf.on.copy()
 
         for on in ons:
@@ -223,7 +223,7 @@ class WorkflowSchedule(BaseModel):
 class Schedule(BaseModel):
     """Schedule Pydantic model that use to run with any scheduler package.
 
-        It does not equal the on value in Workflow model but it use same logic
+        It does not equal the on value in Workflow model, but it uses same logic
     to running release date with crontab interval.
     """
 
@@ -368,7 +368,7 @@ def schedule_task(
     :param stop: A stop datetime object that force stop running scheduler.
     :param queue: A mapping of alias name and WorkflowQueue object.
     :param threads: A mapping of alias name and Thread object.
-    :param log: A log class that want to making log object.
+    :param log: A log class that want to make log object.
 
     :rtype: CancelJob | None
     """
@@ -449,7 +449,7 @@ def schedule_task(
 
 
 def monitor(threads: ReleaseThreads) -> None:  # pragma: no cov
-    """Monitoring function that running every five minute for track long running
+    """Monitoring function that running every five minute for track long-running
     thread instance from the schedule_control function that run every minute.
 
     :param threads: A mapping of Thread object and its name.
@@ -479,7 +479,7 @@ def schedule_control(
     """Scheduler control function that running every minute.
 
     :param schedules: A list of workflow names that want to schedule running.
-    :param stop: An datetime value that use to stop running schedule.
+    :param stop: A datetime value that use to stop running schedule.
     :param externals: An external parameters that pass to Loader.
     :param log:
 
@@ -554,7 +554,7 @@ def schedule_control(
         scheduler.run_pending()
         time.sleep(1)
 
-        # NOTE: Break the scheduler when the control job does not exists.
+        # NOTE: Break the scheduler when the control job does not exist.
         if not scheduler.get_jobs("control"):
             scheduler.clear("monitor")
 
@@ -585,7 +585,7 @@ def schedule_runner(
 
     :param stop: A stop datetime object that force stop running scheduler.
     :param externals:
-    :param excluded: A list of schedule name that want to excluded from finding.
+    :param excluded: A list of schedule name that want to exclude from finding.
 
     :rtype: list[str]
 

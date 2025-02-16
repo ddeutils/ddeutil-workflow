@@ -80,9 +80,13 @@ def get_logger(name: str):
 
 
 class Config:  # pragma: no cov
-    """Config object for keeping application configuration on current session
+    """Config object for keeping core configurations on the current session
     without changing when if the application still running.
+
+        The config value can change when you call that config property again.
     """
+
+    __slots__ = ()
 
     # NOTE: Core
     @property
@@ -349,7 +353,7 @@ class Loader(SimLoad):
 class BaseLog(BaseModel, ABC):
     """Base Log Pydantic Model with abstraction class property that implement
     only model fields. This model should to use with inherit to logging
-    sub-class like file, sqlite, etc.
+    subclass like file, sqlite, etc.
     """
 
     name: str = Field(description="A workflow name.")
@@ -357,9 +361,7 @@ class BaseLog(BaseModel, ABC):
     type: str = Field(description="A running type before logging.")
     context: DictData = Field(
         default_factory=dict,
-        description=(
-            "A context data that receive from a workflow execution result.",
-        ),
+        description="A context that receive from a workflow execution result.",
     )
     parent_run_id: Optional[str] = Field(default=None)
     run_id: str
@@ -386,7 +388,7 @@ class BaseLog(BaseModel, ABC):
 
 class FileLog(BaseLog):
     """File Log Pydantic Model that use to saving log data from result of
-    workflow execution. It inherit from BaseLog model that implement the
+    workflow execution. It inherits from BaseLog model that implement the
     ``self.save`` method for file.
     """
 
@@ -526,7 +528,7 @@ class SQLiteLog(BaseLog):  # pragma: no cov
         primary key ( run_id )
         """
 
-    def save(self, excluded: list[str] | None) -> None:
+    def save(self, excluded: list[str] | None) -> SQLiteLog:
         """Save logging data that receive a context data from a workflow
         execution result.
         """
@@ -549,7 +551,7 @@ Log = Union[
 ]
 
 
-def get_log() -> Log:  # pragma: no cov
+def get_log() -> type[Log]:  # pragma: no cov
     if config.log_path.is_file():
         return SQLiteLog
     return FileLog

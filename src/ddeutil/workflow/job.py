@@ -83,7 +83,7 @@ def make(
     if len(matrix) == 0:
         return [{}]
 
-    # NOTE: Remove matrix that exists on the exclude.
+    # NOTE: Remove matrix that exists on the excluded.
     final: list[DictStr] = []
     for r in cross_product(matrix=matrix):
         if any(
@@ -101,7 +101,7 @@ def make(
     add: list[DictStr] = []
     for inc in include:
         # VALIDATE:
-        #   Validate any key in include list should be a subset of some one
+        #   Validate any key in include list should be a subset of someone
         #   in matrix.
         if all(not (set(inc.keys()) <= set(m.keys())) for m in final):
             raise ValueError(
@@ -128,9 +128,9 @@ class Strategy(BaseModel):
     special job with combination of matrix data.
 
         This model does not be the part of job only because you can use it to
-    any model object. The propose of this model is generate metrix result that
-    comming from combination logic with any matrix values for running it with
-    parallelism.
+    any model object. The objective of this model is generating metrix result
+    that comming from combination logic with any matrix values for running it
+    with parallelism.
 
         [1, 2, 3] x [a, b] --> [1a], [1b], [2a], [2b], [3a], [3b]
 
@@ -180,7 +180,7 @@ class Strategy(BaseModel):
         """Rename key that use dash to underscore because Python does not
         support this character exist in any variable name.
 
-        :param values: A parsing values to this models
+        :param values: A parsing values to these models
         :rtype: DictData
         """
         dash2underscore("max-parallel", values)
@@ -226,7 +226,7 @@ class Job(BaseModel):
     """Job Pydantic model object (short descripte: a group of stages).
 
         This job model allow you to use for-loop that call matrix strategy. If
-    you pass matrix mapping and it able to generate, you will see it running
+    you pass matrix mapping, and it is able to generate, you will see it running
     with loop of matrix values.
 
     Data Validate:
@@ -355,7 +355,7 @@ class Job(BaseModel):
         return all(need in jobs for need in self.needs)
 
     def set_outputs(self, output: DictData, to: DictData) -> DictData:
-        """Set an outputs from execution process to the receive context. The
+        """Set an outputs from execution process to the received context. The
         result from execution will pass to value of ``strategies`` key.
 
             For example of setting output method, If you receive execute output
@@ -420,7 +420,7 @@ class Job(BaseModel):
         strategy and return with context of this strategy data.
 
             The result of this execution will return result with strategy ID
-        that generated from the `gen_id` function with a input strategy value.
+        that generated from the `gen_id` function with an input strategy value.
 
         :raise JobException: If it has any error from ``StageException`` or
             ``UtilException``.
@@ -429,7 +429,7 @@ class Job(BaseModel):
             This value will pass to the `matrix` key for templating.
         :param params: A dynamic parameters that will deepcopy to the context.
         :param run_id: A job running ID for this strategy execution.
-        :param event: An manger event that pass to the PoolThreadExecutor.
+        :param event: An event manager that pass to the PoolThreadExecutor.
 
         :rtype: Result
         """
@@ -496,7 +496,7 @@ class Job(BaseModel):
             # PARAGRAPH:
             #
             #       I do not use below syntax because `params` dict be the
-            #   reference memory pointer and it was changed when I action
+            #   reference memory pointer, and it was changed when I action
             #   anything like update or re-construct this.
             #
             #       ... params |= stage.execute(params=params)
@@ -566,7 +566,7 @@ class Job(BaseModel):
         run_id: str = run_id or gen_id(self.id or "", unique=True)
         context: DictData = {}
 
-        # NOTE: Normal Job execution without parallel strategy matrix. It use
+        # NOTE: Normal Job execution without parallel strategy matrix. It uses
         #   for-loop to control strategy execution sequentially.
         if (not self.strategy.is_set()) or self.strategy.max_parallel == 1:
             for strategy in self.strategy.make():
@@ -585,8 +585,7 @@ class Job(BaseModel):
         event: Event = Event()
 
         # IMPORTANT: Start running strategy execution by multithreading because
-        #   it will running by strategy values without waiting previous
-        #   execution.
+        #   it will run by strategy values without waiting previous execution.
         with ThreadPoolExecutor(
             max_workers=self.strategy.max_parallel,
             thread_name_prefix="job_strategy_exec_",
@@ -618,7 +617,7 @@ class Job(BaseModel):
         timeout: int = 1800,
     ) -> Result:
         """Job parallel pool futures catching with fail-fast mode. That will
-        stop and set event on all not done futures if it receive the first
+        stop and set event on all not done futures if it receives the first
         exception from all running futures.
 
         :param event: An event manager instance that able to set stopper on the

@@ -5,12 +5,12 @@
 # ------------------------------------------------------------------------------
 """Stage Model that use for getting stage data template from the Job Model.
 The stage handle the minimize task that run in some thread (same thread at
-its job owner) that mean it is the lowest executor of a workflow workflow that
-can tracking logs.
+its job owner) that mean it is the lowest executor of a workflow that can
+tracking logs.
 
     The output of stage execution only return 0 status because I do not want to
 handle stage error on this stage model. I think stage model should have a lot of
-usecase and it does not worry when I want to create a new one.
+use-case, and it does not worry when I want to create a new one.
 
     Execution   --> Ok      --> Result with 0
 
@@ -79,7 +79,7 @@ def handler_result(message: str | None = None) -> DecoratorResult:
     """Decorator function for handler result from the stage execution. This
     function should to use with execution method only.
 
-        This stage exception handler still use ok-error concept but it allow
+        This stage exception handler still use ok-error concept, but it allows
     you force catching an output result with error message by specific
     environment variable,`WORKFLOW_CORE_STAGE_RAISE_ERROR`.
 
@@ -226,7 +226,7 @@ class BaseStage(BaseModel, ABC):
         raise NotImplementedError("Stage should implement ``execute`` method.")
 
     def set_outputs(self, output: DictData, to: DictData) -> DictData:
-        """Set an outputs from execution process to the receive context. The
+        """Set an outputs from execution process to the received context. The
         result from execution will pass to value of ``outputs`` key.
 
             For example of setting output method, If you receive execute output
@@ -243,7 +243,7 @@ class BaseStage(BaseModel, ABC):
                         }
                     }
 
-        :param output: A output data that want to extract to an output key.
+        :param output: An output data that want to extract to an output key.
         :param to: A context data that want to add output result.
         :rtype: DictData
         """
@@ -288,8 +288,9 @@ class BaseStage(BaseModel, ABC):
         params: DictData = {} if params is None else params
 
         try:
-            # WARNING: The eval build-in function is vary dangerous. So, it
-            #   should us the re module to validate eval-string before running.
+            # WARNING: The eval build-in function is very dangerous. So, it
+            #   should use the `re` module to validate eval-string before
+            #   running.
             rs: bool = eval(
                 param2template(self.condition, params), globals() | params, {}
             )
@@ -352,7 +353,7 @@ class EmptyStage(BaseStage):
 
 class BashStage(BaseStage):
     """Bash execution stage that execute bash script on the current OS.
-    That mean if your current OS is Windows, it will running bash in the WSL.
+    If your current OS is Windows, it will run on the bash in the WSL.
 
         I get some limitation when I run shell statement with the built-in
     supprocess package. It does not good enough to use multiline statement.
@@ -499,7 +500,7 @@ class PyStage(BaseStage):
         """Override set an outputs method for the Python execution process that
         extract output from all the locals values.
 
-        :param output: A output data that want to extract to an output key.
+        :param output: An output data that want to extract to an output key.
         :param to: A context data that want to add output result.
 
         :rtype: DictData
@@ -542,8 +543,8 @@ class PyStage(BaseStage):
         # NOTE: Start exec the run statement.
         logger.info(f"({cut_id(run_id)}) [STAGE]: Py-Execute: {self.name}")
 
-        # WARNING: The exec build-in function is vary dangerous. So, it
-        #   should us the re module to validate exec-string before running.
+        # WARNING: The exec build-in function is very dangerous. So, it
+        #   should use the re module to validate exec-string before running.
         exec(run, _globals, lc)
 
         return Result(
@@ -560,7 +561,7 @@ class HookStage(BaseStage):
         This stage is different with PyStage because the PyStage is just calling
     a Python statement with the ``eval`` and pass that locale before eval that
     statement. So, you can create your function complexly that you can for your
-    propose to invoked by this stage object.
+    objective to invoked by this stage object.
 
     Data Validate:
         >>> stage = {
@@ -612,7 +613,7 @@ class HookStage(BaseStage):
                 f"Necessary params, ({', '.join(ips.parameters.keys())}, ), "
                 f"does not set to args"
             )
-        # NOTE: add '_' prefix if it want to use.
+        # NOTE: add '_' prefix if it wants to use.
         for k in ips.parameters:
             if k.removeprefix("_") in args:
                 args[k] = args.pop(k.removeprefix("_"))
@@ -634,7 +635,7 @@ class HookStage(BaseStage):
 
 
 class TriggerStage(BaseStage):
-    """Trigger Workflow execution stage that execute another workflow. This this
+    """Trigger Workflow execution stage that execute another workflow. This
     the core stage that allow you to create the reusable workflow object or
     dynamic parameters workflow for common usecase.
 
@@ -658,7 +659,7 @@ class TriggerStage(BaseStage):
 
     @handler_result("Raise from TriggerStage")
     def execute(self, params: DictData, *, run_id: str | None = None) -> Result:
-        """Trigger another workflow execution. It will waiting the trigger
+        """Trigger another workflow execution. It will wait the trigger
         workflow running complete before catching its result.
 
         :param params: A parameter data that want to use in this execution.
@@ -687,7 +688,7 @@ class TriggerStage(BaseStage):
 # NOTE:
 #   An order of parsing stage model on the Job model with ``stages`` field.
 #   From the current build-in stages, they do not have stage that have the same
-#   fields that be cause of parsing on the Job's stages key.
+#   fields that because of parsing on the Job's stages key.
 #
 Stage = Union[
     PyStage,

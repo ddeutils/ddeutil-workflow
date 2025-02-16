@@ -75,7 +75,7 @@ class DatetimeParam(DefaultParam):
     default: datetime = Field(default_factory=get_dt_now)
 
     def receive(self, value: str | datetime | date | None = None) -> datetime:
-        """Receive value that match with datetime. If a input value pass with
+        """Receive value that match with datetime. If an input value pass with
         None, it will use default value instead.
 
         :param value: A value that want to validate with datetime parameter
@@ -98,7 +98,7 @@ class DatetimeParam(DefaultParam):
             return datetime.fromisoformat(value)
         except ValueError:
             raise ParamValueException(
-                f"Invalid isoformat string: {value!r}"
+                f"Invalid the ISO format string: {value!r}"
             ) from None
 
 
@@ -158,7 +158,7 @@ class ChoiceParam(BaseParam):
         :rtype: str
         """
         # NOTE:
-        #   Return the first value in options if does not pass any input value
+        #   Return the first value in options if it does not pass any input value
         if value is None:
             return self.options[0]
         if value not in self.options:

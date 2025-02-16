@@ -29,7 +29,7 @@ def test_stage():
 
 
 def test_stage_empty_execute():
-    stage: Stage = EmptyStage(name="Empty Stage", echo="hello world")
+    stage: EmptyStage = EmptyStage(name="Empty Stage", echo="hello world")
     rs: Result = stage.execute(params={})
     assert isinstance(rs, Result)
     assert 0 == rs.status

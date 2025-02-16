@@ -138,7 +138,7 @@ class WorkflowQueue:
         """Construct WorkflowQueue object from an input queue value that passing
         with list of datetime or list of WorkflowRelease.
 
-        :raise TypeError: If the type of an input queue does not valid.
+        :raise TypeError: If the type of input queue does not valid.
 
         :rtype: Self
         """
@@ -226,9 +226,9 @@ class WorkflowQueue:
 class Workflow(BaseModel):
     """Workflow Pydantic model.
 
-        This is the main future of this project because it use to be workflow
+        This is the main future of this project because it uses to be workflow
     data for running everywhere that you want or using it to scheduler task in
-    background. It use lightweight coding line from Pydantic Model and enhance
+    background. It uses lightweight coding line from Pydantic Model and enhance
     execute method on it.
     """
 
@@ -317,7 +317,7 @@ class Workflow(BaseModel):
     @model_validator(mode="before")
     def __prepare_model_before__(cls, values: DictData) -> DictData:
         """Prepare the params key in the data model before validating."""
-        # NOTE: Prepare params type if it passing with only type value.
+        # NOTE: Prepare params type if it is passing with only type value.
         if params := values.pop("params", {}):
             values["params"] = {
                 p: (
@@ -341,7 +341,7 @@ class Workflow(BaseModel):
     @field_validator("on", mode="after")
     def __on_no_dup_and_reach_limit__(cls, value: list[On]) -> list[On]:
         """Validate the on fields should not contain duplicate values and if it
-        contain the every minute value more than one value, it will remove to
+        contains the every minute value more than one value, it will remove to
         only one value.
 
         :raise ValueError: If it has some duplicate value.
@@ -359,8 +359,8 @@ class Workflow(BaseModel):
         # WARNING:
         # if '* * * * *' in set_ons and len(set_ons) > 1:
         #     raise ValueError(
-        #         "If it has every minute cronjob on value, it should has only "
-        #         "one value in the on field."
+        #         "If it has every minute cronjob on value, it should have "
+        #         "only one value in the on field."
         #     )
 
         if len(set_ons) > config.max_on_per_workflow:
@@ -372,7 +372,7 @@ class Workflow(BaseModel):
 
     @model_validator(mode="after")
     def __validate_jobs_need__(self) -> Self:
-        """Validate each need job in any jobs should exists.
+        """Validate each need job in any jobs should exist.
 
         :raise WorkflowException: If it has not exists need value in this
             workflow job.
@@ -591,10 +591,10 @@ class Workflow(BaseModel):
         """Generate queue of datetime from the cron runner that initialize from
         the on field. with offset value.
 
-        :param offset: A offset in second unit for time travel.
+        :param offset: An offset in second unit for time travel.
         :param end_date: An end datetime object.
         :param queue: A workflow queue object.
-        :param log: A log class that want to making log object.
+        :param log: A log class that want to make log object.
         :param force_run: A flag that allow to release workflow if the log with
             that release was pointed.
 
@@ -696,7 +696,7 @@ class Workflow(BaseModel):
             start_date: datetime = current_date
             offset: float = 0
 
-        # NOTE: End date is use to stop generate queue with an input periods
+        # NOTE: End date is using to stop generate queue with an input periods
         #   value.
         end_date: datetime = start_date + timedelta(minutes=periods)
 
@@ -812,7 +812,7 @@ class Workflow(BaseModel):
         :param params: A params that was parameterized from workflow execution.
         :param run_id: A workflow running ID for this job execution.
         :param raise_error: A flag that raise error instead catching to result
-            if it get exception from job execution.
+            if it gets exception from job execution.
 
         :rtype: Result
         :return: Return the result object that receive the job execution result
@@ -868,8 +868,8 @@ class Workflow(BaseModel):
         """Execute workflow with passing a dynamic parameters to all jobs that
         included in this workflow model with ``jobs`` field.
 
-            The result of execution process for each jobs and stages on this
-        workflow will keeping in dict which able to catch out with all jobs and
+            The result of execution process for each job and stages on this
+        workflow will keep in dict which able to catch out with all jobs and
         stages by dot annotation.
 
             For example, when I want to use the output from previous stage, I
@@ -907,8 +907,8 @@ class Workflow(BaseModel):
             )
             return rs.catch(status=0, context=params)
 
-        # NOTE: Create a job queue that keep the job that want to running after
-        #   it dependency condition.
+        # NOTE: Create a job queue that keep the job that want to run after
+        #   its dependency condition.
         jq: Queue = Queue()
         for job_id in self.jobs:
             jq.put(job_id)
@@ -967,7 +967,7 @@ class Workflow(BaseModel):
 
         :param context: A context workflow data that want to downstream passing.
         :param ts: A start timestamp that use for checking execute time should
-            timeout.
+            time out.
         :param job_queue: A job queue object.
         :param timeout: A second value unit that bounding running time.
         :param thread_timeout: A timeout to waiting all futures complete.
@@ -1064,7 +1064,7 @@ class Workflow(BaseModel):
 
         :param context: A context workflow data that want to downstream passing.
         :param ts: A start timestamp that use for checking execute time should
-            timeout.
+            time out.
         :param timeout: A second value unit that bounding running time.
 
         :rtype: DictData
@@ -1090,7 +1090,7 @@ class Workflow(BaseModel):
                 continue
 
             # NOTE: Start workflow job execution with deep copy context data
-            #   before release. This job execution process will running until
+            #   before release. This job execution process will run until
             #   done before checking all execution timeout or not.
             #
             #   {
@@ -1182,7 +1182,7 @@ class WorkflowTask:
 
         :param end_date: An end datetime object.
         :param queue: A workflow queue object.
-        :param log: A log class that want to making log object.
+        :param log: A log class that want to make log object.
         :param force_run: A flag that allow to release workflow if the log with
             that release was pointed.
 

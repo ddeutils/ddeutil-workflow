@@ -44,10 +44,10 @@ FILTERS: dict[str, callable] = {  # pragma: no cov
 
 class FilterFunc(Protocol):
     """Tag Function Protocol. This protocol that use to represent any callable
-    object that able to access the name attribute.
+    object that able to access the filter attribute.
     """
 
-    name: str
+    filter: str
 
     def __call__(self, *args, **kwargs): ...  # pragma: no cov
 
@@ -94,6 +94,8 @@ def make_filter_registry() -> dict[str, FilterRegistry]:
             #   ``utils.tag`` decorator.
             if not hasattr(func, "filter"):
                 continue
+
+            func: FilterFunc
 
             rs[func.filter] = import_string(f"{module}.{fstr}")
 
@@ -174,7 +176,7 @@ def map_post_filter(
     """Mapping post-filter to value with sequence list of filter function name
     that will get from the filter registry.
 
-    :param value: A string value that want to mapped with filter function.
+    :param value: A string value that want to map with filter function.
     :param post_filter: A list of post-filter function name.
     :param filters: A filter registry.
 
@@ -204,7 +206,7 @@ def not_in_template(value: Any, *, not_in: str = "matrix.") -> bool:
     """Check value should not pass template with not_in value prefix.
 
     :param value: A value that want to find parameter template prefix.
-    :param not_in: The not in string that use in the `.startswith` function.
+    :param not_in: The not-in string that use in the `.startswith` function.
 
     :rtype: bool
     """
@@ -249,7 +251,7 @@ def str2template(
     with the workflow parameter types that is `str`, `int`, `datetime`, and
     `list`.
 
-    :param value: A string value that want to mapped with an params
+    :param value: A string value that want to map with params
     :param params: A parameter value that getting with matched regular
         expression.
     :param filters:
@@ -273,11 +275,11 @@ def str2template(
         if not hasdot(caller, params):
             raise UtilException(f"The params does not set caller: {caller!r}.")
 
-        # NOTE: from validate step, it guarantee that caller exists in params.
+        # NOTE: from validate step, it guarantees that caller exists in params.
         getter: Any = getdot(caller, params)
 
         # NOTE:
-        #   If type of getter caller is not string type and it does not use to
+        #   If type of getter caller is not string type, and it does not use to
         #   concat other string value, it will return origin value from the
         #   ``getdot`` function.
         if value.replace(found.full, "", 1) == "":
@@ -300,7 +302,7 @@ def param2template(
     """Pass param to template string that can search by ``RE_CALLER`` regular
     expression.
 
-    :param value: A value that want to mapped with an params
+    :param value: A value that want to map with params
     :param params: A parameter value that getting with matched regular
         expression.
 

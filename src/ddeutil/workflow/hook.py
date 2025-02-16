@@ -87,8 +87,11 @@ def make_registry(submodule: str) -> dict[str, Registry]:
         for fstr, func in inspect.getmembers(importer, inspect.isfunction):
             # NOTE: check function attribute that already set tag by
             #   ``utils.tag`` decorator.
-            if not hasattr(func, "tag"):
+            if not (hasattr(func, "tag") and hasattr(func, "name")):
                 continue
+
+            # NOTE: Define type of the func value.
+            func: TagFunc
 
             # NOTE: Create new register name if it not exists
             if func.name not in rs:
