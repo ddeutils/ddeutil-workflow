@@ -5,11 +5,11 @@ default_language_version:
 ci:
     skip: [pytest-check, commit-msg-hook]
     autofix_commit_msg: |
-        🚧 [pre-commit.ci] auto fixes from pre-commit.com hooks
+        🚧 build: [pre-commit.ci] auto fixes from pre-commit.com hooks
     autofix_prs: true
     autoupdate_schedule: weekly
     autoupdate_commit_msg: |
-        🚧 [pre-commit.ci] pre-commit autoupdate
+        🚧 build: [pre-commit.ci] pre-commit autoupdate
 
 repos:
 -   repo: https://github.com/asottile/pyupgrade
@@ -48,7 +48,7 @@ repos:
         stages: [commit]
 
 -   repo: https://github.com/korawica/clishelf
-    rev: v0.2.4
+    rev: v0.2.19
     hooks:
     -   id: shelf-commit-msg
 
