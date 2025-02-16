@@ -1,4 +1,4 @@
-# Workflow
+# Workflow Orchestration
 
 [![test](https://github.com/ddeutils/ddeutil-workflow/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/ddeutils/ddeutil-workflow/actions/workflows/tests.yml)
 [![codecov](https://codecov.io/gh/ddeutils/ddeutil-workflow/graph/badge.svg?token=3NDPN2I0H9)](https://codecov.io/gh/ddeutils/ddeutil-workflow)
@@ -8,9 +8,9 @@
 [![gh license](https://img.shields.io/github/license/ddeutils/ddeutil-workflow)](https://github.com/ddeutils/ddeutil-workflow/blob/main/LICENSE)
 [![code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-The **Lightweight workflow orchestration** with less dependencies the was created
-for easy to make a simple metadata driven for data workflow orchestration.
-It can use for data operator by a `.yaml` template.
+The **Lightweight Workflow Orchestration** with fewer dependencies the was created
+for easy to make a simple metadata driven data workflow. It can use for data operator
+by a `.yaml` template.
 
 > [!WARNING]
 > This package provide only orchestration workload. That mean you should not
@@ -47,7 +47,7 @@ This project need `ddeutil` and `ddeutil-io` extension namespace packages.
 If you want to install this package with application add-ons, you should add
 `app` in installation;
 
-| Usecase        | Install Optional         | Support            |
+| Use-case       | Install Optional         | Support            |
 |----------------|--------------------------|--------------------|
 | Python         | `ddeutil-workflow`       | :heavy_check_mark: |
 | FastAPI Server | `ddeutil-workflow[api]`  | :heavy_check_mark: |
@@ -91,7 +91,7 @@ run-py-local:
                  body:
                     resource: ${{ params.source-extract }}
 
-                    # You can able to use filtering like Jinja template but this
+                    # You can use filtering like Jinja template but this
                     # package does not use it.
                     filter: ${{ params.run-date | fmt(fmt='%Y%m%d') }}
                  auth:
@@ -169,7 +169,7 @@ and do not raise any error to you.
 
 ## :rocket: Deployment
 
-This package able to run as a application service for receive manual trigger
+This package able to run as an application service for receive manual trigger
 from the master node via RestAPI or use to be Scheduler background service
 like crontab job but via Python API.
 

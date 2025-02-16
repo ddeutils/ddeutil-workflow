@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=68.0"]
+requires = [ "setuptools>=68.0" ]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "ddeutil-workflow"
-description = "Lightweight workflow orchestration with less dependencies"
+description = "Lightweight workflow orchestration"
 readme = {file = "README.md", content-type = "text/markdown"}
 license = {text = "MIT"}
 authors = [{ name = "ddeutils", email = "korawich.anu@gmail.com" }]
@@ -35,9 +35,7 @@ dependencies = [
 dynamic = ["version"]
 
 [project.optional-dependencies]
-api = [
-    "fastapi>=0.115.0,<1.0.0",
-]
+api = [ "fastapi>=0.115.0,<1.0.0" ]
 
 [project.urls]
 Homepage = "https://github.com/ddeutils/ddeutil-workflow/"
