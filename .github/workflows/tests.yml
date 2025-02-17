@@ -5,7 +5,6 @@ on:
     paths-ignore:
       - 'docs/**'
       - '*.md'
-      - '*.rst'
   pull_request:
     branches:
       - "main"
@@ -13,7 +12,6 @@ on:
     paths-ignore:
       - 'docs/**'
       - '*.md'
-      - '*.rst'
 
 jobs:
 
