@@ -513,7 +513,9 @@ class Job(BaseModel):
             #
             try:
                 stage.set_outputs(
-                    stage.execute(params=context, run_id=run_id).context,
+                    stage.handler_execute(
+                        params=context, run_id=run_id
+                    ).context,
                     to=context,
                 )
             except (StageException, UtilException) as err:

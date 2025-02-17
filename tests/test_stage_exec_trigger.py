@@ -11,7 +11,7 @@ def test_stage_exec_trigger():
     stage: st.Stage = workflow.job("trigger-job").stage(
         stage_id="trigger-stage"
     )
-    rs: Result = stage.execute(params={})
+    rs: Result = stage.handler_execute(params={})
     assert all(k in ("params", "jobs") for k in rs.context.keys())
     assert {
         "author-run": "Trigger Runner",

@@ -15,7 +15,7 @@ def test_stage_exec_py_raise():
         workflow: Workflow = Workflow.from_loader(name="wf-run-common")
         stage: Stage = workflow.job("raise-run").stage(stage_id="raise-error")
         with pytest.raises(StageException):
-            stage.execute(params={"x": "Foo"})
+            stage.handler_execute(params={"x": "Foo"})
 
 
 def test_stage_exec_py_not_raise():
@@ -23,7 +23,7 @@ def test_stage_exec_py_not_raise():
         workflow: Workflow = Workflow.from_loader(name="wf-run-common")
         stage: Stage = workflow.job("raise-run").stage(stage_id="raise-error")
 
-        rs = stage.execute(params={"x": "Foo"})
+        rs = stage.handler_execute(params={"x": "Foo"})
 
         assert rs.status == 1
 
@@ -64,7 +64,9 @@ def test_stage_exec_py_with_vars():
         "params": {"name": "Author"},
         "stages": {"hello-world": {"outputs": {"x": "Foo"}}},
     }
-    rs_out = stage.set_outputs(stage.execute(params=params).context, to=params)
+    rs_out = stage.set_outputs(
+        stage.handler_execute(params=params).context, to=params
+    )
     assert {
         "params": {"name": "Author"},
         "stages": {
@@ -77,7 +79,7 @@ def test_stage_exec_py_with_vars():
 def test_stage_exec_py_func():
     workflow: Workflow = Workflow.from_loader(name="wf-run-python")
     stage: Stage = workflow.job("second-job").stage(stage_id="create-func")
-    rs: Result = stage.execute(params={})
+    rs: Result = stage.handler_execute(params={})
     rs_out = stage.set_outputs(rs.context, to={})
     assert ("var_inside", "echo") == tuple(
         rs_out["stages"]["create-func"]["outputs"].keys()

@@ -8,7 +8,7 @@ from ddeutil.workflow.stage import Stage
 def test_stage_exec_bash():
     workflow: Workflow = Workflow.from_loader(name="wf-run-common")
     stage: Stage = workflow.job("bash-run").stage("echo")
-    rs: Result = stage.execute({})
+    rs: Result = stage.handler_execute({})
     assert {
         "return_code": 0,
         "stdout": "Hello World\nVariable Foo",
@@ -19,7 +19,7 @@ def test_stage_exec_bash():
 def test_stage_exec_bash_env():
     workflow: Workflow = Workflow.from_loader(name="wf-run-common")
     stage: Stage = workflow.job("bash-run-env").stage("echo-env")
-    rs: Result = stage.execute({})
+    rs: Result = stage.handler_execute({})
     assert {
         "return_code": 0,
         "stdout": "Hello World\nVariable Foo\nENV Bar",
@@ -31,4 +31,4 @@ def test_stage_exec_bash_env_raise():
     workflow: Workflow = Workflow.from_loader(name="wf-run-common")
     stage: Stage = workflow.job("bash-run-env").stage("raise-error")
     with pytest.raises(StageException):
-        stage.execute({})
+        stage.handler_execute({})

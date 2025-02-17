@@ -1,16 +1,16 @@
 from datetime import datetime
 
-import ddeutil.workflow as wf
-import ddeutil.workflow.stage as st
+from ddeutil.workflow import Job, Workflow
+from ddeutil.workflow.stage import HookStage
 
 
 def test_workflow_exec_hook_from_stage():
-    workflow = wf.Workflow.from_loader(
+    workflow = Workflow.from_loader(
         name="ingest_csv_to_parquet",
         externals={},
     )
-    stage: st.HookStage = workflow.job("extract-load").stage("extract-load")
-    rs = stage.execute(
+    stage: HookStage = workflow.job("extract-load").stage("extract-load")
+    rs = stage.handler_execute(
         params={
             "params": {
                 "run-date": datetime(2024, 1, 1),
@@ -24,12 +24,12 @@ def test_workflow_exec_hook_from_stage():
 
 
 def test_workflow_exec_hook_from_job():
-    workflow = wf.Workflow.from_loader(
+    workflow = Workflow.from_loader(
         name="ingest_csv_to_parquet",
         externals={},
     )
-    el_job: wf.Job = workflow.job("extract-load")
-    rs = el_job.execute(
+    job: Job = workflow.job("extract-load")
+    rs = job.execute(
         params={
             "params": {
                 "run-date": datetime(2024, 1, 1),
@@ -47,7 +47,7 @@ def test_workflow_exec_hook_from_job():
 
 
 def test_workflow_exec_hook():
-    workflow = wf.Workflow.from_loader(
+    workflow = Workflow.from_loader(
         name="ingest_csv_to_parquet",
         externals={},
     )
@@ -79,7 +79,7 @@ def test_workflow_exec_hook():
 
 
 def test_workflow_exec_hook_with_prefix():
-    workflow = wf.Workflow.from_loader(name="pipe_hook_mssql_proc")
+    workflow = Workflow.from_loader(name="pipe_hook_mssql_proc")
     rs = workflow.execute(
         params={
             "run_date": datetime(2024, 1, 1),

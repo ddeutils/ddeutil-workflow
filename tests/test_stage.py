@@ -13,6 +13,7 @@ def test_stage():
         {"name": "Empty Stage", "echo": "hello world"}
     )
     assert stage.iden == "Empty Stage"
+    assert stage.name == "Empty Stage"
 
     # NOTE: Copy the stage model with adding the id field.
     new_stage: Stage = stage.model_copy(update={"id": "stage-empty"})
@@ -30,7 +31,8 @@ def test_stage():
 
 def test_stage_empty_execute():
     stage: EmptyStage = EmptyStage(name="Empty Stage", echo="hello world")
-    rs: Result = stage.execute(params={})
+    rs: Result = stage.handler_execute(params={})
+
     assert isinstance(rs, Result)
     assert 0 == rs.status
     assert {} == rs.context
@@ -92,7 +94,7 @@ def test_stage_if_condition_raise(test_path):
             stage_id="condition-stage"
         )
 
-        # NOTE: Raise error because output of if-condition does not be boolean
-        #   type.
+        # NOTE: Raise error because output of the if-condition does not be
+        #   boolean type.
         with pytest.raises(StageException):
             stage.is_skipped({"params": {"name": "foo"}})

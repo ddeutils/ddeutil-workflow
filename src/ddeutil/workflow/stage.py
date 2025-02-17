@@ -31,17 +31,11 @@ import time
 import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from functools import wraps
 from inspect import Parameter
 from pathlib import Path
 from subprocess import CompletedProcess
 from textwrap import dedent
-from typing import Callable, Optional, Union
-
-try:
-    from typing import ParamSpec
-except ImportError:
-    from typing_extensions import ParamSpec
+from typing import Optional, Union
 
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
@@ -59,9 +53,6 @@ from .utils import (
     make_exec,
 )
 
-P = ParamSpec("P")
-ReturnResult = Callable[P, Result]
-DecoratorResult = Callable[[ReturnResult], ReturnResult]
 logger = get_logger("ddeutil.workflow")
 
 
@@ -73,90 +64,6 @@ __all__: TupleStr = (
     "TriggerStage",
     "Stage",
 )
-
-
-def handler_result(message: str | None = None) -> DecoratorResult:
-    """Decorator function for handler result from the stage execution. This
-    function should to use with execution method only.
-
-        This stage exception handler still use ok-error concept, but it allows
-    you force catching an output result with error message by specific
-    environment variable,`WORKFLOW_CORE_STAGE_RAISE_ERROR`.
-
-        Execution   --> Ok      --> Result
-                                    |-status: 0
-                                    |-context:
-                                        |-outputs: ...
-
-                    --> Error   --> Result (if env var was set)
-                                    |-status: 1
-                                    |-context:
-                                        |-error: ...
-                                        |-error_message: ...
-
-                    --> Error   --> Raise StageException(...)
-
-        On the last step, it will set the running ID on a return result object
-    from current stage ID before release the final result.
-
-    :param message: A message that want to add at prefix of exception statement.
-    :type message: str | None (Default=None)
-    :rtype: Callable[P, Result]
-    """
-    # NOTE: The prefix message string that want to add on the first exception
-    #   message dialog.
-    #
-    #       >>> ValueError: {message}
-    #       ...     raise value error from the stage execution process.
-    #
-    message: str = message or ""
-
-    def decorator(func: ReturnResult) -> ReturnResult:
-
-        @wraps(func)
-        def wrapped(self: Stage, *args, **kwargs):
-
-            if not (run_id := kwargs.get("run_id")):
-                run_id: str = gen_id(self.name + (self.id or ""), unique=True)
-                kwargs["run_id"] = run_id
-
-            rs_raise: Result = Result(status=1, run_id=run_id)
-
-            try:
-                # NOTE: Start calling origin function with a passing args.
-                return func(self, *args, **kwargs)
-            except Exception as err:
-                # NOTE: Start catching error from the stage execution.
-                logger.error(
-                    f"({cut_id(run_id)}) [STAGE]: {err.__class__.__name__}: "
-                    f"{err}"
-                )
-                if config.stage_raise_error:
-                    # NOTE: If error that raise from stage execution course by
-                    #   itself, it will return that error with previous
-                    #   dependency.
-                    if isinstance(err, StageException):
-                        raise StageException(
-                            f"{self.__class__.__name__}: {message}\n\t{err}"
-                        ) from err
-                    raise StageException(
-                        f"{self.__class__.__name__}: {message}\n\t"
-                        f"{err.__class__.__name__}: {err}"
-                    ) from None
-
-                # NOTE: Catching exception error object to result with
-                #   error_message and error keys.
-                return rs_raise.catch(
-                    status=1,
-                    context={
-                        "error": err,
-                        "error_message": f"{err.__class__.__name__}: {err}",
-                    },
-                )
-
-        return wrapped
-
-    return decorator
 
 
 class BaseStage(BaseModel, ABC):
@@ -224,6 +131,72 @@ class BaseStage(BaseModel, ABC):
         :rtype: Result
         """
         raise NotImplementedError("Stage should implement ``execute`` method.")
+
+    def handler_execute(
+        self, params: DictData, *, run_id: str | None = None
+    ) -> Result:
+        """Handler result from the stage execution.
+
+            This stage exception handler still use ok-error concept, but it
+        allows you force catching an output result with error message by
+        specific environment variable,`WORKFLOW_CORE_STAGE_RAISE_ERROR`.
+
+            Execution   --> Ok      --> Result
+                                        |-status: 0
+                                        |-context:
+                                            |-outputs: ...
+
+                        --> Error   --> Result (if env var was set)
+                                        |-status: 1
+                                        |-context:
+                                            |-error: ...
+                                            |-error_message: ...
+
+                        --> Error   --> Raise StageException(...)
+
+            On the last step, it will set the running ID on a return result object
+        from current stage ID before release the final result.
+
+        :param params: A parameter data that want to use in this execution.
+        :param run_id: A running stage ID for this execution.
+
+        :rtype: Result
+        """
+        if not run_id:
+            run_id: str = gen_id(self.name + (self.id or ""), unique=True)
+
+        rs_raise: Result = Result(status=1, run_id=run_id)
+        try:
+            # NOTE: Start calling origin function with a passing args.
+            return self.execute(params, run_id=run_id)
+        except Exception as err:
+            # NOTE: Start catching error from the stage execution.
+            logger.error(
+                f"({cut_id(run_id)}) [STAGE]: {err.__class__.__name__}: "
+                f"{err}"
+            )
+            if config.stage_raise_error:
+                # NOTE: If error that raise from stage execution course by
+                #   itself, it will return that error with previous
+                #   dependency.
+                if isinstance(err, StageException):
+                    raise StageException(
+                        f"{self.__class__.__name__}: \n\t{err}"
+                    ) from err
+                raise StageException(
+                    f"{self.__class__.__name__}: \n\t"
+                    f"{err.__class__.__name__}: {err}"
+                ) from None
+
+            # NOTE: Catching exception error object to result with
+            #   error_message and error keys.
+            return rs_raise.catch(
+                status=1,
+                context={
+                    "error": err,
+                    "error_message": f"{err.__class__.__name__}: {err}",
+                },
+            )
 
     def set_outputs(self, output: DictData, to: DictData) -> DictData:
         """Set an outputs from execution process to the received context. The
@@ -322,7 +295,6 @@ class EmptyStage(BaseStage):
         ge=0,
     )
 
-    @handler_result()
     def execute(self, params: DictData, *, run_id: str | None = None) -> Result:
         """Execution method for the Empty stage that do only logging out to
         stdout. This method does not use the `handler_result` decorator because
@@ -419,7 +391,6 @@ class BashStage(BaseStage):
         # Note: Remove .sh file that use to run bash.
         Path(f"./{f_name}").unlink()
 
-    @handler_result()
     def execute(self, params: DictData, *, run_id: str | None = None) -> Result:
         """Execute the Bash statement with the Python build-in ``subprocess``
         package.
@@ -521,7 +492,6 @@ class PyStage(BaseStage):
         to.update({k: gb[k] for k in to if k in gb})
         return to
 
-    @handler_result()
     def execute(self, params: DictData, *, run_id: str | None = None) -> Result:
         """Execute the Python statement that pass all globals and input params
         to globals argument on ``exec`` build-in function.
@@ -582,7 +552,6 @@ class HookStage(BaseStage):
         alias="with",
     )
 
-    @handler_result()
     def execute(self, params: DictData, *, run_id: str | None = None) -> Result:
         """Execute the Hook function that already in the hook registry.
 
@@ -657,7 +626,6 @@ class TriggerStage(BaseStage):
         description="A parameter that want to pass to workflow execution.",
     )
 
-    @handler_result("Raise from TriggerStage")
     def execute(self, params: DictData, *, run_id: str | None = None) -> Result:
         """Trigger another workflow execution. It will wait the trigger
         workflow running complete before catching its result.
