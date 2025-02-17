@@ -30,6 +30,46 @@ configuration. It called **Metadata Driven Data Workflow**.
 3. All parallel tasks inside workflow engine use Multi-Threading
    (Python 3.13 unlock GIL :unlock:)
 
+**:memo: <u>Workflow Diagrams</u>**:
+
+```mermaid
+flowchart LR
+    subgraph Interface
+    A((User))
+        subgraph Docker Container
+        G@{ shape: rounded, label: "Observe<br>Application" }
+        end
+    end
+
+    A --->|action| B(Workflow<br>Application)
+    B ---> |response| A
+    B -..-> |response| G
+    G -..-> |request| B
+
+    subgraph Docker Container
+    B
+    end
+    
+    subgraph Data Context
+    D@{ shape: processes, label: "Logs" }
+    E@{ shape: lin-cyl, label: "Metadata" }
+    end
+
+    subgraph Git Context
+    F@{ shape: tag-rect, label: "YAML<br>files" }
+    end
+
+    B --->|disable| F
+    F --->|read| B
+
+    B --->|write| E
+    E --->|read| B
+    B --->|write| D
+  
+    D -.->|read| G
+    E -.->|read| G
+```
+
 > [!NOTE]
 > _Disclaimer_: I inspire the dynamic statement from the [**GitHub Action**](https://github.com/features/actions)
 > with `.yml` files and all configs file from several data orchestration framework
