@@ -14,6 +14,7 @@ def test_stage():
     )
     assert stage.iden == "Empty Stage"
     assert stage.name == "Empty Stage"
+    assert stage == EmptyStage(name="Empty Stage", echo="hello world")
 
     # NOTE: Copy the stage model with adding the id field.
     new_stage: Stage = stage.model_copy(update={"id": "stage-empty"})

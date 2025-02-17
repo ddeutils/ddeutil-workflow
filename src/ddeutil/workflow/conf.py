@@ -273,7 +273,7 @@ class SimLoad:
         method can use include and exclude list of identity name for filter and
         adds-on.
 
-        :param obj: A object that want to validate matching before return.
+        :param obj: An object that want to validate matching before return.
         :param conf: A config object.
         :param included:
         :param excluded:

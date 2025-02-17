@@ -15,11 +15,21 @@ def test_workflow_exec():
     workflow: Workflow = Workflow(
         name="demo-workflow", jobs={"sleep-run": job, "sleep-again-run": job}
     )
-    workflow.execute(params={})
+    rs: Result = workflow.execute(params={})
+    assert rs.status == 0
+    assert rs.context == {
+        "params": {},
+        "jobs": {
+            "sleep-again-run": {
+                "matrix": {},
+                "stages": {"7972360640": {"outputs": {}}},
+            },
+        },
+    }
 
 
 @mock.patch.object(Config, "max_job_parallel", 1)
-def test_workflow_exec_timeout():
+def test_workflow_exec_raise_timeout():
     job: Job = Job(
         stages=[{"name": "Sleep", "run": "import time\ntime.sleep(2)"}],
     )
@@ -27,6 +37,7 @@ def test_workflow_exec_timeout():
         name="demo-workflow", jobs={"sleep-run": job, "sleep-again-run": job}
     )
     rs: Result = workflow.execute(params={}, timeout=1)
+    assert rs.status == 1
     assert rs.context["error_message"] == (
         "WorkflowException: Execution: 'demo-workflow' was timeout."
     )
@@ -268,3 +279,72 @@ def test_workflow_exec_with_matrix():
             },
         },
     } == rs.context
+
+
+def test_workflow_exec_needs():
+    workflow = Workflow.from_loader(name="wf-run-depends", externals={})
+    rs: Result = workflow.execute(params={"name": "bar"})
+    assert {
+        "params": {"name": "bar"},
+        "jobs": {
+            "final-job": {
+                "matrix": {},
+                "stages": {
+                    "8797330324": {
+                        "outputs": {},
+                    },
+                },
+            },
+            "first-job": {
+                "matrix": {},
+                "stages": {
+                    "7824513474": {
+                        "outputs": {},
+                    },
+                },
+            },
+            "second-job": {
+                "matrix": {},
+                "stages": {
+                    "1772094681": {
+                        "outputs": {},
+                    },
+                },
+            },
+        },
+    } == rs.context
+
+
+def test_workflow_exec_needs_parallel():
+    with mock.patch.object(Config, "max_job_parallel", 3):
+        workflow = Workflow.from_loader(name="wf-run-depends", externals={})
+        rs: Result = workflow.execute(params={"name": "bar"})
+        assert {
+            "params": {"name": "bar"},
+            "jobs": {
+                "final-job": {
+                    "matrix": {},
+                    "stages": {
+                        "8797330324": {
+                            "outputs": {},
+                        },
+                    },
+                },
+                "first-job": {
+                    "matrix": {},
+                    "stages": {
+                        "7824513474": {
+                            "outputs": {},
+                        },
+                    },
+                },
+                "second-job": {
+                    "matrix": {},
+                    "stages": {
+                        "1772094681": {
+                            "outputs": {},
+                        },
+                    },
+                },
+            },
+        } == rs.context

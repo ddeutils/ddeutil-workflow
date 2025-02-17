@@ -884,7 +884,9 @@ class Workflow(BaseModel):
         :param run_id: A workflow running ID for this job execution.
         :type run_id: str | None (default: None)
         :param timeout: A workflow execution time out in second unit that use
-            for limit time of execution and waiting job dependency.
+            for limit time of execution and waiting job dependency. This value
+            does not force stop the task that still running more than this limit
+            time.
         :type timeout: int (default: 0)
 
         :rtype: Result
@@ -1220,6 +1222,7 @@ class WorkflowTask:
         return queue
 
     def __repr__(self) -> str:
+        """Override ___repr__ method."""
         return (
             f"{self.__class__.__name__}(alias={self.alias!r}, "
             f"workflow={self.workflow.name!r}, runner={self.runner!r}, "

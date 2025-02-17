@@ -3,7 +3,7 @@ from pathlib import Path
 from textwrap import dedent
 
 import pytest
-from ddeutil.workflow.hook import make_registry
+from ddeutil.workflow.hook import Registry, make_registry
 
 
 @pytest.fixture(scope="module")
@@ -39,11 +39,12 @@ def hook_function(test_path: Path):
 
 
 def test_make_registry_not_found():
-    rs = make_registry("not_found")
+    rs: dict[str, Registry] = make_registry("not_found")
     assert rs == {}
 
 
 def test_make_registry_raise(hook_function):
 
+    # NOTE: Raise error duplicate tag name, polars-dir, that set in this module.
     with pytest.raises(ValueError):
         make_registry("new_tasks")
