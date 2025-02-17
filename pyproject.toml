@@ -50,6 +50,10 @@ where = ["src"]
 [tool.shelf.version]
 version = "./src/ddeutil/workflow/__about__.py"
 changelog = "CHANGELOG.md"
+commit_msg_format = "- {subject}"
+
+[tool.shelf.git]
+commit_prefix_force_fix = true
 
 [tool.coverage.run]
 branch = true
