@@ -163,3 +163,8 @@ schedule-run-local-wf:
           source-extract: "USD-THB"
           asat-dt: "${{ release.logical_date }}"
 ```
+
+For more examples, this workflow can use with these scenarios:
+
+- Extract metadata (1 ~ 15 MB per request) from external API every 15 minutes
+- Sensor data on S3 and send that data to Azure Service Bus every minute

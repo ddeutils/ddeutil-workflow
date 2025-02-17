@@ -1,21 +1,21 @@
 # Getting Started
 
-This execution usecase is getting data from external API and prepare that data
-and aggregate it into daily layer to silver data zone.
+This quick start use-case is getting data from external API and then prepare these
+data and finally, aggregate them into the silver data zone by daily basis.
 
 ## Prerequisite
 
 I will use only the core package of the workflow and run with manual action.
 
 ```shell
-pip install uv
-uv pip install -U ddeutil-workflow
+$ pip install uv
+$ uv pip install -U ddeutil-workflow
 ```
 
-Project structure:
+**Project structure:**
 
 ```text
-root/
+project/
  ├─ conf/
  │   ╰─ manual-workflow.yml
  ├─ logs/
@@ -39,7 +39,7 @@ WORKFLOW_CORE_TIMEZONE=Asia/Bangkok
 
 Create the first pipeline template at `./conf/manual-workflow.yml`:
 
-```yaml
+```yaml title="./conf/manual-workflow.yml"
 wf-run-manual:
   type: Workflow
   params:
@@ -57,15 +57,11 @@ wf-run-manual:
 
 Create the hook function that use on your stage.
 
-At `./src/__init__.py`:
-
-```python
+```python title="./src/__init__.py"
 from .https_hook import *
 ```
 
-At `./src/https_hook.py`:
-
-```python
+```python title="./src/https_hook.py"
 from ddeutil.workflow.hook import tag
 
 
@@ -81,7 +77,7 @@ def dummy_task_polars_dir(url: str, auth: str) -> dict[str, int]:
 
 At the `main.py` file:
 
-```python
+```python title="./main.py"
 from ddeutil.workflow import Workflow
 from ddeutil.workflow.result import Result
 
@@ -101,7 +97,9 @@ if __name__ == '__main__':
 
 ### Release
 
-```python
+At the `main.py` file:
+
+```python title="./main.py"
 from datetime import datetime
 from ddeutil.workflow import Workflow, config
 from ddeutil.workflow.result import Result
@@ -126,9 +124,11 @@ if __name__ == '__main__':
 The log file that keep from this release:
 
 ```text
-root/
+project/
  ╰─ logs/
      ╰─ workflow=wf-run-manual
          ╰─ release=20240101001011
              ╰─ 820626787820250106163236493894.log
 ```
+
+## Conclusion

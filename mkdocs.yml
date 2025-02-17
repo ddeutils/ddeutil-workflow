@@ -62,14 +62,9 @@ nav:
       - 'Params': modules/params.md
       - 'Result': modules/result.md
       - 'Scheduler': modules/scheduler.md
-  - API:
-      - api/index.md
-      - Workflow: api/workflow.md
-      - Schedule: api/schedule.md
   - Examples:
-      - examples/index.md
-      - Extract API: examples/extract_api.md
-      - Extract Postgres: example/extract_pg.md
+      - API: examples/extract_api.md
+      - Postgres: example/extract_pg.md
 
 plugins:
   - tags

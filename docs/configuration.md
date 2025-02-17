@@ -3,9 +3,10 @@
 !!! important
 
     The config value that you will set on the environment should combine with
-    prefix, component, and name which is `WORKFLOW_{component}_{name}` (Upper case).
+    prefix, component, and name which is `WORKFLOW_{component}_{name}` (With upper
+    case).
 
-## Core Config
+## Core
 
 The main configuration that use to dynamic changing with your objective of this
 application. If any configuration values do not set yet, it will use default value
@@ -35,7 +36,7 @@ and do not raise any error to you.
 | **MAX_SCHEDULE_PER_PROCESS** |    App    | `100`                             | A schedule per process that run parallel.                                                                          |        |
 | **STOP_BOUNDARY_DELTA**      |    App    | `'{"minutes": 5, "seconds": 20}'` | A time delta value that use to stop scheduler app in json string format.                                           |        |
 
-## API Config
+## API
 
 | Environment                |  Component  | Default | Description                                                                        | Remark |
 |:---------------------------|:-----------:|---------|------------------------------------------------------------------------------------|--------|
