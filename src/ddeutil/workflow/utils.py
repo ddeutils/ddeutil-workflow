@@ -18,18 +18,12 @@ from random import randrange
 from typing import Any, TypeVar
 from zoneinfo import ZoneInfo
 
-try:
-    from typing import ParamSpec
-except ImportError:
-    from typing_extensions import ParamSpec
-
 from ddeutil.core import hash_str
 
 from .__types import DictData, Matrix
 from .conf import config
 
 T = TypeVar("T")
-P = ParamSpec("P")
 
 logger = logging.getLogger("ddeutil.workflow")
 
@@ -95,6 +89,7 @@ def gen_id(
     :param sensitive: A flag that convert the value to lower case before hashing
     :param unique: A flag that add timestamp at microsecond level to value
         before hashing.
+
     :rtype: str
     """
     if not isinstance(value, str):
@@ -121,7 +116,7 @@ def make_exec(path: str | Path) -> None:
     f.chmod(f.stat().st_mode | stat.S_IEXEC)
 
 
-def filter_func(value: Any) -> Any:
+def filter_func(value: T) -> T:
     """Filter out an own created function of any value of mapping context by
     replacing it to its function name. If it is built-in function, it does not
     have any changing.
@@ -152,6 +147,10 @@ def dash2underscore(
 ) -> DictData:
     """Change key name that has dash to underscore.
 
+    :param key
+    :param values
+    :param fixed
+
     :rtype: DictData
     """
     if key in values:
@@ -161,6 +160,8 @@ def dash2underscore(
 
 def cross_product(matrix: Matrix) -> Iterator[DictData]:
     """Iterator of products value from matrix.
+
+    :param matrix:
 
     :rtype: Iterator[DictData]
     """
@@ -181,6 +182,11 @@ def batch(iterable: Iterator[Any], n: int) -> Iterator[Any]:
         ['A', 'B', 'C']
         ['D', 'E', 'F']
         ['G']
+
+    :param iterable:
+    :param n:
+
+    :rtype: Iterator[Any]
     """
     if n < 1:
         raise ValueError("n must be at least one")
@@ -195,7 +201,7 @@ def batch(iterable: Iterator[Any], n: int) -> Iterator[Any]:
         yield chain((first_el,), chunk_it)
 
 
-def cut_id(run_id: str, *, num: int = 6):
+def cut_id(run_id: str, *, num: int = 6) -> str:
     """Cutting running ID with length.
 
     Example:
@@ -204,6 +210,7 @@ def cut_id(run_id: str, *, num: int = 6):
 
     :param run_id:
     :param num:
-    :return:
+
+    :rtype: str
     """
     return run_id[-num:]
