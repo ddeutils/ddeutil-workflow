@@ -94,6 +94,13 @@ jobs:
         with:
           timezoneLinux: "Asia/Bangkok"
 
-      - name: Test with Pytest
+      - name: Test with Pytest and Python >= 3.13
+        if: "startsWith(matrix.python-version, '3.13')"
         run: |
           pytest -vv
+
+      - name: Test with Pytest and Python < 3.13
+        if: "!startsWith(matrix.python-version, '3.13')"
+        run: |
+          uv pip install -U pytest-xdist
+          pytest -vv -n auto
