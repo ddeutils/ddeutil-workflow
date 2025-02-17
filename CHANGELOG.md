@@ -2,6 +2,37 @@
 
 ## Latest Changes
 
+## 0.0.28
+
+### :sparkles: Features
+
+- :dart: feat: remove handler_result function in stage module and use handler_execution method instead.
+
+### :bug: Bug fixes
+
+- :gear: fixed: change config name of config path from `PATH_CONF` to `CONF_PATH`.
+- :gear: fixed: remove upper route from api component.
+
+### :black_nib: Code Changes
+
+- :art: styled: re-format code on utils.
+- :art: styled: change config pattern on readme page.
+- :art: styled: typo the docs-string and comments.
+- :package: refactored: bump pydantic from 2.10.5 to 2.10.6 (#27)
+- :construction: refactored: ⬆ bump pypa/gh-action-pypi-publish from 1.12.3 to 1.12.4 (#26)
+- :package: refactored: bump pydantic from 2.10.4 to 2.10.5
+
+### :package: Build & Workflow
+
+- :toolbox: build: add clishelf config.
+- :toolbox: build: add sign python dist to gh release job.
+- :toolbox: build: update prefix dependabot message.
+
+### :postbox: Dependencies
+
+- :pushpin: deps: update clishelf from 0.2.4 to 0.2.19.
+- :pushpin: deps: update ddeutil==0.4.6.
+
 ## 0.0.27
 
 ### :sparkles: Features
