@@ -101,7 +101,7 @@ class Config:  # pragma: no cov
 
         :rtype: Path
         """
-        return self.root_path / env("CORE_PATH_CONF", "conf")
+        return self.root_path / env("CORE_CONF_PATH", "conf")
 
     @property
     def tz(self) -> ZoneInfo:

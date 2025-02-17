@@ -16,7 +16,7 @@ and do not raise any error to you.
 | **ROOT_PATH**                |   Core    | `.`                               | The root path of the workflow application.                                                                         |        |
 | **REGISTRY**                 |   Core    | `src`                             | List of importable string for the hook stage.                                                                      |        |
 | **REGISTRY_FILTER**          |   Core    | `ddeutil.workflow.utils`          | List of importable string for the filter template.                                                                 |        |
-| **PATH_CONF**                |   Core    | `conf`                            | The config path that keep all template `.yaml` files.                                                              |        |
+| **CONF_PATH**                |   Core    | `conf`                            | The config path that keep all template `.yaml` files.                                                              |        |
 | **TIMEZONE**                 |   Core    | `Asia/Bangkok`                    | A Timezone string value that will pass to `ZoneInfo` object.                                                       |        |
 | **STAGE_DEFAULT_ID**         |   Core    | `true`                            | A flag that enable default stage ID that use for catch an execution output.                                        |        |
 | **STAGE_RAISE_ERROR**        |   Core    | `false`                           | A flag that all stage raise StageException from stage execution.                                                   |        |

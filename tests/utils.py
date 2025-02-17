@@ -24,17 +24,17 @@ def dotenv_setting() -> None:
     env_path: Path = OUTSIDE_PATH / ".env"
     if not env_path.exists():
         logging.warning("Dot env file does not exists")
-        # NOTE: For ``ROOT_PATH`` value on the different OS:
+        # NOTE: For ``CONF_ROOT_PATH`` value on the different OS:
         #   * Windows: D:\user\path\...\ddeutil-workflow
         #   * Ubuntu: /home/runner/work/ddeutil-workflow/ddeutil-workflow
         #
         env_str: str = dedent(
             f"""
-            WORKFLOW_ROOT_PATH={OUTSIDE_PATH.absolute()}
+            WORKFLOW_CONF_ROOT_PATH={OUTSIDE_PATH.absolute()}
             WORKFLOW_CORE_REGISTRY=tests
             WORKFLOW_CORE_REGISTRY_FILTER=src.ddeutil.workflow.templates
-            WORKFLOW_CORE_PATH_CONF=tests/conf
-            WORKFLOW_CORE_PATH_CONF=tests/conf
+            WORKFLOW_CORE_CONF_PATH=tests/conf
+            WORKFLOW_CORE_CONF_PATH=tests/conf
             WORKFLOW_CORE_TIMEZONE=Asia/Bangkok
             WORKFLOW_CORE_STAGE_DEFAULT_ID=true
             WORKFLOW_CORE_STAGE_RAISE_ERROR=true
