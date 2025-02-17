@@ -28,6 +28,9 @@ jobs:
           - "3.12"
           - "3.13"
           - "3.13-dev"
+        marker:
+          - "poke"
+          - "not_poke"
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -94,13 +97,12 @@ jobs:
         with:
           timezoneLinux: "Asia/Bangkok"
 
-      - name: Test with Pytest and Python >= 3.13
-        if: "startsWith(matrix.python-version, '3.13')"
+      - name: Test with Pytest with not mark poke
+        if: ${{ matrix.marker == 'not_poke' }}
         run: |
-          pytest -vv
+          pytest -vv -s -m "not poke"
 
-      - name: Test with Pytest and Python < 3.13
-        if: "!startsWith(matrix.python-version, '3.13')"
+      - name: Test with Pytest with mark poke
+        if: ${{ matrix.marker == 'poke' }}
         run: |
-          pip install -U pytest-xdist
-          pytest -vv -n auto
+          pytest -vv -s -m "poke"

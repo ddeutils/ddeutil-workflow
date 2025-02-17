@@ -10,6 +10,7 @@ from ddeutil.workflow.result import Result
 from .utils import dump_yaml_context
 
 
+@pytest.mark.poke
 @mock.patch.object(Config, "enable_write_log", False)
 def test_workflow_poke(test_path):
     with dump_yaml_context(
@@ -68,6 +69,7 @@ def test_workflow_poke(test_path):
         assert results[0].run_id != results[0].parent_run_id
 
 
+@pytest.mark.poke
 @mock.patch.object(Config, "enable_write_log", False)
 def test_workflow_poke_no_queue(test_path):
     with dump_yaml_context(
@@ -93,6 +95,7 @@ def test_workflow_poke_no_queue(test_path):
         assert results == []
 
 
+@pytest.mark.poke
 def test_workflow_poke_raise():
     workflow = Workflow.from_loader(name="wf-scheduling-common")
 
@@ -101,6 +104,7 @@ def test_workflow_poke_raise():
         workflow.poke(periods=-1)
 
 
+@pytest.mark.poke
 @mock.patch.object(Config, "enable_write_log", False)
 def test_workflow_poke_with_start_date_and_period(test_path):
     with dump_yaml_context(
@@ -134,6 +138,7 @@ def test_workflow_poke_with_start_date_and_period(test_path):
         assert results[0].parent_run_id == results[1].parent_run_id
 
 
+@pytest.mark.poke
 @mock.patch.object(Config, "enable_write_log", False)
 def test_workflow_poke_no_on(test_path):
     with dump_yaml_context(

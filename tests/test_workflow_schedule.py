@@ -25,7 +25,7 @@ def test_workflow_schedule():
     wf_schedule = WorkflowSchedule(name="demo", on=[{"cronjob": "2 * * * *"}])
     assert len(wf_schedule.on) == 1
 
-    # NOTE: Raise if do not pass any data to WorkflowSchedule
+    # NOTE: Raise if it does not pass any data to WorkflowSchedule
     with pytest.raises(ValidationError):
         WorkflowSchedule.model_validate({})
 
@@ -118,9 +118,7 @@ def test_workflow_schedule_tasks(test_path):
         assert len(tasks) == 1
 
         task = tasks[0]
-
         task.release(queue=queue["tmp-wf-schedule-tasks"])
-
         task.release(queue=queue["tmp-wf-schedule-tasks"])
 
         assert task.runner.date == datetime(2024, 1, 1, 1, 4, tzinfo=tz)

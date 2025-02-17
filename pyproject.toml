@@ -77,6 +77,12 @@ exclude_lines = [
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
+# NOTE: You can deslect multiple markers by '-m "not (poke or api)"'
+markers = [
+    "poke: marks tests as slow by poking (deselect with '-m \"not poke\"')",
+    "schedule: marks tests as schedule (deselect with '-m \"not schedule\"')",
+    "api: marks tests as api (deselect with '-m \"not api\"')",
+]
 console_output_style = "count"
 addopts = [
     "--strict-config",
