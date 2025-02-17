@@ -24,9 +24,11 @@ from typing_extensions import Self
 
 from .__types import DictData, TupleStr
 
+PREFIX: str = "WORKFLOW"
+
 
 def env(var: str, default: str | None = None) -> str | None:  # pragma: no cov
-    return os.getenv(f"WORKFLOW_{var}", default)
+    return os.getenv(f"{PREFIX}_{var.upper().replace(' ', '_')}", default)
 
 
 def glob_files(path: Path) -> Iterator[Path]:  # pragma: no cov
@@ -91,7 +93,7 @@ class Config:  # pragma: no cov
     # NOTE: Core
     @property
     def root_path(self) -> Path:
-        return Path(env("ROOT_PATH", "."))
+        return Path(env("CORE_ROOT_PATH", "."))
 
     @property
     def conf_path(self) -> Path:

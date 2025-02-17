@@ -127,9 +127,21 @@ def extract_hook(hook: str) -> Callable[[], TagFunc]:
     :raise NotImplementedError: When the searching hook's function result does
         not exist in the registry.
     :raise NotImplementedError: When the searching hook's tag result does not
-        exists in the registry with its function key.
+        exist in the registry with its function key.
 
     :param hook: A hook value that able to match with Task regex.
+
+        The format of hook value should contain 3 regular expression groups
+    which match with the below config format:
+
+        >>> "^(?P<path>[^/@]+)/(?P<func>[^@]+)@(?P<tag>.+)$"
+
+    Examples:
+        >>> extract_hook("tasks/el-postgres-to-delta@polars")
+        ...
+        >>> extract_hook("tasks/return-type-not-valid@raise")
+        ...
+
     :rtype: Callable[[], TagFunc]
     """
     if not (found := Re.RE_TASK_FMT.search(hook)):
