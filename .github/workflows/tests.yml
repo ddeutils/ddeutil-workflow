@@ -31,6 +31,7 @@ jobs:
         marker:
           - "poke"
           - "not_poke"
+#        worker_id: [1, 2, 3, 4]
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -97,11 +98,18 @@ jobs:
         with:
           timezoneLinux: "Asia/Bangkok"
 
+#      # 👇 We need to set up the env vars from values taken from the matrix
+#      - name: Set up worker env vars
+#        run: |
+#          echo "GITHUB_WORKER_ID=${{matrix.worker_id}}" >> $GITHUB_ENV
+#          echo "GITHUB_TOTAL_WORKERS=4" >> $GITHUB_ENV
+
       - name: Test with Pytest with not mark poke
         if: ${{ matrix.marker == 'not_poke' }}
         run: |
           pytest -vv -s -m "not poke"
 
+#      - name: Tests with Pytest with mark poke - Worker. ${{ matrix.worker_id }}
       - name: Test with Pytest with mark poke
         if: ${{ matrix.marker == 'poke' }}
         run: |
