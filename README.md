@@ -23,6 +23,8 @@ the input parameters per use-case instead.
 This way I can handle a lot of logical workflows in our orgs with only metadata
 configuration. It called **Metadata Driven Data Workflow**.
 
+---
+
 **:pushpin: <u>Rules of This Workflow engine</u>**:
 
 1. The Minimum frequency unit of scheduling is **1 minute** :warning:
@@ -30,7 +32,13 @@ configuration. It called **Metadata Driven Data Workflow**.
 3. All parallel tasks inside workflow engine use Multi-Threading
    (Python 3.13 unlock GIL :unlock:)
 
+---
+
 **:memo: <u>Workflow Diagrams</u>**:
+
+This diagram show where is this application run on the production infrastructure.
+You will see that this application do only running code with stress-less which mean
+you should to set the data layer separate this core program before run this application.
 
 ```mermaid
 flowchart LR
