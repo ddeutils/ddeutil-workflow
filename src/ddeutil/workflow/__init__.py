@@ -4,6 +4,7 @@
 # license information.
 # ------------------------------------------------------------------------------
 from .__cron import CronJob, CronRunner
+from .__types import Re
 from .conf import (
     Config,
     Loader,

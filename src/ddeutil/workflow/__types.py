@@ -27,6 +27,8 @@ Matrix = dict[str, Union[list[str], list[int]]]
 
 
 class Context(TypedDict):
+    """TypeDict support the Context."""
+
     params: dict[str, Any]
     jobs: dict[str, Any]
 
@@ -71,14 +73,14 @@ class Re:
     #       - ${{ params.source?.schema }}
     #
     __re_caller: str = r"""
-        \$
-        {{
-            \s*
+        \$                                                      # start with $
+        {{                                                      # value open with {{
+            \s*                                                 # whitespace or not
             (?P<caller>
                 (?P<caller_prefix>(?:[a-zA-Z_-]+\??\.)*)
                 (?P<caller_last>[a-zA-Z0-9_\-.'\"(\)[\]{}]+\??)
             )
-            \s*
+            \s*                                                 # whitespace or not
             (?P<post_filters>
                 (?:
                     \|\s*
@@ -88,7 +90,7 @@ class Re:
                     )\s*
                 )*
             )
-        }}
+        }}                                                      # value close with }}
     """
     RE_CALLER: Pattern = re.compile(
         __re_caller, MULTILINE | IGNORECASE | UNICODE | VERBOSE
@@ -103,13 +105,13 @@ class Re:
     #       - tasks/function@dummy
     #
     __re_task_fmt: str = r"""
-        ^
+        ^                               # start task format
             (?P<path>[^/@]+)
-            /
+            /                           # start get function with /
             (?P<func>[^@]+)
-            @
+            @                           # start tag with @
             (?P<tag>.+)
-        $
+        $                               # end task format
     """
     RE_TASK_FMT: Pattern = re.compile(
         __re_task_fmt, MULTILINE | IGNORECASE | UNICODE | VERBOSE
