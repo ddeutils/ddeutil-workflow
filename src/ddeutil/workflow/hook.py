@@ -50,6 +50,7 @@ def tag(
     :param: name: A tag name for make different use-case of a function.
     :param: alias: A alias function name that keeping in registries. If this
         value does not supply, it will use original function name from __name__.
+
     :rtype: Callable[P, TagFunc]
     """
 
@@ -58,7 +59,7 @@ def tag(
         func.name = alias or func.__name__.replace("_", "-")
 
         @wraps(func)
-        def wrapped(*args, **kwargs):
+        def wrapped(*args: P.args, **kwargs: P.kwargs) -> TagFunc:
             # NOTE: Able to do anything before calling hook function.
             return func(*args, **kwargs)
 
@@ -74,6 +75,7 @@ def make_registry(submodule: str) -> dict[str, Registry]:
     """Return registries of all functions that able to called with task.
 
     :param submodule: A module prefix that want to import registry.
+
     :rtype: dict[str, Registry]
     """
     rs: dict[str, Registry] = {}

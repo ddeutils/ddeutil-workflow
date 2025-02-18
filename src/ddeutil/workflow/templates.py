@@ -295,10 +295,7 @@ def str2template(
     return search_env_replace(value)
 
 
-def param2template(
-    value: Any,
-    params: DictData,
-) -> Any:
+def param2template(value: Any, params: DictData) -> Any:
     """Pass param to template string that can search by ``RE_CALLER`` regular
     expression.
 
