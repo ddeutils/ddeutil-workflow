@@ -25,7 +25,7 @@ def conf_path(test_path: Path) -> Path:
 
 
 def pytest_collection_modifyitems(
-    _: pytest.Session, config: pytest.Config, items: list[pytest.Item]
+    session: pytest.Session, config: pytest.Config, items: list[pytest.Item]
 ) -> None:
     """Ref: https://guicommits.com/parallelize-pytest-tests-github-actions/"""
     # 👇 Make these vars optional so locally we don't have to set anything
