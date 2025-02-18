@@ -6,10 +6,6 @@ import pytest
 
 from .utils import dotenv_setting
 
-collect_ignore: list[str] = [
-    "vendors",
-]
-
 dotenv_setting()
 
 

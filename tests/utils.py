@@ -20,7 +20,7 @@ OUTSIDE_PATH: Path = Path(__file__).parent.parent
 
 
 def dotenv_setting() -> None:
-    """Create .env file if this file in the current path do not exists."""
+    """Create .env file if this file in the current path does not exist."""
     env_path: Path = OUTSIDE_PATH / ".env"
     if not env_path.exists():
         logging.warning("Dot env file does not exists")
@@ -67,7 +67,11 @@ def str2dt(value: str) -> datetime:  # pragma: no cov
 def dump_yaml(
     filename: str | Path, data: dict[str, Any] | str
 ) -> None:  # pragma: no cov
-    """Dump the context data to the target yaml file."""
+    """Dump the context data to the target yaml file.
+
+    :param filename:
+    :param data:
+    """
     with Path(filename).open(mode="w") as f:
         if isinstance(data, str):
             f.write(dedent(data.strip("\n")))
@@ -79,7 +83,11 @@ def dump_yaml(
 def dump_yaml_context(
     filename: str | Path, data: dict[str, Any] | str
 ) -> None:  # pragma: no cov
-    """Dump the context data to the target yaml file."""
+    """Dump the context data to the target yaml file.
+
+    :param filename:
+    :param data:
+    """
     test_file: Path = Path(filename) if isinstance(filename, str) else filename
     with test_file.open(mode="w") as f:
         if isinstance(data, str):
