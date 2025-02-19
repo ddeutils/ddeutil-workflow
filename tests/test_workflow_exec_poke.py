@@ -37,7 +37,8 @@ def test_workflow_poke(test_path):
             params={"asat-dt": datetime(2024, 1, 1)}
         )
 
-        # NOTE: Respec the result from poking should has only 1 result.
+        # FIXME: The result that return from this test is random between 1 and 2
+        # NOTE: Respec the result from poking should have only 1 result.
         assert len(results) == 1
 
         # NOTE: Check datatype of results should be list of Result.
