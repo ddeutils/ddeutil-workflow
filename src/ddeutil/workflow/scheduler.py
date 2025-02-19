@@ -58,7 +58,7 @@ from .utils import (
     batch,
     delay,
 )
-from .workflow import Release, Workflow, WorkflowQueue, WorkflowTask
+from .workflow import Release, ReleaseQueue, Workflow, WorkflowTask
 
 P = ParamSpec("P")
 logger = get_logger("ddeutil.workflow")
@@ -170,7 +170,7 @@ class WorkflowSchedule(BaseModel):
     def tasks(
         self,
         start_date: datetime,
-        queue: dict[str, WorkflowQueue],
+        queue: dict[str, ReleaseQueue],
         *,
         externals: DictData | None = None,
     ) -> list[WorkflowTask]:
@@ -193,7 +193,7 @@ class WorkflowSchedule(BaseModel):
 
         # NOTE: Loading workflow model from the name of workflow.
         wf: Workflow = Workflow.from_loader(self.name, externals=extras)
-        wf_queue: WorkflowQueue = queue[self.alias]
+        wf_queue: ReleaseQueue = queue[self.alias]
 
         # IMPORTANT: Create the default 'on' value if it does not pass the `on`
         #   field to the Schedule object.
@@ -280,7 +280,7 @@ class Schedule(BaseModel):
     def tasks(
         self,
         start_date: datetime,
-        queue: dict[str, WorkflowQueue],
+        queue: dict[str, ReleaseQueue],
         *,
         externals: DictData | None = None,
     ) -> list[WorkflowTask]:
@@ -289,7 +289,7 @@ class Schedule(BaseModel):
 
         :param start_date: A start date that get from the workflow schedule.
         :param queue: A mapping of name and list of datetime for queue.
-        :type queue: dict[str, WorkflowQueue]
+        :type queue: dict[str, ReleaseQueue]
         :param externals: An external parameters that pass to the Loader object.
         :type externals: DictData | None
 
@@ -302,7 +302,7 @@ class Schedule(BaseModel):
         for workflow in self.workflows:
 
             if workflow.alias not in queue:
-                queue[workflow.alias] = WorkflowQueue()
+                queue[workflow.alias] = ReleaseQueue()
 
             workflow_tasks.extend(
                 workflow.tasks(start_date, queue=queue, externals=externals)
@@ -355,7 +355,7 @@ ReleaseThreads = dict[str, ReleaseThread]
 def schedule_task(
     tasks: list[WorkflowTask],
     stop: datetime,
-    queue: dict[str, WorkflowQueue],
+    queue: dict[str, ReleaseQueue],
     threads: ReleaseThreads,
     log: type[Log],
 ) -> CancelJob | None:
@@ -366,7 +366,7 @@ def schedule_task(
 
     :param tasks: A list of WorkflowTask object.
     :param stop: A stop datetime object that force stop running scheduler.
-    :param queue: A mapping of alias name and WorkflowQueue object.
+    :param queue: A mapping of alias name and ReleaseQueue object.
     :param threads: A mapping of alias name and Thread object.
     :param log: A log class that want to make log object.
 
@@ -390,7 +390,7 @@ def schedule_task(
     #
     for task in tasks:
 
-        q: WorkflowQueue = queue[task.alias]
+        q: ReleaseQueue = queue[task.alias]
 
         # NOTE: Start adding queue and move the runner date in the WorkflowTask.
         task.queue(stop, q, log=log)
@@ -499,7 +499,7 @@ def schedule_control(
     stop_date: datetime = stop or (start_date + config.stop_boundary_delta)
 
     # IMPORTANT: Create main mapping of queue and thread object.
-    queue: dict[str, WorkflowQueue] = {}
+    queue: dict[str, ReleaseQueue] = {}
     threads: ReleaseThreads = {}
 
     start_date_waiting: datetime = start_date.replace(

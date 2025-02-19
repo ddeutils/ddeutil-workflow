@@ -7,8 +7,8 @@ from ddeutil.workflow.cron import On
 from ddeutil.workflow.result import Result
 from ddeutil.workflow.workflow import (
     Release,
+    ReleaseQueue,
     Workflow,
-    WorkflowQueue,
     WorkflowTask,
 )
 
@@ -63,7 +63,7 @@ def test_workflow_task_queue(test_path):
             datetime(2024, 1, 1, 1)
         )
         queue = {
-            "demo": WorkflowQueue.from_list(
+            "demo": ReleaseQueue.from_list(
                 [
                     datetime(2024, 1, 1, 1, 0, tzinfo=runner.tz),
                     datetime(2024, 1, 1, 1, 1, tzinfo=runner.tz),
@@ -108,7 +108,7 @@ def test_workflow_task_release(test_path):
         runner: CronRunner = On.from_loader("every_minute_bkk").generate(
             datetime(2024, 1, 1, 1)
         )
-        queue = {"demo": WorkflowQueue()}
+        queue = {"demo": ReleaseQueue()}
 
         task: WorkflowTask = WorkflowTask(
             alias="demo",
@@ -163,7 +163,7 @@ def test_workflow_task_release_long_running(test_path):
             datetime(2024, 1, 1, 1)
         )
         queue = {
-            "demo": WorkflowQueue.from_list(
+            "demo": ReleaseQueue.from_list(
                 [
                     datetime(2024, 1, 1, 1, 0, tzinfo=runner.tz),
                     datetime(2024, 1, 1, 1, 2, tzinfo=runner.tz),

@@ -3,43 +3,43 @@ from unittest import mock
 
 import pytest
 from ddeutil.workflow.conf import Config
-from ddeutil.workflow.workflow import Release, WorkflowQueue
+from ddeutil.workflow.workflow import Release, ReleaseQueue
 
 
 def test_workflow_queue():
-    wf_queue = WorkflowQueue()
+    wf_queue = ReleaseQueue()
 
     assert not wf_queue.is_queued
 
 
 def test_workflow_queue_from_list():
-    wf_queue = WorkflowQueue.from_list()
+    wf_queue = ReleaseQueue.from_list()
 
     assert not wf_queue.is_queued
 
-    wf_queue = WorkflowQueue.from_list([])
+    wf_queue = ReleaseQueue.from_list([])
 
     assert not wf_queue.is_queued
 
-    wf_queue = WorkflowQueue.from_list(
+    wf_queue = ReleaseQueue.from_list(
         [datetime(2024, 1, 1, 1), datetime(2024, 1, 2, 1)]
     )
 
     assert wf_queue.is_queued
 
-    wf_queue = WorkflowQueue.from_list(
+    wf_queue = ReleaseQueue.from_list(
         [Release.from_dt(datetime(2024, 1, 1, 1))]
     )
 
     assert wf_queue.is_queued
 
     with pytest.raises(TypeError):
-        WorkflowQueue.from_list(["20240101"])
+        ReleaseQueue.from_list(["20240101"])
 
     with pytest.raises(TypeError):
-        WorkflowQueue.from_list("20240101")
+        ReleaseQueue.from_list("20240101")
 
-    wf_queue = WorkflowQueue.from_list(
+    wf_queue = ReleaseQueue.from_list(
         [datetime(2024, 1, 1, 1), datetime(2024, 1, 2, 1)]
     )
 
@@ -49,7 +49,7 @@ def test_workflow_queue_from_list():
 
 @mock.patch.object(Config, "max_queue_complete_hist", 4)
 def test_workflow_queue_mark_complete():
-    wf_queue = WorkflowQueue(
+    wf_queue = ReleaseQueue(
         complete=[Release.from_dt(datetime(2024, 1, 1, i)) for i in range(5)],
     )
     wf_queue.mark_complete(Release.from_dt(datetime(2024, 1, 1, 10)))

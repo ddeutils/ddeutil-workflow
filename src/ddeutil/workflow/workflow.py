@@ -61,7 +61,7 @@ logger = get_logger("ddeutil.workflow")
 __all__: TupleStr = (
     "Workflow",
     "Release",
-    "WorkflowQueue",
+    "ReleaseQueue",
     "WorkflowTask",
 )
 
@@ -69,7 +69,7 @@ __all__: TupleStr = (
 @total_ordering
 @dataclass(config=ConfigDict(arbitrary_types_allowed=True))
 class Release:
-    """Workflow release Pydantic dataclass object that use for represent
+    """Release Pydantic dataclass object that use for represent
     the release data that use with the `workflow.release` method."""
 
     date: datetime
@@ -125,7 +125,7 @@ class Release:
 
 
 @dataclass
-class WorkflowQueue:
+class ReleaseQueue:
     """Workflow Queue object that is management of Release objects."""
 
     queue: list[Release] = field(default_factory=list)
@@ -136,7 +136,7 @@ class WorkflowQueue:
     def from_list(
         cls, queue: list[datetime] | list[Release] | None = None
     ) -> Self:
-        """Construct WorkflowQueue object from an input queue value that passing
+        """Construct ReleaseQueue object from an input queue value that passing
         with list of datetime or list of Release.
 
         :raise TypeError: If the type of input queue does not valid.
@@ -155,7 +155,7 @@ class WorkflowQueue:
                 return cls(queue=queue)
 
         raise TypeError(
-            "Type of the queue does not valid with WorkflowQueue "
+            "Type of the queue does not valid with ReleaseQueue "
             "or list of datetime or list of Release."
         )
 
@@ -477,7 +477,7 @@ class Workflow(BaseModel):
         *,
         run_id: str | None = None,
         log: type[Log] = None,
-        queue: WorkflowQueue | list[datetime] | list[Release] | None = None,
+        queue: ReleaseQueue | list[datetime] | list[Release] | None = None,
         override_log_name: str | None = None,
     ) -> Result:
         """Release the workflow execution with overriding parameter with the
@@ -488,7 +488,7 @@ class Workflow(BaseModel):
         result to log destination like file log to the local `/logs` directory.
 
         :Steps:
-            - Initialize WorkflowQueue and Release if they do not pass.
+            - Initialize ReleaseQueue and Release if they do not pass.
             - Create release data for pass to parameter templating function.
             - Execute this workflow with mapping release data to its parameters.
             - Writing result log
@@ -500,7 +500,7 @@ class Workflow(BaseModel):
         :param queue: A list of release time that already queue.
         :param run_id: A workflow running ID for this release.
         :param log: A log class that want to save the execution result.
-        :param queue: A WorkflowQueue object.
+        :param queue: A ReleaseQueue object.
         :param override_log_name: An override logging name that use instead
             the workflow name.
 
@@ -512,9 +512,9 @@ class Workflow(BaseModel):
         rs_release: Result = Result(run_id=run_id)
         rs_release_type: str = "release"
 
-        # VALIDATE: Change queue value to WorkflowQueue object.
+        # VALIDATE: Change queue value to ReleaseQueue object.
         if queue is None or isinstance(queue, list):
-            queue: WorkflowQueue = WorkflowQueue.from_list(queue)
+            queue: ReleaseQueue = ReleaseQueue.from_list(queue)
 
         # VALIDATE: Change release value to Release object.
         if isinstance(release, datetime):
@@ -589,11 +589,11 @@ class Workflow(BaseModel):
         self,
         offset: float,
         end_date: datetime,
-        queue: WorkflowQueue,
+        queue: ReleaseQueue,
         log: type[Log],
         *,
         force_run: bool = False,
-    ) -> WorkflowQueue:
+    ) -> ReleaseQueue:
         """Generate queue of datetime from the cron runner that initialize from
         the on field. with offset value.
 
@@ -604,7 +604,7 @@ class Workflow(BaseModel):
         :param force_run: A flag that allow to release workflow if the log with
             that release was pointed.
 
-        :rtype: WorkflowQueue
+        :rtype: ReleaseQueue
         """
         for on in self.on:
 
@@ -714,8 +714,8 @@ class Workflow(BaseModel):
         params: DictData = {} if params is None else params
         results: list[Result] = []
 
-        # NOTE: Create empty WorkflowQueue object.
-        wf_queue: WorkflowQueue = WorkflowQueue()
+        # NOTE: Create empty ReleaseQueue object.
+        wf_queue: ReleaseQueue = ReleaseQueue()
 
         # NOTE: Make queue to the workflow queue object.
         self.queue(
@@ -1148,14 +1148,14 @@ class WorkflowTask:
         release: datetime | Release | None = None,
         run_id: str | None = None,
         log: type[Log] = None,
-        queue: WorkflowQueue | list[datetime] | list[Release] | None = None,
+        queue: ReleaseQueue | list[datetime] | list[Release] | None = None,
     ) -> Result:
         """Release the workflow task data.
 
         :param release: A release datetime or Release object.
         :param run_id: A workflow running ID for this release.
         :param log: A log class that want to save the execution result.
-        :param queue: A WorkflowQueue object.
+        :param queue: A ReleaseQueue object.
 
         :rtype: Result
         """
@@ -1182,12 +1182,12 @@ class WorkflowTask:
     def queue(
         self,
         end_date: datetime,
-        queue: WorkflowQueue,
+        queue: ReleaseQueue,
         log: type[Log],
         *,
         force_run: bool = False,
     ):
-        """Generate Release to WorkflowQueue object.
+        """Generate Release to ReleaseQueue object.
 
         :param end_date: An end datetime object.
         :param queue: A workflow queue object.
@@ -1195,7 +1195,7 @@ class WorkflowTask:
         :param force_run: A flag that allow to release workflow if the log with
             that release was pointed.
 
-        :rtype: WorkflowQueue
+        :rtype: ReleaseQueue
         """
         if self.runner.date > end_date:
             return queue

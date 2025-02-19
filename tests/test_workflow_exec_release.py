@@ -3,7 +3,7 @@ from unittest import mock
 
 from ddeutil.workflow.conf import Config
 from ddeutil.workflow.result import Result
-from ddeutil.workflow.workflow import Release, Workflow, WorkflowQueue
+from ddeutil.workflow.workflow import Release, ReleaseQueue, Workflow
 
 
 @mock.patch.object(Config, "enable_write_log", False)
@@ -45,7 +45,7 @@ def test_workflow_run_release_with_queue():
     workflow: Workflow = Workflow.from_loader(name="wf-scheduling-common")
     current_date: datetime = datetime.now().replace(second=0, microsecond=0)
     release_date: datetime = workflow.on[0].next(current_date).date
-    queue = WorkflowQueue(running=[Release.from_dt(release_date)])
+    queue = ReleaseQueue(running=[Release.from_dt(release_date)])
 
     # NOTE: Start call workflow release method.
     rs: Result = workflow.release(

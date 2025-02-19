@@ -3,7 +3,7 @@ from unittest import mock
 
 from ddeutil.workflow.conf import Config
 from ddeutil.workflow.scheduler import Schedule
-from ddeutil.workflow.workflow import Workflow, WorkflowQueue, WorkflowTask
+from ddeutil.workflow.workflow import ReleaseQueue, Workflow, WorkflowTask
 
 from .utils import dump_yaml_context
 
@@ -22,7 +22,7 @@ def test_schedule_tasks(test_path):
         """,
     ):
         schedule: Schedule = Schedule.from_loader("tmp-schedule-wf-tasks")
-        queue: dict[str, WorkflowQueue] = {}
+        queue: dict[str, ReleaseQueue] = {}
 
         tasks = schedule.tasks(datetime(2024, 1, 1, 1), queue=queue)
 
@@ -57,7 +57,7 @@ def test_schedule_tasks_release(test_path):
         """,
     ):
         schedule: Schedule = Schedule.from_loader("tmp-schedule-common-wf")
-        queue: dict[str, WorkflowQueue] = {}
+        queue: dict[str, ReleaseQueue] = {}
 
         for task in schedule.tasks(
             start_date=datetime(2024, 1, 1, 1, 2, 30),
@@ -71,7 +71,7 @@ def test_schedule_tasks_release(test_path):
 
             assert len(queue["wf-scheduling"].complete) == 2
 
-        queue: dict[str, WorkflowQueue] = {"wf-scheduling": WorkflowQueue()}
+        queue: dict[str, ReleaseQueue] = {"wf-scheduling": ReleaseQueue()}
 
         for task in schedule.tasks(
             start_date=datetime(2024, 1, 1, 1, 2, 30),

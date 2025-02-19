@@ -18,7 +18,7 @@ from fastapi.responses import UJSONResponse
 from ..__about__ import __version__
 from ..conf import config, get_logger
 from ..scheduler import ReleaseThread, ReleaseThreads
-from ..workflow import WorkflowQueue, WorkflowTask
+from ..workflow import ReleaseQueue, WorkflowTask
 from .repeat import repeat_at
 
 load_dotenv()
@@ -31,7 +31,7 @@ class State(TypedDict):
     scheduler: list[str]
     workflow_threads: ReleaseThreads
     workflow_tasks: list[WorkflowTask]
-    workflow_queue: dict[str, WorkflowQueue]
+    workflow_queue: dict[str, ReleaseQueue]
 
 
 @contextlib.asynccontextmanager

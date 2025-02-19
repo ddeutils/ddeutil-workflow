@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 import pytest
 from ddeutil.workflow.conf import Config
 from ddeutil.workflow.scheduler import WorkflowSchedule
-from ddeutil.workflow.workflow import Release, WorkflowQueue
+from ddeutil.workflow.workflow import Release, ReleaseQueue
 from pydantic import ValidationError
 
 from .utils import dump_yaml_context
@@ -85,8 +85,8 @@ def test_workflow_schedule_raise_on(test_path):
 def test_workflow_schedule_tasks(test_path):
     tz: ZoneInfo = ZoneInfo("Asia/Bangkok")
     release_date: datetime = datetime(2024, 1, 1, 1, tzinfo=tz)
-    queue: dict[str, WorkflowQueue] = {
-        "tmp-wf-schedule-tasks": WorkflowQueue(
+    queue: dict[str, ReleaseQueue] = {
+        "tmp-wf-schedule-tasks": ReleaseQueue(
             complete=[
                 Release.from_dt(datetime(2024, 1, 1, 1, 0, tzinfo=tz)),
                 Release.from_dt(datetime(2024, 1, 1, 1, 1, tzinfo=tz)),
