@@ -71,8 +71,6 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@v1.12.4
-        with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
 
   testpypi-publish:
     name: Publish Python 🐍 distribution 📦 to TestPyPI
@@ -101,7 +99,6 @@ jobs:
       - name: Publish to Test PyPI
         uses: pypa/gh-action-pypi-publish@v1.12.4
         with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
           repository-url: ${{ vars.PYPI_REPO_URL }}
 
   github-release:
