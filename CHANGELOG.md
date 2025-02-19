@@ -2,6 +2,37 @@
 
 ## Latest Changes
 
+## 0.0.29
+
+### :sparkles: Features
+
+- :dart: feat: add ddeutil.vendors on registry search.
+
+### :bug: Bug fixes
+
+- :gear: fixed: change default of registry path.
+- :gear: fixed: remove uv prefix.
+
+### :black_nib: Code Changes
+
+- :art: styled: add type hint on config module.
+- :test_tube: tests: revert session arg.
+- :art: styled: add typo on hook module.
+- :test_tube: tests: add worker parallel on tests workflow.
+- :test_tube: tests: add pytest_collection_modifyitems for more parallel action.
+- :test_tube: tests: add markers for split testcase on gh action.
+- :test_tube: tests: add more testcase and reformat code on tests.
+
+### :package: Build & Workflow
+
+- :toolbox: build: move puhlish workflow support oidc.
+- :toolbox: build: mark parallel tests with pytest-xdist on tests workflow.
+- :toolbox: build: adjust ignore file that use on build and tests gh workflow.
+
+### :postbox: Dependencies
+
+- :pushpin: deps: update deps for core package.
+
 ## 0.0.28
 
 ### :sparkles: Features
