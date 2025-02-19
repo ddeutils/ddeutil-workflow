@@ -1,4 +1,4 @@
-# Introduction
+# :person_running: Workflow
 
 The **Lightweight Workflow Orchestration** with fewer dependencies the was created
 for easy to make a simple metadata driven data workflow. It can use for data operator
@@ -16,14 +16,22 @@ the input parameters per use-case instead.
 This way I can handle a lot of logical workflows in our orgs with only metadata
 configuration. It called **Metadata Driven Data Workflow**.
 
+---
+
 **:pushpin: <u>Rules of This Workflow engine</u>**:
 
-1. Minimum frequency unit of scheduling is **1 minute** :warning:
+1. The Minimum frequency unit of scheduling is **1 minute** :warning:
 2. Can not re-run only failed stage and its pending downstream :rotating_light:
 3. All parallel tasks inside workflow engine use Multi-Threading
-   (Because Python 3.13 unlock GIL :unlock:)
+   (Python 3.13 unlock GIL :unlock:)
+
+---
 
 **:memo: <u>Workflow Diagrams</u>**:
+
+This diagram show where is this application run on the production infrastructure.
+You will see that this application do only running code with stress-less which mean
+you should to set the data layer separate this core program before run this application.
 
 ```mermaid
 flowchart LR

@@ -2,36 +2,46 @@ site_name: Workflow
 theme:
   name: material
   features:
-    - navigation.indexes
-    - navigation.instant
-    - navigation.instant.prefetch
-    - navigation.sections
-    - navigation.footer
-    - search.suggest
-    - search.highlight
-    - search.share
-    - content.tabs.link
-    - content.code.annotation
+    - announce.dismiss
+    - content.code.annotate
     - content.code.copy
     - content.code.select
-    - content.footnote.tooltips
+    - content.tabs.link
+    - content.action.edit
     - content.tooltips
+    - header.autohide
+    - navigation.indexes
+    - navigation.expand
+    - navigation.footer
+    - navigation.instant
+    - navigation.sections
+    - navigation.instant.prefetch
+    - navigation.instant.progress
+    - navigation.path
+    - navigation.prune
+    - navigation.tabs
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.share
+    - search.suggest
+    - toc.follow
   language: en
   palette:
     - scheme: default
+      primary: white
+      accent: gray
       toggle:
         icon: material/toggle-switch-off-outline
         name: Switch to dark mode
-      primary: black
-      accent: purple
     - scheme: slate
+      primary: grey
+      accent: white
       toggle:
         icon: material/toggle-switch
         name: Switch to light mode
-      primary: blue grey
-      accent: lime
   font:
-    text: Work Sans
+    text: "Public Sans"
     code: Roboto Mono
   icon:
     repo: fontawesome/brands/github-alt
@@ -51,20 +61,24 @@ extra:
       link: https://x.com/korawica
 
 nav:
-  - index.md
-  - Getting Started: getting-started.md
-  - Configuration: configuration.md
-  - Modules:
-      - 'Stage': modules/stage.md
-      - 'Cron': modules/cron.md
-      - 'Job': modules/job.md
-      - 'Workflow': modules/workflow.md
-      - 'Params': modules/params.md
-      - 'Result': modules/result.md
-      - 'Scheduler': modules/scheduler.md
-  - Examples:
-      - API: examples/extract_api.md
-      - Postgres: example/extract_pg.md
+  - Home:
+    - Introduction: index.md
+    - Get Started: getting-started.md
+    - Configuration: configuration.md
+    - Examples:
+      - API: examples/workflow_api.md
+      - Postgres: examples/workflow_pg.md
+
+  - API references:
+    - Library:
+      - 'Stage': api/stage.md
+      - 'Cron': api/cron.md
+      - 'Job': api/job.md
+      - 'Workflow': api/workflow.md
+      - 'Params': api/params.md
+      - 'Result': api/result.md
+      - Scheduler: api/scheduler.md
+      - Utils: api/utils.md
 
 plugins:
   - tags
