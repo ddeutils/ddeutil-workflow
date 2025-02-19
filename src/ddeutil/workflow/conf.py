@@ -13,7 +13,7 @@ from collections.abc import Iterator
 from datetime import datetime, timedelta
 from functools import cached_property, lru_cache
 from pathlib import Path
-from typing import ClassVar, Optional, Union
+from typing import ClassVar, Optional, TypeVar, Union
 from zoneinfo import ZoneInfo
 
 from ddeutil.core import str2bool
@@ -39,6 +39,7 @@ __all__: TupleStr = (
     "env",
     "get_logger",
     "get_log",
+    "C",
     "Config",
     "SimLoad",
     "Loader",
@@ -81,18 +82,42 @@ def get_logger(name: str):
     return lg
 
 
-class Config:  # pragma: no cov
+class BaseConfig:  # pragma: no cov
+    """BaseConfig object inheritable."""
+
+    __slots__ = ()
+
+    @property
+    def root_path(self) -> Path:
+        """Root path or the project path.
+
+        :rtype: Path
+        """
+        return Path(os.getenv("ROOT_PATH", "."))
+
+    @property
+    def conf_path(self) -> Path:
+        """Config path that use root_path class argument for this construction.
+
+        :rtype: Path
+        """
+        return self.root_path / os.getenv("CONF_PATH", "conf")
+
+
+class Config(BaseConfig):  # pragma: no cov
     """Config object for keeping core configurations on the current session
     without changing when if the application still running.
 
         The config value can change when you call that config property again.
     """
 
-    __slots__ = ()
-
     # NOTE: Core
     @property
     def root_path(self) -> Path:
+        """Root path or the project path.
+
+        :rtype: Path
+        """
         return Path(env("CORE_ROOT_PATH", "."))
 
     @property
@@ -220,6 +245,9 @@ class Config:  # pragma: no cov
         return str2bool(env("API_ENABLE_ROUTE_SCHEDULE", "true"))
 
 
+C = TypeVar("C", bound=BaseConfig)
+
+
 class SimLoad:
     """Simple Load Object that will search config data by given some identity
     value like name of workflow or on.
@@ -243,7 +271,7 @@ class SimLoad:
     def __init__(
         self,
         name: str,
-        conf: Config,
+        conf: C,
         externals: DictData | None = None,
     ) -> None:
         self.data: DictData = {}
@@ -256,7 +284,7 @@ class SimLoad:
         if not self.data:
             raise ValueError(f"Config {name!r} does not found on conf path")
 
-        self.conf: Config = conf
+        self.conf: C = conf
         self.externals: DictData = externals or {}
         self.data.update(self.externals)
 
@@ -264,7 +292,7 @@ class SimLoad:
     def finds(
         cls,
         obj: object,
-        conf: Config,
+        conf: C,
         *,
         included: list[str] | None = None,
         excluded: list[str] | None = None,
@@ -338,7 +366,7 @@ class Loader(SimLoad):
     ) -> Iterator[tuple[str, DictData]]:
         """Override the find class method from the Simple Loader object.
 
-        :param obj: A object that want to validate matching before return.
+        :param obj: An object that want to validate matching before return.
         :param included:
         :param excluded:
 
