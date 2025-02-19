@@ -180,9 +180,9 @@ schedule-run-local-wf:
 
 ## :cookie: Configuration
 
-The main configuration that use to dynamic changing with your objective of this
-application. If any configuration values do not set yet, it will use default value
-and do not raise any error to you.
+The main configuration that use to dynamic changing this workflow engine for your
+objective use environment variable only. If any configuration values do not set yet,
+it will use default value and do not raise any error to you.
 
 > [!IMPORTANT]
 > The config value that you will set on the environment should combine with
@@ -214,6 +214,9 @@ and do not raise any error to you.
 
 **API Application**:
 
+This config part use for the workflow application that build from the FastAPI
+only.
+
 | Environment                |  Component  | Default | Description                                                                        |
 |:---------------------------|:-----------:|---------|------------------------------------------------------------------------------------|
 | **ENABLE_ROUTE_WORKFLOW**  |     API     | `true`  | A flag that enable workflow route to manage execute manually and workflow logging. |
@@ -240,16 +243,9 @@ like crontab job but via Python API.
 
 ### Docker Container
 
-Create Docker image;
-
 ```shell
 $ docker build -t ddeutil-workflow:latest -f .container/Dockerfile .
-```
-
-Run the above Docker image;
-
-```shell
-$ docker run -i ddeutil-workflow:latest
+$ docker run -i ddeutil-workflow:latest ddeutil-workflow
 ```
 
 ## :speech_balloon: Contribute

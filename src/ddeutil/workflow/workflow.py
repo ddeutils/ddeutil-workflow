@@ -201,12 +201,20 @@ class WorkflowQueue:
         )
 
     def remove_running(self, value: WorkflowRelease) -> Self:
-        """Remove WorkflowRelease in the running queue if it exists."""
+        """Remove WorkflowRelease in the running queue if it exists.
+
+        :rtype: Self
+        """
         if value in self.running:
             self.running.remove(value)
 
+        return self
+
     def mark_complete(self, value: WorkflowRelease) -> Self:
-        """Push WorkflowRelease to the complete queue."""
+        """Push WorkflowRelease to the complete queue.
+
+        :rtype: Self
+        """
         heappush(self.complete, value)
 
         # NOTE: Remove complete queue on workflow that keep more than the
