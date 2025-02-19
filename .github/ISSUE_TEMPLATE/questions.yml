@@ -1,0 +1,59 @@
+name: Question or Problem
+description: Ask a question or ask about a problem ⁉️
+labels: [question]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for your interest in Workflow project. 😅
+
+        Please follow these instructions, fill every question, and do every step. 🙏
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      description: What operating system are you on?
+      multiple: true
+      options:
+        - Linux
+        - Windows
+        - macOS
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: Example Code
+      description: |
+        Please add a self-contained, [minimal, reproducible, example](https://stackoverflow.com/help/minimal-reproducible-example) with your use case.
+
+        If I (or someone) can copy it, run it, and see it right away, there's a much higher chance I (or someone) will be able to help you.
+
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: |
+        What is the problem, question, or error?
+
+        Write a short description telling me what you are doing, what you expect to happen, and what is currently happening.
+
+    validations:
+      required: true
+  - type: input
+    id: workflow-version
+    attributes:
+      label: Workflow Version
+      description: |
+        What Workflow version are you using?
+
+        You can find the Workflow version with:
+
+        ```bash
+        python -c "import ddeutil.workflow.__about__; print(ddeutil.workflow.__about__.__version__)"
+        ```
+    validations:
+      required: true
