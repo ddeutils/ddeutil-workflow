@@ -5,6 +5,9 @@ from ddeutil.workflow import Workflow
 from ddeutil.workflow.conf import Config
 from ddeutil.workflow.job import Job
 from ddeutil.workflow.result import Result
+from ddeutil.workflow.stage import HookStage
+
+from .utils import dump_yaml_context
 
 
 @mock.patch.object(Config, "max_job_parallel", 1)
@@ -348,3 +351,126 @@ def test_workflow_exec_needs_parallel():
                 },
             },
         } == rs.context
+
+
+def test_workflow_exec_hook(test_path):
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_hook_csv_to_parquet.yml",
+        data="""
+        tmp-wf-hook-csv-to-parquet:
+          type: Workflow
+          params:
+            run-date: datetime
+            source: str
+            sink: str
+          jobs:
+            extract-load:
+              stages:
+                - name: "Extract & Load Local System"
+                  id: extract-load
+                  uses: tasks/el-csv-to-parquet@polars-dir
+                  with:
+                    source: ${{ params.source }}
+                    sink: ${{ params.sink }}
+        """,
+    ):
+        workflow = Workflow.from_loader(
+            name="tmp-wf-hook-csv-to-parquet",
+            externals={},
+        )
+
+        # NOTE: execute from the hook stage model
+        stage: HookStage = workflow.job("extract-load").stage("extract-load")
+        rs = stage.handler_execute(
+            params={
+                "params": {
+                    "run-date": datetime(2024, 1, 1),
+                    "source": "ds_csv_local_file",
+                    "sink": "ds_parquet_local_file_dir",
+                },
+            }
+        )
+        assert 0 == rs.status
+        assert {"records": 1} == rs.context
+
+        # NOTE: execute from the job model
+        job: Job = workflow.job("extract-load")
+        rs = job.execute(
+            params={
+                "params": {
+                    "run-date": datetime(2024, 1, 1),
+                    "source": "ds_csv_local_file",
+                    "sink": "ds_parquet_local_file_dir",
+                },
+            },
+        )
+        assert {
+            "1354680202": {
+                "matrix": {},
+                "stages": {"extract-load": {"outputs": {"records": 1}}},
+            },
+        } == rs.context
+
+        rs = workflow.execute(
+            params={
+                "run-date": datetime(2024, 1, 1),
+                "source": "ds_csv_local_file",
+                "sink": "ds_parquet_local_file_dir",
+            },
+        )
+        assert 0 == rs.status
+        assert {
+            "params": {
+                "run-date": datetime(2024, 1, 1),
+                "source": "ds_csv_local_file",
+                "sink": "ds_parquet_local_file_dir",
+            },
+            "jobs": {
+                "extract-load": {
+                    "stages": {
+                        "extract-load": {
+                            "outputs": {"records": 1},
+                        },
+                    },
+                    "matrix": {},
+                },
+            },
+        } == rs.context
+
+
+def test_workflow_exec_hook_with_prefix(test_path):
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_hook_mssql_proc.yml",
+        data="""
+        tmp-wf-hook-mssql-proc:
+          type: Workflow
+          params:
+            run_date: datetime
+            sp_name: str
+            source_name: str
+            target_name: str
+          jobs:
+            transform:
+              stages:
+                - name: "Transform Data in MS SQL Server"
+                  id: transform
+                  uses: tasks/mssql-proc@odbc
+                  with:
+                    _exec: ${{ params.sp_name }}
+                    params:
+                      run_mode: "T"
+                      run_date: ${{ params.run_date }}
+                      source: ${{ params.source_name }}
+                      target: ${{ params.target_name }}
+        """,
+    ):
+        workflow = Workflow.from_loader(name="tmp-wf-hook-mssql-proc")
+        rs = workflow.execute(
+            params={
+                "run_date": datetime(2024, 1, 1),
+                "sp_name": "proc-name",
+                "source_name": "src",
+                "target_name": "tgt",
+            },
+        )
+        print(rs)

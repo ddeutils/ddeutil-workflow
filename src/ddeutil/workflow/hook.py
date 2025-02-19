@@ -79,7 +79,9 @@ def make_registry(submodule: str) -> dict[str, Registry]:
     :rtype: dict[str, Registry]
     """
     rs: dict[str, Registry] = {}
-    for module in config.regis_hook | ["ddeutil.vendors"]:
+    regis_hooks: list[str] = config.regis_hook
+    regis_hooks.extend(["ddeutil.vendors"])
+    for module in regis_hooks:
         # NOTE: try to sequential import task functions
         try:
             importer = import_module(f"{module}.{submodule}")

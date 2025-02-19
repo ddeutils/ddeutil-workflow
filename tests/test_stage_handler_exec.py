@@ -10,6 +10,8 @@ from ddeutil.workflow.exceptions import StageException
 from ddeutil.workflow.result import Result
 from ddeutil.workflow.stage import Stage
 
+from .utils import dump_yaml_context
+
 
 def test_stage_exec_bash():
     workflow: Workflow = Workflow.from_loader(name="wf-run-common")
@@ -42,45 +44,70 @@ def test_stage_exec_bash_env_raise():
         stage.handler_execute({})
 
 
-def test_stage_exec_hook():
-    workflow: Workflow = Workflow.from_loader(name="wf-hook-return-type")
-    stage: Stage = workflow.job("second-job").stage("extract-load")
-    rs: Result = stage.handler_execute({})
+def test_stage_exec_hook(test_path):
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_hook_return_type.yml",
+        data="""
+        tmp-wf-hook-return-type:
+          type: Workflow
+          jobs:
+            first-job:
+              stages:
+                - name: "Return type not valid"
+                  id: valid-type
+                  uses: tasks/return-type-not-valid@raise
+                - name: "Necessary argument do not pass"
+                  id: args-necessary
+                  uses: tasks/mssql-proc@odbc
+                  with:
+                    params:
+                      run_mode: "T"
+                      run_date: 2024-08-01
+                      source: src
+                      target: tgt
+                - name: "Hook value not valid"
+                  id: hook-not-valid
+                  uses: tasks-foo-bar
+                - name: "Hook does not register"
+                  id: hook-not-register
+                  uses: tasks/abc@foo
+            second-job:
+              stages:
+                - name: "Extract & Load Local System"
+                  id: extract-load
+                  uses: tasks/el-csv-to-parquet@polars-dir
+                  with:
+                    source: src
+                    sink: sink
+        """,
+    ):
+        workflow = Workflow.from_loader(name="tmp-wf-hook-return-type")
 
-    assert 0 == rs.status
-    assert {"records": 1} == rs.context
+        stage: Stage = workflow.job("second-job").stage("extract-load")
+        rs: Result = stage.handler_execute({})
 
+        assert 0 == rs.status
+        assert {"records": 1} == rs.context
 
-def test_stage_exec_hook_raise_return_type():
-    workflow: Workflow = Workflow.from_loader(name="wf-hook-return-type")
-    stage: Stage = workflow.job("first-job").stage("valid-type")
+        # NOTE: Raise because invalid return type.
+        with pytest.raises(StageException):
+            stage: Stage = workflow.job("first-job").stage("valid-type")
+            stage.handler_execute({})
 
-    with pytest.raises(StageException):
-        stage.handler_execute({})
+        # NOTE: Raise because necessary args do not pass.
+        with pytest.raises(StageException):
+            stage: Stage = workflow.job("first-job").stage("args-necessary")
+            stage.handler_execute({})
 
+        # NOTE: Raise because hook does not valid.
+        with pytest.raises(StageException):
+            stage: Stage = workflow.job("first-job").stage("hook-not-valid")
+            stage.handler_execute({})
 
-def test_stage_exec_hook_raise_args():
-    workflow: Workflow = Workflow.from_loader(name="wf-hook-return-type")
-    stage: Stage = workflow.job("first-job").stage("args-necessary")
-
-    with pytest.raises(StageException):
-        stage.handler_execute({})
-
-
-def test_stage_exec_hook_not_valid():
-    workflow: Workflow = Workflow.from_loader(name="wf-hook-return-type")
-    stage: Stage = workflow.job("first-job").stage("hook-not-valid")
-
-    with pytest.raises(StageException):
-        stage.handler_execute({})
-
-
-def test_stage_exec_hook_not_register():
-    workflow: Workflow = Workflow.from_loader(name="wf-hook-return-type")
-    stage: Stage = workflow.job("first-job").stage("hook-not-register")
-
-    with pytest.raises(StageException):
-        stage.handler_execute({})
+        # NOTE: Raise because hook does not register.
+        with pytest.raises(StageException):
+            stage: Stage = workflow.job("first-job").stage("hook-not-register")
+            stage.handler_execute({})
 
 
 def test_stage_exec_py_raise():
