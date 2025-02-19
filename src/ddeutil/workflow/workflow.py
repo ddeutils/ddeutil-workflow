@@ -60,7 +60,7 @@ logger = get_logger("ddeutil.workflow")
 
 __all__: TupleStr = (
     "Workflow",
-    "WorkflowRelease",
+    "Release",
     "WorkflowQueue",
     "WorkflowTask",
 )
@@ -68,8 +68,9 @@ __all__: TupleStr = (
 
 @total_ordering
 @dataclass(config=ConfigDict(arbitrary_types_allowed=True))
-class WorkflowRelease:
-    """Workflow release Pydantic dataclass object."""
+class Release:
+    """Workflow release Pydantic dataclass object that use for represent
+    the release data that use with the `workflow.release` method."""
 
     date: datetime
     offset: float
@@ -85,7 +86,7 @@ class WorkflowRelease:
 
     @classmethod
     def from_dt(cls, dt: datetime | str) -> Self:
-        """Construct WorkflowRelease via datetime object only.
+        """Construct Release via datetime object only.
 
         :param dt: A datetime object.
 
@@ -102,7 +103,7 @@ class WorkflowRelease:
             type="manual",
         )
 
-    def __eq__(self, other: WorkflowRelease | datetime) -> bool:
+    def __eq__(self, other: Release | datetime) -> bool:
         """Override equal property that will compare only the same type or
         datetime.
         """
@@ -112,7 +113,7 @@ class WorkflowRelease:
             return self.date == other
         return NotImplemented
 
-    def __lt__(self, other: WorkflowRelease | datetime) -> bool:
+    def __lt__(self, other: Release | datetime) -> bool:
         """Override equal property that will compare only the same type or
         datetime.
         """
@@ -125,18 +126,18 @@ class WorkflowRelease:
 
 @dataclass
 class WorkflowQueue:
-    """Workflow Queue object that is management of WorkflowRelease objects."""
+    """Workflow Queue object that is management of Release objects."""
 
-    queue: list[WorkflowRelease] = field(default_factory=list)
-    running: list[WorkflowRelease] = field(default_factory=list)
-    complete: list[WorkflowRelease] = field(default_factory=list)
+    queue: list[Release] = field(default_factory=list)
+    running: list[Release] = field(default_factory=list)
+    complete: list[Release] = field(default_factory=list)
 
     @classmethod
     def from_list(
-        cls, queue: list[datetime] | list[WorkflowRelease] | None = None
+        cls, queue: list[datetime] | list[Release] | None = None
     ) -> Self:
         """Construct WorkflowQueue object from an input queue value that passing
-        with list of datetime or list of WorkflowRelease.
+        with list of datetime or list of Release.
 
         :raise TypeError: If the type of input queue does not valid.
 
@@ -148,14 +149,14 @@ class WorkflowQueue:
         if isinstance(queue, list):
 
             if all(isinstance(q, datetime) for q in queue):
-                return cls(queue=[WorkflowRelease.from_dt(q) for q in queue])
+                return cls(queue=[Release.from_dt(q) for q in queue])
 
-            if all(isinstance(q, WorkflowRelease) for q in queue):
+            if all(isinstance(q, Release) for q in queue):
                 return cls(queue=queue)
 
         raise TypeError(
             "Type of the queue does not valid with WorkflowQueue "
-            "or list of datetime or list of WorkflowRelease."
+            "or list of datetime or list of Release."
         )
 
     @property
@@ -167,32 +168,32 @@ class WorkflowQueue:
         return len(self.queue) > 0
 
     @property
-    def first_queue(self) -> WorkflowRelease:
-        """Check an input WorkflowRelease object is the first value of the
+    def first_queue(self) -> Release:
+        """Check an input Release object is the first value of the
         waiting queue.
 
         :rtype: bool
         """
         # NOTE: Old logic to peeking the first release from waiting queue.
         #
-        # first_value: WorkflowRelease = heappop(self.queue)
+        # first_value: Release = heappop(self.queue)
         # heappush(self.queue, first_value)
         #
         # return first_value
         #
         return self.queue[0]
 
-    def check_queue(self, value: WorkflowRelease | datetime) -> bool:
-        """Check a WorkflowRelease value already exists in list of tracking
+    def check_queue(self, value: Release | datetime) -> bool:
+        """Check a Release value already exists in list of tracking
         queues.
 
-        :param value: A WorkflowRelease object that want to check it already in
+        :param value: A Release object that want to check it already in
             queues.
 
         :rtype: bool
         """
         if isinstance(value, datetime):
-            value = WorkflowRelease.from_dt(value)
+            value = Release.from_dt(value)
 
         return (
             (value in self.queue)
@@ -200,8 +201,8 @@ class WorkflowQueue:
             or (value in self.complete)
         )
 
-    def remove_running(self, value: WorkflowRelease) -> Self:
-        """Remove WorkflowRelease in the running queue if it exists.
+    def remove_running(self, value: Release) -> Self:
+        """Remove Release in the running queue if it exists.
 
         :rtype: Self
         """
@@ -210,8 +211,8 @@ class WorkflowQueue:
 
         return self
 
-    def mark_complete(self, value: WorkflowRelease) -> Self:
-        """Push WorkflowRelease to the complete queue.
+    def mark_complete(self, value: Release) -> Self:
+        """Push Release to the complete queue.
 
         :rtype: Self
         """
@@ -224,7 +225,6 @@ class WorkflowQueue:
         )
 
         if num_complete_delete > 0:
-            print(num_complete_delete)
             for _ in range(num_complete_delete):
                 heappop(self.complete)
 
@@ -472,14 +472,12 @@ class Workflow(BaseModel):
 
     def release(
         self,
-        release: datetime | WorkflowRelease,
+        release: datetime | Release,
         params: DictData,
         *,
         run_id: str | None = None,
         log: type[Log] = None,
-        queue: (
-            WorkflowQueue | list[datetime] | list[WorkflowRelease] | None
-        ) = None,
+        queue: WorkflowQueue | list[datetime] | list[Release] | None = None,
         override_log_name: str | None = None,
     ) -> Result:
         """Release the workflow execution with overriding parameter with the
@@ -490,14 +488,14 @@ class Workflow(BaseModel):
         result to log destination like file log to the local `/logs` directory.
 
         :Steps:
-            - Initialize WorkflowQueue and WorkflowRelease if they do not pass.
+            - Initialize WorkflowQueue and Release if they do not pass.
             - Create release data for pass to parameter templating function.
             - Execute this workflow with mapping release data to its parameters.
             - Writing result log
             - Remove this release on the running queue
             - Push this release to complete queue
 
-        :param release: A release datetime or WorkflowRelease object.
+        :param release: A release datetime or Release object.
         :param params: A workflow parameter that pass to execute method.
         :param queue: A list of release time that already queue.
         :param run_id: A workflow running ID for this release.
@@ -518,10 +516,10 @@ class Workflow(BaseModel):
         if queue is None or isinstance(queue, list):
             queue: WorkflowQueue = WorkflowQueue.from_list(queue)
 
-        # VALIDATE: Change release value to WorkflowRelease object.
+        # VALIDATE: Change release value to Release object.
         if isinstance(release, datetime):
             rs_release_type: str = "datetime"
-            release: WorkflowRelease = WorkflowRelease.from_dt(release)
+            release: Release = Release.from_dt(release)
 
         logger.debug(
             f"({cut_id(run_id)}) [RELEASE]: Start release - {name!r} : "
@@ -618,7 +616,7 @@ class Workflow(BaseModel):
             if runner.date > end_date:
                 continue
 
-            workflow_release = WorkflowRelease(
+            workflow_release = Release(
                 date=runner.date,
                 offset=offset,
                 end_date=end_date,
@@ -630,7 +628,7 @@ class Workflow(BaseModel):
                 log.is_pointed(name=self.name, release=workflow_release.date)
                 and not force_run
             ):
-                workflow_release = WorkflowRelease(
+                workflow_release = Release(
                     date=runner.next,
                     offset=offset,
                     end_date=end_date,
@@ -641,7 +639,7 @@ class Workflow(BaseModel):
             if runner.date > end_date:
                 continue
 
-            # NOTE: Push the WorkflowRelease object to queue.
+            # NOTE: Push the Release object to queue.
             heappush(queue.queue, workflow_release)
 
         return queue
@@ -745,8 +743,8 @@ class Workflow(BaseModel):
 
             while wf_queue.is_queued:
 
-                # NOTE: Pop the latest WorkflowRelease object from queue.
-                release: WorkflowRelease = heappop(wf_queue.queue)
+                # NOTE: Pop the latest Release object from queue.
+                release: Release = heappop(wf_queue.queue)
 
                 if (
                     release.date - get_dt_now(tz=config.tz, offset=offset)
@@ -769,7 +767,7 @@ class Workflow(BaseModel):
                     )
                     continue
 
-                # NOTE: Push the latest WorkflowRelease to the running queue.
+                # NOTE: Push the latest Release to the running queue.
                 heappush(wf_queue.running, release)
 
                 futures.append(
@@ -1135,6 +1133,9 @@ class WorkflowTask:
 
         This dataclass object is mapping 1-to-1 with workflow and cron runner
     objects.
+
+        This dataclass has the release method for itself.
+
     """
 
     alias: str
@@ -1144,16 +1145,14 @@ class WorkflowTask:
 
     def release(
         self,
-        release: datetime | WorkflowRelease | None = None,
+        release: datetime | Release | None = None,
         run_id: str | None = None,
         log: type[Log] = None,
-        queue: (
-            WorkflowQueue | list[datetime] | list[WorkflowRelease] | None
-        ) = None,
+        queue: WorkflowQueue | list[datetime] | list[Release] | None = None,
     ) -> Result:
         """Release the workflow task data.
 
-        :param release: A release datetime or WorkflowRelease object.
+        :param release: A release datetime or Release object.
         :param run_id: A workflow running ID for this release.
         :param log: A log class that want to save the execution result.
         :param queue: A WorkflowQueue object.
@@ -1188,7 +1187,7 @@ class WorkflowTask:
         *,
         force_run: bool = False,
     ):
-        """Generate WorkflowRelease to WorkflowQueue object.
+        """Generate Release to WorkflowQueue object.
 
         :param end_date: An end datetime object.
         :param queue: A workflow queue object.
@@ -1201,7 +1200,7 @@ class WorkflowTask:
         if self.runner.date > end_date:
             return queue
 
-        workflow_release = WorkflowRelease(
+        workflow_release = Release(
             date=self.runner.date,
             offset=0,
             end_date=end_date,
@@ -1213,7 +1212,7 @@ class WorkflowTask:
             log.is_pointed(name=self.alias, release=workflow_release.date)
             and not force_run
         ):
-            workflow_release = WorkflowRelease(
+            workflow_release = Release(
                 date=self.runner.next,
                 offset=0,
                 end_date=end_date,
@@ -1224,7 +1223,7 @@ class WorkflowTask:
         if self.runner.date > end_date:
             return queue
 
-        # NOTE: Push the WorkflowRelease object to queue.
+        # NOTE: Push the Release object to queue.
         heappush(queue.queue, workflow_release)
 
         return queue

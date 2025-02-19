@@ -6,9 +6,9 @@ from ddeutil.workflow.conf import Config, FileLog
 from ddeutil.workflow.cron import On
 from ddeutil.workflow.result import Result
 from ddeutil.workflow.workflow import (
+    Release,
     Workflow,
     WorkflowQueue,
-    WorkflowRelease,
     WorkflowTask,
 )
 
@@ -124,7 +124,7 @@ def test_workflow_task_release(test_path):
             "release": {
                 "status": "success",
                 "type": "datetime",
-                "release": WorkflowRelease.from_dt(
+                "release": Release.from_dt(
                     datetime(2024, 1, 1, 1, tzinfo=runner.tz)
                 ),
                 "logical_date": datetime(2024, 1, 1, 1, tzinfo=runner.tz),

@@ -3,7 +3,7 @@ from unittest import mock
 
 from ddeutil.workflow.conf import Config
 from ddeutil.workflow.result import Result
-from ddeutil.workflow.workflow import Workflow, WorkflowQueue, WorkflowRelease
+from ddeutil.workflow.workflow import Release, Workflow, WorkflowQueue
 
 
 @mock.patch.object(Config, "enable_write_log", False)
@@ -24,7 +24,7 @@ def test_workflow_run_release():
             "status": "success",
             "type": "datetime",
             "logical_date": release_date,
-            "release": WorkflowRelease.from_dt(release_date),
+            "release": Release.from_dt(release_date),
         },
         "outputs": {
             "jobs": {
@@ -45,7 +45,7 @@ def test_workflow_run_release_with_queue():
     workflow: Workflow = Workflow.from_loader(name="wf-scheduling-common")
     current_date: datetime = datetime.now().replace(second=0, microsecond=0)
     release_date: datetime = workflow.on[0].next(current_date).date
-    queue = WorkflowQueue(running=[WorkflowRelease.from_dt(release_date)])
+    queue = WorkflowQueue(running=[Release.from_dt(release_date)])
 
     # NOTE: Start call workflow release method.
     rs: Result = workflow.release(
@@ -60,7 +60,7 @@ def test_workflow_run_release_with_queue():
             "status": "success",
             "type": "datetime",
             "logical_date": release_date,
-            "release": WorkflowRelease.from_dt(release_date),
+            "release": Release.from_dt(release_date),
         },
         "outputs": {
             "jobs": {
@@ -75,7 +75,7 @@ def test_workflow_run_release_with_queue():
         },
     }
     assert queue.running == []
-    assert queue.complete == [WorkflowRelease.from_dt(release_date)]
+    assert queue.complete == [Release.from_dt(release_date)]
 
 
 @mock.patch.object(Config, "enable_write_log", False)
@@ -94,7 +94,7 @@ def test_workflow_run_release_with_start_date():
             "status": "success",
             "type": "datetime",
             "logical_date": start_date,
-            "release": WorkflowRelease.from_dt(start_date),
+            "release": Release.from_dt(start_date),
         },
         "outputs": {
             "jobs": {

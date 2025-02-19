@@ -58,7 +58,7 @@ from .utils import (
     batch,
     delay,
 )
-from .workflow import Workflow, WorkflowQueue, WorkflowRelease, WorkflowTask
+from .workflow import Release, Workflow, WorkflowQueue, WorkflowTask
 
 P = ParamSpec("P")
 logger = get_logger("ddeutil.workflow")
@@ -418,7 +418,7 @@ def schedule_task(
             continue
 
         # NOTE: Pop the latest release and push it to running.
-        release: WorkflowRelease = heappop(q.queue)
+        release: Release = heappop(q.queue)
         heappush(q.running, release)
 
         logger.info(
