@@ -2,6 +2,18 @@
 
 ## Latest Changes
 
+## 0.0.30
+
+### :black_nib: Code Changes
+
+- :construction: hi: change WorkflowQueue object name to ReleaseQueue instead.
+- :construction: hi: change WorkflowRelease object name to Release instead.
+- :test_tube: tests: update testcase for workflow exec hook.
+
+### :package: Build & Workflow
+
+- :toolbox: build: add issue template.
+
 ## 0.0.29
 
 ### :sparkles: Features
