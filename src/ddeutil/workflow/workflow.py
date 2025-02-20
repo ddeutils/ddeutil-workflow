@@ -94,6 +94,10 @@ class Release:
         """
         if isinstance(dt, str):
             dt: datetime = datetime.fromisoformat(dt)
+        elif not isinstance(dt, datetime):
+            raise TypeError(
+                "The `from_dt` need argument type be str or datetime only."
+            )
 
         return cls(
             date=dt,

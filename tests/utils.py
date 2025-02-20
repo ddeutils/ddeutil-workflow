@@ -60,7 +60,12 @@ def dotenv_setting() -> None:
 
 
 def str2dt(value: str) -> datetime:  # pragma: no cov
-    """Convert string value to datetime object with ``fromisoformat`` method."""
+    """Convert string value to datetime object with ``fromisoformat`` method.
+
+    :param value: (str): A string value that want to convert to datetime object.
+
+    :rtype: datetime
+    """
     return datetime.fromisoformat(value).astimezone(ZoneInfo("Asia/Bangkok"))
 
 
@@ -70,7 +75,7 @@ def dump_yaml(
     """Dump the context data to the target yaml file.
 
     :param filename:
-    :param data:
+    :param data: A YAML data context that want to write to the target file path.
     """
     with Path(filename).open(mode="w") as f:
         if isinstance(data, str):
@@ -86,7 +91,7 @@ def dump_yaml_context(
     """Dump the context data to the target yaml file.
 
     :param filename:
-    :param data:
+    :param data: A YAML data context that want to write to the target file path.
     """
     test_file: Path = Path(filename) if isinstance(filename, str) else filename
     with test_file.open(mode="w") as f:
