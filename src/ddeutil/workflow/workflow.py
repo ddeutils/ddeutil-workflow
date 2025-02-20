@@ -485,7 +485,7 @@ class Workflow(BaseModel):
         *,
         run_id: str | None = None,
         log: type[Log] = None,
-        queue: ReleaseQueue | list[datetime] | list[Release] | None = None,
+        queue: ReleaseQueue | None = None,
         override_log_name: str | None = None,
     ) -> Result:
         """Release the workflow execution with overriding parameter with the
@@ -505,7 +505,7 @@ class Workflow(BaseModel):
 
         :param release: A release datetime or Release object.
         :param params: A workflow parameter that pass to execute method.
-        :param queue: A list of release time that already queue.
+        :param queue: A ReleaseQueue that use for mark complete.
         :param run_id: A workflow running ID for this release.
         :param log: A log class that want to save the execution result.
         :param queue: A ReleaseQueue object.
@@ -520,9 +520,10 @@ class Workflow(BaseModel):
         rs_release: Result = Result(run_id=run_id)
         rs_release_type: str = "release"
 
-        # VALIDATE: Change queue value to ReleaseQueue object.
-        if queue is None or isinstance(queue, list):
-            queue: ReleaseQueue = ReleaseQueue.from_list(queue)
+        if queue is not None and not isinstance(queue, ReleaseQueue):
+            raise TypeError(
+                "The queue argument should be ReleaseQueue object only."
+            )
 
         # VALIDATE: Change release value to Release object.
         if isinstance(release, datetime):
@@ -572,8 +573,9 @@ class Workflow(BaseModel):
         rs_log.save(excluded=None)
 
         # NOTE: Remove this release from running.
-        queue.remove_running(release)
-        queue.mark_complete(release)
+        if queue is not None:
+            queue.remove_running(release)
+            queue.mark_complete(release)
 
         # NOTE: Remove the params key from the result context for deduplicate.
         context: dict[str, Any] = rs.context
@@ -1164,20 +1166,31 @@ class WorkflowTask:
         release: datetime | Release | None = None,
         run_id: str | None = None,
         log: type[Log] = None,
-        queue: ReleaseQueue | list[datetime] | list[Release] | None = None,
+        queue: ReleaseQueue | None = None,
     ) -> Result:
         """Release the workflow task data.
 
         :param release: A release datetime or Release object.
         :param run_id: A workflow running ID for this release.
         :param log: A log class that want to save the execution result.
-        :param queue: A ReleaseQueue object.
+        :param queue: A ReleaseQueue object that use to mark complete.
 
         :rtype: Result
         """
         log: type[Log] = log or get_log()
 
         if release is None:
+
+            if queue is None:
+                raise ValueError(
+                    "If pass None release value, you should to pass the queue"
+                    "for generate this release."
+                )
+            elif not isinstance(queue, ReleaseQueue):
+                raise TypeError(
+                    "The queue argument should be ReleaseQueue object only."
+                )
+
             if queue.check_queue(self.runner.date):
                 release = self.runner.next
 

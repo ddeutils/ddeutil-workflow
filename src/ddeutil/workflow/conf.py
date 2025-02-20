@@ -582,6 +582,10 @@ Log = Union[
 
 
 def get_log() -> type[Log]:  # pragma: no cov
+    """Get logging class that dynamic base on the config log path value.
+
+    :rtype: type[Log]
+    """
     if config.log_path.is_file():
         return SQLiteLog
     return FileLog

@@ -1,6 +1,7 @@
 from datetime import datetime
 from unittest import mock
 
+import pytest
 from ddeutil.workflow.__cron import CronRunner
 from ddeutil.workflow.conf import Config, FileLog
 from ddeutil.workflow.cron import On
@@ -181,3 +182,11 @@ def test_workflow_task_release_long_running(test_path):
         rs: Result = task.release(queue=queue["demo"])
         assert rs.status == 0
         print(queue)
+
+        with pytest.raises(ValueError):
+            task.release()
+
+        with pytest.raises(TypeError):
+            task.release(
+                queue=list[datetime(2024, 1, 1, 1, 0, tzinfo=runner.tz)],
+            )
