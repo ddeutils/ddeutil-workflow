@@ -328,7 +328,7 @@ class BashStage(BaseStage):
     If your current OS is Windows, it will run on the bash in the WSL.
 
         I get some limitation when I run shell statement with the built-in
-    supprocess package. It does not good enough to use multiline statement.
+    subprocess package. It does not good enough to use multiline statement.
     Thus, I add writing ``.sh`` file before execution process for fix this
     issue.
 
@@ -665,3 +665,15 @@ Stage = Union[
     TriggerStage,
     EmptyStage,
 ]
+
+
+# TODO: Not implement this stages yet
+class ParallelStage(BaseModel):
+    parallel: list[Stage]
+    max_parallel_core: int = Field(default=2)
+
+
+# TODO: Not implement this stages yet
+class ForEachStage(BaseModel):
+    foreach: list[str]
+    stages: list[Stage]
