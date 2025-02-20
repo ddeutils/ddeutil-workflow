@@ -160,6 +160,15 @@ The above workflow template is main executor pipeline that you want to do. If yo
 want to schedule this workflow, you want to dynamic its parameters change base on
 execution time such as `run-date` should change base on that workflow running date.
 
+```python
+from ddeutil.workflow import Workflow, Result
+
+workflow: Workflow = Workflow.from_loader('run-py-local')
+result: Result = workflow.execute(
+   params={"source-extract": "USD-THB", "asat-dt": "2024-01-01"}
+)
+```
+
 So, this package provide the `Schedule` template for this action.
 
 ```yaml

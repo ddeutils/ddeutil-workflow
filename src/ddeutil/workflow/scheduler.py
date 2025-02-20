@@ -258,7 +258,7 @@ class Schedule(BaseModel):
         an input schedule name. The loader object will use this schedule name to
         searching configuration data of this schedule model in conf path.
 
-        :param name: A schedule name that want to pass to Loader object.
+        :param name: (str) A schedule name that want to pass to Loader object.
         :param externals: An external parameters that want to pass to Loader
             object.
 
@@ -329,7 +329,7 @@ def catch_exceptions(cancel_on_failure: bool = False) -> DecoratorCancelJob:
         try:
 
             @wraps(func)
-            def wrapper(*args, **kwargs):
+            def wrapper(*args: P.args, **kwargs: P.kwargs):
                 return func(*args, **kwargs)
 
             return wrapper
@@ -344,6 +344,8 @@ def catch_exceptions(cancel_on_failure: bool = False) -> DecoratorCancelJob:
 
 
 class ReleaseThread(TypedDict):
+    """TypeDict for the release thread."""
+
     thread: Thread
     start_date: datetime
 
@@ -600,7 +602,7 @@ def schedule_runner(
                                         --> thread of release task 01 02
                             ==> schedule --> thread of release task 02 01
                                         --> thread of release task 02 02
-            ==> process 02
+            ==> process 02  ==> ...
     """
     results: list[str] = []
 

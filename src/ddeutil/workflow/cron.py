@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo
 from pydantic.functional_serializers import field_serializer
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
@@ -47,6 +47,8 @@ def interval2crontab(
         '0 0 1 * *'
         >>> interval2crontab(interval='monthly', day='tuesday', time='12:00')
         '12 0 1 * 2'
+
+    :rtype: str
     """
     d: str = "*"
     if interval == "weekly":
@@ -64,7 +66,7 @@ class On(BaseModel):
     """On Pydantic model (Warped crontab object by model).
 
     See Also:
-        * ``generate()`` is the main usecase of this schedule object.
+        * ``generate()`` is the main use-case of this schedule object.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -168,9 +170,14 @@ class On(BaseModel):
             raise ValueError(f"Invalid timezone: {value}") from err
 
     @field_validator("cronjob", mode="before")
-    def __prepare_cronjob(cls, value: str | CronJob) -> CronJob:
+    def __prepare_cronjob(
+        cls, value: str | CronJob, info: ValidationInfo
+    ) -> CronJob:
         """Prepare crontab value that able to receive with string type."""
-        return CronJob(value) if isinstance(value, str) else value
+        extras: DictData = info.data.get("extras", {})
+        return (
+            CronJob(value, option=extras) if isinstance(value, str) else value
+        )
 
     @field_serializer("cronjob")
     def __serialize_cronjob(self, value: CronJob) -> str:

@@ -845,5 +845,6 @@ __all__ = (
     "CronJob",
     "CronJobYear",
     "CronRunner",
+    "Options",
     "WEEKDAYS",
 )
