@@ -5,8 +5,9 @@
 # ------------------------------------------------------------------------------
 from __future__ import annotations
 
+from dataclasses import fields
 from datetime import datetime
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Union
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo
@@ -14,7 +15,7 @@ from pydantic.functional_serializers import field_serializer
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
-from .__cron import WEEKDAYS, CronJob, CronJobYear, CronRunner
+from .__cron import WEEKDAYS, CronJob, CronJobYear, CronRunner, Options
 from .__types import DictData, DictStr, TupleStr
 from .conf import Loader
 
@@ -72,6 +73,13 @@ class On(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     # NOTE: This is fields of the base schedule.
+    extras: Annotated[
+        DictData,
+        Field(
+            default_factory=dict,
+            description="An extras mapping parameters",
+        ),
+    ]
     cronjob: Annotated[
         CronJob,
         Field(description="Cron job of this schedule"),
@@ -83,13 +91,6 @@ class On(BaseModel):
             alias="timezone",
         ),
     ] = "Etc/UTC"
-    extras: Annotated[
-        DictData,
-        Field(
-            default_factory=dict,
-            description="An extras mapping parameters",
-        ),
-    ]
 
     @classmethod
     def from_value(cls, value: DictStr, externals: DictData) -> Self:
@@ -169,14 +170,25 @@ class On(BaseModel):
         except ZoneInfoNotFoundError as err:
             raise ValueError(f"Invalid timezone: {value}") from err
 
-    @field_validator("cronjob", mode="before")
+    @field_validator(
+        "cronjob", mode="before", json_schema_input_type=Union[CronJob, str]
+    )
     def __prepare_cronjob(
         cls, value: str | CronJob, info: ValidationInfo
     ) -> CronJob:
         """Prepare crontab value that able to receive with string type."""
         extras: DictData = info.data.get("extras", {})
         return (
-            CronJob(value, option=extras) if isinstance(value, str) else value
+            CronJob(
+                value,
+                option={
+                    name: extras[name]
+                    for name in (f.name for f in fields(Options))
+                    if name in extras
+                },
+            )
+            if isinstance(value, str)
+            else value
         )
 
     @field_serializer("cronjob")

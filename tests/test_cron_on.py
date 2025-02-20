@@ -21,16 +21,14 @@ def test_interval2crontab():
 
 
 def test_on():
-    # FIXME: Test passing option to the extras field.
-    # schedule = On(
-    #     cronjob="*/5,3,6 9-17/2 * 1-3 1-5",
-    #     extras={"output_hashes": True},
-    # )
-    # print(schedule.cronjob.options)
-    # assert (
-    #     str(schedule.cronjob)
-    #     == "0,3,5-6,10,15,20,25,30,35,40,45,50,55 H(9-17)/2 H 1-3 1-5"
-    # )
+    schedule = On(
+        cronjob="*/5,3,6 9-17/2 * 1-3 1-5",
+        extras={"output_hashes": True, "other_key": "not_use_value"},
+    )
+    assert (
+        str(schedule.cronjob)
+        == "0,3,5-6,10,15,20,25,30,35,40,45,50,55 H(9-17)/2 H 1-3 1-5"
+    )
 
     schedule = On.from_loader(name="every_5_minute_bkk", externals={})
     assert "Asia/Bangkok" == schedule.tz
