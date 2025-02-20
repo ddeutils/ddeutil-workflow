@@ -29,6 +29,7 @@ from concurrent.futures import (
 )
 from dataclasses import field
 from datetime import datetime, timedelta
+from enum import Enum
 from functools import total_ordering
 from heapq import heappop, heappush
 from queue import Queue
@@ -59,15 +60,26 @@ from .utils import (
 logger = get_logger("ddeutil.workflow")
 
 __all__: TupleStr = (
-    "Workflow",
     "Release",
     "ReleaseQueue",
+    "ReleaseType",
+    "Workflow",
     "WorkflowTask",
 )
 
 
+class ReleaseType(str, Enum):
+    """Release Type Enum support the type field on the Release dataclass."""
+
+    DEFAULT: str = "manual"
+    TASK: str = "task"
+    POKE: str = "poking"
+
+
 @total_ordering
-@dataclass(config=ConfigDict(arbitrary_types_allowed=True))
+@dataclass(
+    config=ConfigDict(arbitrary_types_allowed=True, use_enum_values=True)
+)
 class Release:
     """Release Pydantic dataclass object that use for represent
     the release data that use with the `workflow.release` method."""
@@ -76,7 +88,7 @@ class Release:
     offset: float
     end_date: datetime
     runner: CronRunner
-    type: str
+    type: ReleaseType = field(default=ReleaseType.DEFAULT)
 
     def __repr__(self) -> str:
         return repr(f"{self.date:%Y-%m-%d %H:%M:%S}")
@@ -104,7 +116,6 @@ class Release:
             offset=0,
             end_date=dt + timedelta(days=1),
             runner=CronJob("* * * * *").schedule(dt.replace(tzinfo=config.tz)),
-            type="manual",
         )
 
     def __eq__(self, other: Release | datetime) -> bool:
@@ -491,7 +502,7 @@ class Workflow(BaseModel):
             This method allow workflow use log object to save the execution
         result to log destination like file log to the local `/logs` directory.
 
-        :Steps:
+        Steps:
             - Initialize ReleaseQueue and Release if they do not pass.
             - Create release data for pass to parameter templating function.
             - Execute this workflow with mapping release data to its parameters.
@@ -598,8 +609,16 @@ class Workflow(BaseModel):
         *,
         force_run: bool = False,
     ) -> ReleaseQueue:
-        """Generate queue of datetime from the cron runner that initialize from
-        the on field. with offset value.
+        """Generate Release from all on values from the on field and store them
+        to the ReleaseQueue object.
+
+        Steps:
+            - For-loop all the on value in the on field.
+            - Create Release object from the current date that not reach the end
+              date.
+            - Check this release do not store on the release queue object.
+              Generate the next date if it exists.
+            - Push this release to the release queue
 
         :param offset: An offset in second unit for time travel.
         :param end_date: An end datetime object.
@@ -625,7 +644,7 @@ class Workflow(BaseModel):
                 offset=offset,
                 end_date=end_date,
                 runner=runner,
-                type="poking",
+                type=ReleaseType.POKE,
             )
 
             while queue.check_queue(workflow_release) or (
@@ -637,7 +656,7 @@ class Workflow(BaseModel):
                     offset=offset,
                     end_date=end_date,
                     runner=runner,
-                    type="poking",
+                    type=ReleaseType.POKE,
                 )
 
             if runner.date > end_date:
@@ -1174,6 +1193,7 @@ class WorkflowTask:
             else:
                 release = self.runner.date
 
+        # NOTE: Call the workflow release method.
         return self.workflow.release(
             release=release,
             params=self.values,
@@ -1190,8 +1210,9 @@ class WorkflowTask:
         log: type[Log],
         *,
         force_run: bool = False,
-    ):
-        """Generate Release to ReleaseQueue object.
+    ) -> ReleaseQueue:
+        """Generate Release from the runner field and store it to the
+        ReleaseQueue object.
 
         :param end_date: An end datetime object.
         :param queue: A workflow queue object.
@@ -1209,7 +1230,7 @@ class WorkflowTask:
             offset=0,
             end_date=end_date,
             runner=self.runner,
-            type="task",
+            type=ReleaseType.TASK,
         )
 
         while queue.check_queue(workflow_release) or (
@@ -1221,7 +1242,7 @@ class WorkflowTask:
                 offset=0,
                 end_date=end_date,
                 runner=self.runner,
-                type="task",
+                type=ReleaseType.TASK,
             )
 
         if self.runner.date > end_date:

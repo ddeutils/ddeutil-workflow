@@ -156,6 +156,7 @@ class On(BaseModel):
 
     @model_validator(mode="before")
     def __prepare_values(cls, values: DictData) -> DictData:
+        """Extract tz key from value and change name to timezone key."""
         if tz := values.pop("tz", None):
             values["timezone"] = tz
         return values
@@ -163,7 +164,10 @@ class On(BaseModel):
     @field_validator("tz")
     def __validate_tz(cls, value: str) -> str:
         """Validate timezone value that able to initialize with ZoneInfo after
-        it passing to this model in before mode."""
+        it passing to this model in before mode.
+
+        :rtype: str
+        """
         try:
             _ = ZoneInfo(value)
             return value
@@ -176,7 +180,12 @@ class On(BaseModel):
     def __prepare_cronjob(
         cls, value: str | CronJob, info: ValidationInfo
     ) -> CronJob:
-        """Prepare crontab value that able to receive with string type."""
+        """Prepare crontab value that able to receive with string type.
+        This step will get options kwargs from extras and pass to the
+        CronJob object.
+
+        :rtype: CronJob
+        """
         extras: DictData = info.data.get("extras", {})
         return (
             CronJob(
@@ -193,10 +202,17 @@ class On(BaseModel):
 
     @field_serializer("cronjob")
     def __serialize_cronjob(self, value: CronJob) -> str:
+        """Serialize the cronjob field that store with CronJob object.
+
+        :rtype: str
+        """
         return str(value)
 
     def generate(self, start: str | datetime) -> CronRunner:
-        """Return Cron runner object."""
+        """Return Cron runner object.
+
+        :rtype: CronRunner
+        """
         if isinstance(start, str):
             start: datetime = datetime.fromisoformat(start)
         elif not isinstance(start, datetime):
@@ -206,6 +222,8 @@ class On(BaseModel):
     def next(self, start: str | datetime) -> CronRunner:
         """Return a next datetime from Cron runner object that start with any
         date that given from input.
+
+        :rtype: CronRunner
         """
         runner: CronRunner = self.generate(start=start)
 
@@ -228,7 +246,26 @@ class YearOn(On):
         Field(description="Cron job of this schedule"),
     ]
 
-    @field_validator("cronjob", mode="before")
-    def __prepare_cronjob(cls, value: str | CronJobYear) -> CronJobYear:
-        """Prepare crontab value that able to receive with string type."""
-        return CronJobYear(value) if isinstance(value, str) else value
+    @field_validator(
+        "cronjob", mode="before", json_schema_input_type=Union[CronJob, str]
+    )
+    def __prepare_cronjob(
+        cls, value: str | CronJobYear, info: ValidationInfo
+    ) -> CronJobYear:
+        """Prepare crontab value that able to receive with string type.
+
+        :rtype: CronJobYear
+        """
+        extras: DictData = info.data.get("extras", {})
+        return (
+            CronJobYear(
+                value,
+                option={
+                    name: extras[name]
+                    for name in (f.name for f in fields(Options))
+                    if name in extras
+                },
+            )
+            if isinstance(value, str)
+            else value
+        )
