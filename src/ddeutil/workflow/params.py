@@ -5,6 +5,7 @@
 # ------------------------------------------------------------------------------
 from __future__ import annotations
 
+import decimal
 import logging
 from abc import ABC, abstractmethod
 from datetime import date, datetime
@@ -49,7 +50,7 @@ class BaseParam(BaseModel, ABC):
 
 class DefaultParam(BaseParam):
     """Default Parameter that will check default if it required. This model do
-    not implement the receive method.
+    not implement the `receive` method.
     """
 
     required: bool = Field(
@@ -66,6 +67,15 @@ class DefaultParam(BaseParam):
         raise NotImplementedError(
             "Receive value and validate typing before return valid value."
         )
+
+
+# TODO: Not implement this parameter yet
+class DateParam(DefaultParam):
+    """Date parameter."""
+
+    type: Literal["date"] = "date"
+
+    def receive(self, value: Optional[str | date] = None) -> date: ...
 
 
 class DatetimeParam(DefaultParam):
@@ -143,6 +153,13 @@ class IntParam(DefaultParam):
                     f"Value can not convert to int, {value}, with base 10"
                 ) from err
         return value
+
+
+# TODO: Not implement this parameter yet
+class DecimalParam(DefaultParam):
+    type: Literal["decimal"] = "decimal"
+
+    def receive(self, value: float | None = None) -> decimal.Decimal: ...
 
 
 class ChoiceParam(BaseParam):

@@ -189,13 +189,6 @@ class ReleaseQueue:
 
         :rtype: bool
         """
-        # NOTE: Old logic to peeking the first release from waiting queue.
-        #
-        # first_value: Release = heappop(self.queue)
-        # heappush(self.queue, first_value)
-        #
-        # return first_value
-        #
         return self.queue[0]
 
     def check_queue(self, value: Release | datetime) -> bool:

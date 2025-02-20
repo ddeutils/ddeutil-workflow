@@ -94,6 +94,7 @@ class Result:
         # NOTE: Check the context has jobs key.
         if "jobs" not in self.__dict__["context"]:
             self.__dict__["context"]["jobs"] = {}
+
         self.__dict__["context"]["jobs"].update(result.context)
 
         # NOTE: Update running ID from an incoming result.
