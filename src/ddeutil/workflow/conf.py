@@ -8,19 +8,14 @@ from __future__ import annotations
 import json
 import logging
 import os
-from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from datetime import datetime, timedelta
+from datetime import timedelta
 from functools import cached_property, lru_cache
 from pathlib import Path
-from typing import ClassVar, Optional, TypeVar, Union
 from zoneinfo import ZoneInfo
 
 from ddeutil.core import str2bool
 from ddeutil.io import YamlFlResolve
-from pydantic import BaseModel, Field
-from pydantic.functional_validators import model_validator
-from typing_extensions import Self
 
 from .__types import DictData, TupleStr
 
@@ -36,50 +31,14 @@ def glob_files(path: Path) -> Iterator[Path]:  # pragma: no cov
 
 
 __all__: TupleStr = (
+    "LOGGING_CONFIG",
     "env",
     "get_logger",
-    "get_log",
-    "C",
     "Config",
     "SimLoad",
     "Loader",
     "config",
-    "logger",
-    "FileLog",
-    "SQLiteLog",
-    "Log",
 )
-
-
-@lru_cache
-def get_logger(name: str):
-    """Return logger object with an input module name.
-
-    :param name: A module name that want to log.
-    """
-    lg = logging.getLogger(name)
-
-    # NOTE: Developers using this package can then disable all logging just for
-    #   this package by;
-    #
-    #   `logging.getLogger('ddeutil.workflow').propagate = False`
-    #
-    lg.addHandler(logging.NullHandler())
-
-    formatter = logging.Formatter(
-        fmt=(
-            "%(asctime)s.%(msecs)03d (%(name)-10s, %(process)-5d, "
-            "%(thread)-5d) [%(levelname)-7s] %(message)-120s "
-            "(%(filename)s:%(lineno)s)"
-        ),
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-    stream = logging.StreamHandler()
-    stream.setFormatter(formatter)
-    lg.addHandler(stream)
-
-    lg.setLevel(logging.DEBUG if config.debug else logging.INFO)
-    return lg
 
 
 class BaseConfig:  # pragma: no cov
@@ -162,6 +121,21 @@ class Config(BaseConfig):  # pragma: no cov
     def enable_write_log(self) -> bool:
         return str2bool(env("LOG_ENABLE_WRITE", "false"))
 
+    @property
+    def log_format(self) -> str:
+        return env(
+            "LOG_FORMAT",
+            (
+                "%(asctime)s.%(msecs)03d (%(name)-10s, %(process)-5d, "
+                "%(thread)-5d) [%(levelname)-7s] %(message)-120s "
+                "(%(filename)s:%(lineno)s)"
+            ),
+        )
+
+    @property
+    def log_datetime_format(self) -> str:
+        return env("LOG_DATETIME_FORMAT", "%Y-%m-%d %H:%M:%S")
+
     # NOTE: Stage
     @property
     def stage_raise_error(self) -> bool:
@@ -209,7 +183,7 @@ class Config(BaseConfig):  # pragma: no cov
     def max_queue_complete_hist(self) -> int:
         return int(env("CORE_MAX_QUEUE_COMPLETE_HIST", "16"))
 
-    # NOTE: Schedule App
+    # NOTE: App
     @property
     def max_schedule_process(self) -> int:
         return int(env("APP_MAX_PROCESS", "2"))
@@ -245,15 +219,12 @@ class Config(BaseConfig):  # pragma: no cov
         return str2bool(env("API_ENABLE_ROUTE_SCHEDULE", "true"))
 
 
-C = TypeVar("C", bound=BaseConfig)
-
-
 class SimLoad:
     """Simple Load Object that will search config data by given some identity
     value like name of workflow or on.
 
     :param name: A name of config data that will read by Yaml Loader object.
-    :param conf: A Params model object.
+    :param conf_path: A config path object.
     :param externals: An external parameters
 
     Noted:
@@ -271,11 +242,11 @@ class SimLoad:
     def __init__(
         self,
         name: str,
-        conf: C,
+        conf_path: Path,
         externals: DictData | None = None,
     ) -> None:
         self.data: DictData = {}
-        for file in glob_files(conf.conf_path):
+        for file in glob_files(conf_path):
 
             if data := self.filter_suffix(file, name):
                 self.data = data
@@ -284,7 +255,7 @@ class SimLoad:
         if not self.data:
             raise ValueError(f"Config {name!r} does not found on conf path")
 
-        self.conf: C = conf
+        self.conf_path: Path = conf_path
         self.externals: DictData = externals or {}
         self.data.update(self.externals)
 
@@ -292,7 +263,7 @@ class SimLoad:
     def finds(
         cls,
         obj: object,
-        conf: C,
+        conf_path: Path,
         *,
         included: list[str] | None = None,
         excluded: list[str] | None = None,
@@ -302,14 +273,14 @@ class SimLoad:
         adds-on.
 
         :param obj: An object that want to validate matching before return.
-        :param conf: A config object.
+        :param conf_path: A config object.
         :param included:
         :param excluded:
 
         :rtype: Iterator[tuple[str, DictData]]
         """
         exclude: list[str] = excluded or []
-        for file in glob_files(conf.conf_path):
+        for file in glob_files(conf_path):
 
             for key, data in cls.filter_suffix(file).items():
 
@@ -344,10 +315,6 @@ class SimLoad:
         )
 
 
-config = Config()
-logger = get_logger("ddeutil.workflow")
-
-
 class Loader(SimLoad):
     """Loader Object that get the config `yaml` file from current path.
 
@@ -373,219 +340,94 @@ class Loader(SimLoad):
         :rtype: Iterator[tuple[str, DictData]]
         """
         return super().finds(
-            obj=obj, conf=config, included=included, excluded=excluded
+            obj=obj,
+            conf_path=config.conf_path,
+            included=included,
+            excluded=excluded,
         )
 
     def __init__(self, name: str, externals: DictData) -> None:
-        super().__init__(name, conf=config, externals=externals)
+        super().__init__(name, conf_path=config.conf_path, externals=externals)
 
 
-class BaseLog(BaseModel, ABC):
-    """Base Log Pydantic Model with abstraction class property that implement
-    only model fields. This model should to use with inherit to logging
-    subclass like file, sqlite, etc.
+config: Config = Config()
+
+
+@lru_cache
+def get_logger(name: str):
+    """Return logger object with an input module name.
+
+    :param name: A module name that want to log.
     """
+    logger = logging.getLogger(name)
 
-    name: str = Field(description="A workflow name.")
-    release: datetime = Field(description="A release datetime.")
-    type: str = Field(description="A running type before logging.")
-    context: DictData = Field(
-        default_factory=dict,
-        description="A context that receive from a workflow execution result.",
+    # NOTE: Developers using this package can then disable all logging just for
+    #   this package by;
+    #
+    #   `logging.getLogger('ddeutil.workflow').propagate = False`
+    #
+    logger.addHandler(logging.NullHandler())
+
+    formatter = logging.Formatter(
+        fmt=config.log_format,
+        datefmt=config.log_datetime_format,
     )
-    parent_run_id: Optional[str] = Field(default=None)
-    run_id: str
-    update: datetime = Field(default_factory=datetime.now)
+    stream = logging.StreamHandler()
+    stream.setFormatter(formatter)
+    logger.addHandler(stream)
 
-    @model_validator(mode="after")
-    def __model_action(self) -> Self:
-        """Do before the Log action with WORKFLOW_LOG_ENABLE_WRITE env variable.
-
-        :rtype: Self
-        """
-        if config.enable_write_log:
-            self.do_before()
-        return self
-
-    def do_before(self) -> None:  # pragma: no cov
-        """To something before end up of initial log model."""
-
-    @abstractmethod
-    def save(self, excluded: list[str] | None) -> None:  # pragma: no cov
-        """Save this model logging to target logging store."""
-        raise NotImplementedError("Log should implement ``save`` method.")
+    logger.setLevel(logging.DEBUG if config.debug else logging.INFO)
+    return logger
 
 
-class FileLog(BaseLog):
-    """File Log Pydantic Model that use to saving log data from result of
-    workflow execution. It inherits from BaseLog model that implement the
-    ``self.save`` method for file.
-    """
-
-    filename_fmt: ClassVar[str] = (
-        "workflow={name}/release={release:%Y%m%d%H%M%S}"
-    )
-
-    def do_before(self) -> None:
-        """Create directory of release before saving log file."""
-        self.pointer().mkdir(parents=True, exist_ok=True)
-
-    @classmethod
-    def find_logs(cls, name: str) -> Iterator[Self]:
-        """Generate the logging data that found from logs path with specific a
-        workflow name.
-
-        :param name: A workflow name that want to search release logging data.
-
-        :rtype: Iterator[Self]
-        """
-        pointer: Path = config.log_path / f"workflow={name}"
-        if not pointer.exists():
-            raise FileNotFoundError(f"Pointer: {pointer.absolute()}.")
-
-        for file in pointer.glob("./release=*/*.log"):
-            with file.open(mode="r", encoding="utf-8") as f:
-                yield cls.model_validate(obj=json.load(f))
-
-    @classmethod
-    def find_log_with_release(
-        cls,
-        name: str,
-        release: datetime | None = None,
-    ) -> Self:
-        """Return the logging data that found from logs path with specific
-        workflow name and release values. If a release does not pass to an input
-        argument, it will return the latest release from the current log path.
-
-        :param name: A workflow name that want to search log.
-        :param release: A release datetime that want to search log.
-
-        :raise FileNotFoundError:
-        :raise NotImplementedError:
-
-        :rtype: Self
-        """
-        if release is None:
-            raise NotImplementedError("Find latest log does not implement yet.")
-
-        pointer: Path = (
-            config.log_path / f"workflow={name}/release={release:%Y%m%d%H%M%S}"
-        )
-        if not pointer.exists():
-            raise FileNotFoundError(
-                f"Pointer: ./logs/workflow={name}/"
-                f"release={release:%Y%m%d%H%M%S} does not found."
-            )
-
-        with max(pointer.glob("./*.log"), key=os.path.getctime).open(
-            mode="r", encoding="utf-8"
-        ) as f:
-            return cls.model_validate(obj=json.load(f))
-
-    @classmethod
-    def is_pointed(cls, name: str, release: datetime) -> bool:
-        """Check the release log already pointed or created at the destination
-        log path.
-
-        :param name: A workflow name.
-        :param release: A release datetime.
-
-        :rtype: bool
-        :return: Return False if the release log was not pointed or created.
-        """
-        # NOTE: Return False if enable writing log flag does not set.
-        if not config.enable_write_log:
-            return False
-
-        # NOTE: create pointer path that use the same logic of pointer method.
-        pointer: Path = config.log_path / cls.filename_fmt.format(
-            name=name, release=release
-        )
-
-        return pointer.exists()
-
-    def pointer(self) -> Path:
-        """Return release directory path that was generated from model data.
-
-        :rtype: Path
-        """
-        return config.log_path / self.filename_fmt.format(
-            name=self.name, release=self.release
-        )
-
-    def save(self, excluded: list[str] | None) -> Self:
-        """Save logging data that receive a context data from a workflow
-        execution result.
-
-        :param excluded: An excluded list of key name that want to pass in the
-            model_dump method.
-
-        :rtype: Self
-        """
-        from .utils import cut_id
-
-        # NOTE: Check environ variable was set for real writing.
-        if not config.enable_write_log:
-            logger.debug(
-                f"({cut_id(self.run_id)}) [LOG]: Skip writing log cause "
-                f"config was set"
-            )
-            return self
-
-        log_file: Path = self.pointer() / f"{self.run_id}.log"
-        log_file.write_text(
-            json.dumps(
-                self.model_dump(exclude=excluded),
-                default=str,
-                indent=2,
-            ),
-            encoding="utf-8",
-        )
-        return self
-
-
-class SQLiteLog(BaseLog):  # pragma: no cov
-
-    table: str = "workflow_log"
-    ddl: str = """
-        workflow        str,
-        release         int,
-        type            str,
-        context         json,
-        parent_run_id   int,
-        run_id          int,
-        update          datetime
-        primary key ( run_id )
-        """
-
-    def save(self, excluded: list[str] | None) -> SQLiteLog:
-        """Save logging data that receive a context data from a workflow
-        execution result.
-        """
-        from .utils import cut_id
-
-        # NOTE: Check environ variable was set for real writing.
-        if not config.enable_write_log:
-            logger.debug(
-                f"({cut_id(self.run_id)}) [LOG]: Skip writing log cause "
-                f"config was set"
-            )
-            return self
-
-        raise NotImplementedError("SQLiteLog does not implement yet.")
-
-
-Log = Union[
-    FileLog,
-    SQLiteLog,
-]
-
-
-def get_log() -> type[Log]:  # pragma: no cov
-    """Get logging class that dynamic base on the config log path value.
-
-    :rtype: type[Log]
-    """
-    if config.log_path.is_file():
-        return SQLiteLog
-    return FileLog
+LOGGING_CONFIG = {  # pragma: no cov
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "standard": {
+            "format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+        },
+        "custom_formatter": {"format": config.log_format},
+    },
+    "handlers": {
+        "default": {
+            "formatter": "standard",
+            "class": "logging.StreamHandler",
+            "stream": "ext://sys.stdout",  # Default is stderr
+        },
+        "stream_handler": {
+            "formatter": "custom_formatter",
+            "class": "logging.StreamHandler",
+            "stream": "ext://sys.stdout",  # Default is stderr
+        },
+        "file_handler": {
+            "formatter": "custom_formatter",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": "logs/app.log",
+            "maxBytes": 1024 * 1024 * 1,  # = 1MB
+            "backupCount": 3,
+        },
+    },
+    "loggers": {
+        "uvicorn": {
+            "handlers": ["default", "file_handler"],
+            "level": "TRACE",
+            "propagate": False,
+        },
+        "uvicorn.access": {
+            "handlers": ["stream_handler", "file_handler"],
+            "level": "TRACE",
+            "propagate": False,
+        },
+        "uvicorn.error": {
+            "handlers": ["stream_handler", "file_handler"],
+            "level": "TRACE",
+            "propagate": False,
+        },
+        "uvicorn.asgi": {
+            "handlers": ["stream_handler", "file_handler"],
+            "level": "TRACE",
+            "propagate": False,
+        },
+    },
+}

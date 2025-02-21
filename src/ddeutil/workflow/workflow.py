@@ -43,10 +43,11 @@ from typing_extensions import Self
 
 from .__cron import CronJob, CronRunner
 from .__types import DictData, TupleStr
-from .conf import Loader, Log, config, get_log, get_logger
+from .conf import Loader, config, get_logger
 from .cron import On
 from .exceptions import JobException, WorkflowException
 from .job import Job
+from .logs import Log, get_log
 from .params import Param
 from .result import Result
 from .templates import has_template, param2template

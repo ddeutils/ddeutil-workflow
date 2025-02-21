@@ -8,10 +8,8 @@ from .__types import Re
 from .conf import (
     Config,
     Loader,
-    Log,
     config,
     env,
-    get_log,
     get_logger,
 )
 from .cron import (
@@ -36,6 +34,10 @@ from .hook import (
 from .job import (
     Job,
     Strategy,
+)
+from .logs import (
+    Log,
+    get_log,
 )
 from .params import (
     ChoiceParam,

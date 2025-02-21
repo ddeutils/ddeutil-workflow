@@ -65,8 +65,9 @@ nav:
     - Introduction: index.md
     - Get Started: getting-started.md
     - Configuration: configuration.md
+    - Logging: logging.md
     - Examples:
-      - API: examples/workflow_api.md
+      - RestAPI: examples/workflow_api.md
       - Postgres: examples/workflow_pg.md
 
   - API references:
@@ -78,6 +79,7 @@ nav:
       - 'Params': api/params.md
       - 'Result': api/result.md
       - Scheduler: api/scheduler.md
+      - Logs: api/logs.md
       - Utils: api/utils.md
 
 plugins:

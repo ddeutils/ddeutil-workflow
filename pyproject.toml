@@ -67,6 +67,7 @@ omit = [
     "src/ddeutil/workflow/api/api.py",
     "src/ddeutil/workflow/api/repeat.py",
     "src/ddeutil/workflow/api/route.py",
+    "app.py",
 ]
 
 [tool.coverage.report]
