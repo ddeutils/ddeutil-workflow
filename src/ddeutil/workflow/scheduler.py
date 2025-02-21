@@ -340,7 +340,8 @@ class Schedule(BaseModel):
         return workflow_tasks
 
 
-ReturnCancelJob = Callable[P, Optional[Union[type[CancelJob], Result]]]
+ResultOrCancelJob = Union[type[CancelJob], Result]
+ReturnCancelJob = Callable[P, ResultOrCancelJob]
 DecoratorCancelJob = Callable[[ReturnCancelJob], ReturnCancelJob]
 
 
@@ -357,7 +358,7 @@ def catch_exceptions(cancel_on_failure: bool = False) -> DecoratorCancelJob:
     def decorator(func: ReturnCancelJob) -> ReturnCancelJob:  # pragma: no cov
 
         @wraps(func)
-        def wrapper(*args: P.args, **kwargs: P.kwargs):
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> ResultOrCancelJob:
             try:
                 return func(*args, **kwargs)
             except Exception as err:
