@@ -41,7 +41,7 @@ from typing_extensions import Self
 
 try:
     from typing import ParamSpec
-except ImportError:
+except ImportError:  # pragma: no cov
     from typing_extensions import ParamSpec
 
 try:
@@ -67,7 +67,7 @@ logging.getLogger("schedule").setLevel(logging.INFO)
 
 __all__: TupleStr = (
     "Schedule",
-    "WorkflowSchedule",
+    "ScheduleWorkflow",
     "schedule_task",
     "monitor",
     "schedule_control",
@@ -77,7 +77,7 @@ __all__: TupleStr = (
 )
 
 
-class WorkflowSchedule(BaseModel):
+class ScheduleWorkflow(BaseModel):
     """Workflow Schedule Pydantic model that use to keep workflow model for
     the Schedule model. it should not use Workflow model directly because on the
     schedule config it can adjust crontab value that different from the Workflow
@@ -231,9 +231,9 @@ class Schedule(BaseModel):
             "A schedule description that can be string of markdown content."
         ),
     )
-    workflows: list[WorkflowSchedule] = Field(
+    workflows: list[ScheduleWorkflow] = Field(
         default_factory=list,
-        description="A list of WorkflowSchedule models.",
+        description="A list of ScheduleWorkflow models.",
     )
 
     @field_validator("desc", mode="after")
@@ -475,7 +475,7 @@ def schedule_task(
 
         delay()
 
-    logger.debug(f"[SCHEDULE]: End schedule release {'=' * 80}")
+    logger.debug(f"[SCHEDULE]: End schedule task {'=' * 80}")
 
 
 def monitor(threads: ReleaseThreads) -> None:  # pragma: no cov
@@ -485,9 +485,7 @@ def monitor(threads: ReleaseThreads) -> None:  # pragma: no cov
     :param threads: A mapping of Thread object and its name.
     :type threads: ReleaseThreads
     """
-    logger.debug(
-        "[MONITOR]: Start checking long running workflow release task."
-    )
+    logger.debug("[MONITOR]: Start checking long running schedule task.")
 
     snapshot_threads: list[str] = list(threads.keys())
     for t_name in snapshot_threads:

@@ -47,8 +47,10 @@ from .params import (
 from .result import Result
 from .scheduler import (
     Schedule,
-    WorkflowSchedule,
+    ScheduleWorkflow,
+    schedule_control,
     schedule_runner,
+    schedule_task,
 )
 from .stage import (
     BashStage,
@@ -83,6 +85,8 @@ from .utils import (
     make_exec,
 )
 from .workflow import (
+    Release,
+    ReleaseQueue,
     Workflow,
     WorkflowTask,
 )

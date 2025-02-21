@@ -4,51 +4,51 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from ddeutil.workflow.conf import Config
-from ddeutil.workflow.scheduler import WorkflowSchedule
+from ddeutil.workflow.scheduler import ScheduleWorkflow
 from ddeutil.workflow.workflow import Release, ReleaseQueue
 from pydantic import ValidationError
 
 from .utils import dump_yaml_context
 
 
-def test_workflow_schedule():
-    wf_schedule = WorkflowSchedule(name="demo workflow")
+def test_schedule_workflow():
+    schedule_wf = ScheduleWorkflow(name="demo workflow")
 
-    assert wf_schedule.name == "demo_workflow"
-    assert wf_schedule.alias == "demo_workflow"
+    assert schedule_wf.name == "demo_workflow"
+    assert schedule_wf.alias == "demo_workflow"
 
-    wf_schedule = WorkflowSchedule(name="demo", alias="example", on=[])
+    schedule_wf = ScheduleWorkflow(name="demo", alias="example", on=[])
 
-    assert wf_schedule.name == "demo"
-    assert wf_schedule.alias == "example"
+    assert schedule_wf.name == "demo"
+    assert schedule_wf.alias == "example"
 
-    wf_schedule = WorkflowSchedule(name="demo", on=[{"cronjob": "2 * * * *"}])
-    assert len(wf_schedule.on) == 1
+    schedule_wf = ScheduleWorkflow(name="demo", on=[{"cronjob": "2 * * * *"}])
+    assert len(schedule_wf.on) == 1
 
-    # NOTE: Raise if it does not pass any data to WorkflowSchedule
+    # NOTE: Raise if it does not pass any data to ScheduleWorkflow
     with pytest.raises(ValidationError):
-        WorkflowSchedule.model_validate({})
+        ScheduleWorkflow.model_validate({})
 
 
-def test_workflow_schedule_pass_on_loader():
-    wf_schedule = WorkflowSchedule(
+def test_schedule_workflow_pass_on_loader():
+    schedule_wf = ScheduleWorkflow(
         name="wf-scheduling",
         on=["every_3_minute_bkk", "every_minute_bkk"],
     )
-    assert wf_schedule.alias == "wf-scheduling"
+    assert schedule_wf.alias == "wf-scheduling"
 
-    wf_schedule = WorkflowSchedule(
+    schedule_wf = ScheduleWorkflow(
         alias="wf-scheduling-morning",
         name="wf-scheduling",
         on=["every_3_minute_bkk", "every_minute_bkk"],
     )
-    assert wf_schedule.alias == "wf-scheduling-morning"
+    assert schedule_wf.alias == "wf-scheduling-morning"
 
 
-def test_workflow_schedule_raise_on(test_path):
+def test_schedule_workflow_raise_on(test_path):
     # NOTE: Raise if values on the on field reach the maximum value.
     with pytest.raises(ValidationError):
-        WorkflowSchedule(
+        ScheduleWorkflow(
             name="tmp-wf-on-reach-max-value",
             on=[
                 {"cronjob": "2 * * * *"},
@@ -62,7 +62,7 @@ def test_workflow_schedule_raise_on(test_path):
 
     # NOTE: Raise if values on has duplicate values.
     with pytest.raises(ValidationError):
-        WorkflowSchedule(
+        ScheduleWorkflow(
             name="tmp-wf-on-duplicate",
             on=[
                 {"cronjob": "2 * * * *"},
@@ -72,7 +72,7 @@ def test_workflow_schedule_raise_on(test_path):
 
     # NOTE: Raise if values on has not valid type.
     with pytest.raises(TypeError):
-        WorkflowSchedule(
+        ScheduleWorkflow(
             name="tmp-wf-on-type-not-valid",
             on=[
                 [{"cronjob": "2 * * * *"}],
@@ -82,7 +82,7 @@ def test_workflow_schedule_raise_on(test_path):
 
 
 @mock.patch.object(Config, "enable_write_log", False)
-def test_workflow_schedule_tasks(test_path):
+def test_schedule_workflow_tasks(test_path):
     tz: ZoneInfo = ZoneInfo("Asia/Bangkok")
     release_date: datetime = datetime(2024, 1, 1, 1, tzinfo=tz)
     queue: dict[str, ReleaseQueue] = {
@@ -96,7 +96,7 @@ def test_workflow_schedule_tasks(test_path):
     }
 
     with dump_yaml_context(
-        test_path / "conf/demo/01_99_wf_test_wf_schedule_tasks.yml",
+        test_path / "conf/demo/01_99_wf_test_schedule_wf_tasks.yml",
         data="""
         tmp-wf-schedule-tasks:
           type: Workflow
@@ -108,12 +108,12 @@ def test_workflow_schedule_tasks(test_path):
                   echo: "Hello ${{ params.name }}"
         """,
     ):
-        wf_schedule = WorkflowSchedule(
+        schedule_wf = ScheduleWorkflow(
             name="tmp-wf-schedule-tasks",
             on=[{"cronjob": "* * * * *", "timezone": "Asia/Bangkok"}],
             params={"name": "Foo"},
         )
-        tasks = wf_schedule.tasks(start_date=release_date, queue=queue)
+        tasks = schedule_wf.tasks(start_date=release_date, queue=queue)
 
         assert len(tasks) == 1
 

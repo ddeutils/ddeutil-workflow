@@ -104,13 +104,15 @@ jobs:
 #          echo "GITHUB_WORKER_ID=${{matrix.worker_id}}" >> $GITHUB_ENV
 #          echo "GITHUB_TOTAL_WORKERS=4" >> $GITHUB_ENV
 
-      - name: Test with Pytest with not mark poke
+      - name: Test with Pytest with not mark poke and schedule
         if: ${{ matrix.marker == 'not_poke' }}
         run: |
-          pytest -vv -s -m "not poke"
+          pytest -vv -s -m "not (poke and schedule)"
 
 #      - name: Tests with Pytest with mark poke - Worker. ${{ matrix.worker_id }}
-      - name: Test with Pytest with mark poke
+      - name: Test with Pytest with mark poke and schedule
         if: ${{ matrix.marker == 'poke' }}
         run: |
-          pytest -vv -s -m "poke"
+          pytest -vv -s -m "poke" &
+          pytest -vv -s -m "schedule" &
+          wait
