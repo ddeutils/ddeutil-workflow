@@ -2,6 +2,29 @@
 
 ## Latest Changes
 
+## 0.0.31
+
+### :sparkles: Features
+
+- :dart: feat: typehint on scheduler module.
+- :dart: feat: revise poke logic for checking current datetime.
+- :dart: feat: add ReleaseType support the type field on Release object.
+- :dart: feat: pass extras field to cronjob field with map to option arg.
+
+### :bug: Bug fixes
+
+- :gear: fixed: remove handler queue on the release method if it invalid type.
+
+### :black_nib: Code Changes
+
+- :art: styled: change typehint on catch schdule result.
+- :test_tube: tests: mark schedule and change on tests workflow.
+- :test_tube: tests: update testcase on the workflow poke module.
+- :art: styled: refactore code and docs-string.
+- :test_tube: tests: prepare testcase for the on model.
+- :test_tube: tests: update testcase for release and release_queue object.
+- :test_tube: tests: move test file from store on conf to conftest.
+
 ## 0.0.30
 
 ### :black_nib: Code Changes
