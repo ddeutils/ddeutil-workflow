@@ -128,7 +128,15 @@ class Config(BaseConfig):  # pragma: no cov
             ),
         )
 
+    @property
+    def enable_rotate_file(self) -> bool:
+        return str2bool(env("LOG_ENABLE_ROTATED_FILE", "false"))
+
     # NOTE: Audit Log
+    @property
+    def audit_path(self) -> Path:
+        return Path(env("AUDIT_PATH", "./logs"))
+
     @property
     def enable_write_log(self) -> bool:
         return str2bool(env("AUDIT_ENABLE_WRITE", "false"))

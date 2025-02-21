@@ -90,7 +90,7 @@ class FileAudit(BaseAudit):
 
         :rtype: Iterator[Self]
         """
-        pointer: Path = config.log_path / f"workflow={name}"
+        pointer: Path = config.audit_path / f"workflow={name}"
         if not pointer.exists():
             raise FileNotFoundError(f"Pointer: {pointer.absolute()}.")
 
@@ -120,7 +120,8 @@ class FileAudit(BaseAudit):
             raise NotImplementedError("Find latest log does not implement yet.")
 
         pointer: Path = (
-            config.log_path / f"workflow={name}/release={release:%Y%m%d%H%M%S}"
+            config.audit_path
+            / f"workflow={name}/release={release:%Y%m%d%H%M%S}"
         )
         if not pointer.exists():
             raise FileNotFoundError(
@@ -149,7 +150,7 @@ class FileAudit(BaseAudit):
             return False
 
         # NOTE: create pointer path that use the same logic of pointer method.
-        pointer: Path = config.log_path / cls.filename_fmt.format(
+        pointer: Path = config.audit_path / cls.filename_fmt.format(
             name=name, release=release
         )
 
@@ -160,7 +161,7 @@ class FileAudit(BaseAudit):
 
         :rtype: Path
         """
-        return config.log_path / self.filename_fmt.format(
+        return config.audit_path / self.filename_fmt.format(
             name=self.name, release=self.release
         )
 
@@ -248,6 +249,6 @@ def get_log() -> type[Audit]:  # pragma: no cov
 
     :rtype: type[Audit]
     """
-    if config.log_path.is_file():
+    if config.audit_path.is_file():
         return SQLiteAudit
     return FileAudit
