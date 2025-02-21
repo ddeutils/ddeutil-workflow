@@ -154,7 +154,17 @@ The above workflow template is main executor pipeline that you want to do. If yo
 want to schedule this workflow, you want to dynamic its parameters change base on
 execution time such as `run-date` should change base on that workflow running date.
 
-So, this package provide the `Schedule` template for this action.
+```python
+from ddeutil.workflow import Workflow, Result
+
+workflow: Workflow = Workflow.from_loader('run-py-local')
+result: Result = workflow.execute(
+   params={"source-extract": "USD-THB", "asat-dt": "2024-01-01"}
+)
+```
+
+So, this package provide the `Schedule` template for this action, and you can dynamic
+pass the parameters for changing align with that running time by the `release` prefix.
 
 ```yaml
 schedule-run-local-wf:
@@ -172,7 +182,23 @@ schedule-run-local-wf:
           asat-dt: "${{ release.logical_date }}"
 ```
 
-For more examples, this workflow can use with these scenarios:
+The main method of the `Schedule` model that use to running is `pending`. If you
+do not pass the `stop` date on this method, it will use config with `WORKFLOW_APP_STOP_BOUNDARY_DELTA`
+key for generate this stop date.
 
-- Extract metadata (1 ~ 15 MB per request) from external API every 15 minutes
-- Sensor data on S3 and send that data to Azure Service Bus every minute
+```python
+from ddeutil.workflow import Schedule
+
+(
+   Schedule
+   .from_loader("schedule-run-local-wf")
+   .pending(stop=None)
+)
+```
+
+!!! example
+
+   For more examples, this workflow can use with these scenarios:
+
+   - Extract metadata (1 ~ 15 MB per request) from external API every 15 minutes
+   - Sensor data on S3 and send that data to Azure Service Bus every minute
