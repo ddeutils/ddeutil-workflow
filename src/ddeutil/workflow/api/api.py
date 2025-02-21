@@ -43,8 +43,6 @@ async def lifespan(a: FastAPI) -> AsyncIterator[State]:
     a.state.workflow_queue = {}
 
     yield {
-        "upper_queue": a.state.upper_queue,
-        "upper_result": a.state.upper_result,
         # NOTE: Scheduler value should be contained a key of workflow and
         #   list of datetime of queue and running.
         #

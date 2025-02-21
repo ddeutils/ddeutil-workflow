@@ -169,7 +169,7 @@ async def get_schedules(name: str):
     )
 
 
-@schedule_route.get(path="/deploy")
+@schedule_route.get(path="/deploy/")
 async def get_deploy_schedulers(request: Request):
     snapshot = copy.deepcopy(request.state.scheduler)
     return {"schedule": snapshot}
