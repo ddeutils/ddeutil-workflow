@@ -53,7 +53,7 @@ from .__cron import CronRunner
 from .__types import DictData, TupleStr
 from .conf import Loader, Log, config, get_log, get_logger
 from .cron import On
-from .exceptions import WorkflowException
+from .exceptions import ScheduleException, WorkflowException
 from .result import Result
 from .utils import batch, delay
 from .workflow import Release, ReleaseQueue, Workflow, WorkflowTask
@@ -78,7 +78,7 @@ __all__: TupleStr = (
 
 
 class ScheduleWorkflow(BaseModel):
-    """Workflow Schedule Pydantic model that use to keep workflow model for
+    """Schedule Workflow Pydantic model that use to keep workflow model for
     the Schedule model. it should not use Workflow model directly because on the
     schedule config it can adjust crontab value that different from the Workflow
     model.
@@ -390,10 +390,12 @@ def schedule_task(
     threads: ReleaseThreads,
     log: type[Log],
 ) -> type[CancelJob] | None:
-    """Workflow task generator that create release pair of workflow and on to
-    the threading in background.
+    """Schedule task function that generate thread of workflow task release
+    method in background. This function do the same logic as the workflow poke
+    method, but it runs with map of schedules and the on values.
 
-        This workflow task will start every minute at ':02' second.
+        This schedule task start runs every minute at ':02' second and it does
+    not allow you to run with offset time.
 
     :param tasks: A list of WorkflowTask object.
     :param stop: A stop datetime object that force stop running scheduler.
@@ -441,12 +443,17 @@ def schedule_task(
         current_release: datetime = current_date.replace(
             second=0, microsecond=0
         )
-        if (first_date := q.first_queue.date) != current_release:
+        if (first_date := q.first_queue.date) > current_release:
             logger.debug(
                 f"[WORKFLOW]: Skip schedule "
                 f"{first_date:%Y-%m-%d %H:%M:%S} for : {task.alias!r}"
             )
             continue
+        elif first_date < current_release:  # pragma: no cov
+            raise ScheduleException(
+                "The first release date from queue should not less than current"
+                "release date."
+            )
 
         # NOTE: Pop the latest release and push it to running.
         release: Release = heappop(q.queue)
@@ -525,6 +532,7 @@ def schedule_control(
             "Should install schedule package before use this module."
         ) from None
 
+    # NOTE: Get default logging.
     log: type[Log] = log or get_log()
     scheduler: Scheduler = Scheduler()
 
@@ -557,7 +565,8 @@ def schedule_control(
         .tag("control")
     )
 
-    # NOTE: Checking zombie task with schedule job will start every 5 minute.
+    # NOTE: Checking zombie task with schedule job will start every 5 minute at
+    #   :10 seconds.
     (
         scheduler.every(5)
         .minutes.at(":10")

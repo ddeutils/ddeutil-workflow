@@ -6,12 +6,12 @@ The result Pydantic model that use to keep all result from any execution layers.
 
 ### Fields
 
-| field          | data type   | default | description |
-|----------------|-------------|:-------:|-------------|
-| status         | int         |    2    |             |
-| context        | DictData    | dict()  |             |
-| run_id         | str \| None |  None   |             |
-| parent_run_id  | str \| None |  None   |             |
+| field          | data type   | default  | description |
+|----------------|-------------|:--------:|-------------|
+| status         | int         |   `2`    |             |
+| context        | DictData    | `dict()` |             |
+| run_id         | str \| None |  `None`  |             |
+| parent_run_id  | str \| None |  `None`  |             |
 
 !!! note "Result Context"
 

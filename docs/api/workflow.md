@@ -2,16 +2,6 @@
 
 ## Workflow
 
-### Fields
-
-| field    | data type        | default  | description |
-|----------|------------------|:--------:|-------------|
-| name     | str              |          |             |
-| desc     | str \| None      |  `None`  |             |
-| params   | dict[str, Param] | `dict()` |             |
-| on       | list[On]         | `list()` |             |
-| jobs     | dict[str, Job]   | `dict()` |             |
-
 !!! example "YAML"
 
     === "Workflow"
@@ -57,6 +47,15 @@
         And for the type, you can remove `ddeutil.workflow` prefix because we can find
         it by looping search from `WORKFLOW_CORE_REGISTRY` value.
 
+### Fields
+
+| field    | data type        | default  | description |
+|----------|------------------|:--------:|-------------|
+| name     | str              |          |             |
+| desc     | str \| None      |  `None`  |             |
+| params   | dict[str, Param] | `dict()` |             |
+| on       | list[On]         | `list()` |             |
+| jobs     | dict[str, Job]   | `dict()` |             |
 
 ## WorkflowTask
 

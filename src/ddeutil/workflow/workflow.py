@@ -746,17 +746,17 @@ class Workflow(BaseModel):
         results: list[Result] = []
 
         # NOTE: Create empty ReleaseQueue object.
-        release_queue: ReleaseQueue = ReleaseQueue()
+        q: ReleaseQueue = ReleaseQueue()
 
         # NOTE: Create reusable partial function and add Release to the release
         #   queue object.
         partial_queue = partial(
             self.queue, offset, end_date, log=log, force_run=force_run
         )
-        partial_queue(release_queue)
+        partial_queue(q)
 
         # NOTE: Return the empty result if it does not have any Release.
-        if not release_queue.is_queued:
+        if not q.is_queued:
             logger.info(
                 f"({cut_id(run_id)}) [POKING]: {self.name!r} does not have "
                 f"any queue."
@@ -772,10 +772,10 @@ class Workflow(BaseModel):
 
             futures: list[Future] = []
 
-            while release_queue.is_queued:
+            while q.is_queued:
 
                 # NOTE: Pop the latest Release object from the release queue.
-                release: Release = heappop(release_queue.queue)
+                release: Release = heappop(q.queue)
 
                 if reach_next_minute(release.date, tz=config.tz, offset=offset):
                     logger.debug(
@@ -783,16 +783,16 @@ class Workflow(BaseModel):
                         f"{release.date:%Y-%m-%d %H:%M:%S}, is not able to run "
                         f"on this minute"
                     )
-                    heappush(release_queue.queue, release)
+                    heappush(q.queue, release)
                     wait_to_next_minute(get_dt_now(tz=config.tz, offset=offset))
 
                     # WARNING: I already call queue poking again because issue
                     #   about the every minute crontab.
-                    partial_queue(release_queue)
+                    partial_queue(q)
                     continue
 
                 # NOTE: Push the latest Release to the running queue.
-                heappush(release_queue.running, release)
+                heappush(q.running, release)
 
                 futures.append(
                     executor.submit(
@@ -800,11 +800,11 @@ class Workflow(BaseModel):
                         release=release,
                         params=params,
                         log=log,
-                        queue=release_queue,
+                        queue=q,
                     )
                 )
 
-                partial_queue(release_queue)
+                partial_queue(q)
 
             # WARNING: This poking method does not allow to use fail-fast
             #   logic to catching parallel execution result.
