@@ -51,10 +51,10 @@ except ImportError:  # pragma: no cov
 
 from .__cron import CronRunner
 from .__types import DictData, TupleStr
+from .audit import Audit, get_log
 from .conf import Loader, config, get_logger
 from .cron import On
 from .exceptions import ScheduleException, WorkflowException
-from .logs import Log, get_log
 from .result import Result
 from .utils import batch, delay
 from .workflow import Release, ReleaseQueue, Workflow, WorkflowTask
@@ -314,7 +314,7 @@ class Schedule(BaseModel):
         *,
         stop: datetime | None = None,
         externals: DictData | None = None,
-        log: type[Log] | None = None,
+        log: type[Audit] | None = None,
     ) -> None:  # pragma: no cov
         """Pending this schedule tasks with the schedule package.
 
@@ -331,7 +331,7 @@ class Schedule(BaseModel):
             ) from None
 
         # NOTE: Get default logging.
-        log: type[Log] = log or get_log()
+        log: type[Audit] = log or get_log()
         scheduler: Scheduler = Scheduler()
 
         # NOTE: Create the start and stop datetime.
@@ -451,7 +451,7 @@ def schedule_task(
     stop: datetime,
     queue: dict[str, ReleaseQueue],
     threads: ReleaseThreads,
-    log: type[Log],
+    log: type[Audit],
 ) -> type[CancelJob] | None:
     """Schedule task function that generate thread of workflow task release
     method in background. This function do the same logic as the workflow poke
@@ -574,7 +574,7 @@ def schedule_control(
     stop: datetime | None = None,
     externals: DictData | None = None,
     *,
-    log: type[Log] | None = None,
+    log: type[Audit] | None = None,
 ) -> list[str]:  # pragma: no cov
     """Scheduler control function that run the chuck of schedules every minute
     and this function release monitoring thread for tracking undead thread in
@@ -597,7 +597,7 @@ def schedule_control(
         ) from None
 
     # NOTE: Get default logging.
-    log: type[Log] = log or get_log()
+    log: type[Audit] = log or get_log()
     scheduler: Scheduler = Scheduler()
 
     # NOTE: Create the start and stop datetime.

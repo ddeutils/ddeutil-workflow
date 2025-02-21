@@ -5,6 +5,10 @@
 # ------------------------------------------------------------------------------
 from .__cron import CronJob, CronRunner
 from .__types import Re
+from .audit import (
+    Audit,
+    get_log,
+)
 from .conf import (
     Config,
     Loader,
@@ -34,10 +38,6 @@ from .hook import (
 from .job import (
     Job,
     Strategy,
-)
-from .logs import (
-    Log,
-    get_log,
 )
 from .params import (
     ChoiceParam,

@@ -16,8 +16,8 @@ from fastapi.responses import UJSONResponse
 from pydantic import BaseModel
 
 from ..__types import DictData
+from ..audit import Audit, get_log
 from ..conf import Loader, config, get_logger
-from ..logs import Log, get_log
 from ..result import Result
 from ..scheduler import Schedule
 from ..workflow import Workflow
@@ -123,7 +123,7 @@ async def get_workflow_logs(name: str):
 @workflow_route.get(path="/{name}/logs/{release}")
 async def get_workflow_release_log(name: str, release: str):
     try:
-        log: Log = get_log().find_log_with_release(
+        log: Audit = get_log().find_log_with_release(
             name=name, release=datetime.strptime(release, "%Y%m%d%H%M%S")
         )
     except FileNotFoundError:

@@ -32,7 +32,7 @@ project/
 Create initial config path at `.env`:
 
 ```dotenv
-WORKFLOW_LOG_ENABLE_WRITE=true
+WORKFLOW_AUDIT_ENABLE_WRITE=true
 WORKFLOW_CORE_REGISTRY=src
 WORKFLOW_CORE_TIMEZONE=Asia/Bangkok
 ```

@@ -108,7 +108,7 @@ class Config(BaseConfig):  # pragma: no cov
         )
         return [r.strip() for r in regis_filter_str.split(",")]
 
-    # NOTE: Logging
+    # NOTE: Log
     @property
     def log_path(self) -> Path:
         return Path(env("LOG_PATH", "./logs"))
@@ -116,10 +116,6 @@ class Config(BaseConfig):  # pragma: no cov
     @property
     def debug(self) -> bool:
         return str2bool(env("LOG_DEBUG_MODE", "true"))
-
-    @property
-    def enable_write_log(self) -> bool:
-        return str2bool(env("LOG_ENABLE_WRITE", "false"))
 
     @property
     def log_format(self) -> str:
@@ -131,6 +127,11 @@ class Config(BaseConfig):  # pragma: no cov
                 "(%(filename)s:%(lineno)s)"
             ),
         )
+
+    # NOTE: Audit Log
+    @property
+    def enable_write_log(self) -> bool:
+        return str2bool(env("AUDIT_ENABLE_WRITE", "false"))
 
     @property
     def log_datetime_format(self) -> str:

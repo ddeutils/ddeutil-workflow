@@ -43,11 +43,11 @@ from typing_extensions import Self
 
 from .__cron import CronJob, CronRunner
 from .__types import DictData, TupleStr
+from .audit import Audit, get_log
 from .conf import Loader, config, get_logger
 from .cron import On
 from .exceptions import JobException, WorkflowException
 from .job import Job
-from .logs import Log, get_log
 from .params import Param
 from .result import Result
 from .templates import has_template, param2template
@@ -486,7 +486,7 @@ class Workflow(BaseModel):
         params: DictData,
         *,
         run_id: str | None = None,
-        log: type[Log] = None,
+        log: type[Audit] = None,
         queue: ReleaseQueue | None = None,
         override_log_name: str | None = None,
     ) -> Result:
@@ -516,7 +516,7 @@ class Workflow(BaseModel):
 
         :rtype: Result
         """
-        log: type[Log] = log or get_log()
+        log: type[Audit] = log or get_log()
         name: str = override_log_name or self.name
         run_id: str = run_id or gen_id(name, unique=True)
         rs_release: Result = Result(run_id=run_id)
@@ -603,7 +603,7 @@ class Workflow(BaseModel):
         offset: float,
         end_date: datetime,
         queue: ReleaseQueue,
-        log: type[Log],
+        log: type[Audit],
         *,
         force_run: bool = False,
     ) -> ReleaseQueue:
@@ -672,7 +672,7 @@ class Workflow(BaseModel):
         *,
         run_id: str | None = None,
         periods: int = 1,
-        log: Log | None = None,
+        log: Audit | None = None,
         force_run: bool = False,
         timeout: int = 1800,
     ) -> list[Result]:
@@ -699,7 +699,7 @@ class Workflow(BaseModel):
         :rtype: list[Result]
         :return: A list of all results that return from ``self.release`` method.
         """
-        log: type[Log] = log or get_log()
+        log: type[Audit] = log or get_log()
         run_id: str = run_id or gen_id(self.name, unique=True)
 
         # VALIDATE: Check the periods value should gather than 0.
@@ -1166,7 +1166,7 @@ class WorkflowTask:
         self,
         release: datetime | Release | None = None,
         run_id: str | None = None,
-        log: type[Log] = None,
+        log: type[Audit] = None,
         queue: ReleaseQueue | None = None,
     ) -> Result:
         """Release the workflow task data.
@@ -1178,7 +1178,7 @@ class WorkflowTask:
 
         :rtype: Result
         """
-        log: type[Log] = log or get_log()
+        log: type[Audit] = log or get_log()
 
         if release is None:
 
@@ -1214,7 +1214,7 @@ class WorkflowTask:
         self,
         end_date: datetime,
         queue: ReleaseQueue,
-        log: type[Log],
+        log: type[Audit],
         *,
         force_run: bool = False,
     ) -> ReleaseQueue:

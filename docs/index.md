@@ -53,7 +53,7 @@ flowchart LR
 
     subgraph Data Context
     D@{ shape: processes, label: "Logs" }
-    E@{ shape: lin-cyl, label: "Metadata" }
+    E@{ shape: lin-cyl, label: "Audit<br>Logs" }
     end
 
     subgraph Git Context

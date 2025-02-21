@@ -3,13 +3,13 @@ from datetime import datetime
 from unittest import mock
 
 import pytest
+from ddeutil.workflow.audit import FileAudit
 from ddeutil.workflow.conf import Config
-from ddeutil.workflow.logs import FileLog
 
 
 @mock.patch.object(Config, "enable_write_log", False)
 def test_conf_log_file():
-    log = FileLog.model_validate(
+    log = FileAudit.model_validate(
         obj={
             "name": "wf-scheduling",
             "type": "manual",
@@ -24,14 +24,14 @@ def test_conf_log_file():
     )
     log.save(excluded=None)
 
-    assert not FileLog.is_pointed(
+    assert not FileAudit.is_pointed(
         name="wf-scheduling", release=datetime(2024, 1, 1, 1)
     )
 
 
 @mock.patch.object(Config, "enable_write_log", True)
 def test_conf_log_file_do_first(root_path):
-    log = FileLog.model_validate(
+    log = FileAudit.model_validate(
         obj={
             "name": "wf-demo-logging",
             "type": "manual",
@@ -47,7 +47,7 @@ def test_conf_log_file_do_first(root_path):
     log.save(excluded=None)
     pointer = log.pointer()
 
-    log = FileLog.find_log_with_release(
+    log = FileAudit.find_log_with_release(
         name="wf-demo-logging",
         release=datetime(2024, 1, 1, 1),
     )
@@ -58,7 +58,7 @@ def test_conf_log_file_do_first(root_path):
 
 @mock.patch.object(Config, "enable_write_log", True)
 def test_conf_log_file_find_logs(root_path):
-    log = FileLog.model_validate(
+    log = FileAudit.model_validate(
         obj={
             "name": "wf-scheduling",
             "type": "manual",
@@ -73,18 +73,18 @@ def test_conf_log_file_find_logs(root_path):
     )
     log.save(excluded=None)
 
-    assert FileLog.is_pointed(
+    assert FileAudit.is_pointed(
         name="wf-scheduling", release=datetime(2024, 1, 1, 1)
     )
 
-    log = next(FileLog.find_logs(name="wf-scheduling"))
-    assert isinstance(log, FileLog)
+    log = next(FileAudit.find_logs(name="wf-scheduling"))
+    assert isinstance(log, FileAudit)
 
     wf_log_path = root_path / "logs/workflow=wf-no-release-log/"
     wf_log_path.mkdir(exist_ok=True)
 
-    for log in FileLog.find_logs(name="wf-no-release-log"):
-        assert isinstance(log, FileLog)
+    for log in FileAudit.find_logs(name="wf-no-release-log"):
+        assert isinstance(log, FileAudit)
         log.model_dump(
             by_alias=True,
             exclude_none=True,
@@ -95,12 +95,12 @@ def test_conf_log_file_find_logs(root_path):
 
 def test_conf_log_file_find_logs_raise():
     with pytest.raises(FileNotFoundError):
-        next(FileLog.find_logs(name="wf-file-not-found"))
+        next(FileAudit.find_logs(name="wf-file-not-found"))
 
 
 def test_conf_log_file_find_log_with_release():
     with pytest.raises(FileNotFoundError):
-        FileLog.find_log_with_release(
+        FileAudit.find_log_with_release(
             name="wf-file-not-found",
             release=datetime(2024, 1, 1, 1),
         )

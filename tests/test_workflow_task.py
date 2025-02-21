@@ -3,7 +3,7 @@ from unittest import mock
 
 import pytest
 from ddeutil.workflow.__cron import CronRunner
-from ddeutil.workflow.conf import Config, FileLog
+from ddeutil.workflow.conf import Config, FileAudit
 from ddeutil.workflow.cron import On
 from ddeutil.workflow.result import Result
 from ddeutil.workflow.workflow import (
@@ -84,7 +84,7 @@ def test_workflow_task_queue(test_path):
         task.queue(
             end_date=datetime(2024, 2, 1, 1, 0, tzinfo=runner.tz),
             queue=queue["demo"],
-            log=FileLog,
+            log=FileAudit,
         )
 
         assert len(queue["demo"].queue) == 5

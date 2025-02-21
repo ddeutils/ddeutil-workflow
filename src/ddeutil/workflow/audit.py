@@ -3,6 +3,7 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
+"""Audit Log module."""
 from __future__ import annotations
 
 import json
@@ -24,14 +25,14 @@ logger = get_logger("ddeutil.workflow")
 
 __all__: TupleStr = (
     "get_log",
-    "FileLog",
-    "SQLiteLog",
-    "Log",
+    "FileAudit",
+    "SQLiteAudit",
+    "Audit",
 )
 
 
-class BaseLog(BaseModel, ABC):
-    """Base Log Pydantic Model with abstraction class property that implement
+class BaseAudit(BaseModel, ABC):
+    """Base Audit Pydantic Model with abstraction class property that implement
     only model fields. This model should to use with inherit to logging
     subclass like file, sqlite, etc.
     """
@@ -49,7 +50,7 @@ class BaseLog(BaseModel, ABC):
 
     @model_validator(mode="after")
     def __model_action(self) -> Self:
-        """Do before the Log action with WORKFLOW_LOG_ENABLE_WRITE env variable.
+        """Do before the Audit action with WORKFLOW_AUDIT_ENABLE_WRITE env variable.
 
         :rtype: Self
         """
@@ -63,12 +64,12 @@ class BaseLog(BaseModel, ABC):
     @abstractmethod
     def save(self, excluded: list[str] | None) -> None:  # pragma: no cov
         """Save this model logging to target logging store."""
-        raise NotImplementedError("Log should implement ``save`` method.")
+        raise NotImplementedError("Audit should implement ``save`` method.")
 
 
-class FileLog(BaseLog):
-    """File Log Pydantic Model that use to saving log data from result of
-    workflow execution. It inherits from BaseLog model that implement the
+class FileAudit(BaseAudit):
+    """File Audit Pydantic Model that use to saving log data from result of
+    workflow execution. It inherits from BaseAudit model that implement the
     ``self.save`` method for file.
     """
 
@@ -194,7 +195,8 @@ class FileLog(BaseLog):
         return self
 
 
-class SQLiteLog(BaseLog):  # pragma: no cov
+class SQLiteAudit(BaseAudit):  # pragma: no cov
+    """SQLite Audit Pydantic Model."""
 
     table: str = "workflow_log"
     ddl: str = """
@@ -208,7 +210,7 @@ class SQLiteLog(BaseLog):  # pragma: no cov
         primary key ( run_id )
         """
 
-    def save(self, excluded: list[str] | None) -> SQLiteLog:
+    def save(self, excluded: list[str] | None) -> SQLiteAudit:
         """Save logging data that receive a context data from a workflow
         execution result.
         """
@@ -222,20 +224,30 @@ class SQLiteLog(BaseLog):  # pragma: no cov
             )
             return self
 
-        raise NotImplementedError("SQLiteLog does not implement yet.")
+        raise NotImplementedError("SQLiteAudit does not implement yet.")
 
 
-Log = Union[
-    FileLog,
-    SQLiteLog,
+class RemoteFileAudit(FileAudit):  # pragma: no cov
+
+    def save(self, excluded: list[str] | None) -> RemoteFileAudit: ...
+
+
+class RedisAudit(BaseAudit):  # pragma: no cov
+
+    def save(self, excluded: list[str] | None) -> RedisAudit: ...
+
+
+Audit = Union[
+    FileAudit,
+    SQLiteAudit,
 ]
 
 
-def get_log() -> type[Log]:  # pragma: no cov
+def get_log() -> type[Audit]:  # pragma: no cov
     """Get logging class that dynamic base on the config log path value.
 
-    :rtype: type[Log]
+    :rtype: type[Audit]
     """
     if config.log_path.is_file():
-        return SQLiteLog
-    return FileLog
+        return SQLiteAudit
+    return FileAudit
