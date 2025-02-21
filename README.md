@@ -187,6 +187,16 @@ schedule-run-local-wf:
           asat-dt: "${{ release.logical_date }}"
 ```
 
+```python
+from ddeutil.workflow import Schedule
+
+(
+   Schedule
+   .from_loader("schedule-every-minute-wf")
+   .pending()
+)
+```
+
 ## :cookie: Configuration
 
 The main configuration that use to dynamic changing this workflow engine for your

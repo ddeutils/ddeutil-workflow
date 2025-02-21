@@ -275,37 +275,6 @@ class Schedule(BaseModel):
 
         return cls.model_validate(obj=loader_data)
 
-    @classmethod
-    def extract_tasks(
-        cls,
-        schedules: list[str],
-        start_date: datetime,
-        queue: dict[str, ReleaseQueue],
-        externals: DictData | None = None,
-    ) -> list[WorkflowTask]:
-        """Return the list of WorkflowTask object from all schedule object that
-        include in an input schedules argument.
-
-        :param schedules: A list of schedule name that will use `from_loader`
-            method.
-        :param start_date: A start date that get from the workflow schedule.
-        :param queue: A mapping of name and list of datetime for queue.
-        :param externals: An external parameters that pass to the Loader object.
-
-        :rtype: list[WorkflowTask]
-        """
-        tasks: list[WorkflowTask] = []
-        for name in schedules:
-            schedule: Schedule = Schedule.from_loader(name, externals=externals)
-            tasks.extend(
-                schedule.tasks(
-                    start_date,
-                    queue=queue,
-                    externals=externals,
-                ),
-            )
-        return tasks
-
     def tasks(
         self,
         start_date: datetime,
@@ -338,6 +307,99 @@ class Schedule(BaseModel):
             )
 
         return workflow_tasks
+
+    def pending(
+        self,
+        *,
+        stop: datetime | None = None,
+        externals: DictData | None = None,
+        log: type[Log] | None = None,
+    ) -> None:  # pragma: no cov
+        """Pending this schedule tasks with the schedule package.
+
+        :param stop: A datetime value that use to stop running schedule.
+        :param externals: An external parameters that pass to Loader.
+        :param log: A log class that use on the workflow task release for
+            writing its release log context.
+        """
+        try:
+            from schedule import Scheduler
+        except ImportError:
+            raise ImportError(
+                "Should install schedule package before use this method."
+            ) from None
+
+        # NOTE: Get default logging.
+        log: type[Log] = log or get_log()
+        scheduler: Scheduler = Scheduler()
+
+        # NOTE: Create the start and stop datetime.
+        start_date: datetime = datetime.now(tz=config.tz)
+        stop_date: datetime = stop or (start_date + config.stop_boundary_delta)
+
+        # IMPORTANT: Create main mapping of queue and thread object.
+        queue: dict[str, ReleaseQueue] = {}
+        threads: ReleaseThreads = {}
+
+        start_date_waiting: datetime = start_date.replace(
+            second=0, microsecond=0
+        ) + timedelta(minutes=1)
+
+        # NOTE: This schedule job will start every minute at :02 seconds.
+        (
+            scheduler.every(1)
+            .minutes.at(":02")
+            .do(
+                schedule_task,
+                tasks=self.tasks(
+                    start_date_waiting, queue=queue, externals=externals
+                ),
+                stop=stop_date,
+                queue=queue,
+                threads=threads,
+                log=log,
+            )
+            .tag("control")
+        )
+
+        # NOTE: Checking zombie task with schedule job will start every 5 minute at
+        #   :10 seconds.
+        (
+            scheduler.every(5)
+            .minutes.at(":10")
+            .do(
+                monitor,
+                threads=threads,
+            )
+            .tag("monitor")
+        )
+
+        # NOTE: Start running schedule
+        logger.info(
+            f"[SCHEDULE]: Schedule with stopper: {stop_date:%Y-%m-%d %H:%M:%S}"
+        )
+
+        while True:
+            scheduler.run_pending()
+            time.sleep(1)
+
+            # NOTE: Break the scheduler when the control job does not exist.
+            if not scheduler.get_jobs("control"):
+                scheduler.clear("monitor")
+
+                while len(threads) > 0:
+                    logger.warning(
+                        "[SCHEDULE]: Waiting schedule release thread that still "
+                        "running in background."
+                    )
+                    delay(10)
+                    monitor(threads)
+
+                break
+
+        logger.warning(
+            f"[SCHEDULE]: Queue: {[list(queue[wf].queue) for wf in queue]}"
+        )
 
 
 ResultOrCancelJob = Union[type[CancelJob], Result]
@@ -549,15 +611,24 @@ def schedule_control(
         second=0, microsecond=0
     ) + timedelta(minutes=1)
 
+    tasks: list[WorkflowTask] = []
+    for name in schedules:
+        schedule: Schedule = Schedule.from_loader(name, externals=externals)
+        tasks.extend(
+            schedule.tasks(
+                start_date_waiting,
+                queue=queue,
+                externals=externals,
+            ),
+        )
+
     # NOTE: This schedule job will start every minute at :02 seconds.
     (
         scheduler.every(1)
         .minutes.at(":02")
         .do(
             schedule_task,
-            tasks=Schedule.extract_tasks(
-                schedules, start_date_waiting, queue, externals=externals
-            ),
+            tasks=tasks,
             stop=stop_date,
             queue=queue,
             threads=threads,
@@ -597,7 +668,7 @@ def schedule_control(
                     "[SCHEDULE]: Waiting schedule release thread that still "
                     "running in background."
                 )
-                delay(15)
+                delay(10)
                 monitor(threads)
 
             break
