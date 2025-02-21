@@ -33,7 +33,7 @@ from functools import wraps
 from heapq import heappop, heappush
 from textwrap import dedent
 from threading import Thread
-from typing import Callable, Optional, TypedDict
+from typing import Callable, Optional, TypedDict, Union
 
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import field_validator, model_validator
@@ -54,10 +54,8 @@ from .__types import DictData, TupleStr
 from .conf import Loader, Log, config, get_log, get_logger
 from .cron import On
 from .exceptions import WorkflowException
-from .utils import (
-    batch,
-    delay,
-)
+from .result import Result
+from .utils import batch, delay
 from .workflow import Release, ReleaseQueue, Workflow, WorkflowTask
 
 P = ParamSpec("P")
@@ -277,6 +275,37 @@ class Schedule(BaseModel):
 
         return cls.model_validate(obj=loader_data)
 
+    @classmethod
+    def extract_tasks(
+        cls,
+        schedules: list[str],
+        start_date: datetime,
+        queue: dict[str, ReleaseQueue],
+        externals: DictData | None = None,
+    ) -> list[WorkflowTask]:
+        """Return the list of WorkflowTask object from all schedule object that
+        include in an input schedules argument.
+
+        :param schedules: A list of schedule name that will use `from_loader`
+            method.
+        :param start_date: A start date that get from the workflow schedule.
+        :param queue: A mapping of name and list of datetime for queue.
+        :param externals: An external parameters that pass to the Loader object.
+
+        :rtype: list[WorkflowTask]
+        """
+        tasks: list[WorkflowTask] = []
+        for name in schedules:
+            schedule: Schedule = Schedule.from_loader(name, externals=externals)
+            tasks.extend(
+                schedule.tasks(
+                    start_date,
+                    queue=queue,
+                    externals=externals,
+                ),
+            )
+        return tasks
+
     def tasks(
         self,
         start_date: datetime,
@@ -311,7 +340,7 @@ class Schedule(BaseModel):
         return workflow_tasks
 
 
-ReturnCancelJob = Callable[P, Optional[CancelJob]]
+ReturnCancelJob = Callable[P, Optional[Union[type[CancelJob], Result]]]
 DecoratorCancelJob = Callable[[ReturnCancelJob], ReturnCancelJob]
 
 
@@ -326,19 +355,18 @@ def catch_exceptions(cancel_on_failure: bool = False) -> DecoratorCancelJob:
     """
 
     def decorator(func: ReturnCancelJob) -> ReturnCancelJob:  # pragma: no cov
-        try:
 
-            @wraps(func)
-            def wrapper(*args: P.args, **kwargs: P.kwargs):
+        @wraps(func)
+        def wrapper(*args: P.args, **kwargs: P.kwargs):
+            try:
                 return func(*args, **kwargs)
+            except Exception as err:
+                logger.exception(err)
+                if cancel_on_failure:
+                    return CancelJob
+                raise err
 
-            return wrapper
-
-        except Exception as err:
-            logger.exception(err)
-            if cancel_on_failure:
-                return CancelJob
-            raise err
+        return wrapper
 
     return decorator
 
@@ -360,7 +388,7 @@ def schedule_task(
     queue: dict[str, ReleaseQueue],
     threads: ReleaseThreads,
     log: type[Log],
-) -> CancelJob | None:
+) -> type[CancelJob] | None:
     """Workflow task generator that create release pair of workflow and on to
     the threading in background.
 
@@ -372,7 +400,7 @@ def schedule_task(
     :param threads: A mapping of alias name and Thread object.
     :param log: A log class that want to make log object.
 
-    :rtype: CancelJob | None
+    :rtype: type[CancelJob] | None
     """
     current_date: datetime = datetime.now(tz=config.tz)
     if current_date > stop.replace(tzinfo=config.tz):
@@ -478,12 +506,15 @@ def schedule_control(
     *,
     log: type[Log] | None = None,
 ) -> list[str]:  # pragma: no cov
-    """Scheduler control function that running every minute.
+    """Scheduler control function that run the chuck of schedules every minute
+    and this function release monitoring thread for tracking undead thread in
+    the background.
 
     :param schedules: A list of workflow names that want to schedule running.
     :param stop: A datetime value that use to stop running schedule.
     :param externals: An external parameters that pass to Loader.
-    :param log:
+    :param log: A log class that use on the workflow task release for writing
+        its release log context.
 
     :rtype: list[str]
     """
@@ -497,6 +528,8 @@ def schedule_control(
 
     log: type[Log] = log or get_log()
     scheduler: Scheduler = Scheduler()
+
+    # NOTE: Create the start and stop datetime.
     start_date: datetime = datetime.now(tz=config.tz)
     stop_date: datetime = stop or (start_date + config.stop_boundary_delta)
 
@@ -508,25 +541,15 @@ def schedule_control(
         second=0, microsecond=0
     ) + timedelta(minutes=1)
 
-    # NOTE: Start create workflow tasks from list of schedule name.
-    tasks: list[WorkflowTask] = []
-    for name in schedules:
-        schedule: Schedule = Schedule.from_loader(name, externals=externals)
-        tasks.extend(
-            schedule.tasks(
-                start_date_waiting,
-                queue=queue,
-                externals=externals,
-            ),
-        )
-
     # NOTE: This schedule job will start every minute at :02 seconds.
     (
         scheduler.every(1)
         .minutes.at(":02")
         .do(
             schedule_task,
-            tasks=tasks,
+            tasks=Schedule.extract_tasks(
+                schedules, start_date_waiting, queue, externals=externals
+            ),
             stop=stop_date,
             queue=queue,
             threads=threads,
@@ -581,15 +604,14 @@ def schedule_runner(
     externals: DictData | None = None,
     excluded: list[str] | None = None,
 ) -> list[str]:  # pragma: no cov
-    """Schedule runner function for start submit the ``schedule_control`` func
-    in multiprocessing pool with chunk of schedule config that exists in config
-    path by ``WORKFLOW_APP_MAX_SCHEDULE_PER_PROCESS``.
+    """Schedule runner function it the multiprocess controller function for
+    split the setting schedule to the `schedule_control` function on the
+    process pool. It chunks schedule configs that exists in config
+    path by `WORKFLOW_APP_MAX_SCHEDULE_PER_PROCESS` value.
 
     :param stop: A stop datetime object that force stop running scheduler.
     :param externals:
     :param excluded: A list of schedule name that want to exclude from finding.
-
-    :rtype: list[str]
 
         This function will get all workflows that include on value that was
     created in config path and chuck it with application config variable
@@ -603,6 +625,8 @@ def schedule_runner(
                             ==> schedule --> thread of release task 02 01
                                         --> thread of release task 02 02
             ==> process 02  ==> ...
+
+    :rtype: list[str]
     """
     results: list[str] = []
 
