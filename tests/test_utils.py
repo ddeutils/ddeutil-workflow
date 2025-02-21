@@ -82,8 +82,8 @@ def test_cut_id():
 def test_reach_next_minute():
     assert not reach_next_minute(datetime(2024, 1, 1, 1, 13, 1, tzinfo=UTC))
     assert not reach_next_minute(datetime(2024, 1, 1, 1, 13, 59, tzinfo=UTC))
-    assert reach_next_minute(datetime(2024, 1, 1, 1, 12, 55, tzinfo=UTC))
+    assert reach_next_minute(datetime(2024, 1, 1, 1, 14, 1, tzinfo=UTC))
 
     # NOTE: Raise because this datetime gather than the current time.
     with pytest.raises(ValueError):
-        reach_next_minute(datetime(2024, 1, 1, 1, 14, 1, tzinfo=UTC))
+        reach_next_minute(datetime(2024, 1, 1, 1, 12, 55, tzinfo=UTC))

@@ -21,7 +21,7 @@ def test_workflow_poke(test_path):
           on:
             - cronjob: '* * * * *'
               timezone: "Asia/Bangkok"
-          params: {asat-dt: datetime}
+          params: {"asat-dt": "datetime"}
           jobs:
             condition-job:
               stages:
@@ -104,6 +104,10 @@ def test_workflow_poke_raise():
     with pytest.raises(WorkflowException):
         workflow.poke(periods=-1)
 
+    # Raise: If a period value is lower than 0.
+    with pytest.raises(WorkflowException):
+        workflow.poke(periods=-5)
+
 
 @pytest.mark.poke
 @mock.patch.object(Config, "enable_write_log", False)
@@ -131,12 +135,14 @@ def test_workflow_poke_with_start_date_and_period(test_path):
             periods=2,
             params={"name": "FOO"},
         )
-
-        print(results)
-
         assert len(results) == 2
-
         assert results[0].parent_run_id == results[1].parent_run_id
+        assert results[0].context["release"]["logical_date"] == datetime(
+            2024, 1, 1, 0, 1, tzinfo=config.tz
+        )
+        assert results[1].context["release"]["logical_date"] == datetime(
+            2024, 1, 1, 0, 2, tzinfo=config.tz
+        )
 
 
 @pytest.mark.poke
@@ -147,7 +153,7 @@ def test_workflow_poke_no_on(test_path):
         data="""
         tmp-wf-poke-no-on:
           type: Workflow
-          params: {name: str}
+          params: {"name": str}
           jobs:
             first-job:
               stages:

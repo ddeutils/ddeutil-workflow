@@ -63,14 +63,13 @@ def reach_next_minute(
     datetime.
     """
     diff: float = (
-        (
+        dt.replace(second=0, microsecond=0)
+        - (
             get_dt_now(tz=(tz or UTC), offset=offset).replace(
                 second=0, microsecond=0
             )
         )
-        - dt.replace(second=0, microsecond=0)
     ).total_seconds()
-
     if diff >= 60:
         return True
     elif diff >= 0:
@@ -78,7 +77,7 @@ def reach_next_minute(
 
     raise ValueError(
         "Check reach the next minute function should check a datetime that not "
-        "gather than the current date"
+        "less than the current date"
     )
 
 

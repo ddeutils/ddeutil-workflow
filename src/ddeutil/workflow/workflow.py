@@ -779,8 +779,9 @@ class Workflow(BaseModel):
 
                 if reach_next_minute(release.date, tz=config.tz, offset=offset):
                     logger.debug(
-                        f"({cut_id(run_id)}) [POKING]: Wait because the latest "
-                        f"release has diff time more than 60 seconds ..."
+                        f"({cut_id(run_id)}) [POKING]: The latest release, "
+                        f"{release.date:%Y-%m-%d %H:%M:%S}, is not able to run "
+                        f"on this minute"
                     )
                     heappush(release_queue.queue, release)
                     wait_to_next_minute(get_dt_now(tz=config.tz, offset=offset))
