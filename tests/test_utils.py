@@ -1,14 +1,18 @@
 import os
+from datetime import datetime
 from pathlib import Path
 
 import pytest
 from ddeutil.workflow.utils import (
+    UTC,
     batch,
     cut_id,
     filter_func,
     gen_id,
     make_exec,
+    reach_next_minute,
 )
+from freezegun import freeze_time
 
 
 @pytest.fixture(scope="function")
@@ -72,3 +76,14 @@ def test_make_exec():
 
 def test_cut_id():
     assert cut_id(run_id="668931127320241228100331254567") == "254567"
+
+
+@freeze_time("2024-01-01 01:13:30")
+def test_reach_next_minute():
+    assert not reach_next_minute(datetime(2024, 1, 1, 1, 13, 1, tzinfo=UTC))
+    assert not reach_next_minute(datetime(2024, 1, 1, 1, 13, 59, tzinfo=UTC))
+    assert reach_next_minute(datetime(2024, 1, 1, 1, 12, 55, tzinfo=UTC))
+
+    # NOTE: Raise because this datetime gather than the current time.
+    with pytest.raises(ValueError):
+        reach_next_minute(datetime(2024, 1, 1, 1, 14, 1, tzinfo=UTC))

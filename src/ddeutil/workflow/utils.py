@@ -21,10 +21,9 @@ from zoneinfo import ZoneInfo
 from ddeutil.core import hash_str
 
 from .__types import DictData, Matrix
-from .conf import config
 
 T = TypeVar("T")
-
+UTC = ZoneInfo("UTC")
 logger = logging.getLogger("ddeutil.workflow")
 
 
@@ -37,7 +36,7 @@ def get_dt_now(
     :param offset:
     :return: The current datetime object that use an input timezone or UTC.
     """
-    return datetime.now(tz=(tz or ZoneInfo("UTC"))) - timedelta(seconds=offset)
+    return datetime.now(tz=(tz or UTC)) - timedelta(seconds=offset)
 
 
 def get_diff_sec(
@@ -52,17 +51,43 @@ def get_diff_sec(
     """
     return round(
         (
-            dt
-            - datetime.now(tz=(tz or ZoneInfo("UTC")))
-            - timedelta(seconds=offset)
+            dt - datetime.now(tz=(tz or UTC)) - timedelta(seconds=offset)
         ).total_seconds()
     )
 
 
-def wait_a_minute(now: datetime, second: float = 2) -> None:  # pragma: no cov
+def reach_next_minute(
+    dt: datetime, tz: ZoneInfo | None = None, offset: float = 0.0
+) -> bool:
+    """Check this datetime object is not in range of minute level on the current
+    datetime.
+    """
+    diff: float = (
+        (
+            get_dt_now(tz=(tz or UTC), offset=offset).replace(
+                second=0, microsecond=0
+            )
+        )
+        - dt.replace(second=0, microsecond=0)
+    ).total_seconds()
+
+    if diff >= 60:
+        return True
+    elif diff >= 0:
+        return False
+
+    raise ValueError(
+        "Check reach the next minute function should check a datetime that not "
+        "gather than the current date"
+    )
+
+
+def wait_to_next_minute(
+    dt: datetime, second: float = 0
+) -> None:  # pragma: no cov
     """Wait with sleep to the next minute with an offset second value."""
-    future = now.replace(second=0, microsecond=0) + timedelta(minutes=1)
-    time.sleep((future - now).total_seconds() + second)
+    future = dt.replace(second=0, microsecond=0) + timedelta(minutes=1)
+    time.sleep((future - dt).total_seconds() + second)
 
 
 def delay(second: float = 0) -> None:  # pragma: no cov
@@ -92,6 +117,8 @@ def gen_id(
 
     :rtype: str
     """
+    from .conf import config
+
     if not isinstance(value, str):
         value: str = str(value)
 
@@ -177,7 +204,7 @@ def batch(iterable: Iterator[Any], n: int) -> Iterator[Any]:
     """Batch data into iterators of length n. The last batch may be shorter.
 
     Example:
-        >>> for b in batch('ABCDEFG', 3):
+        >>> for b in batch(iter('ABCDEFG'), 3):
         ...     print(list(b))
         ['A', 'B', 'C']
         ['D', 'E', 'F']

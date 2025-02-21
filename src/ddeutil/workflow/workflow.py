@@ -30,7 +30,7 @@ from concurrent.futures import (
 from dataclasses import field
 from datetime import datetime, timedelta
 from enum import Enum
-from functools import total_ordering
+from functools import partial, total_ordering
 from heapq import heappop, heappush
 from queue import Queue
 from textwrap import dedent
@@ -54,7 +54,8 @@ from .utils import (
     cut_id,
     gen_id,
     get_dt_now,
-    wait_a_minute,
+    reach_next_minute,
+    wait_to_next_minute,
 )
 
 logger = get_logger("ddeutil.workflow")
@@ -518,7 +519,6 @@ class Workflow(BaseModel):
         name: str = override_log_name or self.name
         run_id: str = run_id or gen_id(name, unique=True)
         rs_release: Result = Result(run_id=run_id)
-        rs_release_type: str = "release"
 
         if queue is not None and not isinstance(queue, ReleaseQueue):
             raise TypeError(
@@ -526,6 +526,7 @@ class Workflow(BaseModel):
             )
 
         # VALIDATE: Change release value to Release object.
+        rs_release_type: str = "release"
         if isinstance(release, datetime):
             rs_release_type: str = "datetime"
             release: Release = Release.from_dt(release)
@@ -557,20 +558,21 @@ class Workflow(BaseModel):
         )
 
         rs.set_parent_run_id(run_id)
-        rs_log: Log = log.model_validate(
-            {
-                "name": name,
-                "release": release.date,
-                "type": release.type,
-                "context": rs.context,
-                "parent_run_id": rs.parent_run_id,
-                "run_id": rs.run_id,
-            }
-        )
 
         # NOTE: Saving execution result to destination of the input log object.
         logger.debug(f"({cut_id(run_id)}) [LOG]: Writing log: {name!r}.")
-        rs_log.save(excluded=None)
+        (
+            log.model_validate(
+                {
+                    "name": name,
+                    "release": release.date,
+                    "type": release.type,
+                    "context": rs.context,
+                    "parent_run_id": rs.parent_run_id,
+                    "run_id": rs.run_id,
+                }
+            ).save(excluded=None)
+        )
 
         # NOTE: Remove this release from running.
         if queue is not None:
@@ -680,6 +682,9 @@ class Workflow(BaseModel):
             This method will observe its schedule that nearing to run with the
         ``self.release()`` method.
 
+            The limitation of this method is not allow run a date that less
+        than the current date.
+
         :param start_date: A start datetime object.
         :param params: A parameters that want to pass to the release method.
         :param run_id: A workflow running ID for this poke.
@@ -696,6 +701,12 @@ class Workflow(BaseModel):
         log: type[Log] = log or get_log()
         run_id: str = run_id or gen_id(self.name, unique=True)
 
+        # VALIDATE: Check the periods value should gather than 0.
+        if periods <= 0:
+            raise WorkflowException(
+                "The period of poking should be int and grater or equal than 1."
+            )
+
         # NOTE: If this workflow does not set the on schedule, it will return
         #   empty result.
         if len(self.on) == 0:
@@ -705,23 +716,25 @@ class Workflow(BaseModel):
             )
             return []
 
-        if periods <= 0:
-            raise WorkflowException(
-                "The period of poking should be int and grater or equal than 1."
-            )
+        # NOTE: Create the current date that change microsecond to 0
+        current_date: datetime = datetime.now(tz=config.tz).replace(
+            microsecond=0
+        )
 
         # NOTE: Create start_date and offset variables.
-        current_date: datetime = datetime.now(tz=config.tz)
-
         if start_date and start_date <= current_date:
-            start_date = start_date.replace(tzinfo=config.tz)
+            start_date = start_date.replace(tzinfo=config.tz).replace(
+                microsecond=0
+            )
             offset: float = (current_date - start_date).total_seconds()
         else:
+            # NOTE: Force change start date if it gathers than the current date,
+            #   or it does not pass to this method.
             start_date: datetime = current_date
             offset: float = 0
 
-        # NOTE: End date is using to stop generate queue with an input periods
-        #   value.
+        # NOTE: The end date is using to stop generate queue with an input
+        #   periods value.
         end_date: datetime = start_date + timedelta(minutes=periods)
 
         logger.info(
@@ -733,17 +746,17 @@ class Workflow(BaseModel):
         results: list[Result] = []
 
         # NOTE: Create empty ReleaseQueue object.
-        wf_queue: ReleaseQueue = ReleaseQueue()
+        release_queue: ReleaseQueue = ReleaseQueue()
 
-        # NOTE: Make queue to the workflow queue object.
-        self.queue(
-            offset,
-            end_date=end_date,
-            queue=wf_queue,
-            log=log,
-            force_run=force_run,
+        # NOTE: Create reusable partial function and add Release to the release
+        #   queue object.
+        partial_queue = partial(
+            self.queue, offset, end_date, log=log, force_run=force_run
         )
-        if not wf_queue.is_queued:
+        partial_queue(release_queue)
+
+        # NOTE: Return the empty result if it does not have any Release.
+        if not release_queue.is_queued:
             logger.info(
                 f"({cut_id(run_id)}) [POKING]: {self.name!r} does not have "
                 f"any queue."
@@ -759,34 +772,26 @@ class Workflow(BaseModel):
 
             futures: list[Future] = []
 
-            while wf_queue.is_queued:
+            while release_queue.is_queued:
 
-                # NOTE: Pop the latest Release object from queue.
-                release: Release = heappop(wf_queue.queue)
+                # NOTE: Pop the latest Release object from the release queue.
+                release: Release = heappop(release_queue.queue)
 
-                if (
-                    release.date - get_dt_now(tz=config.tz, offset=offset)
-                ).total_seconds() > 60:
+                if reach_next_minute(release.date, tz=config.tz, offset=offset):
                     logger.debug(
                         f"({cut_id(run_id)}) [POKING]: Wait because the latest "
                         f"release has diff time more than 60 seconds ..."
                     )
-                    heappush(wf_queue.queue, release)
-                    wait_a_minute(get_dt_now(tz=config.tz, offset=offset))
+                    heappush(release_queue.queue, release)
+                    wait_to_next_minute(get_dt_now(tz=config.tz, offset=offset))
 
                     # WARNING: I already call queue poking again because issue
                     #   about the every minute crontab.
-                    self.queue(
-                        offset,
-                        end_date,
-                        queue=wf_queue,
-                        log=log,
-                        force_run=force_run,
-                    )
+                    partial_queue(release_queue)
                     continue
 
                 # NOTE: Push the latest Release to the running queue.
-                heappush(wf_queue.running, release)
+                heappush(release_queue.running, release)
 
                 futures.append(
                     executor.submit(
@@ -794,17 +799,11 @@ class Workflow(BaseModel):
                         release=release,
                         params=params,
                         log=log,
-                        queue=wf_queue,
+                        queue=release_queue,
                     )
                 )
 
-                self.queue(
-                    offset,
-                    end_date,
-                    queue=wf_queue,
-                    log=log,
-                    force_run=force_run,
-                )
+                partial_queue(release_queue)
 
             # WARNING: This poking method does not allow to use fail-fast
             #   logic to catching parallel execution result.

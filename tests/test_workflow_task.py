@@ -140,6 +140,14 @@ def test_workflow_task_release(test_path):
             },
         }
 
+        with pytest.raises(ValueError):
+            task.release()
+
+        with pytest.raises(TypeError):
+            task.release(
+                queue=list[datetime(2024, 1, 1, 1, 0, tzinfo=runner.tz)],
+            )
+
 
 @mock.patch.object(Config, "enable_write_log", False)
 def test_workflow_task_release_long_running(test_path):
@@ -182,11 +190,3 @@ def test_workflow_task_release_long_running(test_path):
         rs: Result = task.release(queue=queue["demo"])
         assert rs.status == 0
         print(queue)
-
-        with pytest.raises(ValueError):
-            task.release()
-
-        with pytest.raises(TypeError):
-            task.release(
-                queue=list[datetime(2024, 1, 1, 1, 0, tzinfo=runner.tz)],
-            )
