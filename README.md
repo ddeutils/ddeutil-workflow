@@ -169,7 +169,8 @@ result: Result = workflow.execute(
 )
 ```
 
-So, this package provide the `Schedule` template for this action.
+So, this package provide the `Schedule` template for this action, and you can dynamic
+pass the parameters for changing align with that running time by the `release` prefix.
 
 ```yaml
 schedule-run-local-wf:
@@ -187,13 +188,17 @@ schedule-run-local-wf:
           asat-dt: "${{ release.logical_date }}"
 ```
 
+The main method of the `Schedule` model that use to running is `pending`. If you
+do not pass the `stop` date on this method, it will use config with `WORKFLOW_APP_STOP_BOUNDARY_DELTA`
+key for generate this stop date.
+
 ```python
 from ddeutil.workflow import Schedule
 
 (
    Schedule
-   .from_loader("schedule-every-minute-wf")
-   .pending()
+   .from_loader("schedule-run-local-wf")
+   .pending(stop=None)
 )
 ```
 
