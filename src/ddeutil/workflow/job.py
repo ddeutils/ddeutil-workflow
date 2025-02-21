@@ -7,6 +7,8 @@
 The job handle the lineage of stages and location of execution of stages that
 mean the job model able to define ``runs-on`` key that allow you to run this
 job.
+
+    This module include Strategy Model that use on the job strategy field.
 """
 from __future__ import annotations
 

@@ -394,7 +394,7 @@ def schedule_task(
     method in background. This function do the same logic as the workflow poke
     method, but it runs with map of schedules and the on values.
 
-        This schedule task start runs every minute at ':02' second and it does
+        This schedule task start runs every minute at ':02' second, and it does
     not allow you to run with offset time.
 
     :param tasks: A list of WorkflowTask object.
@@ -414,15 +414,16 @@ def schedule_task(
     #   function. It will deplicate running with different schedule value
     #   because I use current time in this condition.
     #
-    #       For example, if a workflow A queue has '00:02:00' time that
-    #   should to run and its schedule has '*/2 * * * *' and '*/35 * * * *'.
-    #   This condition will release with 2 threading job.
+    #       For example, if a queue has a time release be '00:02:00' that should
+    #   to run and its schedule has '*/2 * * * *' and '*/35 * * * *'.
+    #   This condition make this function create 2 threading tasks.
     #
-    #   '00:02:00'  --> '*/2 * * * *'   --> running
-    #               --> '*/35 * * * *'  --> skip
+    #       '00:02:00'  --> '*/2 * * * *'   --> run
+    #                   --> '*/35 * * * *'  --> skip
     #
     for task in tasks:
 
+        # NOTE: Get the ReleaseQueue with an alias of the WorkflowTask.
         q: ReleaseQueue = queue[task.alias]
 
         # NOTE: Start adding queue and move the runner date in the WorkflowTask.

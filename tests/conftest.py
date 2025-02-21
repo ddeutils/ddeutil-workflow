@@ -78,6 +78,41 @@ def create_cron_yaml(conf_path: Path):
 
 
 @pytest.fixture(scope="session", autouse=True)
+def create_workflow_yaml(conf_path: Path):
+    with dump_yaml_context(
+        conf_path / "demo/01_workflow.yml",
+        data="""
+        wf-scheduling:
+          type: Workflow
+          on:
+            - 'every_3_minute_bkk'
+            - 'every_minute_bkk'
+          params:
+            asat-dt: datetime
+          jobs:
+            condition-job:
+              stages:
+                - name: "Empty stage"
+                - name: "Call-out"
+                  echo: "Hello ${{ params.asat-dt | fmt('%Y-%m-%d') }}"
+
+        wf-scheduling-agent:
+          type: Workflow
+          params:
+            name: str
+            asat-dt: datetime
+          jobs:
+            condition-job:
+              stages:
+                - name: "Call Out"
+                  id: "call-out"
+                  echo: "Hello ${{ params.name }}: ${{ params.asat-dt | fmt('%Y-%m-%d') }}"
+        """,
+    ):
+        yield
+
+
+@pytest.fixture(scope="session", autouse=True)
 def create_schedule_yaml(conf_path: Path):
     with dump_yaml_context(
         conf_path / "demo/03_schedule.yml",
