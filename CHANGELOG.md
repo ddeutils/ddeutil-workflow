@@ -2,6 +2,20 @@
 
 ## Latest Changes
 
+## 0.0.32
+
+### :stars: Highlight Features
+
+- :star: hl: add pending method on the Schedule model.
+
+### :bug: Bug fixes
+
+- :gear: fixed: remove un-used attributes on app state.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: mark no coverage on TODO features.
+
 ## 0.0.31
 
 ### :sparkles: Features
