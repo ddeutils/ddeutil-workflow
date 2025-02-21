@@ -668,12 +668,12 @@ Stage = Union[
 
 
 # TODO: Not implement this stages yet
-class ParallelStage(BaseModel):
+class ParallelStage(BaseModel):  # pragma: no cov
     parallel: list[Stage]
     max_parallel_core: int = Field(default=2)
 
 
 # TODO: Not implement this stages yet
-class ForEachStage(BaseModel):
+class ForEachStage(BaseModel):  # pragma: no cov
     foreach: list[str]
     stages: list[Stage]

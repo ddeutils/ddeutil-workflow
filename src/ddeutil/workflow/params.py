@@ -70,7 +70,7 @@ class DefaultParam(BaseParam):
 
 
 # TODO: Not implement this parameter yet
-class DateParam(DefaultParam):
+class DateParam(DefaultParam):  # pragma: no cov
     """Date parameter."""
 
     type: Literal["date"] = "date"
@@ -156,7 +156,7 @@ class IntParam(DefaultParam):
 
 
 # TODO: Not implement this parameter yet
-class DecimalParam(DefaultParam):
+class DecimalParam(DefaultParam):  # pragma: no cov
     type: Literal["decimal"] = "decimal"
 
     def receive(self, value: float | None = None) -> decimal.Decimal: ...
