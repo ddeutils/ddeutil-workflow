@@ -79,7 +79,7 @@ def custom_filter(name: str) -> Callable[P, FilterFunc]:
 def make_filter_registry() -> dict[str, FilterRegistry]:
     """Return registries of all functions that able to called with task.
 
-    :rtype: dict[str, Registry]
+    :rtype: dict[str, FilterRegistry]
     """
     rs: dict[str, FilterRegistry] = {}
     for module in config.regis_filter:
@@ -107,6 +107,8 @@ def get_args_const(
     expr: str,
 ) -> tuple[str, list[Constant], dict[str, Constant]]:
     """Get arguments and keyword-arguments from function calling string.
+
+    :param expr: An expr string value.
 
     :rtype: tuple[str, list[Constant], dict[str, Constant]]
     """
@@ -150,6 +152,11 @@ def get_args_from_filter(
 ) -> tuple[str, FilterRegistry, list[Any], dict[Any, Any]]:  # pragma: no cov
     """Get arguments and keyword-arguments from filter function calling string.
     and validate it with the filter functions mapping dict.
+
+    :param ft:
+    :param filters:
+
+    :rtype: tuple[str, FilterRegistry, list[Any], dict[Any, Any]]
     """
     func_name, _args, _kwargs = get_args_const(ft)
     args: list[Any] = [arg.value for arg in _args]
@@ -243,7 +250,7 @@ def str2template(
     params: DictData,
     *,
     filters: dict[str, FilterRegistry] | None = None,
-) -> Any:
+) -> str:
     """(Sub-function) Pass param to template string that can search by
     ``RE_CALLER`` regular expression.
 
@@ -255,6 +262,8 @@ def str2template(
     :param params: A parameter value that getting with matched regular
         expression.
     :param filters:
+
+    :rtype: str
     """
     filters: dict[str, FilterRegistry] = filters or make_filter_registry()
 
@@ -295,7 +304,7 @@ def str2template(
     return search_env_replace(value)
 
 
-def param2template(value: Any, params: DictData) -> Any:
+def param2template(value: T, params: DictData) -> T:
     """Pass param to template string that can search by ``RE_CALLER`` regular
     expression.
 
@@ -303,7 +312,7 @@ def param2template(value: Any, params: DictData) -> Any:
     :param params: A parameter value that getting with matched regular
         expression.
 
-    :rtype: Any
+    :rtype: T
     :returns: An any getter value from the params input.
     """
     filters: dict[str, FilterRegistry] = make_filter_registry()

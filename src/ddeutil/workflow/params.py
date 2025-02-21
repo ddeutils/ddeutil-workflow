@@ -3,6 +3,9 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
+"""Param Model that use for parsing incoming parameters that pass to the
+Workflow and Schedule objects.
+"""
 from __future__ import annotations
 
 import decimal

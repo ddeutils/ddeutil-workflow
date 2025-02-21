@@ -45,7 +45,7 @@ async def lifespan(a: FastAPI) -> AsyncIterator[State]:
     yield {
         "upper_queue": a.state.upper_queue,
         "upper_result": a.state.upper_result,
-        # NOTE: Scheduler value should be contain a key of workflow workflow and
+        # NOTE: Scheduler value should be contained a key of workflow and
         #   list of datetime of queue and running.
         #
         #   ... {
@@ -88,7 +88,7 @@ if config.enable_route_workflow:
 
 # NOTE: Enable the schedule route.
 if config.enable_route_schedule:
-    from ..conf import FileLog
+    from ..conf import get_log
     from ..scheduler import schedule_task
     from .route import schedule_route
 
@@ -108,11 +108,11 @@ if config.enable_route_schedule:
                 stop=datetime.now(config.tz) + timedelta(minutes=1),
                 queue=app.state.workflow_queue,
                 threads=app.state.workflow_threads,
-                log=FileLog,
+                log=get_log(),
             )
 
     @schedule_route.on_event("startup")
-    @repeat_at(cron="*/5 * * * *")
+    @repeat_at(cron="*/5 * * * *", delay=10)
     def monitoring():
         logger.debug("[MONITOR]: Start monitoring threading.")
         snapshot_threads: list[str] = list(app.state.workflow_threads.keys())

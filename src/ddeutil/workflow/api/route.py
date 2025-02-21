@@ -178,9 +178,9 @@ async def get_deploy_schedulers(request: Request):
 @schedule_route.get(path="/deploy/{name}")
 async def get_deploy_scheduler(request: Request, name: str):
     if name in request.state.scheduler:
-        sch = Schedule.from_loader(name)
+        schedule = Schedule.from_loader(name)
         getter: list[dict[str, dict[str, list[datetime]]]] = []
-        for workflow in sch.workflows:
+        for workflow in schedule.workflows:
             getter.append(
                 {
                     workflow.name: {
@@ -219,7 +219,7 @@ async def add_deploy_scheduler(request: Request, name: str):
         second=0, microsecond=0
     )
 
-    # NOTE: Create pair of workflow and on from schedule model.
+    # NOTE: Create a pair of workflow and on from schedule model.
     try:
         schedule: Schedule = Schedule.from_loader(name)
     except ValueError as err:

@@ -78,7 +78,7 @@ flowchart LR
     E -.->|read| G
 ```
 
-> [!NOTE]
+> [!WARNING]
 > _Disclaimer_: I inspire the dynamic statement from the [**GitHub Action**](https://github.com/features/actions)
 > with `.yml` files and all configs file from several data orchestration framework
 > tools from my experience on Data Engineer. :grimacing:
