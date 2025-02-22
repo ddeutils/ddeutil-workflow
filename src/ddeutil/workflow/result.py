@@ -41,11 +41,22 @@ class Status(IntEnum):
 class TraceLog:  # pragma: no cov
     """Trace Log object."""
 
-    def debug(self, message: str): ...
+    __slots__: TupleStr = ("run_id",)
 
-    def info(self, message: str): ...
+    def __init__(self, run_id: str):
+        self.run_id: str = run_id
 
-    def warning(self, message: str): ...
+    def debug(self, message: str):
+        logger.debug(f"({cut_id(self.run_id)}) {message}")
+
+    def info(self, message: str):
+        logger.info(f"({cut_id(self.run_id)}) {message}")
+
+    def warning(self, message: str):
+        logger.warning(f"({cut_id(self.run_id)}) {message}")
+
+    def error(self, message: str):
+        logger.error(f"({cut_id(self.run_id)}) {message}")
 
 
 @dataclass(
@@ -111,5 +122,10 @@ class Result:
         self.run_id = result.run_id
         return self
 
-    def log(self, message: str) -> str:  # pragma: no cov
-        return f"({cut_id(self.run_id)}) {message}"
+    @property
+    def trace(self) -> TraceLog:
+        """Return TraceLog object that passing its running ID.
+
+        :rtype: TraceLog
+        """
+        return TraceLog(self.run_id)

@@ -859,9 +859,7 @@ class Workflow(BaseModel):
                 f"workflow."
             )
 
-        logger.info(
-            f"({cut_id(run_id)}) [WORKFLOW]: Start execute job: {job_id!r}"
-        )
+        result.trace.info(f"[WORKFLOW]: Start execute job: {job_id!r}")
 
         # IMPORTANT:
         #   This execution change all job running IDs to the current workflow
@@ -875,10 +873,7 @@ class Workflow(BaseModel):
                 to=params,
             )
         except JobException as err:
-            logger.error(
-                f"({cut_id(run_id)}) [WORKFLOW]: {err.__class__.__name__}: "
-                f"{err}"
-            )
+            result.trace.error(f"[WORKFLOW]: {err.__class__.__name__}: {err}")
             if raise_error:
                 raise WorkflowException(
                     f"Get job execution error {job_id}: JobException: {err}"
@@ -933,15 +928,13 @@ class Workflow(BaseModel):
         else:
             run_id: str = result.run_id
 
-        logger.info(
-            f"({cut_id(run_id)}) [WORKFLOW]: Start Execute: {self.name!r} ..."
-        )
+        result.trace.info(f"[WORKFLOW]: Start Execute: {self.name!r} ...")
 
         # NOTE: It should not do anything if it does not have job.
         if not self.jobs:
-            logger.warning(
-                f"({cut_id(run_id)}) [WORKFLOW]: This workflow: {self.name!r} "
-                f"does not have any jobs"
+            result.trace.warning(
+                f"[WORKFLOW]: This workflow: {self.name!r} does not have any "
+                f"jobs"
             )
             return result.catch(status=0, context=params)
 
@@ -1015,9 +1008,7 @@ class Workflow(BaseModel):
         """
         not_timeout_flag: bool = True
         timeout: int = timeout or config.max_job_exec_timeout
-        logger.debug(
-            result.log(f"[WORKFLOW]: Run {self.name!r} with threading.")
-        )
+        result.trace.debug(f"[WORKFLOW]: Run {self.name!r} with threading.")
 
         # IMPORTANT: The job execution can run parallel and waiting by
         #   needed.
@@ -1069,9 +1060,7 @@ class Workflow(BaseModel):
 
                 for future in as_completed(futures, timeout=thread_timeout):
                     if err := future.exception():
-                        logger.error(
-                            f"({cut_id(result.run_id)}) [WORKFLOW]: {err}"
-                        )
+                        result.trace.error(f"[WORKFLOW]: {err}")
                         raise WorkflowException(str(err))
 
                     # NOTE: This getting result does not do anything.
@@ -1083,9 +1072,8 @@ class Workflow(BaseModel):
                 future.cancel()
 
         # NOTE: Raise timeout error.
-        logger.warning(
-            f"({cut_id(result.run_id)}) [WORKFLOW]: Execution: {self.name!r} "
-            f"was timeout."
+        result.trace.warning(
+            f"[WORKFLOW]: Execution: {self.name!r} was timeout."
         )
         raise WorkflowException(f"Execution: {self.name!r} was timeout.")
 
@@ -1114,10 +1102,7 @@ class Workflow(BaseModel):
         """
         not_timeout_flag: bool = True
         timeout: int = timeout or config.max_job_exec_timeout
-        logger.debug(
-            f"({cut_id(result.run_id)}) [WORKFLOW]: Run {self.name!r} with "
-            f"non-threading."
-        )
+        result.trace.debug(f"[WORKFLOW]: Run {self.name!r} with non-threading.")
 
         while not job_queue.empty() and (
             not_timeout_flag := ((time.monotonic() - ts) < timeout)
@@ -1154,9 +1139,8 @@ class Workflow(BaseModel):
             return context
 
         # NOTE: Raise timeout error.
-        logger.warning(
-            f"({cut_id(result.run_id)}) [WORKFLOW]: Execution: {self.name!r} "
-            f"was timeout."
+        result.trace.warning(
+            f"[WORKFLOW]: Execution: {self.name!r} was timeout."
         )
         raise WorkflowException(f"Execution: {self.name!r} was timeout.")
 
