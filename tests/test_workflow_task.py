@@ -3,7 +3,8 @@ from unittest import mock
 
 import pytest
 from ddeutil.workflow.__cron import CronRunner
-from ddeutil.workflow.conf import Config, FileAudit
+from ddeutil.workflow.audit import FileAudit
+from ddeutil.workflow.conf import Config
 from ddeutil.workflow.cron import On
 from ddeutil.workflow.result import Result
 from ddeutil.workflow.workflow import (
