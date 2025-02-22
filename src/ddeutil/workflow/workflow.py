@@ -846,10 +846,9 @@ class Workflow(BaseModel):
             context.
         """
         if result is None:  # pragma: no cov
-            run_id: str = run_id or gen_id(self.name, unique=True)
-            result: Result = Result(run_id=run_id)
-        else:
-            run_id: str = result.run_id
+            result: Result = Result(
+                run_id=(run_id or gen_id(self.name, unique=True))
+            )
 
         # VALIDATE: check a job ID that exists in this workflow or not.
         if job_id not in self.jobs:
@@ -868,7 +867,7 @@ class Workflow(BaseModel):
         try:
             job: Job = self.jobs[job_id]
             job.set_outputs(
-                job.execute(params=params, run_id=run_id).context,
+                job.execute(params=params, run_id=result.run_id).context,
                 to=params,
             )
         except JobException as err:
@@ -973,8 +972,11 @@ class Workflow(BaseModel):
             status: int = 1
             context.update(
                 {
-                    "error": err,
-                    "error_message": f"{err.__class__.__name__}: {err}",
+                    "errors": {
+                        "class": err,
+                        "name": err.__class__.__name__,
+                        "message": f"{err.__class__.__name__}: {err}",
+                    },
                 },
             )
         return result.catch(status=status, context=context)
