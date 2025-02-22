@@ -53,6 +53,4 @@ def test_result_catch():
 
     rs.catch(status=1, context={"params": {"new_value": "foo"}})
     assert rs.status == 1
-    assert rs.context == {
-        "params": {"source": "src", "target": "tgt", "new_value": "foo"}
-    }
+    assert rs.context == {"params": {"new_value": "foo"}}

@@ -41,7 +41,7 @@ def test_workflow_exec_raise_timeout():
     )
     rs: Result = workflow.execute(params={}, timeout=1)
     assert rs.status == 1
-    assert rs.context["error_message"] == (
+    assert rs.context["errors"]["message"] == (
         "WorkflowException: Execution: 'demo-workflow' was timeout."
     )
 
