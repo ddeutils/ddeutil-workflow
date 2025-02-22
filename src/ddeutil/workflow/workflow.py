@@ -34,7 +34,7 @@ from functools import partial, total_ordering
 from heapq import heappop, heappush
 from queue import Queue
 from textwrap import dedent
-from typing import Any, Optional
+from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.dataclasses import dataclass
@@ -49,10 +49,9 @@ from .cron import On
 from .exceptions import JobException, WorkflowException
 from .job import Job
 from .params import Param
-from .result import Result
+from .result import Result, Status
 from .templates import has_template, param2template
 from .utils import (
-    cut_id,
     gen_id,
     get_dt_now,
     reach_next_minute,
@@ -486,9 +485,11 @@ class Workflow(BaseModel):
         params: DictData,
         *,
         run_id: str | None = None,
+        parent_run_id: str | None = None,
         log: type[Audit] = None,
         queue: ReleaseQueue | None = None,
         override_log_name: str | None = None,
+        result: Result | None = None,
     ) -> Result:
         """Release the workflow execution with overriding parameter with the
         release templating that include logical date (release date), execution
@@ -509,17 +510,28 @@ class Workflow(BaseModel):
         :param params: A workflow parameter that pass to execute method.
         :param queue: A ReleaseQueue that use for mark complete.
         :param run_id: A workflow running ID for this release.
+        :param parent_run_id: A parent workflow running ID for this release.
         :param log: A log class that want to save the execution result.
         :param queue: A ReleaseQueue object.
         :param override_log_name: An override logging name that use instead
             the workflow name.
+        :param result: (Result) A result object for keeping context and status
+            data.
 
         :rtype: Result
         """
         log: type[Audit] = log or get_audit()
         name: str = override_log_name or self.name
-        run_id: str = run_id or gen_id(name, unique=True)
-        rs_release: Result = Result(run_id=run_id)
+
+        if result is None:
+            run_id: str = run_id or gen_id(name, unique=True)
+            result: Result = Result(
+                run_id=run_id, parent_run_id=(parent_run_id or run_id)
+            )
+        else:
+            run_id: str = result.run_id
+            if parent_run_id:
+                result.set_parent_run_id(parent_run_id)
 
         if queue is not None and not isinstance(queue, ReleaseQueue):
             raise TypeError(
@@ -527,13 +539,11 @@ class Workflow(BaseModel):
             )
 
         # VALIDATE: Change release value to Release object.
-        rs_release_type: str = "release"
         if isinstance(release, datetime):
-            rs_release_type: str = "datetime"
             release: Release = Release.from_dt(release)
 
-        logger.debug(
-            f"({cut_id(run_id)}) [RELEASE]: Start release - {name!r} : "
+        result.trace.debug(
+            f"[RELEASE]: Start release - {name!r} : "
             f"{release.date:%Y-%m-%d %H:%M:%S}"
         )
 
@@ -549,28 +559,30 @@ class Workflow(BaseModel):
         }
 
         # NOTE: Execute workflow with templating params from release mapping.
-        rs: Result = self.execute(
+        #   The result context that return from execution method is:
+        #
+        #   ... {"params": ..., "jobs": ...}
+        #
+        self.execute(
             params=param2template(params, release_params),
-            run_id=run_id,
+            result=result,
         )
-        logger.debug(
-            f"({cut_id(run_id)}) [RELEASE]: End release - {name!r} : "
+        result.trace.debug(
+            f"[RELEASE]: End release - {name!r} : "
             f"{release.date:%Y-%m-%d %H:%M:%S}"
         )
 
-        rs.set_parent_run_id(run_id)
-
         # NOTE: Saving execution result to destination of the input log object.
-        logger.debug(f"({cut_id(run_id)}) [LOG]: Writing log: {name!r}.")
+        result.trace.debug(f"[LOG]: Writing log: {name!r}.")
         (
             log(
                 name=name,
                 release=release.date,
                 type=release.type,
-                context=rs.context,
-                parent_run_id=rs.parent_run_id,
-                run_id=rs.run_id,
-                execution_time=rs.alive_time(),
+                context=result.context,
+                parent_run_id=result.parent_run_id,
+                run_id=result.run_id,
+                execution_time=result.alive_time(),
             ).save(excluded=None)
         )
 
@@ -580,20 +592,25 @@ class Workflow(BaseModel):
             queue.mark_complete(release)
 
         # NOTE: Remove the params key from the result context for deduplicate.
-        context: dict[str, Any] = rs.context
-        context.pop("params")
+        #   This step is prepare result context for this release method.
+        context: DictData = result.context
+        jobs: DictData = context.pop("jobs", {})
+        errors: DictData = (
+            {"errors": context.pop("errors", {})} if "errors" in context else {}
+        )
 
-        return rs_release.catch(
-            status=0,
+        return result.catch(
+            status=Status.SUCCESS,
             context={
+                # NOTE: Update the real params that pass in this method.
                 "params": params,
                 "release": {
-                    "status": "success",
-                    "type": rs_release_type,
+                    "type": release.type,
                     "logical_date": release.date,
                     "release": release,
                 },
-                "outputs": context,
+                "outputs": {"jobs": jobs},
+                **errors,
             },
         )
 
@@ -674,7 +691,7 @@ class Workflow(BaseModel):
         log: Audit | None = None,
         force_run: bool = False,
         timeout: int = 1800,
-    ) -> list[Result]:
+    ) -> Result:
         """Poke this workflow with start datetime value that passing to its
         ``on`` field with threading executor pool for executing with all its
         schedules that was set on the `on` value.
@@ -695,11 +712,13 @@ class Workflow(BaseModel):
         :param timeout: A second value for timeout while waiting all futures
             run completely.
 
-        :rtype: list[Result]
+        :rtype: Result
         :return: A list of all results that return from ``self.release`` method.
         """
         log: type[Audit] = log or get_audit()
-        run_id: str = run_id or gen_id(self.name, unique=True)
+        result: Result = Result(
+            run_id=(run_id or gen_id(self.name, unique=True))
+        )
 
         # VALIDATE: Check the periods value should gather than 0.
         if periods <= 0:
@@ -710,11 +729,10 @@ class Workflow(BaseModel):
         # NOTE: If this workflow does not set the on schedule, it will return
         #   empty result.
         if len(self.on) == 0:
-            logger.info(
-                f"({cut_id(run_id)}) [POKING]: {self.name!r} does not have any "
-                f"schedule to run."
+            result.trace.info(
+                f"[POKING]: {self.name!r} does not have any schedule to run."
             )
-            return []
+            return result.catch(status=Status.SUCCESS, context={"outputs": []})
 
         # NOTE: Create the current date that change microsecond to 0
         current_date: datetime = datetime.now(tz=config.tz).replace(
@@ -737,13 +755,13 @@ class Workflow(BaseModel):
         #   periods value.
         end_date: datetime = start_date + timedelta(minutes=periods)
 
-        logger.info(
-            f"({cut_id(run_id)}) [POKING]: Start Poking: {self.name!r} from "
+        result.trace.info(
+            f"[POKING]: Start Poking: {self.name!r} from "
             f"{start_date:%Y-%m-%d %H:%M:%S} to {end_date:%Y-%m-%d %H:%M:%S}"
         )
 
         params: DictData = {} if params is None else params
-        results: list[Result] = []
+        context: list[Result] = []
 
         # NOTE: Create empty ReleaseQueue object.
         q: ReleaseQueue = ReleaseQueue()
@@ -757,11 +775,10 @@ class Workflow(BaseModel):
 
         # NOTE: Return the empty result if it does not have any Release.
         if not q.is_queued:
-            logger.info(
-                f"({cut_id(run_id)}) [POKING]: {self.name!r} does not have "
-                f"any queue."
+            result.trace.info(
+                f"[POKING]: {self.name!r} does not have any queue."
             )
-            return []
+            return result.catch(status=Status.SUCCESS, context={"outputs": []})
 
         # NOTE: Start create the thread pool executor for running this poke
         #   process.
@@ -778,8 +795,8 @@ class Workflow(BaseModel):
                 release: Release = heappop(q.queue)
 
                 if reach_next_minute(release.date, tz=config.tz, offset=offset):
-                    logger.debug(
-                        f"({cut_id(run_id)}) [POKING]: The latest release, "
+                    result.trace.debug(
+                        f"[POKING]: The latest release, "
                         f"{release.date:%Y-%m-%d %H:%M:%S}, is not able to run "
                         f"on this minute"
                     )
@@ -801,6 +818,7 @@ class Workflow(BaseModel):
                         params=params,
                         log=log,
                         queue=q,
+                        parent_run_id=result.run_id,
                     )
                 )
 
@@ -809,9 +827,12 @@ class Workflow(BaseModel):
             # WARNING: This poking method does not allow to use fail-fast
             #   logic to catching parallel execution result.
             for future in as_completed(futures, timeout=timeout):
-                results.append(future.result().set_parent_run_id(run_id))
+                context.append(future.result())
 
-        return results
+        return result.catch(
+            status=Status.SUCCESS,
+            context={"outputs": context},
+        )
 
     def execute_job(
         self,

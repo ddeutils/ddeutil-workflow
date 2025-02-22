@@ -4,7 +4,12 @@ from unittest import mock
 import pytest
 from ddeutil.workflow.conf import Config
 from ddeutil.workflow.result import Result
-from ddeutil.workflow.workflow import Release, ReleaseQueue, Workflow
+from ddeutil.workflow.workflow import (
+    Release,
+    ReleaseQueue,
+    ReleaseType,
+    Workflow,
+)
 
 
 @mock.patch.object(Config, "enable_write_log", False)
@@ -22,8 +27,7 @@ def test_workflow_exec_release():
     assert rs.context == {
         "params": {"asat-dt": datetime(2024, 10, 1, 0, 0)},
         "release": {
-            "status": "success",
-            "type": "datetime",
+            "type": ReleaseType.DEFAULT,
             "logical_date": release_date,
             "release": Release.from_dt(release_date),
         },
@@ -58,8 +62,7 @@ def test_workflow_exec_release_with_queue():
     assert rs.context == {
         "params": {"asat-dt": datetime(2024, 10, 1, 0, 0)},
         "release": {
-            "status": "success",
-            "type": "datetime",
+            "type": ReleaseType.DEFAULT,
             "logical_date": release_date,
             "release": Release.from_dt(release_date),
         },
@@ -107,8 +110,7 @@ def test_workflow_exec_release_with_start_date():
     assert rs.context == {
         "params": {"asat-dt": datetime(2024, 10, 1, 0, 0)},
         "release": {
-            "status": "success",
-            "type": "datetime",
+            "type": ReleaseType.DEFAULT,
             "logical_date": start_date,
             "release": Release.from_dt(start_date),
         },
