@@ -171,7 +171,7 @@ class BaseStage(BaseModel, ABC):
 
         :rtype: Result
         """
-        if result is None:
+        if result is None:  # pragma: no cov
             result: Result = Result(
                 run_id=(
                     run_id or gen_id(self.name + (self.id or ""), unique=True)

@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
-from typing import ClassVar, Optional, Union
+from typing import Any, ClassVar, Optional, Union
 
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
@@ -47,6 +47,7 @@ class BaseAudit(BaseModel, ABC):
     parent_run_id: Optional[str] = Field(default=None)
     run_id: str
     update: datetime = Field(default_factory=datetime.now)
+    execution_time: float = Field(default=0)
 
     @model_validator(mode="after")
     def __model_action(self) -> Self:
@@ -199,17 +200,21 @@ class FileAudit(BaseAudit):
 class SQLiteAudit(BaseAudit):  # pragma: no cov
     """SQLite Audit Pydantic Model."""
 
-    table: str = "workflow_log"
-    ddl: str = """
-        workflow        str,
-        release         int,
-        type            str,
-        context         json,
-        parent_run_id   int,
-        run_id          int,
-        update          datetime
-        primary key ( run_id )
-        """
+    @staticmethod
+    def meta() -> dict[str, Any]:
+        return {
+            "table": "workflow_log",
+            "ddl": """
+                workflow        str,
+                release         int,
+                type            str,
+                context         json,
+                parent_run_id   int,
+                run_id          int,
+                update          datetime
+                primary key ( run_id )
+                """,
+        }
 
     def save(self, excluded: list[str] | None) -> SQLiteAudit:
         """Save logging data that receive a context data from a workflow

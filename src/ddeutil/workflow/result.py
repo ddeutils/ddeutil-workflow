@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from dataclasses import field
+from datetime import datetime
 from enum import IntEnum
 from threading import Event
 from typing import Optional
@@ -15,8 +16,8 @@ from pydantic.dataclasses import dataclass
 from typing_extensions import Self
 
 from .__types import DictData, TupleStr
-from .conf import get_logger
-from .utils import cut_id, gen_id
+from .conf import config, get_logger
+from .utils import cut_id, gen_id, get_dt_now
 
 logger = get_logger("ddeutil.workflow.audit")
 
@@ -35,7 +36,17 @@ def default_gen_id() -> str:
     return gen_id("manual", unique=True)
 
 
+def get_dt_tznow() -> datetime:
+    """Return the current datetime object that passing the config timezone.
+
+    :rtype: datetime
+    """
+    return get_dt_now(tz=config.tz)
+
+
 class Status(IntEnum):
+    """Status Int Enum object."""
+
     SUCCESS: int = 0
     FAILED: int = 1
     WAIT: int = 2
@@ -81,6 +92,7 @@ class Result:
     # NOTE: Ignore this field to compare another result model with __eq__.
     parent_run_id: Optional[str] = field(default=None, compare=False)
     event: Event = field(default_factory=Event, compare=False)
+    ts: datetime = field(default_factory=get_dt_tznow, compare=False)
 
     def set_run_id(self, running_id: str) -> Self:
         """Set a running ID.
@@ -138,3 +150,6 @@ class Result:
         :rtype: TraceLog
         """
         return TraceLog(self.run_id)
+
+    def alive_time(self) -> float:  # pragma: no cov
+        return (get_dt_tznow() - self.ts).total_seconds()

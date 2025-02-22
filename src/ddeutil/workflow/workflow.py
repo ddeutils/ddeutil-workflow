@@ -563,15 +563,14 @@ class Workflow(BaseModel):
         # NOTE: Saving execution result to destination of the input log object.
         logger.debug(f"({cut_id(run_id)}) [LOG]: Writing log: {name!r}.")
         (
-            log.model_validate(
-                {
-                    "name": name,
-                    "release": release.date,
-                    "type": release.type,
-                    "context": rs.context,
-                    "parent_run_id": rs.parent_run_id,
-                    "run_id": rs.run_id,
-                }
+            log(
+                name=name,
+                release=release.date,
+                type=release.type,
+                context=rs.context,
+                parent_run_id=rs.parent_run_id,
+                run_id=rs.run_id,
+                execution_time=rs.alive_time(),
             ).save(excluded=None)
         )
 
@@ -846,7 +845,7 @@ class Workflow(BaseModel):
         :return: Return the result object that receive the job execution result
             context.
         """
-        if result is None:
+        if result is None:  # pragma: no cov
             run_id: str = run_id or gen_id(self.name, unique=True)
             result: Result = Result(run_id=run_id)
         else:
@@ -922,7 +921,7 @@ class Workflow(BaseModel):
         # NOTE: I use this condition because this method allow passing empty
         #   params and I do not want to create new dict object.
         ts: float = time.monotonic()
-        if result is None:
+        if result is None:  # pragma: no cov
             result: Result = Result(
                 run_id=(run_id or gen_id(self.name, unique=True))
             )
