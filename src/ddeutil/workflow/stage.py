@@ -188,7 +188,6 @@ class BaseStage(BaseModel, ABC):
                 # NOTE: If error that raise from stage execution course by
                 #   itself, it will return that error with previous
                 #   dependency.
-
                 if isinstance(err, StageException):
                     raise
 

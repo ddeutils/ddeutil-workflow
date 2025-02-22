@@ -99,18 +99,24 @@ def test_job_exec_py_fail_fast_raise():
                 "raise-error": {"outputs": {"result": "success"}},
             },
         },
-        "error": rs.context["error"],
-        "error_message": (
-            "JobException: Get stage execution error: StageException: "
-            "PyStage: \n\tValueError: Testing raise error inside PyStage!!!"
-        ),
         "9112472804": {
             "matrix": {"sleep": "4"},
             "stages": {"7972360640": {"outputs": {}}},
-            "error": rs.context["9112472804"]["error"],
-            "error_message": (
-                "Job strategy was canceled from event that had set before "
-                "strategy execution."
+            "errors": {
+                "class": rs.context["9112472804"]["errors"]["class"],
+                "name": "JobException",
+                "message": (
+                    "Job strategy was canceled from event that had set before "
+                    "strategy execution."
+                ),
+            },
+        },
+        "errors": {
+            "class": rs.context["errors"]["class"],
+            "name": "JobException",
+            "message": (
+                "JobException: Stage execution error: StageException: "
+                "PyStage: \n\tValueError: Testing raise error inside PyStage!!!"
             ),
         },
     }
@@ -209,9 +215,12 @@ def test_job_exec_py_complete_raise():
                 "raise-error": {"outputs": {"result": "success"}},
             },
         },
-        "error": rs.context["error"],
-        "error_message": (
-            "JobException: Get stage execution error: StageException: "
-            "PyStage: \n\tValueError: Testing raise error inside PyStage!!!"
-        ),
+        "errors": {
+            "class": rs.context["errors"]["class"],
+            "name": "JobException",
+            "message": (
+                "JobException: Stage execution error: StageException: "
+                "PyStage: \n\tValueError: Testing raise error inside PyStage!!!"
+            ),
+        },
     }

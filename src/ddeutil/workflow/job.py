@@ -400,10 +400,15 @@ class Job(BaseModel):
         # NOTE: If the job ID did not set, it will use index of jobs key
         #   instead.
         _id: str = self.id or str(len(to["jobs"]) + 1)
+
+        errors: DictData = (
+            {"errors": output.pop("errors", {})} if "errors" in output else {}
+        )
+
         to["jobs"][_id] = (
-            {"strategies": output}
+            {"strategies": output, **errors}
             if self.strategy.is_set()
-            else output.get(next(iter(output), "DUMMY"), {})
+            else {**output.get(next(iter(output), "DUMMY"), {}), **errors}
         )
         return to
 
@@ -492,8 +497,11 @@ class Job(BaseModel):
                             # "stages": filter_func(context.pop("stages", {})),
                             #
                             "stages": context.pop("stages", {}),
-                            "error": JobException(error_msg),
-                            "error_message": error_msg,
+                            "errors": {
+                                "class": JobException(error_msg),
+                                "name": "JobException",
+                                "message": error_msg,
+                            },
                         },
                     },
                 )
@@ -527,17 +535,21 @@ class Job(BaseModel):
                 result.trace.error(f"[JOB]: {err.__class__.__name__}: {err}")
                 if config.job_raise_error:
                     raise JobException(
-                        f"Get stage execution error: {err.__class__.__name__}: "
+                        f"Stage execution error: {err.__class__.__name__}: "
                         f"{err}"
                     ) from None
+
                 return result.catch(
                     status=1,
                     context={
                         strategy_id: {
                             "matrix": strategy,
                             "stages": context.pop("stages", {}),
-                            "error": err,
-                            "error_message": f"{err.__class__.__name__}: {err}",
+                            "errors": {
+                                "class": err,
+                                "name": err.__class__.__name__,
+                                "message": f"{err.__class__.__name__}: {err}",
+                            },
                         },
                     },
                 )
@@ -670,12 +682,16 @@ class Job(BaseModel):
             if err := future.exception():
                 status: Status = Status.FAILED
                 result.trace.error(
-                    f"[JOB]: Fail-fast catching:\n\t{future.exception()}"
+                    f"[JOB]: Fail-Fast Catch:\n\t"
+                    f"{err.__class__.__name__}:\n\t{err}"
                 )
                 context.update(
                     {
-                        "error": err,
-                        "error_message": f"{err.__class__.__name__}: {err}",
+                        "errors": {
+                            "class": err,
+                            "name": err.__class__.__name__,
+                            "message": f"{err.__class__.__name__}: {err}",
+                        },
                     },
                 )
                 continue
@@ -710,13 +726,16 @@ class Job(BaseModel):
             except JobException as err:
                 status = Status.FAILED
                 result.trace.error(
-                    f"[JOB]: All-completed catching:\n\t"
+                    f"[JOB]: All-Completed Catch:\n\t"
                     f"{err.__class__.__name__}:\n\t{err}"
                 )
                 context.update(
                     {
-                        "error": err,
-                        "error_message": f"{err.__class__.__name__}: {err}",
+                        "errors": {
+                            "class": err,
+                            "name": err.__class__.__name__,
+                            "message": f"{err.__class__.__name__}: {err}",
+                        },
                     },
                 )
 

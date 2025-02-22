@@ -41,12 +41,14 @@ def test_job_exec_strategy_catch_stage_error():
             "stages": {
                 "1772094681": {"outputs": {}},
                 "raise-error": {
-                    "outputs": {
-                        "error": getdot(
-                            "5027535057.stages.raise-error.outputs.error",
+                    "outputs": {},
+                    "errors": {
+                        "class": getdot(
+                            "5027535057.stages.raise-error.errors.class",
                             rs.context,
                         ),
-                        "error_message": (
+                        "name": "ValueError",
+                        "message": (
                             "ValueError: Testing raise error inside PyStage!!!"
                         ),
                     },
@@ -69,11 +71,14 @@ def test_job_exec_strategy_catch_job_error():
         "5027535057": {
             "matrix": {"name": "foo"},
             "stages": {"1772094681": {"outputs": {}}},
-            "error": rs.context["5027535057"]["error"],  # NOTE: StageException
-            "error_message": (
-                "StageException: PyStage: \n\tValueError: Testing raise error "
-                "inside PyStage!!!"
-            ),
+            "errors": {
+                "class": rs.context["5027535057"]["errors"]["class"],
+                "name": "StageException",
+                "message": (
+                    "StageException: PyStage: \n\tValueError: Testing raise error "
+                    "inside PyStage!!!"
+                ),
+            },
         },
     }
 
@@ -91,7 +96,7 @@ def test_job_exec_strategy_event_set():
         event.set()
 
     return_value: Result = future.result()
-    assert return_value.context["1354680202"]["error_message"] == (
+    assert return_value.context["1354680202"]["errors"]["message"] == (
         "Job strategy was canceled from event that had set before strategy "
         "execution."
     )
@@ -105,7 +110,9 @@ def test_job_exec_strategy_raise():
 
     with mock.patch.object(Config, "job_raise_error", False):
         rs: Result = job.execute_strategy({}, {})
-        assert isinstance(rs.context["1354680202"]["error"], StageException)
+        assert isinstance(
+            rs.context["1354680202"]["errors"]["class"], StageException
+        )
         assert rs.status == 1
 
     with pytest.raises(JobException):

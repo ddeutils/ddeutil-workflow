@@ -185,7 +185,7 @@ def test_workflow_exec_py_raise():
         "error": rs.context["error"],
         "error_message": (
             "WorkflowException: Get job execution error first-job: "
-            "JobException: Get stage execution error: "
+            "JobException: Stage execution error: "
             "StageException: PyStage: \n\t"
             "ValueError: Testing raise error inside PyStage!!!"
         ),
@@ -208,7 +208,7 @@ def test_workflow_exec_py_raise_parallel():
         "error": rs.context["error"],
         "error_message": (
             "WorkflowException: Get job execution error first-job: "
-            "JobException: Get stage execution error: "
+            "JobException: Stage execution error: "
             "StageException: PyStage: \n\t"
             "ValueError: Testing raise error inside PyStage!!!"
         ),
