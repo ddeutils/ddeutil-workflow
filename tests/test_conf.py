@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 import pytest
 import toml
 import yaml
-from ddeutil.workflow.conf import Config, Loader, SimLoad
+from ddeutil.workflow.conf import Config, Loader, SimLoad, config
 from ddeutil.workflow.scheduler import Schedule
 from ddeutil.workflow.workflow import Workflow
 
@@ -57,8 +57,9 @@ def target_path(test_path):
 
 def test_simple_load(target_path: Path):
     with mock.patch.object(Config, "conf_path", target_path):
+
         with pytest.raises(ValueError):
-            SimLoad("test_simple_load_raise", Config())
+            SimLoad("test_simple_load_raise", config.conf_path)
 
 
 def test_simple_load_finds(target_path: Path):
@@ -81,16 +82,16 @@ def test_simple_load_finds(target_path: Path):
                 "test_simple_load_config",
                 {"type": "Config", "foo": "bar"},
             )
-        ] == list(SimLoad.finds(Config, Config()))
+        ] == list(SimLoad.finds(Config, config.conf_path))
         assert [
             (
                 "test_simple_load_config",
                 {"type": "Config"},
             )
-        ] == list(SimLoad.finds(Config, Config(), included=["type"]))
+        ] == list(SimLoad.finds(Config, config.conf_path, included=["type"]))
         assert [] == list(
             SimLoad.finds(
-                Config, Config(), excluded=["test_simple_load_config"]
+                Config, config.conf_path, excluded=["test_simple_load_config"]
             )
         )
 
@@ -112,7 +113,7 @@ def test_simple_load_finds_raise(target_path: Path):
 
     with mock.patch.object(Config, "conf_path", target_path):
         with pytest.raises(ValueError):
-            _ = SimLoad("test_simple_load_config", Config()).type
+            _ = SimLoad("test_simple_load_config", config.conf_path).type
 
 
 def test_loader_find_schedule():
