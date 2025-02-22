@@ -2,6 +2,38 @@
 
 ## Latest Changes
 
+## 0.0.33
+
+### :stars: Highlight Features
+
+- :star: hl: add execute_time field on the Audit model.
+- :star: hl: split log objects from config module to logs module.
+
+### :sparkles: Features
+
+- :dart: feat: use result instead of run_id.
+- :dart: feat: add result argument on job execution.
+- :dart: feat: add trace log on workflow execution.
+- :dart: feat: mark TraceLog object for logging.
+- :dart: feat: mark TraceLog object for logging.
+- :dart: feat: pass result to workflow exec instead of run_id.
+- :dart: feat: update log config.
+
+### :bug: Bug fixes
+
+- :gear: fixed: move default running id function out of model validate.
+- :gear: fixed: rename logs module to audit module.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: fixed testcase on conf module.
+- :fast_forward: merge: branch 'main' of https://github.com/ddeutils/ddeutil-workflow.
+- :test_tube: tests: fixed import invalid module.
+
+### :broom: Deprecate & Clean
+
+- :recycle: clean: remove un-use method on the result model.
+
 ## 0.0.32
 
 ### :stars: Highlight Features
