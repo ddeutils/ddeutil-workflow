@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 import stat
 import time
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from datetime import datetime, timedelta
 from hashlib import md5
 from inspect import isfunction
@@ -199,7 +199,7 @@ def cross_product(matrix: Matrix) -> Iterator[DictData]:
     )
 
 
-def batch(iterable: Iterator[Any], n: int) -> Iterator[Any]:
+def batch(iterable: Iterator[Any] | range, n: int) -> Iterator[Any]:
     """Batch data into iterators of length n. The last batch may be shorter.
 
     Example:
@@ -240,3 +240,21 @@ def cut_id(run_id: str, *, num: int = 6) -> str:
     :rtype: str
     """
     return run_id[-num:]
+
+
+def deep_update(origin: DictData, u: Mapping) -> DictData:
+    """Deep update dict.
+
+    Example:
+        >>> deep_update(
+        ...     origin={"jobs": {"job01": "foo"}},
+        ...     u={"jobs": {"job02": "bar"}},
+        ... )
+        {"jobs": {"job01": "foo", "job02": "bar"}}
+    """
+    for k, value in u.items():
+        if isinstance(value, Mapping) and value:
+            origin[k] = deep_update(origin.get(k, {}), value)
+        else:
+            origin[k] = value
+    return origin

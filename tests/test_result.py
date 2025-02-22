@@ -51,20 +51,8 @@ def test_result_catch():
     assert rs.status == 0
     assert data == rs.context
 
-
-def test_result_receive():
-    data = {
-        "params": {
-            "source": "src",
-            "target": "tgt",
-        }
+    rs.catch(status=1, context={"params": {"new_value": "foo"}})
+    assert rs.status == 1
+    assert rs.context == {
+        "params": {"source": "src", "target": "tgt", "new_value": "foo"}
     }
-    rs: Result = Result(status=1, context=data)
-    rs_empty: Result = Result()
-    rs_empty.receive(rs)
-    assert rs_empty.status == 1
-    assert rs_empty.run_id == rs.run_id
-    assert id(rs_empty) != id(rs)
-    assert {
-        "params": {"source": "src", "target": "tgt"},
-    } == rs_empty.context

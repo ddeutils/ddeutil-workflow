@@ -130,19 +130,6 @@ class Result:
         self.__dict__["context"].update(context or {})
         return self
 
-    def receive(self, result: Result) -> Self:
-        """Receive context from another result object.
-
-        :rtype: Self
-        """
-        self.__dict__["status"] = result.status
-        self.__dict__["context"].update(result.context)
-
-        # NOTE: Update running ID from an incoming result.
-        self.parent_run_id = result.parent_run_id
-        self.run_id = result.run_id
-        return self
-
     @property
     def trace(self) -> TraceLog:
         """Return TraceLog object that passing its running ID.
