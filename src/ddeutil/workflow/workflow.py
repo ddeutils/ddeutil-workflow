@@ -839,7 +839,8 @@ class Workflow(BaseModel):
         :param run_id: A workflow running ID for this job execution.
         :param raise_error: A flag that raise error instead catching to result
             if it gets exception from job execution.
-        :param result: A result object for keeping context and status data.
+        :param result: (Result) A result object for keeping context and status
+            data.
 
         :rtype: Result
         :return: Return the result object that receive the job execution result
@@ -894,6 +895,7 @@ class Workflow(BaseModel):
         *,
         run_id: str | None = None,
         timeout: int = 0,
+        result: Result | None = None,
     ) -> Result:
         """Execute workflow with passing a dynamic parameters to all jobs that
         included in this workflow model with ``jobs`` field.
@@ -913,23 +915,27 @@ class Workflow(BaseModel):
 
         :param run_id: A workflow running ID for this job execution.
         :type run_id: str | None (default: None)
-        :param timeout: A workflow execution time out in second unit that use
+        :param timeout: (int) A workflow execution time out in second unit that use
             for limit time of execution and waiting job dependency. This value
             does not force stop the task that still running more than this limit
-            time.
-        :type timeout: int (default: 0)
+            time. (default: 0)
+        :param result: (Result) A result object for keeping context and status
+            data.
 
         :rtype: Result
         """
-        run_id: str = run_id or gen_id(self.name, unique=True)
-        logger.info(
-            f"({cut_id(run_id)}) [WORKFLOW]: Start Execute: {self.name!r} ..."
-        )
-
         # NOTE: I use this condition because this method allow passing empty
         #   params and I do not want to create new dict object.
         ts: float = time.monotonic()
-        result: Result = Result(run_id=run_id)
+        if result is None:
+            run_id: str = run_id or gen_id(self.name, unique=True)
+            result: Result = Result(run_id=run_id)
+        else:
+            run_id: str = result.run_id
+
+        logger.info(
+            f"({cut_id(run_id)}) [WORKFLOW]: Start Execute: {self.name!r} ..."
+        )
 
         # NOTE: It should not do anything if it does not have job.
         if not self.jobs:
@@ -1010,8 +1016,7 @@ class Workflow(BaseModel):
         not_timeout_flag: bool = True
         timeout: int = timeout or config.max_job_exec_timeout
         logger.debug(
-            f"({cut_id(result.run_id)}) [WORKFLOW]: Run {self.name!r} "
-            f"with threading."
+            result.log(f"[WORKFLOW]: Run {self.name!r} with threading.")
         )
 
         # IMPORTANT: The job execution can run parallel and waiting by
@@ -1235,8 +1240,8 @@ class WorkflowTask:
         :param end_date: An end datetime object.
         :param queue: A workflow queue object.
         :param log: A log class that want to make log object.
-        :param force_run: A flag that allow to release workflow if the log with
-            that release was pointed.
+        :param force_run: (bool) A flag that allow to release workflow if the
+            log with that release was pointed.
 
         :rtype: ReleaseQueue
         """
@@ -1272,7 +1277,7 @@ class WorkflowTask:
         return queue
 
     def __repr__(self) -> str:
-        """Override ___repr__ method."""
+        """Override the `__repr__` method."""
         return (
             f"{self.__class__.__name__}(alias={self.alias!r}, "
             f"workflow={self.workflow.name!r}, runner={self.runner!r}, "

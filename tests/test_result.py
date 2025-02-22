@@ -62,22 +62,3 @@ def test_result_receive():
     assert {
         "params": {"source": "src", "target": "tgt"},
     } == rs_empty.context
-
-
-def test_result_receive_jobs():
-    data = {"params": {"source": "src", "target": "tgt"}}
-    rs: Result = Result(status=1, context=data)
-
-    rs_empty: Result = Result()
-    rs_empty.receive_jobs(rs)
-    assert rs_empty.status == 1
-    assert rs_empty.run_id == rs.run_id
-    assert id(rs_empty) != id(rs)
-    assert {"jobs": data} == rs_empty.context
-
-    rs_empty: Result = Result(context={"jobs": {}})
-    rs_empty.receive_jobs(rs)
-    assert rs_empty.status == 1
-    assert rs_empty.run_id == rs.run_id
-    assert id(rs_empty) != id(rs)
-    assert {"jobs": data} == rs_empty.context

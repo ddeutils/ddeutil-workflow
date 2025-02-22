@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import field
 from enum import IntEnum
+from threading import Event
 from typing import Optional
 
 from pydantic import ConfigDict
@@ -14,7 +15,10 @@ from pydantic.dataclasses import dataclass
 from typing_extensions import Self
 
 from .__types import DictData, TupleStr
-from .utils import gen_id
+from .conf import get_logger
+from .utils import cut_id, gen_id
+
+logger = get_logger("ddeutil.workflow.audit")
 
 __all__: TupleStr = ("Result",)
 
@@ -34,7 +38,19 @@ class Status(IntEnum):
     WAIT: int = 2
 
 
-@dataclass(config=ConfigDict(use_enum_values=True))
+class TraceLog:  # pragma: no cov
+    """Trace Log object."""
+
+    def debug(self, message: str): ...
+
+    def info(self, message: str): ...
+
+    def warning(self, message: str): ...
+
+
+@dataclass(
+    config=ConfigDict(arbitrary_types_allowed=True, use_enum_values=True)
+)
 class Result:
     """Result Pydantic Model for passing and receiving data context from any
     module execution process like stage execution, job execution, or workflow
@@ -50,6 +66,7 @@ class Result:
 
     # NOTE: Ignore this field to compare another result model with __eq__.
     parent_run_id: Optional[str] = field(default=None, compare=False)
+    event: Event = field(default_factory=Event, compare=False)
 
     def set_run_id(self, running_id: str) -> Self:
         """Set a running ID.
@@ -93,3 +110,6 @@ class Result:
         self.parent_run_id = result.parent_run_id
         self.run_id = result.run_id
         return self
+
+    def log(self, message: str) -> str:  # pragma: no cov
+        return f"({cut_id(self.run_id)}) {message}"
