@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+import inspect
 import shutil
 from pathlib import Path
 from textwrap import dedent
@@ -48,3 +51,22 @@ def test_make_registry_raise(hook_function):
     # NOTE: Raise error duplicate tag name, polars-dir, that set in this module.
     with pytest.raises(ValueError):
         make_registry("new_tasks")
+
+
+@pytest.mark.skip("Skip because it use for local test only.")
+def test_inspec_func():
+
+    def demo_func(
+        args_1: str, args_2: Path, *args, kwargs_1: str | None = None, **kwargs
+    ):  # pragma: no cov
+        pass
+
+    ips = inspect.signature(demo_func)
+    for k, v in ips.parameters.items():
+        print(k)
+        print(v)
+        print(v.name)
+        print(v.annotation, "type:", type(v.annotation))
+        print(v.default)
+        print(v.kind)
+        print("-----")

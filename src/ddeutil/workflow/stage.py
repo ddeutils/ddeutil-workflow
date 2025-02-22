@@ -45,7 +45,7 @@ from .__types import DictData, DictStr, TupleStr
 from .conf import config, get_logger
 from .exceptions import StageException
 from .hook import TagFunc, extract_hook
-from .result import Result
+from .result import Result, Status
 from .templates import not_in_template, param2template
 from .utils import (
     cut_id,
@@ -121,19 +121,26 @@ class BaseStage(BaseModel, ABC):
         return self
 
     @abstractmethod
-    def execute(self, params: DictData, *, run_id: str | None = None) -> Result:
+    def execute(
+        self, params: DictData, *, result: Result | None = None
+    ) -> Result:
         """Execute abstraction method that action something by sub-model class.
         This is important method that make this class is able to be the stage.
 
         :param params: A parameter data that want to use in this execution.
-        :param run_id: A running stage ID for this execution.
+        :param result: (Result) A result object for keeping context and status
+            data.
 
         :rtype: Result
         """
         raise NotImplementedError("Stage should implement ``execute`` method.")
 
     def handler_execute(
-        self, params: DictData, *, run_id: str | None = None
+        self,
+        params: DictData,
+        *,
+        run_id: str | None = None,
+        result: Result | None = None,
     ) -> Result:
         """Handler result from the stage execution.
 
@@ -158,23 +165,25 @@ class BaseStage(BaseModel, ABC):
         from current stage ID before release the final result.
 
         :param params: A parameter data that want to use in this execution.
-        :param run_id: A running stage ID for this execution.
+        :param run_id: (str) A running stage ID for this execution.
+        :param result: (Result) A result object for keeping context and status
+            data.
 
         :rtype: Result
         """
-        if not run_id:
-            run_id: str = gen_id(self.name + (self.id or ""), unique=True)
+        if result is None:
+            result: Result = Result(
+                run_id=(
+                    run_id or gen_id(self.name + (self.id or ""), unique=True)
+                ),
+            )
 
-        rs_raise: Result = Result(status=1, run_id=run_id)
         try:
             # NOTE: Start calling origin function with a passing args.
-            return self.execute(params, run_id=run_id)
+            return self.execute(params, result=result)
         except Exception as err:
             # NOTE: Start catching error from the stage execution.
-            logger.error(
-                f"({cut_id(run_id)}) [STAGE]: {err.__class__.__name__}: "
-                f"{err}"
-            )
+            result.trace.error(f"[STAGE]: {err.__class__.__name__}: {err}")
             if config.stage_raise_error:
                 # NOTE: If error that raise from stage execution course by
                 #   itself, it will return that error with previous
@@ -190,8 +199,8 @@ class BaseStage(BaseModel, ABC):
 
             # NOTE: Catching exception error object to result with
             #   error_message and error keys.
-            return rs_raise.catch(
-                status=1,
+            return result.catch(
+                status=Status.FAILED,
                 context={
                     "error": err,
                     "error_message": f"{err.__class__.__name__}: {err}",
@@ -295,7 +304,9 @@ class EmptyStage(BaseStage):
         ge=0,
     )
 
-    def execute(self, params: DictData, *, run_id: str | None = None) -> Result:
+    def execute(
+        self, params: DictData, *, result: Result | None = None
+    ) -> Result:
         """Execution method for the Empty stage that do only logging out to
         stdout. This method does not use the `handler_result` decorator because
         it does not get any error from logging function.
@@ -305,22 +316,21 @@ class EmptyStage(BaseStage):
 
         :param params: A context data that want to add output result. But this
             stage does not pass any output.
-        :param run_id: A running stage ID for this execution.
+        :param result: (Result) A result object for keeping context and status
+            data.
 
         :rtype: Result
         """
-        logger.info(
-            f"({cut_id(run_id)}) [STAGE]: Empty-Execute: {self.name!r}: "
+        result.trace.info(
+            f"[STAGE]: Empty-Execute: {self.name!r}: "
             f"( {param2template(self.echo, params=params) or '...'} )"
         )
         if self.sleep > 0:
             if self.sleep > 30:
-                logger.info(
-                    f"({cut_id(run_id)}) [STAGE]: ... sleep "
-                    f"({self.sleep} seconds)"
-                )
+                result.trace.info(f"[STAGE]: ... sleep ({self.sleep} seconds)")
             time.sleep(self.sleep)
-        return Result(status=0, context={}, run_id=run_id)
+
+        return result.catch(status=Status.SUCCESS)
 
 
 class BashStage(BaseStage):
@@ -334,7 +344,7 @@ class BashStage(BaseStage):
 
     Data Validate:
         >>> stage = {
-        ...     "name": "Shell stage execution",
+        ...     "name": "The Shell stage execution",
         ...     "bash": 'echo "Hello $FOO"',
         ...     "env": {
         ...         "FOO": "BAR",
@@ -391,20 +401,25 @@ class BashStage(BaseStage):
         # Note: Remove .sh file that use to run bash.
         Path(f"./{f_name}").unlink()
 
-    def execute(self, params: DictData, *, run_id: str | None = None) -> Result:
+    def execute(
+        self, params: DictData, *, result: Result | None = None
+    ) -> Result:
         """Execute the Bash statement with the Python build-in ``subprocess``
         package.
 
         :param params: A parameter data that want to use in this execution.
-        :param run_id: A running stage ID for this execution.
+        :param result: (Result) A result object for keeping context and status
+            data.
 
         :rtype: Result
         """
         bash: str = param2template(dedent(self.bash), params)
 
-        logger.info(f"({cut_id(run_id)}) [STAGE]: Shell-Execute: {self.name}")
+        result.trace.info(f"[STAGE]: Shell-Execute: {self.name}")
         with self.create_sh_file(
-            bash=bash, env=param2template(self.env, params), run_id=run_id
+            bash=bash,
+            env=param2template(self.env, params),
+            run_id=result.run_id,
         ) as sh:
             rs: CompletedProcess = subprocess.run(
                 sh, shell=False, capture_output=True, text=True
@@ -420,14 +435,13 @@ class BashStage(BaseStage):
                 f"Subprocess: {err}\nRunning Statement:\n---\n"
                 f"```bash\n{bash}\n```"
             )
-        return Result(
-            status=0,
+        return result.catch(
+            status=Status.SUCCESS,
             context={
                 "return_code": rs.returncode,
                 "stdout": rs.stdout.rstrip("\n") or None,
                 "stderr": rs.stderr.rstrip("\n") or None,
             },
-            run_id=run_id,
         )
 
 
@@ -492,12 +506,15 @@ class PyStage(BaseStage):
         to.update({k: gb[k] for k in to if k in gb})
         return to
 
-    def execute(self, params: DictData, *, run_id: str | None = None) -> Result:
+    def execute(
+        self, params: DictData, *, result: Result | None = None
+    ) -> Result:
         """Execute the Python statement that pass all globals and input params
         to globals argument on ``exec`` build-in function.
 
         :param params: A parameter that want to pass before run any statement.
-        :param run_id: A running stage ID for this execution.
+        :param result: (Result) A result object for keeping context and status
+            data.
 
         :rtype: Result
         """
@@ -511,16 +528,14 @@ class PyStage(BaseStage):
         lc: DictData = {}
 
         # NOTE: Start exec the run statement.
-        logger.info(f"({cut_id(run_id)}) [STAGE]: Py-Execute: {self.name}")
+        result.trace.info(f"[STAGE]: Py-Execute: {self.name}")
 
         # WARNING: The exec build-in function is very dangerous. So, it
         #   should use the re module to validate exec-string before running.
         exec(run, _globals, lc)
 
-        return Result(
-            status=0,
-            context={"locals": lc, "globals": _globals},
-            run_id=run_id,
+        return result.catch(
+            status=Status.SUCCESS, context={"locals": lc, "globals": _globals}
         )
 
 
@@ -552,7 +567,9 @@ class HookStage(BaseStage):
         alias="with",
     )
 
-    def execute(self, params: DictData, *, run_id: str | None = None) -> Result:
+    def execute(
+        self, params: DictData, *, result: Result | None = None
+    ) -> Result:
         """Execute the Hook function that already in the hook registry.
 
         :raise ValueError: When the necessary arguments of hook function do not
@@ -562,7 +579,8 @@ class HookStage(BaseStage):
 
         :param params: A parameter that want to pass before run any statement.
         :type params: DictData
-        :param run_id: A running stage ID for this execution.
+        :param result: (Result) A result object for keeping context and status
+            data.
         :type: str | None
 
         :rtype: Result
@@ -571,7 +589,7 @@ class HookStage(BaseStage):
 
         # VALIDATE: check input task caller parameters that exists before
         #   calling.
-        args: DictData = param2template(self.args, params)
+        args: DictData = {"result": result} | param2template(self.args, params)
         ips = inspect.signature(t_func)
         if any(
             (k.removeprefix("_") not in args and k not in args)
@@ -587,10 +605,10 @@ class HookStage(BaseStage):
             if k.removeprefix("_") in args:
                 args[k] = args.pop(k.removeprefix("_"))
 
-        logger.info(
-            f"({cut_id(run_id)}) [STAGE]: Hook-Execute: "
-            f"{t_func.name}@{t_func.tag}"
-        )
+        if "result" not in ips.parameters:
+            args.pop("result")
+
+        result.trace.info(f"[STAGE]: Hook-Execute: {t_func.name}@{t_func.tag}")
         rs: DictData = t_func(**param2template(args, params))
 
         # VALIDATE:
@@ -600,7 +618,7 @@ class HookStage(BaseStage):
                 f"Return type: '{t_func.name}@{t_func.tag}' does not serialize "
                 f"to result model, you change return type to `dict`."
             )
-        return Result(status=0, context=rs, run_id=run_id)
+        return result.catch(status=Status.SUCCESS, context=rs)
 
 
 class TriggerStage(BaseStage):
@@ -626,12 +644,15 @@ class TriggerStage(BaseStage):
         description="A parameter that want to pass to workflow execution.",
     )
 
-    def execute(self, params: DictData, *, run_id: str | None = None) -> Result:
+    def execute(
+        self, params: DictData, *, result: Result | None = None
+    ) -> Result:
         """Trigger another workflow execution. It will wait the trigger
         workflow running complete before catching its result.
 
         :param params: A parameter data that want to use in this execution.
-        :param run_id: A running stage ID for this execution.
+        :param result: (Result) A result object for keeping context and status
+            data.
 
         :rtype: Result
         """
@@ -644,13 +665,11 @@ class TriggerStage(BaseStage):
         # NOTE: Set running workflow ID from running stage ID to external
         #   params on Loader object.
         wf: Workflow = Workflow.from_loader(name=_trigger)
-        logger.info(
-            f"({cut_id(run_id)}) [STAGE]: Trigger-Execute: {_trigger!r}"
-        )
+        result.trace.info(f"[STAGE]: Trigger-Execute: {_trigger!r}")
         return wf.execute(
             params=param2template(self.params, params),
-            run_id=run_id,
-        ).set_run_id(run_id)
+            result=result,
+        )
 
 
 # NOTE:

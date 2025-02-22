@@ -43,7 +43,6 @@ from .stage import Stage
 from .templates import has_template
 from .utils import (
     cross_product,
-    cut_id,
     dash2underscore,
     filter_func,
     gen_id,
@@ -222,6 +221,8 @@ class RunsOn(str, Enum):
 
     local: str = "local"
     docker: str = "docker"
+    self_hosted: str = "self_hosted"
+    k8s: str = "k8s"
 
 
 class Job(BaseModel):
@@ -412,6 +413,7 @@ class Job(BaseModel):
         params: DictData,
         *,
         run_id: str | None = None,
+        result: Result | None = None,
         event: Event | None = None,
     ) -> Result:
         """Job Strategy execution with passing dynamic parameters from the
@@ -431,13 +433,18 @@ class Job(BaseModel):
             This value will pass to the `matrix` key for templating.
         :param params: A dynamic parameters that will deepcopy to the context.
         :param run_id: A job running ID for this strategy execution.
+        :param result: (Result) A result object for keeping context and status
+            data.
         :param event: An event manager that pass to the PoolThreadExecutor.
 
         :rtype: Result
         """
-        run_id: str = run_id or gen_id(self.id or "", unique=True)
+        if result is None:
+            result: Result = Result(
+                run_id=(run_id or gen_id(self.id or "", unique=True))
+            )
+
         strategy_id: str = gen_id(strategy)
-        rs: Result = Result(run_id=run_id)
 
         # PARAGRAPH:
         #
@@ -458,18 +465,14 @@ class Job(BaseModel):
         for stage in self.stages:
 
             if stage.is_skipped(params=context):
-                logger.info(
-                    f"({cut_id(run_id)}) [JOB]: Skip stage: {stage.iden!r}"
-                )
+                result.trace.info(f"[JOB]: Skip stage: {stage.iden!r}")
                 continue
 
-            logger.info(
-                f"({cut_id(run_id)}) [JOB]: Execute stage: {stage.iden!r}"
-            )
+            result.trace.info(f"[JOB]: Execute stage: {stage.iden!r}")
 
             # NOTE: Logging a matrix that pass on this stage execution.
             if strategy:
-                logger.info(f"({cut_id(run_id)}) [JOB]: ... Matrix: {strategy}")
+                result.trace.info(f"[JOB]: ... Matrix: {strategy}")
 
             # NOTE: Force stop this execution if event was set from main
             #   execution.
@@ -478,7 +481,7 @@ class Job(BaseModel):
                     "Job strategy was canceled from event that had set before "
                     "strategy execution."
                 )
-                return rs.catch(
+                return result.catch(
                     status=1,
                     context={
                         strategy_id: {
@@ -516,20 +519,18 @@ class Job(BaseModel):
             try:
                 stage.set_outputs(
                     stage.handler_execute(
-                        params=context, run_id=run_id
+                        params=context, run_id=result.run_id
                     ).context,
                     to=context,
                 )
             except (StageException, UtilException) as err:
-                logger.error(
-                    f"({cut_id(run_id)}) [JOB]: {err.__class__.__name__}: {err}"
-                )
+                result.trace.error(f"[JOB]: {err.__class__.__name__}: {err}")
                 if config.job_raise_error:
                     raise JobException(
                         f"Get stage execution error: {err.__class__.__name__}: "
                         f"{err}"
                     ) from None
-                return rs.catch(
+                return result.catch(
                     status=1,
                     context={
                         strategy_id: {
@@ -544,8 +545,8 @@ class Job(BaseModel):
             # NOTE: Remove the current stage object for saving memory.
             del stage
 
-        return rs.catch(
-            status=0,
+        return result.catch(
+            status=Status.SUCCESS,
             context={
                 strategy_id: {
                     "matrix": strategy,
@@ -579,21 +580,18 @@ class Job(BaseModel):
             run_id: str = run_id or gen_id(self.id or "", unique=True)
             result: Result = Result(run_id=run_id)
 
-        context: DictData = {}
-
         # NOTE: Normal Job execution without parallel strategy matrix. It uses
         #   for-loop to control strategy execution sequentially.
         if (not self.strategy.is_set()) or self.strategy.max_parallel == 1:
 
             for strategy in self.strategy.make():
-                rs: Result = self.execute_strategy(
+                result: Result = self.execute_strategy(
                     strategy=strategy,
                     params=params,
-                    run_id=run_id,
+                    result=result,
                 )
-                context.update(rs.context)
 
-            return result.catch(status=Status.SUCCESS, context=context)
+            return result.catch(status=Status.SUCCESS)
 
         # NOTE: Create event for cancel executor by trigger stop running event.
         event: Event = Event()
@@ -610,23 +608,23 @@ class Job(BaseModel):
                     self.execute_strategy,
                     strategy=strategy,
                     params=params,
-                    run_id=run_id,
+                    result=result,
                     event=event,
                 )
                 for strategy in self.strategy.make()
             ]
 
             return (
-                self.__catch_fail_fast(event, futures=futures, run_id=run_id)
+                self.__catch_fail_fast(event, futures=futures, result=result)
                 if self.strategy.fail_fast
-                else self.__catch_all_completed(futures=futures, run_id=run_id)
+                else self.__catch_all_completed(futures=futures, result=result)
             )
 
     @staticmethod
     def __catch_fail_fast(
         event: Event,
         futures: list[Future],
-        run_id: str,
+        result: Result,
         *,
         timeout: int = 1800,
     ) -> Result:
@@ -637,14 +635,14 @@ class Job(BaseModel):
         :param event: An event manager instance that able to set stopper on the
             observing multithreading.
         :param futures: A list of futures.
-        :param run_id: A job running ID from execution.
+        :param result: (Result) A result object for keeping context and status
+            data.
         :param timeout: A timeout to waiting all futures complete.
 
         :rtype: Result
         """
-        rs_final: Result = Result(run_id=run_id)
         context: DictData = {}
-        status: int = 0
+        status: Status = Status.SUCCESS
 
         # NOTE: Get results from a collection of tasks with a timeout that has
         #   the first exception.
@@ -654,7 +652,7 @@ class Job(BaseModel):
         nd: str = (
             f", the strategies do not run is {not_done}" if not_done else ""
         )
-        logger.debug(f"({cut_id(run_id)}) [JOB]: Strategy is set Fail Fast{nd}")
+        result.trace.debug(f"[JOB]: Strategy is set Fail Fast{nd}")
 
         # NOTE:
         #       Stop all running tasks with setting the event manager and cancel
@@ -670,10 +668,9 @@ class Job(BaseModel):
 
             # NOTE: Handle the first exception from feature
             if err := future.exception():
-                status: int = 1
-                logger.error(
-                    f"({cut_id(run_id)}) [JOB]: Fail-fast catching:\n\t"
-                    f"{future.exception()}"
+                status: Status = Status.FAILED
+                result.trace.error(
+                    f"[JOB]: Fail-fast catching:\n\t{future.exception()}"
                 )
                 context.update(
                     {
@@ -684,36 +681,36 @@ class Job(BaseModel):
                 continue
 
             # NOTE: Update the result context to main job context.
-            context.update(future.result().context)
+            future.result()
 
-        return rs_final.catch(status=status, context=context)
+        return result.catch(status=status, context=context)
 
     @staticmethod
     def __catch_all_completed(
         futures: list[Future],
-        run_id: str,
+        result: Result,
         *,
         timeout: int = 1800,
     ) -> Result:
         """Job parallel pool futures catching with all-completed mode.
 
         :param futures: A list of futures.
-        :param run_id: A job running ID from execution.
+        :param result: (Result) A result object for keeping context and status
+            data.
         :param timeout: A timeout to waiting all futures complete.
 
         :rtype: Result
         """
-        rs_final: Result = Result(run_id=run_id)
         context: DictData = {}
-        status: int = 0
+        status: Status = Status.SUCCESS
 
         for future in as_completed(futures, timeout=timeout):
             try:
-                context.update(future.result().context)
+                future.result()
             except JobException as err:
-                status = 1
-                logger.error(
-                    f"({cut_id(run_id)}) [JOB]: All-completed catching:\n\t"
+                status = Status.FAILED
+                result.trace.error(
+                    f"[JOB]: All-completed catching:\n\t"
                     f"{err.__class__.__name__}:\n\t{err}"
                 )
                 context.update(
@@ -723,4 +720,4 @@ class Job(BaseModel):
                     },
                 )
 
-        return rs_final.catch(status=status, context=context)
+        return result.catch(status=status, context=context)

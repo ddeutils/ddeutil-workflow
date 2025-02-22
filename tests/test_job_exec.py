@@ -92,17 +92,26 @@ def test_job_exec_py_fail_fast_raise():
     job: Job = workflow.job("job-fail-fast-raise")
     rs: Result = job.execute({})
     assert rs.context == {
-        "error": rs.context["error"],
-        "error_message": (
-            "JobException: Get stage execution error: StageException: "
-            "PyStage: \n\tValueError: Testing raise error inside PyStage!!!"
-        ),
         "9873503202": {
             "matrix": {"sleep": "0.1"},
             "stages": {
                 "7972360640": {"outputs": {}},
                 "raise-error": {"outputs": {"result": "success"}},
             },
+        },
+        "error": rs.context["error"],
+        "error_message": (
+            "JobException: Get stage execution error: StageException: "
+            "PyStage: \n\tValueError: Testing raise error inside PyStage!!!"
+        ),
+        "9112472804": {
+            "matrix": {"sleep": "4"},
+            "stages": {"7972360640": {"outputs": {}}},
+            "error": rs.context["9112472804"]["error"],
+            "error_message": (
+                "Job strategy was canceled from event that had set before "
+                "strategy execution."
+            ),
         },
     }
 
@@ -127,6 +136,59 @@ def test_job_exec_py_complete():
         "9873503202": {
             "matrix": {"sleep": "0.1"},
             "stages": {"success": {"outputs": {"result": "success"}}},
+        },
+    }
+
+
+@mock.patch.object(Config, "job_raise_error", True)
+@mock.patch.object(Config, "stage_raise_error", True)
+def test_job_exec_py_complete_not_parallel():
+    workflow: Workflow = Workflow.from_loader(
+        name="wf-run-python-raise-for-job"
+    )
+    job: Job = workflow.job("job-complete-not-parallel")
+    rs: Result = job.execute({})
+    assert rs.context == {
+        "2150810470": {
+            "matrix": {"sleep": "1"},
+            "stages": {"success": {"outputs": {"result": "fast-success"}}},
+        },
+        "4855178605": {
+            "matrix": {"sleep": "5"},
+            "stages": {"success": {"outputs": {"result": "fast-success"}}},
+        },
+        "9873503202": {
+            "matrix": {"sleep": "0.1"},
+            "stages": {"success": {"outputs": {"result": "success"}}},
+        },
+    }
+
+    params = {}
+    job.set_outputs(rs.context, to=params)
+    assert params == {
+        "jobs": {
+            "job-complete-not-parallel": {
+                "strategies": {
+                    "9873503202": {
+                        "matrix": {"sleep": "0.1"},
+                        "stages": {
+                            "success": {"outputs": {"result": "success"}},
+                        },
+                    },
+                    "4855178605": {
+                        "matrix": {"sleep": "5"},
+                        "stages": {
+                            "success": {"outputs": {"result": "fast-success"}},
+                        },
+                    },
+                    "2150810470": {
+                        "matrix": {"sleep": "1"},
+                        "stages": {
+                            "success": {"outputs": {"result": "fast-success"}},
+                        },
+                    },
+                },
+            },
         },
     }
 

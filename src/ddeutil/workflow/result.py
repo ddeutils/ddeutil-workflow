@@ -100,7 +100,11 @@ class Result:
         self.parent_run_id: str = running_id
         return self
 
-    def catch(self, status: int | Status, context: DictData) -> Self:
+    def catch(
+        self,
+        status: int | Status,
+        context: DictData | None = None,
+    ) -> Self:
         """Catch the status and context to this Result object. This method will
         use between a child execution return a result, and it wants to pass
         status and context to this object.
@@ -111,7 +115,7 @@ class Result:
         self.__dict__["status"] = (
             Status(status) if isinstance(status, int) else status
         )
-        self.__dict__["context"].update(context)
+        self.__dict__["context"].update(context or {})
         return self
 
     def receive(self, result: Result) -> Self:

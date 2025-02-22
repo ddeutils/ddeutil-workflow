@@ -179,6 +179,19 @@ wf-run-python-raise-for-job:
             result: str = (
               'fast-success' if ${{ matrix.sleep }} != 0.1 else 'success'
             )
+    job-complete-not-parallel:
+      strategy:
+        fail-fast: False
+        max_parallel: 1
+        matrix:
+          sleep: [ '0.1', '5', '1' ]
+      stages:
+        - name: Raise Error Inside
+          id: success
+          run: |
+            result: str = (
+              'fast-success' if ${{ matrix.sleep }} != 0.1 else 'success'
+            )
     job-complete-raise:
       strategy:
         fail-fast: False
