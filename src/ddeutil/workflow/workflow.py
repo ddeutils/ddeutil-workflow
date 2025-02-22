@@ -929,7 +929,7 @@ class Workflow(BaseModel):
         # NOTE: I use this condition because this method allow passing empty
         #   params and I do not want to create new dict object.
         ts: float = time.monotonic()
-        rs: Result = Result(run_id=run_id)
+        result: Result = Result(run_id=run_id)
 
         # NOTE: It should not do anything if it does not have job.
         if not self.jobs:
@@ -937,7 +937,7 @@ class Workflow(BaseModel):
                 f"({cut_id(run_id)}) [WORKFLOW]: This workflow: {self.name!r} "
                 f"does not have any jobs"
             )
-            return rs.catch(status=0, context=params)
+            return result.catch(status=0, context=params)
 
         # NOTE: Create a job queue that keep the job that want to run after
         #   its dependency condition.
@@ -958,7 +958,7 @@ class Workflow(BaseModel):
         try:
             if config.max_job_parallel == 1:
                 self.__exec_non_threading(
-                    run_id=run_id,
+                    result=result,
                     context=context,
                     ts=ts,
                     job_queue=jq,
@@ -966,7 +966,7 @@ class Workflow(BaseModel):
                 )
             else:
                 self.__exec_threading(
-                    run_id=run_id,
+                    result=result,
                     context=context,
                     ts=ts,
                     job_queue=jq,
@@ -980,11 +980,11 @@ class Workflow(BaseModel):
                     "error_message": f"{err.__class__.__name__}: {err}",
                 },
             )
-        return rs.catch(status=status, context=context)
+        return result.catch(status=status, context=context)
 
     def __exec_threading(
         self,
-        run_id: str,
+        result: Result,
         context: DictData,
         ts: float,
         job_queue: Queue,
@@ -997,6 +997,7 @@ class Workflow(BaseModel):
             If a job need dependency, it will check dependency job ID from
         context data before allow it run.
 
+        :param result: A result model.
         :param context: A context workflow data that want to downstream passing.
         :param ts: A start timestamp that use for checking execute time should
             time out.
@@ -1009,7 +1010,8 @@ class Workflow(BaseModel):
         not_timeout_flag: bool = True
         timeout: int = timeout or config.max_job_exec_timeout
         logger.debug(
-            f"({cut_id(run_id)}) [WORKFLOW]: Run {self.name!r} with threading."
+            f"({cut_id(result.run_id)}) [WORKFLOW]: Run {self.name!r} "
+            f"with threading."
         )
 
         # IMPORTANT: The job execution can run parallel and waiting by
@@ -1047,6 +1049,7 @@ class Workflow(BaseModel):
                         self.execute_job,
                         job_id,
                         params=context,
+                        result=result,
                     ),
                 )
 
@@ -1061,7 +1064,9 @@ class Workflow(BaseModel):
 
                 for future in as_completed(futures, timeout=thread_timeout):
                     if err := future.exception():
-                        logger.error(f"({cut_id(run_id)}) [WORKFLOW]: {err}")
+                        logger.error(
+                            f"({cut_id(result.run_id)}) [WORKFLOW]: {err}"
+                        )
                         raise WorkflowException(str(err))
 
                     # NOTE: This getting result does not do anything.
@@ -1074,14 +1079,14 @@ class Workflow(BaseModel):
 
         # NOTE: Raise timeout error.
         logger.warning(
-            f"({cut_id(run_id)}) [WORKFLOW]: Execution: {self.name!r} "
+            f"({cut_id(result.run_id)}) [WORKFLOW]: Execution: {self.name!r} "
             f"was timeout."
         )
         raise WorkflowException(f"Execution: {self.name!r} was timeout.")
 
     def __exec_non_threading(
         self,
-        run_id: str,
+        result: Result,
         context: DictData,
         ts: float,
         job_queue: Queue,
@@ -1094,6 +1099,7 @@ class Workflow(BaseModel):
             If a job need dependency, it will check dependency job ID from
         context data before allow it run.
 
+        :param result: A result model.
         :param context: A context workflow data that want to downstream passing.
         :param ts: A start timestamp that use for checking execute time should
             time out.
@@ -1104,7 +1110,7 @@ class Workflow(BaseModel):
         not_timeout_flag: bool = True
         timeout: int = timeout or config.max_job_exec_timeout
         logger.debug(
-            f"({cut_id(run_id)}) [WORKFLOW]: Run {self.name!r} with "
+            f"({cut_id(result.run_id)}) [WORKFLOW]: Run {self.name!r} with "
             f"non-threading."
         )
 
@@ -1129,7 +1135,7 @@ class Workflow(BaseModel):
             #       'params': <input-params>,
             #       'jobs': {},
             #   }
-            self.execute_job(job_id=job_id, params=context, run_id=run_id)
+            self.execute_job(job_id=job_id, params=context, result=result)
 
             # NOTE: Mark this job queue done.
             job_queue.task_done()
@@ -1144,7 +1150,7 @@ class Workflow(BaseModel):
 
         # NOTE: Raise timeout error.
         logger.warning(
-            f"({cut_id(run_id)}) [WORKFLOW]: Execution: {self.name!r} "
+            f"({cut_id(result.run_id)}) [WORKFLOW]: Execution: {self.name!r} "
             f"was timeout."
         )
         raise WorkflowException(f"Execution: {self.name!r} was timeout.")
