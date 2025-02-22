@@ -9,6 +9,7 @@ import logging
 from typing import Any
 
 from ddeutil.workflow.hook import tag
+from ddeutil.workflow.result import Result
 
 logger = logging.getLogger("ddeutil.workflow")
 
@@ -17,16 +18,17 @@ logger = logging.getLogger("ddeutil.workflow")
 def dummy_task_polars_dir(
     source: str,
     sink: str,
+    result: Result,
     conversion: dict[str, Any] | None = None,
 ) -> dict[str, int]:
-    logger.info("[HOOK]: el-csv-to-parquet@polars-dir")
-    logger.debug("... Start EL for CSV to Parquet with Polars Engine")
-    logger.debug(f"... Reading data from {source}")
+    result.trace.info("[HOOK]: el-csv-to-parquet@polars-dir")
+    result.trace.debug("... Start EL for CSV to Parquet with Polars Engine")
+    result.trace.debug(f"... Reading data from {source}")
 
     conversion: dict[str, Any] = conversion or {}
     if conversion:
-        logger.debug("... Start Schema Conversion ...")
-    logger.debug(f"... Writing data to {sink}")
+        result.trace.debug("... Start Schema Conversion ...")
+    result.trace.debug(f"... Writing data to {sink}")
     return {"records": 1}
 
 
