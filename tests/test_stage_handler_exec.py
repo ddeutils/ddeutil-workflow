@@ -23,6 +23,18 @@ def test_stage_exec_bash():
         "stderr": None,
     } == rs.context
 
+    make_rs: Result = Result()
+    rs: Result = stage.handler_execute({}, result=make_rs)
+    assert {
+        "return_code": 0,
+        "stdout": "Hello World\nVariable Foo",
+        "stderr": None,
+    } == make_rs.context
+
+    # NOTE: Make sure that the result that pass to the handler execution method
+    #   is the same object of its return.
+    assert make_rs is rs
+
 
 def test_stage_exec_bash_env():
     workflow: Workflow = Workflow.from_loader(name="wf-run-common")
@@ -110,12 +122,12 @@ def test_stage_exec_hook(test_path):
             stage.handler_execute({})
 
 
+@mock.patch.object(Config, "stage_raise_error", True)
 def test_stage_exec_py_raise():
-    with mock.patch.object(Config, "stage_raise_error", True):
-        workflow: Workflow = Workflow.from_loader(name="wf-run-common")
-        stage: Stage = workflow.job("raise-run").stage(stage_id="raise-error")
-        with pytest.raises(StageException):
-            stage.handler_execute(params={"x": "Foo"})
+    workflow: Workflow = Workflow.from_loader(name="wf-run-common")
+    stage: Stage = workflow.job("raise-run").stage(stage_id="raise-error")
+    with pytest.raises(StageException):
+        stage.handler_execute(params={"x": "Foo"})
 
 
 def test_stage_exec_py_not_raise():
@@ -133,20 +145,26 @@ def test_stage_exec_py_not_raise():
         #       'error': ValueError("Testing ... PyStage!!!"),
         #       'error_message': "ValueError: Testing ... PyStage!!!",
         #   }
-        assert isinstance(rs.context["error"], ValueError)
-        assert rs.context["error_message"] == (
-            "ValueError: Testing raise error inside PyStage!!!"
-        )
+        assert isinstance(rs.context["errors"]["class"], ValueError)
+        assert rs.context == {
+            "errors": {
+                "class": rs.context["errors"]["class"],
+                "name": "ValueError",
+                "message": "ValueError: Testing raise error inside PyStage!!!",
+            }
+        }
 
         rs_out = stage.set_outputs(rs.context, {})
         assert rs_out == {
             "stages": {
                 "raise-error": {
-                    "outputs": {
-                        "error": getdot(
-                            "stages.raise-error.outputs.error", rs_out
+                    "outputs": {},
+                    "errors": {
+                        "class": getdot(
+                            "stages.raise-error.errors.class", rs_out
                         ),
-                        "error_message": (
+                        "name": "ValueError",
+                        "message": (
                             "ValueError: Testing raise error inside PyStage!!!"
                         ),
                     },

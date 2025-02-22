@@ -142,22 +142,23 @@ class BaseStage(BaseModel, ABC):
         run_id: str | None = None,
         result: Result | None = None,
     ) -> Result:
-        """Handler result from the stage execution.
+        """Handler execution result from the stage `execute` method.
 
             This stage exception handler still use ok-error concept, but it
         allows you force catching an output result with error message by
         specific environment variable,`WORKFLOW_CORE_STAGE_RAISE_ERROR`.
 
             Execution   --> Ok      --> Result
-                                        |-status: 0
+                                        |-status: Status.SUCCESS
                                         |-context:
                                             |-outputs: ...
 
                         --> Error   --> Result (if env var was set)
-                                        |-status: 1
-                                        |-context:
-                                            |-error: ...
-                                            |-error_message: ...
+                                        |-status: Status.FAILED
+                                        |-errors:
+                                            |-class: ...
+                                            |-name: ...
+                                            |-message: ...
 
                         --> Error   --> Raise StageException(...)
 
@@ -171,7 +172,7 @@ class BaseStage(BaseModel, ABC):
 
         :rtype: Result
         """
-        if result is None:  # pragma: no cov
+        if result is None:
             result: Result = Result(
                 run_id=(
                     run_id or gen_id(self.name + (self.id or ""), unique=True)
@@ -179,19 +180,18 @@ class BaseStage(BaseModel, ABC):
             )
 
         try:
-            # NOTE: Start calling origin function with a passing args.
             return self.execute(params, result=result)
         except Exception as err:
-            # NOTE: Start catching error from the stage execution.
             result.trace.error(f"[STAGE]: {err.__class__.__name__}: {err}")
+
             if config.stage_raise_error:
                 # NOTE: If error that raise from stage execution course by
                 #   itself, it will return that error with previous
                 #   dependency.
+
                 if isinstance(err, StageException):
-                    raise StageException(
-                        f"{self.__class__.__name__}: \n\t{err}"
-                    ) from err
+                    raise
+
                 raise StageException(
                     f"{self.__class__.__name__}: \n\t"
                     f"{err.__class__.__name__}: {err}"
@@ -202,8 +202,11 @@ class BaseStage(BaseModel, ABC):
             return result.catch(
                 status=Status.FAILED,
                 context={
-                    "error": err,
-                    "error_message": f"{err.__class__.__name__}: {err}",
+                    "errors": {
+                        "class": err,
+                        "name": err.__class__.__name__,
+                        "message": f"{err.__class__.__name__}: {err}",
+                    },
                 },
             )
 
@@ -247,8 +250,12 @@ class BaseStage(BaseModel, ABC):
             else gen_id(param2template(self.name, params=to))
         )
 
+        errors: DictData = (
+            {"errors": output.pop("errors", {})} if "errors" in output else {}
+        )
+
         # NOTE: Set the output to that stage generated ID with ``outputs`` key.
-        to["stages"][_id] = {"outputs": output}
+        to["stages"][_id] = {"outputs": output, **errors}
         return to
 
     def is_skipped(self, params: DictData | None = None) -> bool:
