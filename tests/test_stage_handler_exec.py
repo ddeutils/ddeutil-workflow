@@ -130,47 +130,45 @@ def test_stage_exec_py_raise():
         stage.handler_execute(params={"x": "Foo"})
 
 
+@mock.patch.object(Config, "stage_raise_error", False)
 def test_stage_exec_py_not_raise():
-    with mock.patch.object(Config, "stage_raise_error", False):
-        workflow: Workflow = Workflow.from_loader(name="wf-run-common")
-        stage: Stage = workflow.job("raise-run").stage(stage_id="raise-error")
+    workflow: Workflow = Workflow.from_loader(name="wf-run-common")
+    stage: Stage = workflow.job("raise-run").stage(stage_id="raise-error")
 
-        rs = stage.handler_execute(params={"x": "Foo"})
+    rs = stage.handler_execute(params={"x": "Foo"})
 
-        assert rs.status == 1
+    assert rs.status == 1
 
-        # NOTE:
-        #   Context that return from error will be:
-        #   {
-        #       'error': ValueError("Testing ... PyStage!!!"),
-        #       'error_message': "ValueError: Testing ... PyStage!!!",
-        #   }
-        assert isinstance(rs.context["errors"]["class"], ValueError)
-        assert rs.context == {
-            "errors": {
-                "class": rs.context["errors"]["class"],
-                "name": "ValueError",
-                "message": "ValueError: Testing raise error inside PyStage!!!",
-            }
+    # NOTE:
+    #   Context that return from error will be:
+    #   {
+    #       'error': ValueError("Testing ... PyStage!!!"),
+    #       'error_message': "ValueError: Testing ... PyStage!!!",
+    #   }
+    assert isinstance(rs.context["errors"]["class"], ValueError)
+    assert rs.context == {
+        "errors": {
+            "class": rs.context["errors"]["class"],
+            "name": "ValueError",
+            "message": "ValueError: Testing raise error inside PyStage!!!",
         }
+    }
 
-        rs_out = stage.set_outputs(rs.context, {})
-        assert rs_out == {
-            "stages": {
-                "raise-error": {
-                    "outputs": {},
-                    "errors": {
-                        "class": getdot(
-                            "stages.raise-error.errors.class", rs_out
-                        ),
-                        "name": "ValueError",
-                        "message": (
-                            "ValueError: Testing raise error inside PyStage!!!"
-                        ),
-                    },
+    rs_out = stage.set_outputs(rs.context, {})
+    assert rs_out == {
+        "stages": {
+            "raise-error": {
+                "outputs": {},
+                "errors": {
+                    "class": getdot("stages.raise-error.errors.class", rs_out),
+                    "name": "ValueError",
+                    "message": (
+                        "ValueError: Testing raise error inside PyStage!!!"
+                    ),
                 },
             },
-        }
+        },
+    }
 
 
 def test_stage_exec_py_with_vars():
@@ -197,12 +195,18 @@ def test_stage_exec_py_with_vars():
 def test_stage_exec_py_func():
     workflow: Workflow = Workflow.from_loader(name="wf-run-python")
     stage: Stage = workflow.job("second-job").stage(stage_id="create-func")
-    rs: Result = stage.handler_execute(params={})
-    rs_out = stage.set_outputs(rs.context, to={})
+    rs = stage.set_outputs(stage.handler_execute(params={}).context, to={})
     assert ("var_inside", "echo") == tuple(
-        rs_out["stages"]["create-func"]["outputs"].keys()
+        rs["stages"]["create-func"]["outputs"].keys()
     )
-    assert isfunction(rs_out["stages"]["create-func"]["outputs"]["echo"])
+    assert isfunction(rs["stages"]["create-func"]["outputs"]["echo"])
+
+
+def test_stage_exec_py_create_object():
+    workflow: Workflow = Workflow.from_loader(name="wf-run-python-filter")
+    stage: Stage = workflow.job("create-job").stage(stage_id="create-stage")
+    rs = stage.set_outputs(stage.handler_execute(params={}).context, to={})
+    assert len(rs["stages"]["create-stage"]["outputs"]) == 1
 
 
 def test_stage_exec_trigger():

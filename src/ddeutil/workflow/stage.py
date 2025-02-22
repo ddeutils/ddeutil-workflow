@@ -100,7 +100,7 @@ class BaseStage(BaseModel, ABC):
         return self.id or self.name
 
     @model_validator(mode="after")
-    def __prepare_running_id__(self) -> Self:
+    def __prepare_running_id(self) -> Self:
         """Prepare stage running ID that use default value of field and this
         method will validate name and id fields should not contain any template
         parameter (exclude matrix template).
@@ -479,12 +479,26 @@ class PyStage(BaseStage):
     )
 
     @staticmethod
-    def pick_keys_from_locals(values: DictData) -> Iterator[str]:
-        from inspect import ismodule
+    def filter_locals(values: DictData) -> Iterator[str]:
+        """Filter a locals input values.
+
+        :param values: (DictData) A locals values that want to filter.
+
+        :rtype: Iterator[str]
+        """
+        from inspect import isclass, ismodule
+
+        print(values)
 
         for value in values:
-            if value == "__annotations__" or ismodule(values[value]):
+
+            if (
+                value == "__annotations__"
+                or ismodule(values[value])
+                or isclass(values[value])
+            ):
                 continue
+
             yield value
 
     def set_outputs(self, output: DictData, to: DictData) -> DictData:
@@ -500,7 +514,7 @@ class PyStage(BaseStage):
         lc: DictData = output.get("locals", {})
         super().set_outputs(
             (
-                {k: lc[k] for k in self.pick_keys_from_locals(lc)}
+                {k: lc[k] for k in self.filter_locals(lc)}
                 | {k: output[k] for k in output if k.startswith("error")}
             ),
             to=to,

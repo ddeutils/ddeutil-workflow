@@ -135,6 +135,25 @@ wf-run-python-raise:
           echo: "Hello World"
 
 
+wf-run-python-filter:
+  type: Workflow
+  jobs:
+    create-job:
+      stages:
+        - name: Create Objects
+          id: create-stage
+          run: |
+            from enum import IntEnum
+
+            class Rank(IntEnum):
+              first: 1
+              second: 2
+
+            def check_rank(num: int) -> Rank:
+              if num in Rank:
+                return Rank(num)
+
+
 wf-run-python-raise-for-job:
   type: Workflow
   jobs:
