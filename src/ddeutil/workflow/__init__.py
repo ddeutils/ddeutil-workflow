@@ -7,7 +7,7 @@ from .__cron import CronJob, CronRunner
 from .__types import Re
 from .audit import (
     Audit,
-    get_log,
+    get_audit,
 )
 from .conf import (
     Config,

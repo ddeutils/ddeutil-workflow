@@ -24,7 +24,7 @@ from .conf import config, get_logger
 logger = get_logger("ddeutil.workflow")
 
 __all__: TupleStr = (
-    "get_log",
+    "get_audit",
     "FileAudit",
     "SQLiteAudit",
     "Audit",
@@ -229,11 +229,13 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
 
 
 class RemoteFileAudit(FileAudit):  # pragma: no cov
+    """Remote File Audit Pydantic Model."""
 
     def save(self, excluded: list[str] | None) -> RemoteFileAudit: ...
 
 
 class RedisAudit(BaseAudit):  # pragma: no cov
+    """Redis Audit Pydantic Model."""
 
     def save(self, excluded: list[str] | None) -> RedisAudit: ...
 
@@ -244,8 +246,8 @@ Audit = Union[
 ]
 
 
-def get_log() -> type[Audit]:  # pragma: no cov
-    """Get logging class that dynamic base on the config log path value.
+def get_audit() -> type[Audit]:  # pragma: no cov
+    """Get an audit class that dynamic base on the config audit path value.
 
     :rtype: type[Audit]
     """

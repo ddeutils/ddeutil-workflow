@@ -51,7 +51,7 @@ except ImportError:  # pragma: no cov
 
 from .__cron import CronRunner
 from .__types import DictData, TupleStr
-from .audit import Audit, get_log
+from .audit import Audit, get_audit
 from .conf import Loader, config, get_logger
 from .cron import On
 from .exceptions import ScheduleException, WorkflowException
@@ -331,7 +331,7 @@ class Schedule(BaseModel):
             ) from None
 
         # NOTE: Get default logging.
-        log: type[Audit] = log or get_log()
+        log: type[Audit] = log or get_audit()
         scheduler: Scheduler = Scheduler()
 
         # NOTE: Create the start and stop datetime.
@@ -597,7 +597,7 @@ def schedule_control(
         ) from None
 
     # NOTE: Get default logging.
-    log: type[Audit] = log or get_log()
+    log: type[Audit] = log or get_audit()
     scheduler: Scheduler = Scheduler()
 
     # NOTE: Create the start and stop datetime.

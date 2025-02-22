@@ -43,7 +43,7 @@ from typing_extensions import Self
 
 from .__cron import CronJob, CronRunner
 from .__types import DictData, TupleStr
-from .audit import Audit, get_log
+from .audit import Audit, get_audit
 from .conf import Loader, config, get_logger
 from .cron import On
 from .exceptions import JobException, WorkflowException
@@ -516,7 +516,7 @@ class Workflow(BaseModel):
 
         :rtype: Result
         """
-        log: type[Audit] = log or get_log()
+        log: type[Audit] = log or get_audit()
         name: str = override_log_name or self.name
         run_id: str = run_id or gen_id(name, unique=True)
         rs_release: Result = Result(run_id=run_id)
@@ -699,7 +699,7 @@ class Workflow(BaseModel):
         :rtype: list[Result]
         :return: A list of all results that return from ``self.release`` method.
         """
-        log: type[Audit] = log or get_log()
+        log: type[Audit] = log or get_audit()
         run_id: str = run_id or gen_id(self.name, unique=True)
 
         # VALIDATE: Check the periods value should gather than 0.
@@ -821,6 +821,7 @@ class Workflow(BaseModel):
         *,
         run_id: str | None = None,
         raise_error: bool = True,
+        result: Result | None = None,
     ) -> Result:
         """Job execution with passing dynamic parameters from the main workflow
         execution to the target job object via job's ID.
@@ -838,13 +839,17 @@ class Workflow(BaseModel):
         :param run_id: A workflow running ID for this job execution.
         :param raise_error: A flag that raise error instead catching to result
             if it gets exception from job execution.
+        :param result: A result object for keeping context and status data.
 
         :rtype: Result
         :return: Return the result object that receive the job execution result
             context.
         """
-        run_id: str = run_id or gen_id(self.name, unique=True)
-        rs: Result = Result(run_id=run_id)
+        if result is None:
+            run_id: str = run_id or gen_id(self.name, unique=True)
+            result: Result = Result(run_id=run_id)
+        else:
+            run_id: str = result.run_id
 
         # VALIDATE: check a job ID that exists in this workflow or not.
         if job_id not in self.jobs:
@@ -881,7 +886,7 @@ class Workflow(BaseModel):
                 "Handle error from the job execution does not support yet."
             ) from None
 
-        return rs.catch(status=0, context=params)
+        return result.catch(status=0, context=params)
 
     def execute(
         self,
@@ -1178,7 +1183,7 @@ class WorkflowTask:
 
         :rtype: Result
         """
-        log: type[Audit] = log or get_log()
+        log: type[Audit] = log or get_audit()
 
         if release is None:
 

@@ -93,23 +93,3 @@ class Result:
         self.parent_run_id = result.parent_run_id
         self.run_id = result.run_id
         return self
-
-    def receive_jobs(self, result: Result) -> Self:
-        """Receive context from another result object that use on the workflow
-        execution which create a ``jobs`` keys on the context if it does not
-        exist.
-
-        :rtype: Self
-        """
-        self.__dict__["status"] = result.status
-
-        # NOTE: Check the context has jobs key.
-        if "jobs" not in self.__dict__["context"]:
-            self.__dict__["context"]["jobs"] = {}
-
-        self.__dict__["context"]["jobs"].update(result.context)
-
-        # NOTE: Update running ID from an incoming result.
-        self.parent_run_id: str = result.parent_run_id
-        self.run_id: str = result.run_id
-        return self

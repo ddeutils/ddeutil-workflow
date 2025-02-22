@@ -86,7 +86,7 @@ if config.enable_route_workflow:
 
 # NOTE: Enable the schedule route.
 if config.enable_route_schedule:
-    from ..audit import get_log
+    from ..audit import get_audit
     from ..scheduler import schedule_task
     from .route import schedule_route
 
@@ -106,7 +106,7 @@ if config.enable_route_schedule:
                 stop=datetime.now(config.tz) + timedelta(minutes=1),
                 queue=app.state.workflow_queue,
                 threads=app.state.workflow_threads,
-                log=get_log(),
+                log=get_audit(),
             )
 
     @schedule_route.on_event("startup")
