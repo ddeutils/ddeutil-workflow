@@ -38,7 +38,7 @@ from .exceptions import (
     StageException,
     UtilException,
 )
-from .result import Result
+from .result import Result, Status
 from .stage import Stage
 from .templates import has_template
 from .utils import (
@@ -554,25 +554,37 @@ class Job(BaseModel):
             },
         )
 
-    def execute(self, params: DictData, run_id: str | None = None) -> Result:
+    def execute(
+        self,
+        params: DictData,
+        *,
+        run_id: str | None = None,
+        result: Result | None = None,
+    ) -> Result:
         """Job execution with passing dynamic parameters from the workflow
         execution. It will generate matrix values at the first step and run
         multithread on this metrics to the ``stages`` field of this job.
 
         :param params: An input parameters that use on job execution.
         :param run_id: A job running ID for this execution.
+        :param result: (Result) A result object for keeping context and status
+            data.
 
         :rtype: Result
         """
 
         # NOTE: I use this condition because this method allow passing empty
         #   params and I do not want to create new dict object.
-        run_id: str = run_id or gen_id(self.id or "", unique=True)
+        if result is None:
+            run_id: str = run_id or gen_id(self.id or "", unique=True)
+            result: Result = Result(run_id=run_id)
+
         context: DictData = {}
 
         # NOTE: Normal Job execution without parallel strategy matrix. It uses
         #   for-loop to control strategy execution sequentially.
         if (not self.strategy.is_set()) or self.strategy.max_parallel == 1:
+
             for strategy in self.strategy.make():
                 rs: Result = self.execute_strategy(
                     strategy=strategy,
@@ -580,10 +592,8 @@ class Job(BaseModel):
                     run_id=run_id,
                 )
                 context.update(rs.context)
-            return Result(
-                status=0,
-                context=context,
-            )
+
+            return result.catch(status=Status.SUCCESS, context=context)
 
         # NOTE: Create event for cancel executor by trigger stop running event.
         event: Event = Event()

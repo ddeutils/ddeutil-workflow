@@ -20,7 +20,10 @@ from .utils import cut_id, gen_id
 
 logger = get_logger("ddeutil.workflow.audit")
 
-__all__: TupleStr = ("Result",)
+__all__: TupleStr = (
+    "Result",
+    "Status",
+)
 
 
 def default_gen_id() -> str:
@@ -85,7 +88,7 @@ class Result:
         :param running_id: A running ID that want to update on this model.
         :rtype: Self
         """
-        self.run_id = running_id
+        self.run_id: str = running_id
         return self
 
     def set_parent_run_id(self, running_id: str) -> Self:
@@ -97,7 +100,7 @@ class Result:
         self.parent_run_id: str = running_id
         return self
 
-    def catch(self, status: int, context: DictData) -> Self:
+    def catch(self, status: int | Status, context: DictData) -> Self:
         """Catch the status and context to this Result object. This method will
         use between a child execution return a result, and it wants to pass
         status and context to this object.
@@ -105,7 +108,9 @@ class Result:
         :param status:
         :param context:
         """
-        self.__dict__["status"] = status
+        self.__dict__["status"] = (
+            Status(status) if isinstance(status, int) else status
+        )
         self.__dict__["context"].update(context)
         return self
 

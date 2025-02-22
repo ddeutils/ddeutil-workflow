@@ -1,7 +1,12 @@
 import logging
 import time
 
-from ddeutil.workflow.result import Result
+from ddeutil.workflow.result import Result, Status
+
+
+def test_status():
+    assert Status.SUCCESS == Status.__getitem__("SUCCESS")
+    assert Status.FAILED == Status(1)
 
 
 def test_result_default():
@@ -12,6 +17,7 @@ def test_result_default():
 
     logging.info(f"Run ID: {rs.run_id}, Parent Run ID: {rs.parent_run_id}")
     logging.info(f"Run ID: {rs2.run_id}, Parent Run ID: {rs2.parent_run_id}")
+    assert isinstance(rs.status, Status)
     assert 2 == rs.status
     assert {} == rs.context
 

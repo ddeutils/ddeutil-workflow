@@ -7,7 +7,7 @@ from ddeutil.workflow.exceptions import JobException
 from ddeutil.workflow.result import Result
 
 
-def test_job_py():
+def test_job_exec_py():
     workflow: Workflow = Workflow.from_loader(name="wf-run-common")
     job: Job = workflow.job("demo-run")
 
@@ -23,8 +23,22 @@ def test_job_py():
         },
     } == rs.context
 
+    params = {}
+    job.set_outputs(rs.context, to=params)
+    assert params == {
+        "jobs": {
+            "demo-run": {
+                "matrix": {},
+                "stages": {
+                    "hello-world": {"outputs": {"x": "New Name"}},
+                    "run-var": {"outputs": {"x": 1}},
+                },
+            },
+        },
+    }
 
-def test_job_py_raise():
+
+def test_job_exec_py_raise():
     workflow: Workflow = Workflow.from_loader(
         name="wf-run-python-raise", externals={}
     )
@@ -34,7 +48,7 @@ def test_job_py_raise():
         first_job.execute(params={})
 
 
-def test_job_py_not_set_output():
+def test_job_exec_py_not_set_output():
     with mock.patch.object(Config, "stage_default_id", False):
         # NOTE: Get stage from the specific workflow.
         workflow: Workflow = Workflow.from_loader(
@@ -47,7 +61,7 @@ def test_job_py_not_set_output():
 
 @mock.patch.object(Config, "job_raise_error", True)
 @mock.patch.object(Config, "stage_raise_error", True)
-def test_job_py_fail_fast():
+def test_job_exec_py_fail_fast():
     workflow: Workflow = Workflow.from_loader(
         name="wf-run-python-raise-for-job"
     )
@@ -71,7 +85,7 @@ def test_job_py_fail_fast():
 
 @mock.patch.object(Config, "job_raise_error", True)
 @mock.patch.object(Config, "stage_raise_error", True)
-def test_job_py_fail_fast_raise():
+def test_job_exec_py_fail_fast_raise():
     workflow: Workflow = Workflow.from_loader(
         name="wf-run-python-raise-for-job"
     )
@@ -95,7 +109,7 @@ def test_job_py_fail_fast_raise():
 
 @mock.patch.object(Config, "job_raise_error", True)
 @mock.patch.object(Config, "stage_raise_error", True)
-def test_job_py_complete():
+def test_job_exec_py_complete():
     workflow: Workflow = Workflow.from_loader(
         name="wf-run-python-raise-for-job"
     )
@@ -119,7 +133,7 @@ def test_job_py_complete():
 
 @mock.patch.object(Config, "job_raise_error", True)
 @mock.patch.object(Config, "stage_raise_error", True)
-def test_job_py_complete_raise():
+def test_job_exec_py_complete_raise():
     workflow: Workflow = Workflow.from_loader(
         name="wf-run-python-raise-for-job"
     )

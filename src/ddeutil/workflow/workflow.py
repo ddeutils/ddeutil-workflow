@@ -923,10 +923,9 @@ class Workflow(BaseModel):
         #   params and I do not want to create new dict object.
         ts: float = time.monotonic()
         if result is None:
-            run_id: str = run_id or gen_id(self.name, unique=True)
-            result: Result = Result(run_id=run_id)
-        else:
-            run_id: str = result.run_id
+            result: Result = Result(
+                run_id=(run_id or gen_id(self.name, unique=True))
+            )
 
         result.trace.info(f"[WORKFLOW]: Start Execute: {self.name!r} ...")
 
