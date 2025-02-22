@@ -1010,8 +1010,7 @@ class Workflow(BaseModel):
         not_timeout_flag: bool = True
         timeout: int = timeout or config.max_job_exec_timeout
         logger.debug(
-            f"({cut_id(result.run_id)}) [WORKFLOW]: Run {self.name!r} "
-            f"with threading."
+            result.log(f"[WORKFLOW]: Run {self.name!r} with threading.")
         )
 
         # IMPORTANT: The job execution can run parallel and waiting by
@@ -1235,8 +1234,8 @@ class WorkflowTask:
         :param end_date: An end datetime object.
         :param queue: A workflow queue object.
         :param log: A log class that want to make log object.
-        :param force_run: A flag that allow to release workflow if the log with
-            that release was pointed.
+        :param force_run: (bool) A flag that allow to release workflow if the
+            log with that release was pointed.
 
         :rtype: ReleaseQueue
         """
@@ -1272,7 +1271,7 @@ class WorkflowTask:
         return queue
 
     def __repr__(self) -> str:
-        """Override ___repr__ method."""
+        """Override the `__repr__` method."""
         return (
             f"{self.__class__.__name__}(alias={self.alias!r}, "
             f"workflow={self.workflow.name!r}, runner={self.runner!r}, "

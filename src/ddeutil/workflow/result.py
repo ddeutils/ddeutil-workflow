@@ -14,7 +14,7 @@ from pydantic.dataclasses import dataclass
 from typing_extensions import Self
 
 from .__types import DictData, TupleStr
-from .utils import gen_id
+from .utils import cut_id, gen_id
 
 __all__: TupleStr = ("Result",)
 
@@ -32,6 +32,16 @@ class Status(IntEnum):
     SUCCESS: int = 0
     FAILED: int = 1
     WAIT: int = 2
+
+
+class TraceLog:  # pragma: no cov
+    """Trace Log object."""
+
+    def debug(self): ...
+
+    def info(self): ...
+
+    def warning(self): ...
 
 
 @dataclass(config=ConfigDict(use_enum_values=True))
@@ -93,3 +103,6 @@ class Result:
         self.parent_run_id = result.parent_run_id
         self.run_id = result.run_id
         return self
+
+    def log(self, message: str) -> str:
+        return f"({cut_id(self.run_id)}) {message}"
