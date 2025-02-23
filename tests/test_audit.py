@@ -47,7 +47,7 @@ def test_conf_log_file_do_first(root_path):
     log.save(excluded=None)
     pointer = log.pointer()
 
-    log = FileAudit.find_log_with_release(
+    log = FileAudit.find_audit_with_release(
         name="wf-demo-logging",
         release=datetime(2024, 1, 1, 1),
     )
@@ -77,13 +77,13 @@ def test_conf_log_file_find_logs(root_path):
         name="wf-scheduling", release=datetime(2024, 1, 1, 1)
     )
 
-    log = next(FileAudit.find_logs(name="wf-scheduling"))
+    log = next(FileAudit.find_audits(name="wf-scheduling"))
     assert isinstance(log, FileAudit)
 
     wf_log_path = root_path / "logs/workflow=wf-no-release-log/"
     wf_log_path.mkdir(exist_ok=True)
 
-    for log in FileAudit.find_logs(name="wf-no-release-log"):
+    for log in FileAudit.find_audits(name="wf-no-release-log"):
         assert isinstance(log, FileAudit)
         log.model_dump(
             by_alias=True,
@@ -95,12 +95,12 @@ def test_conf_log_file_find_logs(root_path):
 
 def test_conf_log_file_find_logs_raise():
     with pytest.raises(FileNotFoundError):
-        next(FileAudit.find_logs(name="wf-file-not-found"))
+        next(FileAudit.find_audits(name="wf-file-not-found"))
 
 
 def test_conf_log_file_find_log_with_release():
     with pytest.raises(FileNotFoundError):
-        FileAudit.find_log_with_release(
+        FileAudit.find_audit_with_release(
             name="wf-file-not-found",
             release=datetime(2024, 1, 1, 1),
         )

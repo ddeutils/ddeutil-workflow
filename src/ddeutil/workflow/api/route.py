@@ -110,7 +110,7 @@ async def get_workflow_logs(name: str):
                     exclude_unset=True,
                     exclude_defaults=True,
                 )
-                for log in get_audit().find_logs(name=name)
+                for log in get_audit().find_audits(name=name)
             ],
         }
     except FileNotFoundError:
@@ -123,7 +123,7 @@ async def get_workflow_logs(name: str):
 @workflow_route.get(path="/{name}/logs/{release}")
 async def get_workflow_release_log(name: str, release: str):
     try:
-        log: Audit = get_audit().find_log_with_release(
+        log: Audit = get_audit().find_audit_with_release(
             name=name, release=datetime.strptime(release, "%Y%m%d%H%M%S")
         )
     except FileNotFoundError:

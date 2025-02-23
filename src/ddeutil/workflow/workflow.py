@@ -486,7 +486,7 @@ class Workflow(BaseModel):
         *,
         run_id: str | None = None,
         parent_run_id: str | None = None,
-        log: type[Audit] = None,
+        audit: type[Audit] = None,
         queue: ReleaseQueue | None = None,
         override_log_name: str | None = None,
         result: Result | None = None,
@@ -495,14 +495,15 @@ class Workflow(BaseModel):
         release templating that include logical date (release date), execution
         date, or running id to the params.
 
-            This method allow workflow use log object to save the execution
-        result to log destination like file log to the local `/logs` directory.
+            This method allow workflow use audit object to save the execution
+        result to audit destination like file audit to the local `/logs`
+        directory.
 
         Steps:
             - Initialize ReleaseQueue and Release if they do not pass.
             - Create release data for pass to parameter templating function.
             - Execute this workflow with mapping release data to its parameters.
-            - Writing result log
+            - Writing result audit
             - Remove this release on the running queue
             - Push this release to complete queue
 
@@ -511,7 +512,7 @@ class Workflow(BaseModel):
         :param queue: A ReleaseQueue that use for mark complete.
         :param run_id: A workflow running ID for this release.
         :param parent_run_id: A parent workflow running ID for this release.
-        :param log: A log class that want to save the execution result.
+        :param audit: An audit class that want to save the execution result.
         :param queue: A ReleaseQueue object.
         :param override_log_name: An override logging name that use instead
             the workflow name.
@@ -520,7 +521,7 @@ class Workflow(BaseModel):
 
         :rtype: Result
         """
-        log: type[Audit] = log or get_audit()
+        audit: type[Audit] = audit or get_audit()
         name: str = override_log_name or self.name
 
         if result is None:
@@ -570,10 +571,11 @@ class Workflow(BaseModel):
             f"{release.date:%Y-%m-%d %H:%M:%S}"
         )
 
-        # NOTE: Saving execution result to destination of the input log object.
-        result.trace.debug(f"[LOG]: Writing log: {name!r}.")
+        # NOTE: Saving execution result to destination of the input audit
+        #   object.
+        result.trace.debug(f"[LOG]: Writing audit: {name!r}.")
         (
-            log(
+            audit(
                 name=name,
                 release=release.date,
                 type=release.type,
@@ -617,7 +619,7 @@ class Workflow(BaseModel):
         offset: float,
         end_date: datetime,
         queue: ReleaseQueue,
-        log: type[Audit],
+        audit: type[Audit],
         *,
         force_run: bool = False,
     ) -> ReleaseQueue:
@@ -635,9 +637,9 @@ class Workflow(BaseModel):
         :param offset: An offset in second unit for time travel.
         :param end_date: An end datetime object.
         :param queue: A workflow queue object.
-        :param log: A log class that want to make log object.
-        :param force_run: A flag that allow to release workflow if the log with
-            that release was pointed.
+        :param audit: An audit class that want to make audit object.
+        :param force_run: A flag that allow to release workflow if the audit
+            with that release was pointed.
 
         :rtype: ReleaseQueue
         """
@@ -660,7 +662,7 @@ class Workflow(BaseModel):
             )
 
             while queue.check_queue(workflow_release) or (
-                log.is_pointed(name=self.name, release=workflow_release.date)
+                audit.is_pointed(name=self.name, release=workflow_release.date)
                 and not force_run
             ):
                 workflow_release = Release(
@@ -686,7 +688,7 @@ class Workflow(BaseModel):
         *,
         run_id: str | None = None,
         periods: int = 1,
-        log: Audit | None = None,
+        audit: Audit | None = None,
         force_run: bool = False,
         timeout: int = 1800,
     ) -> Result:
@@ -704,8 +706,8 @@ class Workflow(BaseModel):
         :param params: A parameters that want to pass to the release method.
         :param run_id: A workflow running ID for this poke.
         :param periods: A periods in minutes value that use to run this poking.
-        :param log: A log object that want to use on this poking process.
-        :param force_run: A flag that allow to release workflow if the log with
+        :param audit: An audit object that want to use on this poking process.
+        :param force_run: A flag that allow to release workflow if the audit with
             that release was pointed.
         :param timeout: A second value for timeout while waiting all futures
             run completely.
@@ -713,7 +715,7 @@ class Workflow(BaseModel):
         :rtype: Result
         :return: A list of all results that return from `self.release` method.
         """
-        log: type[Audit] = log or get_audit()
+        audit: type[Audit] = audit or get_audit()
         result: Result = Result(
             run_id=(run_id or gen_id(self.name, unique=True))
         )
@@ -767,7 +769,7 @@ class Workflow(BaseModel):
         # NOTE: Create reusable partial function and add Release to the release
         #   queue object.
         partial_queue = partial(
-            self.queue, offset, end_date, log=log, force_run=force_run
+            self.queue, offset, end_date, audit=audit, force_run=force_run
         )
         partial_queue(q)
 
@@ -814,7 +816,7 @@ class Workflow(BaseModel):
                         self.release,
                         release=release,
                         params=params,
-                        log=log,
+                        audit=audit,
                         queue=q,
                         parent_run_id=result.run_id,
                     )
@@ -1185,7 +1187,7 @@ class WorkflowTask:
         self,
         release: datetime | Release | None = None,
         run_id: str | None = None,
-        log: type[Audit] = None,
+        audit: type[Audit] = None,
         queue: ReleaseQueue | None = None,
     ) -> Result:
         """Release the workflow task that passing an override parameter to
@@ -1196,12 +1198,12 @@ class WorkflowTask:
 
         :param release: A release datetime or Release object.
         :param run_id: A workflow running ID for this release.
-        :param log: A log class that want to save the execution result.
+        :param audit: An audit class that want to save the execution result.
         :param queue: A ReleaseQueue object that use to mark complete.
 
         :rtype: Result
         """
-        log: type[Audit] = log or get_audit()
+        audit: type[Audit] = audit or get_audit()
 
         if release is None:
 
@@ -1228,7 +1230,7 @@ class WorkflowTask:
             release=release,
             params=self.values,
             run_id=run_id,
-            log=log,
+            audit=audit,
             queue=queue,
             override_log_name=self.alias,
         )
@@ -1237,7 +1239,7 @@ class WorkflowTask:
         self,
         end_date: datetime,
         queue: ReleaseQueue,
-        log: type[Audit],
+        audit: type[Audit],
         *,
         force_run: bool = False,
     ) -> ReleaseQueue:
@@ -1246,9 +1248,9 @@ class WorkflowTask:
 
         :param end_date: An end datetime object.
         :param queue: A workflow queue object.
-        :param log: A log class that want to make log object.
+        :param audit: An audit class that want to make audit object.
         :param force_run: (bool) A flag that allow to release workflow if the
-            log with that release was pointed.
+            audit with that release was pointed.
 
         :rtype: ReleaseQueue
         """
@@ -1264,7 +1266,7 @@ class WorkflowTask:
         )
 
         while queue.check_queue(workflow_release) or (
-            log.is_pointed(name=self.alias, release=workflow_release.date)
+            audit.is_pointed(name=self.alias, release=workflow_release.date)
             and not force_run
         ):
             workflow_release = Release(

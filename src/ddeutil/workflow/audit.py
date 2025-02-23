@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
-from typing import Any, ClassVar, Optional, Union
+from typing import ClassVar, Optional, Union
 
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
@@ -83,8 +83,8 @@ class FileAudit(BaseAudit):
         self.pointer().mkdir(parents=True, exist_ok=True)
 
     @classmethod
-    def find_logs(cls, name: str) -> Iterator[Self]:
-        """Generate the logging data that found from logs path with specific a
+    def find_audits(cls, name: str) -> Iterator[Self]:
+        """Generate the audit data that found from logs path with specific a
         workflow name.
 
         :param name: A workflow name that want to search release logging data.
@@ -100,12 +100,12 @@ class FileAudit(BaseAudit):
                 yield cls.model_validate(obj=json.load(f))
 
     @classmethod
-    def find_log_with_release(
+    def find_audit_with_release(
         cls,
         name: str,
         release: datetime | None = None,
     ) -> Self:
-        """Return the logging data that found from logs path with specific
+        """Return the audit data that found from logs path with specific
         workflow name and release values. If a release does not pass to an input
         argument, it will return the latest release from the current log path.
 
@@ -200,21 +200,19 @@ class FileAudit(BaseAudit):
 class SQLiteAudit(BaseAudit):  # pragma: no cov
     """SQLite Audit Pydantic Model."""
 
-    @staticmethod
-    def meta() -> dict[str, Any]:
-        return {
-            "table": "workflow_log",
-            "ddl": """
-                workflow        str,
-                release         int,
-                type            str,
-                context         json,
-                parent_run_id   int,
-                run_id          int,
-                update          datetime
-                primary key ( run_id )
-                """,
-        }
+    table_name: ClassVar[str] = "workflow_log"
+    schemas: ClassVar[
+        str
+    ] = """
+        workflow        str,
+        release         int,
+        type            str,
+        context         json,
+        parent_run_id   int,
+        run_id          int,
+        update          datetime
+        primary key ( run_id )
+        """
 
     def save(self, excluded: list[str] | None) -> SQLiteAudit:
         """Save logging data that receive a context data from a workflow

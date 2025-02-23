@@ -8,6 +8,7 @@ from __future__ import annotations
 from dataclasses import field
 from datetime import datetime
 from enum import IntEnum
+from pathlib import Path
 from threading import Event
 from typing import Optional
 
@@ -54,20 +55,41 @@ class Status(IntEnum):
     WAIT: int = 2
 
 
+class TraceLogWriter:
+    """Writing log message to the target log path that was set from config."""
+
+    def trace_log_path(self) -> Path: ...
+
+    def debug(self, message: str):
+        logger.debug(message)
+
+    def info(self, message: str):
+        logger.info(message)
+
+    def warning(self, message: str):
+        logger.warning(message)
+
+    def error(self, message: str):
+        logger.error(message)
+
+
 class TraceLog:  # pragma: no cov
     """Trace Log object."""
 
     __slots__: TupleStr = (
         "run_id",
         "parent_run_id",
+        "writer",
     )
 
     def __init__(self, run_id: str, parent_run_id: str | None = None):
         self.run_id: str = run_id
         self.parent_run_id: str | None = parent_run_id
+        self.writer: TraceLogWriter = TraceLogWriter()
 
     @property
     def cut_id(self) -> str:
+        """Combine cutting ID of parent running ID if it set."""
         cut_run_id: str = cut_id(self.run_id)
         if not self.parent_run_id:
             return cut_run_id
@@ -76,16 +98,16 @@ class TraceLog:  # pragma: no cov
         return f"{cut_parent_run_id}...{cut_run_id}"
 
     def debug(self, message: str):
-        logger.debug(f"({self.cut_id}) {message}")
+        self.writer.debug(f"({self.cut_id}) {message}")
 
     def info(self, message: str):
-        logger.info(f"({self.cut_id}) {message}")
+        self.writer.info(f"({self.cut_id}) {message}")
 
     def warning(self, message: str):
-        logger.warning(f"({self.cut_id}) {message}")
+        self.writer.warning(f"({self.cut_id}) {message}")
 
     def error(self, message: str):
-        logger.error(f"({self.cut_id}) {message}")
+        self.writer.error(f"({self.cut_id}) {message}")
 
 
 @dataclass(

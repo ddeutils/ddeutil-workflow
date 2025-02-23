@@ -314,14 +314,14 @@ class Schedule(BaseModel):
         *,
         stop: datetime | None = None,
         externals: DictData | None = None,
-        log: type[Audit] | None = None,
+        audit: type[Audit] | None = None,
     ) -> None:  # pragma: no cov
         """Pending this schedule tasks with the schedule package.
 
         :param stop: A datetime value that use to stop running schedule.
         :param externals: An external parameters that pass to Loader.
-        :param log: A log class that use on the workflow task release for
-            writing its release log context.
+        :param audit: An audit class that use on the workflow task release for
+            writing its release audit context.
         """
         try:
             from schedule import Scheduler
@@ -331,7 +331,7 @@ class Schedule(BaseModel):
             ) from None
 
         # NOTE: Get default logging.
-        log: type[Audit] = log or get_audit()
+        audit: type[Audit] = audit or get_audit()
         scheduler: Scheduler = Scheduler()
 
         # NOTE: Create the start and stop datetime.
@@ -358,7 +358,7 @@ class Schedule(BaseModel):
                 stop=stop_date,
                 queue=queue,
                 threads=threads,
-                log=log,
+                audit=audit,
             )
             .tag("control")
         )
@@ -454,7 +454,7 @@ def schedule_task(
     stop: datetime,
     queue: dict[str, ReleaseQueue],
     threads: ReleaseThreads,
-    log: type[Audit],
+    audit: type[Audit],
 ) -> type[CancelJob] | None:
     """Schedule task function that generate thread of workflow task release
     method in background. This function do the same logic as the workflow poke
@@ -467,7 +467,7 @@ def schedule_task(
     :param stop: A stop datetime object that force stop running scheduler.
     :param queue: A mapping of alias name and ReleaseQueue object.
     :param threads: A mapping of alias name and Thread object.
-    :param log: A log class that want to make log object.
+    :param audit: An audit class that want to make audit object.
 
     :rtype: type[CancelJob] | None
     """
@@ -493,7 +493,7 @@ def schedule_task(
         q: ReleaseQueue = queue[task.alias]
 
         # NOTE: Start adding queue and move the runner date in the WorkflowTask.
-        task.queue(stop, q, log=log)
+        task.queue(stop, q, audit=audit)
 
         # NOTE: Get incoming datetime queue.
         logger.debug(f"[WORKFLOW]: Queue: {task.alias!r} : {list(q.queue)}")
@@ -536,7 +536,7 @@ def schedule_task(
         thread_name: str = f"{task.alias}|{release.date:%Y%m%d%H%M}"
         thread: Thread = Thread(
             target=catch_exceptions(cancel_on_failure=True)(task.release),
-            kwargs={"release": release, "queue": q, "log": log},
+            kwargs={"release": release, "queue": q, "audit": audit},
             name=thread_name,
             daemon=True,
         )
@@ -578,7 +578,7 @@ def schedule_control(
     stop: datetime | None = None,
     externals: DictData | None = None,
     *,
-    log: type[Audit] | None = None,
+    audit: type[Audit] | None = None,
     parent_run_id: str | None = None,
 ) -> Result:  # pragma: no cov
     """Scheduler control function that run the chuck of schedules every minute
@@ -588,8 +588,8 @@ def schedule_control(
     :param schedules: A list of workflow names that want to schedule running.
     :param stop: A datetime value that use to stop running schedule.
     :param externals: An external parameters that pass to Loader.
-    :param log: A log class that use on the workflow task release for writing
-        its release log context.
+    :param audit: An audit class that use on the workflow task release for
+        writing its release audit context.
     :param parent_run_id: A parent workflow running ID for this release.
 
     :rtype: Result
@@ -603,7 +603,7 @@ def schedule_control(
         ) from None
 
     # NOTE: Get default logging.
-    log: type[Audit] = log or get_audit()
+    audit: type[Audit] = audit or get_audit()
     result: Result = Result().set_parent_run_id(parent_run_id)
     scheduler: Scheduler = Scheduler()
 
@@ -639,7 +639,7 @@ def schedule_control(
             stop=stop_date,
             queue=queue,
             threads=threads,
-            log=log,
+            audit=audit,
         )
         .tag("task")
     )
