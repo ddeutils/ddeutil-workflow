@@ -57,22 +57,35 @@ class Status(IntEnum):
 class TraceLog:  # pragma: no cov
     """Trace Log object."""
 
-    __slots__: TupleStr = ("run_id",)
+    __slots__: TupleStr = (
+        "run_id",
+        "parent_run_id",
+    )
 
-    def __init__(self, run_id: str):
+    def __init__(self, run_id: str, parent_run_id: str | None = None):
         self.run_id: str = run_id
+        self.parent_run_id: str | None = parent_run_id
+
+    @property
+    def cut_id(self) -> str:
+        cut_run_id: str = cut_id(self.run_id)
+        if not self.parent_run_id:
+            return cut_run_id
+
+        cut_parent_run_id: str = cut_id(self.parent_run_id)
+        return f"{cut_parent_run_id}...{cut_run_id}"
 
     def debug(self, message: str):
-        logger.debug(f"({cut_id(self.run_id)}) {message}")
+        logger.debug(f"({self.cut_id}) {message}")
 
     def info(self, message: str):
-        logger.info(f"({cut_id(self.run_id)}) {message}")
+        logger.info(f"({self.cut_id}) {message}")
 
     def warning(self, message: str):
-        logger.warning(f"({cut_id(self.run_id)}) {message}")
+        logger.warning(f"({self.cut_id}) {message}")
 
     def error(self, message: str):
-        logger.error(f"({cut_id(self.run_id)}) {message}")
+        logger.error(f"({self.cut_id}) {message}")
 
 
 @dataclass(
@@ -138,7 +151,7 @@ class Result:
 
         :rtype: TraceLog
         """
-        return TraceLog(self.run_id)
+        return TraceLog(self.run_id, self.parent_run_id)
 
     def alive_time(self) -> float:  # pragma: no cov
         return (get_dt_tznow() - self.ts).total_seconds()

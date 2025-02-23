@@ -66,6 +66,7 @@ nav:
     - Get Started: getting-started.md
     - Configuration: configuration.md
     - Logging: logging.md
+    - Context: context.md
     - Examples:
       - RestAPI: examples/workflow_api.md
       - Postgres: examples/workflow_pg.md

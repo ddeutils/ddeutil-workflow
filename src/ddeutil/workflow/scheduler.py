@@ -5,16 +5,16 @@
 # ------------------------------------------------------------------------------
 """
 The main schedule running is ``schedule_runner`` function that trigger the
-multiprocess of ``workflow_control`` function for listing schedules on the
+multiprocess of ``schedule_control`` function for listing schedules on the
 config by ``Loader.finds(Schedule)``.
 
-    The ``workflow_control`` is the scheduler function that release 2 schedule
+    The ``schedule_control`` is the scheduler function that release 2 schedule
 functions; ``workflow_task``, and ``workflow_monitor``.
 
-    ``workflow_control`` --- Every minute at :02 --> ``workflow_task``
-                         --- Every 5 minutes     --> ``workflow_monitor``
+    ``schedule_control`` --- Every minute at :02 --> ``schedule_task``
+                         --- Every 5 minutes     --> ``monitor``
 
-    The ``workflow_task`` will run ``task.release`` method in threading object
+    The ``schedule_task`` will run ``task.release`` method in threading object
 for multithreading strategy. This ``release`` method will run only one crontab
 value with the on field.
 """
@@ -403,9 +403,9 @@ class Schedule(BaseModel):
         )
 
 
-ResultOrCancelJob = Union[type[CancelJob], Result]
-ReturnCancelJob = Callable[P, ResultOrCancelJob]
-DecoratorCancelJob = Callable[[ReturnCancelJob], ReturnCancelJob]
+ResultOrCancel = Optional[Union[type[CancelJob], Result]]
+ReturnResultOrCancel = Callable[P, ResultOrCancel]
+DecoratorCancelJob = Callable[[ReturnResultOrCancel], ReturnResultOrCancel]
 
 
 def catch_exceptions(cancel_on_failure: bool = False) -> DecoratorCancelJob:
@@ -418,10 +418,12 @@ def catch_exceptions(cancel_on_failure: bool = False) -> DecoratorCancelJob:
     :rtype: DecoratorCancelJob
     """
 
-    def decorator(func: ReturnCancelJob) -> ReturnCancelJob:  # pragma: no cov
+    def decorator(
+        func: ReturnResultOrCancel,
+    ) -> ReturnResultOrCancel:  # pragma: no cov
 
         @wraps(func)
-        def wrapper(*args: P.args, **kwargs: P.kwargs) -> ResultOrCancelJob:
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> ResultOrCancel:
             try:
                 return func(*args, **kwargs)
             except Exception as err:
@@ -438,8 +440,9 @@ def catch_exceptions(cancel_on_failure: bool = False) -> DecoratorCancelJob:
 class ReleaseThread(TypedDict):
     """TypeDict for the release thread."""
 
-    thread: Thread
+    thread: Optional[Thread]
     start_date: datetime
+    release_date: datetime
 
 
 ReleaseThreads = dict[str, ReleaseThread]
@@ -541,6 +544,7 @@ def schedule_task(
         threads[thread_name] = {
             "thread": thread,
             "start_date": datetime.now(tz=config.tz),
+            "release_date": release.date,
         }
 
         thread.start()
@@ -560,13 +564,13 @@ def monitor(threads: ReleaseThreads) -> None:  # pragma: no cov
     logger.debug("[MONITOR]: Start checking long running schedule task.")
 
     snapshot_threads: list[str] = list(threads.keys())
-    for t_name in snapshot_threads:
+    for thread_name in snapshot_threads:
 
-        thread_release: ReleaseThread = threads[t_name]
+        thread_release: ReleaseThread = threads[thread_name]
 
         # NOTE: remove the thread that running success.
         if not thread_release["thread"].is_alive():
-            threads.pop(t_name)
+            thread_release["thread"] = None
 
 
 def schedule_control(
@@ -575,7 +579,8 @@ def schedule_control(
     externals: DictData | None = None,
     *,
     log: type[Audit] | None = None,
-) -> list[str]:  # pragma: no cov
+    parent_run_id: str | None = None,
+) -> Result:  # pragma: no cov
     """Scheduler control function that run the chuck of schedules every minute
     and this function release monitoring thread for tracking undead thread in
     the background.
@@ -585,8 +590,9 @@ def schedule_control(
     :param externals: An external parameters that pass to Loader.
     :param log: A log class that use on the workflow task release for writing
         its release log context.
+    :param parent_run_id: A parent workflow running ID for this release.
 
-    :rtype: list[str]
+    :rtype: Result
     """
     # NOTE: Lazy import Scheduler object from the schedule package.
     try:
@@ -598,6 +604,7 @@ def schedule_control(
 
     # NOTE: Get default logging.
     log: type[Audit] = log or get_audit()
+    result: Result = Result().set_parent_run_id(parent_run_id)
     scheduler: Scheduler = Scheduler()
 
     # NOTE: Create the start and stop datetime.
@@ -614,9 +621,8 @@ def schedule_control(
 
     tasks: list[WorkflowTask] = []
     for name in schedules:
-        schedule: Schedule = Schedule.from_loader(name, externals=externals)
         tasks.extend(
-            schedule.tasks(
+            Schedule.from_loader(name, externals=externals).tasks(
                 start_date_waiting,
                 queue=queue,
                 externals=externals,
@@ -635,7 +641,7 @@ def schedule_control(
             threads=threads,
             log=log,
         )
-        .tag("control")
+        .tag("task")
     )
 
     # NOTE: Checking zombie task with schedule job will start every 5 minute at
@@ -660,11 +666,11 @@ def schedule_control(
         scheduler.run_pending()
         time.sleep(1)
 
-        # NOTE: Break the scheduler when the control job does not exist.
-        if not scheduler.get_jobs("control"):
+        # NOTE: Break the scheduler when the task job does not exist.
+        if not scheduler.get_jobs("task"):
             scheduler.clear("monitor")
 
-            while len(threads) > 0:
+            while len([t for t in threads.values() if t["thread"]]) > 0:
                 logger.warning(
                     "[SCHEDULE]: Waiting schedule release thread that still "
                     "running in background."
@@ -677,14 +683,27 @@ def schedule_control(
     logger.warning(
         f"[SCHEDULE]: Queue: {[list(queue[wf].queue) for wf in queue]}"
     )
-    return schedules
+    return result.catch(
+        status=0,
+        context={
+            "schedules": schedules,
+            "threads": [
+                {
+                    "name": thread,
+                    "start_date": threads[thread]["start_date"],
+                    "release_date": threads[thread]["release_date"],
+                }
+                for thread in threads
+            ],
+        },
+    )
 
 
 def schedule_runner(
     stop: datetime | None = None,
     externals: DictData | None = None,
     excluded: list[str] | None = None,
-) -> list[str]:  # pragma: no cov
+) -> Result:  # pragma: no cov
     """Schedule runner function it the multiprocess controller function for
     split the setting schedule to the `schedule_control` function on the
     process pool. It chunks schedule configs that exists in config
@@ -707,9 +726,10 @@ def schedule_runner(
                                         --> thread of release task 02 02
             ==> process 02  ==> ...
 
-    :rtype: list[str]
+    :rtype: Result
     """
-    results: list[str] = []
+    result: Result = Result()
+    context: DictData = {"schedules": [], "threads": []}
 
     with ProcessPoolExecutor(
         max_workers=config.max_schedule_process,
@@ -735,6 +755,8 @@ def schedule_runner(
                 logger.error(str(err))
                 raise WorkflowException(str(err)) from err
 
-            results.extend(future.result(timeout=1))
+            rs: Result = future.result(timeout=1)
+            context["schedule"].extend(rs.context.get("schedules", []))
+            context["threads"].extend(rs.context.get("threads", []))
 
-    return results
+    return result.catch(status=0, context=context)

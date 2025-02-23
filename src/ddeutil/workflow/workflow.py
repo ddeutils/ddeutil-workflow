@@ -525,9 +525,7 @@ class Workflow(BaseModel):
 
         if result is None:
             run_id: str = run_id or gen_id(name, unique=True)
-            result: Result = Result(
-                run_id=run_id, parent_run_id=(parent_run_id or run_id)
-            )
+            result: Result = Result(run_id=run_id, parent_run_id=parent_run_id)
         else:
             run_id: str = result.run_id
             if parent_run_id:
@@ -692,12 +690,12 @@ class Workflow(BaseModel):
         force_run: bool = False,
         timeout: int = 1800,
     ) -> Result:
-        """Poke this workflow with start datetime value that passing to its
-        ``on`` field with threading executor pool for executing with all its
-        schedules that was set on the `on` value.
+        """Poke function with a start datetime value that will pass to its
+        `on` field on the threading executor pool for execute the `release`
+        method (It run all schedules that was set on the `on` values).
 
             This method will observe its schedule that nearing to run with the
-        ``self.release()`` method.
+        `self.release()` method.
 
             The limitation of this method is not allow run a date that less
         than the current date.
@@ -713,7 +711,7 @@ class Workflow(BaseModel):
             run completely.
 
         :rtype: Result
-        :return: A list of all results that return from ``self.release`` method.
+        :return: A list of all results that return from `self.release` method.
         """
         log: type[Audit] = log or get_audit()
         result: Result = Result(
@@ -908,6 +906,7 @@ class Workflow(BaseModel):
         params: DictData,
         *,
         run_id: str | None = None,
+        parent_run_id: str | None = None,
         timeout: int = 0,
         result: Result | None = None,
     ) -> Result:
@@ -925,14 +924,12 @@ class Workflow(BaseModel):
 
         :param params: An input parameters that use on workflow execution that
             will parameterize before using it. Default is None.
-        :type params: DictData
-
         :param run_id: A workflow running ID for this job execution.
-        :type run_id: str | None (default: None)
-        :param timeout: (int) A workflow execution time out in second unit that use
-            for limit time of execution and waiting job dependency. This value
-            does not force stop the task that still running more than this limit
-            time. (default: 0)
+        :param parent_run_id: A parent workflow running ID for this release.
+        :param timeout: (int) A workflow execution time out in second unit that
+            use for limit time of execution and waiting job dependency. This
+            value does not force stop the task that still running more than this
+            limit time. (default: 0)
         :param result: (Result) A result object for keeping context and status
             data.
 
@@ -943,7 +940,8 @@ class Workflow(BaseModel):
         ts: float = time.monotonic()
         if result is None:  # pragma: no cov
             result: Result = Result(
-                run_id=(run_id or gen_id(self.name, unique=True))
+                run_id=(run_id or gen_id(self.name, unique=True)),
+                parent_run_id=parent_run_id,
             )
 
         result.trace.info(f"[WORKFLOW]: Start Execute: {self.name!r} ...")
@@ -1174,8 +1172,8 @@ class WorkflowTask:
         This dataclass object is mapping 1-to-1 with workflow and cron runner
     objects.
 
-        This dataclass has the release method for itself.
-
+        This dataclass has the release method for itself that prepare necessary
+    arguments before passing to the parent release method.
     """
 
     alias: str
@@ -1190,7 +1188,11 @@ class WorkflowTask:
         log: type[Audit] = None,
         queue: ReleaseQueue | None = None,
     ) -> Result:
-        """Release the workflow task data.
+        """Release the workflow task that passing an override parameter to
+        the parent release method with the `values` field.
+
+            This method can handler not passing release value by default
+        generate step. It uses the `runner` field for generate release object.
 
         :param release: A release datetime or Release object.
         :param run_id: A workflow running ID for this release.

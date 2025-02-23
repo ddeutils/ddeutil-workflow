@@ -44,6 +44,15 @@ def test_workflow_task():
         "datetime.datetime(2024, 1, 1, 1, 0)})"
     )
 
+    # NOTE: Raise because the WorkflowTask does not implement the order property
+    with pytest.raises(TypeError):
+        assert task < WorkflowTask(
+            alias=workflow.name,
+            workflow=workflow,
+            runner=runner,
+            values={},
+        )
+
 
 @mock.patch.object(Config, "enable_write_log", False)
 def test_workflow_task_queue(test_path):
