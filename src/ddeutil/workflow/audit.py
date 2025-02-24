@@ -19,9 +19,8 @@ from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
 from .__types import DictData, TupleStr
-from .conf import config, get_logger
-
-logger = get_logger("ddeutil.workflow")
+from .conf import config
+from .result import TraceLog
 
 __all__: TupleStr = (
     "get_audit",
@@ -175,14 +174,11 @@ class FileAudit(BaseAudit):
 
         :rtype: Self
         """
-        from .utils import cut_id
+        trace: TraceLog = TraceLog(self.run_id, self.parent_run_id)
 
         # NOTE: Check environ variable was set for real writing.
         if not config.enable_write_audit:
-            logger.debug(
-                f"({cut_id(self.run_id)}) [LOG]: Skip writing log cause "
-                f"config was set"
-            )
+            trace.debug("[LOG]: Skip writing log cause config was set")
             return self
 
         log_file: Path = self.pointer() / f"{self.run_id}.log"
@@ -218,14 +214,11 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
         """Save logging data that receive a context data from a workflow
         execution result.
         """
-        from .utils import cut_id
+        trace: TraceLog = TraceLog(self.run_id, self.parent_run_id)
 
         # NOTE: Check environ variable was set for real writing.
         if not config.enable_write_audit:
-            logger.debug(
-                f"({cut_id(self.run_id)}) [LOG]: Skip writing log cause "
-                f"config was set"
-            )
+            trace.debug("[LOG]: Skip writing log cause config was set")
             return self
 
         raise NotImplementedError("SQLiteAudit does not implement yet.")

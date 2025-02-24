@@ -8,9 +8,12 @@ by all object in this package.
 """
 from __future__ import annotations
 
+import os.path
+from abc import ABC, abstractmethod
 from dataclasses import field
 from datetime import datetime
 from enum import IntEnum
+from inspect import Traceback, currentframe, getframeinfo
 from pathlib import Path
 from threading import Event
 from typing import Optional
@@ -28,6 +31,7 @@ logger = get_logger("ddeutil.workflow")
 __all__: TupleStr = (
     "Result",
     "Status",
+    "TraceLog",
     "default_gen_id",
     "get_dt_tznow",
 )
@@ -58,8 +62,8 @@ class Status(IntEnum):
     WAIT: int = 2
 
 
-class TraceLog:  # pragma: no cov
-    """Trace Log object."""
+class BaseTraceLog(ABC):  # pragma: no cov
+    """Base Trace Log object."""
 
     __slots__: TupleStr = (
         "run_id",
@@ -67,7 +71,41 @@ class TraceLog:  # pragma: no cov
         "log_file",
     )
 
-    def __init__(self, run_id: str, parent_run_id: str | None = None):
+    @abstractmethod
+    def writer(self, message: str, is_err: bool = False) -> None: ...
+
+    @abstractmethod
+    def make_message(self, message: str) -> str: ...
+
+    def debug(self, message: str):
+        msg: str = self.make_message(message)
+        self.writer(msg)
+        logger.debug(msg, stacklevel=2)
+
+    def info(self, message: str):
+        msg: str = self.make_message(message)
+        self.writer(msg)
+        logger.info(msg, stacklevel=2)
+
+    def warning(self, message: str):
+        msg: str = self.make_message(message)
+        self.writer(msg)
+        logger.warning(msg, stacklevel=2)
+
+    def error(self, message: str):
+        msg: str = self.make_message(message)
+        self.writer(msg, is_err=True)
+        logger.error(msg, stacklevel=2)
+
+
+class TraceLog(BaseTraceLog):  # pragma: no cov
+    """Trace Log object that write file to the local storage."""
+
+    def __init__(
+        self,
+        run_id: str,
+        parent_run_id: str | None = None,
+    ):
         self.run_id: str = run_id
         self.parent_run_id: str | None = parent_run_id
         self.log_file: Path = (
@@ -75,17 +113,20 @@ class TraceLog:  # pragma: no cov
         )
 
         if not self.log_file.exists():
-            self.log_file.mkdir()
+            self.log_file.mkdir(parents=True)
 
     @property
     def cut_id(self) -> str:
         """Combine cutting ID of parent running ID if it set."""
         cut_run_id: str = cut_id(self.run_id)
         if not self.parent_run_id:
-            return cut_run_id
+            return f"{cut_run_id} -> {' ' * 6}"
 
         cut_parent_run_id: str = cut_id(self.parent_run_id)
-        return f"{cut_parent_run_id}...{cut_run_id}"
+        return f"{cut_parent_run_id} -> {cut_run_id}"
+
+    def make_message(self, message: str) -> str:
+        return f"({self.cut_id}) {message}"
 
     def writer(self, message: str, is_err: bool = False) -> None:
         """The path of logging data will store by format:
@@ -100,25 +141,18 @@ class TraceLog:  # pragma: no cov
         if not config.enable_write_log:
             return
 
-        filename: str = "stderr.txt" if is_err else "stdout.txt"
-        with (self.log_file / filename).open(mode="at", encoding="utf-8") as f:
-            f.write(message)
+        frame_info: Traceback = getframeinfo(currentframe().f_back.f_back)
+        filename: str = frame_info.filename.split(os.path.sep)[-1]
+        lineno: int = frame_info.lineno
 
-    def debug(self, message: str):
-        self.writer(message)
-        logger.debug(f"({self.cut_id}) {message}")
-
-    def info(self, message: str):
-        self.writer(message)
-        logger.info(f"({self.cut_id}) {message}")
-
-    def warning(self, message: str):
-        self.writer(message)
-        logger.warning(f"({self.cut_id}) {message}")
-
-    def error(self, message: str):
-        self.writer(message, is_err=True)
-        logger.error(f"({self.cut_id}) {message}")
+        write_file: str = "stderr.txt" if is_err else "stdout.txt"
+        with (self.log_file / write_file).open(
+            mode="at", encoding="utf-8"
+        ) as f:
+            f.write(
+                f"{get_dt_tznow():%Y-%m-%d %H-%M-%S}: {message:120s} "
+                f"{filename}{lineno}\n"
+            )
 
 
 @dataclass(

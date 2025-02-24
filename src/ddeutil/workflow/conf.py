@@ -129,6 +129,16 @@ class Config(BaseConfig):  # pragma: no cov
         )
 
     @property
+    def log_format_file(self) -> str:
+        return env(
+            "LOG_FORMAT_FILE",
+            (
+                "{datetime():%Y-%m-%d %H-%M-%S}: {message:120s} "
+                "{filename}{lineno}"
+            ),
+        )
+
+    @property
     def enable_write_log(self) -> bool:
         return str2bool(env("LOG_ENABLE_WRITE", "false"))
 
