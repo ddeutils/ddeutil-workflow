@@ -143,9 +143,9 @@ such as import your installed package.
 | run   | str            |          | A Python string statement that want to run with exec.       |
 | vars  | dict[str, Any] |  dict()  | A mapping to variable that want to pass to globals in exec. |
 
-## Hook Stage
+## Call Stage
 
-Hook executor that hook the Python function from registry with tag
+Call executor that call the Python function from registry with tag
 decorator function in ``utils`` module and run it with input arguments.
 
 This stage is different with PyStage because the PyStage is just calling
@@ -155,12 +155,12 @@ objective to invoked by this stage object.
 
 !!! example "YAML"
 
-    === "Hook"
+    === "Call"
 
         ```yaml
         ...
         stages:
-            - name: Call hook task
+            - name: Call call task
               uses: tasks/el-csv-to-parquet@polars
               with:
                 source-path: "./data"
@@ -172,8 +172,8 @@ objective to invoked by this stage object.
 
 | field  | alias | data type           | default  | description                                                  |
 |--------|-------|---------------------|:--------:|--------------------------------------------------------------|
-| uses   |       | str                 |          | A pointer that want to load function from the hook registry. |
-| args   | with  | dict[str, Any]      |  dict()  | An arguments that want to pass to the hook function.         |
+| uses   |       | str                 |          | A pointer that want to load function from the call registry. |
+| args   | with  | dict[str, Any]      |  dict()  | An arguments that want to pass to the call function.         |
 
 ## Trigger Stage
 

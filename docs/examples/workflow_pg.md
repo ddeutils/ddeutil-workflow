@@ -1,14 +1,14 @@
 # Extract Postgres
 
-The hook stage is the hook Python function from any registry location.
+The call stage is the call Python function from any registry location.
 
 ## Getting Started
 
-First, you should start create your hook.
+First, you should start create your call.
 
 ## Examples
 
-### Hook (Extract & Load)
+### Call (Extract & Load)
 
 ```yaml
 wf_el_pg_to_lake:
@@ -33,10 +33,10 @@ wf_el_pg_to_lake:
               endpoint: "/${{ params.name }}"
 ```
 
-Implement hook:
+Implement call:
 
 ```python
-from ddeutil.workflow.hook import tag
+from ddeutil.workflow.call import tag
 
 @tag('polars', alias='postgres-to-delta')
 def postgres_to_delta(source, sink):
@@ -45,10 +45,10 @@ def postgres_to_delta(source, sink):
     }
 ```
 
-### Hook (Transform)
+### Call (Transform)
 
 ```yaml
-wf_hook_mssql_proc:
+wf_call_mssql_proc:
   type: Workflow
   params:
     run_date: datetime
@@ -70,10 +70,10 @@ wf_hook_mssql_proc:
               target: ${{ params.target_name }}
 ```
 
-Implement hook:
+Implement call:
 
 ```python
-from ddeutil.workflow.hook import tag
+from ddeutil.workflow.call import tag
 
 @tag('odbc', alias='mssql-proc')
 def odbc_mssql_procedure(_exec: str, params: dict):

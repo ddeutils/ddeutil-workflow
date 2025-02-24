@@ -60,7 +60,7 @@ def tag(
 
         @wraps(func)
         def wrapped(*args: P.args, **kwargs: P.kwargs) -> TagFunc:
-            # NOTE: Able to do anything before calling hook function.
+            # NOTE: Able to do anything before calling call function.
             return func(*args, **kwargs)
 
         return wrapped
@@ -79,9 +79,9 @@ def make_registry(submodule: str) -> dict[str, Registry]:
     :rtype: dict[str, Registry]
     """
     rs: dict[str, Registry] = {}
-    regis_hooks: list[str] = config.regis_hook
-    regis_hooks.extend(["ddeutil.vendors"])
-    for module in regis_hooks:
+    regis_calls: list[str] = config.regis_call
+    regis_calls.extend(["ddeutil.vendors"])
+    for module in regis_calls:
         # NOTE: try to sequential import task functions
         try:
             importer = import_module(f"{module}.{submodule}")
@@ -114,9 +114,9 @@ def make_registry(submodule: str) -> dict[str, Registry]:
 
 
 @dataclass(frozen=True)
-class HookSearchData:
-    """Hook Search dataclass that use for receive regular expression grouping
-    dict from searching hook string value.
+class CallSearchData:
+    """Call Search dataclass that use for receive regular expression grouping
+    dict from searching call string value.
     """
 
     path: str
@@ -124,49 +124,49 @@ class HookSearchData:
     tag: str
 
 
-def extract_hook(hook: str) -> Callable[[], TagFunc]:
-    """Extract Hook function from string value to hook partial function that
+def extract_call(call: str) -> Callable[[], TagFunc]:
+    """Extract Call function from string value to call partial function that
     does run it at runtime.
 
-    :raise NotImplementedError: When the searching hook's function result does
+    :raise NotImplementedError: When the searching call's function result does
         not exist in the registry.
-    :raise NotImplementedError: When the searching hook's tag result does not
+    :raise NotImplementedError: When the searching call's tag result does not
         exist in the registry with its function key.
 
-    :param hook: A hook value that able to match with Task regex.
+    :param call: A call value that able to match with Task regex.
 
-        The format of hook value should contain 3 regular expression groups
+        The format of call value should contain 3 regular expression groups
     which match with the below config format:
 
         >>> "^(?P<path>[^/@]+)/(?P<func>[^@]+)@(?P<tag>.+)$"
 
     Examples:
-        >>> extract_hook("tasks/el-postgres-to-delta@polars")
+        >>> extract_call("tasks/el-postgres-to-delta@polars")
         ...
-        >>> extract_hook("tasks/return-type-not-valid@raise")
+        >>> extract_call("tasks/return-type-not-valid@raise")
         ...
 
     :rtype: Callable[[], TagFunc]
     """
-    if not (found := Re.RE_TASK_FMT.search(hook)):
+    if not (found := Re.RE_TASK_FMT.search(call)):
         raise ValueError(
-            f"Hook {hook!r} does not match with hook format regex."
+            f"Call {call!r} does not match with call format regex."
         )
 
-    # NOTE: Pass the searching hook string to `path`, `func`, and `tag`.
-    hook: HookSearchData = HookSearchData(**found.groupdict())
+    # NOTE: Pass the searching call string to `path`, `func`, and `tag`.
+    call: CallSearchData = CallSearchData(**found.groupdict())
 
     # NOTE: Registry object should implement on this package only.
-    rgt: dict[str, Registry] = make_registry(f"{hook.path}")
-    if hook.func not in rgt:
+    rgt: dict[str, Registry] = make_registry(f"{call.path}")
+    if call.func not in rgt:
         raise NotImplementedError(
-            f"``REGISTER-MODULES.{hook.path}.registries`` does not "
-            f"implement registry: {hook.func!r}."
+            f"``REGISTER-MODULES.{call.path}.registries`` does not "
+            f"implement registry: {call.func!r}."
         )
 
-    if hook.tag not in rgt[hook.func]:
+    if call.tag not in rgt[call.func]:
         raise NotImplementedError(
-            f"tag: {hook.tag!r} does not found on registry func: "
-            f"``REGISTER-MODULES.{hook.path}.registries.{hook.func}``"
+            f"tag: {call.tag!r} does not found on registry func: "
+            f"``REGISTER-MODULES.{call.path}.registries.{call.func}``"
         )
-    return rgt[hook.func][hook.tag]
+    return rgt[call.func][call.tag]

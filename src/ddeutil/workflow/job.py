@@ -39,7 +39,7 @@ from .exceptions import (
     UtilException,
 )
 from .result import Result, Status
-from .stage import Stage
+from .stages import Stage
 from .templates import has_template
 from .utils import (
     cross_product,
@@ -417,7 +417,6 @@ class Job(BaseModel):
         strategy: DictData,
         params: DictData,
         *,
-        run_id: str | None = None,
         result: Result | None = None,
         event: Event | None = None,
     ) -> Result:
@@ -437,7 +436,6 @@ class Job(BaseModel):
         :param strategy: A strategy metrix value that use on this execution.
             This value will pass to the `matrix` key for templating.
         :param params: A dynamic parameters that will deepcopy to the context.
-        :param run_id: A job running ID for this strategy execution.
         :param result: (Result) A result object for keeping context and status
             data.
         :param event: An event manager that pass to the PoolThreadExecutor.
@@ -445,9 +443,7 @@ class Job(BaseModel):
         :rtype: Result
         """
         if result is None:  # pragma: no cov
-            result: Result = Result(
-                run_id=(run_id or gen_id(self.id or "", unique=True))
-            )
+            result: Result = Result(run_id=gen_id(self.id or "", unique=True))
 
         strategy_id: str = gen_id(strategy)
 
@@ -524,10 +520,18 @@ class Job(BaseModel):
             #       "stages": { { "stage-id-1": ... }, ... }
             #   }
             #
+            # IMPORTANT:
+            #   This execution change all stage running IDs to the current job
+            #   running ID, but it still trac log to the same parent running ID
+            #   (with passing `run_id` and `parent_run_id` to the stage
+            #   execution arguments).
+            #
             try:
                 stage.set_outputs(
                     stage.handler_execute(
-                        params=context, run_id=result.run_id
+                        params=context,
+                        run_id=result.run_id,
+                        parent_run_id=result.parent_run_id,
                     ).context,
                     to=context,
                 )
@@ -572,6 +576,7 @@ class Job(BaseModel):
         params: DictData,
         *,
         run_id: str | None = None,
+        parent_run_id: str | None = None,
         result: Result | None = None,
     ) -> Result:
         """Job execution with passing dynamic parameters from the workflow
@@ -580,6 +585,7 @@ class Job(BaseModel):
 
         :param params: An input parameters that use on job execution.
         :param run_id: A job running ID for this execution.
+        :param parent_run_id: A parent workflow running ID for this release.
         :param result: (Result) A result object for keeping context and status
             data.
 
@@ -589,8 +595,12 @@ class Job(BaseModel):
         # NOTE: I use this condition because this method allow passing empty
         #   params and I do not want to create new dict object.
         if result is None:  # pragma: no cov
-            run_id: str = run_id or gen_id(self.id or "", unique=True)
-            result: Result = Result(run_id=run_id)
+            result: Result = Result(
+                run_id=(run_id or gen_id(self.id or "", unique=True)),
+                parent_run_id=parent_run_id,
+            )
+        elif parent_run_id:
+            result.set_parent_run_id(parent_run_id)
 
         # NOTE: Normal Job execution without parallel strategy matrix. It uses
         #   for-loop to control strategy execution sequentially.
@@ -626,11 +636,34 @@ class Job(BaseModel):
                 for strategy in self.strategy.make()
             ]
 
-            return (
-                self.__catch_fail_fast(event, futures=futures, result=result)
-                if self.strategy.fail_fast
-                else self.__catch_all_completed(futures=futures, result=result)
-            )
+            if self.strategy.fail_fast:
+                return self.__catch_fail_fast(
+                    event, futures=futures, result=result
+                )
+
+            context: DictData = {}
+            status: Status = Status.SUCCESS
+
+            for future in as_completed(futures, timeout=1800):
+                try:
+                    future.result()
+                except JobException as err:
+                    status = Status.FAILED
+                    result.trace.error(
+                        f"[JOB]: All-Completed Catch:\n\t"
+                        f"{err.__class__.__name__}:\n\t{err}"
+                    )
+                    context.update(
+                        {
+                            "errors": {
+                                "class": err,
+                                "name": err.__class__.__name__,
+                                "message": f"{err.__class__.__name__}: {err}",
+                            },
+                        },
+                    )
+
+        return result.catch(status=status, context=context)
 
     @staticmethod
     def __catch_fail_fast(
@@ -698,45 +731,5 @@ class Job(BaseModel):
 
             # NOTE: Update the result context to main job context.
             future.result()
-
-        return result.catch(status=status, context=context)
-
-    @staticmethod
-    def __catch_all_completed(
-        futures: list[Future],
-        result: Result,
-        *,
-        timeout: int = 1800,
-    ) -> Result:
-        """Job parallel pool futures catching with all-completed mode.
-
-        :param futures: A list of futures.
-        :param result: (Result) A result object for keeping context and status
-            data.
-        :param timeout: A timeout to waiting all futures complete.
-
-        :rtype: Result
-        """
-        context: DictData = {}
-        status: Status = Status.SUCCESS
-
-        for future in as_completed(futures, timeout=timeout):
-            try:
-                future.result()
-            except JobException as err:
-                status = Status.FAILED
-                result.trace.error(
-                    f"[JOB]: All-Completed Catch:\n\t"
-                    f"{err.__class__.__name__}:\n\t{err}"
-                )
-                context.update(
-                    {
-                        "errors": {
-                            "class": err,
-                            "name": err.__class__.__name__,
-                            "message": f"{err.__class__.__name__}: {err}",
-                        },
-                    },
-                )
 
         return result.catch(status=status, context=context)

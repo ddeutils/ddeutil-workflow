@@ -9,6 +9,13 @@ from .audit import (
     Audit,
     get_audit,
 )
+from .call import (
+    ReturnTagFunc,
+    TagFunc,
+    extract_call,
+    make_registry,
+    tag,
+)
 from .conf import (
     Config,
     Loader,
@@ -27,13 +34,6 @@ from .exceptions import (
     StageException,
     UtilException,
     WorkflowException,
-)
-from .hook import (
-    ReturnTagFunc,
-    TagFunc,
-    extract_hook,
-    make_registry,
-    tag,
 )
 from .job import (
     Job,
@@ -54,10 +54,10 @@ from .scheduler import (
     schedule_runner,
     schedule_task,
 )
-from .stage import (
+from .stages import (
     BashStage,
+    CallStage,
     EmptyStage,
-    HookStage,
     PyStage,
     Stage,
     TriggerStage,

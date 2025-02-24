@@ -6,11 +6,11 @@ from pathlib import Path
 from textwrap import dedent
 
 import pytest
-from ddeutil.workflow.hook import Registry, make_registry
+from ddeutil.workflow.call import Registry, make_registry
 
 
 @pytest.fixture(scope="module")
-def hook_function(test_path: Path):
+def call_function(test_path: Path):
     new_tasks_path: Path = test_path / "new_tasks"
     new_tasks_path.mkdir(exist_ok=True)
 
@@ -21,7 +21,7 @@ def hook_function(test_path: Path):
         f.write(
             dedent(
                 """
-            from ddeutil.workflow.hook import tag
+            from ddeutil.workflow.call import tag
 
             @tag("polars-dir", alias="el-csv-to-parquet")
             def dummy_task(source: str, sink: str) -> dict[str, int]:
@@ -46,7 +46,7 @@ def test_make_registry_not_found():
     assert rs == {}
 
 
-def test_make_registry_raise(hook_function):
+def test_make_registry_raise(call_function):
 
     # NOTE: Raise error duplicate tag name, polars-dir, that set in this module.
     with pytest.raises(ValueError):

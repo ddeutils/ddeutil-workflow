@@ -97,9 +97,9 @@ class Config(BaseConfig):  # pragma: no cov
 
     # NOTE: Register
     @property
-    def regis_hook(self) -> list[str]:
-        regis_hook_str: str = env("CORE_REGISTRY", ".")
-        return [r.strip() for r in regis_hook_str.split(",")]
+    def regis_call(self) -> list[str]:
+        regis_call_str: str = env("CORE_REGISTRY", ".")
+        return [r.strip() for r in regis_call_str.split(",")]
 
     @property
     def regis_filter(self) -> list[str]:

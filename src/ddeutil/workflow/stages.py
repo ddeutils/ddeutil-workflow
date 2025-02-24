@@ -42,9 +42,9 @@ from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
 from .__types import DictData, DictStr, TupleStr
+from .call import TagFunc, extract_call
 from .conf import config, get_logger
 from .exceptions import StageException
-from .hook import TagFunc, extract_hook
 from .result import Result, Status
 from .templates import not_in_template, param2template
 from .utils import (
@@ -60,7 +60,7 @@ __all__: TupleStr = (
     "EmptyStage",
     "BashStage",
     "PyStage",
-    "HookStage",
+    "CallStage",
     "TriggerStage",
     "Stage",
 )
@@ -140,6 +140,7 @@ class BaseStage(BaseModel, ABC):
         params: DictData,
         *,
         run_id: str | None = None,
+        parent_run_id: str | None = None,
         result: Result | None = None,
     ) -> Result:
         """Handler execution result from the stage `execute` method.
@@ -167,6 +168,7 @@ class BaseStage(BaseModel, ABC):
 
         :param params: A parameter data that want to use in this execution.
         :param run_id: (str) A running stage ID for this execution.
+        :param parent_run_id: A parent workflow running ID for this release.
         :param result: (Result) A result object for keeping context and status
             data.
 
@@ -177,7 +179,10 @@ class BaseStage(BaseModel, ABC):
                 run_id=(
                     run_id or gen_id(self.name + (self.id or ""), unique=True)
                 ),
+                parent_run_id=parent_run_id,
             )
+        elif parent_run_id:
+            result.set_parent_run_id(parent_run_id)
 
         try:
             return self.execute(params, result=result)
@@ -327,6 +332,11 @@ class EmptyStage(BaseStage):
 
         :rtype: Result
         """
+        if result is None:  # pragma: no cov
+            result: Result = Result(
+                run_id=gen_id(self.name + (self.id or ""), unique=True)
+            )
+
         result.trace.info(
             f"[STAGE]: Empty-Execute: {self.name!r}: "
             f"( {param2template(self.echo, params=params) or '...'} )"
@@ -419,6 +429,11 @@ class BashStage(BaseStage):
 
         :rtype: Result
         """
+        if result is None:  # pragma: no cov
+            result: Result = Result(
+                run_id=gen_id(self.name + (self.id or ""), unique=True)
+            )
+
         bash: str = param2template(dedent(self.bash), params)
 
         result.trace.info(f"[STAGE]: Shell-Execute: {self.name}")
@@ -538,6 +553,11 @@ class PyStage(BaseStage):
 
         :rtype: Result
         """
+        if result is None:  # pragma: no cov
+            result: Result = Result(
+                run_id=gen_id(self.name + (self.id or ""), unique=True)
+            )
+
         # NOTE: Replace the run statement that has templating value.
         run: str = param2template(dedent(self.run), params)
 
@@ -559,8 +579,8 @@ class PyStage(BaseStage):
         )
 
 
-class HookStage(BaseStage):
-    """Hook executor that hook the Python function from registry with tag
+class CallStage(BaseStage):
+    """Call executor that call the Python function from registry with tag
     decorator function in ``utils`` module and run it with input arguments.
 
         This stage is different with PyStage because the PyStage is just calling
@@ -578,23 +598,23 @@ class HookStage(BaseStage):
 
     uses: str = Field(
         description=(
-            "A pointer that want to load function from the hook registry."
+            "A pointer that want to load function from the call registry."
         ),
     )
     args: DictData = Field(
         default_factory=dict,
-        description="An arguments that want to pass to the hook function.",
+        description="An arguments that want to pass to the call function.",
         alias="with",
     )
 
     def execute(
         self, params: DictData, *, result: Result | None = None
     ) -> Result:
-        """Execute the Hook function that already in the hook registry.
+        """Execute the Call function that already in the call registry.
 
-        :raise ValueError: When the necessary arguments of hook function do not
+        :raise ValueError: When the necessary arguments of call function do not
             set from the input params argument.
-        :raise TypeError: When the return type of hook function does not be
+        :raise TypeError: When the return type of call function does not be
             dict type.
 
         :param params: A parameter that want to pass before run any statement.
@@ -605,7 +625,12 @@ class HookStage(BaseStage):
 
         :rtype: Result
         """
-        t_func: TagFunc = extract_hook(param2template(self.uses, params))()
+        if result is None:  # pragma: no cov
+            result: Result = Result(
+                run_id=gen_id(self.name + (self.id or ""), unique=True)
+            )
+
+        t_func: TagFunc = extract_call(param2template(self.uses, params))()
 
         # VALIDATE: check input task caller parameters that exists before
         #   calling.
@@ -628,11 +653,11 @@ class HookStage(BaseStage):
         if "result" not in ips.parameters:
             args.pop("result")
 
-        result.trace.info(f"[STAGE]: Hook-Execute: {t_func.name}@{t_func.tag}")
+        result.trace.info(f"[STAGE]: Call-Execute: {t_func.name}@{t_func.tag}")
         rs: DictData = t_func(**param2template(args, params))
 
         # VALIDATE:
-        #   Check the result type from hook function, it should be dict.
+        #   Check the result type from call function, it should be dict.
         if not isinstance(rs, dict):
             raise TypeError(
                 f"Return type: '{t_func.name}@{t_func.tag}' does not serialize "
@@ -679,6 +704,11 @@ class TriggerStage(BaseStage):
         # NOTE: Lazy import this workflow object.
         from . import Workflow
 
+        if result is None:  # pragma: no cov
+            result: Result = Result(
+                run_id=gen_id(self.name + (self.id or ""), unique=True)
+            )
+
         # NOTE: Loading workflow object from trigger name.
         _trigger: str = param2template(self.trigger, params=params)
 
@@ -700,19 +730,37 @@ class TriggerStage(BaseStage):
 Stage = Union[
     PyStage,
     BashStage,
-    HookStage,
+    CallStage,
     TriggerStage,
     EmptyStage,
 ]
 
 
 # TODO: Not implement this stages yet
-class ParallelStage(BaseModel):  # pragma: no cov
+class ParallelStage(BaseStage):  # pragma: no cov
     parallel: list[Stage]
     max_parallel_core: int = Field(default=2)
 
+    def execute(
+        self, params: DictData, *, result: Result | None = None
+    ) -> Result: ...
+
 
 # TODO: Not implement this stages yet
-class ForEachStage(BaseModel):  # pragma: no cov
+class ForEachStage(BaseStage):  # pragma: no cov
     foreach: list[str]
     stages: list[Stage]
+
+    def execute(
+        self, params: DictData, *, result: Result | None = None
+    ) -> Result: ...
+
+
+# TODO: Not implement this stages yet
+class HookStage(BaseStage):  # pragma: no cov
+    foreach: list[str]
+    stages: list[Stage]
+
+    def execute(
+        self, params: DictData, *, result: Result | None = None
+    ) -> Result: ...

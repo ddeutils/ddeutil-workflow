@@ -5,7 +5,7 @@ from ddeutil.workflow import Workflow
 from ddeutil.workflow.conf import Config
 from ddeutil.workflow.job import Job
 from ddeutil.workflow.result import Result
-from ddeutil.workflow.stage import HookStage
+from ddeutil.workflow.stages import CallStage
 
 from .utils import dump_yaml_context
 
@@ -359,11 +359,11 @@ def test_workflow_exec_needs_parallel():
         } == rs.context
 
 
-def test_workflow_exec_hook(test_path):
+def test_workflow_exec_call(test_path):
     with dump_yaml_context(
-        test_path / "conf/demo/01_99_wf_test_wf_hook_csv_to_parquet.yml",
+        test_path / "conf/demo/01_99_wf_test_wf_call_csv_to_parquet.yml",
         data="""
-        tmp-wf-hook-csv-to-parquet:
+        tmp-wf-call-csv-to-parquet:
           type: Workflow
           params:
             run-date: datetime
@@ -381,12 +381,12 @@ def test_workflow_exec_hook(test_path):
         """,
     ):
         workflow = Workflow.from_loader(
-            name="tmp-wf-hook-csv-to-parquet",
+            name="tmp-wf-call-csv-to-parquet",
             externals={},
         )
 
-        # NOTE: execute from the hook stage model
-        stage: HookStage = workflow.job("extract-load").stage("extract-load")
+        # NOTE: execute from the call stage model
+        stage: CallStage = workflow.job("extract-load").stage("extract-load")
         rs = stage.handler_execute(
             params={
                 "params": {
@@ -444,11 +444,11 @@ def test_workflow_exec_hook(test_path):
         } == rs.context
 
 
-def test_workflow_exec_hook_with_prefix(test_path):
+def test_workflow_exec_call_with_prefix(test_path):
     with dump_yaml_context(
-        test_path / "conf/demo/01_99_wf_test_wf_hook_mssql_proc.yml",
+        test_path / "conf/demo/01_99_wf_test_wf_call_mssql_proc.yml",
         data="""
-        tmp-wf-hook-mssql-proc:
+        tmp-wf-call-mssql-proc:
           type: Workflow
           params:
             run_date: datetime
@@ -470,7 +470,7 @@ def test_workflow_exec_hook_with_prefix(test_path):
                       target: ${{ params.target_name }}
         """,
     ):
-        workflow = Workflow.from_loader(name="tmp-wf-hook-mssql-proc")
+        workflow = Workflow.from_loader(name="tmp-wf-call-mssql-proc")
         rs = workflow.execute(
             params={
                 "run_date": datetime(2024, 1, 1),

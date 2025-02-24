@@ -20,9 +20,9 @@ project/
  │   ╰─ manual-workflow.yml
  ├─ logs/
  ├─ src/
- │   ╰─ hooks/
+ │   ╰─ calls/
  │       ├─ __init__.py
- │       ╰─ https_hook.py
+ │       ╰─ https_call.py
  ├─ main.py
  ╰─ .env
 ```
@@ -55,14 +55,14 @@ wf-run-manual:
             incremental: {{ params.run_date }}
 ```
 
-Create the hook function that use on your stage.
+Create the call function that use on your stage.
 
 ```python title="./src/__init__.py"
-from .https_hook import *
+from .https_call import *
 ```
 
-```python title="./src/https_hook.py"
-from ddeutil.workflow.hook import tag
+```python title="./src/https_call.py"
+from ddeutil.workflow.call import tag
 
 
 @tag("httpx", alias="https-external")

@@ -104,9 +104,9 @@ use-case.
 
 !!! important
 
-    I recommend you to use the `hook` stage for all actions that you want to do
+    I recommend you to use the `call` stage for all actions that you want to do
     with workflow activity that you want to orchestrate. Because it able to dynamic
-    an input argument with the same hook function that make you use less time to
+    an input argument with the same call function that make you use less time to
     maintenance your data workflows.
 
 ```yaml
@@ -148,7 +148,7 @@ run-py-local:
                  writing_mode: flatten
                  aws_s3_path: my-data/open-data/${{ params.source-extract }}
 
-                 # This Authentication code should implement with your custom hook
+                 # This Authentication code should implement with your custom call
                  # function. The template allow you to use environment variable.
                  aws_access_client_id: ${AWS_ACCESS_CLIENT_ID}
                  aws_access_client_secret: ${AWS_ACCESS_CLIENT_SECRET}

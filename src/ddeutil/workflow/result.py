@@ -142,6 +142,26 @@ class Result:
     event: Event = field(default_factory=Event, compare=False)
     ts: datetime = field(default_factory=get_dt_tznow, compare=False)
 
+    @classmethod
+    def construct_with_rs_or_id(
+        cls,
+        result: Result | None = None,
+        run_id: str | None = None,
+        parent_run_id: str | None = None,
+        id_logic: str | None = None,
+    ) -> Self:  # pragma: no cov
+        """Create the Result object or set parent running id if passing Result
+        object.
+        """
+        if result is None:
+            result: Result = cls(
+                run_id=(run_id or gen_id(id_logic or "", unique=True)),
+                parent_run_id=parent_run_id,
+            )
+        elif parent_run_id:
+            result.set_parent_run_id(parent_run_id)
+        return result
+
     def set_run_id(self, running_id: str) -> Self:
         """Set a running ID.
 

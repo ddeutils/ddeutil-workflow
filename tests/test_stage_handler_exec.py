@@ -8,7 +8,7 @@ from ddeutil.workflow import Workflow
 from ddeutil.workflow.conf import Config
 from ddeutil.workflow.exceptions import StageException
 from ddeutil.workflow.result import Result
-from ddeutil.workflow.stage import Stage
+from ddeutil.workflow.stages import Stage
 
 from .utils import dump_yaml_context
 
@@ -56,11 +56,11 @@ def test_stage_exec_bash_env_raise():
         stage.handler_execute({})
 
 
-def test_stage_exec_hook(test_path):
+def test_stage_exec_call(test_path):
     with dump_yaml_context(
-        test_path / "conf/demo/01_99_wf_test_wf_hook_return_type.yml",
+        test_path / "conf/demo/01_99_wf_test_wf_call_return_type.yml",
         data="""
-        tmp-wf-hook-return-type:
+        tmp-wf-call-return-type:
           type: Workflow
           jobs:
             first-job:
@@ -77,11 +77,11 @@ def test_stage_exec_hook(test_path):
                       run_date: 2024-08-01
                       source: src
                       target: tgt
-                - name: "Hook value not valid"
-                  id: hook-not-valid
+                - name: "Call value not valid"
+                  id: call-not-valid
                   uses: tasks-foo-bar
-                - name: "Hook does not register"
-                  id: hook-not-register
+                - name: "Call does not register"
+                  id: call-not-register
                   uses: tasks/abc@foo
             second-job:
               stages:
@@ -93,7 +93,7 @@ def test_stage_exec_hook(test_path):
                     sink: sink
         """,
     ):
-        workflow = Workflow.from_loader(name="tmp-wf-hook-return-type")
+        workflow = Workflow.from_loader(name="tmp-wf-call-return-type")
 
         stage: Stage = workflow.job("second-job").stage("extract-load")
         rs: Result = stage.handler_execute({})
@@ -111,14 +111,14 @@ def test_stage_exec_hook(test_path):
             stage: Stage = workflow.job("first-job").stage("args-necessary")
             stage.handler_execute({})
 
-        # NOTE: Raise because hook does not valid.
+        # NOTE: Raise because call does not valid.
         with pytest.raises(StageException):
-            stage: Stage = workflow.job("first-job").stage("hook-not-valid")
+            stage: Stage = workflow.job("first-job").stage("call-not-valid")
             stage.handler_execute({})
 
-        # NOTE: Raise because hook does not register.
+        # NOTE: Raise because call does not register.
         with pytest.raises(StageException):
-            stage: Stage = workflow.job("first-job").stage("hook-not-register")
+            stage: Stage = workflow.job("first-job").stage("call-not-register")
             stage.handler_execute({})
 
 

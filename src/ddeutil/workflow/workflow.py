@@ -840,9 +840,8 @@ class Workflow(BaseModel):
         job_id: str,
         params: DictData,
         *,
-        run_id: str | None = None,
-        raise_error: bool = True,
         result: Result | None = None,
+        raise_error: bool = True,
     ) -> Result:
         """Job execution with passing dynamic parameters from the main workflow
         execution to the target job object via job's ID.
@@ -857,7 +856,6 @@ class Workflow(BaseModel):
 
         :param job_id: A job ID that want to execute.
         :param params: A params that was parameterized from workflow execution.
-        :param run_id: A workflow running ID for this job execution.
         :param raise_error: A flag that raise error instead catching to result
             if it gets exception from job execution.
         :param result: (Result) A result object for keeping context and status
@@ -868,9 +866,7 @@ class Workflow(BaseModel):
             context.
         """
         if result is None:  # pragma: no cov
-            result: Result = Result(
-                run_id=(run_id or gen_id(self.name, unique=True))
-            )
+            result: Result = Result(run_id=gen_id(self.name, unique=True))
 
         # VALIDATE: check a job ID that exists in this workflow or not.
         if job_id not in self.jobs:
@@ -883,13 +879,18 @@ class Workflow(BaseModel):
 
         # IMPORTANT:
         #   This execution change all job running IDs to the current workflow
-        #   execution running ID (with passing run_id to the job execution
-        #   argument).
+        #   running ID, but it still trac log to the same parent running ID
+        #   (with passing `run_id` and `parent_run_id` to the job execution
+        #   arguments).
         #
         try:
             job: Job = self.jobs[job_id]
             job.set_outputs(
-                job.execute(params=params, run_id=result.run_id).context,
+                job.execute(
+                    params=params,
+                    run_id=result.run_id,
+                    parent_run_id=result.parent_run_id,
+                ).context,
                 to=params,
             )
         except JobException as err:
@@ -1065,7 +1066,7 @@ class Workflow(BaseModel):
                 futures.append(
                     executor.submit(
                         self.execute_job,
-                        job_id,
+                        job_id=job_id,
                         params=context,
                         result=result,
                     ),
