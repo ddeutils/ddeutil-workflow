@@ -133,18 +133,14 @@ class Config(BaseConfig):  # pragma: no cov
         return env(
             "LOG_FORMAT_FILE",
             (
-                "{datetime():%Y-%m-%d %H-%M-%S}: {message:120s} "
-                "{filename}{lineno}"
+                "{datetime:%Y-%m-%d %H-%M-%S} ({process:5d}, {thread:5d}) "
+                "{message:120s} ({filename}:{lineno})"
             ),
         )
 
     @property
     def enable_write_log(self) -> bool:
         return str2bool(env("LOG_ENABLE_WRITE", "false"))
-
-    @property
-    def enable_rotate_file(self) -> bool:
-        return str2bool(env("LOG_ENABLE_ROTATED_FILE", "false"))
 
     # NOTE: Audit Log
     @property

@@ -77,7 +77,11 @@ class BaseTraceLog(ABC):  # pragma: no cov
 
     def debug(self, message: str):
         msg: str = self.make_message(message)
-        self.writer(msg)
+
+        # NOTE: Write file if debug mode.
+        if config.debug:
+            self.writer(msg)
+
         logger.debug(msg, stacklevel=2)
 
     def info(self, message: str):
@@ -145,9 +149,20 @@ class TraceLog(BaseTraceLog):  # pragma: no cov
         with (self.log_file / write_file).open(
             mode="at", encoding="utf-8"
         ) as f:
+            msg_fmt: str = f"{config.log_format_file}\n"
             f.write(
-                f"{get_dt_tznow():%Y-%m-%d %H-%M-%S} ({process:5d}, {thread:5d}) "
-                f"{message:120s} ({filename}:{lineno})\n"
+                msg_fmt.format(
+                    **{
+                        "datetime": get_dt_tznow().strftime(
+                            config.log_datetime_format
+                        ),
+                        "process": process,
+                        "thread": thread,
+                        "message": message,
+                        "filename": filename,
+                        "lineno": lineno,
+                    }
+                )
             )
 
 
