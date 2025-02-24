@@ -150,6 +150,7 @@ class TraceLog(BaseTraceLog):  # pragma: no cov
             mode="at", encoding="utf-8"
         ) as f:
             msg_fmt: str = f"{config.log_format_file}\n"
+            print(msg_fmt)
             f.write(
                 msg_fmt.format(
                     **{

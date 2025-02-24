@@ -133,8 +133,8 @@ class Config(BaseConfig):  # pragma: no cov
         return env(
             "LOG_FORMAT_FILE",
             (
-                "{datetime:%Y-%m-%d %H-%M-%S} ({process:5d}, {thread:5d}) "
-                "{message:120s} ({filename}:{lineno})"
+                "{datetime} ({process:5d}, {thread:5d}) {message:120s} "
+                "({filename}:{lineno})"
             ),
         )
 
