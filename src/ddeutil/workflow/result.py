@@ -8,14 +8,14 @@ by all object in this package.
 """
 from __future__ import annotations
 
-import os.path
+import os
 from abc import ABC, abstractmethod
 from dataclasses import field
 from datetime import datetime
 from enum import IntEnum
 from inspect import Traceback, currentframe, getframeinfo
 from pathlib import Path
-from threading import Event
+from threading import Event, get_ident
 from typing import Optional
 
 from pydantic import ConfigDict
@@ -62,14 +62,12 @@ class Status(IntEnum):
     WAIT: int = 2
 
 
+@dataclass(frozen=True)
 class BaseTraceLog(ABC):  # pragma: no cov
-    """Base Trace Log object."""
+    """Base Trace Log dataclass object."""
 
-    __slots__: TupleStr = (
-        "run_id",
-        "parent_run_id",
-        "log_file",
-    )
+    run_id: str
+    parent_run_id: Optional[str] = None
 
     @abstractmethod
     def writer(self, message: str, is_err: bool = False) -> None: ...
@@ -101,19 +99,14 @@ class BaseTraceLog(ABC):  # pragma: no cov
 class TraceLog(BaseTraceLog):  # pragma: no cov
     """Trace Log object that write file to the local storage."""
 
-    def __init__(
-        self,
-        run_id: str,
-        parent_run_id: str | None = None,
-    ):
-        self.run_id: str = run_id
-        self.parent_run_id: str | None = parent_run_id
-        self.log_file: Path = (
+    @property
+    def log_file(self) -> Path:
+        log_file: Path = (
             config.log_path / f"run_id={self.parent_run_id or self.run_id}"
         )
-
-        if not self.log_file.exists():
-            self.log_file.mkdir(parents=True)
+        if not log_file.exists():
+            log_file.mkdir(parents=True)
+        return log_file
 
     @property
     def cut_id(self) -> str:
@@ -136,7 +129,6 @@ class TraceLog(BaseTraceLog):  # pragma: no cov
 
         :param message:
         :param is_err:
-        :return:
         """
         if not config.enable_write_log:
             return
@@ -145,13 +137,17 @@ class TraceLog(BaseTraceLog):  # pragma: no cov
         filename: str = frame_info.filename.split(os.path.sep)[-1]
         lineno: int = frame_info.lineno
 
+        # NOTE: set process and thread IDs.
+        process: int = os.getpid()
+        thread: int = get_ident()
+
         write_file: str = "stderr.txt" if is_err else "stdout.txt"
         with (self.log_file / write_file).open(
             mode="at", encoding="utf-8"
         ) as f:
             f.write(
-                f"{get_dt_tznow():%Y-%m-%d %H-%M-%S}: {message:120s} "
-                f"{filename}{lineno}\n"
+                f"{get_dt_tznow():%Y-%m-%d %H-%M-%S} ({process:5d}, {thread:5d}) "
+                f"{message:120s} ({filename}:{lineno})\n"
             )
 
 
