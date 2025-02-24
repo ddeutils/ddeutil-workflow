@@ -80,7 +80,7 @@ def test_conf_log_file_find_logs(root_path):
     log = next(FileAudit.find_audits(name="wf-scheduling"))
     assert isinstance(log, FileAudit)
 
-    wf_log_path = root_path / "logs/workflow=wf-no-release-log/"
+    wf_log_path = root_path / "audits/workflow=wf-no-release-log/"
     wf_log_path.mkdir(exist_ok=True)
 
     for log in FileAudit.find_audits(name="wf-no-release-log"):
