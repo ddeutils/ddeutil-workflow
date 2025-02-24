@@ -139,6 +139,7 @@ cython_debug/
 # Examples data for testing
 jobs-store.sqlite
 *.parquet
+audits/
 logs/
 
 # Mount Volumn Docker

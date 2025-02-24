@@ -3,6 +3,9 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
+"""This is the Result module. It is the data context transfer objects that use
+by all object in this package.
+"""
 from __future__ import annotations
 
 from dataclasses import field
@@ -55,37 +58,24 @@ class Status(IntEnum):
     WAIT: int = 2
 
 
-class TraceLogWriter:
-    """Writing log message to the target log path that was set from config."""
-
-    def trace_log_path(self) -> Path: ...
-
-    def debug(self, message: str):
-        logger.debug(message)
-
-    def info(self, message: str):
-        logger.info(message)
-
-    def warning(self, message: str):
-        logger.warning(message)
-
-    def error(self, message: str):
-        logger.error(message)
-
-
 class TraceLog:  # pragma: no cov
     """Trace Log object."""
 
     __slots__: TupleStr = (
         "run_id",
         "parent_run_id",
-        "writer",
+        "log_file",
     )
 
     def __init__(self, run_id: str, parent_run_id: str | None = None):
         self.run_id: str = run_id
         self.parent_run_id: str | None = parent_run_id
-        self.writer: TraceLogWriter = TraceLogWriter()
+        self.log_file: Path = (
+            config.log_path / f"run_id={self.parent_run_id or self.run_id}"
+        )
+
+        if not self.log_file.exists():
+            self.log_file.mkdir()
 
     @property
     def cut_id(self) -> str:
@@ -97,17 +87,38 @@ class TraceLog:  # pragma: no cov
         cut_parent_run_id: str = cut_id(self.parent_run_id)
         return f"{cut_parent_run_id}...{cut_run_id}"
 
+    def writer(self, message: str, is_err: bool = False) -> None:
+        """The path of logging data will store by format:
+
+            ... ./logs/run_id=<run-id>/stdout.txt
+            ... ./logs/run_id=<run-id>/stderr.txt
+
+        :param message:
+        :param is_err:
+        :return:
+        """
+        if not config.enable_write_log:
+            return
+
+        filename: str = "stderr.txt" if is_err else "stdout.txt"
+        with (self.log_file / filename).open(mode="at", encoding="utf-8") as f:
+            f.write(message)
+
     def debug(self, message: str):
-        self.writer.debug(f"({self.cut_id}) {message}")
+        self.writer(message)
+        logger.debug(f"({self.cut_id}) {message}")
 
     def info(self, message: str):
-        self.writer.info(f"({self.cut_id}) {message}")
+        self.writer(message)
+        logger.info(f"({self.cut_id}) {message}")
 
     def warning(self, message: str):
-        self.writer.warning(f"({self.cut_id}) {message}")
+        self.writer(message)
+        logger.warning(f"({self.cut_id}) {message}")
 
     def error(self, message: str):
-        self.writer.error(f"({self.cut_id}) {message}")
+        self.writer(message, is_err=True)
+        logger.error(f"({self.cut_id}) {message}")
 
 
 @dataclass(

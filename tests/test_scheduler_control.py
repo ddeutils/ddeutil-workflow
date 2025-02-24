@@ -9,7 +9,7 @@ from ddeutil.workflow.scheduler import schedule_control
 
 @pytest.mark.schedule
 @mock.patch.object(Config, "stop_boundary_delta", timedelta(minutes=1))
-@mock.patch.object(Config, "enable_write_log", False)
+@mock.patch.object(Config, "enable_write_audit", False)
 def test_scheduler_control():
     result: Result = schedule_control(["schedule-every-minute-wf"])
     assert result.status == 0
@@ -27,7 +27,7 @@ def test_scheduler_control():
 
 @pytest.mark.schedule
 @mock.patch.object(Config, "stop_boundary_delta", timedelta(minutes=3))
-@mock.patch.object(Config, "enable_write_log", False)
+@mock.patch.object(Config, "enable_write_audit", False)
 def test_scheduler_control_multi_on():
     result: Result = schedule_control(["schedule-multi-on-wf"])
     assert result.status == 0
@@ -48,7 +48,7 @@ def test_scheduler_control_stop():
 
 @pytest.mark.schedule
 @mock.patch.object(Config, "stop_boundary_delta", timedelta(minutes=2))
-@mock.patch.object(Config, "enable_write_log", False)
+@mock.patch.object(Config, "enable_write_audit", False)
 def test_scheduler_control_parallel():
     result: Result = schedule_control(["schedule-every-minute-wf-parallel"])
     assert result.status == 0

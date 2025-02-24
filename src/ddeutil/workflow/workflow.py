@@ -525,12 +525,12 @@ class Workflow(BaseModel):
         name: str = override_log_name or self.name
 
         if result is None:
-            run_id: str = run_id or gen_id(name, unique=True)
-            result: Result = Result(run_id=run_id, parent_run_id=parent_run_id)
-        else:
-            run_id: str = result.run_id
-            if parent_run_id:
-                result.set_parent_run_id(parent_run_id)
+            result: Result = Result(
+                run_id=(run_id or gen_id(name, unique=True)),
+                parent_run_id=parent_run_id,
+            )
+        elif parent_run_id:
+            result.set_parent_run_id(parent_run_id)
 
         if queue is not None and not isinstance(queue, ReleaseQueue):
             raise TypeError(
@@ -552,7 +552,7 @@ class Workflow(BaseModel):
             "release": {
                 "logical_date": release.date,
                 "execute_date": datetime.now(tz=config.tz),
-                "run_id": run_id,
+                "run_id": result.run_id,
                 "timezone": config.tz,
             }
         }
@@ -565,6 +565,7 @@ class Workflow(BaseModel):
         self.execute(
             params=param2template(params, release_params),
             result=result,
+            parent_run_id=result.parent_run_id,
         )
         result.trace.debug(
             f"[RELEASE]: End release - {name!r} : "
@@ -923,6 +924,7 @@ class Workflow(BaseModel):
         can access it with syntax:
 
             ... ${job-name}.stages.${stage-id}.outputs.${key}
+            ... ${job-name}.stages.${stage-id}.errors.${key}
 
         :param params: An input parameters that use on workflow execution that
             will parameterize before using it. Default is None.
@@ -937,22 +939,21 @@ class Workflow(BaseModel):
 
         :rtype: Result
         """
-        # NOTE: I use this condition because this method allow passing empty
-        #   params and I do not want to create new dict object.
         ts: float = time.monotonic()
         if result is None:  # pragma: no cov
             result: Result = Result(
                 run_id=(run_id or gen_id(self.name, unique=True)),
                 parent_run_id=parent_run_id,
             )
+        elif parent_run_id:
+            result.set_parent_run_id(parent_run_id)
 
         result.trace.info(f"[WORKFLOW]: Start Execute: {self.name!r} ...")
 
         # NOTE: It should not do anything if it does not have job.
         if not self.jobs:
             result.trace.warning(
-                f"[WORKFLOW]: This workflow: {self.name!r} does not have any "
-                f"jobs"
+                f"[WORKFLOW]: Workflow: {self.name!r} does not have any jobs"
             )
             return result.catch(status=0, context=params)
 
@@ -1093,9 +1094,7 @@ class Workflow(BaseModel):
                 future.cancel()
 
         # NOTE: Raise timeout error.
-        result.trace.warning(
-            f"[WORKFLOW]: Execution: {self.name!r} was timeout."
-        )
+        result.trace.error(f"[WORKFLOW]: Execution: {self.name!r} was timeout.")
         raise WorkflowException(f"Execution: {self.name!r} was timeout.")
 
     def __exec_non_threading(
@@ -1160,9 +1159,7 @@ class Workflow(BaseModel):
             return context
 
         # NOTE: Raise timeout error.
-        result.trace.warning(
-            f"[WORKFLOW]: Execution: {self.name!r} was timeout."
-        )
+        result.trace.error(f"[WORKFLOW]: Execution: {self.name!r} was timeout.")
         raise WorkflowException(f"Execution: {self.name!r} was timeout.")
 
 

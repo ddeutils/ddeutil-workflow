@@ -42,7 +42,7 @@ def test_schedule_tasks(test_path):
         )
 
 
-@mock.patch.object(Config, "enable_write_log", False)
+@mock.patch.object(Config, "enable_write_audit", False)
 def test_schedule_tasks_release(test_path):
     with dump_yaml_context(
         test_path / "conf/demo/03_99_schedule_tasks_release.yml",

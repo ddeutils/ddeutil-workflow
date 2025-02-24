@@ -3,7 +3,7 @@ venv/
 .venv/
 
 # Exclude cache, logs, and temporary files
-logs/
+audits/
 docs/
 __pycache__/
 .github/

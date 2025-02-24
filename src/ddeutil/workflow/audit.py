@@ -55,7 +55,7 @@ class BaseAudit(BaseModel, ABC):
 
         :rtype: Self
         """
-        if config.enable_write_log:
+        if config.enable_write_audit:
             self.do_before()
         return self
 
@@ -147,7 +147,7 @@ class FileAudit(BaseAudit):
         :return: Return False if the release log was not pointed or created.
         """
         # NOTE: Return False if enable writing log flag does not set.
-        if not config.enable_write_log:
+        if not config.enable_write_audit:
             return False
 
         # NOTE: create pointer path that use the same logic of pointer method.
@@ -178,7 +178,7 @@ class FileAudit(BaseAudit):
         from .utils import cut_id
 
         # NOTE: Check environ variable was set for real writing.
-        if not config.enable_write_log:
+        if not config.enable_write_audit:
             logger.debug(
                 f"({cut_id(self.run_id)}) [LOG]: Skip writing log cause "
                 f"config was set"
@@ -221,7 +221,7 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
         from .utils import cut_id
 
         # NOTE: Check environ variable was set for real writing.
-        if not config.enable_write_log:
+        if not config.enable_write_audit:
             logger.debug(
                 f"({cut_id(self.run_id)}) [LOG]: Skip writing log cause "
                 f"config was set"

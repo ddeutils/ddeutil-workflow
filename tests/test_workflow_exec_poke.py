@@ -11,7 +11,8 @@ from .utils import dump_yaml_context
 
 
 @pytest.mark.poke
-@mock.patch.object(Config, "enable_write_log", False)
+@mock.patch.object(Config, "enable_write_audit", False)
+@mock.patch.object(Config, "enable_write_log", True)
 def test_workflow_poke(test_path):
     with dump_yaml_context(
         test_path / "conf/demo/01_99_wf_test_wf_poke.yml",
@@ -75,7 +76,7 @@ def test_workflow_poke(test_path):
 
 
 @pytest.mark.poke
-@mock.patch.object(Config, "enable_write_log", False)
+@mock.patch.object(Config, "enable_write_audit", False)
 def test_workflow_poke_no_queue(test_path):
     with dump_yaml_context(
         test_path / "conf/demo/01_99_wf_test_wf_poke_no_schedule.yml",
@@ -114,7 +115,7 @@ def test_workflow_poke_raise():
 
 
 @pytest.mark.poke
-@mock.patch.object(Config, "enable_write_log", False)
+@mock.patch.object(Config, "enable_write_audit", False)
 def test_workflow_poke_with_start_date_and_period(test_path):
     with dump_yaml_context(
         test_path / "conf/demo/01_99_wf_test_wf_poke_with_start_date.yml",
@@ -151,7 +152,7 @@ def test_workflow_poke_with_start_date_and_period(test_path):
 
 
 @pytest.mark.poke
-@mock.patch.object(Config, "enable_write_log", False)
+@mock.patch.object(Config, "enable_write_audit", False)
 def test_workflow_poke_no_on(test_path):
     with dump_yaml_context(
         test_path / "conf/demo/01_99_wf_test_wf_poke_no_on.yml",

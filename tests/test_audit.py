@@ -7,7 +7,7 @@ from ddeutil.workflow.audit import FileAudit
 from ddeutil.workflow.conf import Config
 
 
-@mock.patch.object(Config, "enable_write_log", False)
+@mock.patch.object(Config, "enable_write_audit", False)
 def test_conf_log_file():
     log = FileAudit.model_validate(
         obj={
@@ -29,7 +29,7 @@ def test_conf_log_file():
     )
 
 
-@mock.patch.object(Config, "enable_write_log", True)
+@mock.patch.object(Config, "enable_write_audit", True)
 def test_conf_log_file_do_first(root_path):
     log = FileAudit.model_validate(
         obj={
@@ -56,7 +56,7 @@ def test_conf_log_file_do_first(root_path):
     shutil.rmtree((root_path / pointer).parent)
 
 
-@mock.patch.object(Config, "enable_write_log", True)
+@mock.patch.object(Config, "enable_write_audit", True)
 def test_conf_log_file_find_logs(root_path):
     log = FileAudit.model_validate(
         obj={

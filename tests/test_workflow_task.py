@@ -54,7 +54,7 @@ def test_workflow_task():
         )
 
 
-@mock.patch.object(Config, "enable_write_log", False)
+@mock.patch.object(Config, "enable_write_audit", False)
 def test_workflow_task_queue(test_path):
     with dump_yaml_context(
         test_path / "conf/demo/01_99_wf_test_wf_task_data_release.yml",
@@ -100,7 +100,7 @@ def test_workflow_task_queue(test_path):
         assert len(queue["demo"].queue) == 5
 
 
-@mock.patch.object(Config, "enable_write_log", False)
+@mock.patch.object(Config, "enable_write_audit", False)
 def test_workflow_task_release(test_path):
     with dump_yaml_context(
         test_path / "conf/demo/01_99_wf_test_wf_task_data_release.yml",
@@ -159,7 +159,7 @@ def test_workflow_task_release(test_path):
             )
 
 
-@mock.patch.object(Config, "enable_write_log", False)
+@mock.patch.object(Config, "enable_write_audit", False)
 def test_workflow_task_release_long_running(test_path):
     with dump_yaml_context(
         test_path / "conf/demo/01_99_wf_test_wf_task_data_release_long_run.yml",

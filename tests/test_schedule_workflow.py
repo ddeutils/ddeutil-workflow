@@ -81,7 +81,7 @@ def test_schedule_workflow_raise_on(test_path):
         )
 
 
-@mock.patch.object(Config, "enable_write_log", False)
+@mock.patch.object(Config, "enable_write_audit", False)
 def test_schedule_workflow_tasks(test_path):
     tz: ZoneInfo = ZoneInfo("Asia/Bangkok")
     release_date: datetime = datetime(2024, 1, 1, 1, tzinfo=tz)
