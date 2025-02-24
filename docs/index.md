@@ -35,20 +35,16 @@ you should to set the data layer separate this core program before run this appl
 
 ```mermaid
 flowchart LR
-    A((User))
+    A((fa:fa-user User))
+
     subgraph Docker Container
+        direction TB
         G@{ shape: rounded, label: "Observe<br>Application" }
     end
 
     subgraph Docker Container
         direction TB
-
-        subgraph wf [Workflow]
-            direction LR
-            B(FastAPI)
-            BE(Core)
-            B <--> |interact| BE
-        end
+        B@{ shape: rounded, label: "Workflow<br>Application" }
     end
 
     A <--->|action &<br>response| B
@@ -64,12 +60,12 @@ flowchart LR
     F@{ shape: tag-rect, label: "YAML<br>files" }
     end
 
-    BE --->|disable| F
-    F --->|read| BE
+    B --->|disable| F
+    F --->|read| B
 
-    BE --->|write| E
-    E --->|read| BE
-    BE --->|write| D
+    B --->|write| E
+    E --->|read| B
+    B --->|write| D
 
     D -.->|read| G
     E -.->|read| G

@@ -42,20 +42,16 @@ you should to set the data layer separate this core program before run this appl
 
 ```mermaid
 flowchart LR
-    A((User))
+    A((fa:fa-user User))
+
     subgraph Docker Container
+        direction TB
         G@{ shape: rounded, label: "Observe<br>Application" }
     end
 
     subgraph Docker Container
         direction TB
-
-        subgraph wf [Workflow]
-            direction LR
-            B(FastAPI)
-            BE(Core)
-            B <--> |interact| BE
-        end
+        B@{ shape: rounded, label: "Workflow<br>Application" }
     end
 
     A <--->|action &<br>response| B
@@ -71,12 +67,12 @@ flowchart LR
     F@{ shape: tag-rect, label: "YAML<br>files" }
     end
 
-    BE --->|disable| F
-    F --->|read| BE
+    B --->|disable| F
+    F --->|read| B
 
-    BE --->|write| E
-    E --->|read| BE
-    BE --->|write| D
+    B --->|write| E
+    E --->|read| B
+    B --->|write| D
 
     D -.->|read| G
     E -.->|read| G
@@ -236,8 +232,9 @@ it will use default value and do not raise any error to you.
 | **PATH**                     |    Log    | `./logs`                                                                                                                        | The log path of the workflow saving log.                                                                           |
 | **DEBUG_MODE**               |    Log    | `true`                                                                                                                          | A flag that enable logging with debug level mode.                                                                  |
 | **FORMAT**                   |    Log    | `%(asctime)s.%(msecs)03d (%(name)-10s, %(process)-5d,%(thread)-5d) [%(levelname)-7s] %(message)-120s (%(filename)s:%(lineno)s)` |                                                                                                                    |
+| **FORMAT_FILE**              |    Log    | `{datetime} ({process:5d}, {thread:5d}) {message:120s} ({filename}:{lineno})`                                                   |                                                                                                                    |
 | **DATETIME_FORMAT**          |    Log    | `%Y-%m-%d %H:%M:%S`                                                                                                             |                                                                                                                    |
-| **ENABLE_ROTATED_FILE**      |    Log    | `false`                                                                                                                         |                                                                                                                    |
+| **ENABLE_WRITE**             |    Log    | `false`                                                                                                                         |                                                                                                                    |
 | **PATH**                     |   Audit   | `./audits`                                                                                                                      |                                                                                                                    |
 | **ENABLE_WRITE**             |   Audit   | `true`                                                                                                                          | A flag that enable logging object saving log to its destination.                                                   |
 | **MAX_PROCESS**              |    App    | `2`                                                                                                                             | The maximum process worker number that run in scheduler app module.                                                |
