@@ -54,25 +54,27 @@ flowchart LR
         B@{ shape: rounded, label: "Workflow<br>Application" }
     end
 
-    A <--->|action &<br>response| B
-    B -....-> |response| G
-    G -....-> |request| B
+    A <-->|action &<br>response| B
+    B -...-> |response| G
+    G -...-> |request| B
 
     subgraph Data Context
-    D@{ shape: processes, label: "Logs" }
-    E@{ shape: lin-cyl, label: "Audit<br>Logs" }
+        D@{ shape: processes, label: "Logs" }
+        E@{ shape: lin-cyl, label: "Audit<br>Logs" }
     end
 
     subgraph Git Context
-    F@{ shape: tag-rect, label: "YAML<br>files" }
+        F@{ shape: tag-rect, label: "YAML<br>files" }
     end
 
-    B --->|disable| F
-    F --->|read| B
+    A ---> |push| H(Repo)
+    H -.-> |pull| F
 
-    B --->|write| E
-    E --->|read| B
-    B --->|write| D
+    B <-->|disable &<br>read| F
+
+    B <-->|read &<br>write| E
+
+    B -->|write| D
 
     D -.->|read| G
     E -.->|read| G
