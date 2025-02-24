@@ -354,7 +354,7 @@ class Schedule(BaseModel):
         return result.catch(status=Status.SUCCESS)
 
 
-ResultOrCancel = Optional[Union[type[CancelJob], Result]]
+ResultOrCancel = Union[type[CancelJob], Result]
 ReturnResultOrCancel = Callable[P, ResultOrCancel]
 DecoratorCancelJob = Callable[[ReturnResultOrCancel], ReturnResultOrCancel]
 
@@ -406,7 +406,8 @@ def schedule_task(
     queue: dict[str, ReleaseQueue],
     threads: ReleaseThreads,
     audit: type[Audit],
-) -> type[CancelJob] | None:
+    parent_run_id: str | None = None,
+) -> ResultOrCancel:
     """Schedule task function that generate thread of workflow task release
     method in background. This function do the same logic as the workflow poke
     method, but it runs with map of schedules and the on values.
@@ -419,9 +420,11 @@ def schedule_task(
     :param queue: A mapping of alias name and ReleaseQueue object.
     :param threads: A mapping of alias name and Thread object.
     :param audit: An audit class that want to make audit object.
+    :param parent_run_id: A parent workflow running ID for this release.
 
-    :rtype: type[CancelJob] | None
+    :rtype: ResultOrCancel
     """
+    result: Result = Result().set_parent_run_id(parent_run_id)
     current_date: datetime = datetime.now(tz=config.tz)
     if current_date > stop.replace(tzinfo=config.tz):
         return CancelJob
@@ -447,11 +450,13 @@ def schedule_task(
         task.queue(stop, q, audit=audit)
 
         # NOTE: Get incoming datetime queue.
-        logger.debug(f"[WORKFLOW]: Queue: {task.alias!r} : {list(q.queue)}")
+        result.trace.debug(
+            f"[WORKFLOW]: Queue: {task.alias!r} : {list(q.queue)}"
+        )
 
         # VALIDATE: Check the queue is empty or not.
         if not q.is_queued:
-            logger.warning(
+            result.trace.warning(
                 f"[WORKFLOW]: Queue is empty for : {task.alias!r} : "
                 f"{task.runner.cron}"
             )
@@ -462,7 +467,7 @@ def schedule_task(
             second=0, microsecond=0
         )
         if (first_date := q.first_queue.date) > current_release:
-            logger.debug(
+            result.trace.debug(
                 f"[WORKFLOW]: Skip schedule "
                 f"{first_date:%Y-%m-%d %H:%M:%S} for : {task.alias!r}"
             )
@@ -477,7 +482,7 @@ def schedule_task(
         release: Release = heappop(q.queue)
         heappush(q.running, release)
 
-        logger.info(
+        result.trace.info(
             f"[WORKFLOW]: Start thread: '{task.alias}|"
             f"{release.date:%Y%m%d%H%M}'"
         )
@@ -502,7 +507,13 @@ def schedule_task(
 
         delay()
 
-    logger.debug(f"[SCHEDULE]: End schedule task {'=' * 80}")
+    result.trace.debug(
+        f"[SCHEDULE]: End schedule task at {current_date:%Y-%m-%d %H:%M:%S} "
+        f"{'=' * 80}"
+    )
+    return result.catch(
+        status=Status.SUCCESS, context={"task_date": current_date}
+    )
 
 
 def monitor(threads: ReleaseThreads) -> None:  # pragma: no cov
@@ -533,6 +544,17 @@ def scheduler_pending(
     result: Result,
     audit: type[Audit],
 ) -> Result:  # pragma: no cov
+    """
+
+    :param tasks:
+    :param stop_date:
+    :param queue:
+    :param threads:
+    :param result:
+    :param audit:
+
+    :rtype: Result
+    """
     try:
         from schedule import Scheduler
     except ImportError:
@@ -553,6 +575,7 @@ def scheduler_pending(
             queue=queue,
             threads=threads,
             audit=audit,
+            parent_run_id=result.parent_run_id,
         )
         .tag("control")
     )
@@ -710,6 +733,7 @@ def schedule_runner(
                 schedules=[load[0] for load in loader],
                 stop=stop,
                 externals=(externals or {}),
+                parent_run_id=result.parent_run_id,
             )
             for loader in batch(
                 Loader.finds(Schedule, excluded=excluded),
