@@ -20,6 +20,7 @@ from ..conf import config, get_logger
 from ..scheduler import ReleaseThread, ReleaseThreads
 from ..workflow import ReleaseQueue, WorkflowTask
 from .repeat import repeat_at
+from .route import log_route
 
 load_dotenv()
 logger = get_logger("ddeutil.workflow")
@@ -77,14 +78,18 @@ async def health():
     return {"message": "Workflow API already start up"}
 
 
-# NOTE: Enable the workflow route.
+# NOTE Add the logs route by default.
+app.include_router(log_route, prefix=config.prefix_path)
+
+
+# NOTE: Enable the workflows route.
 if config.enable_route_workflow:
     from .route import workflow_route
 
     app.include_router(workflow_route, prefix=config.prefix_path)
 
 
-# NOTE: Enable the schedule route.
+# NOTE: Enable the schedules route.
 if config.enable_route_schedule:
     from ..audit import get_audit
     from ..scheduler import schedule_task

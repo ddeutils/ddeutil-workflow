@@ -18,7 +18,7 @@ from pydantic import BaseModel
 from ..__types import DictData
 from ..audit import Audit, get_audit
 from ..conf import Loader, config, get_logger
-from ..result import Result
+from ..result import Result, get_trace
 from ..scheduler import Schedule
 from ..workflow import Workflow
 
@@ -27,12 +27,6 @@ logger = get_logger("ddeutil.workflow")
 workflow_route = APIRouter(
     prefix="/workflows",
     tags=["workflows"],
-    default_response_class=UJSONResponse,
-)
-
-schedule_route = APIRouter(
-    prefix="/schedules",
-    tags=["schedules"],
     default_response_class=UJSONResponse,
 )
 
@@ -98,45 +92,45 @@ async def execute_workflow(name: str, payload: ExecutePayload) -> DictData:
     return asdict(result)
 
 
-@workflow_route.get(path="/{name}/logs")
-async def get_workflow_logs(name: str):
+@workflow_route.get(path="/{name}/audits")
+async def get_workflow_audits(name: str):
     try:
         return {
-            "message": f"Getting workflow {name!r} logs",
-            "logs": [
-                log.model_dump(
+            "message": f"Getting workflow {name!r} audits",
+            "audits": [
+                audit.model_dump(
                     by_alias=True,
                     exclude_none=True,
                     exclude_unset=True,
                     exclude_defaults=True,
                 )
-                for log in get_audit().find_audits(name=name)
+                for audit in get_audit().find_audits(name=name)
             ],
         }
     except FileNotFoundError:
         raise HTTPException(
             status_code=st.HTTP_404_NOT_FOUND,
-            detail=f"Does not found log for workflow {name!r}",
+            detail=f"Does not found audit for workflow {name!r}",
         ) from None
 
 
-@workflow_route.get(path="/{name}/logs/{release}")
-async def get_workflow_release_log(name: str, release: str):
+@workflow_route.get(path="/{name}/audits/{release}")
+async def get_workflow_release_audit(name: str, release: str):
     try:
-        log: Audit = get_audit().find_audit_with_release(
+        audit: Audit = get_audit().find_audit_with_release(
             name=name, release=datetime.strptime(release, "%Y%m%d%H%M%S")
         )
     except FileNotFoundError:
         raise HTTPException(
             status_code=st.HTTP_404_NOT_FOUND,
             detail=(
-                f"Does not found log for workflow {name!r} "
+                f"Does not found audit for workflow {name!r} "
                 f"with release {release!r}"
             ),
         ) from None
     return {
-        "message": f"Getting workflow {name!r} log in release {release}",
-        "log": log.model_dump(
+        "message": f"Getting workflow {name!r} audit in release {release}",
+        "audit": audit.model_dump(
             by_alias=True,
             exclude_none=True,
             exclude_unset=True,
@@ -146,11 +140,42 @@ async def get_workflow_release_log(name: str, release: str):
 
 
 @workflow_route.delete(
-    path="/{name}/logs/{release}",
+    path="/{name}/audits/{release}",
     status_code=st.HTTP_204_NO_CONTENT,
 )
-async def del_workflow_release_log(name: str, release: str):
-    return {"message": f"Deleted workflow {name!r} log in release {release}"}
+async def del_workflow_release_audit(name: str, release: str):
+    return {"message": f"Deleted workflow {name!r} audit in release {release}"}
+
+
+# NOTE: Start create the schedule routes.
+#
+log_route = APIRouter(
+    prefix="/logs",
+    tags=["logs"],
+    default_response_class=UJSONResponse,
+)
+
+
+@log_route.get(path="/")
+async def get_logs():
+    return {
+        "message": "Getting logs",
+        "audits": list(get_trace().find_logs()),
+    }
+
+
+@log_route.get(path="/{run_id}")
+async def get_log_with_run_id(run_id: str):
+    return get_trace().find_log_with_id(run_id)
+
+
+# NOTE: Start create the schedule routes.
+#
+schedule_route = APIRouter(
+    prefix="/schedules",
+    tags=["schedules"],
+    default_response_class=UJSONResponse,
+)
 
 
 @schedule_route.get(path="/{name}")

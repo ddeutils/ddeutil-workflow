@@ -1,7 +1,7 @@
 import logging
 import time
 
-from ddeutil.workflow.result import Result, Status
+from ddeutil.workflow.result import FileTraceLog, Result, Status
 
 
 def test_status():
@@ -54,3 +54,8 @@ def test_result_catch():
     rs.catch(status=1, context={"params": {"new_value": "foo"}})
     assert rs.status == 1
     assert rs.context == {"params": {"new_value": "foo"}}
+
+
+def test_result_trace_find_logs():
+    for log in FileTraceLog.find_logs():
+        print(log)

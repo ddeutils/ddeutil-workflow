@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from dataclasses import field
 from datetime import datetime
 from enum import IntEnum
@@ -33,8 +34,10 @@ __all__: TupleStr = (
     "Result",
     "Status",
     "FileTraceLog",
+    "TraceLog",
     "default_gen_id",
     "get_dt_tznow",
+    "get_trace",
 )
 
 
@@ -104,6 +107,36 @@ class BaseTraceLog(ABC):  # pragma: no cov
 class FileTraceLog(BaseTraceLog):  # pragma: no cov
     """Trace Log object that write file to the local storage."""
 
+    @classmethod
+    def find_logs(cls) -> Iterator[dict[str, str]]:  # pragma: no cov
+        for file in config.log_path.glob("./run_id=*"):
+            data: dict[str, str] = {}
+
+            if (file / "stdout.txt").exists():
+                data["stdout"] = (file / "stdout.txt").read_text(
+                    encoding="utf-8"
+                )
+
+            if (file / "stderr.txt").exists():
+                data["stdout"] = (file / "stdout.txt").read_text(
+                    encoding="utf-8"
+                )
+
+            yield data
+
+    @classmethod
+    def find_log_with_id(cls, run_id: str) -> dict[str, str]:
+        file: Path = config.log_path / f"run_id={run_id}"
+        data: dict[str, str] = {}
+
+        if (file / "stdout.txt").exists():
+            data["stdout"] = (file / "stdout.txt").read_text(encoding="utf-8")
+
+        if (file / "stderr.txt").exists():
+            data["stdout"] = (file / "stdout.txt").read_text(encoding="utf-8")
+
+        return data
+
     @property
     def log_file(self) -> Path:
         log_file: Path = (
@@ -170,6 +203,12 @@ class FileTraceLog(BaseTraceLog):  # pragma: no cov
 
 class SQLiteTraceLog(BaseTraceLog):  # pragma: no cov
 
+    @classmethod
+    def find_logs(cls) -> Iterator[dict[str, str]]: ...
+
+    @classmethod
+    def find_log_with_id(cls, run_id: str) -> dict[str, str]: ...
+
     def make_message(self, message: str) -> str: ...
 
     def writer(self, message: str, is_err: bool = False) -> None: ...
@@ -181,7 +220,7 @@ TraceLog = Union[
 ]
 
 
-def get_trace() -> type[BaseTraceLog]:  # pragma: no cov
+def get_trace() -> type[TraceLog]:  # pragma: no cov
     if config.log_path.is_file():
         return SQLiteTraceLog
     return FileTraceLog
