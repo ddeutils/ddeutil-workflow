@@ -503,8 +503,6 @@ class PyStage(BaseStage):
         """
         from inspect import isclass, ismodule
 
-        print(values)
-
         for value in values:
 
             if (

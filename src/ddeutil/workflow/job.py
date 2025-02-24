@@ -636,22 +636,41 @@ class Job(BaseModel):
                 for strategy in self.strategy.make()
             ]
 
-            if self.strategy.fail_fast:
-                return self.__catch_fail_fast(
-                    event, futures=futures, result=result
-                )
-
             context: DictData = {}
             status: Status = Status.SUCCESS
+            fail_fast_flag: bool = self.strategy.fail_fast
 
-            for future in as_completed(futures, timeout=1800):
+            if fail_fast_flag:
+                # NOTE: Get results from a collection of tasks with a timeout
+                #   that has the first exception.
+                done, not_done = wait(
+                    futures, timeout=1800, return_when=FIRST_EXCEPTION
+                )
+                nd: str = (
+                    f", the strategies do not run is {not_done}"
+                    if not_done
+                    else ""
+                )
+                result.trace.debug(f"[JOB]: Strategy is set Fail Fast{nd}")
+
+                # NOTE: Stop all running tasks with setting the event manager
+                #   and cancel any scheduled tasks.
+                if len(done) != len(futures):
+                    event.set()
+                    for future in not_done:
+                        future.cancel()
+            else:
+                done = as_completed(futures, timeout=1800)
+
+            for future in done:
                 try:
                     future.result()
                 except JobException as err:
                     status = Status.FAILED
+                    ls: str = "Fail-Fast" if fail_fast_flag else "All-Completed"
                     result.trace.error(
-                        f"[JOB]: All-Completed Catch:\n\t"
-                        f"{err.__class__.__name__}:\n\t{err}"
+                        f"[JOB]: {ls} Catch:\n\t{err.__class__.__name__}:"
+                        f"\n\t{err}"
                     )
                     context.update(
                         {
@@ -662,74 +681,5 @@ class Job(BaseModel):
                             },
                         },
                     )
-
-        return result.catch(status=status, context=context)
-
-    @staticmethod
-    def __catch_fail_fast(
-        event: Event,
-        futures: list[Future],
-        result: Result,
-        *,
-        timeout: int = 1800,
-    ) -> Result:
-        """Job parallel pool futures catching with fail-fast mode. That will
-        stop and set event on all not done futures if it receives the first
-        exception from all running futures.
-
-        :param event: An event manager instance that able to set stopper on the
-            observing multithreading.
-        :param futures: A list of futures.
-        :param result: (Result) A result object for keeping context and status
-            data.
-        :param timeout: A timeout to waiting all futures complete.
-
-        :rtype: Result
-        """
-        context: DictData = {}
-        status: Status = Status.SUCCESS
-
-        # NOTE: Get results from a collection of tasks with a timeout that has
-        #   the first exception.
-        done, not_done = wait(
-            futures, timeout=timeout, return_when=FIRST_EXCEPTION
-        )
-        nd: str = (
-            f", the strategies do not run is {not_done}" if not_done else ""
-        )
-        result.trace.debug(f"[JOB]: Strategy is set Fail Fast{nd}")
-
-        # NOTE:
-        #       Stop all running tasks with setting the event manager and cancel
-        #   any scheduled tasks.
-        #
-        if len(done) != len(futures):
-            event.set()
-            for future in not_done:
-                future.cancel()
-
-        future: Future
-        for future in done:
-
-            # NOTE: Handle the first exception from feature
-            if err := future.exception():
-                status: Status = Status.FAILED
-                result.trace.error(
-                    f"[JOB]: Fail-Fast Catch:\n\t"
-                    f"{err.__class__.__name__}:\n\t{err}"
-                )
-                context.update(
-                    {
-                        "errors": {
-                            "class": err,
-                            "name": err.__class__.__name__,
-                            "message": f"{err.__class__.__name__}: {err}",
-                        },
-                    },
-                )
-                continue
-
-            # NOTE: Update the result context to main job context.
-            future.result()
 
         return result.catch(status=status, context=context)

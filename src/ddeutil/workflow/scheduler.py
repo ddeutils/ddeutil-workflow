@@ -55,7 +55,7 @@ from .audit import Audit, get_audit
 from .conf import Loader, config, get_logger
 from .cron import On
 from .exceptions import ScheduleException, WorkflowException
-from .result import Result
+from .result import Result, Status
 from .utils import batch, delay
 from .workflow import Release, ReleaseQueue, Workflow, WorkflowTask
 
@@ -315,24 +315,18 @@ class Schedule(BaseModel):
         stop: datetime | None = None,
         externals: DictData | None = None,
         audit: type[Audit] | None = None,
-    ) -> None:  # pragma: no cov
+        parent_run_id: str | None = None,
+    ) -> Result:  # pragma: no cov
         """Pending this schedule tasks with the schedule package.
 
         :param stop: A datetime value that use to stop running schedule.
         :param externals: An external parameters that pass to Loader.
         :param audit: An audit class that use on the workflow task release for
             writing its release audit context.
+        :param parent_run_id: A parent workflow running ID for this release.
         """
-        try:
-            from schedule import Scheduler
-        except ImportError:
-            raise ImportError(
-                "Should install schedule package before use this method."
-            ) from None
-
-        # NOTE: Get default logging.
         audit: type[Audit] = audit or get_audit()
-        scheduler: Scheduler = Scheduler()
+        result: Result = Result().set_parent_run_id(parent_run_id)
 
         # NOTE: Create the start and stop datetime.
         start_date: datetime = datetime.now(tz=config.tz)
@@ -346,61 +340,18 @@ class Schedule(BaseModel):
             second=0, microsecond=0
         ) + timedelta(minutes=1)
 
-        # NOTE: This schedule job will start every minute at :02 seconds.
-        (
-            scheduler.every(1)
-            .minutes.at(":02")
-            .do(
-                schedule_task,
-                tasks=self.tasks(
-                    start_date_waiting, queue=queue, externals=externals
-                ),
-                stop=stop_date,
-                queue=queue,
-                threads=threads,
-                audit=audit,
-            )
-            .tag("control")
+        scheduler_pending(
+            tasks=self.tasks(
+                start_date_waiting, queue=queue, externals=externals
+            ),
+            stop_date=stop_date,
+            queue=queue,
+            threads=threads,
+            result=result,
+            audit=audit,
         )
 
-        # NOTE: Checking zombie task with schedule job will start every 5 minute at
-        #   :10 seconds.
-        (
-            scheduler.every(5)
-            .minutes.at(":10")
-            .do(
-                monitor,
-                threads=threads,
-            )
-            .tag("monitor")
-        )
-
-        # NOTE: Start running schedule
-        logger.info(
-            f"[SCHEDULE]: Schedule with stopper: {stop_date:%Y-%m-%d %H:%M:%S}"
-        )
-
-        while True:
-            scheduler.run_pending()
-            time.sleep(1)
-
-            # NOTE: Break the scheduler when the control job does not exist.
-            if not scheduler.get_jobs("control"):
-                scheduler.clear("monitor")
-
-                while len([t for t in threads.values() if t["thread"]]) > 0:
-                    logger.warning(
-                        "[SCHEDULE]: Waiting schedule release thread that still "
-                        "running in background."
-                    )
-                    delay(10)
-                    monitor(threads)
-
-                break
-
-        logger.warning(
-            f"[SCHEDULE]: Queue: {[list(queue[wf].queue) for wf in queue]}"
-        )
+        return result.catch(status=Status.SUCCESS)
 
 
 ResultOrCancel = Optional[Union[type[CancelJob], Result]]
@@ -574,6 +525,91 @@ def monitor(threads: ReleaseThreads) -> None:  # pragma: no cov
             thread_release["thread"] = None
 
 
+def scheduler_pending(
+    tasks: list[WorkflowTask],
+    stop_date,
+    queue,
+    threads,
+    result: Result,
+    audit: type[Audit],
+) -> Result:  # pragma: no cov
+    try:
+        from schedule import Scheduler
+    except ImportError:
+        raise ImportError(
+            "Should install schedule package before use this method."
+        ) from None
+
+    scheduler: Scheduler = Scheduler()
+
+    # NOTE: This schedule job will start every minute at :02 seconds.
+    (
+        scheduler.every(1)
+        .minutes.at(":02")
+        .do(
+            schedule_task,
+            tasks=tasks,
+            stop=stop_date,
+            queue=queue,
+            threads=threads,
+            audit=audit,
+        )
+        .tag("control")
+    )
+
+    # NOTE: Checking zombie task with schedule job will start every 5 minute at
+    #   :10 seconds.
+    (
+        scheduler.every(5)
+        .minutes.at(":10")
+        .do(
+            monitor,
+            threads=threads,
+        )
+        .tag("monitor")
+    )
+
+    # NOTE: Start running schedule
+    result.trace.info(
+        f"[SCHEDULE]: Schedule with stopper: {stop_date:%Y-%m-%d %H:%M:%S}"
+    )
+
+    while True:
+        scheduler.run_pending()
+        time.sleep(1)
+
+        # NOTE: Break the scheduler when the control job does not exist.
+        if not scheduler.get_jobs("control"):
+            scheduler.clear("monitor")
+
+            while len([t for t in threads.values() if t["thread"]]) > 0:
+                result.trace.warning(
+                    "[SCHEDULE]: Waiting schedule release thread that still "
+                    "running in background."
+                )
+                delay(10)
+                monitor(threads)
+
+            break
+
+    result.trace.warning(
+        f"[SCHEDULE]: Queue: {[list(queue[wf].queue) for wf in queue]}"
+    )
+    return result.catch(
+        status=Status.SUCCESS,
+        context={
+            "threads": [
+                {
+                    "name": thread,
+                    "start_date": threads[thread]["start_date"],
+                    "release_date": threads[thread]["release_date"],
+                }
+                for thread in threads
+            ],
+        },
+    )
+
+
 def schedule_control(
     schedules: list[str],
     stop: datetime | None = None,
@@ -595,18 +631,8 @@ def schedule_control(
 
     :rtype: Result
     """
-    # NOTE: Lazy import Scheduler object from the schedule package.
-    try:
-        from schedule import Scheduler
-    except ImportError:
-        raise ImportError(
-            "Should install schedule package before use this module."
-        ) from None
-
-    # NOTE: Get default logging.
     audit: type[Audit] = audit or get_audit()
     result: Result = Result().set_parent_run_id(parent_run_id)
-    scheduler: Scheduler = Scheduler()
 
     # NOTE: Create the start and stop datetime.
     start_date: datetime = datetime.now(tz=config.tz)
@@ -630,74 +656,16 @@ def schedule_control(
             ),
         )
 
-    # NOTE: This schedule job will start every minute at :02 seconds.
-    (
-        scheduler.every(1)
-        .minutes.at(":02")
-        .do(
-            schedule_task,
-            tasks=tasks,
-            stop=stop_date,
-            queue=queue,
-            threads=threads,
-            audit=audit,
-        )
-        .tag("task")
+    scheduler_pending(
+        tasks=tasks,
+        stop_date=stop_date,
+        queue=queue,
+        threads=threads,
+        result=result,
+        audit=audit,
     )
 
-    # NOTE: Checking zombie task with schedule job will start every 5 minute at
-    #   :10 seconds.
-    (
-        scheduler.every(5)
-        .minutes.at(":10")
-        .do(
-            monitor,
-            threads=threads,
-        )
-        .tag("monitor")
-    )
-
-    # NOTE: Start running schedule
-    logger.info(
-        f"[SCHEDULE]: Schedule: {schedules} with stopper: "
-        f"{stop_date:%Y-%m-%d %H:%M:%S}"
-    )
-
-    while True:
-        scheduler.run_pending()
-        time.sleep(1)
-
-        # NOTE: Break the scheduler when the task job does not exist.
-        if not scheduler.get_jobs("task"):
-            scheduler.clear("monitor")
-
-            while len([t for t in threads.values() if t["thread"]]) > 0:
-                logger.warning(
-                    "[SCHEDULE]: Waiting schedule release thread that still "
-                    "running in background."
-                )
-                delay(10)
-                monitor(threads)
-
-            break
-
-    logger.warning(
-        f"[SCHEDULE]: Queue: {[list(queue[wf].queue) for wf in queue]}"
-    )
-    return result.catch(
-        status=0,
-        context={
-            "schedules": schedules,
-            "threads": [
-                {
-                    "name": thread,
-                    "start_date": threads[thread]["start_date"],
-                    "release_date": threads[thread]["release_date"],
-                }
-                for thread in threads
-            ],
-        },
-    )
+    return result.catch(status=Status.SUCCESS, context={"schedules": schedules})
 
 
 def schedule_runner(

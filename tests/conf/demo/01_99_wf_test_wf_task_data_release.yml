@@ -1,8 +1,0 @@
-tmp-wf-task-data-release:
-  type: Workflow
-  params: {name: str}
-  jobs:
-    first-job:
-      stages:
-        - name: "Hello stage"
-          echo: "Hello ${{ params.name | title }}"
