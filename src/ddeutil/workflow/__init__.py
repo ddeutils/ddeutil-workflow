@@ -47,9 +47,9 @@ from .params import (
     StrParam,
 )
 from .result import (
+    FileTraceLog,
     Result,
     Status,
-    TraceLog,
     default_gen_id,
     get_dt_tznow,
 )

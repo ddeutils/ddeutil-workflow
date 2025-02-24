@@ -4,7 +4,8 @@
 # license information.
 # ------------------------------------------------------------------------------
 """This is the Result module. It is the data context transfer objects that use
-by all object in this package.
+by all object in this package. This module provide TraceLog dataclasses and
+Result dataclass.
 """
 from __future__ import annotations
 
@@ -16,7 +17,7 @@ from enum import IntEnum
 from inspect import Traceback, currentframe, getframeinfo
 from pathlib import Path
 from threading import Event, get_ident
-from typing import Optional
+from typing import Optional, Union
 
 from pydantic import ConfigDict
 from pydantic.dataclasses import dataclass
@@ -31,7 +32,7 @@ logger = get_logger("ddeutil.workflow")
 __all__: TupleStr = (
     "Result",
     "Status",
-    "TraceLog",
+    "FileTraceLog",
     "default_gen_id",
     "get_dt_tznow",
 )
@@ -100,7 +101,7 @@ class BaseTraceLog(ABC):  # pragma: no cov
         logger.error(msg, stacklevel=2)
 
 
-class TraceLog(BaseTraceLog):  # pragma: no cov
+class FileTraceLog(BaseTraceLog):  # pragma: no cov
     """Trace Log object that write file to the local storage."""
 
     @property
@@ -167,6 +168,25 @@ class TraceLog(BaseTraceLog):  # pragma: no cov
             )
 
 
+class SQLiteTraceLog(BaseTraceLog):  # pragma: no cov
+
+    def make_message(self, message: str) -> str: ...
+
+    def writer(self, message: str, is_err: bool = False) -> None: ...
+
+
+TraceLog = Union[
+    FileTraceLog,
+    SQLiteTraceLog,
+]
+
+
+def get_trace() -> type[BaseTraceLog]:  # pragma: no cov
+    if config.log_path.is_file():
+        return SQLiteTraceLog
+    return FileTraceLog
+
+
 @dataclass(
     config=ConfigDict(arbitrary_types_allowed=True, use_enum_values=True)
 )
@@ -208,15 +228,6 @@ class Result:
             result.set_parent_run_id(parent_run_id)
         return result
 
-    def set_run_id(self, running_id: str) -> Self:
-        """Set a running ID.
-
-        :param running_id: A running ID that want to update on this model.
-        :rtype: Self
-        """
-        self.run_id: str = running_id
-        return self
-
     def set_parent_run_id(self, running_id: str) -> Self:
         """Set a parent running ID.
 
@@ -245,12 +256,12 @@ class Result:
         return self
 
     @property
-    def trace(self) -> TraceLog:
-        """Return TraceLog object that passing its running ID.
+    def trace(self) -> FileTraceLog:
+        """Return FileTraceLog object that passing its running ID.
 
-        :rtype: TraceLog
+        :rtype: FileTraceLog
         """
-        return TraceLog(self.run_id, self.parent_run_id)
+        return FileTraceLog(self.run_id, self.parent_run_id)
 
     def alive_time(self) -> float:  # pragma: no cov
         return (get_dt_tznow() - self.ts).total_seconds()

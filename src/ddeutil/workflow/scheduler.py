@@ -4,18 +4,18 @@
 # license information.
 # ------------------------------------------------------------------------------
 """
-The main schedule running is ``schedule_runner`` function that trigger the
-multiprocess of ``schedule_control`` function for listing schedules on the
-config by ``Loader.finds(Schedule)``.
+The main schedule running is `schedule_runner` function that trigger the
+multiprocess of `schedule_control` function for listing schedules on the
+config by `Loader.finds(Schedule)`.
 
-    The ``schedule_control`` is the scheduler function that release 2 schedule
-functions; ``workflow_task``, and ``workflow_monitor``.
+    The `schedule_control` is the scheduler function that release 2 schedule
+functions; `workflow_task`, and `workflow_monitor`.
 
-    ``schedule_control`` --- Every minute at :02 --> ``schedule_task``
-                         --- Every 5 minutes     --> ``monitor``
+    `schedule_control` ---( Every minute at :02 )--> `schedule_task`
+                       ---( Every 5 minutes     )--> `monitor`
 
-    The ``schedule_task`` will run ``task.release`` method in threading object
-for multithreading strategy. This ``release`` method will run only one crontab
+    The `schedule_task` will run `task.release` method in threading object
+for multithreading strategy. This `release` method will run only one crontab
 value with the on field.
 """
 from __future__ import annotations
@@ -134,7 +134,7 @@ class ScheduleWorkflow(BaseModel):
                 on: list[str] = [on]
 
             if any(not isinstance(n, (dict, str)) for n in on):
-                raise TypeError("The ``on`` key should be list of str or dict")
+                raise TypeError("The `on` key should be list of str or dict")
 
             # NOTE: Pass on value to Loader and keep on model object to on
             #   field.
@@ -344,7 +344,7 @@ class Schedule(BaseModel):
             tasks=self.tasks(
                 start_date_waiting, queue=queue, externals=externals
             ),
-            stop_date=stop_date,
+            stop=stop_date,
             queue=queue,
             threads=threads,
             result=result,
@@ -509,21 +509,27 @@ def schedule_task(
 
     result.trace.debug(
         f"[SCHEDULE]: End schedule task at {current_date:%Y-%m-%d %H:%M:%S} "
-        f"{'=' * 80}"
+        f"{'=' * 60}"
     )
     return result.catch(
         status=Status.SUCCESS, context={"task_date": current_date}
     )
 
 
-def monitor(threads: ReleaseThreads) -> None:  # pragma: no cov
+def monitor(
+    threads: ReleaseThreads,
+    parent_run_id: str | None = None,
+) -> None:  # pragma: no cov
     """Monitoring function that running every five minute for track long-running
     thread instance from the schedule_control function that run every minute.
 
     :param threads: A mapping of Thread object and its name.
+    :param parent_run_id: A parent workflow running ID for this release.
+
     :type threads: ReleaseThreads
     """
-    logger.debug("[MONITOR]: Start checking long running schedule task.")
+    result: Result = Result().set_parent_run_id(parent_run_id)
+    result.trace.debug("[MONITOR]: Start checking long running schedule task.")
 
     snapshot_threads: list[str] = list(threads.keys())
     for thread_name in snapshot_threads:
@@ -538,20 +544,20 @@ def monitor(threads: ReleaseThreads) -> None:  # pragma: no cov
 
 def scheduler_pending(
     tasks: list[WorkflowTask],
-    stop_date,
-    queue,
-    threads,
+    stop: datetime,
+    queue: dict[str, ReleaseQueue],
+    threads: ReleaseThreads,
     result: Result,
     audit: type[Audit],
 ) -> Result:  # pragma: no cov
-    """
+    """Scheduler pending function.
 
-    :param tasks:
-    :param stop_date:
-    :param queue:
-    :param threads:
-    :param result:
-    :param audit:
+    :param tasks: A list of WorkflowTask object.
+    :param stop: A stop datetime object that force stop running scheduler.
+    :param queue: A mapping of alias name and ReleaseQueue object.
+    :param threads: A mapping of alias name and Thread object.
+    :param result: A result object.
+    :param audit: An audit class that want to make audit object.
 
     :rtype: Result
     """
@@ -571,7 +577,7 @@ def scheduler_pending(
         .do(
             schedule_task,
             tasks=tasks,
-            stop=stop_date,
+            stop=stop,
             queue=queue,
             threads=threads,
             audit=audit,
@@ -594,7 +600,7 @@ def scheduler_pending(
 
     # NOTE: Start running schedule
     result.trace.info(
-        f"[SCHEDULE]: Schedule with stopper: {stop_date:%Y-%m-%d %H:%M:%S}"
+        f"[SCHEDULE]: Schedule with stopper: {stop:%Y-%m-%d %H:%M:%S}"
     )
 
     while True:
@@ -681,7 +687,7 @@ def schedule_control(
 
     scheduler_pending(
         tasks=tasks,
-        stop_date=stop_date,
+        stop=stop_date,
         queue=queue,
         threads=threads,
         result=result,
@@ -707,15 +713,16 @@ def schedule_runner(
 
         This function will get all workflows that include on value that was
     created in config path and chuck it with application config variable
-    ``WORKFLOW_APP_MAX_SCHEDULE_PER_PROCESS`` env var to multiprocess executor
+    `WORKFLOW_APP_MAX_SCHEDULE_PER_PROCESS` env var to multiprocess executor
     pool.
 
         The current workflow logic that split to process will be below diagram:
 
-        MAIN ==> process 01 ==> schedule --> thread of release task 01 01
-                                        --> thread of release task 01 02
-                            ==> schedule --> thread of release task 02 01
-                                        --> thread of release task 02 02
+        MAIN ==> process 01 ==> schedule ==> thread 01 --> 01
+                                         ==> thread 01 --> 02
+                            ==> schedule ==> thread 02 --> 01
+                                         ==> thread 02 --> 02
+                                         ==> ...
             ==> process 02  ==> ...
 
     :rtype: Result

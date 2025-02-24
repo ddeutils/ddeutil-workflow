@@ -20,7 +20,7 @@ from typing_extensions import Self
 
 from .__types import DictData, TupleStr
 from .conf import config
-from .result import TraceLog
+from .result import FileTraceLog
 
 __all__: TupleStr = (
     "get_audit",
@@ -174,7 +174,7 @@ class FileAudit(BaseAudit):
 
         :rtype: Self
         """
-        trace: TraceLog = TraceLog(self.run_id, self.parent_run_id)
+        trace: FileTraceLog = FileTraceLog(self.run_id, self.parent_run_id)
 
         # NOTE: Check environ variable was set for real writing.
         if not config.enable_write_audit:
@@ -214,7 +214,7 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
         """Save logging data that receive a context data from a workflow
         execution result.
         """
-        trace: TraceLog = TraceLog(self.run_id, self.parent_run_id)
+        trace: FileTraceLog = FileTraceLog(self.run_id, self.parent_run_id)
 
         # NOTE: Check environ variable was set for real writing.
         if not config.enable_write_audit:

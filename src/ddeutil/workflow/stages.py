@@ -181,7 +181,7 @@ class BaseStage(BaseModel, ABC):
                 ),
                 parent_run_id=parent_run_id,
             )
-        elif parent_run_id:
+        elif parent_run_id:  # pragma: no cov
             result.set_parent_run_id(parent_run_id)
 
         try:

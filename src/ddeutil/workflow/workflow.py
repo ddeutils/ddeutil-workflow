@@ -3,12 +3,12 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-"""The main schedule running is ``workflow_runner`` function that trigger the
-multiprocess of ``workflow_control`` function for listing schedules on the
-config by ``Loader.finds(Schedule)``.
+"""The main schedule running is `workflow_runner` function that trigger the
+multiprocess of `workflow_control` function for listing schedules on the
+config by `Loader.finds(Schedule)`.
 
-    The ``workflow_control`` is the scheduler function that release 2 schedule
-functions; ``workflow_task``, and ``workflow_monitor``.
+    The `workflow_control` is the scheduler function that release 2 schedule
+functions; `workflow_task`, and ``workflow_monitor``.
 
     ``workflow_control`` --- Every minute at :02 --> ``workflow_task``
 
@@ -529,7 +529,7 @@ class Workflow(BaseModel):
                 run_id=(run_id or gen_id(name, unique=True)),
                 parent_run_id=parent_run_id,
             )
-        elif parent_run_id:
+        elif parent_run_id:  # pragma: no cov
             result.set_parent_run_id(parent_run_id)
 
         if queue is not None and not isinstance(queue, ReleaseQueue):

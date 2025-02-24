@@ -5,7 +5,7 @@
 # ------------------------------------------------------------------------------
 """Job Model that use for keeping stages and node that running its stages.
 The job handle the lineage of stages and location of execution of stages that
-mean the job model able to define ``runs-on`` key that allow you to run this
+mean the job model able to define `runs-on` key that allow you to run this
 job.
 
     This module include Strategy Model that use on the job strategy field.
@@ -359,7 +359,7 @@ class Job(BaseModel):
 
     def set_outputs(self, output: DictData, to: DictData) -> DictData:
         """Set an outputs from execution process to the received context. The
-        result from execution will pass to value of ``strategies`` key.
+        result from execution will pass to value of `strategies` key.
 
             For example of setting output method, If you receive execute output
         and want to set on the `to` like;
@@ -424,14 +424,14 @@ class Job(BaseModel):
         workflow execution to strategy matrix.
 
             This execution is the minimum level of execution of this job model.
-        It different with ``self.execute`` because this method run only one
+        It different with `self.execute` because this method run only one
         strategy and return with context of this strategy data.
 
             The result of this execution will return result with strategy ID
         that generated from the `gen_id` function with an input strategy value.
 
-        :raise JobException: If it has any error from ``StageException`` or
-            ``UtilException``.
+        :raise JobException: If it has any error from `StageException` or
+            `UtilException`.
 
         :param strategy: A strategy metrix value that use on this execution.
             This value will pass to the `matrix` key for templating.
@@ -510,7 +510,7 @@ class Job(BaseModel):
             #
             #       ... params |= stage.execute(params=params)
             #
-            #   This step will add the stage result to ``stages`` key in
+            #   This step will add the stage result to `stages` key in
             #   that stage id. It will have structure like;
             #
             #   {
@@ -581,7 +581,7 @@ class Job(BaseModel):
     ) -> Result:
         """Job execution with passing dynamic parameters from the workflow
         execution. It will generate matrix values at the first step and run
-        multithread on this metrics to the ``stages`` field of this job.
+        multithread on this metrics to the `stages` field of this job.
 
         :param params: An input parameters that use on job execution.
         :param run_id: A job running ID for this execution.
@@ -599,7 +599,7 @@ class Job(BaseModel):
                 run_id=(run_id or gen_id(self.id or "", unique=True)),
                 parent_run_id=parent_run_id,
             )
-        elif parent_run_id:
+        elif parent_run_id:  # pragma: no cov
             result.set_parent_run_id(parent_run_id)
 
         # NOTE: Normal Job execution without parallel strategy matrix. It uses

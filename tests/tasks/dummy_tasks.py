@@ -58,3 +58,7 @@ def dummy_task_odbc_mssql_procedure(_exec: str, params: dict):
 @tag("raise", alias="return-type-not-valid")
 def dummy_task_raise_return_type_not_valid():
     return True
+
+
+def simple_function():  # pragma: no cov
+    return "bar"

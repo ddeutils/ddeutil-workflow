@@ -60,7 +60,7 @@ def tag(
 
         @wraps(func)
         def wrapped(*args: P.args, **kwargs: P.kwargs) -> TagFunc:
-            # NOTE: Able to do anything before calling call function.
+            # NOTE: Able to do anything before calling the call function.
             return func(*args, **kwargs)
 
         return wrapped
@@ -150,7 +150,7 @@ def extract_call(call: str) -> Callable[[], TagFunc]:
     """
     if not (found := Re.RE_TASK_FMT.search(call)):
         raise ValueError(
-            f"Call {call!r} does not match with call format regex."
+            f"Call {call!r} does not match with the call regex format."
         )
 
     # NOTE: Pass the searching call string to `path`, `func`, and `tag`.
@@ -160,13 +160,13 @@ def extract_call(call: str) -> Callable[[], TagFunc]:
     rgt: dict[str, Registry] = make_registry(f"{call.path}")
     if call.func not in rgt:
         raise NotImplementedError(
-            f"``REGISTER-MODULES.{call.path}.registries`` does not "
+            f"`REGISTER-MODULES.{call.path}.registries` does not "
             f"implement registry: {call.func!r}."
         )
 
     if call.tag not in rgt[call.func]:
         raise NotImplementedError(
             f"tag: {call.tag!r} does not found on registry func: "
-            f"``REGISTER-MODULES.{call.path}.registries.{call.func}``"
+            f"`REGISTER-MODULES.{call.path}.registries.{call.func}`"
         )
     return rgt[call.func][call.tag]
