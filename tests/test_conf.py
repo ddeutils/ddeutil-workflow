@@ -61,6 +61,12 @@ def test_simple_load(target_path: Path):
         with pytest.raises(ValueError):
             SimLoad("test_simple_load_raise", config.conf_path)
 
+        with pytest.raises(ValueError):
+            SimLoad("wf-ignore-inside", config.conf_path)
+
+        with pytest.raises(ValueError):
+            SimLoad("wf-ignore", config.conf_path)
+
 
 def test_simple_load_finds(target_path: Path):
     dummy_file: Path = target_path / "test_simple_file.yaml"

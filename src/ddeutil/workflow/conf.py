@@ -38,6 +38,7 @@ __all__: TupleStr = (
     "SimLoad",
     "Loader",
     "config",
+    "glob_files",
 )
 
 
@@ -264,18 +265,22 @@ class SimLoad:
         conf_path: Path,
         externals: DictData | None = None,
     ) -> None:
+        self.conf_path: Path = conf_path
+        self.externals: DictData = externals or {}
+
         self.data: DictData = {}
         for file in glob_files(conf_path):
 
-            if data := self.filter_suffix(file, name):
+            if self.is_ignore(file, conf_path):
+                continue
+
+            if data := self.filter_suffix(file, name=name):
                 self.data = data
 
         # VALIDATE: check the data that reading should not empty.
         if not self.data:
             raise ValueError(f"Config {name!r} does not found on conf path")
 
-        self.conf_path: Path = conf_path
-        self.externals: DictData = externals or {}
         self.data.update(self.externals)
 
     @classmethod
@@ -293,8 +298,10 @@ class SimLoad:
 
         :param obj: An object that want to validate matching before return.
         :param conf_path: A config object.
-        :param included:
-        :param excluded:
+        :param included: An excluded list of data key that want to reject this
+            data if any key exist.
+        :param excluded: An included list of data key that want to filter from
+            data.
 
         :rtype: Iterator[tuple[str, DictData]]
         """
@@ -302,6 +309,9 @@ class SimLoad:
         for file in glob_files(conf_path):
 
             for key, data in cls.filter_suffix(file).items():
+
+                if cls.is_ignore(file, conf_path):
+                    continue
 
                 if key in exclude:
                     continue
@@ -314,10 +324,25 @@ class SimLoad:
                     )
 
     @classmethod
+    def is_ignore(cls, file: Path, conf_path: Path) -> bool:
+        ignore_file: Path = conf_path / ".confignore"
+        ignore: list[str] = []
+        if ignore_file.exists():
+            ignore = ignore_file.read_text(encoding="utf-8").splitlines()
+
+        if any(
+            (file.match(f"**/{pattern}/*") or file.match(f"**/{pattern}*"))
+            for pattern in ignore
+        ):
+            return True
+        return False
+
+    @classmethod
     def filter_suffix(cls, file: Path, name: str | None = None) -> DictData:
         if any(file.suffix.endswith(s) for s in (".yml", ".yaml")):
             values: DictData = YamlFlResolve(file).read()
             return values.get(name, {}) if name else values
+
         return {}
 
     @cached_property
