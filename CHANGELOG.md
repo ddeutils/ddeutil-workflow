@@ -2,6 +2,42 @@
 
 ## Latest Changes
 
+## 0.0.34
+
+### :stars: Highlight Features
+
+- :star: hl: add confignore support for filter config data.
+- :star: hl: revise job execution logic for fail-fast and complete.
+- :star: hl: change hook stage to call stage.
+- :star: hl: add parent run id trace log.
+- :star: hl: change catch error data from workflow execution.
+- :star: hl: change catch error data from job execution.
+- :star: hl: change catch error data from stage execution.
+
+### :sparkles: Features
+
+- :dart: feat: pass config to trace log object.
+- :dart: feat: add return result from schedule_task function.
+- :dart: feat: update optional arg on app file.
+- :dart: feat: pass parent running id to workflow release from poke method.
+- :dart: feat: change return type of poking from list[Result] to Result.
+- :dart: feat: add filter class on python stage.
+- :dart: feat: add deep_copy util func.
+
+### :bug: Bug fixes
+
+- :gear: fixed: remove format on string datetime.
+- :gear: fixed: default path of audits and logic of shcedule pending.
+- :gear: fixed: change TraceLog from object to dataclass.
+- :gear: fixed: add traceback and adjust stacklevel for logging.
+- :gear: fixed: rename method of audit object that use log prefix.
+- :gear: fixed: fix testcase does not valid.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: fixed audit on testcase.
+- :test_tube: tests: add result object on hook function.
+
 ## 0.0.33
 
 ### :stars: Highlight Features
