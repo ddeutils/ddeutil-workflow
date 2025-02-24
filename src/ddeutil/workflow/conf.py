@@ -149,7 +149,7 @@ class Config(BaseConfig):  # pragma: no cov
     # NOTE: Audit Log
     @property
     def audit_path(self) -> Path:
-        return Path(env("AUDIT_PATH", "./logs"))
+        return Path(env("AUDIT_PATH", "./audits"))
 
     @property
     def enable_write_audit(self) -> bool:

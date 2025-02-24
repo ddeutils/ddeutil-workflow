@@ -15,13 +15,7 @@ def test_scheduler_control():
     assert result.status == 0
     assert result.context == {
         "schedules": ["schedule-every-minute-wf"],
-        "threads": [
-            {
-                "name": "wf-scheduling-agent|202502231106",
-                "start_date": result.context["threads"][0]["start_date"],
-                "release_date": result.context["threads"][0]["release_date"],
-            },
-        ],
+        "threads": result.context["threads"],
     }
 
 

@@ -10,6 +10,7 @@ from ddeutil.workflow.result import Result
 from ddeutil.workflow.workflow import (
     Release,
     ReleaseQueue,
+    ReleaseType,
     Workflow,
     WorkflowTask,
 )
@@ -94,7 +95,7 @@ def test_workflow_task_queue(test_path):
         task.queue(
             end_date=datetime(2024, 2, 1, 1, 0, tzinfo=runner.tz),
             queue=queue["demo"],
-            log=FileAudit,
+            audit=FileAudit,
         )
 
         assert len(queue["demo"].queue) == 5
@@ -133,8 +134,7 @@ def test_workflow_task_release(test_path):
         assert rs.context == {
             "params": {"name": "foo"},
             "release": {
-                "status": "success",
-                "type": "datetime",
+                "type": ReleaseType.DEFAULT,
                 "release": Release.from_dt(
                     datetime(2024, 1, 1, 1, tzinfo=runner.tz)
                 ),

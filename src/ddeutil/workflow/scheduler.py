@@ -388,7 +388,7 @@ class Schedule(BaseModel):
             if not scheduler.get_jobs("control"):
                 scheduler.clear("monitor")
 
-                while len(threads) > 0:
+                while len([t for t in threads.values() if t["thread"]]) > 0:
                     logger.warning(
                         "[SCHEDULE]: Waiting schedule release thread that still "
                         "running in background."
@@ -569,7 +569,8 @@ def monitor(threads: ReleaseThreads) -> None:  # pragma: no cov
         thread_release: ReleaseThread = threads[thread_name]
 
         # NOTE: remove the thread that running success.
-        if not thread_release["thread"].is_alive():
+        thread = thread_release["thread"]
+        if thread and (not thread_release["thread"].is_alive()):
             thread_release["thread"] = None
 
 
