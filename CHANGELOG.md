@@ -2,6 +2,26 @@
 
 ## Latest Changes
 
+## 0.0.35
+
+### :stars: Highlight Features
+
+- :star: hl: create RunOn model for support dynamic job executor.
+
+### :sparkles: Features
+
+- :dart: feat: move trace property to field of Result object.
+- :dart: feat: move route module to dir instead.
+- :dart: feat: add logs route.
+
+### :black_nib: Code Changes
+
+- :construction: clear: add type hint and clear method that not use.
+
+### :broom: Deprecate & Clean
+
+- :recycle: clean: split logs module from result module.
+
 ## 0.0.34
 
 ### :stars: Highlight Features
