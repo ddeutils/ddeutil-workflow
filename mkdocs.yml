@@ -73,15 +73,18 @@ nav:
 
   - API references:
     - Library:
-      - 'Stage': api/stage.md
-      - 'Cron': api/cron.md
-      - 'Job': api/job.md
-      - 'Workflow': api/workflow.md
-      - 'Params': api/params.md
-      - 'Result': api/result.md
+      - Stages: api/stage.md
+      - Cron: api/cron.md
+      - Job: api/job.md
+      - Workflow: api/workflow.md
       - Scheduler: api/scheduler.md
+      - Params: api/params.md
+      - Result: api/result.md
+      - Caller: api/caller.md
+      - Templates: api/templates.md
       - Logs: api/logs.md
       - Utils: api/utils.md
+      - Exceptions: api/exceptions.md
 
 plugins:
   - tags

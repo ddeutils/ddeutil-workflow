@@ -1,4 +1,4 @@
-# Stage
+# Stages
 
 A stage is the minimum object for this package that use to do a task with it
 propose such as the empty stage is doing nothing without printing custom statement
