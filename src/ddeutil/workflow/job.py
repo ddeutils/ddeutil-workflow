@@ -241,20 +241,28 @@ class BaseRunsOn(BaseModel):
 
 
 class RunsOnLocal(BaseRunsOn):
+    """Runs-on local."""
+
     type: Literal[RunsOnType.LOCAL] = Field(default=RunsOnType.LOCAL)
 
 
 class RunsOnSelfHosted(BaseRunsOn):
+    """Runs-on self-hosted."""
+
     type: Literal[RunsOnType.SELF_HOSTED] = Field(
         default=RunsOnType.SELF_HOSTED
     )
 
 
 class RunsOnDocker(BaseRunsOn):
+    """Runs-on local Docker."""
+
     type: Literal[RunsOnType.DOCKER] = Field(default=RunsOnType.DOCKER)
 
 
 class RunsOnK8s(BaseRunsOn):
+    """Runs-on Kubernetes."""
+
     type: Literal[RunsOnType.K8S] = Field(default=RunsOnType.K8S)
 
 

@@ -20,7 +20,7 @@ from ..conf import config, get_logger
 from ..scheduler import ReleaseThread, ReleaseThreads
 from ..workflow import ReleaseQueue, WorkflowTask
 from .repeat import repeat_at
-from .route import log_route
+from .routes import log
 
 load_dotenv()
 logger = get_logger("ddeutil.workflow")
@@ -79,25 +79,25 @@ async def health():
 
 
 # NOTE Add the logs route by default.
-app.include_router(log_route, prefix=config.prefix_path)
+app.include_router(log, prefix=config.prefix_path)
 
 
 # NOTE: Enable the workflows route.
 if config.enable_route_workflow:
-    from .route import workflow_route
+    from .routes import workflow
 
-    app.include_router(workflow_route, prefix=config.prefix_path)
+    app.include_router(workflow, prefix=config.prefix_path)
 
 
 # NOTE: Enable the schedules route.
 if config.enable_route_schedule:
     from ..audit import get_audit
     from ..scheduler import schedule_task
-    from .route import schedule_route
+    from .routes import schedule
 
-    app.include_router(schedule_route, prefix=config.prefix_path)
+    app.include_router(schedule, prefix=config.prefix_path)
 
-    @schedule_route.on_event("startup")
+    @schedule.on_event("startup")
     @repeat_at(cron="* * * * *", delay=2)
     def scheduler_listener():
         """Schedule broker every minute at 02 second."""
@@ -114,7 +114,7 @@ if config.enable_route_schedule:
                 log=get_audit(),
             )
 
-    @schedule_route.on_event("startup")
+    @schedule.on_event("startup")
     @repeat_at(cron="*/5 * * * *", delay=10)
     def monitoring():
         logger.debug("[MONITOR]: Start monitoring threading.")
