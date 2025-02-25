@@ -24,10 +24,10 @@ from enum import Enum
 from functools import lru_cache
 from textwrap import dedent
 from threading import Event
-from typing import Any, Optional, Union
+from typing import Annotated, Any, Literal, Optional, Union
 
 from ddeutil.core import freeze_args
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
@@ -56,6 +56,11 @@ __all__: TupleStr = (
     "Strategy",
     "Job",
     "TriggerRules",
+    "RunsOn",
+    "RunsOnLocal",
+    "RunsOnSelfHosted",
+    "RunsOnDocker",
+    "RunsOnK8s",
     "make",
 )
 
@@ -216,13 +221,52 @@ class TriggerRules(str, Enum):
     none_skipped: str = "none_skipped"
 
 
-class RunsOn(str, Enum):
+class RunsOnType(str, Enum):
     """Runs-On enum object."""
 
-    local: str = "local"
-    docker: str = "docker"
-    self_hosted: str = "self_hosted"
-    k8s: str = "k8s"
+    LOCAL: str = "local"
+    DOCKER: str = "docker"
+    SELF_HOSTED: str = "self_hosted"
+    K8S: str = "k8s"
+
+
+class BaseRunsOn(BaseModel):
+    model_config = ConfigDict(use_enum_values=True)
+
+    type: Literal[RunsOnType.LOCAL]
+    args: DictData = Field(
+        default_factory=dict,
+        alias="with",
+    )
+
+
+class RunsOnLocal(BaseRunsOn):
+    type: Literal[RunsOnType.LOCAL] = Field(default=RunsOnType.LOCAL)
+
+
+class RunsOnSelfHosted(BaseRunsOn):
+    type: Literal[RunsOnType.SELF_HOSTED] = Field(
+        default=RunsOnType.SELF_HOSTED
+    )
+
+
+class RunsOnDocker(BaseRunsOn):
+    type: Literal[RunsOnType.DOCKER] = Field(default=RunsOnType.DOCKER)
+
+
+class RunsOnK8s(BaseRunsOn):
+    type: Literal[RunsOnType.K8S] = Field(default=RunsOnType.K8S)
+
+
+RunsOn = Annotated[
+    Union[
+        RunsOnLocal,
+        RunsOnSelfHosted,
+        RunsOnDocker,
+        RunsOnK8s,
+    ],
+    Field(discriminator="type"),
+]
 
 
 class Job(BaseModel):
@@ -263,9 +307,9 @@ class Job(BaseModel):
         default=None,
         description="A job description that can be string of markdown content.",
     )
-    runs_on: Optional[str] = Field(
-        default=None,
-        description="A target executor node for this job use to execution.",
+    runs_on: RunsOn = Field(
+        default_factory=RunsOnLocal,
+        description="A target node for this job to use for execution.",
         serialization_alias="runs-on",
     )
     stages: list[Stage] = Field(

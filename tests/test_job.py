@@ -3,8 +3,33 @@ from unittest import mock
 import pytest
 from ddeutil.workflow.conf import Config
 from ddeutil.workflow.exceptions import JobException
-from ddeutil.workflow.job import Job, TriggerRules
-from pydantic import ValidationError
+from ddeutil.workflow.job import (
+    Job,
+    RunsOn,
+    RunsOnDocker,
+    RunsOnK8s,
+    RunsOnLocal,
+    RunsOnSelfHosted,
+    TriggerRules,
+)
+from pydantic import TypeAdapter, ValidationError
+
+
+def test_run_ons():
+    with pytest.raises(ValidationError):
+        TypeAdapter(RunsOn).validate_python({})
+
+    model = TypeAdapter(RunsOn).validate_python({"type": "local"})
+    assert isinstance(model, RunsOnLocal)
+
+    model = TypeAdapter(RunsOn).validate_python({"type": "self_hosted"})
+    assert isinstance(model, RunsOnSelfHosted)
+
+    model = TypeAdapter(RunsOn).validate_python({"type": "docker"})
+    assert isinstance(model, RunsOnDocker)
+
+    model = TypeAdapter(RunsOn).validate_python({"type": "k8s"})
+    assert isinstance(model, RunsOnK8s)
 
 
 def test_job():
@@ -21,6 +46,9 @@ def test_job():
     # NOTE: Validate the `check_needs` method
     assert job.check_needs({"job-before": "foo"})
     assert not job.check_needs({"job-after": "foo"})
+
+    job = Job(runs_on={"type": "self_hosted"})
+    assert isinstance(job.runs_on, RunsOnSelfHosted)
 
 
 def test_job_raise():

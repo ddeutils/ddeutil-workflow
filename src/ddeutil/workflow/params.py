@@ -12,7 +12,7 @@ import decimal
 import logging
 from abc import ABC, abstractmethod
 from datetime import date, datetime
-from typing import Any, Literal, Optional, Union
+from typing import Annotated, Any, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -213,9 +213,12 @@ class ArrayParam(DefaultParam):  # pragma: no cov
             return self.default
 
 
-Param = Union[
-    ChoiceParam,
-    DatetimeParam,
-    IntParam,
-    StrParam,
+Param = Annotated[
+    Union[
+        ChoiceParam,
+        DatetimeParam,
+        IntParam,
+        StrParam,
+    ],
+    Field(discriminator="type"),
 ]
