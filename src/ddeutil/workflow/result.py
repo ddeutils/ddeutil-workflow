@@ -22,6 +22,7 @@ from typing import Optional, Union
 
 from pydantic import ConfigDict
 from pydantic.dataclasses import dataclass
+from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
 from .__types import DictData, TupleStr
@@ -247,11 +248,10 @@ class Result:
     status: Status = field(default=Status.WAIT)
     context: DictData = field(default_factory=dict)
     run_id: Optional[str] = field(default_factory=default_gen_id)
-
-    # NOTE: Ignore this field to compare another result model with __eq__.
     parent_run_id: Optional[str] = field(default=None, compare=False)
     event: Event = field(default_factory=Event, compare=False)
     ts: datetime = field(default_factory=get_dt_tznow, compare=False)
+    trace: Optional[TraceLog] = field(default=None)
 
     @classmethod
     def construct_with_rs_or_id(
@@ -273,6 +273,14 @@ class Result:
             result.set_parent_run_id(parent_run_id)
         return result
 
+    @model_validator(mode="after")
+    def __prepare_trace(self) -> Self:
+        """Prepare trace field that want to pass after its initialize step."""
+        if self.trace is None:  # pragma: no cove
+            self.trace: TraceLog = get_trace()(self.run_id, self.parent_run_id)
+
+        return self
+
     def set_parent_run_id(self, running_id: str) -> Self:
         """Set a parent running ID.
 
@@ -280,6 +288,7 @@ class Result:
         :rtype: Self
         """
         self.parent_run_id: str = running_id
+        self.trace: TraceLog = get_trace()(self.run_id, running_id)
         return self
 
     def catch(
@@ -300,13 +309,9 @@ class Result:
         self.__dict__["context"].update(context or {})
         return self
 
-    @property
-    def trace(self) -> FileTraceLog:
-        """Return FileTraceLog object that passing its running ID.
-
-        :rtype: FileTraceLog
-        """
-        return FileTraceLog(self.run_id, self.parent_run_id)
-
     def alive_time(self) -> float:  # pragma: no cov
+        """Return total seconds that this object use since it was created.
+
+        :rtype: float
+        """
         return (get_dt_tznow() - self.ts).total_seconds()

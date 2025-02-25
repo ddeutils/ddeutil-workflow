@@ -174,15 +174,12 @@ class BaseStage(BaseModel, ABC):
 
         :rtype: Result
         """
-        if result is None:
-            result: Result = Result(
-                run_id=(
-                    run_id or gen_id(self.name + (self.id or ""), unique=True)
-                ),
-                parent_run_id=parent_run_id,
-            )
-        elif parent_run_id:  # pragma: no cov
-            result.set_parent_run_id(parent_run_id)
+        result: Result = Result.construct_with_rs_or_id(
+            result,
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            id_logic=(self.name + (self.id or "")),
+        )
 
         try:
             return self.execute(params, result=result)
