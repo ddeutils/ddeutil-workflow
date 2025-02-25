@@ -74,10 +74,16 @@ class BaseTraceLog(ABC):  # pragma: no cov
     parent_run_id: Optional[str] = None
 
     @abstractmethod
-    def writer(self, message: str, is_err: bool = False) -> None: ...
+    def writer(self, message: str, is_err: bool = False) -> None:
+        raise NotImplementedError(
+            "Create writer logic for this trace object before using."
+        )
 
     @abstractmethod
-    def make_message(self, message: str) -> str: ...
+    def make_message(self, message: str) -> str:
+        raise NotImplementedError(
+            "Adjust make message method for this trace object before using."
+        )
 
     def debug(self, message: str):
         msg: str = self.make_message(message)

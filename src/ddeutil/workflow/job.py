@@ -591,9 +591,6 @@ class Job(BaseModel):
 
         :rtype: Result
         """
-
-        # NOTE: I use this condition because this method allow passing empty
-        #   params and I do not want to create new dict object.
         if result is None:  # pragma: no cov
             result: Result = Result(
                 run_id=(run_id or gen_id(self.id or "", unique=True)),

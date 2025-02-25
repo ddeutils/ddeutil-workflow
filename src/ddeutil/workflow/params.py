@@ -3,8 +3,8 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-"""Param Model that use for parsing incoming parameters that pass to the
-Workflow and Schedule objects.
+"""This module include all Param Models that use for parsing incoming parameters
+that pass to the Workflow and Schedule objects.
 """
 from __future__ import annotations
 
@@ -32,8 +32,9 @@ __all__: TupleStr = (
 
 
 class BaseParam(BaseModel, ABC):
-    """Base Parameter that use to make any Params Model. The type will dynamic
-    with the type field that made from literal string."""
+    """Base Parameter that use to make any Params Models. The parameter type
+    will dynamic with the setup type field that made from literal string.
+    """
 
     desc: Optional[str] = Field(
         default=None, description="A description of parameter providing."
@@ -169,9 +170,11 @@ class ChoiceParam(BaseParam):
     """Choice parameter."""
 
     type: Literal["choice"] = "choice"
-    options: list[str] = Field(description="A list of choice parameters.")
+    options: Union[list[str], list[int]] = Field(
+        description="A list of choice parameters that able be str or int.",
+    )
 
-    def receive(self, value: str | None = None) -> str:
+    def receive(self, value: Union[str, int] | None = None) -> Union[str, int]:
         """Receive value that match with options.
 
         :param value: A value that want to select from the options field.
@@ -186,6 +189,28 @@ class ChoiceParam(BaseParam):
                 f"{value!r} does not match any value in choice options."
             )
         return value
+
+
+# TODO: Not implement this parameter yet
+class MappingParam(DefaultParam):  # pragma: no cov
+
+    type: Literal["map"] = "map"
+    default: dict[Any, Any] = Field(default_factory=dict)
+
+    def receive(self, value: Optional[dict[Any, Any]] = None) -> dict[Any, Any]:
+        if value is None:
+            return self.default
+
+
+# TODO: Not implement this parameter yet
+class ArrayParam(DefaultParam):  # pragma: no cov
+
+    type: Literal["array"] = "array"
+    default: list[Any] = Field(default_factory=list)
+
+    def receive(self, value: Optional[list[Any]] = None) -> list[Any]:
+        if value is None:
+            return self.default
 
 
 Param = Union[
