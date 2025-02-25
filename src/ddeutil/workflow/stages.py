@@ -42,7 +42,7 @@ from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
 from .__types import DictData, DictStr, TupleStr
-from .call import TagFunc, extract_call
+from .caller import TagFunc, extract_call
 from .conf import config, get_logger
 from .exceptions import StageException
 from .result import Result, Status

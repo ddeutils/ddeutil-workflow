@@ -36,7 +36,7 @@ wf_el_pg_to_lake:
 Implement call:
 
 ```python
-from ddeutil.workflow.call import tag
+from ddeutil.workflow.caller import tag
 
 @tag('polars', alias='postgres-to-delta')
 def postgres_to_delta(source, sink):
@@ -73,7 +73,7 @@ wf_call_mssql_proc:
 Implement call:
 
 ```python
-from ddeutil.workflow.call import tag
+from ddeutil.workflow.caller import tag
 
 @tag('odbc', alias='mssql-proc')
 def odbc_mssql_procedure(_exec: str, params: dict):

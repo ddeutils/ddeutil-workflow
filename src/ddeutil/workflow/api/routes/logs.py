@@ -9,7 +9,7 @@ from fastapi import APIRouter
 from fastapi.responses import UJSONResponse
 
 from ...conf import get_logger
-from ...result import get_trace
+from ...logs import get_trace_obj
 
 logger = get_logger("ddeutil.workflow")
 
@@ -27,10 +27,10 @@ log_route = APIRouter(
 async def get_logs():
     return {
         "message": "Getting logs",
-        "audits": list(get_trace().find_logs()),
+        "audits": list(get_trace_obj().find_logs()),
     }
 
 
 @log_route.get(path="/{run_id}")
 async def get_log_with_run_id(run_id: str):
-    return get_trace().find_log_with_id(run_id)
+    return get_trace_obj().find_log_with_id(run_id)

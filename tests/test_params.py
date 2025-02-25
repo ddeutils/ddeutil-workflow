@@ -7,9 +7,30 @@ from ddeutil.workflow.params import (
     ChoiceParam,
     DatetimeParam,
     IntParam,
+    Param,
     StrParam,
 )
 from freezegun import freeze_time
+from pydantic import TypeAdapter, ValidationError
+
+
+def test_param():
+    model = TypeAdapter(Param).validate_python({"type": "str"})
+    assert isinstance(model, StrParam)
+
+    model = TypeAdapter(Param).validate_python({"type": "int"})
+    assert isinstance(model, IntParam)
+
+    model = TypeAdapter(Param).validate_python({"type": "datetime"})
+    assert isinstance(model, DatetimeParam)
+
+    model = TypeAdapter(Param).validate_python(
+        {"type": "choice", "options": [1, 2, 3]}
+    )
+    assert isinstance(model, ChoiceParam)
+
+    with pytest.raises(ValidationError):
+        TypeAdapter(Param).validate_python({"type": "string"})
 
 
 def test_param_str():

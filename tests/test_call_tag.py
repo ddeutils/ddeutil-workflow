@@ -6,7 +6,7 @@ from pathlib import Path
 from textwrap import dedent
 
 import pytest
-from ddeutil.workflow.call import Registry, make_registry
+from ddeutil.workflow.caller import Registry, make_registry
 
 
 @pytest.fixture(scope="module")
@@ -21,7 +21,7 @@ def call_function(test_path: Path):
         f.write(
             dedent(
                 """
-            from ddeutil.workflow.call import tag
+            from ddeutil.workflow.caller import tag
 
             @tag("polars-dir", alias="el-csv-to-parquet")
             def dummy_task(source: str, sink: str) -> dict[str, int]:

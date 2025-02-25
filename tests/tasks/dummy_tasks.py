@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from ddeutil.workflow.call import tag
+from ddeutil.workflow.caller import tag
 from ddeutil.workflow.result import Result
 
 logger = logging.getLogger("ddeutil.workflow")
