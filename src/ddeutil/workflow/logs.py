@@ -32,7 +32,7 @@ __all__: TupleStr = (
 )
 
 
-def get_dt_tznow() -> datetime:
+def get_dt_tznow() -> datetime:  # pragma: no cov
     """Return the current datetime object that passing the config timezone.
 
     :rtype: datetime

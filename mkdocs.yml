@@ -73,7 +73,7 @@ nav:
 
   - API references:
     - Library:
-      - Stages: api/stage.md
+      - Stages: api/stages.md
       - Cron: api/cron.md
       - Job: api/job.md
       - Workflow: api/workflow.md

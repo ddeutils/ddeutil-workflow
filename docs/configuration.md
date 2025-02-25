@@ -12,7 +12,7 @@ The main configuration that use to dynamic changing with your objective of this
 application. If any configuration values do not set yet, it will use default value
 and do not raise any error to you.
 
-| Name                         | Component | <div style="width:35em">Default</div>                                                                                           | <div style="width:35em">Description</div>                                                                          |
+| Name                         | Component | <div style="width:20em">Default</div>                                                                                           | <div style="width:30em">Description</div>                                                                          |
 |:-----------------------------|:---------:|:--------------------------------------------------------------------------------------------------------------------------------|:-------------------------------------------------------------------------------------------------------------------|
 | **ROOT_PATH**                |   Core    | `.`                                                                                                                             | The root path of the workflow application.                                                                         |
 | **REGISTRY**                 |   Core    | `.`                                                                                                                             | List of importable string for the call stage.                                                                      |
@@ -43,7 +43,7 @@ and do not raise any error to you.
 
 ## API
 
-| Environment                |  Component  | Default | <div style="width:35em">Description</div>                                          | Remark |
-|:---------------------------|:-----------:|---------|------------------------------------------------------------------------------------|--------|
-| **ENABLE_ROUTE_WORKFLOW**  |     API     | `true`  | A flag that enable workflow route to manage execute manually and workflow logging. |        |
-| **ENABLE_ROUTE_SCHEDULE**  |     API     | `true`  | A flag that enable run scheduler.                                                  |        |
+| Environment                |  Component  | Default | <div style="width:25em">Description</div>                                          |
+|:---------------------------|:-----------:|---------|------------------------------------------------------------------------------------|
+| **ENABLE_ROUTE_WORKFLOW**  |     API     | `true`  | A flag that enable workflow route to manage execute manually and workflow logging. |
+| **ENABLE_ROUTE_SCHEDULE**  |     API     | `true`  | A flag that enable run scheduler.                                                  |

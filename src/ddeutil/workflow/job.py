@@ -230,7 +230,7 @@ class RunsOnType(str, Enum):
     K8S: str = "k8s"
 
 
-class BaseRunsOn(BaseModel):
+class BaseRunsOn(BaseModel):  # pragma: no cov
     model_config = ConfigDict(use_enum_values=True)
 
     type: Literal[RunsOnType.LOCAL]
@@ -240,13 +240,13 @@ class BaseRunsOn(BaseModel):
     )
 
 
-class RunsOnLocal(BaseRunsOn):
+class RunsOnLocal(BaseRunsOn):  # pragma: no cov
     """Runs-on local."""
 
     type: Literal[RunsOnType.LOCAL] = Field(default=RunsOnType.LOCAL)
 
 
-class RunsOnSelfHosted(BaseRunsOn):
+class RunsOnSelfHosted(BaseRunsOn):  # pragma: no cov
     """Runs-on self-hosted."""
 
     type: Literal[RunsOnType.SELF_HOSTED] = Field(
@@ -254,13 +254,13 @@ class RunsOnSelfHosted(BaseRunsOn):
     )
 
 
-class RunsOnDocker(BaseRunsOn):
+class RunsOnDocker(BaseRunsOn):  # pragma: no cov
     """Runs-on local Docker."""
 
     type: Literal[RunsOnType.DOCKER] = Field(default=RunsOnType.DOCKER)
 
 
-class RunsOnK8s(BaseRunsOn):
+class RunsOnK8s(BaseRunsOn):  # pragma: no cov
     """Runs-on Kubernetes."""
 
     type: Literal[RunsOnType.K8S] = Field(default=RunsOnType.K8S)
@@ -286,7 +286,7 @@ class Job(BaseModel):
 
     Data Validate:
         >>> job = {
-        ...     "runs-on": None,
+        ...     "runs-on": {"type": "local"},
         ...     "strategy": {
         ...         "max-parallel": 1,
         ...         "matrix": {
