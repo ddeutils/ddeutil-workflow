@@ -6,7 +6,6 @@ from ddeutil.workflow.exceptions import JobException
 from ddeutil.workflow.job import (
     Job,
     RunsOn,
-    RunsOnDocker,
     RunsOnK8s,
     RunsOnLocal,
     RunsOnSelfHosted,
@@ -24,9 +23,6 @@ def test_run_ons():
 
     model = TypeAdapter(RunsOn).validate_python({"type": "self_hosted"})
     assert isinstance(model, RunsOnSelfHosted)
-
-    model = TypeAdapter(RunsOn).validate_python({"type": "docker"})
-    assert isinstance(model, RunsOnDocker)
 
     model = TypeAdapter(RunsOn).validate_python({"type": "k8s"})
     assert isinstance(model, RunsOnK8s)

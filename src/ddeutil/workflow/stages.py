@@ -759,3 +759,18 @@ class HookStage(BaseStage):  # pragma: no cov
     def execute(
         self, params: DictData, *, result: Result | None = None
     ) -> Result: ...
+
+
+# TODO: Not implement this stages yet
+class DockerStage(BaseStage):  # pragma: no cov
+    image: str
+    env: DictData = Field(default_factory=dict)
+
+    def execute(
+        self, params: DictData, *, result: Result | None = None
+    ) -> Result: ...
+
+
+# TODO: Not implement this stages yet
+class VirtualPyStage(PyStage):  # pragma: no cov
+    ...

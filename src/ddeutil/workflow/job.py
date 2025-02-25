@@ -59,7 +59,6 @@ __all__: TupleStr = (
     "RunsOn",
     "RunsOnLocal",
     "RunsOnSelfHosted",
-    "RunsOnDocker",
     "RunsOnK8s",
     "make",
 )
@@ -225,7 +224,6 @@ class RunsOnType(str, Enum):
     """Runs-On enum object."""
 
     LOCAL: str = "local"
-    DOCKER: str = "docker"
     SELF_HOSTED: str = "self_hosted"
     K8S: str = "k8s"
 
@@ -254,12 +252,6 @@ class RunsOnSelfHosted(BaseRunsOn):  # pragma: no cov
     )
 
 
-class RunsOnDocker(BaseRunsOn):  # pragma: no cov
-    """Runs-on local Docker."""
-
-    type: Literal[RunsOnType.DOCKER] = Field(default=RunsOnType.DOCKER)
-
-
 class RunsOnK8s(BaseRunsOn):  # pragma: no cov
     """Runs-on Kubernetes."""
 
@@ -270,7 +262,6 @@ RunsOn = Annotated[
     Union[
         RunsOnLocal,
         RunsOnSelfHosted,
-        RunsOnDocker,
         RunsOnK8s,
     ],
     Field(discriminator="type"),

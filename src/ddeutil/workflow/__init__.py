@@ -37,6 +37,7 @@ from .exceptions import (
 )
 from .job import (
     Job,
+    RunsOn,
     Strategy,
 )
 from .logs import (
