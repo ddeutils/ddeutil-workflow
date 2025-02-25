@@ -1,6 +1,6 @@
 # Context
 
-## Workflow Exec
+## Workflow Execute
 
 ```mermaid
 stateDiagram-v2
@@ -32,7 +32,7 @@ stateDiagram-v2
     }
 ```
 
-## Strategy Exec
+## Job Execute
 
 ```mermaid
 stateDiagram-v2
@@ -56,3 +56,5 @@ stateDiagram-v2
         Stage02 --> [*]
     }
 ```
+
+## Stage Execute

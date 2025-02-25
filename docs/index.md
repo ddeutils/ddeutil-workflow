@@ -75,12 +75,12 @@ flowchart LR
 
 !!! note
 
-    _Disclaimer_: I inspire the dynamic statement from the [**GitHub Action**](https://github.com/features/actions)
-    with `.yml` files and all of config file from several data orchestration framework
-    tools from my experience on Data Engineer. :grimacing:
+    _**Disclaimer**_: I inspire the dynamic YAML statement from the [**GitHub Action**](https://github.com/features/actions),
+    and all configs pattern from several data orchestration framework tools from
+    my data engineering experience. :grimacing:
 
-    Other workflow that I interest on them and pick some interested feature to this
-    package:
+    Other workflow orchestration tools that I interest and pick them to be inspiration
+    some for this package:
 
     - [Google **Workflows**](https://cloud.google.com/workflows)
     - [AWS **Step Functions**](https://aws.amazon.com/step-functions/)
@@ -200,7 +200,7 @@ from ddeutil.workflow import Schedule
 
 !!! example
 
-   For more examples, this workflow can use with these scenarios:
+    For more examples, this workflow can use with these scenarios:
 
-   - Extract metadata (1 ~ 15 MB per request) from external API every 15 minutes
-   - Sensor data on S3 and send that data to Azure Service Bus every minute
+    - Extract metadata (1 ~ 15 MB per request) from external API every 15 minutes
+    - Sensor data on S3 and send that data to Azure Service Bus every minute
