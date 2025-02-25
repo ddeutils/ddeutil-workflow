@@ -7,13 +7,20 @@ datetime value with next or previous with any start point of an input datetime.
 
 !!! example "YAML"
 
-    === "Corn"
+    === "Cron"
 
         ```yaml
         on_every_5_min:
           type: On
           cron: "*/5 * * * *"
         ```
+
+### Fields
+
+| field          | data type   |    default    | description |
+|----------------|-------------|:-------------:|-------------|
+
+### Usage
 
 ```python
 from ddeutil.workflow.cron import On

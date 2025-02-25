@@ -39,12 +39,12 @@ flowchart LR
 
     subgraph Docker Container
         direction TB
-        G@{ shape: rounded, label: "Observe<br>Application" }
+        G@{ shape: rounded, label: "📡Observe<br>Application" }
     end
 
     subgraph Docker Container
         direction TB
-        B@{ shape: rounded, label: "Workflow<br>Application" }
+        B@{ shape: rounded, label: "🏃Workflow<br>Application" }
     end
 
     A <-->|action &<br>response| B
@@ -56,7 +56,7 @@ flowchart LR
         E@{ shape: lin-cyl, label: "Audit<br>Logs" }
     end
 
-    subgraph Git Context
+    subgraph Config Context
         F@{ shape: tag-rect, label: "YAML<br>files" }
     end
 
@@ -90,10 +90,10 @@ flowchart LR
 This project need `ddeutil-io` extension namespace packages. If you want to install
 this package with application add-ons, you should add `app` in installation;
 
-| Usecase        | Install Optional                         | Support            |
-|----------------|------------------------------------------|--------------------|
-| Python         | `pip install ddeutil-workflow`           | :heavy_check_mark: |
-| FastAPI Server | `pip install ddeutil-workflow[api]`      | :heavy_check_mark: |
+| Use-case       | Install Optional                         |       Support       |
+|----------------|------------------------------------------|:-------------------:|
+| Python         | `pip install ddeutil-workflow`           | :heavy_check_mark:  |
+| FastAPI Server | `pip install ddeutil-workflow[api]`      | :heavy_check_mark:  |
 
 ## :beers: Usage
 

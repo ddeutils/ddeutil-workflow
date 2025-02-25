@@ -20,7 +20,7 @@ project/
  │   ╰─ manual-workflow.yml
  ├─ logs/
  ├─ src/
- │   ╰─ calls/
+ │   ╰─ tasks/
  │       ├─ __init__.py
  │       ╰─ https_call.py
  ├─ main.py
@@ -33,6 +33,7 @@ Create initial config path at `.env`:
 
 ```dotenv
 WORKFLOW_AUDIT_ENABLE_WRITE=true
+WORKFLOW_LOG_ENABLE_WRITE=true
 WORKFLOW_CORE_REGISTRY=src
 WORKFLOW_CORE_TIMEZONE=Asia/Bangkok
 ```
@@ -63,11 +64,12 @@ from .https_call import *
 
 ```python title="./src/https_call.py"
 from ddeutil.workflow.caller import tag
+from ddeutil.workflow.result import Result
 
 
 @tag("httpx", alias="https-external")
-def dummy_task_polars_dir(url: str, auth: str) -> dict[str, int]:
-    print(f"Start POST: {url} with auth: {auth}")
+def dummy_task_polars_dir(url: str, auth: str, result: Result) -> dict[str, int]:
+    result.trace.info(f"Start POST: {url} with auth: {auth}")
     return {"counts": 0}
 ```
 
@@ -93,6 +95,10 @@ def call_execute():
 
 if __name__ == '__main__':
     call_execute()
+```
+
+```text
+
 ```
 
 ### Release
@@ -121,14 +127,30 @@ if __name__ == '__main__':
     call_release()
 ```
 
-The log file that keep from this release:
+```text
+
+```
+
+The audit file that keep from this release execution:
 
 ```text
 project/
- ╰─ logs/
-     ╰─ workflow=wf-run-manual
-         ╰─ release=20240101001011
+ ╰─ audits/
+     ╰─ workflow=wf-run-manual/
+         ╰─ release=20240101001011/
              ╰─ 820626787820250106163236493894.log
 ```
 
 ## Conclusion
+
+You can run any workflow that you want by config a YAML file. If it raises any
+error from your caller stage, you can observe the error log in log path with
+the release running ID from `run_id` attribute of the return Result object.
+
+```text
+project/
+ ╰─ logs/
+     ╰─ run_id=820626787820250106163236493894/
+         ├─ stderr.txt
+         ╰─ stdout.txt
+```

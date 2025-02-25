@@ -141,7 +141,7 @@ such as import your installed package.
 | field | data type      | default  | description                                                 |
 |-------|----------------|:--------:|-------------------------------------------------------------|
 | run   | str            |          | A Python string statement that want to run with exec.       |
-| vars  | dict[str, Any] |  dict()  | A mapping to variable that want to pass to globals in exec. |
+| vars  | dict[str, Any] | `dict()` | A mapping to variable that want to pass to globals in exec. |
 
 ## Call Stage
 
@@ -173,13 +173,13 @@ objective to invoked by this stage object.
 | field  | alias | data type           | default  | description                                                  |
 |--------|-------|---------------------|:--------:|--------------------------------------------------------------|
 | uses   |       | str                 |          | A pointer that want to load function from the call registry. |
-| args   | with  | dict[str, Any]      |  dict()  | An arguments that want to pass to the call function.         |
+| args   | with  | dict[str, Any]      | `dict()` | An arguments that want to pass to the call function.         |
 
 ## Trigger Stage
 
 Trigger Workflow execution stage that execute another workflow. This
 the core stage that allow you to create the reusable workflow object or
-dynamic parameters workflow for common usecase.
+dynamic parameters workflow for common use-case.
 
 !!! example "YAML"
 
@@ -197,4 +197,4 @@ dynamic parameters workflow for common usecase.
 | field     | data type      | default  | description                                                      |
 |-----------|----------------|:--------:|------------------------------------------------------------------|
 | trigger   | str            |          | A trigger workflow name that should already exist on the config. |
-| params    | dict[str, Any] |  dict()  | A parameter that want to pass to workflow execution.             |
+| params    | dict[str, Any] | `dict()` | A parameter that want to pass to workflow execution.             |

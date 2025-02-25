@@ -1,5 +1,7 @@
 # Result
 
+## Status
+
 ## Result
 
 Result Pydantic Model for passing and receiving data context from any
@@ -70,9 +72,9 @@ For comparison property, this result will use ``status``, ``context``, and
 
 ### Fields
 
-| field          | data type   | default  | description |
-|----------------|-------------|:--------:|-------------|
-| status         | int         |   `2`    |             |
-| context        | DictData    | `dict()` |             |
-| run_id         | str \| None |  `None`  |             |
-| parent_run_id  | str \| None |  `None`  |             |
+| field          | data type   |    default    | description |
+|----------------|-------------|:-------------:|-------------|
+| status         | int         | `Status.WAIT` |             |
+| context        | DictData    |   `dict()`    |             |
+| run_id         | str \| None |    `None`     |             |
+| parent_run_id  | str \| None |    `None`     |             |

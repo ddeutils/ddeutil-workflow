@@ -3,21 +3,7 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-"""The main schedule running is `workflow_runner` function that trigger the
-multiprocess of `workflow_control` function for listing schedules on the
-config by `Loader.finds(Schedule)`.
-
-    The `workflow_control` is the scheduler function that release 2 schedule
-functions; `workflow_task`, and ``workflow_monitor``.
-
-    ``workflow_control`` --- Every minute at :02 --> ``workflow_task``
-
-                         --- Every 5 minutes     --> ``workflow_monitor``
-
-    The ``workflow_task`` will run ``task.release`` method in threading object
-for multithreading strategy. This ``release`` method will run only one crontab
-value with the on field.
-"""
+"""A Workflow module."""
 from __future__ import annotations
 
 import copy

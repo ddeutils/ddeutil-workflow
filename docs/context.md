@@ -2,6 +2,8 @@
 
 ## Workflow Execute
 
+A workflow execution context that return from the `execute` method.
+
 ```mermaid
 stateDiagram-v2
     [*] --> Workflow : execute
@@ -34,6 +36,8 @@ stateDiagram-v2
 
 ## Job Execute
 
+A job execution context that return from the `execute` method.
+
 ```mermaid
 stateDiagram-v2
     [*] --> Strategy : execute
@@ -58,3 +62,5 @@ stateDiagram-v2
 ```
 
 ## Stage Execute
+
+A stage execution context that return from the `handler_execute` method.
