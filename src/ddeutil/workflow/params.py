@@ -9,7 +9,6 @@ that pass to the Workflow and Schedule objects.
 from __future__ import annotations
 
 import decimal
-import logging
 from abc import ABC, abstractmethod
 from datetime import date, datetime
 from typing import Annotated, Any, Literal, Optional, Union
@@ -19,8 +18,6 @@ from pydantic import BaseModel, Field
 from .__types import TupleStr
 from .exceptions import ParamValueException
 from .utils import get_dt_now
-
-logger = logging.getLogger("ddeutil.workflow")
 
 __all__: TupleStr = (
     "ChoiceParam",

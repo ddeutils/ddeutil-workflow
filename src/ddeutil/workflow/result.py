@@ -20,11 +20,8 @@ from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
 from .__types import DictData, TupleStr
-from .conf import get_logger
 from .logs import TraceLog, get_dt_tznow, get_trace
 from .utils import gen_id
-
-logger = get_logger("ddeutil.workflow")
 
 __all__: TupleStr = (
     "Result",

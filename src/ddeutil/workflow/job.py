@@ -32,7 +32,7 @@ from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
 from .__types import DictData, DictStr, Matrix, TupleStr
-from .conf import config, get_logger
+from .conf import config
 from .exceptions import (
     JobException,
     StageException,
@@ -48,7 +48,6 @@ from .utils import (
     gen_id,
 )
 
-logger = get_logger("ddeutil.workflow")
 MatrixFilter = list[dict[str, Union[str, int]]]
 
 

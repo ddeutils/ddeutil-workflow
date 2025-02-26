@@ -3,7 +3,7 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-"""This is the Logs module. This module provide TraceLog dataclasses.
+"""A Logs module contain a TraceLog dataclass.
 """
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from typing import Optional, Union
 
 from pydantic.dataclasses import dataclass
 
-from .__types import TupleStr
+from .__types import DictStr, TupleStr
 from .conf import config, get_logger
 from .utils import cut_id, get_dt_now
 
@@ -83,31 +83,34 @@ class BaseTraceLog(ABC):  # pragma: no cov
         self.writer(msg, is_err=True)
         logger.error(msg, stacklevel=2)
 
+    def exception(self, message: str):
+        msg: str = self.make_message(message)
+        self.writer(msg, is_err=True)
+        logger.exception(msg, stacklevel=2)
+
 
 class FileTraceLog(BaseTraceLog):  # pragma: no cov
     """Trace Log object that write file to the local storage."""
 
     @classmethod
-    def find_logs(cls) -> Iterator[dict[str, str]]:  # pragma: no cov
+    def find_logs(cls) -> Iterator[DictStr]:  # pragma: no cov
         for file in config.log_path.glob("./run_id=*"):
-            data: dict[str, str] = {}
-
-            if (file / "stdout.txt").exists():
-                data["stdout"] = (file / "stdout.txt").read_text(
-                    encoding="utf-8"
-                )
-
-            if (file / "stderr.txt").exists():
-                data["stdout"] = (file / "stdout.txt").read_text(
-                    encoding="utf-8"
-                )
-
-            yield data
+            yield cls.__read_std(file)
 
     @classmethod
-    def find_log_with_id(cls, run_id: str) -> dict[str, str]:
+    def find_log_with_id(cls, run_id: str, force_raise: bool = True) -> DictStr:
         file: Path = config.log_path / f"run_id={run_id}"
-        data: dict[str, str] = {}
+        if file.exists():
+            return cls.__read_std(file)
+        elif force_raise:
+            raise FileNotFoundError(
+                f"Trace log on path 'run_id={run_id}' does not found."
+            )
+        return {}
+
+    @classmethod
+    def __read_std(cls, file: Path) -> DictStr:
+        data: DictStr = {}
 
         if (file / "stdout.txt").exists():
             data["stdout"] = (file / "stdout.txt").read_text(encoding="utf-8")
@@ -118,7 +121,7 @@ class FileTraceLog(BaseTraceLog):  # pragma: no cov
         return data
 
     @property
-    def log_file(self) -> Path:
+    def pointer(self) -> Path:
         log_file: Path = (
             config.log_path / f"run_id={self.parent_run_id or self.run_id}"
         )
@@ -128,7 +131,10 @@ class FileTraceLog(BaseTraceLog):  # pragma: no cov
 
     @property
     def cut_id(self) -> str:
-        """Combine cutting ID of parent running ID if it set."""
+        """Combine cutting ID of parent running ID if it set.
+
+        :rtype: str
+        """
         cut_run_id: str = cut_id(self.run_id)
         if not self.parent_run_id:
             return f"{cut_run_id} -> {' ' * 6}"
@@ -160,9 +166,7 @@ class FileTraceLog(BaseTraceLog):  # pragma: no cov
         thread: int = get_ident()
 
         write_file: str = "stderr.txt" if is_err else "stdout.txt"
-        with (self.log_file / write_file).open(
-            mode="at", encoding="utf-8"
-        ) as f:
+        with (self.pointer / write_file).open(mode="at", encoding="utf-8") as f:
             msg_fmt: str = f"{config.log_format_file}\n"
             print(msg_fmt)
             f.write(
@@ -184,10 +188,10 @@ class FileTraceLog(BaseTraceLog):  # pragma: no cov
 class SQLiteTraceLog(BaseTraceLog):  # pragma: no cov
 
     @classmethod
-    def find_logs(cls) -> Iterator[dict[str, str]]: ...
+    def find_logs(cls) -> Iterator[DictStr]: ...
 
     @classmethod
-    def find_log_with_id(cls, run_id: str) -> dict[str, str]: ...
+    def find_log_with_id(cls, run_id: str) -> DictStr: ...
 
     def make_message(self, message: str) -> str: ...
 
@@ -203,6 +207,7 @@ TraceLog = Union[
 def get_trace(
     run_id: str, parent_run_id: str | None = None
 ) -> TraceLog:  # pragma: no cov
+    """Get dynamic TraceLog object from the setting config."""
     if config.log_path.is_file():
         return SQLiteTraceLog(run_id, parent_run_id=parent_run_id)
     return FileTraceLog(run_id, parent_run_id=parent_run_id)

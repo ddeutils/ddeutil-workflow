@@ -359,12 +359,16 @@ ReturnResultOrCancel = Callable[P, ResultOrCancel]
 DecoratorCancelJob = Callable[[ReturnResultOrCancel], ReturnResultOrCancel]
 
 
-def catch_exceptions(cancel_on_failure: bool = False) -> DecoratorCancelJob:
+def catch_exceptions(
+    cancel_on_failure: bool = False,
+    parent_run_id: str | None = None,
+) -> DecoratorCancelJob:
     """Catch exception error from scheduler job that running with schedule
     package and return CancelJob if this function raise an error.
 
     :param cancel_on_failure: A flag that allow to return the CancelJob or not
         it will raise.
+    :param parent_run_id:
 
     :rtype: DecoratorCancelJob
     """
@@ -375,10 +379,17 @@ def catch_exceptions(cancel_on_failure: bool = False) -> DecoratorCancelJob:
 
         @wraps(func)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> ResultOrCancel:
+
             try:
                 return func(*args, **kwargs)
+
             except Exception as err:
-                logger.exception(err)
+                if parent_run_id:
+                    (
+                        Result(parent_run_id=parent_run_id).trace.exception(
+                            str(err)
+                        )
+                    )
                 if cancel_on_failure:
                     return CancelJob
                 raise err
@@ -399,13 +410,13 @@ class ReleaseThread(TypedDict):
 ReleaseThreads = dict[str, ReleaseThread]
 
 
-@catch_exceptions(cancel_on_failure=True)
 def schedule_task(
     tasks: list[WorkflowTask],
     stop: datetime,
     queue: dict[str, ReleaseQueue],
     threads: ReleaseThreads,
     audit: type[Audit],
+    *,
     parent_run_id: str | None = None,
 ) -> ResultOrCancel:
     """Schedule task function that generate thread of workflow task release
@@ -491,8 +502,14 @@ def schedule_task(
         #   job.
         thread_name: str = f"{task.alias}|{release.date:%Y%m%d%H%M}"
         thread: Thread = Thread(
-            target=catch_exceptions(cancel_on_failure=True)(task.release),
-            kwargs={"release": release, "queue": q, "audit": audit},
+            target=catch_exceptions(
+                cancel_on_failure=True,
+            )(task.release),
+            kwargs={
+                "release": release,
+                "queue": q,
+                "audit": audit,
+            },
             name=thread_name,
             daemon=True,
         )
@@ -508,8 +525,8 @@ def schedule_task(
         delay()
 
     result.trace.debug(
-        f"[SCHEDULE]: End schedule task at {current_date:%Y-%m-%d %H:%M:%S} "
-        f"{'=' * 60}"
+        f"[SCHEDULE]: End schedule task that run since "
+        f"{current_date:%Y-%m-%d %H:%M:%S} {'=' * 30}"
     )
     return result.catch(
         status=Status.SUCCESS, context={"task_date": current_date}
@@ -575,7 +592,10 @@ def scheduler_pending(
         scheduler.every(1)
         .minutes.at(":02")
         .do(
-            schedule_task,
+            catch_exceptions(
+                cancel_on_failure=True,
+                parent_run_id=result.parent_run_id,
+            )(schedule_task),
             tasks=tasks,
             stop=stop,
             queue=queue,
@@ -594,6 +614,7 @@ def scheduler_pending(
         .do(
             monitor,
             threads=threads,
+            parent_run_id=result.parent_run_id,
         )
         .tag("monitor")
     )
@@ -617,7 +638,7 @@ def scheduler_pending(
                     "running in background."
                 )
                 delay(10)
-                monitor(threads)
+                monitor(threads, parent_run_id=result.parent_run_id)
 
             break
 
@@ -752,7 +773,7 @@ def schedule_runner(
 
             # NOTE: Raise error when it has any error from schedule_control.
             if err := future.exception():
-                logger.error(str(err))
+                result.trace.error(str(err))
                 raise WorkflowException(str(err)) from err
 
             rs: Result = future.result(timeout=1)
