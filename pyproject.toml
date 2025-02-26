@@ -67,6 +67,7 @@ omit = [
     "src/ddeutil/workflow/api/api.py",
     "src/ddeutil/workflow/api/repeat.py",
     "src/ddeutil/workflow/api/routes/__init__.py",
+    "src/ddeutil/workflow/api/routes/jobs.py",
     "src/ddeutil/workflow/api/routes/logs.py",
     "src/ddeutil/workflow/api/routes/schedules.py",
     "src/ddeutil/workflow/api/routes/workflows.py",

@@ -29,6 +29,7 @@ __all__: TupleStr = (
     "TraceLog",
     "get_dt_tznow",
     "get_trace",
+    "get_trace_obj",
 )
 
 

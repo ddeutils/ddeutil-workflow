@@ -112,7 +112,8 @@ class FileAudit(BaseAudit):
         :param release: A release datetime that want to search log.
 
         :raise FileNotFoundError:
-        :raise NotImplementedError:
+        :raise NotImplementedError: If an input release does not pass to this
+            method. Because this method does not implement latest log.
 
         :rtype: Self
         """

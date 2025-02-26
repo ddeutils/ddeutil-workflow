@@ -26,6 +26,7 @@ schedule_route = APIRouter(
 
 @schedule_route.get(path="/{name}")
 async def get_schedules(name: str):
+    """Get schedule object."""
     try:
         schedule: Schedule = Schedule.from_loader(name=name, externals={})
     except ValueError:

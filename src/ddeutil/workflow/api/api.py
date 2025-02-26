@@ -20,7 +20,7 @@ from ..conf import config, get_logger
 from ..scheduler import ReleaseThread, ReleaseThreads
 from ..workflow import ReleaseQueue, WorkflowTask
 from .repeat import repeat_at
-from .routes import log
+from .routes import job, log
 
 load_dotenv()
 logger = get_logger("ddeutil.workflow")
@@ -78,7 +78,8 @@ async def health():
     return {"message": "Workflow API already start up"}
 
 
-# NOTE Add the logs route by default.
+# NOTE Add the jobs and logs routes by default.
+app.include_router(job, prefix=config.prefix_path)
 app.include_router(log, prefix=config.prefix_path)
 
 

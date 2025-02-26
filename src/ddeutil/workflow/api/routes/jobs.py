@@ -8,25 +8,20 @@ from __future__ import annotations
 from fastapi import APIRouter
 from fastapi.responses import UJSONResponse
 
-from ...logs import get_trace_obj
+from ...conf import get_logger
 
-log_route = APIRouter(
-    prefix="/logs",
-    tags=["logs"],
+logger = get_logger("ddeutil.workflow")
+
+
+job_route = APIRouter(
+    prefix="/jobs",
+    tags=["jobs"],
     default_response_class=UJSONResponse,
 )
 
 
-@log_route.get(path="/")
-async def get_logs():
-    """Get all logs."""
+@job_route.post(path="/")
+async def execute_jobs():
     return {
-        "message": "Getting logs",
-        "audits": list(get_trace_obj().find_logs()),
+        "message": "Start execute job.",
     }
-
-
-@log_route.get(path="/{run_id}")
-async def get_log_with_run_id(run_id: str):
-    """Get log with specific running ID."""
-    return get_trace_obj().find_log_with_id(run_id)
