@@ -61,10 +61,10 @@ async def lifespan(a: FastAPI) -> AsyncIterator[State]:
 
 
 app = FastAPI(
-    titile="Workflow API",
+    titile="Workflow",
     description=(
-        "This is workflow FastAPI web application that use to manage manual "
-        "execute or schedule workflow via RestAPI."
+        "This is a workflow FastAPI application that use to manage manual "
+        "execute, logging, and schedule workflow via RestAPI."
     ),
     version=__version__,
     lifespan=lifespan,
@@ -75,7 +75,8 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 @app.get("/")
 async def health():
-    return {"message": "Workflow API already start up"}
+    """Index view that not return any template without json status."""
+    return {"message": "Workflow already start up with healthy status."}
 
 
 # NOTE Add the jobs and logs routes by default.
@@ -112,12 +113,13 @@ if config.enable_route_schedule:
                 stop=datetime.now(config.tz) + timedelta(minutes=1),
                 queue=app.state.workflow_queue,
                 threads=app.state.workflow_threads,
-                log=get_audit(),
+                audit=get_audit(),
             )
 
     @schedule.on_event("startup")
     @repeat_at(cron="*/5 * * * *", delay=10)
     def monitoring():
+        """Monitoring workflow thread that running in the background."""
         logger.debug("[MONITOR]: Start monitoring threading.")
         snapshot_threads: list[str] = list(app.state.workflow_threads.keys())
         for t_name in snapshot_threads:
