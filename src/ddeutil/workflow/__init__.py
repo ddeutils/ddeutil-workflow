@@ -41,6 +41,7 @@ from .job import (
     Strategy,
 )
 from .logs import (
+    TraceData,
     TraceLog,
     get_dt_tznow,
     get_trace,

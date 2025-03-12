@@ -127,7 +127,10 @@ class FileTraceLog(BaseTraceLog):  # pragma: no cov
 
     @classmethod
     def find_logs(cls) -> Iterator[TraceData]:  # pragma: no cov
-        for file in config.log_path.glob("./run_id=*"):
+        for file in sorted(
+            config.log_path.glob("./run_id=*"),
+            key=lambda f: f.lstat().st_mtime,
+        ):
             yield TraceData.from_path(file)
 
     @classmethod
