@@ -7,6 +7,7 @@
 """
 from __future__ import annotations
 
+import json
 import os
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
@@ -14,9 +15,11 @@ from datetime import datetime
 from inspect import Traceback, currentframe, getframeinfo
 from pathlib import Path
 from threading import get_ident
-from typing import Optional, Union
+from typing import ClassVar, Optional, Union
 
+from pydantic import BaseModel, Field
 from pydantic.dataclasses import dataclass
+from typing_extensions import Self
 
 from .__types import DictStr, TupleStr
 from .conf import config, get_logger
@@ -26,6 +29,7 @@ logger = get_logger("ddeutil.workflow")
 
 __all__: TupleStr = (
     "FileTraceLog",
+    "TraceData",
     "TraceLog",
     "get_dt_tznow",
     "get_trace",
@@ -90,36 +94,54 @@ class BaseTraceLog(ABC):  # pragma: no cov
         logger.exception(msg, stacklevel=2)
 
 
-class FileTraceLog(BaseTraceLog):  # pragma: no cov
-    """Trace Log object that write file to the local storage."""
+class TraceData(BaseModel):
+    stdout: str
+    stderr: str
+    meta: list[dict] = Field(default_factory=dict)
 
     @classmethod
-    def find_logs(cls) -> Iterator[DictStr]:  # pragma: no cov
-        for file in config.log_path.glob("./run_id=*"):
-            yield cls.__read_std(file)
-
-    @classmethod
-    def find_log_with_id(cls, run_id: str, force_raise: bool = True) -> DictStr:
-        file: Path = config.log_path / f"run_id={run_id}"
-        if file.exists():
-            return cls.__read_std(file)
-        elif force_raise:
-            raise FileNotFoundError(
-                f"Trace log on path 'run_id={run_id}' does not found."
-            )
-        return {}
-
-    @classmethod
-    def __read_std(cls, file: Path) -> DictStr:
-        data: DictStr = {}
+    def from_path(cls, file: Path) -> Self:
+        data: DictStr = {"stdout": "", "stderr": "", "meta": []}
 
         if (file / "stdout.txt").exists():
             data["stdout"] = (file / "stdout.txt").read_text(encoding="utf-8")
 
         if (file / "stderr.txt").exists():
-            data["stdout"] = (file / "stdout.txt").read_text(encoding="utf-8")
+            data["stderr"] = (file / "stderr.txt").read_text(encoding="utf-8")
 
-        return data
+        if (file / "metadata.json").exists():
+            data["meta"] = [
+                json.loads(line)
+                for line in (
+                    (file / "metadata.json")
+                    .read_text(encoding="utf-8")
+                    .splitlines()
+                )
+            ]
+
+        return cls.model_validate(data)
+
+
+class FileTraceLog(BaseTraceLog):  # pragma: no cov
+    """Trace Log object that write file to the local storage."""
+
+    @classmethod
+    def find_logs(cls) -> Iterator[TraceData]:  # pragma: no cov
+        for file in config.log_path.glob("./run_id=*"):
+            yield TraceData.from_path(file)
+
+    @classmethod
+    def find_log_with_id(
+        cls, run_id: str, force_raise: bool = True
+    ) -> TraceData:
+        file: Path = config.log_path / f"run_id={run_id}"
+        if file.exists():
+            return TraceData.from_path(file)
+        elif force_raise:
+            raise FileNotFoundError(
+                f"Trace log on path 'run_id={run_id}' does not found."
+            )
+        return {}
 
     @property
     def pointer(self) -> Path:
@@ -149,6 +171,7 @@ class FileTraceLog(BaseTraceLog):  # pragma: no cov
     def writer(self, message: str, is_err: bool = False) -> None:
         """The path of logging data will store by format:
 
+            ... ./logs/run_id=<run-id>/metadata.json
             ... ./logs/run_id=<run-id>/stdout.txt
             ... ./logs/run_id=<run-id>/stderr.txt
 
@@ -169,7 +192,6 @@ class FileTraceLog(BaseTraceLog):  # pragma: no cov
         write_file: str = "stderr.txt" if is_err else "stdout.txt"
         with (self.pointer / write_file).open(mode="at", encoding="utf-8") as f:
             msg_fmt: str = f"{config.log_format_file}\n"
-            print(msg_fmt)
             f.write(
                 msg_fmt.format(
                     **{
@@ -185,8 +207,40 @@ class FileTraceLog(BaseTraceLog):  # pragma: no cov
                 )
             )
 
+        with (self.pointer / "metadata.json").open(
+            mode="at", encoding="utf-8"
+        ) as f:
+            f.write(
+                json.dumps(
+                    {
+                        "mode": write_file.split(".")[0],
+                        "datetime": get_dt_tznow().strftime(
+                            config.log_datetime_format
+                        ),
+                        "process": process,
+                        "thread": thread,
+                        "message": message,
+                        "filename": filename,
+                        "lineno": lineno,
+                    }
+                )
+                + "\n"
+            )
+
 
 class SQLiteTraceLog(BaseTraceLog):  # pragma: no cov
+    """Trace Log object that write trace log to the SQLite database file."""
+
+    table_name: ClassVar[str] = "audits"
+    schemas: ClassVar[
+        str
+    ] = """
+        run_id          int,
+        stdout          str,
+        stderr          str,
+        update          datetime
+        primary key ( run_id )
+        """
 
     @classmethod
     def find_logs(cls) -> Iterator[DictStr]: ...

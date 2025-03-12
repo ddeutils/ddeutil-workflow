@@ -182,7 +182,9 @@ class FileAudit(BaseAudit):
             trace.debug("[LOG]: Skip writing log cause config was set")
             return self
 
-        log_file: Path = self.pointer() / f"{self.run_id}.log"
+        log_file: Path = (
+            self.pointer() / f"{self.parent_run_id or self.run_id}.log"
+        )
         log_file.write_text(
             json.dumps(
                 self.model_dump(exclude=excluded),
@@ -197,7 +199,7 @@ class FileAudit(BaseAudit):
 class SQLiteAudit(BaseAudit):  # pragma: no cov
     """SQLite Audit Pydantic Model."""
 
-    table_name: ClassVar[str] = "workflow_log"
+    table_name: ClassVar[str] = "audits"
     schemas: ClassVar[
         str
     ] = """
