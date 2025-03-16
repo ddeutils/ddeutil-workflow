@@ -2,6 +2,42 @@
 
 ## Latest Changes
 
+## 0.0.36
+
+### :sparkles: Features
+
+- :dart: feat: update job route on api component.
+- :dart: feat: add date param model object.
+- :dart: feat: add logs routes for audit log.
+- :dart: feat: add TraceData on init file.
+- :dart: feat: update logs route on api component.
+- :dart: feat: add TraceData object for keep trace data context.
+- :dart: feat: add jobs route for support self-hosted trigger.
+- :dart: feat: mark next feature on stages module.
+
+### :bug: Bug fixes
+
+- :gear: fixed: change trace log parent id that not valid on scheduler module.
+- :gear: fixed: link stage page does not valid.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: add testcase for job execution route.
+- :test_tube: tests: update testcase for api.
+- :test_tube: tests: exclude route files for coverage.
+
+### :broom: Deprecate & Clean
+
+- :recycle: clean: clear code on logs module.
+
+### :package: Build & Workflow
+
+- :toolbox: build: update .dockerignore file.
+
+### :postbox: Dependencies
+
+- :pushpin: deps: update ujson package on api deps.
+
 ## 0.0.35
 
 ### :stars: Highlight Features
