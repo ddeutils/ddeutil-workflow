@@ -3,29 +3,36 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-"""This module include all Param Models that use for parsing incoming parameters
-that pass to the Workflow and Schedule objects.
+"""This module include all Param Pydantic Models that use for parsing an
+incoming parameters that was passed to the Workflow and Schedule objects before
+execution or release methods.
+
+    The Param model allow you to handle validation and preparation steps before
+passing an input value to target execution method.
 """
 from __future__ import annotations
 
 import decimal
 from abc import ABC, abstractmethod
 from datetime import date, datetime
-from typing import Annotated, Any, Literal, Optional, Union
+from typing import Annotated, Any, Literal, Optional, TypeVar, Union
 
 from pydantic import BaseModel, Field
 
 from .__types import TupleStr
 from .exceptions import ParamValueException
-from .utils import get_dt_now
+from .utils import get_d_now, get_dt_now
 
 __all__: TupleStr = (
     "ChoiceParam",
     "DatetimeParam",
+    "DateParam",
     "IntParam",
     "Param",
     "StrParam",
 )
+
+T = TypeVar("T")
 
 
 class BaseParam(BaseModel, ABC):
@@ -43,7 +50,7 @@ class BaseParam(BaseModel, ABC):
     type: str = Field(description="A type of parameter.")
 
     @abstractmethod
-    def receive(self, value: Optional[Any] = None) -> Any:
+    def receive(self, value: Optional[T] = None) -> T:
         raise NotImplementedError(
             "Receive value and validate typing before return valid value."
         )
@@ -70,17 +77,42 @@ class DefaultParam(BaseParam):
         )
 
 
-# TODO: Not implement this parameter yet
 class DateParam(DefaultParam):  # pragma: no cov
-    """Date parameter."""
+    """Date parameter model."""
 
     type: Literal["date"] = "date"
+    default: date = Field(default_factory=get_d_now)
 
-    def receive(self, value: Optional[str | date] = None) -> date: ...
+    def receive(self, value: Optional[str | datetime | date] = None) -> date:
+        """Receive value that match with date. If an input value pass with
+        None, it will use default value instead.
+
+        :param value: A value that want to validate with date parameter type.
+
+        :rtype: date
+        """
+        if value is None:
+            return self.default
+
+        if isinstance(value, datetime):
+            return value.date()
+        elif isinstance(value, date):
+            return value
+        elif not isinstance(value, str):
+            raise ParamValueException(
+                f"Value that want to convert to date does not support for "
+                f"type: {type(value)}"
+            )
+        try:
+            return date.fromisoformat(value)
+        except ValueError:
+            raise ParamValueException(
+                f"Invalid the ISO format string for date: {value!r}"
+            ) from None
 
 
 class DatetimeParam(DefaultParam):
-    """Datetime parameter."""
+    """Datetime parameter model."""
 
     type: Literal["datetime"] = "datetime"
     default: datetime = Field(default_factory=get_dt_now)
@@ -91,6 +123,7 @@ class DatetimeParam(DefaultParam):
 
         :param value: A value that want to validate with datetime parameter
             type.
+
         :rtype: datetime
         """
         if value is None:
@@ -109,7 +142,7 @@ class DatetimeParam(DefaultParam):
             return datetime.fromisoformat(value)
         except ValueError:
             raise ParamValueException(
-                f"Invalid the ISO format string: {value!r}"
+                f"Invalid the ISO format string for datetime: {value!r}"
             ) from None
 
 
@@ -189,7 +222,7 @@ class ChoiceParam(BaseParam):
 
 
 # TODO: Not implement this parameter yet
-class MappingParam(DefaultParam):  # pragma: no cov
+class MapParam(DefaultParam):  # pragma: no cov
 
     type: Literal["map"] = "map"
     default: dict[Any, Any] = Field(default_factory=dict)
@@ -205,15 +238,22 @@ class ArrayParam(DefaultParam):  # pragma: no cov
     type: Literal["array"] = "array"
     default: list[Any] = Field(default_factory=list)
 
-    def receive(self, value: Optional[list[Any]] = None) -> list[Any]:
+    def receive(self, value: Optional[list[T]] = None) -> list[T]:
         if value is None:
             return self.default
+        if not isinstance(value, list):
+            raise ParamValueException(
+                f"Value that want to convert to array does not support for "
+                f"type: {type(value)}"
+            )
+        return value
 
 
 Param = Annotated[
     Union[
         ChoiceParam,
         DatetimeParam,
+        DateParam,
         IntParam,
         StrParam,
     ],

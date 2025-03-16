@@ -29,7 +29,9 @@ logger = get_logger("ddeutil.workflow")
 
 __all__: TupleStr = (
     "FileTraceLog",
+    "SQLiteTraceLog",
     "TraceData",
+    "TraceMeda",
     "TraceLog",
     "get_dt_tznow",
     "get_trace",

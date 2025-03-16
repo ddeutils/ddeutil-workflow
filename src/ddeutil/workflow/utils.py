@@ -9,7 +9,7 @@ import logging
 import stat
 import time
 from collections.abc import Iterator, Mapping
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from hashlib import md5
 from inspect import isfunction
 from itertools import chain, islice, product
@@ -37,6 +37,12 @@ def get_dt_now(
     :return: The current datetime object that use an input timezone or UTC.
     """
     return datetime.now(tz=(tz or UTC)) - timedelta(seconds=offset)
+
+
+def get_d_now(
+    tz: ZoneInfo | None = None, offset: float = 0.0
+) -> date:  # pragma: no cov
+    return (datetime.now(tz=(tz or UTC)) - timedelta(seconds=offset)).date()
 
 
 def get_diff_sec(

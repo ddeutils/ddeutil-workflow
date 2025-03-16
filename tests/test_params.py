@@ -5,6 +5,7 @@ import pytest
 from ddeutil.workflow.exceptions import ParamValueException
 from ddeutil.workflow.params import (
     ChoiceParam,
+    DateParam,
     DatetimeParam,
     IntParam,
     Param,
@@ -40,6 +41,23 @@ def test_param_str():
     assert StrParam().receive() is None
     assert StrParam().receive(1) == "1"
     assert StrParam().receive({"foo": "bar"}) == "{'foo': 'bar'}"
+
+
+def test_param_date():
+    assert DateParam().receive("2024-01-01") == date(2024, 1, 1)
+    assert DateParam().receive(date(2024, 1, 1)) == date(2024, 1, 1)
+    assert DateParam().receive(datetime(2024, 1, 1, 13, 24)) == date(2024, 1, 1)
+
+    with pytest.raises(ParamValueException):
+        DateParam().receive(2024)
+
+    with pytest.raises(ParamValueException):
+        DateParam().receive("2024")
+
+
+@freeze_time("2024-01-01 00:00:00")
+def test_param_date_default():
+    assert DateParam().receive() == date(2024, 1, 1)
 
 
 def test_param_datetime():

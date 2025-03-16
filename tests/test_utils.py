@@ -1,6 +1,7 @@
 import os
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 from ddeutil.workflow.utils import (
@@ -10,6 +11,8 @@ from ddeutil.workflow.utils import (
     deep_update,
     filter_func,
     gen_id,
+    get_d_now,
+    get_dt_now,
     make_exec,
     reach_next_minute,
 )
@@ -24,6 +27,18 @@ def adjust_config_gen_id():
     yield
 
     os.environ["WORKFLOW_CORE_GENERATE_ID_SIMPLE_MODE"] = origin_simple
+
+
+@freeze_time("2024-01-01 01:13:30")
+def test_get_dt_now():
+    rs = get_dt_now()
+    assert rs == datetime(2024, 1, 1, 1, 13, 30, tzinfo=ZoneInfo("UTC"))
+
+    rs = get_dt_now(offset=30)
+    assert rs == datetime(2024, 1, 1, 1, 13, 00, tzinfo=ZoneInfo("UTC"))
+
+    rs = get_d_now()
+    assert rs == date(2024, 1, 1)
 
 
 def test_gen_id():
