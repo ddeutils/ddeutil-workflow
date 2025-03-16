@@ -263,7 +263,7 @@ like crontab job but via Python API.
 ### API Server
 
 ```shell
-(venv) $ uvicorn src.ddeutil.workflow.api:app \
+(venv) $ uvicorn ddeutil.workflow.api:app \
   --host 127.0.0.1 \
   --port 80 \
   --no-access-log
