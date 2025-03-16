@@ -11,7 +11,11 @@ from datetime import datetime, timedelta
 from typing import TypedDict
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi import status as st
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import UJSONResponse
 
@@ -71,6 +75,18 @@ app = FastAPI(
     default_response_class=UJSONResponse,
 )
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+origins: list[str] = [
+    "http://localhost",
+    "http://localhost:88",
+    "http://localhost:80",
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/")
@@ -129,3 +145,23 @@ if config.enable_route_schedule:
             # NOTE: remove the thread that running success.
             if not thread_release["thread"].is_alive():
                 app.state.workflow_threads.pop(t_name)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+):
+    return UJSONResponse(
+        status_code=st.HTTP_422_UNPROCESSABLE_ENTITY,
+        content=jsonable_encoder({"detail": exc.errors(), "body": exc.body}),
+    )
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=80,
+    )

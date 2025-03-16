@@ -14,8 +14,8 @@ use-case, and it does not worry when I want to create a new one.
 
     Execution   --> Ok      --> Result with 0
 
-                --> Error   --> Result with 1 (if env var was set)
-                            --> Raise StageException(...)
+                --> Error   ┬-> Result with 1 (if env var was set)
+                            ╰-> Raise StageException(...)
 
     On the context I/O that pass to a stage object at execute process. The
 execute method receives a `params={"params": {...}}` value for mapping to
@@ -733,6 +733,26 @@ Stage = Union[
 
 # TODO: Not implement this stages yet
 class ParallelStage(BaseStage):  # pragma: no cov
+    """Parallel execution stage that execute child stages with parallel.
+
+    Data Validate:
+        >>> stage = {
+        ...     "name": "Parallel stage execution.",
+        ...     "parallel": [
+        ...         {
+        ...             "name": "Echo first stage",
+        ...             "echo": "Start run with branch 1",
+        ...             "sleep": 3,
+        ...         },
+        ...         {
+        ...             "name": "Echo second stage",
+        ...             "echo": "Start run with branch 2",
+        ...             "sleep": 1,
+        ...         },
+        ...     ]
+        ... }
+    """
+
     parallel: list[Stage]
     max_parallel_core: int = Field(default=2)
 
@@ -743,6 +763,22 @@ class ParallelStage(BaseStage):  # pragma: no cov
 
 # TODO: Not implement this stages yet
 class ForEachStage(BaseStage):  # pragma: no cov
+    """For-Each execution stage that execute child stages with an item in list of
+    item values.
+
+    Data Validate:
+        >>> stage = {
+        ...     "name": "For-each stage execution",
+        ...     "foreach": [1, 2, 3]
+        ...     "stages": [
+        ...         {
+        ...             "name": "Echo stage",
+        ...             "echo": "Start run with item {{ item }}"
+        ...         },
+        ...     ],
+        ... }
+    """
+
     foreach: list[str]
     stages: list[Stage]
 
@@ -753,8 +789,9 @@ class ForEachStage(BaseStage):  # pragma: no cov
 
 # TODO: Not implement this stages yet
 class HookStage(BaseStage):  # pragma: no cov
-    foreach: list[str]
-    stages: list[Stage]
+    hook: str
+    args: DictData
+    callback: str
 
     def execute(
         self, params: DictData, *, result: Result | None = None
@@ -773,4 +810,9 @@ class DockerStage(BaseStage):  # pragma: no cov
 
 # TODO: Not implement this stages yet
 class VirtualPyStage(PyStage):  # pragma: no cov
-    ...
+    """Python Virtual Environment stage execution."""
+
+    run: str
+    vars: DictData
+
+    def create_py_file(self, py: str, run_id: str | None): ...

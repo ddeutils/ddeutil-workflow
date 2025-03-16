@@ -21,17 +21,26 @@ logger = get_logger("ddeutil.workflow")
 def get_cronjob_delta(cron: str) -> float:
     """This function returns the time delta between now and the next cron
     execution time.
+
+    :rtype: float
     """
     now: datetime = datetime.now(tz=config.tz)
     cron = CronJob(cron)
     return (cron.schedule(now).next - now).total_seconds()
 
 
-def cron_valid(cron: str):
+def cron_valid(cron: str, raise_error: bool = True) -> bool:
+    """Check this crontab string value is valid with its cron syntax.
+
+    :rtype: bool
+    """
     try:
         CronJob(cron)
+        return True
     except Exception as err:
-        raise ValueError(f"Crontab value does not valid, {cron}") from err
+        if raise_error:
+            raise ValueError(f"Crontab value does not valid, {cron}") from err
+        return False
 
 
 async def run_func(
@@ -41,6 +50,7 @@ async def run_func(
     raise_exceptions: bool = False,
     **kwargs,
 ):
+    """Run function inside the repeat decorator functions."""
     try:
         if is_coroutine:
             await func(*args, **kwargs)
@@ -62,11 +72,11 @@ def repeat_at(
     """This function returns a decorator that makes a function execute
     periodically as per the cron expression provided.
 
-    :param cron: str
-        Cron-style string for periodic execution, eg. '0 0 * * *' every midnight
-    :param delay:
-    :param raise_exceptions: bool (default False)
-        Whether to raise exceptions or log them
+    :param cron: (str) A Cron-style string for periodic execution, e.g.
+        '0 0 * * *' every midnight
+    :param delay: (float) A delay seconds value.
+    :param raise_exceptions: (bool) A raise exception flag. Whether to raise
+        exceptions or log them if raise was set be false.
     :param max_repetitions: int (default None)
         Maximum number of times to repeat the function. If None, repeat
         indefinitely.
@@ -81,12 +91,12 @@ def repeat_at(
 
         @wraps(func)
         def wrapper(*_args, **_kwargs):
-            repititions: int = 0
+            repetitions: int = 0
             cron_valid(cron)
 
             async def loop(*args, **kwargs):
-                nonlocal repititions
-                while max_repetitions is None or repititions < max_repetitions:
+                nonlocal repetitions
+                while max_repetitions is None or repetitions < max_repetitions:
                     sleep_time = get_cronjob_delta(cron) + delay
                     await asyncio.sleep(sleep_time)
                     await run_func(
@@ -96,7 +106,7 @@ def repeat_at(
                         raise_exceptions=raise_exceptions,
                         **kwargs,
                     )
-                    repititions += 1
+                    repetitions += 1
 
             ensure_future(loop(*_args, **_kwargs))
 
