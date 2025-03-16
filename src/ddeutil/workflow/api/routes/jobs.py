@@ -20,8 +20,8 @@ job_route = APIRouter(
 )
 
 
-@job_route.post(path="/")
-async def execute_jobs():
+@job_route.post(path="/execute/")
+async def job_execute():
     return {
         "message": "Start execute job.",
     }

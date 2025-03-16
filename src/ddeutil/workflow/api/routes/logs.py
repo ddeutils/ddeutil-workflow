@@ -3,6 +3,7 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
+"""This route include audit and trace log paths."""
 from __future__ import annotations
 
 from fastapi import APIRouter
@@ -38,5 +39,26 @@ async def get_audits():
     """Get all audit logs."""
     return {
         "message": "Getting audit logs",
+        "audits": list(get_audit().find_audits(name="demo")),
+    }
+
+
+@log_route.get(path="/audit/{workflow}/")
+async def get_audit_with_workflow(workflow: str):
+    """Get all audit logs."""
+    return {
+        "message": f"Getting audit logs with workflow name {workflow}",
+        "audits": list(get_audit().find_audits(name="demo")),
+    }
+
+
+@log_route.get(path="/audit/{workflow}/{release}")
+async def get_audit_with_workflow_release(workflow: str, release: str):
+    """Get all audit logs."""
+    return {
+        "message": (
+            f"Getting audit logs with workflow name {workflow} and release "
+            f"{release}"
+        ),
         "audits": list(get_audit().find_audits(name="demo")),
     }
