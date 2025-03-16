@@ -1,21 +1,29 @@
+# External files
+docs/
+.github/
+.git/
+.gitignore
+.pre-commit-config.yaml
+LICENSE
+CHANGELOG.md
+README.md
+
 # Exclude virtual environment
 venv/
 .venv/
 
 # Exclude cache, logs, and temporary files
 audits/
-docs/
+logs/
 __pycache__/
-.github/
 *.log
 *.tmp
 *.pyc
 *.pyo
 *.pyd
 .pytest_cache
-.git
-.gitignore
-README.md
+.coverage
+.htmlcov
 
 # Exclude model training checkpoints and tensorboard logs
 checkpoints/
