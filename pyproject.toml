@@ -35,7 +35,10 @@ dependencies = [
 dynamic = ["version"]
 
 [project.optional-dependencies]
-api = [ "fastapi>=0.115.0,<1.0.0" ]
+api = [
+    "fastapi>=0.115.0,<1.0.0",
+    "httpx",
+]
 
 [project.urls]
 Homepage = "https://github.com/ddeutils/ddeutil-workflow/"
@@ -93,7 +96,10 @@ addopts = [
     "--strict-config",
     "--strict-markers",
 ]
-filterwarnings = ["error"]
+filterwarnings = [
+    "error",
+    "ignore::DeprecationWarning",
+]
 log_cli = true
 log_cli_level = "DEBUG"
 log_cli_format = "%(asctime)s [%(levelname)-7s] %(message)-120s (%(filename)s:%(lineno)s)"
