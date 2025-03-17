@@ -21,8 +21,14 @@ def test_run_ons():
     model = TypeAdapter(RunsOn).validate_python({"type": "local"})
     assert isinstance(model, RunsOnLocal)
 
-    model = TypeAdapter(RunsOn).validate_python({"type": "self_hosted"})
+    model = TypeAdapter(RunsOn).validate_python(
+        {
+            "type": "self_hosted",
+            "with": {"host": "localhost:88"},
+        },
+    )
     assert isinstance(model, RunsOnSelfHosted)
+    assert model.args.host == "localhost:88"
 
     model = TypeAdapter(RunsOn).validate_python({"type": "k8s"})
     assert isinstance(model, RunsOnK8s)
@@ -43,8 +49,8 @@ def test_job():
     assert job.check_needs({"job-before": "foo"})
     assert not job.check_needs({"job-after": "foo"})
 
-    job = Job(runs_on={"type": "self_hosted"})
-    assert isinstance(job.runs_on, RunsOnSelfHosted)
+    job = Job(runs_on={"type": "k8s"})
+    assert isinstance(job.runs_on, RunsOnK8s)
 
 
 def test_job_raise():

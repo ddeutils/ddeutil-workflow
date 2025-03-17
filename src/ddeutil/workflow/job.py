@@ -243,12 +243,17 @@ class RunsOnLocal(BaseRunsOn):  # pragma: no cov
     type: Literal[RunsOnType.LOCAL] = Field(default=RunsOnType.LOCAL)
 
 
+class SelfHostedArgs(BaseModel):
+    host: str
+
+
 class RunsOnSelfHosted(BaseRunsOn):  # pragma: no cov
     """Runs-on self-hosted."""
 
     type: Literal[RunsOnType.SELF_HOSTED] = Field(
         default=RunsOnType.SELF_HOSTED
     )
+    args: SelfHostedArgs = Field(alias="with")
 
 
 class RunsOnK8s(BaseRunsOn):  # pragma: no cov
@@ -679,7 +684,9 @@ class Job(BaseModel):
             status: Status = Status.SUCCESS
             fail_fast_flag: bool = self.strategy.fail_fast
 
-            if fail_fast_flag:
+            if not fail_fast_flag:
+                done = as_completed(futures, timeout=1800)
+            else:
                 # NOTE: Get results from a collection of tasks with a timeout
                 #   that has the first exception.
                 done, not_done = wait(
@@ -698,8 +705,6 @@ class Job(BaseModel):
                     event.set()
                     for future in not_done:
                         future.cancel()
-            else:
-                done = as_completed(futures, timeout=1800)
 
             for future in done:
                 try:

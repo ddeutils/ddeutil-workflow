@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from src.ddeutil.workflow.api.api import app
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="session")
 def client() -> Generator[TestClient, None, None]:
     """Provide a TestClient that uses the test database session.
     Override the get_db dependency to use the test session.
