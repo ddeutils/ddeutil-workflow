@@ -32,8 +32,10 @@ def get_dt_now(
 ) -> datetime:  # pragma: no cov
     """Return the current datetime object.
 
-    :param tz:
-    :param offset:
+    :param tz: A ZoneInfo object for replace timezone of return datetime object.
+    :param offset: An offset second value.
+
+    :rtype: datetime
     :return: The current datetime object that use an input timezone or UTC.
     """
     return datetime.now(tz=(tz or UTC)) - timedelta(seconds=offset)
@@ -42,6 +44,14 @@ def get_dt_now(
 def get_d_now(
     tz: ZoneInfo | None = None, offset: float = 0.0
 ) -> date:  # pragma: no cov
+    """Return the current date object.
+
+    :param tz: A ZoneInfo object for replace timezone of return date object.
+    :param offset: An offset second value.
+
+    :rtype: date
+    :return: The current date object that use an input timezone or UTC.
+    """
     return (datetime.now(tz=(tz or UTC)) - timedelta(seconds=offset)).date()
 
 
@@ -52,8 +62,10 @@ def get_diff_sec(
     current datetime with specific timezone.
 
     :param dt:
-    :param tz:
-    :param offset:
+    :param tz: A ZoneInfo object for replace timezone of return datetime object.
+    :param offset: An offset second value.
+
+    :rtype: int
     """
     return round(
         (
@@ -67,6 +79,10 @@ def reach_next_minute(
 ) -> bool:
     """Check this datetime object is not in range of minute level on the current
     datetime.
+
+    :param dt:
+    :param tz: A ZoneInfo object for replace timezone of return datetime object.
+    :param offset: An offset second value.
     """
     diff: float = (
         dt.replace(second=0, microsecond=0)
@@ -128,13 +144,14 @@ def gen_id(
         value: str = str(value)
 
     if config.gen_id_simple_mode:
-        return hash_str(f"{(value if sensitive else value.lower())}", n=10) + (
-            f"{datetime.now(tz=config.tz):%Y%m%d%H%M%S%f}" if unique else ""
-        )
+        return (
+            f"{datetime.now(tz=config.tz):%Y%m%d%H%M%S%f}T" if unique else ""
+        ) + hash_str(f"{(value if sensitive else value.lower())}", n=10)
+
     return md5(
         (
-            f"{(value if sensitive else value.lower())}"
-            + (f"{datetime.now(tz=config.tz):%Y%m%d%H%M%S%f}" if unique else "")
+            (f"{datetime.now(tz=config.tz):%Y%m%d%H%M%S%f}T" if unique else "")
+            + f"{(value if sensitive else value.lower())}"
         ).encode()
     ).hexdigest()
 
@@ -179,9 +196,13 @@ def dash2underscore(
 ) -> DictData:
     """Change key name that has dash to underscore.
 
-    :param key
-    :param values
-    :param fixed
+    :param key:
+    :param values:
+    :param fixed:
+
+    Examples:
+        >>> dash2underscore('foo-bar', {"foo-bar": "demo"})
+        {'foo_bar': 'demo'}
 
     :rtype: DictData
     """

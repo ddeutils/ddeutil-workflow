@@ -83,6 +83,11 @@ class ScheduleWorkflow(BaseModel):
     the Schedule model. it should not use Workflow model directly because on the
     schedule config it can adjust crontab value that different from the Workflow
     model.
+
+        This on field does not equal to the on field of Workflow model, but it
+    uses same logic to generate running release date with crontab object. It use
+    for override the on field if the schedule time was change but you do not
+    want to change on the workflow model.
     """
 
     alias: Optional[str] = Field(
@@ -97,7 +102,7 @@ class ScheduleWorkflow(BaseModel):
     values: DictData = Field(
         default_factory=dict,
         description=(
-            "A value that want to pass to the workflow parameters when "
+            "A value that want to pass to the workflow params field when auto "
             "calling release method."
         ),
         alias="params",
@@ -222,8 +227,8 @@ class ScheduleWorkflow(BaseModel):
 class Schedule(BaseModel):
     """Schedule Pydantic model that use to run with any scheduler package.
 
-        It does not equal the on value in Workflow model, but it uses same logic
-    to running release date with crontab interval.
+        The workflows field of this model include ScheduleWorkflow objects that
+    enhance the workflow object by adding the alias and values fields.
     """
 
     desc: Optional[str] = Field(
