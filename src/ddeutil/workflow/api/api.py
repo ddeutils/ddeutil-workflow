@@ -151,6 +151,7 @@ if config.enable_route_schedule:
 async def validation_exception_handler(
     request: Request, exc: RequestValidationError
 ):
+    _ = request
     return UJSONResponse(
         status_code=st.HTTP_422_UNPROCESSABLE_ENTITY,
         content=jsonable_encoder({"detail": exc.errors(), "body": exc.body}),

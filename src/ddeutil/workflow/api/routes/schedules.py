@@ -24,7 +24,7 @@ schedule_route = APIRouter(
 )
 
 
-@schedule_route.get(path="/{name}")
+@schedule_route.get(path="/{name}", status_code=st.HTTP_200_OK)
 async def get_schedules(name: str):
     """Get schedule object."""
     try:
@@ -42,13 +42,13 @@ async def get_schedules(name: str):
     )
 
 
-@schedule_route.get(path="/deploy/")
+@schedule_route.get(path="/deploy/", status_code=st.HTTP_200_OK)
 async def get_deploy_schedulers(request: Request):
     snapshot = copy.deepcopy(request.state.scheduler)
     return {"schedule": snapshot}
 
 
-@schedule_route.get(path="/deploy/{name}")
+@schedule_route.get(path="/deploy/{name}", status_code=st.HTTP_200_OK)
 async def get_deploy_scheduler(request: Request, name: str):
     if name in request.state.scheduler:
         schedule = Schedule.from_loader(name)
@@ -76,7 +76,7 @@ async def get_deploy_scheduler(request: Request, name: str):
     )
 
 
-@schedule_route.post(path="/deploy/{name}")
+@schedule_route.post(path="/deploy/{name}", status_code=st.HTTP_202_ACCEPTED)
 async def add_deploy_scheduler(request: Request, name: str):
     """Adding schedule name to application state store."""
     if name in request.state.scheduler:
@@ -116,7 +116,7 @@ async def add_deploy_scheduler(request: Request, name: str):
     }
 
 
-@schedule_route.delete(path="/deploy/{name}")
+@schedule_route.delete(path="/deploy/{name}", status_code=st.HTTP_202_ACCEPTED)
 async def del_deploy_scheduler(request: Request, name: str):
     """Delete workflow task on the schedule listener."""
     if name in request.state.scheduler:

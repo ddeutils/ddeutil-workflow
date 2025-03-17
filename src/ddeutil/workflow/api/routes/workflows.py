@@ -29,7 +29,7 @@ workflow_route = APIRouter(
 )
 
 
-@workflow_route.get(path="/")
+@workflow_route.get(path="/", status_code=st.HTTP_200_OK)
 async def get_workflows() -> DictData:
     """Return all workflow workflows that exists in config path."""
     workflows: DictData = dict(Loader.finds(Workflow))
@@ -40,7 +40,7 @@ async def get_workflows() -> DictData:
     }
 
 
-@workflow_route.get(path="/{name}")
+@workflow_route.get(path="/{name}", status_code=st.HTTP_200_OK)
 async def get_workflow_by_name(name: str) -> DictData:
     """Return model of workflow that passing an input workflow name."""
     try:
@@ -66,7 +66,7 @@ class ExecutePayload(BaseModel):
 
 
 @workflow_route.post(path="/{name}/execute", status_code=st.HTTP_202_ACCEPTED)
-async def execute_workflow(name: str, payload: ExecutePayload) -> DictData:
+async def workflow_execute(name: str, payload: ExecutePayload) -> DictData:
     """Return model of workflow that passing an input workflow name."""
     try:
         workflow: Workflow = Workflow.from_loader(name=name, externals={})
@@ -90,7 +90,7 @@ async def execute_workflow(name: str, payload: ExecutePayload) -> DictData:
     return asdict(result)
 
 
-@workflow_route.get(path="/{name}/audits")
+@workflow_route.get(path="/{name}/audits", status_code=st.HTTP_200_OK)
 async def get_workflow_audits(name: str):
     try:
         return {
@@ -112,11 +112,13 @@ async def get_workflow_audits(name: str):
         ) from None
 
 
-@workflow_route.get(path="/{name}/audits/{release}")
+@workflow_route.get(path="/{name}/audits/{release}", status_code=st.HTTP_200_OK)
 async def get_workflow_release_audit(name: str, release: str):
+    """Get Workflow audit log with an input release value."""
     try:
         audit: Audit = get_audit().find_audit_with_release(
-            name=name, release=datetime.strptime(release, "%Y%m%d%H%M%S")
+            name=name,
+            release=datetime.strptime(release, "%Y%m%d%H%M%S"),
         )
     except FileNotFoundError:
         raise HTTPException(
