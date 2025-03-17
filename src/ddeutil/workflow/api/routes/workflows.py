@@ -20,7 +20,7 @@ from ...conf import Loader, get_logger
 from ...result import Result
 from ...workflow import Workflow
 
-logger = get_logger("ddeutil.workflow")
+logger = get_logger("uvicorn.error")
 
 workflow_route = APIRouter(
     prefix="/workflows",

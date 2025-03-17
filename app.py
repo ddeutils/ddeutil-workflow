@@ -9,7 +9,7 @@ from __future__ import annotations
 import uvicorn
 
 from src.ddeutil.workflow.api import app
-from src.ddeutil.workflow.conf import LOGGING_CONFIG
+from src.ddeutil.workflow.api.log import LOGGING_CONFIG
 
 if __name__ == "__main__":
     import argparse

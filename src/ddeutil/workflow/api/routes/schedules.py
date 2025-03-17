@@ -15,7 +15,7 @@ from fastapi.responses import UJSONResponse
 from ...conf import config, get_logger
 from ...scheduler import Schedule
 
-logger = get_logger("ddeutil.workflow")
+logger = get_logger("uvicorn.error")
 
 schedule_route = APIRouter(
     prefix="/schedules",

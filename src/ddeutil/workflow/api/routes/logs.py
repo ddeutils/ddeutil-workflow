@@ -25,7 +25,6 @@ log_route = APIRouter(
     response_class=UJSONResponse,
     status_code=st.HTTP_200_OK,
     summary="Read all trace logs.",
-    description="Read all trace logs that store on the current trace log path.",
 )
 async def get_traces():
     """Return all trace logs from the current trace log path that config with
@@ -50,10 +49,6 @@ async def get_traces():
     response_class=UJSONResponse,
     status_code=st.HTTP_200_OK,
     summary="Read trace log with specific running ID.",
-    description=(
-        "Read trace log with specific running ID that store on the current "
-        "trace log path."
-    ),
 )
 async def get_trace_with_id(run_id: str):
     """Return trace log with specific running ID from the current trace log path

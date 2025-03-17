@@ -17,7 +17,7 @@ from ...exceptions import JobException
 from ...job import Job
 from ...result import Result
 
-logger = get_logger("ddeutil.workflow")
+logger = get_logger("uvicorn.error")
 
 
 job_route = APIRouter(

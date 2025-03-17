@@ -27,7 +27,7 @@ from .repeat import repeat_at
 from .routes import job, log
 
 load_dotenv()
-logger = get_logger("ddeutil.workflow")
+logger = get_logger("uvicorn.error")
 
 
 class State(TypedDict):
@@ -165,4 +165,5 @@ if __name__ == "__main__":
         app,
         host="0.0.0.0",
         port=80,
+        log_level="DEBUG",
     )
