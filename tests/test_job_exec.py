@@ -224,3 +224,15 @@ def test_job_exec_py_complete_raise():
             ),
         },
     }
+
+
+@mock.patch.object(Config, "job_raise_error", True)
+@mock.patch.object(Config, "stage_raise_error", True)
+def test_job_exec_runs_on_not_implement():
+    workflow: Workflow = Workflow.from_loader(
+        name="wf-run-python-raise-for-job"
+    )
+    job: Job = workflow.job("job-fail-runs-on")
+
+    with pytest.raises(NotImplementedError):
+        job.execute({})
