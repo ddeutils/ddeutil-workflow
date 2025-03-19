@@ -198,3 +198,8 @@ dynamic parameters workflow for common use-case.
 |-----------|----------------|:--------:|------------------------------------------------------------------|
 | trigger   | str            |          | A trigger workflow name that should already exist on the config. |
 | params    | dict[str, Any] | `dict()` | A parameter that want to pass to workflow execution.             |
+
+
+## ForEach Stage
+
+## Parallel Stage

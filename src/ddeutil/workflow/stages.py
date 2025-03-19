@@ -31,6 +31,11 @@ import time
 import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
+from concurrent.futures import (
+    Future,
+    ThreadPoolExecutor,
+    as_completed,
+)
 from inspect import Parameter
 from pathlib import Path
 from subprocess import CompletedProcess
@@ -62,6 +67,8 @@ __all__: TupleStr = (
     "PyStage",
     "CallStage",
     "TriggerStage",
+    "ForEachStage",
+    "ParallelStage",
     "Stage",
 )
 
@@ -339,7 +346,7 @@ class EmptyStage(BaseStage):
             f"( {param2template(self.echo, params=params) or '...'} )"
         )
         if self.sleep > 0:
-            if self.sleep > 30:
+            if self.sleep > 5:
                 result.trace.info(f"[STAGE]: ... sleep ({self.sleep} seconds)")
             time.sleep(self.sleep)
 
@@ -717,54 +724,115 @@ class TriggerStage(BaseStage):
         )
 
 
-# NOTE:
-#   An order of parsing stage model on the Job model with ``stages`` field.
-#   From the current build-in stages, they do not have stage that have the same
-#   fields that because of parsing on the Job's stages key.
-#
-Stage = Union[
-    PyStage,
-    BashStage,
-    CallStage,
-    TriggerStage,
-    EmptyStage,
-]
-
-
-# TODO: Not implement this stages yet
 class ParallelStage(BaseStage):  # pragma: no cov
     """Parallel execution stage that execute child stages with parallel.
+
+        This stage is not the low-level stage model because it runs muti-stages
+    in this stage execution.
 
     Data Validate:
         >>> stage = {
         ...     "name": "Parallel stage execution.",
-        ...     "parallel": [
-        ...         {
-        ...             "name": "Echo first stage",
-        ...             "echo": "Start run with branch 1",
-        ...             "sleep": 3,
-        ...         },
-        ...         {
-        ...             "name": "Echo second stage",
-        ...             "echo": "Start run with branch 2",
-        ...             "sleep": 1,
-        ...         },
-        ...     ]
+        ...     "parallel": {
+        ...         "branch01": [
+        ...             {
+        ...                 "name": "Echo first stage",
+        ...                 "echo": "Start run with branch 1",
+        ...                 "sleep": 3,
+        ...             },
+        ...         ],
+        ...         "branch02": [
+        ...             {
+        ...                 "name": "Echo second stage",
+        ...                 "echo": "Start run with branch 2",
+        ...                 "sleep": 1,
+        ...             },
+        ...         ],
+        ...     }
         ... }
     """
 
-    parallel: list[Stage]
+    parallel: dict[str, list[Stage]] = Field()
     max_parallel_core: int = Field(default=2)
+
+    @staticmethod
+    def task(
+        branch: str,
+        params: DictData,
+        result: Result,
+        stages: list[Stage],
+    ) -> DictData:
+        context = {"branch": branch, "stages": {}}
+        result.trace.debug(f"[STAGE]: Execute parallel branch: {branch!r}")
+        for stage in stages:
+            try:
+                stage.set_outputs(
+                    stage.handler_execute(
+                        params=params,
+                        run_id=result.run_id,
+                        parent_run_id=result.parent_run_id,
+                    ).context,
+                    to=context,
+                )
+            except StageException as err:  # pragma: no cov
+                result.trace.error(
+                    f"[STAGE]: Catch:\n\t{err.__class__.__name__}:" f"\n\t{err}"
+                )
+                context.update(
+                    {
+                        "errors": {
+                            "class": err,
+                            "name": err.__class__.__name__,
+                            "message": f"{err.__class__.__name__}: {err}",
+                        },
+                    },
+                )
+        return context
 
     def execute(
         self, params: DictData, *, result: Result | None = None
-    ) -> Result: ...
+    ) -> Result:
+        if result is None:  # pragma: no cov
+            result: Result = Result(
+                run_id=gen_id(self.name + (self.id or ""), unique=True)
+            )
+
+        rs: DictData = {"parallel": {}}
+        status = Status.SUCCESS
+        with ThreadPoolExecutor(
+            max_workers=self.max_parallel_core,
+            thread_name_prefix="parallel_stage_exec_",
+        ) as executor:
+
+            futures: list[Future] = []
+            for branch in self.parallel:
+                futures.append(
+                    executor.submit(
+                        self.task,
+                        branch=branch,
+                        params=params,
+                        result=result,
+                        stages=self.parallel[branch],
+                    )
+                )
+
+            done = as_completed(futures, timeout=1800)
+            for future in done:
+                context: DictData = future.result()
+                rs["parallel"][context.pop("branch")] = context
+
+                if "errors" in context:
+                    status = Status.FAILED
+
+        return result.catch(status=status, context=rs)
 
 
-# TODO: Not implement this stages yet
-class ForEachStage(BaseStage):  # pragma: no cov
-    """For-Each execution stage that execute child stages with an item in list of
-    item values.
+class ForEachStage(BaseStage):
+    """For-Each execution stage that execute child stages with an item in list
+    of item values.
+
+        This stage is not the low-level stage model because it runs muti-stages
+    in this stage execution.
 
     Data Validate:
         >>> stage = {
@@ -779,12 +847,63 @@ class ForEachStage(BaseStage):  # pragma: no cov
         ... }
     """
 
-    foreach: list[str]
-    stages: list[Stage]
+    foreach: Union[list[str], list[int]] = Field(
+        description="A items for passing to each stages via item template."
+    )
+    stages: list[Stage] = Field()
 
     def execute(
         self, params: DictData, *, result: Result | None = None
-    ) -> Result: ...
+    ) -> Result:
+        """Execute the stages that pass each item form the foreach field.
+
+        :param params: A parameter that want to pass before run any statement.
+        :param result: (Result) A result object for keeping context and status
+            data.
+
+        :rtype: Result
+        """
+        if result is None:  # pragma: no cov
+            result: Result = Result(
+                run_id=gen_id(self.name + (self.id or ""), unique=True)
+            )
+
+        rs: DictData = {"items": self.foreach, "foreach": {}}
+        status = Status.SUCCESS
+        for item in self.foreach:
+            result.trace.debug(f"[STAGE]: Execute foreach item: {item!r}")
+            params["item"] = item
+            context = {"stages": {}}
+
+            for stage in self.stages:
+                try:
+                    stage.set_outputs(
+                        stage.handler_execute(
+                            params=params,
+                            run_id=result.run_id,
+                            parent_run_id=result.parent_run_id,
+                        ).context,
+                        to=context,
+                    )
+                except StageException as err:  # pragma: no cov
+                    status = Status.FAILED
+                    result.trace.error(
+                        f"[STAGE]: Catch:\n\t{err.__class__.__name__}:"
+                        f"\n\t{err}"
+                    )
+                    context.update(
+                        {
+                            "errors": {
+                                "class": err,
+                                "name": err.__class__.__name__,
+                                "message": f"{err.__class__.__name__}: {err}",
+                            },
+                        },
+                    )
+
+            rs["foreach"][item] = context
+
+        return result.catch(status=status, context=rs)
 
 
 # TODO: Not implement this stages yet
@@ -820,3 +939,27 @@ class VirtualPyStage(PyStage):  # pragma: no cov
     vars: DictData
 
     def create_py_file(self, py: str, run_id: str | None): ...
+
+
+# TODO: Not implement this stages yet
+class SensorStage(BaseStage):  # pragma: no cov
+
+    def execute(
+        self, params: DictData, *, result: Result | None = None
+    ) -> Result: ...
+
+
+# NOTE:
+#   An order of parsing stage model on the Job model with ``stages`` field.
+#   From the current build-in stages, they do not have stage that have the same
+#   fields that because of parsing on the Job's stages key.
+#
+Stage = Union[
+    PyStage,
+    BashStage,
+    CallStage,
+    TriggerStage,
+    ForEachStage,
+    ParallelStage,
+    EmptyStage,
+]

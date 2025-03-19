@@ -229,3 +229,112 @@ def test_stage_exec_trigger_from_workflow():
     } == getdot(
         "jobs.trigger-job.stages.trigger-stage.outputs.params", rs.context
     )
+
+
+def test_stage_exec_foreach(test_path):
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_foreach.yml",
+        data="""
+        tmp-wf-foreach:
+          type: Workflow
+          jobs:
+            first-job:
+              stages:
+                - name: "Start run for-each stage"
+                  id: foreach-stage
+                  foreach: [1, 2, 3, 4]
+                  stages:
+                    - name: "Echo stage"
+                      echo: |
+                        Start run with item ${{ item }}
+                    - name: "Final Echo"
+                      if: ${{ item }} == 4
+                      echo: |
+                        Final run
+        """,
+    ):
+        workflow = Workflow.from_loader(name="tmp-wf-foreach")
+
+        stage: Stage = workflow.job("first-job").stage("foreach-stage")
+        rs = stage.set_outputs(stage.handler_execute({}).context, to={})
+        assert rs == {
+            "stages": {
+                "foreach-stage": {
+                    "outputs": {
+                        "items": [1, 2, 3, 4],
+                        "foreach": {
+                            1: {
+                                "stages": {
+                                    "2709471980": {"outputs": {}},
+                                    "9263488742": {"outputs": {}},
+                                },
+                            },
+                            2: {
+                                "stages": {
+                                    "2709471980": {"outputs": {}},
+                                    "9263488742": {"outputs": {}},
+                                },
+                            },
+                            3: {
+                                "stages": {
+                                    "2709471980": {"outputs": {}},
+                                    "9263488742": {"outputs": {}},
+                                },
+                            },
+                            4: {
+                                "stages": {
+                                    "2709471980": {"outputs": {}},
+                                    "9263488742": {"outputs": {}},
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        }
+
+
+def test_stage_exec_parallel(test_path):
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_parallel.yml",
+        data="""
+        tmp-wf-parallel:
+          type: Workflow
+          jobs:
+            first-job:
+              stages:
+                - name: "Start run parallel stage"
+                  id: parallel-stage
+                  parallel:
+                    branch01:
+                      - name: "Echo branch01 stage"
+                        echo: |
+                          Start run with branch 1
+                        sleep: 5
+                    branch02:
+                      - name: "Echo branch02 stage"
+                        echo: |
+                          Start run with branch 2
+                        sleep: 1
+        """,
+    ):
+        workflow = Workflow.from_loader(name="tmp-wf-parallel")
+
+        stage: Stage = workflow.job("first-job").stage("parallel-stage")
+        rs = stage.set_outputs(stage.handler_execute({}).context, to={})
+        assert rs == {
+            "stages": {
+                "parallel-stage": {
+                    "outputs": {
+                        "parallel": {
+                            "branch02": {
+                                "stages": {"4967824305": {"outputs": {}}},
+                            },
+                            "branch01": {
+                                "stages": {"0573477600": {"outputs": {}}},
+                            },
+                        },
+                    },
+                },
+            },
+        }

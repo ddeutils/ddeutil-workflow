@@ -39,6 +39,8 @@ from .job import (
     Job,
     RunsOn,
     Strategy,
+    local_execute,
+    local_execute_strategy,
 )
 from .logs import (
     TraceData,
@@ -69,6 +71,8 @@ from .stages import (
     BashStage,
     CallStage,
     EmptyStage,
+    ForEachStage,
+    ParallelStage,
     PyStage,
     Stage,
     TriggerStage,
