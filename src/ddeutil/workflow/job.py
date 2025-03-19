@@ -228,6 +228,10 @@ class RunsOnType(str, Enum):
 
 
 class BaseRunsOn(BaseModel):  # pragma: no cov
+    """Base Runs-On Model for generate runs-on types via inherit this model
+    object and override execute method.
+    """
+
     model_config = ConfigDict(use_enum_values=True)
 
     type: Literal[RunsOnType.LOCAL]
@@ -242,6 +246,14 @@ class RunsOnLocal(BaseRunsOn):  # pragma: no cov
 
     type: Literal[RunsOnType.LOCAL] = Field(default=RunsOnType.LOCAL)
 
+    def execute(
+        self,
+        func,
+        *args,
+        **kwargs,
+    ):
+        return func(*args, **kwargs)
+
 
 class SelfHostedArgs(BaseModel):
     host: str
@@ -254,6 +266,14 @@ class RunsOnSelfHosted(BaseRunsOn):  # pragma: no cov
         default=RunsOnType.SELF_HOSTED
     )
     args: SelfHostedArgs = Field(alias="with")
+
+    def execute(
+        self,
+        func,
+        *args,
+        **kwargs,
+    ):
+        return
 
 
 class RunsOnK8s(BaseRunsOn):  # pragma: no cov
