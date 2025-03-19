@@ -717,54 +717,63 @@ class TriggerStage(BaseStage):
         )
 
 
-# NOTE:
-#   An order of parsing stage model on the Job model with ``stages`` field.
-#   From the current build-in stages, they do not have stage that have the same
-#   fields that because of parsing on the Job's stages key.
-#
-Stage = Union[
-    PyStage,
-    BashStage,
-    CallStage,
-    TriggerStage,
-    EmptyStage,
-]
-
-
 # TODO: Not implement this stages yet
 class ParallelStage(BaseStage):  # pragma: no cov
     """Parallel execution stage that execute child stages with parallel.
 
+        This stage is not the low-level stage model because it runs muti-stages
+    in this stage execution.
+
     Data Validate:
         >>> stage = {
         ...     "name": "Parallel stage execution.",
-        ...     "parallel": [
-        ...         {
-        ...             "name": "Echo first stage",
-        ...             "echo": "Start run with branch 1",
-        ...             "sleep": 3,
+        ...     "parallel": {
+        ...         "branch01": {
+        ...             "stages": [
+        ...                 {
+        ...                     "name": "Echo first stage",
+        ...                     "echo": "Start run with branch 1",
+        ...                     "sleep": 3,
+        ...                 },
+        ...             ]
         ...         },
-        ...         {
-        ...             "name": "Echo second stage",
-        ...             "echo": "Start run with branch 2",
-        ...             "sleep": 1,
+        ...         "branch02": {
+        ...             "stages": [
+        ...                 {
+        ...                     "name": "Echo second stage",
+        ...                     "echo": "Start run with branch 2",
+        ...                     "sleep": 1,
+        ...                 },
+        ...             ]
         ...         },
-        ...     ]
+        ...     }
         ... }
     """
 
-    parallel: list[Stage]
+    parallel: dict[str, dict[str, list[Stage]]] = Field()
     max_parallel_core: int = Field(default=2)
 
     def execute(
         self, params: DictData, *, result: Result | None = None
-    ) -> Result: ...
+    ) -> Result:
+        if result is None:  # pragma: no cov
+            result: Result = Result(
+                run_id=gen_id(self.name + (self.id or ""), unique=True)
+            )
+
+        return result.catch(
+            status=Status.SUCCESS,
+            context={},
+        )
 
 
 # TODO: Not implement this stages yet
 class ForEachStage(BaseStage):  # pragma: no cov
-    """For-Each execution stage that execute child stages with an item in list of
-    item values.
+    """For-Each execution stage that execute child stages with an item in list
+    of item values.
+
+        This stage is not the low-level stage model because it runs muti-stages
+    in this stage execution.
 
     Data Validate:
         >>> stage = {
@@ -779,12 +788,36 @@ class ForEachStage(BaseStage):  # pragma: no cov
         ... }
     """
 
-    foreach: list[str]
-    stages: list[Stage]
+    foreach: Union[list[str], list[int]] = Field()
+    stages: list[Stage] = Field()
 
     def execute(
         self, params: DictData, *, result: Result | None = None
-    ) -> Result: ...
+    ) -> Result:
+        """Execute the stages that pass each item form the foreach field.
+
+        :param params: A parameter that want to pass before run any statement.
+        :param result: (Result) A result object for keeping context and status
+            data.
+
+        :rtype: Result
+        """
+        if result is None:  # pragma: no cov
+            result: Result = Result(
+                run_id=gen_id(self.name + (self.id or ""), unique=True)
+            )
+
+        for item in self.foreach:
+            params["item"] = item
+
+            for stage in self.stages:
+                print(f"Start execute stage: {stage}")
+                print(f"... with param: {params}")
+
+        return result.catch(
+            status=Status.SUCCESS,
+            context={},
+        )
 
 
 # TODO: Not implement this stages yet
@@ -820,3 +853,26 @@ class VirtualPyStage(PyStage):  # pragma: no cov
     vars: DictData
 
     def create_py_file(self, py: str, run_id: str | None): ...
+
+
+# TODO: Not implement this stages yet
+class SensorStage(BaseStage):  # pragma: no cov
+
+    def execute(
+        self, params: DictData, *, result: Result | None = None
+    ) -> Result: ...
+
+
+# NOTE:
+#   An order of parsing stage model on the Job model with ``stages`` field.
+#   From the current build-in stages, they do not have stage that have the same
+#   fields that because of parsing on the Job's stages key.
+#
+Stage = Union[
+    PyStage,
+    BashStage,
+    CallStage,
+    TriggerStage,
+    ForEachStage,
+    EmptyStage,
+]

@@ -229,3 +229,28 @@ def test_stage_exec_trigger_from_workflow():
     } == getdot(
         "jobs.trigger-job.stages.trigger-stage.outputs.params", rs.context
     )
+
+
+def test_stage_exec_foreach(test_path):
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_foreach.yml",
+        data="""
+        tmp-wf-foreach:
+          type: Workflow
+          jobs:
+            first-job:
+              stages:
+                - name: "Start run for-each stage"
+                  id: foreach-stage
+                  foreach: [1, 2, 3, 4]
+                  stages:
+                    - name: "Echo stage"
+                      echo: |
+                        Start run with item {{ item }}
+        """,
+    ):
+        workflow = Workflow.from_loader(name="tmp-wf-foreach")
+
+        stage: Stage = workflow.job("first-job").stage("foreach-stage")
+        rs: Result = stage.handler_execute({})
+        print(rs)
