@@ -60,6 +60,8 @@ __all__: TupleStr = (
     "RunsOnSelfHosted",
     "RunsOnK8s",
     "make",
+    "local_execute_strategy",
+    "local_execute",
 )
 
 
@@ -246,14 +248,6 @@ class RunsOnLocal(BaseRunsOn):  # pragma: no cov
 
     type: Literal[RunsOnType.LOCAL] = Field(default=RunsOnType.LOCAL)
 
-    def execute(
-        self,
-        func,
-        *args,
-        **kwargs,
-    ):
-        return func(*args, **kwargs)
-
 
 class SelfHostedArgs(BaseModel):
     host: str
@@ -266,14 +260,6 @@ class RunsOnSelfHosted(BaseRunsOn):  # pragma: no cov
         default=RunsOnType.SELF_HOSTED
     )
     args: SelfHostedArgs = Field(alias="with")
-
-    def execute(
-        self,
-        func,
-        *args,
-        **kwargs,
-    ):
-        return
 
 
 class RunsOnK8s(BaseRunsOn):  # pragma: no cov
@@ -479,165 +465,6 @@ class Job(BaseModel):
         )
         return to
 
-    def execute_strategy(
-        self,
-        strategy: DictData,
-        params: DictData,
-        *,
-        result: Result | None = None,
-        event: Event | None = None,
-    ) -> Result:
-        """Job Strategy execution with passing dynamic parameters from the
-        workflow execution to strategy matrix.
-
-            This execution is the minimum level of execution of this job model.
-        It different with `self.execute` because this method run only one
-        strategy and return with context of this strategy data.
-
-            The result of this execution will return result with strategy ID
-        that generated from the `gen_id` function with an input strategy value.
-
-        :raise JobException: If it has any error from `StageException` or
-            `UtilException`.
-
-        :param strategy: A strategy metrix value that use on this execution.
-            This value will pass to the `matrix` key for templating.
-        :param params: A dynamic parameters that will deepcopy to the context.
-        :param result: (Result) A result object for keeping context and status
-            data.
-        :param event: An event manager that pass to the PoolThreadExecutor.
-
-        :rtype: Result
-        """
-        if result is None:  # pragma: no cov
-            result: Result = Result(run_id=gen_id(self.id or "", unique=True))
-
-        strategy_id: str = gen_id(strategy)
-
-        # PARAGRAPH:
-        #
-        #       Create strategy execution context and update a matrix and copied
-        #   of params. So, the context value will have structure like;
-        #
-        #   {
-        #       "params": { ... },      <== Current input params
-        #       "jobs": { ... },        <== Current input params
-        #       "matrix": { ... }       <== Current strategy value
-        #       "stages": { ... }       <== Catching stage outputs
-        #   }
-        #
-        context: DictData = copy.deepcopy(params)
-        context.update({"matrix": strategy, "stages": {}})
-
-        # IMPORTANT: The stage execution only run sequentially one-by-one.
-        for stage in self.stages:
-
-            if stage.is_skipped(params=context):
-                result.trace.info(f"[JOB]: Skip stage: {stage.iden!r}")
-                continue
-
-            result.trace.info(f"[JOB]: Execute stage: {stage.iden!r}")
-
-            # NOTE: Logging a matrix that pass on this stage execution.
-            if strategy:
-                result.trace.info(f"[JOB]: ... Matrix: {strategy}")
-
-            # NOTE: Force stop this execution if event was set from main
-            #   execution.
-            if event and event.is_set():
-                error_msg: str = (
-                    "Job strategy was canceled from event that had set before "
-                    "strategy execution."
-                )
-                return result.catch(
-                    status=1,
-                    context={
-                        strategy_id: {
-                            "matrix": strategy,
-                            # NOTE: If job strategy executor use multithreading,
-                            #   it will not filter function object from context.
-                            # ---
-                            # "stages": filter_func(context.pop("stages", {})),
-                            #
-                            "stages": context.pop("stages", {}),
-                            "errors": {
-                                "class": JobException(error_msg),
-                                "name": "JobException",
-                                "message": error_msg,
-                            },
-                        },
-                    },
-                )
-
-            # PARAGRAPH:
-            #
-            #       I do not use below syntax because `params` dict be the
-            #   reference memory pointer, and it was changed when I action
-            #   anything like update or re-construct this.
-            #
-            #       ... params |= stage.execute(params=params)
-            #
-            #   This step will add the stage result to `stages` key in
-            #   that stage id. It will have structure like;
-            #
-            #   {
-            #       "params": { ... },
-            #       "jobs": { ... },
-            #       "matrix": { ... },
-            #       "stages": { { "stage-id-1": ... }, ... }
-            #   }
-            #
-            # IMPORTANT:
-            #   This execution change all stage running IDs to the current job
-            #   running ID, but it still trac log to the same parent running ID
-            #   (with passing `run_id` and `parent_run_id` to the stage
-            #   execution arguments).
-            #
-            try:
-                stage.set_outputs(
-                    stage.handler_execute(
-                        params=context,
-                        run_id=result.run_id,
-                        parent_run_id=result.parent_run_id,
-                    ).context,
-                    to=context,
-                )
-            except (StageException, UtilException) as err:
-                result.trace.error(f"[JOB]: {err.__class__.__name__}: {err}")
-                if config.job_raise_error:
-                    raise JobException(
-                        f"Stage execution error: {err.__class__.__name__}: "
-                        f"{err}"
-                    ) from None
-
-                return result.catch(
-                    status=1,
-                    context={
-                        strategy_id: {
-                            "matrix": strategy,
-                            "stages": context.pop("stages", {}),
-                            "errors": {
-                                "class": err,
-                                "name": err.__class__.__name__,
-                                "message": f"{err.__class__.__name__}: {err}",
-                            },
-                        },
-                    },
-                )
-
-            # NOTE: Remove the current stage object for saving memory.
-            del stage
-
-        return result.catch(
-            status=Status.SUCCESS,
-            context={
-                strategy_id: {
-                    "matrix": strategy,
-                    "stages": filter_func(context.pop("stages", {})),
-                },
-            },
-        )
-
     def execute(
         self,
         params: DictData,
@@ -671,7 +498,8 @@ class Job(BaseModel):
         if (not self.strategy.is_set()) or self.strategy.max_parallel == 1:
 
             for strategy in self.strategy.make():
-                result: Result = self.execute_strategy(
+                result: Result = local_execute_strategy(
+                    job=self,
                     strategy=strategy,
                     params=params,
                     result=result,
@@ -691,7 +519,8 @@ class Job(BaseModel):
 
             futures: list[Future] = [
                 executor.submit(
-                    self.execute_strategy,
+                    local_execute_strategy,
+                    job=self,
                     strategy=strategy,
                     params=params,
                     result=result,
@@ -747,3 +576,276 @@ class Job(BaseModel):
                     )
 
         return result.catch(status=status, context=context)
+
+
+def local_execute_strategy(
+    job: Job,
+    strategy: DictData,
+    params: DictData,
+    *,
+    result: Result | None = None,
+    event: Event | None = None,
+) -> Result:
+    """Job Strategy execution with passing dynamic parameters from the
+    workflow execution to strategy matrix.
+
+        This execution is the minimum level of execution of this job model.
+    It different with `self.execute` because this method run only one
+    strategy and return with context of this strategy data.
+
+        The result of this execution will return result with strategy ID
+    that generated from the `gen_id` function with an input strategy value.
+
+    :raise JobException: If it has any error from `StageException` or
+        `UtilException`.
+
+    :param job:
+    :param strategy: A strategy metrix value that use on this execution.
+        This value will pass to the `matrix` key for templating.
+    :param params: A dynamic parameters that will deepcopy to the context.
+    :param result: (Result) A result object for keeping context and status
+        data.
+    :param event: An event manager that pass to the PoolThreadExecutor.
+
+    :rtype: Result
+    """
+    if result is None:  # pragma: no cov
+        result: Result = Result(run_id=gen_id(job.id or "", unique=True))
+
+    strategy_id: str = gen_id(strategy)
+
+    # PARAGRAPH:
+    #
+    #       Create strategy execution context and update a matrix and copied
+    #   of params. So, the context value will have structure like;
+    #
+    #   {
+    #       "params": { ... },      <== Current input params
+    #       "jobs": { ... },        <== Current input params
+    #       "matrix": { ... }       <== Current strategy value
+    #       "stages": { ... }       <== Catching stage outputs
+    #   }
+    #
+    context: DictData = copy.deepcopy(params)
+    context.update({"matrix": strategy, "stages": {}})
+
+    # IMPORTANT: The stage execution only run sequentially one-by-one.
+    for stage in job.stages:
+
+        if stage.is_skipped(params=context):
+            result.trace.info(f"[JOB]: Skip stage: {stage.iden!r}")
+            continue
+
+        result.trace.info(f"[JOB]: Execute stage: {stage.iden!r}")
+
+        # NOTE: Logging a matrix that pass on this stage execution.
+        if strategy:
+            result.trace.info(f"[JOB]: ... Matrix: {strategy}")
+
+        # NOTE: Force stop this execution if event was set from main
+        #   execution.
+        if event and event.is_set():
+            error_msg: str = (
+                "Job strategy was canceled from event that had set before "
+                "strategy execution."
+            )
+            return result.catch(
+                status=1,
+                context={
+                    strategy_id: {
+                        "matrix": strategy,
+                        # NOTE: If job strategy executor use multithreading,
+                        #   it will not filter function object from context.
+                        # ---
+                        # "stages": filter_func(context.pop("stages", {})),
+                        #
+                        "stages": context.pop("stages", {}),
+                        "errors": {
+                            "class": JobException(error_msg),
+                            "name": "JobException",
+                            "message": error_msg,
+                        },
+                    },
+                },
+            )
+
+        # PARAGRAPH:
+        #
+        #       I do not use below syntax because `params` dict be the
+        #   reference memory pointer, and it was changed when I action
+        #   anything like update or re-construct this.
+        #
+        #       ... params |= stage.execute(params=params)
+        #
+        #   This step will add the stage result to `stages` key in
+        #   that stage id. It will have structure like;
+        #
+        #   {
+        #       "params": { ... },
+        #       "jobs": { ... },
+        #       "matrix": { ... },
+        #       "stages": { { "stage-id-1": ... }, ... }
+        #   }
+        #
+        # IMPORTANT:
+        #   This execution change all stage running IDs to the current job
+        #   running ID, but it still trac log to the same parent running ID
+        #   (with passing `run_id` and `parent_run_id` to the stage
+        #   execution arguments).
+        #
+        try:
+            stage.set_outputs(
+                stage.handler_execute(
+                    params=context,
+                    run_id=result.run_id,
+                    parent_run_id=result.parent_run_id,
+                ).context,
+                to=context,
+            )
+        except (StageException, UtilException) as err:
+            result.trace.error(f"[JOB]: {err.__class__.__name__}: {err}")
+            if config.job_raise_error:
+                raise JobException(
+                    f"Stage execution error: {err.__class__.__name__}: "
+                    f"{err}"
+                ) from None
+
+            return result.catch(
+                status=1,
+                context={
+                    strategy_id: {
+                        "matrix": strategy,
+                        "stages": context.pop("stages", {}),
+                        "errors": {
+                            "class": err,
+                            "name": err.__class__.__name__,
+                            "message": f"{err.__class__.__name__}: {err}",
+                        },
+                    },
+                },
+            )
+
+        # NOTE: Remove the current stage object for saving memory.
+        del stage
+
+    return result.catch(
+        status=Status.SUCCESS,
+        context={
+            strategy_id: {
+                "matrix": strategy,
+                "stages": filter_func(context.pop("stages", {})),
+            },
+        },
+    )
+
+
+def local_execute(
+    job: Job,
+    params: DictData,
+    *,
+    run_id: str | None = None,
+    parent_run_id: str | None = None,
+    result: Result | None = None,
+) -> Result:
+    """Job execution with passing dynamic parameters from the workflow
+    execution. It will generate matrix values at the first step and run
+    multithread on this metrics to the `stages` field of this job.
+
+    :param job:
+    :param params: An input parameters that use on job execution.
+    :param run_id: A job running ID for this execution.
+    :param parent_run_id: A parent workflow running ID for this release.
+    :param result: (Result) A result object for keeping context and status
+        data.
+
+    :rtype: Result
+    """
+    if result is None:  # pragma: no cov
+        result: Result = Result(
+            run_id=(run_id or gen_id(job.id or "", unique=True)),
+            parent_run_id=parent_run_id,
+        )
+    elif parent_run_id:  # pragma: no cov
+        result.set_parent_run_id(parent_run_id)
+
+    # NOTE: Normal Job execution without parallel strategy matrix. It uses
+    #   for-loop to control strategy execution sequentially.
+    if (not job.strategy.is_set()) or job.strategy.max_parallel == 1:
+
+        for strategy in job.strategy.make():
+            result: Result = local_execute_strategy(
+                job=job,
+                strategy=strategy,
+                params=params,
+                result=result,
+            )
+
+        return result.catch(status=Status.SUCCESS)
+
+    # NOTE: Create event for cancel executor by trigger stop running event.
+    event: Event = Event()
+
+    # IMPORTANT: Start running strategy execution by multithreading because
+    #   it will run by strategy values without waiting previous execution.
+    with ThreadPoolExecutor(
+        max_workers=job.strategy.max_parallel,
+        thread_name_prefix="job_strategy_exec_",
+    ) as executor:
+
+        futures: list[Future] = [
+            executor.submit(
+                local_execute_strategy,
+                job=job,
+                strategy=strategy,
+                params=params,
+                result=result,
+                event=event,
+            )
+            for strategy in job.strategy.make()
+        ]
+
+        context: DictData = {}
+        status: Status = Status.SUCCESS
+        fail_fast_flag: bool = job.strategy.fail_fast
+
+        if not fail_fast_flag:
+            done = as_completed(futures, timeout=1800)
+        else:
+            # NOTE: Get results from a collection of tasks with a timeout
+            #   that has the first exception.
+            done, not_done = wait(
+                futures, timeout=1800, return_when=FIRST_EXCEPTION
+            )
+            nd: str = (
+                f", the strategies do not run is {not_done}" if not_done else ""
+            )
+            result.trace.debug(f"[JOB]: Strategy is set Fail Fast{nd}")
+
+            # NOTE: Stop all running tasks with setting the event manager
+            #   and cancel any scheduled tasks.
+            if len(done) != len(futures):
+                event.set()
+                for future in not_done:
+                    future.cancel()
+
+        for future in done:
+            try:
+                future.result()
+            except JobException as err:
+                status = Status.FAILED
+                ls: str = "Fail-Fast" if fail_fast_flag else "All-Completed"
+                result.trace.error(
+                    f"[JOB]: {ls} Catch:\n\t{err.__class__.__name__}:"
+                    f"\n\t{err}"
+                )
+                context.update(
+                    {
+                        "errors": {
+                            "class": err,
+                            "name": err.__class__.__name__,
+                            "message": f"{err.__class__.__name__}: {err}",
+                        },
+                    },
+                )
+
+    return result.catch(status=status, context=context)

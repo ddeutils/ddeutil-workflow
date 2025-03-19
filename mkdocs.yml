@@ -62,7 +62,8 @@ extra:
 
 nav:
   - Home:
-    - Introduction: index.md
+    - index.md
+    - Introduction: introduction.md
     - Get Started: getting-started.md
     - Configuration: configuration.md
     - Logging: logging.md
