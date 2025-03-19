@@ -728,29 +728,25 @@ class ParallelStage(BaseStage):  # pragma: no cov
         >>> stage = {
         ...     "name": "Parallel stage execution.",
         ...     "parallel": {
-        ...         "branch01": {
-        ...             "stages": [
-        ...                 {
-        ...                     "name": "Echo first stage",
-        ...                     "echo": "Start run with branch 1",
-        ...                     "sleep": 3,
-        ...                 },
-        ...             ]
-        ...         },
-        ...         "branch02": {
-        ...             "stages": [
-        ...                 {
-        ...                     "name": "Echo second stage",
-        ...                     "echo": "Start run with branch 2",
-        ...                     "sleep": 1,
-        ...                 },
-        ...             ]
-        ...         },
+        ...         "branch01": [
+        ...             {
+        ...                 "name": "Echo first stage",
+        ...                 "echo": "Start run with branch 1",
+        ...                 "sleep": 3,
+        ...             },
+        ...         ],
+        ...         "branch02": [
+        ...             {
+        ...                 "name": "Echo second stage",
+        ...                 "echo": "Start run with branch 2",
+        ...                 "sleep": 1,
+        ...             },
+        ...         ],
         ...     }
         ... }
     """
 
-    parallel: dict[str, dict[str, list[Stage]]] = Field()
+    parallel: dict[str, list[Stage]] = Field()
     max_parallel_core: int = Field(default=2)
 
     def execute(
@@ -767,8 +763,7 @@ class ParallelStage(BaseStage):  # pragma: no cov
         )
 
 
-# TODO: Not implement this stages yet
-class ForEachStage(BaseStage):  # pragma: no cov
+class ForEachStage(BaseStage):
     """For-Each execution stage that execute child stages with an item in list
     of item values.
 
@@ -788,7 +783,9 @@ class ForEachStage(BaseStage):  # pragma: no cov
         ... }
     """
 
-    foreach: Union[list[str], list[int]] = Field()
+    foreach: Union[list[str], list[int]] = Field(
+        description="A items for passing to each stages via item template."
+    )
     stages: list[Stage] = Field()
 
     def execute(
@@ -807,16 +804,26 @@ class ForEachStage(BaseStage):  # pragma: no cov
                 run_id=gen_id(self.name + (self.id or ""), unique=True)
             )
 
+        rs: DictData = {"items": self.foreach, "foreach": {}}
         for item in self.foreach:
             params["item"] = item
+            context = {"stages": {}}
 
             for stage in self.stages:
-                print(f"Start execute stage: {stage}")
-                print(f"... with param: {params}")
+                stage.set_outputs(
+                    stage.handler_execute(
+                        params=params,
+                        run_id=result.run_id,
+                        parent_run_id=result.parent_run_id,
+                    ).context,
+                    to=context,
+                )
+
+            rs["foreach"][item] = context
 
         return result.catch(
             status=Status.SUCCESS,
-            context={},
+            context=rs,
         )
 
 
