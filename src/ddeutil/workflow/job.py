@@ -493,89 +493,16 @@ class Job(BaseModel):
         elif parent_run_id:  # pragma: no cov
             result.set_parent_run_id(parent_run_id)
 
-        # NOTE: Normal Job execution without parallel strategy matrix. It uses
-        #   for-loop to control strategy execution sequentially.
-        if (not self.strategy.is_set()) or self.strategy.max_parallel == 1:
-
-            for strategy in self.strategy.make():
-                result: Result = local_execute_strategy(
-                    job=self,
-                    strategy=strategy,
-                    params=params,
-                    result=result,
-                )
-
-            return result.catch(status=Status.SUCCESS)
-
-        # NOTE: Create event for cancel executor by trigger stop running event.
-        event: Event = Event()
-
-        # IMPORTANT: Start running strategy execution by multithreading because
-        #   it will run by strategy values without waiting previous execution.
-        with ThreadPoolExecutor(
-            max_workers=self.strategy.max_parallel,
-            thread_name_prefix="job_strategy_exec_",
-        ) as executor:
-
-            futures: list[Future] = [
-                executor.submit(
-                    local_execute_strategy,
-                    job=self,
-                    strategy=strategy,
-                    params=params,
-                    result=result,
-                    event=event,
-                )
-                for strategy in self.strategy.make()
-            ]
-
-            context: DictData = {}
-            status: Status = Status.SUCCESS
-            fail_fast_flag: bool = self.strategy.fail_fast
-
-            if not fail_fast_flag:
-                done = as_completed(futures, timeout=1800)
-            else:
-                # NOTE: Get results from a collection of tasks with a timeout
-                #   that has the first exception.
-                done, not_done = wait(
-                    futures, timeout=1800, return_when=FIRST_EXCEPTION
-                )
-                nd: str = (
-                    f", the strategies do not run is {not_done}"
-                    if not_done
-                    else ""
-                )
-                result.trace.debug(f"[JOB]: Strategy is set Fail Fast{nd}")
-
-                # NOTE: Stop all running tasks with setting the event manager
-                #   and cancel any scheduled tasks.
-                if len(done) != len(futures):
-                    event.set()
-                    for future in not_done:
-                        future.cancel()
-
-            for future in done:
-                try:
-                    future.result()
-                except JobException as err:
-                    status = Status.FAILED
-                    ls: str = "Fail-Fast" if fail_fast_flag else "All-Completed"
-                    result.trace.error(
-                        f"[JOB]: {ls} Catch:\n\t{err.__class__.__name__}:"
-                        f"\n\t{err}"
-                    )
-                    context.update(
-                        {
-                            "errors": {
-                                "class": err,
-                                "name": err.__class__.__name__,
-                                "message": f"{err.__class__.__name__}: {err}",
-                            },
-                        },
-                    )
-
-        return result.catch(status=status, context=context)
+        if self.runs_on.type == RunsOnType.LOCAL:
+            return local_execute(
+                job=self,
+                params=params,
+                result=result,
+            )
+        raise NotImplementedError(
+            f"The job runs-on other type: {self.runs_on.type} does not "
+            f"support yet."
+        )
 
 
 def local_execute_strategy(
@@ -586,7 +513,7 @@ def local_execute_strategy(
     result: Result | None = None,
     event: Event | None = None,
 ) -> Result:
-    """Job Strategy execution with passing dynamic parameters from the
+    """Local job strategy execution with passing dynamic parameters from the
     workflow execution to strategy matrix.
 
         This execution is the minimum level of execution of this job model.
@@ -599,13 +526,13 @@ def local_execute_strategy(
     :raise JobException: If it has any error from `StageException` or
         `UtilException`.
 
-    :param job:
+    :param job: (Job) A job model that want to execute.
     :param strategy: A strategy metrix value that use on this execution.
         This value will pass to the `matrix` key for templating.
     :param params: A dynamic parameters that will deepcopy to the context.
     :param result: (Result) A result object for keeping context and status
         data.
-    :param event: An event manager that pass to the PoolThreadExecutor.
+    :param event: (Event) An event manager that pass to the PoolThreadExecutor.
 
     :rtype: Result
     """
@@ -747,11 +674,11 @@ def local_execute(
     parent_run_id: str | None = None,
     result: Result | None = None,
 ) -> Result:
-    """Job execution with passing dynamic parameters from the workflow
+    """Local job execution with passing dynamic parameters from the workflow
     execution. It will generate matrix values at the first step and run
     multithread on this metrics to the `stages` field of this job.
 
-    :param job:
+    :param job: A job model that want to execute.
     :param params: An input parameters that use on job execution.
     :param run_id: A job running ID for this execution.
     :param parent_run_id: A parent workflow running ID for this release.
