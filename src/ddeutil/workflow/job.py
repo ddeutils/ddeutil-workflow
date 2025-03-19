@@ -499,6 +499,16 @@ class Job(BaseModel):
                 params=params,
                 result=result,
             )
+        elif self.runs_on.type == RunsOnType.SELF_HOSTED:  # pragma: no cov
+            pass
+        elif self.runs_on.type == RunsOnType.K8S:  # pragma: no cov
+            pass
+
+        # pragma: no cov
+        result.trace.error(
+            f"[JOB]: Job executor does not support for runs-on type: "
+            f"{self.runs_on.type} yet"
+        )
         raise NotImplementedError(
             f"The job runs-on other type: {self.runs_on.type} does not "
             f"support yet."
@@ -678,10 +688,10 @@ def local_execute(
     execution. It will generate matrix values at the first step and run
     multithread on this metrics to the `stages` field of this job.
 
-    :param job: A job model that want to execute.
-    :param params: An input parameters that use on job execution.
-    :param run_id: A job running ID for this execution.
-    :param parent_run_id: A parent workflow running ID for this release.
+    :param job: (Job) A job model that want to execute.
+    :param params: (DictData) An input parameters that use on job execution.
+    :param run_id: (str) A job running ID for this execution.
+    :param parent_run_id: (str) A parent workflow running ID for this release.
     :param result: (Result) A result object for keeping context and status
         data.
 
