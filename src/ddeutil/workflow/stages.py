@@ -31,6 +31,11 @@ import time
 import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
+from concurrent.futures import (
+    Future,
+    ThreadPoolExecutor,
+    as_completed,
+)
 from inspect import Parameter
 from pathlib import Path
 from subprocess import CompletedProcess
@@ -62,6 +67,8 @@ __all__: TupleStr = (
     "PyStage",
     "CallStage",
     "TriggerStage",
+    "ForEachStage",
+    "ParallelStage",
     "Stage",
 )
 
@@ -339,7 +346,7 @@ class EmptyStage(BaseStage):
             f"( {param2template(self.echo, params=params) or '...'} )"
         )
         if self.sleep > 0:
-            if self.sleep > 30:
+            if self.sleep > 5:
                 result.trace.info(f"[STAGE]: ... sleep ({self.sleep} seconds)")
             time.sleep(self.sleep)
 
@@ -717,7 +724,6 @@ class TriggerStage(BaseStage):
         )
 
 
-# TODO: Not implement this stages yet
 class ParallelStage(BaseStage):  # pragma: no cov
     """Parallel execution stage that execute child stages with parallel.
 
@@ -749,6 +755,40 @@ class ParallelStage(BaseStage):  # pragma: no cov
     parallel: dict[str, list[Stage]] = Field()
     max_parallel_core: int = Field(default=2)
 
+    @staticmethod
+    def task(
+        branch: str,
+        params: DictData,
+        result: Result,
+        stages: list[Stage],
+    ) -> DictData:
+        context = {"branch": branch, "stages": {}}
+        result.trace.debug(f"[STAGE]: Execute parallel branch: {branch!r}")
+        for stage in stages:
+            try:
+                stage.set_outputs(
+                    stage.handler_execute(
+                        params=params,
+                        run_id=result.run_id,
+                        parent_run_id=result.parent_run_id,
+                    ).context,
+                    to=context,
+                )
+            except StageException as err:  # pragma: no cov
+                result.trace.error(
+                    f"[STAGE]: Catch:\n\t{err.__class__.__name__}:" f"\n\t{err}"
+                )
+                context.update(
+                    {
+                        "errors": {
+                            "class": err,
+                            "name": err.__class__.__name__,
+                            "message": f"{err.__class__.__name__}: {err}",
+                        },
+                    },
+                )
+        return context
+
     def execute(
         self, params: DictData, *, result: Result | None = None
     ) -> Result:
@@ -757,10 +797,34 @@ class ParallelStage(BaseStage):  # pragma: no cov
                 run_id=gen_id(self.name + (self.id or ""), unique=True)
             )
 
-        return result.catch(
-            status=Status.SUCCESS,
-            context={},
-        )
+        rs: DictData = {"parallel": {}}
+        status = Status.SUCCESS
+        with ThreadPoolExecutor(
+            max_workers=self.max_parallel_core,
+            thread_name_prefix="parallel_stage_exec_",
+        ) as executor:
+
+            futures: list[Future] = []
+            for branch in self.parallel:
+                futures.append(
+                    executor.submit(
+                        self.task,
+                        branch=branch,
+                        params=params,
+                        result=result,
+                        stages=self.parallel[branch],
+                    )
+                )
+
+            done = as_completed(futures, timeout=1800)
+            for future in done:
+                context: DictData = future.result()
+                rs["parallel"][context.pop("branch")] = context
+
+                if "errors" in context:
+                    status = Status.FAILED
+
+        return result.catch(status=status, context=rs)
 
 
 class ForEachStage(BaseStage):
@@ -805,26 +869,41 @@ class ForEachStage(BaseStage):
             )
 
         rs: DictData = {"items": self.foreach, "foreach": {}}
+        status = Status.SUCCESS
         for item in self.foreach:
+            result.trace.debug(f"[STAGE]: Execute foreach item: {item!r}")
             params["item"] = item
             context = {"stages": {}}
 
             for stage in self.stages:
-                stage.set_outputs(
-                    stage.handler_execute(
-                        params=params,
-                        run_id=result.run_id,
-                        parent_run_id=result.parent_run_id,
-                    ).context,
-                    to=context,
-                )
+                try:
+                    stage.set_outputs(
+                        stage.handler_execute(
+                            params=params,
+                            run_id=result.run_id,
+                            parent_run_id=result.parent_run_id,
+                        ).context,
+                        to=context,
+                    )
+                except StageException as err:  # pragma: no cov
+                    status = Status.FAILED
+                    result.trace.error(
+                        f"[STAGE]: Catch:\n\t{err.__class__.__name__}:"
+                        f"\n\t{err}"
+                    )
+                    context.update(
+                        {
+                            "errors": {
+                                "class": err,
+                                "name": err.__class__.__name__,
+                                "message": f"{err.__class__.__name__}: {err}",
+                            },
+                        },
+                    )
 
             rs["foreach"][item] = context
 
-        return result.catch(
-            status=Status.SUCCESS,
-            context=rs,
-        )
+        return result.catch(status=status, context=rs)
 
 
 # TODO: Not implement this stages yet
@@ -881,5 +960,6 @@ Stage = Union[
     CallStage,
     TriggerStage,
     ForEachStage,
+    ParallelStage,
     EmptyStage,
 ]

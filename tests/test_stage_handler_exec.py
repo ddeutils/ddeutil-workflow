@@ -310,7 +310,7 @@ def test_stage_exec_parallel(test_path):
                       - name: "Echo branch01 stage"
                         echo: |
                           Start run with branch 1
-                        sleep: 3
+                        sleep: 5
                     branch02:
                       - name: "Echo branch02 stage"
                         echo: |
@@ -322,4 +322,19 @@ def test_stage_exec_parallel(test_path):
 
         stage: Stage = workflow.job("first-job").stage("parallel-stage")
         rs = stage.set_outputs(stage.handler_execute({}).context, to={})
-        print(rs)
+        assert rs == {
+            "stages": {
+                "parallel-stage": {
+                    "outputs": {
+                        "parallel": {
+                            "branch02": {
+                                "stages": {"4967824305": {"outputs": {}}},
+                            },
+                            "branch01": {
+                                "stages": {"0573477600": {"outputs": {}}},
+                            },
+                        },
+                    },
+                },
+            },
+        }
