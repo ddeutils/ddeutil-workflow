@@ -2,6 +2,28 @@
 
 ## Latest Changes
 
+## 0.0.37
+
+### :stars: Highlight Features
+
+- :star: hl: add dynamic job runs-on execute func.
+
+### :sparkles: Features
+
+- :dart: feat: move execute strategy from method to func.
+- :dart: feat: change logic of gen_id.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: add testcase for job execute with self-hosted.
+- :test_tube: tests: update testcase for cover coverage.
+- :art: styled: change log name of routes from workflow to uvicorn.
+- :test_tube: tests: update testcase for workflows on api component.
+
+### :package: Build & Workflow
+
+- :toolbox: build: add uv dockerfile support uv building.
+
 ## 0.0.36
 
 ### :sparkles: Features
