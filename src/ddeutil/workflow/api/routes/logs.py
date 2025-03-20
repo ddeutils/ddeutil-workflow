@@ -6,7 +6,7 @@
 """This route include audit and trace log paths."""
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Path, Query
 from fastapi import status as st
 from fastapi.responses import UJSONResponse
 
@@ -27,12 +27,17 @@ log_route = APIRouter(
     summary="Read all trace logs.",
     tags=["trace"],
 )
-async def get_traces():
+async def get_traces(
+    offset: int = Query(default=0, gt=0),
+    limit: int = Query(default=100, gt=0),
+):
     """Return all trace logs from the current trace log path that config with
     `WORKFLOW_LOG_PATH` environment variable name.
     """
     return {
-        "message": "Getting trace logs",
+        "message": (
+            f"Getting trace logs with offset: {offset} and limit: {limit}"
+        ),
         "traces": [
             trace.model_dump(
                 by_alias=True,
@@ -117,7 +122,10 @@ async def get_audit_with_workflow(workflow: str):
     summary="Read all audit logs with specific workflow name and release date.",
     tags=["audit"],
 )
-async def get_audit_with_workflow_release(workflow: str, release: str):
+async def get_audit_with_workflow_release(
+    workflow: str = Path(...),
+    release: str = Path(...),
+):
     """Return all audit logs with specific workflow name and release date from
     the current audit log path that config with `WORKFLOW_AUDIT_PATH`
     environment variable name.
