@@ -48,7 +48,38 @@ A job execution context that return from the `execute` method.
 
 ## Stage
 
-A stage execution context that return from the `handler_execute` method.
+A stage execution context that return from `execute` and `handler_execute`
+methods.
+
+```json
+{
+  "key": "value"
+}
+```
+
+With error;
+
+```json
+{
+  "errors": {
+    "class": ExceptionClass,
+    "name": "class-name",
+    "message": "error-message"
+  }
+}
+```
+
+A context that return from `set_outputs` method.
+
+if a `to` argument that pass to this method be;
+
+```json
+{
+  "params": {"key":  "value"}
+}
+```
+
+it will return result be;
 
 ```json
 {

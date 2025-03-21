@@ -49,18 +49,14 @@ from typing_extensions import Self
 
 from .__types import DictData, DictStr, TupleStr
 from .caller import TagFunc, extract_call
-from .conf import config, get_logger
+from .conf import config
 from .exceptions import StageException
 from .result import Result, Status
 from .templates import not_in_template, param2template
 from .utils import (
-    cut_id,
     gen_id,
     make_exec,
 )
-
-logger = get_logger("ddeutil.workflow")
-
 
 __all__: TupleStr = (
     "EmptyStage",
@@ -135,13 +131,14 @@ class BaseStage(BaseModel, ABC):
         """Execute abstraction method that action something by sub-model class.
         This is important method that make this class is able to be the stage.
 
-        :param params: A parameter data that want to use in this execution.
+        :param params: (DictData) A parameter data that want to use in this
+            execution.
         :param result: (Result) A result object for keeping context and status
             data.
 
         :rtype: Result
         """
-        raise NotImplementedError("Stage should implement ``execute`` method.")
+        raise NotImplementedError("Stage should implement `execute` method.")
 
     def handler_execute(
         self,
@@ -150,6 +147,7 @@ class BaseStage(BaseModel, ABC):
         run_id: str | None = None,
         parent_run_id: str | None = None,
         result: Result | None = None,
+        raise_error: bool = False,
     ) -> Result:
         """Handler stage execution result from the stage `execute` method.
 
@@ -159,15 +157,15 @@ class BaseStage(BaseModel, ABC):
 
             Execution   --> Ok      --> Result
                                         |-status: Status.SUCCESS
-                                        |-context:
-                                            |-outputs: ...
+                                        ╰-context:
+                                            ╰-outputs: ...
 
                         --> Error   --> Result (if env var was set)
                                         |-status: Status.FAILED
-                                        |-errors:
+                                        ╰-errors:
                                             |-class: ...
                                             |-name: ...
-                                            |-message: ...
+                                            ╰-message: ...
 
                         --> Error   --> Raise StageException(...)
 
@@ -181,6 +179,7 @@ class BaseStage(BaseModel, ABC):
             execution.
         :param result: (Result) A result object for keeping context and status
             data before execution.
+        :param raise_error: (bool) A flag that all this method raise error
 
         :rtype: Result
         """
@@ -196,10 +195,7 @@ class BaseStage(BaseModel, ABC):
         except Exception as err:
             result.trace.error(f"[STAGE]: {err.__class__.__name__}: {err}")
 
-            if config.stage_raise_error:
-                # NOTE: If error that raise from stage execution course by
-                #   itself, it will return that error with previous
-                #   dependency.
+            if raise_error or config.stage_raise_error:
                 if isinstance(err, StageException):
                     raise
 
@@ -208,8 +204,6 @@ class BaseStage(BaseModel, ABC):
                     f"{err.__class__.__name__}: {err}"
                 ) from None
 
-            # NOTE: Catching exception error object to result with
-            #   error_message and error keys.
             return result.catch(
                 status=Status.FAILED,
                 context={
@@ -223,7 +217,7 @@ class BaseStage(BaseModel, ABC):
 
     def set_outputs(self, output: DictData, to: DictData) -> DictData:
         """Set an outputs from execution process to the received context. The
-        result from execution will pass to value of ``outputs`` key.
+        result from execution will pass to value of `outputs` key.
 
             For example of setting output method, If you receive execute output
         and want to set on the `to` like;
@@ -239,15 +233,13 @@ class BaseStage(BaseModel, ABC):
                         }
                     }
 
-        :param output: An output data that want to extract to an output key.
-        :param to: A context data that want to add output result.
+        :param output: (DictData) An output data that want to extract to an
+            output key.
+        :param to: (DictData) A context data that want to add output result.
+
         :rtype: DictData
         """
         if self.id is None and not config.stage_default_id:
-            logger.warning(
-                "Output does not set because this stage does not set ID or "
-                "default stage ID config flag not be True."
-            )
             return to
 
         # NOTE: Create stages key to receive an output from the stage execution.
@@ -278,10 +270,11 @@ class BaseStage(BaseModel, ABC):
         :raise StageException: When return type of the eval condition statement
             does not return with boolean type.
 
-        :param params: A parameters that want to pass to condition template.
+        :param params: (DictData) A parameters that want to pass to condition
+            template.
+
         :rtype: bool
         """
-        # NOTE: Return false result if condition does not set.
         if self.condition is None:
             return False
 
@@ -309,6 +302,7 @@ class EmptyStage(BaseStage):
         >>> stage = {
         ...     "name": "Empty stage execution",
         ...     "echo": "Hello World",
+        ...     "sleep": 1,
         ... }
     """
 
@@ -408,19 +402,17 @@ class BashStage(BaseStage):
         step will write the `.sh` file before giving this file name to context.
         After that, it will auto delete this file automatic.
 
-        :param bash: A bash statement that want to execute.
-        :param env: An environment variable that use on this bash statement.
-        :param run_id: A running stage ID that use for writing sh file instead
-            generate by UUID4.
+        :param bash: (str) A bash statement that want to execute.
+        :param env: (DictStr) An environment variable that use on this bash
+            statement.
+        :param run_id: (str | None) A running stage ID that use for writing sh
+            file instead generate by UUID4.
+
         :rtype: Iterator[TupleStr]
         """
         run_id: str = run_id or uuid.uuid4()
         f_name: str = f"{run_id}.sh"
         f_shebang: str = "bash" if sys.platform.startswith("win") else "sh"
-
-        logger.debug(
-            f"({cut_id(run_id)}) [STAGE]: Start create `{f_name}` file."
-        )
 
         with open(f"./{f_name}", mode="w", newline="\n") as f:
             # NOTE: write header of `.sh` file
@@ -465,9 +457,11 @@ class BashStage(BaseStage):
             env=param2template(self.env, params),
             run_id=result.run_id,
         ) as sh:
+            result.trace.debug(f"... Start create `{sh[1]}` file.")
             rs: CompletedProcess = subprocess.run(
                 sh, shell=False, capture_output=True, text=True
             )
+
         if rs.returncode > 0:
             # NOTE: Prepare stderr message that returning from subprocess.
             err: str = (
@@ -541,8 +535,9 @@ class PyStage(BaseStage):
         """Override set an outputs method for the Python execution process that
         extract output from all the locals values.
 
-        :param output: An output data that want to extract to an output key.
-        :param to: A context data that want to add output result.
+        :param output: (DictData) An output data that want to extract to an
+            output key.
+        :param to: (DictData) A context data that want to add output result.
 
         :rtype: DictData
         """
