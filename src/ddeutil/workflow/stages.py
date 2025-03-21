@@ -151,7 +151,7 @@ class BaseStage(BaseModel, ABC):
         parent_run_id: str | None = None,
         result: Result | None = None,
     ) -> Result:
-        """Handler execution result from the stage `execute` method.
+        """Handler stage execution result from the stage `execute` method.
 
             This stage exception handler still use ok-error concept, but it
         allows you force catching an output result with error message by
@@ -174,11 +174,13 @@ class BaseStage(BaseModel, ABC):
             On the last step, it will set the running ID on a return result object
         from current stage ID before release the final result.
 
-        :param params: A parameter data that want to use in this execution.
+        :param params: (DictData) A parameterize value data that use in this
+            stage execution.
         :param run_id: (str) A running stage ID for this execution.
-        :param parent_run_id: A parent workflow running ID for this release.
+        :param parent_run_id: (str) A parent workflow running ID for this
+            execution.
         :param result: (Result) A result object for keeping context and status
-            data.
+            data before execution.
 
         :rtype: Result
         """
@@ -330,17 +332,16 @@ class EmptyStage(BaseStage):
             The result context should be empty and do not process anything
         without calling logging function.
 
-        :param params: A context data that want to add output result. But this
-            stage does not pass any output.
+        :param params: (DictData) A context data that want to add output result.
+            But this stage does not pass any output.
         :param result: (Result) A result object for keeping context and status
             data.
 
         :rtype: Result
         """
-        if result is None:  # pragma: no cov
-            result: Result = Result(
-                run_id=gen_id(self.name + (self.id or ""), unique=True)
-            )
+        result: Result = result or Result(
+            run_id=gen_id(self.name + (self.id or ""), unique=True)
+        )
 
         result.trace.info(
             f"[STAGE]: Empty-Execute: {self.name!r}: "

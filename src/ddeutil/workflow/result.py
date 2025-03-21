@@ -12,9 +12,9 @@ from dataclasses import field
 from datetime import datetime
 from enum import IntEnum
 from threading import Event
-from typing import Optional
+from typing import Optional, Union
 
-from pydantic import ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 from pydantic.dataclasses import dataclass
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
@@ -91,7 +91,7 @@ class Result:
     @model_validator(mode="after")
     def __prepare_trace(self) -> Self:
         """Prepare trace field that want to pass after its initialize step."""
-        if self.trace is None:  # pragma: no cove
+        if self.trace is None:  # pragma: no cov
             self.trace: TraceLog = get_trace(self.run_id, self.parent_run_id)
 
         return self
@@ -130,3 +130,37 @@ class Result:
         :rtype: float
         """
         return (get_dt_tznow() - self.ts).total_seconds()
+
+
+class ErrorContext(BaseModel):  # pragma: no cov
+    obj: Exception = Field(alias="class")
+    name: str = Field()
+    message: str = Field()
+
+
+class StageContext(BaseModel):  # pragma: no cov
+    outputs: DictData = Field(default_factory=dict)
+    errors: Optional[ErrorContext] = Field(default=None)
+
+
+class StrategyContext(BaseModel):  # pragma: no cov
+    matrix: DictData = Field(default_factory=dict)
+    stages: dict[str, StageContext]
+    errors: Optional[ErrorContext] = Field(default=None)
+
+
+class JobStrategyContext(BaseModel):  # pragma: no cov
+    strategies: dict[str, StrategyContext]
+    errors: Optional[ErrorContext] = Field(default=None)
+
+
+JobNotStrategyContext = TypeAdapter(
+    dict[str, StrategyContext]
+)  # pragma: no cov
+JobContext = Union[JobStrategyContext, JobNotStrategyContext]  # pragma: no cov
+
+
+class WorkflowContext(BaseModel):  # pragma: no cov
+    params: DictData = Field(description="A parameterize value")
+    jobs: dict[str, JobContext]
+    errors: Optional[ErrorContext] = Field(default=None)
