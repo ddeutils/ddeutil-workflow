@@ -1,7 +1,12 @@
 import logging
 import time
 
-from ddeutil.workflow.result import Result, Status
+from ddeutil.workflow.result import (
+    Result,
+    StageContext,
+    Status,
+    StrategyContext,
+)
 
 
 def test_status():
@@ -54,3 +59,27 @@ def test_result_catch():
     rs.catch(status=1, context={"params": {"new_value": "foo"}})
     assert rs.status == 1
     assert rs.context == {"params": {"new_value": "foo"}}
+
+
+def test_context_stage():
+    stage_context = StageContext()
+    assert stage_context.errors is None
+    assert not stage_context.is_exception()
+
+
+def test_context_stage_errors():
+    stage_context = StageContext(
+        errors={
+            "class": TypeError("str type"),
+            "name": "TypeError",
+            "message": "str type",
+        }
+    )
+    assert stage_context.is_exception()
+    assert stage_context.errors.message == "str type"
+
+
+def test_context_strategy():
+    strategy_context = StrategyContext(stages={"stage-id": {}})
+    assert strategy_context.errors is None
+    assert not strategy_context.is_exception()

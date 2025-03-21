@@ -53,7 +53,7 @@ methods.
 
 ```json
 {
-  "key": "value"
+  "out": "result"
 }
 ```
 
@@ -62,7 +62,7 @@ With error;
 ```json
 {
   "errors": {
-    "class": ExceptionClass,
+    "class": "ExceptionClass",
     "name": "class-name",
     "message": "error-message"
   }
@@ -86,7 +86,9 @@ it will return result be;
     "params": {"key": "value"},
     "stages": {
       "<stage-id>": {
-        "outputs": {},
+        "outputs": {
+          "out": "result"
+        },
         "errors": {
           "class": "",
           "name": "",
@@ -96,3 +98,8 @@ it will return result be;
     }
 }
 ```
+
+!!! note
+
+    The main key from stage setting output method are
+    `outputs` and `errors`.
