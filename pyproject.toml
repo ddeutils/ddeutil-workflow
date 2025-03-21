@@ -40,6 +40,10 @@ api = [
     "httpx",
     "ujson",
 ]
+async = [
+    "aiofiles",
+    "aiohttp",
+]
 
 [project.urls]
 Homepage = "https://github.com/ddeutils/ddeutil-workflow/"

@@ -234,7 +234,7 @@ class FileTraceLog(BaseTraceLog):  # pragma: no cov
         return f"({self.cut_id}) {message}"
 
     def writer(self, message: str, is_err: bool = False) -> None:
-        """ "Write a trace message after making to target file and write metadata
+        """Write a trace message after making to target file and write metadata
         in the same path of standard files.
 
             The path of logging data will store by format:
@@ -278,6 +278,11 @@ class FileTraceLog(BaseTraceLog):  # pragma: no cov
                 json.dumps({"mode": write_file.split(".")[0]} | write_data)
                 + "\n"
             )
+
+    async def awriter(
+        self, message: str, is_err: bool = False
+    ):  # pragma: no cov
+        """TODO: Use `aiofiles` for make writer method support async."""
 
 
 class SQLiteTraceLog(BaseTraceLog):  # pragma: no cov
