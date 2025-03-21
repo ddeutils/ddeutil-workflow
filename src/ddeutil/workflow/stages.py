@@ -23,6 +23,7 @@ template searching.
 """
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import inspect
 import subprocess
@@ -352,6 +353,23 @@ class EmptyStage(BaseStage):
 
         return result.catch(status=Status.SUCCESS)
 
+    # TODO: Draft async execute method for the perf improvement.
+    async def aexecute(
+        self, params: DictData, *, result: Result | None = None
+    ) -> Result:  # pragma: no cov
+        if result is None:  # pragma: no cov
+            result: Result = Result(
+                run_id=gen_id(self.name + (self.id or ""), unique=True)
+            )
+
+        result.trace.info(
+            f"[STAGE]: Empty-Execute: {self.name!r}: "
+            f"( {param2template(self.echo, params=params) or '...'} )"
+        )
+
+        await asyncio.sleep(1)
+        return result.catch(status=Status.SUCCESS)
+
 
 class BashStage(BaseStage):
     """Bash execution stage that execute bash script on the current OS.
@@ -571,7 +589,13 @@ class PyStage(BaseStage):
 
         # NOTE: Start exec the run statement.
         result.trace.info(f"[STAGE]: Py-Execute: {self.name}")
+        result.trace.warning(
+            "... [STAGE]: This stage allow use `eval` function, so, please "
+            "check your statement be safe before execute."
+        )
 
+        # TODO: Add Python systax wrapper for checking dangerous code before run
+        #   this statement.
         # WARNING: The exec build-in function is very dangerous. So, it
         #   should use the re module to validate exec-string before running.
         exec(run, _globals, lc)
@@ -590,11 +614,16 @@ class CallStage(BaseStage):
     statement. So, you can create your function complexly that you can for your
     objective to invoked by this stage object.
 
+        This stage is the usefull stage for run every job by a custom requirement
+    that you want by creating the Python function and adding it to the task
+    registry by importer syntax like `module.tasks.registry` not path style like
+    `module/tasks/registry`.
+
     Data Validate:
         >>> stage = {
         ...     "name": "Task stage execution",
         ...     "uses": "tasks/function-name@tag-name",
-        ...     "args": {"FOO": "BAR"},
+        ...     "args": {"arg01": "BAR", "kwarg01": 10},
         ... }
     """
 
@@ -638,15 +667,26 @@ class CallStage(BaseStage):
         #   calling.
         args: DictData = {"result": result} | param2template(self.args, params)
         ips = inspect.signature(t_func)
+        necessary_params: list[str] = [
+            k
+            for k in ips.parameters
+            if (
+                (v := ips.parameters[k]).default == Parameter.empty
+                and (
+                    v.kind != Parameter.VAR_KEYWORD
+                    or v.kind != Parameter.VAR_POSITIONAL
+                )
+            )
+        ]
         if any(
             (k.removeprefix("_") not in args and k not in args)
-            for k in ips.parameters
-            if ips.parameters[k].default == Parameter.empty
+            for k in necessary_params
         ):
             raise ValueError(
-                f"Necessary params, ({', '.join(ips.parameters.keys())}, ), "
+                f"Necessary params, ({', '.join(necessary_params)}, ), "
                 f"does not set to args"
             )
+
         # NOTE: add '_' prefix if it wants to use.
         for k in ips.parameters:
             if k.removeprefix("_") in args:
@@ -762,6 +802,15 @@ class ParallelStage(BaseStage):  # pragma: no cov
         result: Result,
         stages: list[Stage],
     ) -> DictData:
+        """Task execution method for passing a branch to each thread.
+
+        :param branch:
+        :param params:
+        :param result:
+        :param stages:
+
+        :rtype: DictData
+        """
         context = {"branch": branch, "stages": {}}
         result.trace.debug(f"[STAGE]: Execute parallel branch: {branch!r}")
         for stage in stages:
@@ -792,6 +841,15 @@ class ParallelStage(BaseStage):  # pragma: no cov
     def execute(
         self, params: DictData, *, result: Result | None = None
     ) -> Result:
+        """Execute the stages that parallel each branch via multi-threading mode
+        or async mode by changing `async_mode` flag.
+
+        :param params: A parameter that want to pass before run any statement.
+        :param result: (Result) A result object for keeping context and status
+            data.
+
+        :rtype: Result
+        """
         if result is None:  # pragma: no cov
             result: Result = Result(
                 run_id=gen_id(self.name + (self.id or ""), unique=True)
@@ -848,9 +906,15 @@ class ForEachStage(BaseStage):
     """
 
     foreach: Union[list[str], list[int]] = Field(
-        description="A items for passing to each stages via item template."
+        description=(
+            "A items for passing to each stages via ${{ item }} template."
+        ),
     )
-    stages: list[Stage] = Field()
+    stages: list[Stage] = Field(
+        description=(
+            "A list of stage that will run with each item in the foreach field."
+        ),
+    )
 
     def execute(
         self, params: DictData, *, result: Result | None = None
@@ -904,6 +968,31 @@ class ForEachStage(BaseStage):
             rs["foreach"][item] = context
 
         return result.catch(status=status, context=rs)
+
+
+# TODO: Not implement this stages yet
+class IfStage(BaseStage):  # pragma: no cov
+    """If execution stage.
+
+    Data Validate:
+        >>> stage = {
+        ...     "name": "If stage execution.",
+        ...     "case": "${{ param.test }}",
+        ...     "match": [
+        ...         {"case": "1", "stage": "..."},
+        ...         {"case": "2", "stage": "..."},
+        ...         {"case": "_", "stage": "..."},
+        ...     ],
+        ... }
+
+    """
+
+    case: str
+    match: list[dict[str, Union[str, Stage]]]
+
+    def execute(
+        self, params: DictData, *, result: Result | None = None
+    ) -> Result: ...
 
 
 # TODO: Not implement this stages yet

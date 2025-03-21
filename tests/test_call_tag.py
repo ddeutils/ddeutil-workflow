@@ -103,7 +103,7 @@ def test_make_registry_raise(call_function_dup):
         make_registry("new_tasks_dup")
 
 
-@pytest.mark.skip("Skip because it use for local test only.")
+# @pytest.mark.skip("Skip because it uses for local test only.")
 def test_inspec_func():
 
     def demo_func(
@@ -114,9 +114,10 @@ def test_inspec_func():
     ips = inspect.signature(demo_func)
     for k, v in ips.parameters.items():
         print(k)
+        print(ips.parameters[k].default)
         print(v)
         print(v.name)
         print(v.annotation, "type:", type(v.annotation))
         print(v.default)
-        print(v.kind)
+        print(v.kind, " (", type(v.kind), ")")
         print("-----")
