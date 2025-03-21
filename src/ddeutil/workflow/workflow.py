@@ -68,34 +68,45 @@ class ReleaseType(str, Enum):
     config=ConfigDict(arbitrary_types_allowed=True, use_enum_values=True)
 )
 class Release:
-    """Release Pydantic dataclass object that use for represent
-    the release data that use with the `workflow.release` method."""
+    """Release Pydantic dataclass object that use for represent the release data
+    that use with the `workflow.release` method.
+    """
 
-    date: datetime
-    offset: float
-    end_date: datetime
-    runner: CronRunner
+    date: datetime = field()
+    offset: float = field()
+    end_date: datetime = field()
+    runner: CronRunner = field()
     type: ReleaseType = field(default=ReleaseType.DEFAULT)
 
     def __repr__(self) -> str:
+        """Represent string"""
         return repr(f"{self.date:%Y-%m-%d %H:%M:%S}")
 
     def __str__(self) -> str:
+        """Override string value of this release object with the date field.
+
+        :rtype: str
+        """
         return f"{self.date:%Y-%m-%d %H:%M:%S}"
 
     @classmethod
     def from_dt(cls, dt: datetime | str) -> Self:
         """Construct Release via datetime object only.
 
-        :param dt: A datetime object.
+        :param dt: (datetime | str) A datetime object or string that want to
+            construct to the Release object.
 
-        :rtype: Self
+        :raise TypeError: If the type of the dt argument does not valid with
+            datetime or str object.
+
+        :rtype: Release
         """
         if isinstance(dt, str):
             dt: datetime = datetime.fromisoformat(dt)
         elif not isinstance(dt, datetime):
             raise TypeError(
-                "The `from_dt` need argument type be str or datetime only."
+                "The `from_dt` need the `dt` argument type be str or datetime "
+                "only."
             )
 
         return cls(
@@ -108,6 +119,8 @@ class Release:
     def __eq__(self, other: Release | datetime) -> bool:
         """Override equal property that will compare only the same type or
         datetime.
+
+        :rtype: bool
         """
         if isinstance(other, self.__class__):
             return self.date == other.date
@@ -118,6 +131,8 @@ class Release:
     def __lt__(self, other: Release | datetime) -> bool:
         """Override equal property that will compare only the same type or
         datetime.
+
+        :rtype: bool
         """
         if isinstance(other, self.__class__):
             return self.date < other.date
@@ -143,7 +158,7 @@ class ReleaseQueue:
 
         :raise TypeError: If the type of input queue does not valid.
 
-        :rtype: Self
+        :rtype: ReleaseQueue
         """
         if queue is None:
             return cls()
@@ -174,7 +189,7 @@ class ReleaseQueue:
         """Check an input Release object is the first value of the
         waiting queue.
 
-        :rtype: bool
+        :rtype: Release
         """
         return self.queue[0]
 
@@ -265,11 +280,11 @@ class Workflow(BaseModel):
         an input workflow name. The loader object will use this workflow name to
         searching configuration data of this workflow model in conf path.
 
-        :raise ValueError: If the type does not match with current object.
-
         :param name: A workflow name that want to pass to Loader object.
         :param externals: An external parameters that want to pass to Loader
             object.
+
+        :raise ValueError: If the type does not match with current object.
 
         :rtype: Self
         """
@@ -285,11 +300,11 @@ class Workflow(BaseModel):
         loader_data["name"] = name.replace(" ", "_")
 
         # NOTE: Prepare `on` data
-        cls.__bypass_on(loader_data, externals=externals)
+        cls.__bypass_on__(loader_data, externals=externals)
         return cls.model_validate(obj=loader_data)
 
     @classmethod
-    def __bypass_on(
+    def __bypass_on__(
         cls,
         data: DictData,
         externals: DictData | None = None,
@@ -405,10 +420,13 @@ class Workflow(BaseModel):
         return self
 
     def job(self, name: str) -> Job:
-        """Return this workflow's jobs that passing with the Job model.
+        """Return the workflow's job model that searching with an input job's
+        name or job's ID.
 
-        :param name: A job name that want to get from a mapping of job models.
-        :type name: str
+        :param name: (str) A job name or ID that want to get from a mapping of
+            job models.
+
+        :raise ValueError: If a name or ID does not exist on the jobs field.
 
         :rtype: Job
         :return: A job model that exists on this workflow by input name.
