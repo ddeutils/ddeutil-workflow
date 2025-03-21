@@ -93,7 +93,6 @@ from .templates import (
 from .utils import (
     batch,
     cross_product,
-    dash2underscore,
     delay,
     filter_func,
     gen_id,

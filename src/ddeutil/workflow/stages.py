@@ -225,7 +225,7 @@ class BaseStage(BaseModel, ABC):
             ... (i)   output: {'foo': bar}
             ... (ii)  to: {}
 
-        The result of the `to` variable will be;
+            The result of the `to` argument will be;
 
             ... (iii) to: {
                         'stages': {
@@ -239,14 +239,12 @@ class BaseStage(BaseModel, ABC):
 
         :rtype: DictData
         """
-        if self.id is None and not config.stage_default_id:
-            return to
-
-        # NOTE: Create stages key to receive an output from the stage execution.
         if "stages" not in to:
             to["stages"] = {}
 
-        # NOTE: If the stage ID did not set, it will use its name instead.
+        if self.id is None and not config.stage_default_id:
+            return to
+
         _id: str = (
             param2template(self.id, params=to)
             if self.id
@@ -257,7 +255,6 @@ class BaseStage(BaseModel, ABC):
             {"errors": output.pop("errors", {})} if "errors" in output else {}
         )
 
-        # NOTE: Set the output to that stage generated ID with ``outputs`` key.
         to["stages"][_id] = {"outputs": output, **errors}
         return to
 

@@ -43,7 +43,6 @@ from .stages import Stage
 from .templates import has_template
 from .utils import (
     cross_product,
-    dash2underscore,
     filter_func,
     gen_id,
 )
@@ -155,7 +154,7 @@ class Strategy(BaseModel):
 
     fail_fast: bool = Field(
         default=False,
-        serialization_alias="fail-fast",
+        alias="fail-fast",
     )
     max_parallel: int = Field(
         default=1,
@@ -164,7 +163,7 @@ class Strategy(BaseModel):
             "The maximum number of executor thread pool that want to run "
             "parallel"
         ),
-        serialization_alias="max-parallel",
+        alias="max-parallel",
     )
     matrix: Matrix = Field(
         default_factory=dict,
@@ -180,18 +179,6 @@ class Strategy(BaseModel):
         default_factory=list,
         description="A list of exclude matrix that want to filter-out.",
     )
-
-    @model_validator(mode="before")
-    def __prepare_keys(cls, values: DictData) -> DictData:
-        """Rename key that use dash to underscore because Python does not
-        support this character exist in any variable name.
-
-        :param values: A parsing values to these models
-        :rtype: DictData
-        """
-        dash2underscore("max-parallel", values)
-        dash2underscore("fail-fast", values)
-        return values
 
     def is_set(self) -> bool:
         """Return True if this strategy was set from yaml template.
@@ -319,7 +306,7 @@ class Job(BaseModel):
     runs_on: RunsOn = Field(
         default_factory=RunsOnLocal,
         description="A target node for this job to use for execution.",
-        serialization_alias="runs-on",
+        alias="runs-on",
     )
     stages: list[Stage] = Field(
         default_factory=list,
@@ -328,7 +315,7 @@ class Job(BaseModel):
     trigger_rule: TriggerRules = Field(
         default=TriggerRules.all_success,
         description="A trigger rule of tracking needed jobs.",
-        serialization_alias="trigger-rule",
+        alias="trigger-rule",
     )
     needs: list[str] = Field(
         default_factory=list,
@@ -338,18 +325,6 @@ class Job(BaseModel):
         default_factory=Strategy,
         description="A strategy matrix that want to generate.",
     )
-
-    @model_validator(mode="before")
-    def __prepare_keys__(cls, values: DictData) -> DictData:
-        """Rename key that use dash to underscore because Python does not
-        support this character exist in any variable name.
-
-        :param values: A passing value that coming for initialize this object.
-        :rtype: DictData
-        """
-        dash2underscore("runs-on", values)
-        dash2underscore("trigger-rule", values)
-        return values
 
     @field_validator("desc", mode="after")
     def ___prepare_desc__(cls, value: str) -> str:
@@ -441,14 +416,13 @@ class Job(BaseModel):
 
         :rtype: DictData
         """
+        if "jobs" not in to:
+            to["jobs"] = {}
+
         if self.id is None and not config.job_default_id:
             raise JobException(
                 "This job do not set the ID before setting execution output."
             )
-
-        # NOTE: Create jobs key to receive an output from the job execution.
-        if "jobs" not in to:
-            to["jobs"] = {}
 
         # NOTE: If the job ID did not set, it will use index of jobs key
         #   instead.
@@ -522,6 +496,7 @@ def local_execute_strategy(
     *,
     result: Result | None = None,
     event: Event | None = None,
+    raise_error: bool = False,
 ) -> Result:
     """Local job strategy execution with passing dynamic parameters from the
     workflow execution to strategy matrix.
@@ -543,6 +518,7 @@ def local_execute_strategy(
     :param result: (Result) A result object for keeping context and status
         data.
     :param event: (Event) An event manager that pass to the PoolThreadExecutor.
+    :param raise_error: (bool) A flag that all this method raise error
 
     :rtype: Result
     """
@@ -641,7 +617,7 @@ def local_execute_strategy(
             )
         except (StageException, UtilException) as err:
             result.trace.error(f"[JOB]: {err.__class__.__name__}: {err}")
-            if config.job_raise_error:
+            if raise_error or config.job_raise_error:
                 raise JobException(
                     f"Stage execution error: {err.__class__.__name__}: "
                     f"{err}"
