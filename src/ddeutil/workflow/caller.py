@@ -26,6 +26,7 @@ T = TypeVar("T")
 P = ParamSpec("P")
 
 logger = logging.getLogger("ddeutil.workflow")
+logging.getLogger("asyncio").setLevel(logging.INFO)
 
 
 class TagFunc(Protocol):
@@ -60,10 +61,13 @@ def tag(
 
         @wraps(func)
         def wrapped(*args: P.args, **kwargs: P.kwargs) -> TagFunc:
-            # NOTE: Able to do anything before calling the call function.
             return func(*args, **kwargs)
 
-        return wrapped
+        @wraps(func)
+        async def awrapped(*args: P.args, **kwargs: P.kwargs) -> TagFunc:
+            return await func(*args, **kwargs)
+
+        return awrapped if inspect.iscoroutinefunction(func) else wrapped
 
     return func_internal
 

@@ -316,7 +316,7 @@ class EmptyStage(BaseStage):
     )
     sleep: float = Field(
         default=0,
-        description="A second value to sleep before finish execution",
+        description="A second value to sleep before start execution",
         ge=0,
     )
 
@@ -696,7 +696,13 @@ class CallStage(BaseStage):
             args.pop("result")
 
         result.trace.info(f"[STAGE]: Call-Execute: {t_func.name}@{t_func.tag}")
-        rs: DictData = t_func(**param2template(args, params))
+        if inspect.iscoroutinefunction(t_func):  # pragma: no cov
+            loop = asyncio.get_event_loop()
+            rs: DictData = loop.run_until_complete(
+                t_func(**param2template(args, params))
+            )
+        else:
+            rs: DictData = t_func(**param2template(args, params))
 
         # VALIDATE:
         #   Check the result type from call function, it should be dict.
@@ -979,9 +985,27 @@ class IfStage(BaseStage):  # pragma: no cov
         ...     "name": "If stage execution.",
         ...     "case": "${{ param.test }}",
         ...     "match": [
-        ...         {"case": "1", "stage": "..."},
-        ...         {"case": "2", "stage": "..."},
-        ...         {"case": "_", "stage": "..."},
+        ...         {
+        ...             "case": "1",
+        ...             "stage": {
+        ...                 "name": "Stage case 1",
+        ...                 "eche": "Hello case 1",
+        ...             },
+        ...         },
+        ...         {
+        ...             "case": "2",
+        ...             "stage": {
+        ...                 "name": "Stage case 2",
+        ...                 "eche": "Hello case 2",
+        ...             },
+        ...         },
+        ...         {
+        ...             "case": "_",
+        ...             "stage": {
+        ...                 "name": "Stage else",
+        ...                 "eche": "Hello case else",
+        ...             },
+        ...         },
         ...     ],
         ... }
 
@@ -1044,11 +1068,11 @@ class SensorStage(BaseStage):  # pragma: no cov
 #   fields that because of parsing on the Job's stages key.
 #
 Stage = Union[
-    PyStage,
+    EmptyStage,
     BashStage,
     CallStage,
     TriggerStage,
     ForEachStage,
     ParallelStage,
-    EmptyStage,
+    PyStage,
 ]

@@ -5,6 +5,7 @@
 # ------------------------------------------------------------------------------
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -25,6 +26,25 @@ def dummy_task_polars_dir(
     result.trace.debug("... Start EL for CSV to Parquet with Polars Engine")
     result.trace.debug(f"... Reading data from {source}")
 
+    conversion: dict[str, Any] = conversion or {}
+    if conversion:
+        result.trace.debug("... Start Schema Conversion ...")
+    result.trace.debug(f"... Writing data to {sink}")
+    return {"records": 1}
+
+
+@tag("polars-dir", alias="async-el-csv-to-parquet")
+async def dummy_async_task_polars_dir(
+    source: str,
+    sink: str,
+    result: Result,
+    conversion: dict[str, Any] | None = None,
+) -> dict[str, int]:
+    result.trace.info("[HOOK]: async-el-csv-to-parquet@polars-dir")
+    result.trace.debug("... Start EL for CSV to Parquet with Polars Engine")
+    result.trace.debug(f"... Reading data from {source}")
+
+    await asyncio.sleep(0.1)
     conversion: dict[str, Any] = conversion or {}
     if conversion:
         result.trace.debug("... Start Schema Conversion ...")

@@ -91,12 +91,23 @@ def test_stage_exec_call(test_path):
                   with:
                     source: src
                     sink: sink
+                - name: "Extract & Load Local System"
+                  id: async-extract-load
+                  uses: tasks/async-el-csv-to-parquet@polars-dir
+                  with:
+                    source: src
+                    sink: sink
         """,
     ):
         workflow = Workflow.from_loader(name="tmp-wf-call-return-type")
 
         stage: Stage = workflow.job("second-job").stage("extract-load")
         rs: Result = stage.handler_execute({})
+        print(rs)
+
+        stage: Stage = workflow.job("second-job").stage("async-extract-load")
+        rs: Result = stage.handler_execute({})
+        print(rs)
 
         assert 0 == rs.status
         assert {"records": 1} == rs.context

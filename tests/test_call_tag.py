@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import inspect
 import shutil
 from pathlib import Path
@@ -91,6 +92,11 @@ def test_make_registry(call_function):
     assert rs["el-csv-to-delta"]["polars-dir"]().tag == "polars-dir"
 
 
+def test_make_registry_from_env():
+    rs: dict[str, Registry] = make_registry("tasks")
+    print(rs)
+
+
 def test_make_registry_not_found():
     rs: dict[str, Registry] = make_registry("not_found")
     assert rs == {}
@@ -103,13 +109,15 @@ def test_make_registry_raise(call_function_dup):
         make_registry("new_tasks_dup")
 
 
-# @pytest.mark.skip("Skip because it uses for local test only.")
+@pytest.mark.skip("Skip because it uses for local test only.")
 def test_inspec_func():
 
     def demo_func(
         args_1: str, args_2: Path, *args, kwargs_1: str | None = None, **kwargs
     ):  # pragma: no cov
         pass
+
+    assert inspect.isfunction(demo_func)
 
     ips = inspect.signature(demo_func)
     for k, v in ips.parameters.items():
@@ -121,3 +129,25 @@ def test_inspec_func():
         print(v.default)
         print(v.kind, " (", type(v.kind), ")")
         print("-----")
+
+    async def ademo_func(
+        args_1: str, args_2: Path, *args, kwargs_1: str | None = None, **kwargs
+    ):  # pragma: no cov
+        await asyncio.sleep(0.1)
+        pass
+
+    print(inspect.isfunction(ademo_func))
+    print(inspect.isasyncgenfunction(ademo_func))
+    print(inspect.isasyncgen(ademo_func))
+    print(inspect.iscoroutinefunction(ademo_func))
+
+    # ips = inspect.signature(demo_func)
+    # for k, v in ips.parameters.items():
+    #     print(k)
+    #     print(ips.parameters[k].default)
+    #     print(v)
+    #     print(v.name)
+    #     print(v.annotation, "type:", type(v.annotation))
+    #     print(v.default)
+    #     print(v.kind, " (", type(v.kind), ")")
+    #     print("-----")
