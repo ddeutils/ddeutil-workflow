@@ -187,7 +187,7 @@ class BaseStage(BaseModel, ABC):
             result,
             run_id=run_id,
             parent_run_id=parent_run_id,
-            id_logic=(self.name + (self.id or "")),
+            id_logic=self.iden,
         )
 
         try:

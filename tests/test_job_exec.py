@@ -23,9 +23,9 @@ def test_job_exec_py():
         },
     } == rs.context
 
-    params = {}
-    job.set_outputs(rs.context, to=params)
-    assert params == {
+    output = {}
+    job.set_outputs(rs.context, to=output)
+    assert output == {
         "jobs": {
             "demo-run": {
                 "matrix": {},
@@ -48,15 +48,14 @@ def test_job_exec_py_raise():
         first_job.execute(params={})
 
 
+@mock.patch.object(Config, "stage_default_id", False)
 def test_job_exec_py_not_set_output():
-    with mock.patch.object(Config, "stage_default_id", False):
-        # NOTE: Get stage from the specific workflow.
-        workflow: Workflow = Workflow.from_loader(
-            name="wf-run-python-raise", externals={}
-        )
-        job: Job = workflow.job("second-job")
-        rs = job.execute(params={})
-        assert {"1354680202": {"matrix": {}, "stages": {}}} == rs.context
+    workflow: Workflow = Workflow.from_loader(
+        name="wf-run-python-raise", externals={}
+    )
+    job: Job = workflow.job("second-job")
+    rs = job.execute(params={})
+    assert {"1354680202": {"matrix": {}, "stages": {}}} == rs.context
 
 
 @mock.patch.object(Config, "job_raise_error", True)
@@ -169,9 +168,9 @@ def test_job_exec_py_complete_not_parallel():
         },
     }
 
-    params = {}
-    job.set_outputs(rs.context, to=params)
-    assert params == {
+    output = {}
+    job.set_outputs(rs.context, to=output)
+    assert output == {
         "jobs": {
             "job-complete-not-parallel": {
                 "strategies": {

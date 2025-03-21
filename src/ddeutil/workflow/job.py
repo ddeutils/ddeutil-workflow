@@ -522,8 +522,8 @@ def local_execute_strategy(
 
     :rtype: Result
     """
-    if result is None:  # pragma: no cov
-        result: Result = Result(run_id=gen_id(job.id or "", unique=True))
+    if result is None:
+        result: Result = Result(run_id=gen_id(job.id or "not-set", unique=True))
 
     strategy_id: str = gen_id(strategy)
 
@@ -542,6 +542,10 @@ def local_execute_strategy(
     context: DictData = copy.deepcopy(params)
     context.update({"matrix": strategy, "stages": {}})
 
+    if strategy:
+        result.trace.info(f"[JOB]: Execute Strategy ID: {strategy_id}")
+        result.trace.info(f"[JOB]: ... Matrix: {strategy_id}")
+
     # IMPORTANT: The stage execution only run sequentially one-by-one.
     for stage in job.stages:
 
@@ -550,28 +554,16 @@ def local_execute_strategy(
             continue
 
         result.trace.info(f"[JOB]: Execute stage: {stage.iden!r}")
-
-        # NOTE: Logging a matrix that pass on this stage execution.
-        if strategy:
-            result.trace.info(f"[JOB]: ... Matrix: {strategy}")
-
-        # NOTE: Force stop this execution if event was set from main
-        #   execution.
         if event and event.is_set():
             error_msg: str = (
                 "Job strategy was canceled from event that had set before "
                 "strategy execution."
             )
             return result.catch(
-                status=1,
+                status=Status.FAILED,
                 context={
                     strategy_id: {
                         "matrix": strategy,
-                        # NOTE: If job strategy executor use multithreading,
-                        #   it will not filter function object from context.
-                        # ---
-                        # "stages": filter_func(context.pop("stages", {})),
-                        #
                         "stages": context.pop("stages", {}),
                         "errors": {
                             "class": JobException(error_msg),
@@ -584,20 +576,14 @@ def local_execute_strategy(
 
         # PARAGRAPH:
         #
-        #       I do not use below syntax because `params` dict be the
-        #   reference memory pointer, and it was changed when I action
-        #   anything like update or re-construct this.
-        #
-        #       ... params |= stage.execute(params=params)
-        #
-        #   This step will add the stage result to `stages` key in
-        #   that stage id. It will have structure like;
+        #       This step will add the stage result to `stages` key in that
+        #   stage id. It will have structure like;
         #
         #   {
         #       "params": { ... },
         #       "jobs": { ... },
         #       "matrix": { ... },
-        #       "stages": { { "stage-id-1": ... }, ... }
+        #       "stages": { { "stage-id-01": { "outputs": { ... } } }, ... }
         #   }
         #
         # IMPORTANT:
@@ -624,7 +610,7 @@ def local_execute_strategy(
                 ) from None
 
             return result.catch(
-                status=1,
+                status=Status.FAILED,
                 context={
                     strategy_id: {
                         "matrix": strategy,
@@ -659,6 +645,7 @@ def local_execute(
     run_id: str | None = None,
     parent_run_id: str | None = None,
     result: Result | None = None,
+    raise_error: bool = False,
 ) -> Result:
     """Local job execution with passing dynamic parameters from the workflow
     execution. It will generate matrix values at the first step and run
@@ -670,27 +657,31 @@ def local_execute(
     :param parent_run_id: (str) A parent workflow running ID for this release.
     :param result: (Result) A result object for keeping context and status
         data.
+    :param raise_error: (bool) A flag that all this method raise error
+
+    :raise JobException: If the raise_error flag was set be True and result
+        from future object was raised.
 
     :rtype: Result
     """
-    if result is None:  # pragma: no cov
-        result: Result = Result(
-            run_id=(run_id or gen_id(job.id or "", unique=True)),
-            parent_run_id=parent_run_id,
-        )
-    elif parent_run_id:  # pragma: no cov
-        result.set_parent_run_id(parent_run_id)
+    result: Result = Result.construct_with_rs_or_id(
+        result,
+        run_id=run_id,
+        parent_run_id=parent_run_id,
+        id_logic=(job.id or "not-set"),
+    )
 
     # NOTE: Normal Job execution without parallel strategy matrix. It uses
     #   for-loop to control strategy execution sequentially.
     if (not job.strategy.is_set()) or job.strategy.max_parallel == 1:
 
         for strategy in job.strategy.make():
-            result: Result = local_execute_strategy(
+            local_execute_strategy(
                 job=job,
                 strategy=strategy,
                 params=params,
                 result=result,
+                raise_error=raise_error,
             )
 
         return result.catch(status=Status.SUCCESS)
@@ -713,6 +704,7 @@ def local_execute(
                 params=params,
                 result=result,
                 event=event,
+                raise_error=raise_error,
             )
             for strategy in job.strategy.make()
         ]
@@ -724,27 +716,27 @@ def local_execute(
         if not fail_fast_flag:
             done = as_completed(futures, timeout=1800)
         else:
-            # NOTE: Get results from a collection of tasks with a timeout
-            #   that has the first exception.
             done, not_done = wait(
                 futures, timeout=1800, return_when=FIRST_EXCEPTION
             )
-            nd: str = (
-                f", the strategies do not run is {not_done}" if not_done else ""
-            )
-            result.trace.debug(f"[JOB]: Strategy is set Fail Fast{nd}")
 
-            # NOTE: Stop all running tasks with setting the event manager
-            #   and cancel any scheduled tasks.
             if len(done) != len(futures):
                 event.set()
                 for future in not_done:
                     future.cancel()
 
+            nd: str = (
+                f", the strategies do not run is {not_done}" if not_done else ""
+            )
+            result.trace.debug(f"[JOB]: Strategy is set Fail Fast{nd}")
+
         for future in done:
             try:
                 future.result()
             except JobException as err:
+                if raise_error:
+                    raise
+
                 status = Status.FAILED
                 ls: str = "Fail-Fast" if fail_fast_flag else "All-Completed"
                 result.trace.error(

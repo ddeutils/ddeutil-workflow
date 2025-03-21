@@ -38,7 +38,9 @@ A job execution context that return from the `execute` method.
       "strategies": {
         "<strategy-id>": {
           "matrix": {},
-          "stages": {}
+          "stages": {
+            "<stage-id>": {}
+          }
         }
       }
     }
