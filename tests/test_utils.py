@@ -8,7 +8,6 @@ from ddeutil.workflow.utils import (
     UTC,
     batch,
     cut_id,
-    deep_update,
     filter_func,
     gen_id,
     get_d_now,
@@ -103,11 +102,3 @@ def test_reach_next_minute():
     # NOTE: Raise because this datetime gather than the current time.
     with pytest.raises(ValueError):
         reach_next_minute(datetime(2024, 1, 1, 1, 12, 55, tzinfo=UTC))
-
-
-def test_deep_update():
-    assert deep_update(
-        origin={"jobs": {"job01": "foo"}}, u={"jobs": {"job02": "bar"}}
-    ) == {
-        "jobs": {"job01": "foo", "job02": "bar"},
-    }
