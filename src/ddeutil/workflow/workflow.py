@@ -523,18 +523,19 @@ class Workflow(BaseModel):
         :param result: (Result) A result object for keeping context and status
             data.
 
+        :raise TypeError: If a queue parameter does not match with ReleaseQueue
+            type.
+
         :rtype: Result
         """
         audit: type[Audit] = audit or get_audit()
         name: str = override_log_name or self.name
-
-        if result is None:
-            result: Result = Result(
-                run_id=(run_id or gen_id(name, unique=True)),
-                parent_run_id=parent_run_id,
-            )
-        elif parent_run_id:  # pragma: no cov
-            result.set_parent_run_id(parent_run_id)
+        result: Result = Result.construct_with_rs_or_id(
+            result,
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            id_logic=name,
+        )
 
         if queue is not None and not isinstance(queue, ReleaseQueue):
             raise TypeError(
@@ -945,13 +946,12 @@ class Workflow(BaseModel):
         :rtype: Result
         """
         ts: float = time.monotonic()
-        if result is None:  # pragma: no cov
-            result: Result = Result(
-                run_id=(run_id or gen_id(self.name, unique=True)),
-                parent_run_id=parent_run_id,
-            )
-        elif parent_run_id:
-            result.set_parent_run_id(parent_run_id)
+        result: Result = Result.construct_with_rs_or_id(
+            result,
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            id_logic=self.name,
+        )
 
         result.trace.info(f"[WORKFLOW]: Start Execute: {self.name!r} ...")
 

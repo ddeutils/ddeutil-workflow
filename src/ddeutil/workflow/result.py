@@ -12,9 +12,9 @@ from dataclasses import field
 from datetime import datetime
 from enum import IntEnum
 from threading import Event
-from typing import Optional, Union
+from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict
 from pydantic.dataclasses import dataclass
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
@@ -26,8 +26,6 @@ from .utils import gen_id
 __all__: TupleStr = (
     "Result",
     "Status",
-    "StageContext",
-    "StrategyContext",
     "default_gen_id",
 )
 
@@ -132,43 +130,3 @@ class Result:
         :rtype: float
         """
         return (get_dt_tznow() - self.ts).total_seconds()
-
-
-class ErrorContext(BaseModel):  # pragma: no cov
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    obj: Exception = Field(alias="class")
-    name: str = Field(description="A name of exception class.")
-    message: str = Field(description="A exception message.")
-
-
-class StageContext(BaseModel):  # pragma: no cov
-    outputs: DictData = Field(default_factory=dict)
-    errors: Optional[ErrorContext] = Field(default=None)
-
-    def is_exception(self) -> bool:
-        return self.errors is not None
-
-
-class StrategyContext(BaseModel):  # pragma: no cov
-    matrix: DictData = Field(default_factory=dict)
-    stages: dict[str, StageContext]
-    errors: Optional[ErrorContext] = Field(default=None)
-
-    def is_exception(self) -> bool:
-        return self.errors is not None
-
-
-class JobStrategyContext(BaseModel):  # pragma: no cov
-    strategies: dict[str, StrategyContext]
-    errors: Optional[ErrorContext] = Field(default=None)
-
-
-JobNotStrategyContext = dict[str, StrategyContext]  # pragma: no cov
-JobContext = Union[JobStrategyContext, JobNotStrategyContext]  # pragma: no cov
-
-
-class WorkflowContext(BaseModel):  # pragma: no cov
-    params: DictData = Field(description="A parameterize value")
-    jobs: dict[str, JobContext]
-    errors: Optional[ErrorContext] = Field(default=None)

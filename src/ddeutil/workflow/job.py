@@ -459,13 +459,12 @@ class Job(BaseModel):
 
         :rtype: Result
         """
-        if result is None:  # pragma: no cov
-            result: Result = Result(
-                run_id=(run_id or gen_id(self.id or "", unique=True)),
-                parent_run_id=parent_run_id,
-            )
-        elif parent_run_id:  # pragma: no cov
-            result.set_parent_run_id(parent_run_id)
+        result: Result = Result.construct_with_rs_or_id(
+            result,
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            id_logic=(self.id or "not-set"),
+        )
 
         if self.runs_on.type == RunsOnType.LOCAL:
             return local_execute(
