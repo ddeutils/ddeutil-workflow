@@ -1164,7 +1164,7 @@ class Workflow(BaseModel):
             #       'params': <input-params>,
             #       'jobs': {},
             #   }
-            if future is None or future.done():
+            if future is None:
                 future: Future = executor.submit(
                     self.execute_job,
                     job_id=job_id,
@@ -1172,14 +1172,24 @@ class Workflow(BaseModel):
                     result=result,
                     event=event,
                 )
+                result.trace.debug(f"[WORKFLOW]: Make future: {future}")
+                time.sleep(0.025)
+            elif future.done():
+                if err := future.exception():
+                    result.trace.error(f"[WORKFLOW]: {err}")
+                    raise WorkflowException(str(err))
+
+                future = None
+                job_queue.put(job_id)
             elif future.running():
                 time.sleep(0.075)
-                job_queue.task_done()
                 job_queue.put(job_id)
-                continue
-            elif err := future.exception():
-                result.trace.error(f"[WORKFLOW]: {err}")
-                raise WorkflowException(str(err))
+            else:  # pragma: no cov
+                job_queue.put(job_id)
+                result.trace.debug(
+                    f"Execution non-threading does not handle case: {future} "
+                    f"that not running."
+                )
 
             # NOTE: Mark this job queue done.
             job_queue.task_done()
@@ -1210,9 +1220,9 @@ class WorkflowTask:
     arguments before passing to the parent release method.
     """
 
-    alias: str
-    workflow: Workflow
-    runner: CronRunner
+    alias: str = field()
+    workflow: Workflow = field()
+    runner: CronRunner = field()
     values: DictData = field(default_factory=dict)
 
     def release(
@@ -1331,7 +1341,7 @@ class WorkflowTask:
         )
 
     def __eq__(self, other: WorkflowTask) -> bool:
-        """Override equal property that will compare only the same type.
+        """Override the equal property that will compare only the same type.
 
         :rtype: bool
         """

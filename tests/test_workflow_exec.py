@@ -39,7 +39,8 @@ def test_workflow_exec_raise_timeout():
         ],
     )
     workflow: Workflow = Workflow(
-        name="demo-workflow", jobs={"sleep-run": job, "sleep-again-run": job}
+        name="demo-workflow",
+        jobs={"sleep-run": job, "sleep-again-run": job},
     )
     rs: Result = workflow.execute(params={}, timeout=1)
     assert rs.status == 1
