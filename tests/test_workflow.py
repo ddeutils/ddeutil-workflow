@@ -216,7 +216,6 @@ def test_workflow_condition(test_path):
             "params": {"name": "foo"},
             "jobs": {
                 "condition-job": {
-                    "matrix": {},
                     "stages": {
                         "condition-stage": {
                             "outputs": {"message": "Hello World"}
