@@ -20,6 +20,7 @@ from functools import partial, total_ordering
 from heapq import heappop, heappush
 from queue import Queue
 from textwrap import dedent
+from threading import Event
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -844,6 +845,7 @@ class Workflow(BaseModel):
         params: DictData,
         *,
         result: Result | None = None,
+        event: Event | None = None,
         raise_error: bool = True,
     ) -> Result:
         """Job execution with passing dynamic parameters from the main workflow
@@ -859,10 +861,12 @@ class Workflow(BaseModel):
 
         :param job_id: A job ID that want to execute.
         :param params: A params that was parameterized from workflow execution.
-        :param raise_error: A flag that raise error instead catching to result
-            if it gets exception from job execution.
         :param result: (Result) A result object for keeping context and status
             data.
+        :param event: (Event) An event manager that pass to the
+            PoolThreadExecutor.
+        :param raise_error: A flag that raise error instead catching to result
+            if it gets exception from job execution.
 
         :rtype: Result
         :return: Return the result object that receive the job execution result
@@ -893,6 +897,7 @@ class Workflow(BaseModel):
                     params=params,
                     run_id=result.run_id,
                     parent_run_id=result.parent_run_id,
+                    event=event,
                 ).context,
                 to=params,
             )
@@ -906,7 +911,7 @@ class Workflow(BaseModel):
                 "Handle error from the job execution does not support yet."
             ) from None
 
-        return result.catch(status=0, context=params)
+        return result.catch(status=Status.SUCCESS, context=params)
 
     def execute(
         self,
@@ -1033,6 +1038,7 @@ class Workflow(BaseModel):
         """
         not_timeout_flag: bool = True
         timeout: int = timeout or config.max_job_exec_timeout
+        event: Event = Event()
         result.trace.debug(f"[WORKFLOW]: Run {self.name!r} with threading.")
 
         # IMPORTANT: The job execution can run parallel and waiting by
@@ -1071,6 +1077,7 @@ class Workflow(BaseModel):
                         job_id=job_id,
                         params=context,
                         result=result,
+                        event=event,
                     ),
                 )
 
@@ -1093,10 +1100,14 @@ class Workflow(BaseModel):
 
                 return context
 
+            result.trace.error(
+                f"[WORKFLOW]: Execution: {self.name!r} was timeout."
+            )
+
             for future in futures:
+                # TODO: This action does not cancel running future.
                 future.cancel()
 
-        result.trace.error(f"[WORKFLOW]: Execution: {self.name!r} was timeout.")
         raise WorkflowException(f"Execution: {self.name!r} was timeout.")
 
     def __exec_non_threading(
@@ -1124,6 +1135,7 @@ class Workflow(BaseModel):
         """
         not_timeout_flag: bool = True
         timeout: int = timeout or config.max_job_exec_timeout
+        event: Event = Event()
         result.trace.debug(f"[WORKFLOW]: Run {self.name!r} with non-threading.")
 
         while not job_queue.empty() and (
@@ -1147,7 +1159,16 @@ class Workflow(BaseModel):
             #       'params': <input-params>,
             #       'jobs': {},
             #   }
-            self.execute_job(job_id=job_id, params=context, result=result)
+            try:
+                self.execute_job(
+                    job_id=job_id,
+                    params=context,
+                    result=result,
+                    event=event,
+                )
+            except Exception as err:
+                result.trace.error(f"[WORKFLOW]: {err}")
+                raise WorkflowException(str(err)) from None
 
             # NOTE: Mark this job queue done.
             job_queue.task_done()
