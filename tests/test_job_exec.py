@@ -84,39 +84,26 @@ def test_job_exec_py_fail_fast():
 
 @mock.patch.object(Config, "job_raise_error", True)
 @mock.patch.object(Config, "stage_raise_error", True)
-def test_job_exec_py_fail_fast_raise():
+def test_job_exec_py_fail_fast_raise_catch():
     workflow: Workflow = Workflow.from_loader(
         name="wf-run-python-raise-for-job"
     )
     job: Job = workflow.job("job-fail-fast-raise")
     rs: Result = job.execute({})
     assert rs.context == {
-        "9873503202": {
-            "matrix": {"sleep": "0.1"},
-            "stages": {
-                "7972360640": {"outputs": {}},
-                "raise-error": {"outputs": {"result": "success"}},
-            },
-        },
         "9112472804": {
             "matrix": {"sleep": "4"},
-            "stages": {"7972360640": {"outputs": {}}},
+            "stages": {"1181478804": {"outputs": {}}},
             "errors": {
                 "class": rs.context["9112472804"]["errors"]["class"],
                 "name": "JobException",
-                "message": (
-                    "Job strategy was canceled from event that had set before "
-                    "strategy execution."
-                ),
+                "message": "Job strategy was canceled from event that had set before strategy execution.",
             },
         },
         "errors": {
             "class": rs.context["errors"]["class"],
             "name": "JobException",
-            "message": (
-                "JobException: Stage execution error: StageException: "
-                "PyStage: \n\tValueError: Testing raise error inside PyStage!!!"
-            ),
+            "message": "JobException: Stage execution error: StageException: PyStage: \n\tValueError: Testing raise error inside PyStage with the sleep not equal 4!!!",
         },
     }
 

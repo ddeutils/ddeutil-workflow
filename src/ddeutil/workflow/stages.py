@@ -583,7 +583,7 @@ class PyStage(BaseStage):
         # NOTE: Start exec the run statement.
         result.trace.info(f"[STAGE]: Py-Execute: {self.name}")
         result.trace.warning(
-            "... [STAGE]: This stage allow use `eval` function, so, please "
+            "[STAGE]: This stage allow use `eval` function, so, please "
             "check your statement be safe before execute."
         )
 

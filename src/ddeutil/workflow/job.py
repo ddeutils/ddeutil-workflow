@@ -550,10 +550,9 @@ def local_execute_strategy(
     for stage in job.stages:
 
         if stage.is_skipped(params=context):
-            result.trace.info(f"[JOB]: Skip stage: {stage.iden!r}")
+            result.trace.info(f"[STAGE]: Skip stage: {stage.iden!r}")
             continue
 
-        result.trace.info(f"[JOB]: Execute stage: {stage.iden!r}")
         if event and event.is_set():
             error_msg: str = (
                 "Job strategy was canceled from event that had set before "
@@ -651,16 +650,17 @@ def local_execute(
     execution. It will generate matrix values at the first step and run
     multithread on this metrics to the `stages` field of this job.
 
+        This method does not raise any JobException if it runs with
+    multi-threading strategy.
+
     :param job: (Job) A job model that want to execute.
     :param params: (DictData) An input parameters that use on job execution.
     :param run_id: (str) A job running ID for this execution.
     :param parent_run_id: (str) A parent workflow running ID for this release.
     :param result: (Result) A result object for keeping context and status
         data.
-    :param raise_error: (bool) A flag that all this method raise error
-
-    :raise JobException: If the raise_error flag was set be True and result
-        from future object was raised.
+    :param raise_error: (bool) A flag that all this method raise error to the
+        strategy execution.
 
     :rtype: Result
     """
@@ -688,6 +688,13 @@ def local_execute(
 
     # NOTE: Create event for cancel executor by trigger stop running event.
     event: Event = Event()
+    fail_fast_flag: bool = job.strategy.fail_fast
+    ls: str = "Fail-Fast" if fail_fast_flag else "All-Completed"
+
+    result.trace.info(
+        f"[JOB]: Start multithreading: {job.strategy.max_parallel} threads "
+        f"with {ls} mode."
+    )
 
     # IMPORTANT: Start running strategy execution by multithreading because
     #   it will run by strategy values without waiting previous execution.
@@ -711,7 +718,6 @@ def local_execute(
 
         context: DictData = {}
         status: Status = Status.SUCCESS
-        fail_fast_flag: bool = job.strategy.fail_fast
 
         if not fail_fast_flag:
             done = as_completed(futures, timeout=1800)
@@ -721,6 +727,9 @@ def local_execute(
             )
 
             if len(done) != len(futures):
+                result.trace.warning(
+                    "[JOB]: Set the event for stop running stage."
+                )
                 event.set()
                 for future in not_done:
                     future.cancel()
@@ -734,11 +743,7 @@ def local_execute(
             try:
                 future.result()
             except JobException as err:
-                if raise_error:
-                    raise
-
                 status = Status.FAILED
-                ls: str = "Fail-Fast" if fail_fast_flag else "All-Completed"
                 result.trace.error(
                     f"[JOB]: {ls} Catch:\n\t{err.__class__.__name__}:"
                     f"\n\t{err}"
