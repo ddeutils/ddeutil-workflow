@@ -814,9 +814,7 @@ class Workflow(BaseModel):
                     partial_queue(q)
                     continue
 
-                # NOTE: Push the latest Release to the running queue.
                 heappush(q.running, release)
-
                 futures.append(
                     executor.submit(
                         self.release,
@@ -958,9 +956,9 @@ class Workflow(BaseModel):
         # NOTE: It should not do anything if it does not have job.
         if not self.jobs:
             result.trace.warning(
-                f"[WORKFLOW]: Workflow: {self.name!r} does not have any jobs"
+                f"[WORKFLOW]: {self.name!r} does not have any jobs"
             )
-            return result.catch(status=0, context=params)
+            return result.catch(status=Status.SUCCESS, context=params)
 
         # NOTE: Create a job queue that keep the job that want to run after
         #   its dependency condition.
@@ -977,7 +975,7 @@ class Workflow(BaseModel):
         #   }
         #
         context: DictData = self.parameterize(params)
-        status: int = 0
+        status: Status = Status.SUCCESS
         try:
             if config.max_job_parallel == 1:
                 self.__exec_non_threading(
@@ -996,7 +994,7 @@ class Workflow(BaseModel):
                     timeout=timeout,
                 )
         except WorkflowException as err:
-            status: int = 1
+            status = Status.FAILED
             context.update(
                 {
                     "errors": {
@@ -1023,12 +1021,12 @@ class Workflow(BaseModel):
             If a job need dependency, it will check dependency job ID from
         context data before allow it run.
 
-        :param result: A result model.
+        :param result: (Result) A result model.
         :param context: A context workflow data that want to downstream passing.
         :param ts: A start timestamp that use for checking execute time should
             time out.
-        :param job_queue: A job queue object.
-        :param timeout: A second value unit that bounding running time.
+        :param job_queue: (Queue) A job queue object.
+        :param timeout: (int) A second value unit that bounding running time.
         :param thread_timeout: A timeout to waiting all futures complete.
 
         :rtype: DictData
@@ -1098,7 +1096,6 @@ class Workflow(BaseModel):
             for future in futures:
                 future.cancel()
 
-        # NOTE: Raise timeout error.
         result.trace.error(f"[WORKFLOW]: Execution: {self.name!r} was timeout.")
         raise WorkflowException(f"Execution: {self.name!r} was timeout.")
 
@@ -1163,7 +1160,6 @@ class Workflow(BaseModel):
 
             return context
 
-        # NOTE: Raise timeout error.
         result.trace.error(f"[WORKFLOW]: Execution: {self.name!r} was timeout.")
         raise WorkflowException(f"Execution: {self.name!r} was timeout.")
 
@@ -1203,6 +1199,11 @@ class WorkflowTask:
         :param audit: An audit class that want to save the execution result.
         :param queue: A ReleaseQueue object that use to mark complete.
 
+        :raise ValueError: If a queue parameter does not pass while release
+            is None.
+        :raise TypeError: If a queue parameter does not match with ReleaseQueue
+            type.
+
         :rtype: Result
         """
         audit: type[Audit] = audit or get_audit()
@@ -1227,7 +1228,6 @@ class WorkflowTask:
             else:
                 release = self.runner.date
 
-        # NOTE: Call the workflow release method.
         return self.workflow.release(
             release=release,
             params=self.values,
@@ -1282,13 +1282,14 @@ class WorkflowTask:
         if self.runner.date > end_date:
             return queue
 
-        # NOTE: Push the Release object to queue.
         heappush(queue.queue, workflow_release)
-
         return queue
 
     def __repr__(self) -> str:
-        """Override the `__repr__` method."""
+        """Override the `__repr__` method.
+
+        :rtype: str
+        """
         return (
             f"{self.__class__.__name__}(alias={self.alias!r}, "
             f"workflow={self.workflow.name!r}, runner={self.runner!r}, "
@@ -1296,7 +1297,10 @@ class WorkflowTask:
         )
 
     def __eq__(self, other: WorkflowTask) -> bool:
-        """Override equal property that will compare only the same type."""
+        """Override equal property that will compare only the same type.
+
+        :rtype: bool
+        """
         if isinstance(other, WorkflowTask):
             return (
                 self.workflow.name == other.workflow.name

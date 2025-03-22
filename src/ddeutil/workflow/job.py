@@ -432,11 +432,12 @@ class Job(BaseModel):
             {"errors": output.pop("errors", {})} if "errors" in output else {}
         )
 
-        to["jobs"][_id] = (
-            {"strategies": output, **errors}
-            if self.strategy.is_set()
-            else {**output.get(next(iter(output), "DUMMY"), {}), **errors}
-        )
+        if self.strategy.is_set():
+            to["jobs"][_id] = {"strategies": output, **errors}
+        else:
+            _output = output.get(next(iter(output), "FIRST"), {})
+            _output.pop("matrix", {})
+            to["jobs"][_id] = {**_output, **errors}
         return to
 
     def execute(

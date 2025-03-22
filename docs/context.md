@@ -48,6 +48,22 @@ A job execution context that return from the `execute` method.
 }
 ```
 
+If the job does not set strategy matrix;
+
+```json
+{
+  "params": {},
+  "jobs": {
+    "<job-name>": {
+      "stages": {
+        "<stage-id>": {}
+      }
+    }
+  }
+}
+```
+
+
 ## Stage
 
 A stage execution context that return from `execute` and `handler_execute`

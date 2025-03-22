@@ -28,7 +28,6 @@ def test_job_exec_py():
     assert output == {
         "jobs": {
             "demo-run": {
-                "matrix": {},
                 "stages": {
                     "hello-world": {"outputs": {"x": "New Name"}},
                     "run-var": {"outputs": {"x": 1}},
@@ -56,6 +55,10 @@ def test_job_exec_py_not_set_output():
     job: Job = workflow.job("second-job")
     rs = job.execute(params={})
     assert {"1354680202": {"matrix": {}, "stages": {}}} == rs.context
+
+    output = {}
+    job.set_outputs(rs.context, to=output)
+    assert output == {"jobs": {"second-job": {"stages": {}}}}
 
 
 @mock.patch.object(Config, "job_raise_error", True)
