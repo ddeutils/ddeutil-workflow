@@ -34,7 +34,6 @@ def test_workflow_exec_release():
         "outputs": {
             "jobs": {
                 "condition-job": {
-                    "matrix": {},
                     "stages": {
                         "4083404693": {"outputs": {}},
                         "call-out": {"outputs": {}},
@@ -69,7 +68,6 @@ def test_workflow_exec_release_with_queue():
         "outputs": {
             "jobs": {
                 "condition-job": {
-                    "matrix": {},
                     "stages": {
                         "4083404693": {"outputs": {}},
                         "call-out": {"outputs": {}},
@@ -117,7 +115,6 @@ def test_workflow_exec_release_with_start_date():
         "outputs": {
             "jobs": {
                 "condition-job": {
-                    "matrix": {},
                     "stages": {
                         "4083404693": {"outputs": {}},
                         "call-out": {"outputs": {}},

@@ -24,7 +24,6 @@ def test_workflow_exec():
         "params": {},
         "jobs": {
             "sleep-again-run": {
-                "matrix": {},
                 "stages": {"7972360640": {"outputs": {}}},
             },
         },
@@ -62,14 +61,12 @@ def test_workflow_exec_py():
         },
         "jobs": {
             "first-job": {
-                "matrix": {},
                 "stages": {
                     "printing": {"outputs": {"x": "Local Workflow"}},
                     "setting-x": {"outputs": {"x": 1}},
                 },
             },
             "second-job": {
-                "matrix": {},
                 "stages": {
                     "create-func": {
                         "outputs": {
@@ -82,7 +79,6 @@ def test_workflow_exec_py():
                 },
             },
             "final-job": {
-                "matrix": {},
                 "stages": {
                     "1772094681": {
                         "outputs": {
@@ -140,14 +136,12 @@ def test_workflow_exec_py_with_parallel():
             },
             "jobs": {
                 "first-job": {
-                    "matrix": {},
                     "stages": {
                         "printing": {"outputs": {"x": "Local Workflow"}},
                         "setting-x": {"outputs": {"x": 1}},
                     },
                 },
                 "second-job": {
-                    "matrix": {},
                     "stages": {
                         "create-func": {
                             "outputs": {
@@ -160,7 +154,6 @@ def test_workflow_exec_py_with_parallel():
                     },
                 },
                 "final-job": {
-                    "matrix": {},
                     "stages": {
                         "1772094681": {
                             "outputs": {
@@ -204,7 +197,6 @@ def test_workflow_exec_py_raise_parallel():
         "params": {},
         "jobs": {
             "second-job": {
-                "matrix": {},
                 "stages": {"1772094681": {"outputs": {}}},
             }
         },
@@ -297,7 +289,6 @@ def test_workflow_exec_needs():
         "params": {"name": "bar"},
         "jobs": {
             "final-job": {
-                "matrix": {},
                 "stages": {
                     "8797330324": {
                         "outputs": {},
@@ -305,7 +296,6 @@ def test_workflow_exec_needs():
                 },
             },
             "first-job": {
-                "matrix": {},
                 "stages": {
                     "7824513474": {
                         "outputs": {},
@@ -313,7 +303,6 @@ def test_workflow_exec_needs():
                 },
             },
             "second-job": {
-                "matrix": {},
                 "stages": {
                     "1772094681": {
                         "outputs": {},
@@ -332,7 +321,6 @@ def test_workflow_exec_needs_parallel():
             "params": {"name": "bar"},
             "jobs": {
                 "final-job": {
-                    "matrix": {},
                     "stages": {
                         "8797330324": {
                             "outputs": {},
@@ -340,7 +328,6 @@ def test_workflow_exec_needs_parallel():
                     },
                 },
                 "first-job": {
-                    "matrix": {},
                     "stages": {
                         "7824513474": {
                             "outputs": {},
@@ -348,7 +335,6 @@ def test_workflow_exec_needs_parallel():
                     },
                 },
                 "second-job": {
-                    "matrix": {},
                     "stages": {
                         "1772094681": {
                             "outputs": {},
@@ -438,7 +424,6 @@ def test_workflow_exec_call(test_path):
                             "outputs": {"records": 1},
                         },
                     },
-                    "matrix": {},
                 },
             },
         } == rs.context
