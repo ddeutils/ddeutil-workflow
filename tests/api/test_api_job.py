@@ -30,4 +30,5 @@ def tests_route_job_execute(client):
             ],
         },
         "params": {},
+        "context": {"jobs": {}},
     }

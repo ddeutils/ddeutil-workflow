@@ -49,7 +49,7 @@ def test_job():
     assert job.check_needs({"job-before": "foo"})
     assert not job.check_needs({"job-after": "foo"})
 
-    job = Job(runs_on={"type": "k8s"})
+    job = Job.model_validate({"runs-on": {"type": "k8s"}})
     assert isinstance(job.runs_on, RunsOnK8s)
 
 
