@@ -1,21 +1,21 @@
 from ddeutil.workflow.context import (
     JobContext,
-    MapStrategyContext,
+    MatrixStageContext,
+    OutputContext,
     StageContext,
-    StrategyContext,
-    WorkflowContext,
+    StrategyMatrixContext,
 )
 from pydantic import TypeAdapter
 
 
-def test_context_stage():
-    context = StageContext()
+def test_context_output():
+    context = OutputContext()
     assert context.errors is None
     assert not context.is_exception()
 
 
-def test_context_stage_errors():
-    context = StageContext(
+def test_context_output_errors():
+    context = OutputContext(
         errors={
             "class": TypeError("str type"),
             "name": "TypeError",
@@ -26,14 +26,14 @@ def test_context_stage_errors():
     assert context.errors.message == "str type"
 
 
-def test_context_strategy():
-    context = StrategyContext(stages={"stage-id": {}})
+def test_context_stage():
+    context = StageContext(stages={"stage-id": {}})
     assert context.errors is None
     assert not context.is_exception()
 
 
 def test_strategies_context():
-    context = TypeAdapter(MapStrategyContext).validate_python(
+    context = TypeAdapter(MatrixStageContext).validate_python(
         {
             "2150810470": {
                 "matrix": {"sleep": "1"},
@@ -54,7 +54,7 @@ def test_strategies_context():
 
 
 def test_job_context():
-    TypeAdapter(JobContext).validate_python(
+    TypeAdapter(StrategyMatrixContext).validate_python(
         {
             "2150810470": {
                 "matrix": {"sleep": "1"},
@@ -71,7 +71,7 @@ def test_job_context():
         }
     )
 
-    context = TypeAdapter(JobContext).validate_python(
+    context = TypeAdapter(StrategyMatrixContext).validate_python(
         {
             "strategies": {
                 "9873503202": {
@@ -100,7 +100,7 @@ def test_job_context():
 
 
 def test_context_workflow():
-    context = WorkflowContext.model_validate(
+    context = JobContext.model_validate(
         {
             "params": {},
             "jobs": {
