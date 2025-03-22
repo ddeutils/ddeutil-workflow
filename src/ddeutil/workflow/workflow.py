@@ -1103,9 +1103,8 @@ class Workflow(BaseModel):
             result.trace.error(
                 f"[WORKFLOW]: Execution: {self.name!r} was timeout."
             )
-
+            event.set()
             for future in futures:
-                # TODO: This action does not cancel running future.
                 future.cancel()
 
         raise WorkflowException(f"Execution: {self.name!r} was timeout.")
@@ -1136,7 +1135,13 @@ class Workflow(BaseModel):
         not_timeout_flag: bool = True
         timeout: int = timeout or config.max_job_exec_timeout
         event: Event = Event()
+        future: Future | None = None
         result.trace.debug(f"[WORKFLOW]: Run {self.name!r} with non-threading.")
+
+        executor = ThreadPoolExecutor(
+            max_workers=1,
+            thread_name_prefix="wf_exec_non_threading_",
+        )
 
         while not job_queue.empty() and (
             not_timeout_flag := ((time.monotonic() - ts) < timeout)
@@ -1159,16 +1164,22 @@ class Workflow(BaseModel):
             #       'params': <input-params>,
             #       'jobs': {},
             #   }
-            try:
-                self.execute_job(
+            if future is None or future.done():
+                future: Future = executor.submit(
+                    self.execute_job,
                     job_id=job_id,
                     params=context,
                     result=result,
                     event=event,
                 )
-            except Exception as err:
+            elif future.running():
+                time.sleep(0.075)
+                job_queue.task_done()
+                job_queue.put(job_id)
+                continue
+            elif err := future.exception():
                 result.trace.error(f"[WORKFLOW]: {err}")
-                raise WorkflowException(str(err)) from None
+                raise WorkflowException(str(err))
 
             # NOTE: Mark this job queue done.
             job_queue.task_done()
@@ -1178,10 +1189,12 @@ class Workflow(BaseModel):
             # NOTE: Wait for all items to finish processing by `task_done()`
             #   method.
             job_queue.join()
-
+            executor.shutdown()
             return context
 
         result.trace.error(f"[WORKFLOW]: Execution: {self.name!r} was timeout.")
+        event.set()
+        executor.shutdown()
         raise WorkflowException(f"Execution: {self.name!r} was timeout.")
 
 

@@ -676,23 +676,26 @@ def local_execute(
         parent_run_id=parent_run_id,
         id_logic=(job.id or "not-set"),
     )
+    event: Event = Event() if event is None else event
 
     # NOTE: Normal Job execution without parallel strategy matrix. It uses
     #   for-loop to control strategy execution sequentially.
     if (not job.strategy.is_set()) or job.strategy.max_parallel == 1:
 
         for strategy in job.strategy.make():
+
+            # TODO: stop and raise error if the event was set.
             local_execute_strategy(
                 job=job,
                 strategy=strategy,
                 params=params,
                 result=result,
+                event=event,
                 raise_error=raise_error,
             )
 
         return result.catch(status=Status.SUCCESS)
 
-    event: Event = event or Event()
     fail_fast_flag: bool = job.strategy.fail_fast
     ls: str = "Fail-Fast" if fail_fast_flag else "All-Completed"
 
