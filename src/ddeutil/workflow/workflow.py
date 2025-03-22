@@ -20,6 +20,7 @@ from functools import partial, total_ordering
 from heapq import heappop, heappush
 from queue import Queue
 from textwrap import dedent
+from threading import Event
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -68,34 +69,45 @@ class ReleaseType(str, Enum):
     config=ConfigDict(arbitrary_types_allowed=True, use_enum_values=True)
 )
 class Release:
-    """Release Pydantic dataclass object that use for represent
-    the release data that use with the `workflow.release` method."""
+    """Release Pydantic dataclass object that use for represent the release data
+    that use with the `workflow.release` method.
+    """
 
-    date: datetime
-    offset: float
-    end_date: datetime
-    runner: CronRunner
+    date: datetime = field()
+    offset: float = field()
+    end_date: datetime = field()
+    runner: CronRunner = field()
     type: ReleaseType = field(default=ReleaseType.DEFAULT)
 
     def __repr__(self) -> str:
+        """Represent string"""
         return repr(f"{self.date:%Y-%m-%d %H:%M:%S}")
 
     def __str__(self) -> str:
+        """Override string value of this release object with the date field.
+
+        :rtype: str
+        """
         return f"{self.date:%Y-%m-%d %H:%M:%S}"
 
     @classmethod
     def from_dt(cls, dt: datetime | str) -> Self:
         """Construct Release via datetime object only.
 
-        :param dt: A datetime object.
+        :param dt: (datetime | str) A datetime object or string that want to
+            construct to the Release object.
 
-        :rtype: Self
+        :raise TypeError: If the type of the dt argument does not valid with
+            datetime or str object.
+
+        :rtype: Release
         """
         if isinstance(dt, str):
             dt: datetime = datetime.fromisoformat(dt)
         elif not isinstance(dt, datetime):
             raise TypeError(
-                "The `from_dt` need argument type be str or datetime only."
+                "The `from_dt` need the `dt` argument type be str or datetime "
+                "only."
             )
 
         return cls(
@@ -108,6 +120,8 @@ class Release:
     def __eq__(self, other: Release | datetime) -> bool:
         """Override equal property that will compare only the same type or
         datetime.
+
+        :rtype: bool
         """
         if isinstance(other, self.__class__):
             return self.date == other.date
@@ -118,6 +132,8 @@ class Release:
     def __lt__(self, other: Release | datetime) -> bool:
         """Override equal property that will compare only the same type or
         datetime.
+
+        :rtype: bool
         """
         if isinstance(other, self.__class__):
             return self.date < other.date
@@ -143,7 +159,7 @@ class ReleaseQueue:
 
         :raise TypeError: If the type of input queue does not valid.
 
-        :rtype: Self
+        :rtype: ReleaseQueue
         """
         if queue is None:
             return cls()
@@ -174,7 +190,7 @@ class ReleaseQueue:
         """Check an input Release object is the first value of the
         waiting queue.
 
-        :rtype: bool
+        :rtype: Release
         """
         return self.queue[0]
 
@@ -265,11 +281,11 @@ class Workflow(BaseModel):
         an input workflow name. The loader object will use this workflow name to
         searching configuration data of this workflow model in conf path.
 
-        :raise ValueError: If the type does not match with current object.
-
         :param name: A workflow name that want to pass to Loader object.
         :param externals: An external parameters that want to pass to Loader
             object.
+
+        :raise ValueError: If the type does not match with current object.
 
         :rtype: Self
         """
@@ -285,11 +301,11 @@ class Workflow(BaseModel):
         loader_data["name"] = name.replace(" ", "_")
 
         # NOTE: Prepare `on` data
-        cls.__bypass_on(loader_data, externals=externals)
+        cls.__bypass_on__(loader_data, externals=externals)
         return cls.model_validate(obj=loader_data)
 
     @classmethod
-    def __bypass_on(
+    def __bypass_on__(
         cls,
         data: DictData,
         externals: DictData | None = None,
@@ -405,10 +421,13 @@ class Workflow(BaseModel):
         return self
 
     def job(self, name: str) -> Job:
-        """Return this workflow's jobs that passing with the Job model.
+        """Return the workflow's job model that searching with an input job's
+        name or job's ID.
 
-        :param name: A job name that want to get from a mapping of job models.
-        :type name: str
+        :param name: (str) A job name or ID that want to get from a mapping of
+            job models.
+
+        :raise ValueError: If a name or ID does not exist on the jobs field.
 
         :rtype: Job
         :return: A job model that exists on this workflow by input name.
@@ -505,18 +524,19 @@ class Workflow(BaseModel):
         :param result: (Result) A result object for keeping context and status
             data.
 
+        :raise TypeError: If a queue parameter does not match with ReleaseQueue
+            type.
+
         :rtype: Result
         """
         audit: type[Audit] = audit or get_audit()
         name: str = override_log_name or self.name
-
-        if result is None:
-            result: Result = Result(
-                run_id=(run_id or gen_id(name, unique=True)),
-                parent_run_id=parent_run_id,
-            )
-        elif parent_run_id:  # pragma: no cov
-            result.set_parent_run_id(parent_run_id)
+        result: Result = Result.construct_with_rs_or_id(
+            result,
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            id_logic=name,
+        )
 
         if queue is not None and not isinstance(queue, ReleaseQueue):
             raise TypeError(
@@ -795,9 +815,7 @@ class Workflow(BaseModel):
                     partial_queue(q)
                     continue
 
-                # NOTE: Push the latest Release to the running queue.
                 heappush(q.running, release)
-
                 futures.append(
                     executor.submit(
                         self.release,
@@ -827,6 +845,7 @@ class Workflow(BaseModel):
         params: DictData,
         *,
         result: Result | None = None,
+        event: Event | None = None,
         raise_error: bool = True,
     ) -> Result:
         """Job execution with passing dynamic parameters from the main workflow
@@ -842,10 +861,12 @@ class Workflow(BaseModel):
 
         :param job_id: A job ID that want to execute.
         :param params: A params that was parameterized from workflow execution.
-        :param raise_error: A flag that raise error instead catching to result
-            if it gets exception from job execution.
         :param result: (Result) A result object for keeping context and status
             data.
+        :param event: (Event) An event manager that pass to the
+            PoolThreadExecutor.
+        :param raise_error: A flag that raise error instead catching to result
+            if it gets exception from job execution.
 
         :rtype: Result
         :return: Return the result object that receive the job execution result
@@ -876,6 +897,7 @@ class Workflow(BaseModel):
                     params=params,
                     run_id=result.run_id,
                     parent_run_id=result.parent_run_id,
+                    event=event,
                 ).context,
                 to=params,
             )
@@ -889,7 +911,7 @@ class Workflow(BaseModel):
                 "Handle error from the job execution does not support yet."
             ) from None
 
-        return result.catch(status=0, context=params)
+        return result.catch(status=Status.SUCCESS, context=params)
 
     def execute(
         self,
@@ -927,22 +949,21 @@ class Workflow(BaseModel):
         :rtype: Result
         """
         ts: float = time.monotonic()
-        if result is None:  # pragma: no cov
-            result: Result = Result(
-                run_id=(run_id or gen_id(self.name, unique=True)),
-                parent_run_id=parent_run_id,
-            )
-        elif parent_run_id:
-            result.set_parent_run_id(parent_run_id)
+        result: Result = Result.construct_with_rs_or_id(
+            result,
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            id_logic=self.name,
+        )
 
         result.trace.info(f"[WORKFLOW]: Start Execute: {self.name!r} ...")
 
         # NOTE: It should not do anything if it does not have job.
         if not self.jobs:
             result.trace.warning(
-                f"[WORKFLOW]: Workflow: {self.name!r} does not have any jobs"
+                f"[WORKFLOW]: {self.name!r} does not have any jobs"
             )
-            return result.catch(status=0, context=params)
+            return result.catch(status=Status.SUCCESS, context=params)
 
         # NOTE: Create a job queue that keep the job that want to run after
         #   its dependency condition.
@@ -959,7 +980,7 @@ class Workflow(BaseModel):
         #   }
         #
         context: DictData = self.parameterize(params)
-        status: int = 0
+        status: Status = Status.SUCCESS
         try:
             if config.max_job_parallel == 1:
                 self.__exec_non_threading(
@@ -978,7 +999,7 @@ class Workflow(BaseModel):
                     timeout=timeout,
                 )
         except WorkflowException as err:
-            status: int = 1
+            status = Status.FAILED
             context.update(
                 {
                     "errors": {
@@ -1005,18 +1026,19 @@ class Workflow(BaseModel):
             If a job need dependency, it will check dependency job ID from
         context data before allow it run.
 
-        :param result: A result model.
+        :param result: (Result) A result model.
         :param context: A context workflow data that want to downstream passing.
         :param ts: A start timestamp that use for checking execute time should
             time out.
-        :param job_queue: A job queue object.
-        :param timeout: A second value unit that bounding running time.
+        :param job_queue: (Queue) A job queue object.
+        :param timeout: (int) A second value unit that bounding running time.
         :param thread_timeout: A timeout to waiting all futures complete.
 
         :rtype: DictData
         """
         not_timeout_flag: bool = True
         timeout: int = timeout or config.max_job_exec_timeout
+        event: Event = Event()
         result.trace.debug(f"[WORKFLOW]: Run {self.name!r} with threading.")
 
         # IMPORTANT: The job execution can run parallel and waiting by
@@ -1055,6 +1077,7 @@ class Workflow(BaseModel):
                         job_id=job_id,
                         params=context,
                         result=result,
+                        event=event,
                     ),
                 )
 
@@ -1077,11 +1100,13 @@ class Workflow(BaseModel):
 
                 return context
 
+            result.trace.error(
+                f"[WORKFLOW]: Execution: {self.name!r} was timeout."
+            )
+            event.set()
             for future in futures:
                 future.cancel()
 
-        # NOTE: Raise timeout error.
-        result.trace.error(f"[WORKFLOW]: Execution: {self.name!r} was timeout.")
         raise WorkflowException(f"Execution: {self.name!r} was timeout.")
 
     def __exec_non_threading(
@@ -1109,7 +1134,14 @@ class Workflow(BaseModel):
         """
         not_timeout_flag: bool = True
         timeout: int = timeout or config.max_job_exec_timeout
+        event: Event = Event()
+        future: Future | None = None
         result.trace.debug(f"[WORKFLOW]: Run {self.name!r} with non-threading.")
+
+        executor = ThreadPoolExecutor(
+            max_workers=1,
+            thread_name_prefix="wf_exec_non_threading_",
+        )
 
         while not job_queue.empty() and (
             not_timeout_flag := ((time.monotonic() - ts) < timeout)
@@ -1132,7 +1164,32 @@ class Workflow(BaseModel):
             #       'params': <input-params>,
             #       'jobs': {},
             #   }
-            self.execute_job(job_id=job_id, params=context, result=result)
+            if future is None:
+                future: Future = executor.submit(
+                    self.execute_job,
+                    job_id=job_id,
+                    params=context,
+                    result=result,
+                    event=event,
+                )
+                result.trace.debug(f"[WORKFLOW]: Make future: {future}")
+                time.sleep(0.025)
+            elif future.done():
+                if err := future.exception():
+                    result.trace.error(f"[WORKFLOW]: {err}")
+                    raise WorkflowException(str(err))
+
+                future = None
+                job_queue.put(job_id)
+            elif future.running():
+                time.sleep(0.075)
+                job_queue.put(job_id)
+            else:  # pragma: no cov
+                job_queue.put(job_id)
+                result.trace.debug(
+                    f"Execution non-threading does not handle case: {future} "
+                    f"that not running."
+                )
 
             # NOTE: Mark this job queue done.
             job_queue.task_done()
@@ -1142,11 +1199,12 @@ class Workflow(BaseModel):
             # NOTE: Wait for all items to finish processing by `task_done()`
             #   method.
             job_queue.join()
-
+            executor.shutdown()
             return context
 
-        # NOTE: Raise timeout error.
         result.trace.error(f"[WORKFLOW]: Execution: {self.name!r} was timeout.")
+        event.set()
+        executor.shutdown()
         raise WorkflowException(f"Execution: {self.name!r} was timeout.")
 
 
@@ -1162,9 +1220,9 @@ class WorkflowTask:
     arguments before passing to the parent release method.
     """
 
-    alias: str
-    workflow: Workflow
-    runner: CronRunner
+    alias: str = field()
+    workflow: Workflow = field()
+    runner: CronRunner = field()
     values: DictData = field(default_factory=dict)
 
     def release(
@@ -1184,6 +1242,11 @@ class WorkflowTask:
         :param run_id: A workflow running ID for this release.
         :param audit: An audit class that want to save the execution result.
         :param queue: A ReleaseQueue object that use to mark complete.
+
+        :raise ValueError: If a queue parameter does not pass while release
+            is None.
+        :raise TypeError: If a queue parameter does not match with ReleaseQueue
+            type.
 
         :rtype: Result
         """
@@ -1209,7 +1272,6 @@ class WorkflowTask:
             else:
                 release = self.runner.date
 
-        # NOTE: Call the workflow release method.
         return self.workflow.release(
             release=release,
             params=self.values,
@@ -1264,13 +1326,14 @@ class WorkflowTask:
         if self.runner.date > end_date:
             return queue
 
-        # NOTE: Push the Release object to queue.
         heappush(queue.queue, workflow_release)
-
         return queue
 
     def __repr__(self) -> str:
-        """Override the `__repr__` method."""
+        """Override the `__repr__` method.
+
+        :rtype: str
+        """
         return (
             f"{self.__class__.__name__}(alias={self.alias!r}, "
             f"workflow={self.workflow.name!r}, runner={self.runner!r}, "
@@ -1278,7 +1341,10 @@ class WorkflowTask:
         )
 
     def __eq__(self, other: WorkflowTask) -> bool:
-        """Override equal property that will compare only the same type."""
+        """Override the equal property that will compare only the same type.
+
+        :rtype: bool
+        """
         if isinstance(other, WorkflowTask):
             return (
                 self.workflow.name == other.workflow.name

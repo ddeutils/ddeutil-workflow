@@ -1,7 +1,10 @@
 import logging
 import time
 
-from ddeutil.workflow.result import Result, Status
+from ddeutil.workflow.result import (
+    Result,
+    Status,
+)
 
 
 def test_status():

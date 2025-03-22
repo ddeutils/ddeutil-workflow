@@ -143,7 +143,6 @@ def test_workflow_task_release(test_path):
             "outputs": {
                 "jobs": {
                     "first-job": {
-                        "matrix": {},
                         "stages": {"9818133124": {"outputs": {}}},
                     },
                 },

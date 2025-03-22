@@ -1,66 +1,123 @@
 # Context
 
-## Workflow Execute
+This content will explain a context data that passing in and out to execution
+process for each workflow model objects such as **Workflow**, **Job**, and **Stage**.
+
+## Workflow
 
 A workflow execution context that return from the `execute` method.
 
-```mermaid
-stateDiagram-v2
-    [*] --> Workflow : execute
+### Execution
 
-    state Workflow {
-        [*] --> Job
+For the fist context values that passing to the workflow execution method:
 
-        state Job {
-            [*] --> generate
-            generate --> Strategy
-
-            state Strategy {
-                [*] --> strategy01
-                strategy01 --> [*]
-                --
-
-                [*] --> strategy02
-                strategy02 --> [*]
-                --
-
-                [*] --> strategy03
-                strategy03 --> [*]
-
-            }
-
-            Strategy --> [*]
-        }
-    }
+```json
+{
+  "params": {"key": "value"},
+  "jobs": {
+    "<job-name>": {},
+    "<job-name-02>": {}
+  }
+}
 ```
 
-## Job Execute
+The `params` is the values from the parameterize method that already validated
+typing.
+
+## Job
 
 A job execution context that return from the `execute` method.
 
-```mermaid
-stateDiagram-v2
-    [*] --> Strategy : execute
+### Execution
 
-    state Strategy {
-        [*] --> Stage01
-
-        state Stage01 {
-            [*] --> stage0101 : handler<br>execute
-            stage0101 --> [*]
+```json
+{
+  "params": {},
+  "jobs": {
+    "<job-name>": {
+      "strategies": {
+        "<strategy-id>": {
+          "matrix": {},
+          "stages": {
+            "<stage-id>": {}
+          }
         }
-
-        Stage01 --> Stage02
-
-        state Stage02 {
-            [*] --> stage0201 : handler<br>execute
-            stage0201 --> [*]
-        }
-
-        Stage02 --> [*]
+      }
     }
+  }
+}
 ```
 
-## Stage Execute
+If the job does not set strategy matrix;
 
-A stage execution context that return from the `handler_execute` method.
+```json
+{
+  "params": {},
+  "jobs": {
+    "<job-name>": {
+      "stages": {
+        "<stage-id>": {}
+      }
+    }
+  }
+}
+```
+
+
+## Stage
+
+A stage execution context that return from `execute` and `handler_execute`
+methods.
+
+```json
+{
+  "out": "result"
+}
+```
+
+With error;
+
+```json
+{
+  "errors": {
+    "class": "ExceptionClass",
+    "name": "class-name",
+    "message": "error-message"
+  }
+}
+```
+
+A context that return from `set_outputs` method.
+
+if a `to` argument that pass to this method be;
+
+```json
+{
+  "params": {"key":  "value"}
+}
+```
+
+it will return result be;
+
+```json
+{
+    "params": {"key": "value"},
+    "stages": {
+      "<stage-id>": {
+        "outputs": {
+          "out": "result"
+        },
+        "errors": {
+          "class": "",
+          "name": "",
+          "message": ""
+        }
+      }
+    }
+}
+```
+
+!!! note
+
+    The main key from stage setting output method are
+    `outputs` and `errors`.

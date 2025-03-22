@@ -43,7 +43,6 @@ from .stages import Stage
 from .templates import has_template
 from .utils import (
     cross_product,
-    dash2underscore,
     filter_func,
     gen_id,
 )
@@ -155,7 +154,7 @@ class Strategy(BaseModel):
 
     fail_fast: bool = Field(
         default=False,
-        serialization_alias="fail-fast",
+        alias="fail-fast",
     )
     max_parallel: int = Field(
         default=1,
@@ -164,7 +163,7 @@ class Strategy(BaseModel):
             "The maximum number of executor thread pool that want to run "
             "parallel"
         ),
-        serialization_alias="max-parallel",
+        alias="max-parallel",
     )
     matrix: Matrix = Field(
         default_factory=dict,
@@ -180,18 +179,6 @@ class Strategy(BaseModel):
         default_factory=list,
         description="A list of exclude matrix that want to filter-out.",
     )
-
-    @model_validator(mode="before")
-    def __prepare_keys(cls, values: DictData) -> DictData:
-        """Rename key that use dash to underscore because Python does not
-        support this character exist in any variable name.
-
-        :param values: A parsing values to these models
-        :rtype: DictData
-        """
-        dash2underscore("max-parallel", values)
-        dash2underscore("fail-fast", values)
-        return values
 
     def is_set(self) -> bool:
         """Return True if this strategy was set from yaml template.
@@ -319,7 +306,7 @@ class Job(BaseModel):
     runs_on: RunsOn = Field(
         default_factory=RunsOnLocal,
         description="A target node for this job to use for execution.",
-        serialization_alias="runs-on",
+        alias="runs-on",
     )
     stages: list[Stage] = Field(
         default_factory=list,
@@ -328,7 +315,7 @@ class Job(BaseModel):
     trigger_rule: TriggerRules = Field(
         default=TriggerRules.all_success,
         description="A trigger rule of tracking needed jobs.",
-        serialization_alias="trigger-rule",
+        alias="trigger-rule",
     )
     needs: list[str] = Field(
         default_factory=list,
@@ -338,18 +325,6 @@ class Job(BaseModel):
         default_factory=Strategy,
         description="A strategy matrix that want to generate.",
     )
-
-    @model_validator(mode="before")
-    def __prepare_keys__(cls, values: DictData) -> DictData:
-        """Rename key that use dash to underscore because Python does not
-        support this character exist in any variable name.
-
-        :param values: A passing value that coming for initialize this object.
-        :rtype: DictData
-        """
-        dash2underscore("runs-on", values)
-        dash2underscore("trigger-rule", values)
-        return values
 
     @field_validator("desc", mode="after")
     def ___prepare_desc__(cls, value: str) -> str:
@@ -441,14 +416,13 @@ class Job(BaseModel):
 
         :rtype: DictData
         """
+        if "jobs" not in to:
+            to["jobs"] = {}
+
         if self.id is None and not config.job_default_id:
             raise JobException(
                 "This job do not set the ID before setting execution output."
             )
-
-        # NOTE: Create jobs key to receive an output from the job execution.
-        if "jobs" not in to:
-            to["jobs"] = {}
 
         # NOTE: If the job ID did not set, it will use index of jobs key
         #   instead.
@@ -458,11 +432,12 @@ class Job(BaseModel):
             {"errors": output.pop("errors", {})} if "errors" in output else {}
         )
 
-        to["jobs"][_id] = (
-            {"strategies": output, **errors}
-            if self.strategy.is_set()
-            else {**output.get(next(iter(output), "DUMMY"), {}), **errors}
-        )
+        if self.strategy.is_set():
+            to["jobs"][_id] = {"strategies": output, **errors}
+        else:
+            _output = output.get(next(iter(output), "FIRST"), {})
+            _output.pop("matrix", {})
+            to["jobs"][_id] = {**_output, **errors}
         return to
 
     def execute(
@@ -472,6 +447,7 @@ class Job(BaseModel):
         run_id: str | None = None,
         parent_run_id: str | None = None,
         result: Result | None = None,
+        event: Event | None = None,
     ) -> Result:
         """Job execution with passing dynamic parameters from the workflow
         execution. It will generate matrix values at the first step and run
@@ -482,22 +458,24 @@ class Job(BaseModel):
         :param parent_run_id: A parent workflow running ID for this release.
         :param result: (Result) A result object for keeping context and status
             data.
+        :param event: (Event) An event manager that pass to the
+            PoolThreadExecutor.
 
         :rtype: Result
         """
-        if result is None:  # pragma: no cov
-            result: Result = Result(
-                run_id=(run_id or gen_id(self.id or "", unique=True)),
-                parent_run_id=parent_run_id,
-            )
-        elif parent_run_id:  # pragma: no cov
-            result.set_parent_run_id(parent_run_id)
+        result: Result = Result.construct_with_rs_or_id(
+            result,
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            id_logic=(self.id or "not-set"),
+        )
 
         if self.runs_on.type == RunsOnType.LOCAL:
             return local_execute(
                 job=self,
                 params=params,
                 result=result,
+                event=event,
             )
         elif self.runs_on.type == RunsOnType.SELF_HOSTED:  # pragma: no cov
             pass
@@ -522,6 +500,7 @@ def local_execute_strategy(
     *,
     result: Result | None = None,
     event: Event | None = None,
+    raise_error: bool = False,
 ) -> Result:
     """Local job strategy execution with passing dynamic parameters from the
     workflow execution to strategy matrix.
@@ -543,11 +522,12 @@ def local_execute_strategy(
     :param result: (Result) A result object for keeping context and status
         data.
     :param event: (Event) An event manager that pass to the PoolThreadExecutor.
+    :param raise_error: (bool) A flag that all this method raise error
 
     :rtype: Result
     """
-    if result is None:  # pragma: no cov
-        result: Result = Result(run_id=gen_id(job.id or "", unique=True))
+    if result is None:
+        result: Result = Result(run_id=gen_id(job.id or "not-set", unique=True))
 
     strategy_id: str = gen_id(strategy)
 
@@ -566,36 +546,27 @@ def local_execute_strategy(
     context: DictData = copy.deepcopy(params)
     context.update({"matrix": strategy, "stages": {}})
 
+    if strategy:
+        result.trace.info(f"[JOB]: Execute Strategy ID: {strategy_id}")
+        result.trace.info(f"[JOB]: ... Matrix: {strategy_id}")
+
     # IMPORTANT: The stage execution only run sequentially one-by-one.
     for stage in job.stages:
 
         if stage.is_skipped(params=context):
-            result.trace.info(f"[JOB]: Skip stage: {stage.iden!r}")
+            result.trace.info(f"[STAGE]: Skip stage: {stage.iden!r}")
             continue
 
-        result.trace.info(f"[JOB]: Execute stage: {stage.iden!r}")
-
-        # NOTE: Logging a matrix that pass on this stage execution.
-        if strategy:
-            result.trace.info(f"[JOB]: ... Matrix: {strategy}")
-
-        # NOTE: Force stop this execution if event was set from main
-        #   execution.
         if event and event.is_set():
             error_msg: str = (
                 "Job strategy was canceled from event that had set before "
                 "strategy execution."
             )
             return result.catch(
-                status=1,
+                status=Status.FAILED,
                 context={
                     strategy_id: {
                         "matrix": strategy,
-                        # NOTE: If job strategy executor use multithreading,
-                        #   it will not filter function object from context.
-                        # ---
-                        # "stages": filter_func(context.pop("stages", {})),
-                        #
                         "stages": context.pop("stages", {}),
                         "errors": {
                             "class": JobException(error_msg),
@@ -608,20 +579,14 @@ def local_execute_strategy(
 
         # PARAGRAPH:
         #
-        #       I do not use below syntax because `params` dict be the
-        #   reference memory pointer, and it was changed when I action
-        #   anything like update or re-construct this.
-        #
-        #       ... params |= stage.execute(params=params)
-        #
-        #   This step will add the stage result to `stages` key in
-        #   that stage id. It will have structure like;
+        #       This step will add the stage result to `stages` key in that
+        #   stage id. It will have structure like;
         #
         #   {
         #       "params": { ... },
         #       "jobs": { ... },
         #       "matrix": { ... },
-        #       "stages": { { "stage-id-1": ... }, ... }
+        #       "stages": { { "stage-id-01": { "outputs": { ... } } }, ... }
         #   }
         #
         # IMPORTANT:
@@ -641,14 +606,14 @@ def local_execute_strategy(
             )
         except (StageException, UtilException) as err:
             result.trace.error(f"[JOB]: {err.__class__.__name__}: {err}")
-            if config.job_raise_error:
+            if raise_error or config.job_raise_error:
                 raise JobException(
                     f"Stage execution error: {err.__class__.__name__}: "
                     f"{err}"
                 ) from None
 
             return result.catch(
-                status=1,
+                status=Status.FAILED,
                 context={
                     strategy_id: {
                         "matrix": strategy,
@@ -683,10 +648,15 @@ def local_execute(
     run_id: str | None = None,
     parent_run_id: str | None = None,
     result: Result | None = None,
+    event: Event | None = None,
+    raise_error: bool = False,
 ) -> Result:
     """Local job execution with passing dynamic parameters from the workflow
     execution. It will generate matrix values at the first step and run
     multithread on this metrics to the `stages` field of this job.
+
+        This method does not raise any JobException if it runs with
+    multi-threading strategy.
 
     :param job: (Job) A job model that want to execute.
     :param params: (DictData) An input parameters that use on job execution.
@@ -694,33 +664,45 @@ def local_execute(
     :param parent_run_id: (str) A parent workflow running ID for this release.
     :param result: (Result) A result object for keeping context and status
         data.
+    :param event: (Event) An event manager that pass to the PoolThreadExecutor.
+    :param raise_error: (bool) A flag that all this method raise error to the
+        strategy execution.
 
     :rtype: Result
     """
-    if result is None:  # pragma: no cov
-        result: Result = Result(
-            run_id=(run_id or gen_id(job.id or "", unique=True)),
-            parent_run_id=parent_run_id,
-        )
-    elif parent_run_id:  # pragma: no cov
-        result.set_parent_run_id(parent_run_id)
+    result: Result = Result.construct_with_rs_or_id(
+        result,
+        run_id=run_id,
+        parent_run_id=parent_run_id,
+        id_logic=(job.id or "not-set"),
+    )
+    event: Event = Event() if event is None else event
 
     # NOTE: Normal Job execution without parallel strategy matrix. It uses
     #   for-loop to control strategy execution sequentially.
     if (not job.strategy.is_set()) or job.strategy.max_parallel == 1:
 
         for strategy in job.strategy.make():
-            result: Result = local_execute_strategy(
+
+            # TODO: stop and raise error if the event was set.
+            local_execute_strategy(
                 job=job,
                 strategy=strategy,
                 params=params,
                 result=result,
+                event=event,
+                raise_error=raise_error,
             )
 
         return result.catch(status=Status.SUCCESS)
 
-    # NOTE: Create event for cancel executor by trigger stop running event.
-    event: Event = Event()
+    fail_fast_flag: bool = job.strategy.fail_fast
+    ls: str = "Fail-Fast" if fail_fast_flag else "All-Completed"
+
+    result.trace.info(
+        f"[JOB]: Start multithreading: {job.strategy.max_parallel} threads "
+        f"with {ls} mode."
+    )
 
     # IMPORTANT: Start running strategy execution by multithreading because
     #   it will run by strategy values without waiting previous execution.
@@ -737,40 +719,39 @@ def local_execute(
                 params=params,
                 result=result,
                 event=event,
+                raise_error=raise_error,
             )
             for strategy in job.strategy.make()
         ]
 
         context: DictData = {}
         status: Status = Status.SUCCESS
-        fail_fast_flag: bool = job.strategy.fail_fast
 
         if not fail_fast_flag:
             done = as_completed(futures, timeout=1800)
         else:
-            # NOTE: Get results from a collection of tasks with a timeout
-            #   that has the first exception.
             done, not_done = wait(
                 futures, timeout=1800, return_when=FIRST_EXCEPTION
             )
+
+            if len(done) != len(futures):
+                result.trace.warning(
+                    "[JOB]: Set the event for stop running stage."
+                )
+                event.set()
+                for future in not_done:
+                    future.cancel()
+
             nd: str = (
                 f", the strategies do not run is {not_done}" if not_done else ""
             )
             result.trace.debug(f"[JOB]: Strategy is set Fail Fast{nd}")
-
-            # NOTE: Stop all running tasks with setting the event manager
-            #   and cancel any scheduled tasks.
-            if len(done) != len(futures):
-                event.set()
-                for future in not_done:
-                    future.cancel()
 
         for future in done:
             try:
                 future.result()
             except JobException as err:
                 status = Status.FAILED
-                ls: str = "Fail-Fast" if fail_fast_flag else "All-Completed"
                 result.trace.error(
                     f"[JOB]: {ls} Catch:\n\t{err.__class__.__name__}:"
                     f"\n\t{err}"

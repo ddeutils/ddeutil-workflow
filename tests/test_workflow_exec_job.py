@@ -24,7 +24,6 @@ def test_workflow_execute_job():
     assert rs.context == {
         "jobs": {
             "demo-run": {
-                "matrix": {},
                 "stages": {
                     "9371661540": {"outputs": {"var": "Foo", "echo": "echo"}},
                     "3008506540": {"outputs": {}},

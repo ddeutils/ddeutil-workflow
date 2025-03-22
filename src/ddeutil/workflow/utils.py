@@ -5,10 +5,9 @@
 # ------------------------------------------------------------------------------
 from __future__ import annotations
 
-import logging
 import stat
 import time
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator
 from datetime import date, datetime, timedelta
 from hashlib import md5
 from inspect import isfunction
@@ -24,7 +23,6 @@ from .__types import DictData, Matrix
 
 T = TypeVar("T")
 UTC = ZoneInfo("UTC")
-logger = logging.getLogger("ddeutil.workflow")
 
 
 def get_dt_now(
@@ -188,29 +186,6 @@ def filter_func(value: T) -> T:
     return value
 
 
-def dash2underscore(
-    key: str,
-    values: DictData,
-    *,
-    fixed: str | None = None,
-) -> DictData:
-    """Change key name that has dash to underscore.
-
-    :param key:
-    :param values:
-    :param fixed:
-
-    Examples:
-        >>> dash2underscore('foo-bar', {"foo-bar": "demo"})
-        {'foo_bar': 'demo'}
-
-    :rtype: DictData
-    """
-    if key in values:
-        values[(fixed or key.replace("-", "_"))] = values.pop(key)
-    return values
-
-
 def cross_product(matrix: Matrix) -> Iterator[DictData]:
     """Iterator of products value from matrix.
 
@@ -267,21 +242,3 @@ def cut_id(run_id: str, *, num: int = 6) -> str:
     :rtype: str
     """
     return run_id[-num:]
-
-
-def deep_update(origin: DictData, u: Mapping) -> DictData:
-    """Deep update dict.
-
-    Example:
-        >>> deep_update(
-        ...     origin={"jobs": {"job01": "foo"}},
-        ...     u={"jobs": {"job02": "bar"}},
-        ... )
-        {"jobs": {"job01": "foo", "job02": "bar"}}
-    """
-    for k, value in u.items():
-        if isinstance(value, Mapping) and value:
-            origin[k] = deep_update(origin.get(k, {}), value)
-        else:
-            origin[k] = value
-    return origin

@@ -188,7 +188,7 @@ wf-run-python-raise-for-job:
     job-complete:
       strategy:
         fail-fast: False
-        max_parallel: 2
+        max-parallel: 2
         matrix:
           sleep: [ '0.1', '5', '1' ]
       stages:
@@ -201,7 +201,7 @@ wf-run-python-raise-for-job:
     job-complete-not-parallel:
       strategy:
         fail-fast: False
-        max_parallel: 1
+        max-parallel: 1
         matrix:
           sleep: [ '0.1', '5', '1' ]
       stages:
@@ -214,7 +214,7 @@ wf-run-python-raise-for-job:
     job-complete-raise:
       strategy:
         fail-fast: False
-        max_parallel: 2
+        max-parallel: 2
         matrix:
           sleep: [ '0.1', '4', '1' ]
       stages:
@@ -232,7 +232,7 @@ wf-run-python-raise-for-job:
     job-fail-fast:
       strategy:
         fail-fast: True
-        max_parallel: 2
+        max-parallel: 2
         matrix:
           sleep: [ '0.1', '5', '1' ]
       stages:
@@ -242,24 +242,31 @@ wf-run-python-raise-for-job:
             result: str = (
               'fast-success' if ${{ matrix.sleep }} != 0.1 else 'success'
             )
+
     job-fail-fast-raise:
       strategy:
         fail-fast: True
-        max_parallel: 2
+        max-parallel: 2
         matrix:
-          sleep: [ '0.1', '4', '1' ]
+          sleep: [ '1', '4' ]
       stages:
-        - name: Sleep
+        - name: Python Sleep
           run: |
             import time
             print("Start Sleep ... ${{ matrix.sleep }}")
             time.sleep(${{ matrix.sleep }})
+
         - name: Raise Error Inside
           id: raise-error
           run: |
-            if ${{ matrix.sleep }} != 0.1:
-              raise ValueError('Testing raise error inside PyStage!!!')
+            import time
+
+            if ${{ matrix.sleep }} != 4:
+              raise ValueError(
+                'Testing raise error inside PyStage with the sleep not equal 4!!!'
+              )
             result: str = 'success'
+
     job-fail-runs-on:
       runs-on:
         type: self_hosted

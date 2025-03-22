@@ -24,7 +24,6 @@ def test_workflow_exec():
         "params": {},
         "jobs": {
             "sleep-again-run": {
-                "matrix": {},
                 "stages": {"7972360640": {"outputs": {}}},
             },
         },
@@ -34,10 +33,14 @@ def test_workflow_exec():
 @mock.patch.object(Config, "max_job_parallel", 1)
 def test_workflow_exec_raise_timeout():
     job: Job = Job(
-        stages=[{"name": "Sleep", "run": "import time\ntime.sleep(2)"}],
+        stages=[
+            {"name": "Sleep", "run": "import time\ntime.sleep(2)"},
+            {"name": "Echo Last Stage", "echo": "the last stage"},
+        ],
     )
     workflow: Workflow = Workflow(
-        name="demo-workflow", jobs={"sleep-run": job, "sleep-again-run": job}
+        name="demo-workflow",
+        jobs={"sleep-run": job, "sleep-again-run": job},
     )
     rs: Result = workflow.execute(params={}, timeout=1)
     assert rs.status == 1
@@ -54,7 +57,7 @@ def test_workflow_exec_py():
             "run-date": "2024-01-01",
         },
     )
-    assert 0 == rs.status
+    assert rs.status == 0
     assert {
         "params": {
             "author-run": "Local Workflow",
@@ -62,14 +65,12 @@ def test_workflow_exec_py():
         },
         "jobs": {
             "first-job": {
-                "matrix": {},
                 "stages": {
                     "printing": {"outputs": {"x": "Local Workflow"}},
                     "setting-x": {"outputs": {"x": 1}},
                 },
             },
             "second-job": {
-                "matrix": {},
                 "stages": {
                     "create-func": {
                         "outputs": {
@@ -82,7 +83,6 @@ def test_workflow_exec_py():
                 },
             },
             "final-job": {
-                "matrix": {},
                 "stages": {
                     "1772094681": {
                         "outputs": {
@@ -111,7 +111,10 @@ def test_workflow_exec_parallel():
 @mock.patch.object(Config, "max_job_parallel", 2)
 def test_workflow_exec_parallel_timeout():
     job: Job = Job(
-        stages=[{"name": "Sleep", "run": "import time\ntime.sleep(2)"}],
+        stages=[
+            {"name": "Sleep", "run": "import time\ntime.sleep(2)"},
+            {"name": "Echo Last Stage", "echo": "the last stage"},
+        ],
     )
     workflow: Workflow = Workflow(
         name="demo-workflow",
@@ -120,7 +123,30 @@ def test_workflow_exec_parallel_timeout():
             "sleep-again-run": job.model_copy(update={"needs": ["sleep-run"]}),
         },
     )
-    workflow.execute(params={}, timeout=1)
+    rs = workflow.execute(params={}, timeout=0.5)
+    assert rs.context == {
+        "params": {},
+        "jobs": {
+            "sleep-run": {
+                "stages": {"7972360640": {"outputs": {}}},
+                "errors": {
+                    "class": rs.context["jobs"]["sleep-run"]["errors"]["class"],
+                    "name": "JobException",
+                    "message": (
+                        "Job strategy was canceled from event that had set "
+                        "before strategy execution."
+                    ),
+                },
+            },
+        },
+        "errors": {
+            "class": rs.context["errors"]["class"],
+            "name": "WorkflowException",
+            "message": (
+                "WorkflowException: Execution: 'demo-workflow' was timeout."
+            ),
+        },
+    }
 
 
 def test_workflow_exec_py_with_parallel():
@@ -140,14 +166,12 @@ def test_workflow_exec_py_with_parallel():
             },
             "jobs": {
                 "first-job": {
-                    "matrix": {},
                     "stages": {
                         "printing": {"outputs": {"x": "Local Workflow"}},
                         "setting-x": {"outputs": {"x": 1}},
                     },
                 },
                 "second-job": {
-                    "matrix": {},
                     "stages": {
                         "create-func": {
                             "outputs": {
@@ -160,7 +184,6 @@ def test_workflow_exec_py_with_parallel():
                     },
                 },
                 "final-job": {
-                    "matrix": {},
                     "stages": {
                         "1772094681": {
                             "outputs": {
@@ -204,7 +227,6 @@ def test_workflow_exec_py_raise_parallel():
         "params": {},
         "jobs": {
             "second-job": {
-                "matrix": {},
                 "stages": {"1772094681": {"outputs": {}}},
             }
         },
@@ -297,7 +319,6 @@ def test_workflow_exec_needs():
         "params": {"name": "bar"},
         "jobs": {
             "final-job": {
-                "matrix": {},
                 "stages": {
                     "8797330324": {
                         "outputs": {},
@@ -305,7 +326,6 @@ def test_workflow_exec_needs():
                 },
             },
             "first-job": {
-                "matrix": {},
                 "stages": {
                     "7824513474": {
                         "outputs": {},
@@ -313,7 +333,6 @@ def test_workflow_exec_needs():
                 },
             },
             "second-job": {
-                "matrix": {},
                 "stages": {
                     "1772094681": {
                         "outputs": {},
@@ -332,7 +351,6 @@ def test_workflow_exec_needs_parallel():
             "params": {"name": "bar"},
             "jobs": {
                 "final-job": {
-                    "matrix": {},
                     "stages": {
                         "8797330324": {
                             "outputs": {},
@@ -340,7 +358,6 @@ def test_workflow_exec_needs_parallel():
                     },
                 },
                 "first-job": {
-                    "matrix": {},
                     "stages": {
                         "7824513474": {
                             "outputs": {},
@@ -348,7 +365,6 @@ def test_workflow_exec_needs_parallel():
                     },
                 },
                 "second-job": {
-                    "matrix": {},
                     "stages": {
                         "1772094681": {
                             "outputs": {},
@@ -438,7 +454,6 @@ def test_workflow_exec_call(test_path):
                             "outputs": {"records": 1},
                         },
                     },
-                    "matrix": {},
                 },
             },
         } == rs.context

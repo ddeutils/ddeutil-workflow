@@ -45,6 +45,7 @@ async def job_execute(
         run_id=result.run_id,
         parent_run_id=result.parent_run_id,
     )
+    context: DictData = {}
     try:
         job.set_outputs(
             job.execute(
@@ -52,7 +53,7 @@ async def job_execute(
                 run_id=rs.run_id,
                 parent_run_id=rs.parent_run_id,
             ).context,
-            to=params,
+            to=context,
         )
     except JobException as err:
         rs.trace.error(f"[WORKFLOW]: {err.__class__.__name__}: {err}")
@@ -70,4 +71,5 @@ async def job_execute(
             exclude_defaults=True,
         ),
         "params": params,
+        "context": context,
     }

@@ -58,7 +58,6 @@ def test_workflow_poke(test_path):
             "outputs": {
                 "jobs": {
                     "condition-job": {
-                        "matrix": {},
                         "stages": {
                             "6708019737": {"outputs": {}},
                             "0663452000": {"outputs": {}},

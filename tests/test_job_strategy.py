@@ -4,6 +4,12 @@ from ddeutil.workflow.job import make
 
 
 def test_make():
+    assert (make({"sleep": ["3", "1", "0.1"]}, [], [])) == [
+        {"sleep": "3"},
+        {"sleep": "1"},
+        {"sleep": "0.1"},
+    ]
+
     assert make(
         matrix={
             "table": ["customer", "sales"],

@@ -91,7 +91,7 @@ class Result:
     @model_validator(mode="after")
     def __prepare_trace(self) -> Self:
         """Prepare trace field that want to pass after its initialize step."""
-        if self.trace is None:  # pragma: no cove
+        if self.trace is None:  # pragma: no cov
             self.trace: TraceLog = get_trace(self.run_id, self.parent_run_id)
 
         return self
