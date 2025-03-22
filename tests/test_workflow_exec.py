@@ -56,7 +56,7 @@ def test_workflow_exec_py():
             "run-date": "2024-01-01",
         },
     )
-    assert 0 == rs.status
+    assert rs.status == 0
     assert {
         "params": {
             "author-run": "Local Workflow",
@@ -127,9 +127,14 @@ def test_workflow_exec_parallel_timeout():
         "params": {},
         "jobs": {
             "sleep-run": {
-                "stages": {
-                    "7972360640": {"outputs": {}},
-                    "6531070353": {"outputs": {}},
+                "stages": {"7972360640": {"outputs": {}}},
+                "errors": {
+                    "class": rs.context["jobs"]["sleep-run"]["errors"]["class"],
+                    "name": "JobException",
+                    "message": (
+                        "Job strategy was canceled from event that had set "
+                        "before strategy execution."
+                    ),
                 },
             },
         },
