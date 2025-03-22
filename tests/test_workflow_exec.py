@@ -33,7 +33,10 @@ def test_workflow_exec():
 @mock.patch.object(Config, "max_job_parallel", 1)
 def test_workflow_exec_raise_timeout():
     job: Job = Job(
-        stages=[{"name": "Sleep", "run": "import time\ntime.sleep(2)"}],
+        stages=[
+            {"name": "Sleep", "run": "import time\ntime.sleep(2)"},
+            {"name": "Echo Last Stage", "echo": "the last stage"},
+        ],
     )
     workflow: Workflow = Workflow(
         name="demo-workflow", jobs={"sleep-run": job, "sleep-again-run": job}
@@ -107,7 +110,10 @@ def test_workflow_exec_parallel():
 @mock.patch.object(Config, "max_job_parallel", 2)
 def test_workflow_exec_parallel_timeout():
     job: Job = Job(
-        stages=[{"name": "Sleep", "run": "import time\ntime.sleep(2)"}],
+        stages=[
+            {"name": "Sleep", "run": "import time\ntime.sleep(2)"},
+            {"name": "Echo Last Stage", "echo": "the last stage"},
+        ],
     )
     workflow: Workflow = Workflow(
         name="demo-workflow",
@@ -116,7 +122,25 @@ def test_workflow_exec_parallel_timeout():
             "sleep-again-run": job.model_copy(update={"needs": ["sleep-run"]}),
         },
     )
-    workflow.execute(params={}, timeout=1)
+    rs = workflow.execute(params={}, timeout=0.5)
+    assert rs.context == {
+        "params": {},
+        "jobs": {
+            "sleep-run": {
+                "stages": {
+                    "7972360640": {"outputs": {}},
+                    "6531070353": {"outputs": {}},
+                },
+            },
+        },
+        "errors": {
+            "class": rs.context["errors"]["class"],
+            "name": "WorkflowException",
+            "message": (
+                "WorkflowException: Execution: 'demo-workflow' was timeout."
+            ),
+        },
+    }
 
 
 def test_workflow_exec_py_with_parallel():

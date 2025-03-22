@@ -447,6 +447,7 @@ class Job(BaseModel):
         run_id: str | None = None,
         parent_run_id: str | None = None,
         result: Result | None = None,
+        event: Event | None = None,
     ) -> Result:
         """Job execution with passing dynamic parameters from the workflow
         execution. It will generate matrix values at the first step and run
@@ -457,6 +458,8 @@ class Job(BaseModel):
         :param parent_run_id: A parent workflow running ID for this release.
         :param result: (Result) A result object for keeping context and status
             data.
+        :param event: (Event) An event manager that pass to the
+            PoolThreadExecutor.
 
         :rtype: Result
         """
@@ -472,6 +475,7 @@ class Job(BaseModel):
                 job=self,
                 params=params,
                 result=result,
+                event=event,
             )
         elif self.runs_on.type == RunsOnType.SELF_HOSTED:  # pragma: no cov
             pass
@@ -644,6 +648,7 @@ def local_execute(
     run_id: str | None = None,
     parent_run_id: str | None = None,
     result: Result | None = None,
+    event: Event | None = None,
     raise_error: bool = False,
 ) -> Result:
     """Local job execution with passing dynamic parameters from the workflow
@@ -659,6 +664,7 @@ def local_execute(
     :param parent_run_id: (str) A parent workflow running ID for this release.
     :param result: (Result) A result object for keeping context and status
         data.
+    :param event: (Event) An event manager that pass to the PoolThreadExecutor.
     :param raise_error: (bool) A flag that all this method raise error to the
         strategy execution.
 
@@ -686,8 +692,7 @@ def local_execute(
 
         return result.catch(status=Status.SUCCESS)
 
-    # NOTE: Create event for cancel executor by trigger stop running event.
-    event: Event = Event()
+    event: Event = event or Event()
     fail_fast_flag: bool = job.strategy.fail_fast
     ls: str = "Fail-Fast" if fail_fast_flag else "All-Completed"
 
