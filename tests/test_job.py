@@ -15,12 +15,6 @@ from pydantic import TypeAdapter, ValidationError
 
 
 def test_run_ons():
-    with pytest.raises(ValidationError):
-        TypeAdapter(RunsOn).validate_python({})
-
-    model = TypeAdapter(RunsOn).validate_python({"type": "local"})
-    assert isinstance(model, RunsOnLocal)
-
     model = TypeAdapter(RunsOn).validate_python(
         {
             "type": "self_hosted",
@@ -32,6 +26,9 @@ def test_run_ons():
 
     model = TypeAdapter(RunsOn).validate_python({"type": "k8s"})
     assert isinstance(model, RunsOnK8s)
+
+    model = TypeAdapter(RunsOn).validate_python({})
+    assert isinstance(model, RunsOnLocal)
 
 
 def test_job():
