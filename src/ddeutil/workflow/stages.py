@@ -148,6 +148,7 @@ class BaseStage(BaseModel, ABC):
         parent_run_id: str | None = None,
         result: Result | None = None,
         raise_error: bool = False,
+        to: DictData | None = None,
     ) -> Result:
         """Handler stage execution result from the stage `execute` method.
 
@@ -180,6 +181,8 @@ class BaseStage(BaseModel, ABC):
         :param result: (Result) A result object for keeping context and status
             data before execution.
         :param raise_error: (bool) A flag that all this method raise error
+        :param to: (DictData) A target object for auto set the return output
+            after execution.
 
         :rtype: Result
         """
@@ -191,7 +194,10 @@ class BaseStage(BaseModel, ABC):
         )
 
         try:
-            return self.execute(params, result=result)
+            rs: Result = self.execute(params, result=result)
+            if to is not None:
+                return self.set_outputs(rs.context, to=to)
+            return rs
         except Exception as err:
             result.trace.error(f"[STAGE]: {err.__class__.__name__}: {err}")
 
@@ -204,10 +210,11 @@ class BaseStage(BaseModel, ABC):
                     f"{err.__class__.__name__}: {err}"
                 ) from None
 
-            return result.catch(
-                status=Status.FAILED,
-                context={"errors": to_dict(err)},
-            )
+            errors: DictData = {"errors": to_dict(err)}
+            if to is not None:
+                return self.set_outputs(errors, to=to)
+
+            return result.catch(status=Status.FAILED, context=errors)
 
     def set_outputs(self, output: DictData, to: DictData) -> DictData:
         """Set an outputs from execution process to the received context. The
@@ -537,7 +544,7 @@ class PyStage(BaseStage):
         super().set_outputs(
             (
                 {k: lc[k] for k in self.filter_locals(lc)}
-                | {k: output[k] for k in output if k.startswith("error")}
+                | ({"errors": output["errors"]} if "errors" in output else {})
             ),
             to=to,
         )
@@ -585,7 +592,7 @@ class PyStage(BaseStage):
         #   this statement.
         # WARNING: The exec build-in function is very dangerous. So, it
         #   should use the re module to validate exec-string before running.
-        exec(run, _globals, lc)
+        exec(run, _globals, lc | {"result": result})
 
         return result.catch(
             status=Status.SUCCESS, context={"locals": lc, "globals": _globals}
