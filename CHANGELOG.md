@@ -2,6 +2,48 @@
 
 ## Latest Changes
 
+## 0.0.38
+
+### :stars: Highlight Features
+
+- :star: hl: support cancel stage from workflow execution timeout.
+- :star: hl: add context module for keep context models.
+
+### :sparkles: Features
+
+- :dart: feat: change RunsOn model to annotated object.
+- :dart: feat: add to argument on stage handle exec method.
+- :dart: feat: add event on workflow execution for cancel if it timeout.
+- :dart: feat: remove deep_copy func that was deleted.
+- :dart: feat: add support async function on call stage.
+- :dart: feat: add parallel and foreach stages. (#29)
+
+### :bug: Bug fixes
+
+- :gear: fixed: move locals contruct to globals on pystage.
+- :gear: fixed: remove exception class name before error message.
+- :gear: fixed: testcase that assert matrix key.
+- :gear: fixed: rewrite checking condition for make sigle future thread pool.
+- :gear: fixed: remove matrix key from none-strategy exec.
+- :gear: fixed: change name of context model.
+- :gear: fixed: fix return context from job exec route.
+- :gear: fixed: remove logger from stages module.
+- :gear: fixed: fix error statement for necessary params on call stage.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: add testing condition for schedule on py39 only.
+- :test_tube: tests: fix workflow exec does not valid.
+- :test_tube: tests: add testcase for context models on result module.
+- :art: styled: not sync deps for future improvement.
+- :art: styled: add query and path params.
+
+### :broom: Deprecate & Clean
+
+- :recycle: clean: add to_dict method on exception object.
+- :recycle: clean: clean code on job module.
+- :recycle: clean: remove function that does not use on utils module.
+
 ## 0.0.37
 
 ### :stars: Highlight Features
