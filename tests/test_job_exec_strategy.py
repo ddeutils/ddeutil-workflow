@@ -48,9 +48,7 @@ def test_job_exec_strategy_catch_stage_error():
                             rs.context,
                         ),
                         "name": "ValueError",
-                        "message": (
-                            "ValueError: Testing raise error inside PyStage!!!"
-                        ),
+                        "message": "Testing raise error inside PyStage!!!",
                     },
                 },
                 "7761132585": {"outputs": {}},
@@ -75,7 +73,7 @@ def test_job_exec_strategy_catch_job_error():
                 "class": rs.context["5027535057"]["errors"]["class"],
                 "name": "StageException",
                 "message": (
-                    "StageException: PyStage: \n\tValueError: Testing raise error "
+                    "PyStage: \n\tValueError: Testing raise error "
                     "inside PyStage!!!"
                 ),
             },

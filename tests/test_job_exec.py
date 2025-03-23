@@ -100,13 +100,20 @@ def test_job_exec_py_fail_fast_raise_catch():
             "errors": {
                 "class": rs.context["9112472804"]["errors"]["class"],
                 "name": "JobException",
-                "message": "Job strategy was canceled from event that had set before strategy execution.",
+                "message": (
+                    "Job strategy was canceled from event that had set before "
+                    "strategy execution."
+                ),
             },
         },
         "errors": {
             "class": rs.context["errors"]["class"],
             "name": "JobException",
-            "message": "JobException: Stage execution error: StageException: PyStage: \n\tValueError: Testing raise error inside PyStage with the sleep not equal 4!!!",
+            "message": (
+                "Stage execution error: StageException: PyStage: \n\t"
+                "ValueError: Testing raise error inside PyStage with the "
+                "sleep not equal 4!!!"
+            ),
         },
     }
 
@@ -208,8 +215,8 @@ def test_job_exec_py_complete_raise():
             "class": rs.context["errors"]["class"],
             "name": "JobException",
             "message": (
-                "JobException: Stage execution error: StageException: "
-                "PyStage: \n\tValueError: Testing raise error inside PyStage!!!"
+                "Stage execution error: StageException: PyStage: \n\t"
+                "ValueError: Testing raise error inside PyStage!!!"
             ),
         },
     }
