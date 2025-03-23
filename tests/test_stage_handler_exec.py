@@ -211,6 +211,49 @@ def test_stage_exec_py_func():
     assert isfunction(rs["stages"]["create-func"]["outputs"]["echo"])
 
 
+@mock.patch.object(Config, "stage_raise_error", False)
+def test_stage_exec_py_result(test_path):
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_py_result.yml",
+        data="""
+        tmp-wf-py-result:
+          type: Workflow
+          jobs:
+            first-job:
+              stages:
+                - name: "Start run python with result argument"
+                  id: py-result-stage
+                  run: |
+                    result.trace.info("I am log from result object!!!")
+                - name: "Raise error"
+                  id: py-raise
+                  run: |
+                    raise ValueError("test raise error")
+        """,
+    ):
+        workflow: Workflow = Workflow.from_loader(name="tmp-wf-py-result")
+        stage: Stage = workflow.job("first-job").stage(
+            stage_id="py-result-stage"
+        )
+        rs: dict = stage.handler_execute(params={}, to={})
+        assert rs == {"stages": {"py-result-stage": {"outputs": {}}}}
+
+        stage: Stage = workflow.job("first-job").stage(stage_id="py-raise")
+        rs: dict = stage.handler_execute(params={}, to={})
+        assert rs == {
+            "stages": {
+                "py-raise": {
+                    "outputs": {},
+                    "errors": {
+                        "class": rs["stages"]["py-raise"]["errors"]["class"],
+                        "name": "ValueError",
+                        "message": "test raise error",
+                    },
+                },
+            },
+        }
+
+
 def test_stage_exec_py_create_object():
     workflow: Workflow = Workflow.from_loader(name="wf-run-python-filter")
     stage: Stage = workflow.job("create-job").stage(stage_id="create-stage")

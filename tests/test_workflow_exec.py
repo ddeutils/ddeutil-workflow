@@ -142,7 +142,7 @@ def test_workflow_exec_parallel_timeout():
         "errors": {
             "class": rs.context["errors"]["class"],
             "name": "WorkflowException",
-            "message": ("Execution: 'demo-workflow' was timeout."),
+            "message": "Execution: 'demo-workflow' was timeout.",
         },
     }
 
