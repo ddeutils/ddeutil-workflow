@@ -45,7 +45,7 @@ def test_workflow_exec_raise_timeout():
     rs: Result = workflow.execute(params={}, timeout=1)
     assert rs.status == 1
     assert rs.context["errors"]["message"] == (
-        "WorkflowException: Execution: 'demo-workflow' was timeout."
+        "Execution: 'demo-workflow' was timeout."
     )
 
 
@@ -142,9 +142,7 @@ def test_workflow_exec_parallel_timeout():
         "errors": {
             "class": rs.context["errors"]["class"],
             "name": "WorkflowException",
-            "message": (
-                "WorkflowException: Execution: 'demo-workflow' was timeout."
-            ),
+            "message": ("Execution: 'demo-workflow' was timeout."),
         },
     }
 
@@ -209,9 +207,8 @@ def test_workflow_exec_py_raise():
             "class": rs.context["errors"]["class"],
             "name": "WorkflowException",
             "message": (
-                "WorkflowException: Get job execution error first-job: "
-                "JobException: Stage execution error: "
-                "StageException: PyStage: \n\t"
+                "Get job execution error first-job: JobException: Stage "
+                "execution error: StageException: PyStage: \n\t"
                 "ValueError: Testing raise error inside PyStage!!!"
             ),
         },
@@ -234,9 +231,8 @@ def test_workflow_exec_py_raise_parallel():
             "class": rs.context["errors"]["class"],
             "name": "WorkflowException",
             "message": (
-                "WorkflowException: Get job execution error first-job: "
-                "JobException: Stage execution error: "
-                "StageException: PyStage: \n\t"
+                "Get job execution error first-job: JobException: Stage "
+                "execution error: StageException: PyStage: \n\t"
                 "ValueError: Testing raise error inside PyStage!!!"
             ),
         },

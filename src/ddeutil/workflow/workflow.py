@@ -884,6 +884,12 @@ class Workflow(BaseModel):
 
         result.trace.info(f"[WORKFLOW]: Start execute job: {job_id!r}")
 
+        if event and event.is_set():  # pragma: no cov
+            raise WorkflowException(
+                "Workflow job was canceled from event that had set before "
+                "job execution."
+            )
+
         # IMPORTANT:
         #   This execution change all job running IDs to the current workflow
         #   running ID, but it still trac log to the same parent running ID
@@ -1000,15 +1006,8 @@ class Workflow(BaseModel):
                 )
         except WorkflowException as err:
             status = Status.FAILED
-            context.update(
-                {
-                    "errors": {
-                        "class": err,
-                        "name": err.__class__.__name__,
-                        "message": f"{err.__class__.__name__}: {err}",
-                    },
-                },
-            )
+            context.update({"errors": err.to_dict()})
+
         return result.catch(status=status, context=context)
 
     def __exec_threading(
@@ -1058,7 +1057,7 @@ class Workflow(BaseModel):
                 if not job.check_needs(context["jobs"]):
                     job_queue.task_done()
                     job_queue.put(job_id)
-                    time.sleep(0.25)
+                    time.sleep(0.15)
                     continue
 
                 # NOTE: Start workflow job execution with deep copy context data
@@ -1124,11 +1123,11 @@ class Workflow(BaseModel):
             If a job need dependency, it will check dependency job ID from
         context data before allow it run.
 
-        :param result: A result model.
+        :param result: (Result) A result model.
         :param context: A context workflow data that want to downstream passing.
-        :param ts: A start timestamp that use for checking execute time should
-            time out.
-        :param timeout: A second value unit that bounding running time.
+        :param ts: (float) A start timestamp that use for checking execute time
+            should time out.
+        :param timeout: (int) A second value unit that bounding running time.
 
         :rtype: DictData
         """

@@ -568,11 +568,7 @@ def local_execute_strategy(
                     strategy_id: {
                         "matrix": strategy,
                         "stages": context.pop("stages", {}),
-                        "errors": {
-                            "class": JobException(error_msg),
-                            "name": "JobException",
-                            "message": error_msg,
-                        },
+                        "errors": JobException(error_msg).to_dict(),
                     },
                 },
             )
@@ -618,11 +614,7 @@ def local_execute_strategy(
                     strategy_id: {
                         "matrix": strategy,
                         "stages": context.pop("stages", {}),
-                        "errors": {
-                            "class": err,
-                            "name": err.__class__.__name__,
-                            "message": f"{err.__class__.__name__}: {err}",
-                        },
+                        "errors": err.to_dict(),
                     },
                 },
             )
@@ -756,14 +748,6 @@ def local_execute(
                     f"[JOB]: {ls} Catch:\n\t{err.__class__.__name__}:"
                     f"\n\t{err}"
                 )
-                context.update(
-                    {
-                        "errors": {
-                            "class": err,
-                            "name": err.__class__.__name__,
-                            "message": f"{err.__class__.__name__}: {err}",
-                        },
-                    },
-                )
+                context.update({"errors": err.to_dict()})
 
     return result.catch(status=status, context=context)

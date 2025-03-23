@@ -50,7 +50,7 @@ from typing_extensions import Self
 from .__types import DictData, DictStr, TupleStr
 from .caller import TagFunc, extract_call
 from .conf import config
-from .exceptions import StageException
+from .exceptions import StageException, to_dict
 from .result import Result, Status
 from .templates import not_in_template, param2template
 from .utils import (
@@ -206,13 +206,7 @@ class BaseStage(BaseModel, ABC):
 
             return result.catch(
                 status=Status.FAILED,
-                context={
-                    "errors": {
-                        "class": err,
-                        "name": err.__class__.__name__,
-                        "message": f"{err.__class__.__name__}: {err}",
-                    },
-                },
+                context={"errors": to_dict(err)},
             )
 
     def set_outputs(self, output: DictData, to: DictData) -> DictData:
@@ -474,8 +468,8 @@ class BashStage(BaseStage):
             status=Status.SUCCESS,
             context={
                 "return_code": rs.returncode,
-                "stdout": rs.stdout.rstrip("\n") or None,
-                "stderr": rs.stderr.rstrip("\n") or None,
+                "stdout": None if (out := rs.stdout.strip("\n")) == "" else out,
+                "stderr": None if (out := rs.stderr.strip("\n")) == "" else out,
             },
         )
 
