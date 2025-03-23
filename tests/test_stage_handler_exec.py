@@ -224,7 +224,7 @@ def test_stage_exec_py_result(test_path):
                 - name: "Start run python with result argument"
                   id: py-result-stage
                   run: |
-                    result.trace.info("I am log from result object!!!")
+                    result.trace.info("Log from result object inside PyStage!!!")
                 - name: "Raise error"
                   id: py-raise
                   run: |

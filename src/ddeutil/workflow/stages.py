@@ -577,7 +577,10 @@ class PyStage(BaseStage):
 
         # NOTE: create custom globals value that will pass to exec function.
         _globals: DictData = (
-            globals() | params | param2template(self.vars, params)
+            globals()
+            | params
+            | param2template(self.vars, params)
+            | {"result": result}
         )
         lc: DictData = {}
 
@@ -592,7 +595,7 @@ class PyStage(BaseStage):
         #   this statement.
         # WARNING: The exec build-in function is very dangerous. So, it
         #   should use the re module to validate exec-string before running.
-        exec(run, _globals, lc | {"result": result})
+        exec(run, _globals, lc)
 
         return result.catch(
             status=Status.SUCCESS, context={"locals": lc, "globals": _globals}
