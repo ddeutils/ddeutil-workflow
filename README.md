@@ -131,6 +131,8 @@ run-py-local:
       run-date: datetime
    jobs:
       getting-api-data:
+         runs-on:
+            type: local
          stages:
             - name: "Retrieve API Data"
               id: retrieve-api

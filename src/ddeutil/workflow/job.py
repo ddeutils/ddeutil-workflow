@@ -27,7 +27,7 @@ from threading import Event
 from typing import Annotated, Any, Literal, Optional, Union
 
 from ddeutil.core import freeze_args
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
@@ -255,13 +255,17 @@ class RunsOnK8s(BaseRunsOn):  # pragma: no cov
     type: Literal[RunsOnType.K8S] = Field(default=RunsOnType.K8S)
 
 
+def get_discriminator_runs_on(model: dict[str, Any]) -> str:
+    return model.get("type", "local")
+
+
 RunsOn = Annotated[
     Union[
-        RunsOnLocal,
-        RunsOnSelfHosted,
-        RunsOnK8s,
+        Annotated[RunsOnK8s, Tag(RunsOnType.K8S)],
+        Annotated[RunsOnSelfHosted, Tag(RunsOnType.SELF_HOSTED)],
+        Annotated[RunsOnLocal, Tag(RunsOnType.LOCAL)],
     ],
-    Field(discriminator="type"),
+    Discriminator(get_discriminator_runs_on),
 ]
 
 
