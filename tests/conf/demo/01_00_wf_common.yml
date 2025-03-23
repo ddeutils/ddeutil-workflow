@@ -288,7 +288,7 @@ wf-run-depends:
       stages:
         - name: Echo hello world
           echo: "Hello World"
-          sleep: 10
+          sleep: 2
     final-job:
       stages:
         - name: Echo final

@@ -161,7 +161,7 @@ def test_stage_exec_py_not_raise():
         "errors": {
             "class": rs.context["errors"]["class"],
             "name": "ValueError",
-            "message": "ValueError: Testing raise error inside PyStage!!!",
+            "message": "Testing raise error inside PyStage!!!",
         }
     }
 
@@ -173,9 +173,7 @@ def test_stage_exec_py_not_raise():
                 "errors": {
                     "class": getdot("stages.raise-error.errors.class", rs_out),
                     "name": "ValueError",
-                    "message": (
-                        "ValueError: Testing raise error inside PyStage!!!"
-                    ),
+                    "message": "Testing raise error inside PyStage!!!",
                 },
             },
         },
