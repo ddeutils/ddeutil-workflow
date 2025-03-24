@@ -2,6 +2,31 @@
 
 ## Latest Changes
 
+## 0.0.39
+
+### :stars: Highlight Features
+
+- :star: hl: add condition on job model by alias if value.
+- :star: hl: add condition for check job trigger rules.
+
+### :sparkles: Features
+
+- :dart: feat: add support skip checking result from job trigger rule check.
+- :dart: feat: add check condition on workflow exec method.
+- :dart: feat: add return result on job exec if event was set.
+- :dart: feat: add support ? template for check caller exist.
+
+### :bug: Bug fixes
+
+- :gear: fixed: update skipped field on context objects.
+- :gear: fixed: commnet assert for workflow poking that not make sense.
+- :gear: fixed: change default factory of update field from config tz.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: add job is_skipped testcase for make coverage.
+- :test_tube: tests: fix failed testcase.
+
 ## 0.0.38
 
 ### :stars: Highlight Features
