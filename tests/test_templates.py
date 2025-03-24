@@ -40,6 +40,15 @@ def test_param2template():
     with pytest.raises(UtilException):
         param2template("${{ params.foo }}", {"params": {"value": -5}})
 
+    value = param2template(
+        {
+            "in-string": "value is ${{ stages.first-stage.errors?.class }}",
+            "key-only": "${{ stages.first-stage.errors?.message }}",
+        },
+        params={"stages": {"first-stage": {"outputs": {"result": 100}}}},
+    )
+    assert value == {"in-string": "value is None", "key-only": None}
+
 
 def test_param2template_with_filter():
     value: int = param2template(

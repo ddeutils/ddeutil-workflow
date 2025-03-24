@@ -18,7 +18,7 @@ try:
 except ImportError:
     from typing_extensions import ParamSpec
 
-from ddeutil.core import getdot, hasdot, import_string
+from ddeutil.core import getdot, import_string
 from ddeutil.io import search_env_replace
 
 from .__types import DictData, Re
@@ -59,7 +59,8 @@ def custom_filter(name: str) -> Callable[P, FilterFunc]:
     """Custom filter decorator function that set function attributes, ``filter``
     for making filter registries variable.
 
-    :param: name: A filter name for make different use-case of a function.
+    :param: name: (str) A filter name for make different use-case of a function.
+
     :rtype: Callable[P, FilterFunc]
     """
 
@@ -108,7 +109,7 @@ def get_args_const(
 ) -> tuple[str, list[Constant], dict[str, Constant]]:
     """Get arguments and keyword-arguments from function calling string.
 
-    :param expr: An expr string value.
+    :param expr: (str) An expr string value.
 
     :rtype: tuple[str, list[Constant], dict[str, Constant]]
     """
@@ -154,7 +155,7 @@ def get_args_from_filter(
     and validate it with the filter functions mapping dict.
 
     :param ft:
-    :param filters:
+    :param filters: A mapping of filter registry.
 
     :rtype: tuple[str, FilterRegistry, list[Any], dict[Any, Any]]
     """
@@ -185,7 +186,7 @@ def map_post_filter(
 
     :param value: A string value that want to map with filter function.
     :param post_filter: A list of post-filter function name.
-    :param filters: A filter registry.
+    :param filters: A mapping of filter registry.
 
     :rtype: T
     """
@@ -203,8 +204,8 @@ def map_post_filter(
         except Exception as err:
             logger.warning(str(err))
             raise UtilException(
-                f"The post-filter function: {func_name} does not fit with "
-                f"{value} (type: {type(value).__name__})."
+                f"The post-filter: {func_name!r} does not fit with {value!r} "
+                f"(type: {type(value).__name__})."
             ) from None
     return value
 
@@ -258,10 +259,10 @@ def str2template(
     with the workflow parameter types that is `str`, `int`, `datetime`, and
     `list`.
 
-    :param value: A string value that want to map with params
-    :param params: A parameter value that getting with matched regular
-        expression.
-    :param filters:
+    :param value: (str) A string value that want to map with params.
+    :param params: (DictData) A parameter value that getting with matched
+        regular expression.
+    :param filters: A mapping of filter registry.
 
     :rtype: str
     """
@@ -281,11 +282,14 @@ def str2template(
             for i in (found.post_filters.strip().removeprefix("|").split("|"))
             if i != ""
         ]
-        if not hasdot(caller, params):
-            raise UtilException(f"The params does not set caller: {caller!r}.")
 
         # NOTE: from validate step, it guarantees that caller exists in params.
-        getter: Any = getdot(caller, params)
+        try:
+            getter: Any = getdot(caller, params)
+        except ValueError as err:
+            raise UtilException(
+                f"Params does not set caller: {caller!r}."
+            ) from err
 
         # NOTE:
         #   If type of getter caller is not string type, and it does not use to
@@ -301,25 +305,33 @@ def str2template(
 
         value: str = value.replace(found.full, getter, 1)
 
+    if value == "None":
+        return None
+
     return search_env_replace(value)
 
 
-def param2template(value: T, params: DictData) -> T:
+def param2template(
+    value: T,
+    params: DictData,
+    filters: dict[str, FilterRegistry] | None = None,
+) -> T:
     """Pass param to template string that can search by ``RE_CALLER`` regular
     expression.
 
     :param value: A value that want to map with params
     :param params: A parameter value that getting with matched regular
         expression.
+    :param filters: A filter mapping for mapping with `map_post_filter` func.
 
     :rtype: T
     :returns: An any getter value from the params input.
     """
-    filters: dict[str, FilterRegistry] = make_filter_registry()
+    filters: dict[str, FilterRegistry] = filters or make_filter_registry()
     if isinstance(value, dict):
-        return {k: param2template(value[k], params) for k in value}
+        return {k: param2template(value[k], params, filters) for k in value}
     elif isinstance(value, (list, tuple, set)):
-        return type(value)([param2template(i, params) for i in value])
+        return type(value)([param2template(i, params, filters) for i in value])
     elif not isinstance(value, str):
         return value
     return str2template(value, params, filters=filters)
@@ -329,8 +341,9 @@ def param2template(value: T, params: DictData) -> T:
 def datetime_format(value: datetime, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
     """Format datetime object to string with the format.
 
-    :param value: A datetime value that want to format to string value.
-    :param fmt: A format string pattern that passing to the `dt.strftime`
+    :param value: (datetime) A datetime value that want to format to string
+        value.
+    :param fmt: (str) A format string pattern that passing to the `dt.strftime`
         method.
 
     :rtype: str

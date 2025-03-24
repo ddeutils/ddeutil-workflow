@@ -92,7 +92,7 @@ flowchart LR
 > - [Google **Workflows**](https://cloud.google.com/workflows)
 > - [AWS **Step Functions**](https://aws.amazon.com/step-functions/)
 
-## :round_pushpin: Installation
+## 📦 Installation
 
 This project need `ddeutil` and `ddeutil-io` extension namespace packages.
 If you want to install this package with application add-ons, you should add

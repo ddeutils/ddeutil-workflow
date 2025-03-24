@@ -3,6 +3,39 @@
 This content will explain a context data that passing in and out to execution
 process for each workflow model objects such as **Workflow**, **Job**, and **Stage**.
 
+```text
+Input       --> {params: {}}
+|
+Workflow    --> {params: {}, jobs: {<job-id>: {}}}
+|
+Job         --> {
+|                   params: {},
+|                   jobs: {
+|                       <job-id>: {
+|                           strategies: {
+|                               <strategy-id>: {metrix: {}, stages: {}}
+|                           }
+|                       }
+|                   },
+|                   metrix: {},
+|                   stages: {}
+|           --> {
+|                   params: {},
+|                   jobs: {
+|                       <job-id>: {stages: {}}
+|                   },
+|                   metrix: {},
+|                   stages: {}
+|               }
+|
+Stage       --> {
+                    params: {},
+                    jobs: {},
+                    metrix: {},
+                    stages: {<stage-id>: {outputs: {}, errors: {}}}
+                }
+```
+
 ## Workflow
 
 A workflow execution context that return from the `execute` method.
@@ -17,6 +50,11 @@ For the fist context values that passing to the workflow execution method:
   "jobs": {
     "<job-name>": {},
     "<job-name-02>": {}
+  },
+  "errors": {
+    "class": "",
+    "name": "",
+    "message": ""
   }
 }
 ```
@@ -66,12 +104,12 @@ If the job does not set strategy matrix;
 
 ## Stage
 
-A stage execution context that return from `execute` and `handler_execute`
-methods.
+A stage context execution that return from `execute` and `handler_execute`
+methods can be any custom output with its stage.
 
 ```json
 {
-  "out": "result"
+  "result": 100
 }
 ```
 
@@ -87,6 +125,8 @@ With error;
 }
 ```
 
+### Set Output
+
 A context that return from `set_outputs` method.
 
 if a `to` argument that pass to this method be;
@@ -101,23 +141,30 @@ it will return result be;
 
 ```json
 {
-    "params": {"key": "value"},
-    "stages": {
-      "<stage-id>": {
-        "outputs": {
-          "out": "result"
-        },
-        "errors": {
-          "class": "",
-          "name": "",
-          "message": ""
-        }
+  "params": {"key": "value"},
+  "stages": {
+    "<stage-id>": {
+      "outputs": {"result": "100"},
+      "errors": {
+        "class": "ExceptionClass",
+        "name": "class-name",
+        "message": "error-message"
       }
     }
+  }
 }
 ```
 
 !!! note
 
-    The main key from stage setting output method are
-    `outputs` and `errors`.
+    The main key from stage setting output method are `outputs` and `errors`.
+
+The template parameter that want to use on stage will can be
+
+- `${{ stages.<stage-id>.outputs.<result> }}`
+- `${{ stages.<stage-id>.errors?.name }}`
+
+Job reference if it has any job running finish before.
+
+- `${{ jobs.<job-id>.stages.<stage-id>.outputs.<result> }}`
+- `${{ jobs.<job-id>.strategies.<strategy-id>.stages.<stage-id>.errors?.name }}`
