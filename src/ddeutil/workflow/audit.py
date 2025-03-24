@@ -20,7 +20,7 @@ from typing_extensions import Self
 
 from .__types import DictData, TupleStr
 from .conf import config
-from .logs import TraceLog, get_trace
+from .logs import TraceLog, get_dt_tznow, get_trace
 
 __all__: TupleStr = (
     "get_audit",
@@ -43,10 +43,12 @@ class BaseAudit(BaseModel, ABC):
         default_factory=dict,
         description="A context that receive from a workflow execution result.",
     )
-    parent_run_id: Optional[str] = Field(default=None)
-    run_id: str
-    update: datetime = Field(default_factory=datetime.now)
-    execution_time: float = Field(default=0)
+    parent_run_id: Optional[str] = Field(
+        default=None, description="A parent running ID."
+    )
+    run_id: str = Field(description="A running ID")
+    update: datetime = Field(default_factory=get_dt_tznow)
+    execution_time: float = Field(default=0, description="An execution time.")
 
     @model_validator(mode="after")
     def __model_action(self) -> Self:

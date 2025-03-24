@@ -48,9 +48,10 @@ def tag(
     """Tag decorator function that set function attributes, ``tag`` and ``name``
     for making registries variable.
 
-    :param: name: A tag name for make different use-case of a function.
-    :param: alias: A alias function name that keeping in registries. If this
-        value does not supply, it will use original function name from __name__.
+    :param: name: (str) A tag name for make different use-case of a function.
+    :param: alias: (str) A alias function name that keeping in registries.
+        If this value does not supply, it will use original function name
+        from `__name__` argument.
 
     :rtype: Callable[P, TagFunc]
     """
@@ -78,7 +79,7 @@ Registry = dict[str, Callable[[], TagFunc]]
 def make_registry(submodule: str) -> dict[str, Registry]:
     """Return registries of all functions that able to called with task.
 
-    :param submodule: A module prefix that want to import registry.
+    :param submodule: (str) A module prefix that want to import registry.
 
     :rtype: dict[str, Registry]
     """
@@ -134,12 +135,7 @@ def extract_call(call: str) -> Callable[[], TagFunc]:
     """Extract Call function from string value to call partial function that
     does run it at runtime.
 
-    :raise NotImplementedError: When the searching call's function result does
-        not exist in the registry.
-    :raise NotImplementedError: When the searching call's tag result does not
-        exist in the registry with its function key.
-
-    :param call: A call value that able to match with Task regex.
+    :param call: (str) A call value that able to match with Task regex.
 
         The format of call value should contain 3 regular expression groups
     which match with the below config format:
@@ -151,6 +147,11 @@ def extract_call(call: str) -> Callable[[], TagFunc]:
         ...
         >>> extract_call("tasks/return-type-not-valid@raise")
         ...
+
+    :raise NotImplementedError: When the searching call's function result does
+        not exist in the registry.
+    :raise NotImplementedError: When the searching call's tag result does not
+        exist in the registry with its function key.
 
     :rtype: Callable[[], TagFunc]
     """
