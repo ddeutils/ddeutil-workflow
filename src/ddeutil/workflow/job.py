@@ -51,6 +51,7 @@ MatrixFilter = list[dict[str, Union[str, int]]]
 
 
 __all__: TupleStr = (
+    "CheckState",
     "Strategy",
     "Job",
     "TriggerRules",
@@ -206,6 +207,16 @@ class TriggerRules(str, Enum):
     one_success: str = "one_success"
     none_failed: str = "none_failed"
     none_skipped: str = "none_skipped"
+
+
+class CheckState(str, Enum):
+    wait: str = "wait"
+    passed: str = "passed"
+    skipped: str = "skipped"
+    failed: str = "failed"
+
+    def is_waited(self):
+        return self.value == "wait"
 
 
 class RunsOnType(str, Enum):
@@ -385,33 +396,37 @@ class Job(BaseModel):
                 return stage
         raise ValueError(f"Stage ID {stage_id} does not exists")
 
-    def check_needs(self, jobs: dict[str, Any]) -> bool:
+    def check_needs(self, jobs: dict[str, Any]) -> CheckState:
         """Return True if job's need exists in an input list of job's ID.
 
         :param jobs: A mapping of job model and its ID.
 
-        :rtype: bool
+        :rtype: CheckState
         """
         if not self.needs:
-            return True
+            return CheckState.passed
+
+        def make_return(result: bool) -> CheckState:
+            return CheckState.passed if result else CheckState.failed
 
         need_exist: dict[str, Any] = {
             need: jobs[need] for need in self.needs if need in jobs
         }
+        rs: bool = False
         if len(need_exist) != len(self.needs):
-            return False
+            return CheckState.wait
         elif self.trigger_rule == TriggerRules.all_done:
-            return True
+            return CheckState.passed
         elif self.trigger_rule == TriggerRules.all_success:
-            return all("errors" not in need_exist[job] for job in need_exist)
+            rs = all("errors" not in need_exist[job] for job in need_exist)
         elif self.trigger_rule == TriggerRules.all_failed:
-            return all("errors" in need_exist[job] for job in need_exist)
+            rs = all("errors" in need_exist[job] for job in need_exist)
         elif self.trigger_rule == TriggerRules.one_success:
-            return sum(
+            rs = sum(
                 "errors" not in need_exist[job] for job in need_exist
             ) + 1 == len(self.needs)
         elif self.trigger_rule == TriggerRules.one_failed:
-            return sum("errors" in need_exist[job] for job in need_exist) == 1
+            rs = sum("errors" in need_exist[job] for job in need_exist) == 1
         elif self.trigger_rule in (
             TriggerRules.none_failed,
             TriggerRules.none_skipped,
@@ -419,7 +434,7 @@ class Job(BaseModel):
             raise NotImplementedError(
                 f"Trigger rule: {self.trigger_rule} does not support yet."
             )
-        return False
+        return make_return(rs)
 
     def set_outputs(self, output: DictData, to: DictData) -> DictData:
         """Set an outputs from execution process to the received context. The

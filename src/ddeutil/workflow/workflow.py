@@ -34,7 +34,7 @@ from .audit import Audit, get_audit
 from .conf import Loader, config, get_logger
 from .cron import On
 from .exceptions import JobException, WorkflowException
-from .job import Job
+from .job import CheckState, Job
 from .params import Param
 from .result import Result, Status
 from .templates import has_template, param2template
@@ -882,8 +882,6 @@ class Workflow(BaseModel):
                 f"workflow."
             )
 
-        result.trace.info(f"[WORKFLOW]: Start execute job: {job_id!r}")
-
         if event and event.is_set():  # pragma: no cov
             raise WorkflowException(
                 "Workflow job was canceled from event that had set before "
@@ -897,6 +895,7 @@ class Workflow(BaseModel):
         #   arguments).
         #
         try:
+            result.trace.info(f"[JOB]: Start execute job: {job_id!r}")
             job: Job = self.jobs[job_id]
             job.set_outputs(
                 job.execute(
@@ -1054,11 +1053,19 @@ class Workflow(BaseModel):
                 job_id: str = job_queue.get()
                 job: Job = self.jobs[job_id]
 
-                if not job.check_needs(context["jobs"]):
+                if (check := job.check_needs(context["jobs"])).is_waited():
                     job_queue.task_done()
                     job_queue.put(job_id)
                     time.sleep(0.15)
                     continue
+                elif check == CheckState.failed:  # pragma: no cov
+                    raise WorkflowException(
+                        "Check job trigger rule was failed."
+                    )
+                elif check == CheckState.skipped:  # pragma: no cov
+                    raise NotImplementedError(
+                        "Job trigger rule: 'slipped' does not implement yet."
+                    )
 
                 # NOTE: Start workflow job execution with deep copy context data
                 #   before release.
@@ -1149,11 +1156,17 @@ class Workflow(BaseModel):
             job: Job = self.jobs[job_id]
 
             # NOTE: Waiting dependency job run successful before release.
-            if not job.check_needs(context["jobs"]):
+            if (check := job.check_needs(context["jobs"])).is_waited():
                 job_queue.task_done()
                 job_queue.put(job_id)
                 time.sleep(0.075)
                 continue
+            elif check == CheckState.failed:  # pragma: no cov
+                raise WorkflowException("Check job trigger rule was failed.")
+            elif check == CheckState.skipped:  # pragma: no cov
+                raise NotImplementedError(
+                    "Job trigger rule: 'slipped' does not implement yet."
+                )
 
             # NOTE: Start workflow job execution with deep copy context data
             #   before release. This job execution process will run until
