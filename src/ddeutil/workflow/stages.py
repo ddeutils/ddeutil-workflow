@@ -41,7 +41,7 @@ from inspect import Parameter
 from pathlib import Path
 from subprocess import CompletedProcess
 from textwrap import dedent
-from typing import Optional, Union
+from typing import Annotated, Optional, Union
 
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
@@ -230,7 +230,10 @@ class BaseStage(BaseModel, ABC):
 
             ... (iii) to: {
                         'stages': {
-                            '<stage-id>': {'outputs': {'foo': 'bar'}}
+                            '<stage-id>': {
+                                'outputs': {'foo': 'bar'},
+                                'skipped': False
+                            }
                         }
                     }
 
@@ -255,8 +258,12 @@ class BaseStage(BaseModel, ABC):
         errors: DictData = (
             {"errors": output.pop("errors", {})} if "errors" in output else {}
         )
-
-        to["stages"][_id] = {"outputs": output, **errors}
+        skipping: dict[str, bool] = (
+            {"skipped": output.pop("skipped", False)}
+            if "skipped" in output
+            else {}
+        )
+        to["stages"][_id] = {"outputs": output, **skipping, **errors}
         return to
 
     def is_skipped(self, params: DictData | None = None) -> bool:
@@ -539,19 +546,11 @@ class PyStage(BaseStage):
 
         :rtype: DictData
         """
-        # NOTE: The output will fileter unnecessary keys from locals.
-        lc: DictData = output.get("locals", {})
+        lc: DictData = output.pop("locals", {})
+        gb: DictData = output.pop("globals", {})
         super().set_outputs(
-            (
-                {k: lc[k] for k in self.filter_locals(lc)}
-                | ({"errors": output["errors"]} if "errors" in output else {})
-            ),
-            to=to,
+            {k: lc[k] for k in self.filter_locals(lc)} | output, to=to
         )
-
-        # NOTE: Override value that changing from the globals that pass via the
-        #   exec function.
-        gb: DictData = output.get("globals", {})
         to.update({k: gb[k] for k in to if k in gb})
         return to
 
@@ -572,17 +571,13 @@ class PyStage(BaseStage):
                 run_id=gen_id(self.name + (self.id or ""), unique=True)
             )
 
-        # NOTE: Replace the run statement that has templating value.
-        run: str = param2template(dedent(self.run), params)
-
-        # NOTE: create custom globals value that will pass to exec function.
-        _globals: DictData = (
+        lc: DictData = {}
+        gb: DictData = (
             globals()
             | params
             | param2template(self.vars, params)
             | {"result": result}
         )
-        lc: DictData = {}
 
         # NOTE: Start exec the run statement.
         result.trace.info(f"[STAGE]: Py-Execute: {self.name}")
@@ -591,14 +586,12 @@ class PyStage(BaseStage):
             "check your statement be safe before execute."
         )
 
-        # TODO: Add Python systax wrapper for checking dangerous code before run
-        #   this statement.
         # WARNING: The exec build-in function is very dangerous. So, it
         #   should use the re module to validate exec-string before running.
-        exec(run, _globals, lc)
+        exec(param2template(dedent(self.run), params), gb, lc)
 
         return result.catch(
-            status=Status.SUCCESS, context={"locals": lc, "globals": _globals}
+            status=Status.SUCCESS, context={"locals": lc, "globals": gb}
         )
 
 
@@ -795,7 +788,9 @@ class ParallelStage(BaseStage):  # pragma: no cov
         ... }
     """
 
-    parallel: dict[str, list[Stage]] = Field()
+    parallel: dict[str, list[Stage]] = Field(
+        description="A mapping of parallel branch ID.",
+    )
     max_parallel_core: int = Field(default=2)
 
     @staticmethod
@@ -807,9 +802,10 @@ class ParallelStage(BaseStage):  # pragma: no cov
     ) -> DictData:
         """Task execution method for passing a branch to each thread.
 
-        :param branch:
-        :param params:
-        :param result:
+        :param branch: A branch ID.
+        :param params: A parameter data that want to use in this execution.
+        :param result: (Result) A result object for keeping context and status
+            data.
         :param stages:
 
         :rtype: DictData
@@ -1008,12 +1004,21 @@ class IfStage(BaseStage):  # pragma: no cov
 
     """
 
-    case: str
+    case: str = Field(description="A case condition for routing.")
     match: list[dict[str, Union[str, Stage]]]
 
     def execute(
         self, params: DictData, *, result: Result | None = None
     ) -> Result: ...
+
+
+class RaiseStage(BaseStage):  # pragma: no cov
+    message: str = Field(alias="raise")
+
+    def execute(
+        self, params: DictData, *, result: Result | None = None
+    ) -> Result:
+        raise StageException(self.message)
 
 
 # TODO: Not implement this stages yet
@@ -1050,6 +1055,11 @@ class VirtualPyStage(PyStage):  # pragma: no cov
 
     def create_py_file(self, py: str, run_id: str | None): ...
 
+    def execute(
+        self, params: DictData, *, result: Result | None = None
+    ) -> Result:
+        return super().execute(params, result=result)
+
 
 # TODO: Not implement this stages yet
 class SensorStage(BaseStage):  # pragma: no cov
@@ -1064,12 +1074,16 @@ class SensorStage(BaseStage):  # pragma: no cov
 #   From the current build-in stages, they do not have stage that have the same
 #   fields that because of parsing on the Job's stages key.
 #
-Stage = Union[
-    EmptyStage,
-    BashStage,
-    CallStage,
-    TriggerStage,
-    ForEachStage,
-    ParallelStage,
-    PyStage,
+Stage = Annotated[
+    Union[
+        EmptyStage,
+        BashStage,
+        CallStage,
+        TriggerStage,
+        ForEachStage,
+        ParallelStage,
+        PyStage,
+        RaiseStage,
+    ],
+    Field(union_mode="smart"),
 ]

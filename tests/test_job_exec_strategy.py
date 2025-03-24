@@ -26,6 +26,24 @@ def test_job_exec_strategy():
     }
 
 
+def test_job_exec_strategy_skip_stage():
+    workflow: Workflow = Workflow.from_loader(
+        name="wf-run-python-raise-for-job"
+    )
+    job: Job = workflow.job("job-stage-condition")
+    rs = local_execute_strategy(job, {"sleep": "1"}, {})
+
+    assert rs.context == {
+        "2150810470": {
+            "matrix": {"sleep": "1"},
+            "stages": {
+                "equal-one": {"outputs": {"result": "pass-condition"}},
+                "not-equal-one": {"outputs": {}, "skipped": True},
+            },
+        },
+    }
+
+
 @mock.patch.object(Config, "job_raise_error", True)
 @mock.patch.object(Config, "stage_raise_error", False)
 def test_job_exec_strategy_catch_stage_error():

@@ -78,6 +78,15 @@ def test_batch():
     ]
 
 
+def test_demo():
+    rs = [True, False, False, True]
+    assert sum(rs) == 2
+    rs = [False, False, False]
+    assert sum(rs) == 0
+    rs = [True, False, False, False]
+    assert sum(rs) == 1
+
+
 def test_make_exec():
     test_file: str = "./tmp_test_exec.txt"
 

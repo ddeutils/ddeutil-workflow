@@ -44,10 +44,15 @@ def test_param2template():
         {
             "in-string": "value is ${{ stages.first-stage.errors?.class }}",
             "key-only": "${{ stages.first-stage.errors?.message }}",
+            "key-only-default": "${{ stages.first-stage.errors?.message | coalesce(False) }}",
         },
         params={"stages": {"first-stage": {"outputs": {"result": 100}}}},
     )
-    assert value == {"in-string": "value is None", "key-only": None}
+    assert value == {
+        "in-string": "value is None",
+        "key-only": None,
+        "key-only-default": False,
+    }
 
 
 def test_param2template_with_filter():

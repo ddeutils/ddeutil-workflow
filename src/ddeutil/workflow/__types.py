@@ -61,8 +61,10 @@ class Re:
     #   Regular expression:
     #       - Version 1:
     #         \${{\s*(?P<caller>[a-zA-Z0-9_.\s'\"\[\]\(\)\-\{}]+?)\s*(?P<post_filters>(?:\|\s*(?:[a-zA-Z0-9_]{3,}[a-zA-Z0-9_.,-\\%\s'\"[\]()\{}]+)\s*)*)}}
+    #
     #       - Version 2: (2024-09-30):
     #         \${{\s*(?P<caller>(?P<caller_prefix>(?:[a-zA-Z_-]+\.)*)(?P<caller_last>[a-zA-Z0-9_\-.'\"(\)[\]{}]+))\s*(?P<post_filters>(?:\|\s*(?:[a-zA-Z0-9_]{3,}[a-zA-Z0-9_.,-\\%\s'\"[\]()\{}]+)\s*)*)}}
+    #
     #       - Version 3: (2024-10-05):
     #         \${{\s*(?P<caller>(?P<caller_prefix>(?:[a-zA-Z_-]+\??\.)*)(?P<caller_last>[a-zA-Z0-9_\-.'\"(\)[\]{}]+\??))\s*(?P<post_filters>(?:\|\s*(?:[a-zA-Z0-9_]{3,}[a-zA-Z0-9_.,-\\%\s'\"[\]()\{}]+)\s*)*)}}
     #

@@ -32,7 +32,7 @@ Stage       --> {
                     params: {},
                     jobs: {},
                     metrix: {},
-                    stages: {<stage-id>: {outputs: {}, errors: {}}}
+                    stages: {<stage-id>: {outputs: {}, errors: {}, skipped: False}}
                 }
 ```
 
