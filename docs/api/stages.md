@@ -203,3 +203,5 @@ dynamic parameters workflow for common use-case.
 ## ForEach Stage
 
 ## Parallel Stage
+
+## Raise Stage
