@@ -770,7 +770,7 @@ def local_execute(
 
         for strategy in job.strategy.make():
 
-            if event and event.is_set():
+            if event and event.is_set():  # pragma: no cov
                 return result.catch(
                     status=Status.FAILED,
                     context={
@@ -799,7 +799,7 @@ def local_execute(
         f"with {ls} mode."
     )
 
-    if event and event.is_set():
+    if event and event.is_set():  # pragma: no cov
         return result.catch(
             status=Status.FAILED,
             context={

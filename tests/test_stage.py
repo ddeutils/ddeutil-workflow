@@ -1,11 +1,8 @@
 import pytest
-from ddeutil.workflow import Workflow
 from ddeutil.workflow.exceptions import StageException
 from ddeutil.workflow.result import Result
 from ddeutil.workflow.stages import EmptyStage, PyStage, Stage
 from pydantic import ValidationError
-
-from .utils import dump_yaml_context
 
 
 def test_stage():
@@ -65,7 +62,6 @@ def test_stage_if_condition():
     stage: PyStage = PyStage.model_validate(
         {
             "name": "Test if condition",
-            "id": "condition - stage",
             "if": '"${{ params.name }}" == "foo"',
             "run": """message: str = 'Hello World'\nprint(message)""",
         }
@@ -75,27 +71,13 @@ def test_stage_if_condition():
 
 
 def test_stage_if_condition_raise(test_path):
-    with dump_yaml_context(
-        test_path / "conf/demo/01_99_wf_test_wf_condition_raise.yml",
-        data="""
-        tmp-wf-condition-raise:
-          type: Workflow
-          on: 'every_5_minute_bkk'
-          params: {name: str}
-          jobs:
-            condition-job:
-              stages:
-                - name: "Test if condition failed"
-                  id: condition-stage
-                  if: '"${{ params.name }}"'
-        """,
-    ):
-        workflow = Workflow.from_loader(name="tmp-wf-condition-raise")
-        stage: Stage = workflow.job("condition-job").stage(
-            stage_id="condition-stage"
-        )
+    stage: PyStage = PyStage.model_validate(
+        {
+            "name": "Test if condition",
+            "if": '"${{ params.name }}"',
+            "run": """message: str = 'Hello World'\nprint(message)""",
+        }
+    )
 
-        # NOTE: Raise error because output of the if-condition does not be
-        #   boolean type.
-        with pytest.raises(StageException):
-            stage.is_skipped({"params": {"name": "foo"}})
+    with pytest.raises(StageException):
+        stage.is_skipped({"params": {"name": "foo"}})

@@ -7,7 +7,16 @@ from ddeutil.workflow.templates import (
     has_template,
     not_in_template,
     param2template,
+    str2template,
 )
+
+
+def test_str2template():
+    value = str2template("None", params={})
+    assert value is None
+
+    value = str2template("${{ stages?.message }}", params={})
+    assert value is None
 
 
 def test_param2template():

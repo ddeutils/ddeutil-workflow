@@ -101,3 +101,15 @@ def test_job_set_outputs():
                 {}, {"jobs": {}}
             )
         ) == {"jobs": {"1": {"strategies": {}}}}
+
+
+def test_job_if_condition():
+    job = Job.model_validate({"if": '"${{ params.name }}" == "foo"'})
+    assert not job.is_skipped(params={"params": {"name": "foo"}})
+    assert job.is_skipped(params={"params": {"name": "bar"}})
+
+
+def test_job_if_condition_raise():
+    job = Job.model_validate({"if": '"${{ params.name }}"'})
+    with pytest.raises(JobException):
+        job.is_skipped({"params": {"name": "foo"}})
