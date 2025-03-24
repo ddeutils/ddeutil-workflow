@@ -388,9 +388,38 @@ class Job(BaseModel):
     def check_needs(self, jobs: dict[str, Any]) -> bool:
         """Return True if job's need exists in an input list of job's ID.
 
+        :param jobs: A mapping of job model and its ID.
+
         :rtype: bool
         """
-        return all(need in jobs for need in self.needs)
+        if not self.needs:
+            return True
+
+        need_exist: dict[str, Any] = {
+            need: jobs[need] for need in self.needs if need in jobs
+        }
+        if len(need_exist) != len(self.needs):
+            return False
+        elif self.trigger_rule == TriggerRules.all_done:
+            return True
+        elif self.trigger_rule == TriggerRules.all_success:
+            return all("errors" not in need_exist[job] for job in need_exist)
+        elif self.trigger_rule == TriggerRules.all_failed:
+            return all("errors" in need_exist[job] for job in need_exist)
+        elif self.trigger_rule == TriggerRules.one_success:
+            return sum(
+                "errors" not in need_exist[job] for job in need_exist
+            ) + 1 == len(self.needs)
+        elif self.trigger_rule == TriggerRules.one_failed:
+            return sum("errors" in need_exist[job] for job in need_exist) == 1
+        elif self.trigger_rule in (
+            TriggerRules.none_failed,
+            TriggerRules.none_skipped,
+        ):
+            raise NotImplementedError(
+                f"Trigger rule: {self.trigger_rule} does not support yet."
+            )
+        return False
 
     def set_outputs(self, output: DictData, to: DictData) -> DictData:
         """Set an outputs from execution process to the received context. The
@@ -562,6 +591,7 @@ def local_execute_strategy(
 
         if stage.is_skipped(params=context):
             result.trace.info(f"[STAGE]: Skip stage: {stage.iden!r}")
+            stage.set_outputs(output={"skipped": True}, to=context)
             continue
 
         if event and event.is_set():
@@ -625,9 +655,6 @@ def local_execute_strategy(
                     },
                 },
             )
-
-        # NOTE: Remove the current stage object for saving memory.
-        del stage
 
     return result.catch(
         status=Status.SUCCESS,

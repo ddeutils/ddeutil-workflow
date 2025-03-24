@@ -353,3 +353,9 @@ def datetime_format(value: datetime, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
     raise UtilException(
         "This custom function should pass input value with datetime type."
     )
+
+
+@custom_filter("coalesce")  # pragma: no cov
+def coalesce(value: T | None, default: Any) -> T:
+    """Coalesce with default value if the main value is None."""
+    return default if value is None else value

@@ -185,6 +185,18 @@ wf-run-python-raise-for-job:
             raise ValueError('Testing raise error inside PyStage!!!')
         - name: Echo hello world 2
           echo: "Hello World 2"
+    job-stage-condition:
+      stages:
+        - name: Raise Error Inside
+          id: equal-one
+          if: ${{ matrix.sleep }} == 1
+          run: |
+            result: str = 'pass-condition'
+        - name: Raise Error Inside
+          id: not-equal-one
+          if: ${{ matrix.sleep }} != 1
+          run: |
+            result: str = 'not-equal-1-condition'
     job-complete:
       strategy:
         fail-fast: False
