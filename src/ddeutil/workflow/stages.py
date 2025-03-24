@@ -1013,7 +1013,10 @@ class IfStage(BaseStage):  # pragma: no cov
 
 
 class RaiseStage(BaseStage):  # pragma: no cov
-    message: str = Field(alias="raise")
+    message: str = Field(
+        description="An error message that want to raise",
+        alias="raise",
+    )
 
     def execute(
         self, params: DictData, *, result: Result | None = None

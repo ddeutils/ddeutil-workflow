@@ -397,7 +397,9 @@ class Job(BaseModel):
                 return stage
         raise ValueError(f"Stage ID {stage_id} does not exists")
 
-    def check_needs(self, jobs: dict[str, Any]) -> TriggerState:
+    def check_needs(
+        self, jobs: dict[str, Any]
+    ) -> TriggerState:  # pragma: no cov
         """Return True if job's need exists in an input list of job's ID.
 
         :param jobs: A mapping of job model and its ID.
