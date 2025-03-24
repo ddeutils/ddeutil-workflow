@@ -208,7 +208,13 @@ def test_workflow_condition(test_path):
         rs: Result = workflow.execute(params={"name": "bar"})
         assert {
             "params": {"name": "bar"},
-            "jobs": {"condition-job": {"stages": {}}},
+            "jobs": {
+                "condition-job": {
+                    "stages": {
+                        "condition-stage": {"outputs": {}, "skipped": True},
+                    },
+                },
+            },
         } == rs.context
 
         rs: Result = workflow.execute(params={"name": "foo"})
