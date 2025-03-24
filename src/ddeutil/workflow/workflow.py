@@ -895,17 +895,21 @@ class Workflow(BaseModel):
         #   arguments).
         #
         try:
-            result.trace.info(f"[JOB]: Start execute job: {job_id!r}")
             job: Job = self.jobs[job_id]
-            job.set_outputs(
-                job.execute(
-                    params=params,
-                    run_id=result.run_id,
-                    parent_run_id=result.parent_run_id,
-                    event=event,
-                ).context,
-                to=params,
-            )
+            if job.is_skipped(params=params):
+                result.trace.info(f"[JOB]: Skip job: {job_id!r}")
+                job.set_outputs(output={"SKIP": {"skipped": True}}, to=params)
+            else:
+                result.trace.info(f"[JOB]: Start execute job: {job_id!r}")
+                job.set_outputs(
+                    job.execute(
+                        params=params,
+                        run_id=result.run_id,
+                        parent_run_id=result.parent_run_id,
+                        event=event,
+                    ).context,
+                    to=params,
+                )
         except JobException as err:
             result.trace.error(f"[WORKFLOW]: {err.__class__.__name__}: {err}")
             if raise_error:
@@ -1063,6 +1067,7 @@ class Workflow(BaseModel):
                         "Check job trigger rule was failed."
                     )
                 elif check == TriggerState.skipped:  # pragma: no cov
+                    result.trace.info(f"[JOB]: Skip job: {job_id!r}")
                     job.set_outputs({"SKIP": {"skipped": True}}, to=context)
                     job_queue.task_done()
                     continue
@@ -1164,6 +1169,7 @@ class Workflow(BaseModel):
             elif check == TriggerState.failed:  # pragma: no cov
                 raise WorkflowException("Check job trigger rule was failed.")
             elif check == TriggerState.skipped:  # pragma: no cov
+                result.trace.info(f"[JOB]: Skip job: {job_id!r}")
                 job.set_outputs({"SKIP": {"skipped": True}}, to=context)
                 job_queue.task_done()
                 continue

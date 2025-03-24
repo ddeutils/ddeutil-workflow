@@ -309,7 +309,7 @@ def test_workflow_exec_with_matrix():
 
 
 def test_workflow_exec_needs():
-    workflow = Workflow.from_loader(name="wf-run-depends", externals={})
+    workflow = Workflow.from_loader(name="wf-run-depends")
     rs: Result = workflow.execute(params={"name": "bar"})
     assert {
         "params": {"name": "bar"},
@@ -335,6 +335,25 @@ def test_workflow_exec_needs():
                     },
                 },
             },
+        },
+    } == rs.context
+
+
+def test_workflow_exec_needs_condition():
+    workflow = Workflow.from_loader(name="wf-run-depends-condition")
+    rs: Result = workflow.execute(params={"name": "bar"})
+    assert {
+        "params": {"name": "bar"},
+        "jobs": {
+            "final-job": {
+                "stages": {
+                    "8797330324": {
+                        "outputs": {},
+                    },
+                },
+            },
+            "first-job": {"skipped": True},
+            "second-job": {"skipped": True},
         },
     } == rs.context
 

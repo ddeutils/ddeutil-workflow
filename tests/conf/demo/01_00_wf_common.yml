@@ -306,6 +306,25 @@ wf-run-depends:
         - name: Echo final
           echo: "This job do not wait the first jon finish"
 
+wf-run-depends-condition:
+  type: Workflow
+  jobs:
+    first-job:
+      needs: [ 'second-job' ]
+      stages:
+        - name: Echo next
+          echo: "Wait fist job success full"
+    second-job:
+      if: "False"
+      stages:
+        - name: Echo hello world
+          echo: "Hello World"
+    final-job:
+      stages:
+        - name: Echo final
+          echo: "This job do not wait the first jon finish"
+          sleep: 1
+
 
 wf-without-jobs:
   type: Workflow
