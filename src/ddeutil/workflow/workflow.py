@@ -34,7 +34,7 @@ from .audit import Audit, get_audit
 from .conf import Loader, config, get_logger
 from .cron import On
 from .exceptions import JobException, WorkflowException
-from .job import CheckState, Job
+from .job import Job, TriggerState
 from .params import Param
 from .result import Result, Status
 from .templates import has_template, param2template
@@ -1053,19 +1053,19 @@ class Workflow(BaseModel):
                 job_id: str = job_queue.get()
                 job: Job = self.jobs[job_id]
 
-                if (check := job.check_needs(context["jobs"])).is_waited():
+                if (check := job.check_needs(context["jobs"])).is_waiting():
                     job_queue.task_done()
                     job_queue.put(job_id)
                     time.sleep(0.15)
                     continue
-                elif check == CheckState.failed:  # pragma: no cov
+                elif check == TriggerState.failed:  # pragma: no cov
                     raise WorkflowException(
                         "Check job trigger rule was failed."
                     )
-                elif check == CheckState.skipped:  # pragma: no cov
-                    raise NotImplementedError(
-                        "Job trigger rule: 'slipped' does not implement yet."
-                    )
+                elif check == TriggerState.skipped:  # pragma: no cov
+                    job.set_outputs({"SKIP": {"skipped": True}}, to=context)
+                    job_queue.task_done()
+                    continue
 
                 # NOTE: Start workflow job execution with deep copy context data
                 #   before release.
@@ -1156,17 +1156,17 @@ class Workflow(BaseModel):
             job: Job = self.jobs[job_id]
 
             # NOTE: Waiting dependency job run successful before release.
-            if (check := job.check_needs(context["jobs"])).is_waited():
+            if (check := job.check_needs(context["jobs"])).is_waiting():
                 job_queue.task_done()
                 job_queue.put(job_id)
                 time.sleep(0.075)
                 continue
-            elif check == CheckState.failed:  # pragma: no cov
+            elif check == TriggerState.failed:  # pragma: no cov
                 raise WorkflowException("Check job trigger rule was failed.")
-            elif check == CheckState.skipped:  # pragma: no cov
-                raise NotImplementedError(
-                    "Job trigger rule: 'slipped' does not implement yet."
-                )
+            elif check == TriggerState.skipped:  # pragma: no cov
+                job.set_outputs({"SKIP": {"skipped": True}}, to=context)
+                job_queue.task_done()
+                continue
 
             # NOTE: Start workflow job execution with deep copy context data
             #   before release. This job execution process will run until

@@ -51,10 +51,10 @@ MatrixFilter = list[dict[str, Union[str, int]]]
 
 
 __all__: TupleStr = (
-    "CheckState",
     "Strategy",
     "Job",
     "TriggerRules",
+    "TriggerState",
     "RunsOn",
     "RunsOnLocal",
     "RunsOnSelfHosted",
@@ -209,14 +209,14 @@ class TriggerRules(str, Enum):
     none_skipped: str = "none_skipped"
 
 
-class CheckState(str, Enum):
-    wait: str = "wait"
+class TriggerState(str, Enum):
+    waiting: str = "waiting"
     passed: str = "passed"
     skipped: str = "skipped"
     failed: str = "failed"
 
-    def is_waited(self):
-        return self.value == "wait"
+    def is_waiting(self):
+        return self.value == "waiting"
 
 
 class RunsOnType(str, Enum):
@@ -396,41 +396,49 @@ class Job(BaseModel):
                 return stage
         raise ValueError(f"Stage ID {stage_id} does not exists")
 
-    def check_needs(self, jobs: dict[str, Any]) -> CheckState:
+    def check_needs(self, jobs: dict[str, Any]) -> TriggerState:
         """Return True if job's need exists in an input list of job's ID.
 
         :param jobs: A mapping of job model and its ID.
 
-        :rtype: CheckState
+        :rtype: TriggerState
         """
         if not self.needs:
-            return CheckState.passed
+            return TriggerState.passed
 
-        def make_return(result: bool) -> CheckState:
-            return CheckState.passed if result else CheckState.failed
+        def make_return(result: bool) -> TriggerState:
+            return TriggerState.passed if result else TriggerState.failed
 
         need_exist: dict[str, Any] = {
             need: jobs[need] for need in self.needs if need in jobs
         }
-        rs: bool = False
         if len(need_exist) != len(self.needs):
-            return CheckState.wait
+            return TriggerState.waiting
+        elif all("skipped" in need_exist[job] for job in need_exist):
+            return TriggerState.skipped
         elif self.trigger_rule == TriggerRules.all_done:
-            return CheckState.passed
+            return TriggerState.passed
         elif self.trigger_rule == TriggerRules.all_success:
-            rs = all("errors" not in need_exist[job] for job in need_exist)
+            rs = all(
+                k not in need_exist[job]
+                for k in ("errors", "skipped")
+                for job in need_exist
+            )
         elif self.trigger_rule == TriggerRules.all_failed:
             rs = all("errors" in need_exist[job] for job in need_exist)
         elif self.trigger_rule == TriggerRules.one_success:
             rs = sum(
-                "errors" not in need_exist[job] for job in need_exist
+                k not in need_exist[job]
+                for k in ("errors", "skipped")
+                for job in need_exist
             ) + 1 == len(self.needs)
         elif self.trigger_rule == TriggerRules.one_failed:
             rs = sum("errors" in need_exist[job] for job in need_exist) == 1
-        elif self.trigger_rule in (
-            TriggerRules.none_failed,
-            TriggerRules.none_skipped,
-        ):
+        elif self.trigger_rule == TriggerRules.none_skipped:
+            rs = all("skipped" not in need_exist[job] for job in need_exist)
+        elif self.trigger_rule == TriggerRules.none_failed:
+            rs = all("errors" not in need_exist[job] for job in need_exist)
+        else:  # pragma: no cov
             raise NotImplementedError(
                 f"Trigger rule: {self.trigger_rule} does not support yet."
             )
@@ -483,7 +491,9 @@ class Job(BaseModel):
             {"errors": output.pop("errors", {})} if "errors" in output else {}
         )
 
-        if self.strategy.is_set():
+        if "SKIP" in output:  # pragma: no cov
+            to["jobs"][_id] = output["SKIP"]
+        elif self.strategy.is_set():
             to["jobs"][_id] = {"strategies": output, **errors}
         else:
             _output = output.get(next(iter(output), "FIRST"), {})
