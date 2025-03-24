@@ -40,12 +40,8 @@ from .exceptions import (
 )
 from .result import Result, Status
 from .stages import Stage
-from .templates import has_template
-from .utils import (
-    cross_product,
-    filter_func,
-    gen_id,
-)
+from .templates import has_template, param2template
+from .utils import cross_product, filter_func, gen_id
 
 MatrixFilter = list[dict[str, Union[str, int]]]
 
@@ -323,6 +319,11 @@ class Job(BaseModel):
         description="A target node for this job to use for execution.",
         alias="runs-on",
     )
+    condition: Optional[str] = Field(
+        default=None,
+        description="A job condition statement to allow job executable.",
+        alias="if",
+    )
     stages: list[Stage] = Field(
         default_factory=list,
         description="A list of Stage of this job.",
@@ -443,6 +444,38 @@ class Job(BaseModel):
                 f"Trigger rule: {self.trigger_rule} does not support yet."
             )
         return make_return(rs)
+
+    def is_skipped(self, params: DictData | None = None) -> bool:
+        """Return true if condition of this job do not correct. This process
+        use build-in eval function to execute the if-condition.
+
+        :raise JobException: When it has any error raise from the eval
+            condition statement.
+        :raise JobException: When return type of the eval condition statement
+            does not return with boolean type.
+
+        :param params: (DictData) A parameters that want to pass to condition
+            template.
+
+        :rtype: bool
+        """
+        if self.condition is None:
+            return False
+
+        params: DictData = {} if params is None else params
+
+        try:
+            # WARNING: The eval build-in function is very dangerous. So, it
+            #   should use the `re` module to validate eval-string before
+            #   running.
+            rs: bool = eval(
+                param2template(self.condition, params), globals() | params, {}
+            )
+            if not isinstance(rs, bool):
+                raise TypeError("Return type of condition does not be boolean")
+            return not rs
+        except Exception as err:
+            raise JobException(f"{err.__class__.__name__}: {err}") from err
 
     def set_outputs(self, output: DictData, to: DictData) -> DictData:
         """Set an outputs from execution process to the received context. The
