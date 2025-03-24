@@ -18,6 +18,7 @@ class ErrorContext(BaseModel):  # pragma: no cov
 class OutputContext(BaseModel):  # pragma: no cov
     outputs: DictData = Field(default_factory=dict)
     errors: Optional[ErrorContext] = Field(default=None)
+    skipped: bool = Field(default=False)
 
     def is_exception(self) -> bool:
         return self.errors is not None
@@ -57,3 +58,4 @@ class JobContext(BaseModel):  # pragma: no cov
     params: DictData = Field(description="A parameterize value")
     jobs: dict[str, StrategyMatrixContext]
     errors: Optional[ErrorContext] = Field(default=None)
+    skipped: bool = Field(default=False)
