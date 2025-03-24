@@ -318,7 +318,10 @@ class Job(BaseModel):
     )
     trigger_rule: TriggerRules = Field(
         default=TriggerRules.all_success,
-        description="A trigger rule of tracking needed jobs.",
+        description=(
+            "A trigger rule of tracking needed jobs if feature will use when "
+            "the `raise_error` did not set from job and stage executions."
+        ),
         alias="trigger-rule",
     )
     needs: list[str] = Field(
@@ -458,8 +461,8 @@ class Job(BaseModel):
         multithread on this metrics to the `stages` field of this job.
 
         :param params: An input parameters that use on job execution.
-        :param run_id: A job running ID for this execution.
-        :param parent_run_id: A parent workflow running ID for this release.
+        :param run_id: (str) A job running ID.
+        :param parent_run_id: (str) A parent workflow running ID.
         :param result: (Result) A result object for keeping context and status
             data.
         :param event: (Event) An event manager that pass to the
@@ -680,7 +683,17 @@ def local_execute(
 
         for strategy in job.strategy.make():
 
-            # TODO: stop and raise error if the event was set.
+            if event and event.is_set():
+                return result.catch(
+                    status=Status.FAILED,
+                    context={
+                        "errors": JobException(
+                            "Job strategy was canceled from event that had set "
+                            "before strategy execution."
+                        ).to_dict()
+                    },
+                )
+
             local_execute_strategy(
                 job=job,
                 strategy=strategy,
@@ -694,11 +707,21 @@ def local_execute(
 
     fail_fast_flag: bool = job.strategy.fail_fast
     ls: str = "Fail-Fast" if fail_fast_flag else "All-Completed"
-
     result.trace.info(
         f"[JOB]: Start multithreading: {job.strategy.max_parallel} threads "
         f"with {ls} mode."
     )
+
+    if event and event.is_set():
+        return result.catch(
+            status=Status.FAILED,
+            context={
+                "errors": JobException(
+                    "Job strategy was canceled from event that had set "
+                    "before strategy execution."
+                ).to_dict()
+            },
+        )
 
     # IMPORTANT: Start running strategy execution by multithreading because
     #   it will run by strategy values without waiting previous execution.
