@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 
 from ddeutil.core import str2bool
 from ddeutil.io import YamlFlResolve
+from ddeutil.io.paths import glob_files, is_ignored, read_ignore
 
 from .__types import DictData, TupleStr
 
@@ -26,10 +27,6 @@ def env(var: str, default: str | None = None) -> str | None:  # pragma: no cov
     return os.getenv(f"{PREFIX}_{var.upper().replace(' ', '_')}", default)
 
 
-def glob_files(path: Path) -> Iterator[Path]:  # pragma: no cov
-    yield from (file for file in path.rglob("*") if file.is_file())
-
-
 __all__: TupleStr = (
     "env",
     "get_logger",
@@ -37,7 +34,6 @@ __all__: TupleStr = (
     "SimLoad",
     "Loader",
     "config",
-    "glob_files",
 )
 
 
@@ -324,17 +320,7 @@ class SimLoad:
 
     @classmethod
     def is_ignore(cls, file: Path, conf_path: Path) -> bool:
-        ignore_file: Path = conf_path / ".confignore"
-        ignore: list[str] = []
-        if ignore_file.exists():
-            ignore = ignore_file.read_text(encoding="utf-8").splitlines()
-
-        if any(
-            (file.match(f"**/{pattern}/*") or file.match(f"**/{pattern}*"))
-            for pattern in ignore
-        ):
-            return True
-        return False
+        return is_ignored(file, read_ignore(conf_path / ".confignore"))
 
     @classmethod
     def filter_yaml(cls, file: Path, name: str | None = None) -> DictData:
