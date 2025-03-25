@@ -273,7 +273,7 @@ class SimLoad:
             if self.is_ignore(file, conf_path):
                 continue
 
-            if data := self.filter_suffix(file, name=name):
+            if data := self.filter_yaml(file, name=name):
                 self.data = data
 
         # VALIDATE: check the data that reading should not empty.
@@ -307,15 +307,15 @@ class SimLoad:
         exclude: list[str] = excluded or []
         for file in glob_files(conf_path):
 
-            for key, data in cls.filter_suffix(file).items():
+            if cls.is_ignore(file, conf_path):
+                continue
 
-                if cls.is_ignore(file, conf_path):
-                    continue
+            for key, data in cls.filter_yaml(file).items():
 
                 if key in exclude:
                     continue
 
-                if data["type"] == obj.__name__:
+                if data.get("type", "") == obj.__name__:
                     yield key, (
                         {k: data[k] for k in data if k in included}
                         if included
@@ -337,11 +337,10 @@ class SimLoad:
         return False
 
     @classmethod
-    def filter_suffix(cls, file: Path, name: str | None = None) -> DictData:
+    def filter_yaml(cls, file: Path, name: str | None = None) -> DictData:
         if any(file.suffix.endswith(s) for s in (".yml", ".yaml")):
             values: DictData = YamlFlResolve(file).read()
             return values.get(name, {}) if name else values
-
         return {}
 
     @cached_property
