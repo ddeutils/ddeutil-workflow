@@ -31,6 +31,7 @@ from concurrent.futures import (
 from datetime import datetime, timedelta
 from functools import wraps
 from heapq import heappop, heappush
+from pathlib import Path
 from textwrap import dedent
 from threading import Thread
 from typing import Callable, Optional, TypedDict, Union
@@ -52,7 +53,7 @@ except ImportError:  # pragma: no cov
 from .__cron import CronRunner
 from .__types import DictData, TupleStr
 from .audit import Audit, get_audit
-from .conf import Loader, config, get_logger
+from .conf import Loader, SimLoad, config, get_logger
 from .cron import On
 from .exceptions import ScheduleException, WorkflowException
 from .result import Result, Status
@@ -266,9 +267,47 @@ class Schedule(BaseModel):
         :param externals: An external parameters that want to pass to Loader
             object.
 
+        :raise ValueError: If the type does not match with current object.
+
         :rtype: Self
         """
         loader: Loader = Loader(name, externals=(externals or {}))
+
+        # NOTE: Validate the config type match with current connection model
+        if loader.type != cls.__name__:
+            raise ValueError(f"Type {loader.type} does not match with {cls}")
+
+        loader_data: DictData = copy.deepcopy(loader.data)
+
+        # NOTE: Add name to loader data
+        loader_data["name"] = name.replace(" ", "_")
+
+        return cls.model_validate(obj=loader_data)
+
+    @classmethod
+    def from_path(
+        cls,
+        name: str,
+        path: Path,
+        externals: DictData | None = None,
+    ) -> Self:
+        """Create Schedule instance from the SimLoad object that receive an
+        input schedule name and conf path. The loader object will use this
+        schedule name to searching configuration data of this schedule model
+        in conf path.
+
+        :param name: (str) A schedule name that want to pass to Loader object.
+        :param path: (Path) A config path that want to search.
+        :param externals: An external parameters that want to pass to Loader
+            object.
+
+        :raise ValueError: If the type does not match with current object.
+
+        :rtype: Self
+        """
+        loader: SimLoad = SimLoad(
+            name, conf_path=path, externals=(externals or {})
+        )
 
         # NOTE: Validate the config type match with current connection model
         if loader.type != cls.__name__:
