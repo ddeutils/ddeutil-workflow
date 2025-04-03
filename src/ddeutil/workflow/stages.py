@@ -42,6 +42,7 @@ from inspect import Parameter
 from pathlib import Path
 from subprocess import CompletedProcess
 from textwrap import dedent
+from threading import Event
 from typing import Annotated, Optional, Union
 
 from pydantic import BaseModel, Field
@@ -127,7 +128,11 @@ class BaseStage(BaseModel, ABC):
 
     @abstractmethod
     def execute(
-        self, params: DictData, *, result: Result | None = None
+        self,
+        params: DictData,
+        *,
+        result: Result | None = None,
+        event: Event | None = None,
     ) -> Result:
         """Execute abstraction method that action something by sub-model class.
         This is important method that make this class is able to be the stage.
@@ -136,6 +141,8 @@ class BaseStage(BaseModel, ABC):
             execution.
         :param result: (Result) A result object for keeping context and status
             data.
+        :param event: (Event) An event manager that use to track parent execute
+            was not force stopped.
 
         :rtype: Result
         """
@@ -150,6 +157,7 @@ class BaseStage(BaseModel, ABC):
         result: Result | None = None,
         raise_error: bool = False,
         to: DictData | None = None,
+        event: Event | None = None,
     ) -> Result:
         """Handler stage execution result from the stage `execute` method.
 
@@ -184,6 +192,7 @@ class BaseStage(BaseModel, ABC):
         :param raise_error: (bool) A flag that all this method raise error
         :param to: (DictData) A target object for auto set the return output
             after execution.
+        :param event: (Event) An event manager that pass to the stage execution.
 
         :rtype: Result
         """
@@ -195,7 +204,7 @@ class BaseStage(BaseModel, ABC):
         )
 
         try:
-            rs: Result = self.execute(params, result=result)
+            rs: Result = self.execute(params, result=result, event=event)
             if to is not None:
                 return self.set_outputs(rs.context, to=to)
             return rs
@@ -323,7 +332,11 @@ class EmptyStage(BaseStage):
     )
 
     def execute(
-        self, params: DictData, *, result: Result | None = None
+        self,
+        params: DictData,
+        *,
+        result: Result | None = None,
+        event: Event | None = None,
     ) -> Result:
         """Execution method for the Empty stage that do only logging out to
         stdout. This method does not use the `handler_result` decorator because
@@ -336,6 +349,8 @@ class EmptyStage(BaseStage):
             But this stage does not pass any output.
         :param result: (Result) A result object for keeping context and status
             data.
+        :param event: (Event) An event manager that use to track parent execute
+            was not force stopped.
 
         :rtype: Result
         """
@@ -439,7 +454,11 @@ class BashStage(BaseStage):
         Path(f"./{f_name}").unlink()
 
     def execute(
-        self, params: DictData, *, result: Result | None = None
+        self,
+        params: DictData,
+        *,
+        result: Result | None = None,
+        event: Event | None = None,
     ) -> Result:
         """Execute the Bash statement with the Python build-in ``subprocess``
         package.
@@ -447,6 +466,8 @@ class BashStage(BaseStage):
         :param params: A parameter data that want to use in this execution.
         :param result: (Result) A result object for keeping context and status
             data.
+        :param event: (Event) An event manager that use to track parent execute
+            was not force stopped.
 
         :rtype: Result
         """
@@ -556,7 +577,11 @@ class PyStage(BaseStage):
         return to
 
     def execute(
-        self, params: DictData, *, result: Result | None = None
+        self,
+        params: DictData,
+        *,
+        result: Result | None = None,
+        event: Event | None = None,
     ) -> Result:
         """Execute the Python statement that pass all globals and input params
         to globals argument on ``exec`` build-in function.
@@ -564,6 +589,8 @@ class PyStage(BaseStage):
         :param params: A parameter that want to pass before run any statement.
         :param result: (Result) A result object for keeping context and status
             data.
+        :param event: (Event) An event manager that use to track parent execute
+            was not force stopped.
 
         :rtype: Result
         """
@@ -630,7 +657,11 @@ class CallStage(BaseStage):
     )
 
     def execute(
-        self, params: DictData, *, result: Result | None = None
+        self,
+        params: DictData,
+        *,
+        result: Result | None = None,
+        event: Event | None = None,
     ) -> Result:
         """Execute the Call function that already in the call registry.
 
@@ -639,11 +670,12 @@ class CallStage(BaseStage):
         :raise TypeError: When the return type of call function does not be
             dict type.
 
-        :param params: A parameter that want to pass before run any statement.
-        :type params: DictData
+        :param params: (DictData) A parameter that want to pass before run any
+            statement.
         :param result: (Result) A result object for keeping context and status
             data.
-        :type: str | None
+        :param event: (Event) An event manager that use to track parent execute
+            was not force stopped.
 
         :rtype: Result
         """
@@ -729,7 +761,11 @@ class TriggerStage(BaseStage):
     )
 
     def execute(
-        self, params: DictData, *, result: Result | None = None
+        self,
+        params: DictData,
+        *,
+        result: Result | None = None,
+        event: Event | None = None,
     ) -> Result:
         """Trigger another workflow execution. It will wait the trigger
         workflow running complete before catching its result.
@@ -737,6 +773,8 @@ class TriggerStage(BaseStage):
         :param params: A parameter data that want to use in this execution.
         :param result: (Result) A result object for keeping context and status
             data.
+        :param event: (Event) An event manager that use to track parent execute
+            was not force stopped.
 
         :rtype: Result
         """
@@ -839,7 +877,11 @@ class ParallelStage(BaseStage):  # pragma: no cov
         return context
 
     def execute(
-        self, params: DictData, *, result: Result | None = None
+        self,
+        params: DictData,
+        *,
+        result: Result | None = None,
+        event: Event | None = None,
     ) -> Result:
         """Execute the stages that parallel each branch via multi-threading mode
         or async mode by changing `async_mode` flag.
@@ -847,6 +889,8 @@ class ParallelStage(BaseStage):  # pragma: no cov
         :param params: A parameter that want to pass before run any statement.
         :param result: (Result) A result object for keeping context and status
             data.
+        :param event: (Event) An event manager that use to track parent execute
+            was not force stopped.
 
         :rtype: Result
         """
@@ -915,15 +959,28 @@ class ForEachStage(BaseStage):
             "A list of stage that will run with each item in the foreach field."
         ),
     )
+    concurrent: int = Field(
+        default=1,
+        description=(
+            "A concurrent value allow to run each item at the same time. It "
+            "will be sequential mode if this value equal 1."
+        ),
+    )
 
     def execute(
-        self, params: DictData, *, result: Result | None = None
+        self,
+        params: DictData,
+        *,
+        result: Result | None = None,
+        event: Event | None = None,
     ) -> Result:
         """Execute the stages that pass each item form the foreach field.
 
         :param params: A parameter that want to pass before run any statement.
         :param result: (Result) A result object for keeping context and status
             data.
+        :param event: (Event) An event manager that use to track parent execute
+            was not force stopped.
 
         :rtype: Result
         """
@@ -1009,7 +1066,11 @@ class IfStage(BaseStage):  # pragma: no cov
     match: list[dict[str, Union[str, Stage]]]
 
     def execute(
-        self, params: DictData, *, result: Result | None = None
+        self,
+        params: DictData,
+        *,
+        result: Result | None = None,
+        event: Event | None = None,
     ) -> Result: ...
 
 
@@ -1020,7 +1081,11 @@ class RaiseStage(BaseStage):  # pragma: no cov
     )
 
     def execute(
-        self, params: DictData, *, result: Result | None = None
+        self,
+        params: DictData,
+        *,
+        result: Result | None = None,
+        event: Event | None = None,
     ) -> Result:
         raise StageException(self.message)
 
@@ -1032,7 +1097,11 @@ class HookStage(BaseStage):  # pragma: no cov
     callback: str
 
     def execute(
-        self, params: DictData, *, result: Result | None = None
+        self,
+        params: DictData,
+        *,
+        result: Result | None = None,
+        event: Event | None = None,
     ) -> Result: ...
 
 
@@ -1046,7 +1115,11 @@ class DockerStage(BaseStage):  # pragma: no cov
     auth: DictData = Field(default_factory=dict)
 
     def execute(
-        self, params: DictData, *, result: Result | None = None
+        self,
+        params: DictData,
+        *,
+        result: Result | None = None,
+        event: Event | None = None,
     ) -> Result: ...
 
 
@@ -1060,7 +1133,11 @@ class VirtualPyStage(PyStage):  # pragma: no cov
     def create_py_file(self, py: str, run_id: str | None): ...
 
     def execute(
-        self, params: DictData, *, result: Result | None = None
+        self,
+        params: DictData,
+        *,
+        result: Result | None = None,
+        event: Event | None = None,
     ) -> Result:
         return super().execute(params, result=result)
 
@@ -1069,7 +1146,11 @@ class VirtualPyStage(PyStage):  # pragma: no cov
 class SensorStage(BaseStage):  # pragma: no cov
 
     def execute(
-        self, params: DictData, *, result: Result | None = None
+        self,
+        params: DictData,
+        *,
+        result: Result | None = None,
+        event: Event | None = None,
     ) -> Result: ...
 
 

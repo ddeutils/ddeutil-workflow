@@ -694,6 +694,7 @@ def local_execute_strategy(
                     params=context,
                     run_id=result.run_id,
                     parent_run_id=result.parent_run_id,
+                    event=event,
                 ).context,
                 to=context,
             )
