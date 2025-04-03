@@ -326,7 +326,8 @@ class SimLoad:
     def filter_yaml(cls, file: Path, name: str | None = None) -> DictData:
         if any(file.suffix.endswith(s) for s in (".yml", ".yaml")):
             values: DictData = YamlFlResolve(file).read()
-            return values.get(name, {}) if name else values
+            if values is not None:
+                return values.get(name, {}) if name else values
         return {}
 
     @cached_property
