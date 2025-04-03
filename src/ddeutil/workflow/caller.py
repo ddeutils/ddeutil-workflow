@@ -10,7 +10,7 @@ import logging
 from dataclasses import dataclass
 from functools import wraps
 from importlib import import_module
-from typing import Any, Callable, Protocol, TypeVar
+from typing import Any, Callable, Optional, Protocol, TypeVar
 
 try:
     from typing import ParamSpec
@@ -76,15 +76,19 @@ def tag(
 Registry = dict[str, Callable[[], TagFunc]]
 
 
-def make_registry(submodule: str) -> dict[str, Registry]:
+def make_registry(
+    submodule: str,
+    registries: Optional[list[str]] = None,
+) -> dict[str, Registry]:
     """Return registries of all functions that able to called with task.
 
     :param submodule: (str) A module prefix that want to import registry.
+    :param registries: (Optional[list[str]]) A list of registry.
 
     :rtype: dict[str, Registry]
     """
     rs: dict[str, Registry] = {}
-    regis_calls: list[str] = config.regis_call
+    regis_calls: list[str] = registries or config.regis_call  # pragma: no cov
     regis_calls.extend(["ddeutil.vendors"])
     for module in regis_calls:
         # NOTE: try to sequential import task functions
@@ -131,11 +135,15 @@ class CallSearchData:
     tag: str
 
 
-def extract_call(call: str) -> Callable[[], TagFunc]:
+def extract_call(
+    call: str,
+    registries: Optional[list[str]] = None,
+) -> Callable[[], TagFunc]:
     """Extract Call function from string value to call partial function that
     does run it at runtime.
 
     :param call: (str) A call value that able to match with Task regex.
+    :param registries: (Optional[list[str]]) A list of registry.
 
         The format of call value should contain 3 regular expression groups
     which match with the below config format:
@@ -164,7 +172,10 @@ def extract_call(call: str) -> Callable[[], TagFunc]:
     call: CallSearchData = CallSearchData(**found.groupdict())
 
     # NOTE: Registry object should implement on this package only.
-    rgt: dict[str, Registry] = make_registry(f"{call.path}")
+    rgt: dict[str, Registry] = make_registry(
+        submodule=f"{call.path}",
+        registries=registries,
+    )
     if call.func not in rgt:
         raise NotImplementedError(
             f"`REGISTER-MODULES.{call.path}.registries` does not "
