@@ -2,6 +2,31 @@
 
 ## Latest Changes
 
+## 0.0.40
+
+### :stars: Highlight Features
+
+- :star: hl: add. rom_path construct on the Schedule model
+- :star: hl: add. rom_path construct on the Workflow model
+
+### :bug: Bug fixes
+
+- :gear: fixed: revise filter ignore condition on simload object.
+
+### :black_nib: Code Changes
+
+- :construction: typo: add type-hint on __cron module.
+
+### :package: Build & Workflow
+
+- :package: build: bump pydantic from 2.10.6 to 2.11.1 (#34)
+- :package: build: bump python-dotenv from 1.0.1 to 1.1.0 (#35)
+
+### :postbox: Dependencies
+
+- :pushpin: deps: update version ddeutil-io[yaml,toml] from 0.2.8 to 0.2.10.
+- :pushpin: deps: update ddeutil-io from 0.2.3 to 0.2.8.
+
 ## 0.0.39
 
 ### :stars: Highlight Features
