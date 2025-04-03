@@ -3,7 +3,7 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-"""A Workflow module."""
+"""A Workflow module that is the core model of this package."""
 from __future__ import annotations
 
 import copy
@@ -18,6 +18,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 from functools import partial, total_ordering
 from heapq import heappop, heappush
+from pathlib import Path
 from queue import Queue
 from textwrap import dedent
 from threading import Event
@@ -31,7 +32,7 @@ from typing_extensions import Self
 from .__cron import CronJob, CronRunner
 from .__types import DictData, TupleStr
 from .audit import Audit, get_audit
-from .conf import Loader, config, get_logger
+from .conf import Loader, SimLoad, config, get_logger
 from .cron import On
 from .exceptions import JobException, WorkflowException
 from .job import Job, TriggerState
@@ -299,33 +300,71 @@ class Workflow(BaseModel):
 
         # NOTE: Add name to loader data
         loader_data["name"] = name.replace(" ", "_")
+        cls.__bypass_on__(
+            loader_data, path=loader.conf_path, externals=externals
+        )
+        return cls.model_validate(obj=loader_data)
 
-        # NOTE: Prepare `on` data
-        cls.__bypass_on__(loader_data, externals=externals)
+    @classmethod
+    def from_path(
+        cls,
+        name: str,
+        path: Path,
+        externals: DictData | None = None,
+    ) -> Self:
+        """Create Workflow instance from the specific path. The loader object
+        will use this workflow name and path to searching configuration data of
+        this workflow model.
+
+        :param name: (str) A workflow name that want to pass to Loader object.
+        :param path: (Path) A config path that want to search.
+        :param externals: An external parameters that want to pass to Loader
+            object.
+
+        :raise ValueError: If the type does not match with current object.
+
+        :rtype: Self
+        """
+        loader: SimLoad = SimLoad(
+            name, conf_path=path, externals=(externals or {})
+        )
+        # NOTE: Validate the config type match with current connection model
+        if loader.type != cls.__name__:
+            raise ValueError(f"Type {loader.type} does not match with {cls}")
+
+        loader_data: DictData = copy.deepcopy(loader.data)
+
+        # NOTE: Add name to loader data
+        loader_data["name"] = name.replace(" ", "_")
+        cls.__bypass_on__(loader_data, path=path, externals=externals)
         return cls.model_validate(obj=loader_data)
 
     @classmethod
     def __bypass_on__(
         cls,
         data: DictData,
+        path: Path,
         externals: DictData | None = None,
     ) -> DictData:
         """Bypass the on data to loaded config data.
 
-        :param data:
-        :param externals:
+        :param data: A data to construct to this Workflow model.
+        :param path: A config path.
+        :param externals: An external parameters that want to pass to SimLoad
+            object.
         :rtype: DictData
         """
         if on := data.pop("on", []):
             if isinstance(on, str):
-                on = [on]
+                on: list[str] = [on]
             if any(not isinstance(i, (dict, str)) for i in on):
                 raise TypeError("The ``on`` key should be list of str or dict")
 
-            # NOTE: Pass on value to Loader and keep on model object to on field
+            # NOTE: Pass on value to SimLoad and keep on model object to the on
+            #   field.
             data["on"] = [
                 (
-                    Loader(n, externals=(externals or {})).data
+                    SimLoad(n, conf_path=path, externals=(externals or {})).data
                     if isinstance(n, str)
                     else n
                 )

@@ -114,6 +114,19 @@ def test_workflow_desc():
 
 def test_workflow_from_loader_without_job():
     workflow = Workflow.from_loader(name="wf-without-jobs")
+    assert workflow.name == "wf-without-jobs"
+
+    rs = workflow.execute({})
+    assert rs.context == {}
+
+
+def test_workflow_from_path(test_path):
+    workflow = Workflow.from_path(
+        name="wf-without-jobs",
+        path=test_path / "conf",
+    )
+    assert workflow.name == "wf-without-jobs"
+
     rs = workflow.execute({})
     assert rs.context == {}
 
@@ -139,6 +152,12 @@ def test_workflow_from_loader_raise(test_path):
     with pytest.raises(ValueError):
         Workflow.from_loader(name="wf-run-from-loader-raise")
 
+    with pytest.raises(ValueError):
+        Workflow.from_path(
+            name="wf-run-from-loader-raise",
+            path=test_path / "conf",
+        )
+
     # NOTE: Raise if type of the on field does not valid with str or dict.
     dump_yaml(
         test_file,
@@ -161,7 +180,13 @@ def test_workflow_from_loader_raise(test_path):
     with pytest.raises(TypeError):
         Workflow.from_loader(name="wf-run-from-loader-raise")
 
-    # NOTE: Raise if value of the on field does not parsing to the CronJob obj.
+    with pytest.raises(TypeError):
+        Workflow.from_path(
+            name="wf-run-from-loader-raise",
+            path=test_path / "conf",
+        )
+
+    # NOTE: Raise if value of the on field does not parse to the CronJob obj.
     dump_yaml(
         test_file,
         data={
@@ -181,6 +206,12 @@ def test_workflow_from_loader_raise(test_path):
 
     with pytest.raises(WorkflowException):
         Workflow.from_loader(name="wf-run-from-loader-raise")
+
+    with pytest.raises(WorkflowException):
+        Workflow.from_path(
+            name="wf-run-from-loader-raise",
+            path=test_path / "conf",
+        )
 
     # NOTE: Remove the testing file on the demo path.
     test_file.unlink(missing_ok=True)
