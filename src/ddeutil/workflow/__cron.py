@@ -37,7 +37,7 @@ class CronYearLimit(Exception): ...
 def str2cron(value: str) -> str:  # pragma: no cov
     """Convert Special String with the @ prefix to Crontab value.
 
-    :param value: A string value that want to convert to cron value.
+    :param value: (str) A string value that want to convert to cron value.
     :rtype: str
 
     Table:
@@ -82,6 +82,9 @@ class Unit:
         )
 
 
+Units = tuple[Unit, ...]
+
+
 @dataclass
 class Options:
     """Options dataclass for config CronPart object."""
@@ -91,7 +94,7 @@ class Options:
     output_hashes: bool = False
 
 
-CRON_UNITS: tuple[Unit, ...] = (
+CRON_UNITS: Units = (
     Unit(
         name="minute",
         range=partial(range, 0, 60),
@@ -147,7 +150,7 @@ CRON_UNITS: tuple[Unit, ...] = (
     ),
 )
 
-CRON_UNITS_YEAR: tuple[Unit, ...] = CRON_UNITS + (
+CRON_UNITS_YEAR: Units = CRON_UNITS + (
     Unit(
         name="year",
         range=partial(range, 1990, 2101),
@@ -220,18 +223,21 @@ class CronPart:
         return ",".join(cron_range_strings) if cron_range_strings else "?"
 
     def __repr__(self) -> str:
+        """Override __repr__ method."""
         return (
             f"{self.__class__.__name__}"
             f"(unit={self.unit}, values={self.__str__()!r})"
         )
 
     def __lt__(self, other) -> bool:
+        """Override __lt__ method."""
         if isinstance(other, CronPart):
             return self.values < other.values
         elif isinstance(other, list):
             return self.values < other
 
     def __eq__(self, other) -> bool:
+        """Override __eq__ method."""
         if isinstance(other, CronPart):
             return self.values == other.values
         elif isinstance(other, list):
@@ -239,18 +245,26 @@ class CronPart:
 
     @property
     def min(self) -> int:
-        """Returns the smallest value in the range."""
+        """Returns the smallest value in the range.
+
+        :rtype: int
+        """
         return self.values[0]
 
     @property
     def max(self) -> int:
-        """Returns the largest value in the range."""
+        """Returns the largest value in the range.
+
+        :rtype: int
+        """
         return self.values[-1]
 
     @property
     def step(self) -> Optional[int]:
         """Returns the difference between first and second elements in the
         range.
+
+        :rtype: Optional[int]
         """
         if (
             len(self.values) > 2
@@ -260,15 +274,17 @@ class CronPart:
 
     @property
     def is_full(self) -> bool:
-        """Returns true if range has all the values of the unit."""
+        """Returns true if range has all the values of the unit.
+
+        :rtype: bool
+        """
         return len(self.values) == (self.unit.max - self.unit.min + 1)
 
     def from_str(self, value: str) -> tuple[int, ...]:
         """Parses a string as a range of positive integers. The string should
         include only `-` and `,` special strings.
 
-        :param value: A string value that want to parse
-        :type value: str
+        :param value: (str) A string value that want to parse
 
         TODO: support for `L`, `W`, and `#`
         ---
@@ -351,6 +367,8 @@ class CronPart:
             For example if value == 'JAN,AUG' it will replace to '1,8'.
 
         :param value: A string value that want to replace alternative to int.
+
+        :rtype: str
         """
         for i, alt in enumerate(self.unit.alt):
             if alt in value:
@@ -361,6 +379,7 @@ class CronPart:
         """Replaces all 7 with 0 as Sunday can be represented by both.
 
         :param values: list or iter of int that want to mode by 7
+
         :rtype: list[int]
         """
         if self.unit.name == "weekday":
@@ -388,7 +407,13 @@ class CronPart:
         return values
 
     def _parse_range(self, value: str) -> list[int]:
-        """Parses a range string."""
+        """Parses a range string from a cron-part.
+
+        :param value: (str) A cron-part string value that want to parse.
+
+        :rtype: list[int]
+        :return: A list of parse range.
+        """
         if value == "*":
             return list(self.unit.range())
         elif value.count("-") > 1:
@@ -410,7 +435,13 @@ class CronPart:
         values: list[int],
         step: int | None = None,
     ) -> list[int]:
-        """Applies an interval step to a collection of values."""
+        """Applies an interval step to a collection of values.
+
+        :param values:
+        :param step:
+
+        :rtype: list[int]
+        """
         if not step:
             return values
         elif (_step := int(step)) < 1:
@@ -427,7 +458,10 @@ class CronPart:
 
     @property
     def is_interval(self) -> bool:
-        """Returns true if the range can be represented as an interval."""
+        """Returns true if the range can be represented as an interval.
+
+        :rtype: bool
+        """
         if not (step := self.step):
             return False
         for idx, value in enumerate(self.values):
@@ -439,7 +473,10 @@ class CronPart:
 
     @property
     def is_full_interval(self) -> bool:
-        """Returns true if the range contains all the interval values."""
+        """Returns true if the range contains all the interval values.
+
+        :rtype: bool
+        """
         if step := self.step:
             return (
                 self.min == self.unit.min
@@ -482,8 +519,7 @@ class CronPart:
         """Formats weekday and month names as string when the relevant options
         are set.
 
-        :param value: a int value
-        :type value: int
+        :param value: (int) An int value that want to get from the unit.
 
         :rtype: int | str
         """
@@ -538,8 +574,8 @@ class CronJob:
             monitor-data-warehouse-schedule.html
     """
 
-    cron_length: int = 5
-    cron_units: tuple[Unit, ...] = CRON_UNITS
+    cron_length: ClassVar[int] = 5
+    cron_units: ClassVar[Units] = CRON_UNITS
 
     def __init__(
         self,
@@ -600,38 +636,64 @@ class CronJob:
 
     @property
     def parts_order(self) -> Iterator[CronPart]:
+        """Return iterator of CronPart instance.
+
+        :rtype: Iterator[CronPart]
+        """
         return reversed(self.parts[:3] + [self.parts[4], self.parts[3]])
 
     @property
     def minute(self) -> CronPart:
-        """Return part of minute."""
+        """Return part of minute with the CronPart instance.
+
+        :rtype: CronPart
+        """
         return self.parts[0]
 
     @property
     def hour(self) -> CronPart:
-        """Return part of hour."""
+        """Return part of hour with the CronPart instance.
+
+        :rtype: CronPart
+        """
         return self.parts[1]
 
     @property
     def day(self) -> CronPart:
-        """Return part of day."""
+        """Return part of day with the CronPart instance.
+
+        :rtype: CronPart
+        """
         return self.parts[2]
 
     @property
     def month(self) -> CronPart:
-        """Return part of month."""
+        """Return part of month with the CronPart instance.
+
+        :rtype: CronPart
+        """
         return self.parts[3]
 
     @property
     def dow(self) -> CronPart:
-        """Return part of day of month."""
+        """Return part of day of month with the CronPart instance.
+
+        :rtype: CronPart
+        """
         return self.parts[4]
 
     def to_list(self) -> list[list[int]]:
-        """Returns the cron schedule as a 2-dimensional list of integers."""
+        """Returns the cron schedule as a 2-dimensional list of integers.
+
+        :rtype: list[list[int]]
+        """
         return [part.values for part in self.parts]
 
     def check(self, date: datetime, mode: str) -> bool:
+        """Check the date value with the mode.
+
+        :rtype: bool
+        """
         assert mode in ("year", "month", "day", "hour", "minute")
         return getattr(date, mode) in getattr(self, mode).values
 
@@ -667,12 +729,14 @@ class CronJobYear(CronJob):
         (vi)    year (1990 - 2100)
     """
 
-    cron_length = 6
-    cron_units = CRON_UNITS_YEAR
+    cron_length: ClassVar[int] = 6
+    cron_units: ClassVar[Units] = CRON_UNITS_YEAR
 
     @property
     def year(self) -> CronPart:
-        """Return part of year."""
+        """Return part of year with the CronPart instance.
+
+        :rtype: CronPart"""
         return self.parts[5]
 
 
