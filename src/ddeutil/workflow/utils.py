@@ -3,6 +3,8 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
+# [ ] Use config
+"""Utility function model."""
 from __future__ import annotations
 
 import stat
@@ -152,6 +154,15 @@ def gen_id(
             + f"{(value if sensitive else value.lower())}"
         ).encode()
     ).hexdigest()
+
+
+def default_gen_id() -> str:
+    """Return running ID which use for making default ID for the Result model if
+    a run_id field initializes at the first time.
+
+    :rtype: str
+    """
+    return gen_id("manual", unique=True)
 
 
 def make_exec(path: str | Path) -> None:

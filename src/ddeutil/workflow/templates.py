@@ -3,6 +3,8 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
+# [x] Use config
+"""Template module."""
 from __future__ import annotations
 
 import inspect
@@ -11,7 +13,7 @@ from ast import Call, Constant, Expr, Module, Name, parse
 from datetime import datetime
 from functools import wraps
 from importlib import import_module
-from typing import Any, Callable, Protocol, TypeVar, Union
+from typing import Any, Callable, Optional, Protocol, TypeVar, Union
 
 try:
     from typing import ParamSpec
@@ -77,13 +79,17 @@ def custom_filter(name: str) -> Callable[P, FilterFunc]:
     return func_internal
 
 
-def make_filter_registry() -> dict[str, FilterRegistry]:
+def make_filter_registry(
+    registers: Optional[list[str]] = None,
+) -> dict[str, FilterRegistry]:
     """Return registries of all functions that able to called with task.
+
+    :param registers: (Optional[list[str]]) Override list of register.
 
     :rtype: dict[str, FilterRegistry]
     """
     rs: dict[str, FilterRegistry] = {}
-    for module in config.regis_filter:
+    for module in registers or config.regis_filter:
         # NOTE: try to sequential import task functions
         try:
             importer = import_module(module)

@@ -58,7 +58,6 @@ from .params import (
 from .result import (
     Result,
     Status,
-    default_gen_id,
 )
 from .scheduler import (
     Schedule,
@@ -93,6 +92,7 @@ from .templates import (
 from .utils import (
     batch,
     cross_product,
+    default_gen_id,
     delay,
     filter_func,
     gen_id,

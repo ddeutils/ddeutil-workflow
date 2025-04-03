@@ -3,6 +3,7 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
+# [x] Use config
 """Stage Model that use for getting stage data template from the Job Model.
 The stage handle the minimize task that run in some thread (same thread at
 its job owner) that mean it is the lowest executor of a workflow that can

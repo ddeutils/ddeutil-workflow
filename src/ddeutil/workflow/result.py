@@ -21,22 +21,12 @@ from typing_extensions import Self
 
 from .__types import DictData, TupleStr
 from .logs import TraceLog, get_dt_tznow, get_trace
-from .utils import gen_id
+from .utils import default_gen_id, gen_id
 
 __all__: TupleStr = (
     "Result",
     "Status",
-    "default_gen_id",
 )
-
-
-def default_gen_id() -> str:
-    """Return running ID which use for making default ID for the Result model if
-    a run_id field initializes at the first time.
-
-    :rtype: str
-    """
-    return gen_id("manual", unique=True)
 
 
 class Status(IntEnum):
