@@ -596,7 +596,7 @@ def local_execute_strategy(
     *,
     result: Result | None = None,
     event: Event | None = None,
-    raise_error: bool = False,
+    raise_error: bool | None = None,
 ) -> Result:
     """Local job strategy execution with passing dynamic parameters from the
     workflow execution to strategy matrix.
@@ -700,7 +700,10 @@ def local_execute_strategy(
             )
         except (StageException, UtilException) as err:
             result.trace.error(f"[JOB]: {err.__class__.__name__}: {err}")
-            if raise_error or config.job_raise_error:
+            do_raise: bool = (
+                config.job_raise_error if raise_error is None else raise_error
+            )
+            if do_raise:
                 raise JobException(
                     f"Stage execution error: {err.__class__.__name__}: "
                     f"{err}"
@@ -736,7 +739,7 @@ def local_execute(
     parent_run_id: str | None = None,
     result: Result | None = None,
     event: Event | None = None,
-    raise_error: bool = False,
+    raise_error: bool | None = None,
 ) -> Result:
     """Local job execution with passing dynamic parameters from the workflow
     execution. It will generate matrix values at the first step and run
@@ -866,3 +869,44 @@ def local_execute(
                 context.update({"errors": err.to_dict()})
 
     return result.catch(status=status, context=context)
+
+
+def self_hosted_execute(
+    job: Job,
+    params: DictData,
+    *,
+    run_id: str | None = None,
+    parent_run_id: str | None = None,
+    result: Result | None = None,
+    event: Event | None = None,
+    raise_error: bool | None = None,
+) -> Result:  # pragma: no cov
+    result: Result = Result.construct_with_rs_or_id(
+        result,
+        run_id=run_id,
+        parent_run_id=parent_run_id,
+        id_logic=(job.id or "not-set"),
+    )
+
+    if event and event.is_set():
+        return result.catch(status=Status.FAILED)
+
+    import requests
+
+    resp = requests.post(
+        job.runs_on.args.host,
+        data={"job": job.model_dump(), "params": params},
+    )
+
+    if resp.status_code != 200:
+        do_raise: bool = (
+            config.job_raise_error if raise_error is None else raise_error
+        )
+        if do_raise:
+            raise JobException(
+                f"Job execution error from request to self-hosted: "
+                f"{job.runs_on.args.host!r}"
+            )
+
+        return result.catch(status=Status.FAILED)
+    return result.catch(status=Status.SUCCESS)
