@@ -109,7 +109,7 @@ if config.enable_route_workflow:
 
 # NOTE: Enable the schedules route.
 if config.enable_route_schedule:
-    from ..audit import get_audit
+    from ..logs import get_audit
     from ..scheduler import schedule_task
     from .routes import schedule
 
