@@ -22,7 +22,7 @@ def call_function(test_path: Path):
         f.write(
             dedent(
                 """
-            from ddeutil.workflow.caller import tag
+            from ddeutil.workflow.reusables import tag
 
             @tag("polars-dir", alias="el-csv-to-parquet")
             def dummy_task(source: str, sink: str) -> dict[str, int]:
@@ -62,7 +62,7 @@ def call_function_dup(test_path: Path):
         f.write(
             dedent(
                 """
-            from ddeutil.workflow.caller import tag
+            from ddeutil.workflow.reusables import tag
 
             @tag("polars-dir", alias="el-csv-to-parquet")
             def dummy_task(source: str, sink: str) -> dict[str, int]:
