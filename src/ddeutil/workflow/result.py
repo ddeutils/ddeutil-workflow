@@ -11,7 +11,6 @@ from __future__ import annotations
 from dataclasses import field
 from datetime import datetime
 from enum import IntEnum
-from threading import Event
 from typing import Optional
 
 from pydantic import ConfigDict
@@ -56,7 +55,6 @@ class Result:
     parent_run_id: Optional[str] = field(default=None, compare=False)
     ts: datetime = field(default_factory=get_dt_tznow, compare=False)
 
-    event: Event = field(default_factory=Event, compare=False, repr=False)
     trace: Optional[TraceLog] = field(default=None, compare=False, repr=False)
 
     @classmethod
@@ -81,10 +79,12 @@ class Result:
 
     @model_validator(mode="after")
     def __prepare_trace(self) -> Self:
-        """Prepare trace field that want to pass after its initialize step."""
+        """Prepare trace field that want to pass after its initialize step.
+
+        :rtype: Self
+        """
         if self.trace is None:  # pragma: no cov
             self.trace: TraceLog = get_trace(self.run_id, self.parent_run_id)
-
         return self
 
     def set_parent_run_id(self, running_id: str) -> Self:

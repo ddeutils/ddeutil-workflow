@@ -3,7 +3,7 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-"""A Logs module contain a TraceLog dataclass.
+"""A Logs module contain a TraceLog dataclass and TracData model.
 """
 from __future__ import annotations
 
@@ -47,6 +47,66 @@ def get_dt_tznow() -> datetime:  # pragma: no cov
     return get_dt_now(tz=config.tz)
 
 
+class TraceMeda(BaseModel):  # pragma: no cov
+    mode: Literal["stdout", "stderr"]
+    datetime: str
+    process: int
+    thread: int
+    message: str
+    filename: str
+    lineno: int
+
+    @classmethod
+    def make(cls, mode: Literal["stdout", "stderr"], message: str) -> Self:
+        """Make a TraceMeda instance."""
+        frame_info: Traceback = getframeinfo(
+            currentframe().f_back.f_back.f_back
+        )
+        return cls(
+            mode=mode,
+            datetime=get_dt_tznow().strftime(config.log_datetime_format),
+            process=os.getpid(),
+            thread=get_ident(),
+            message=message,
+            filename=frame_info.filename.split(os.path.sep)[-1],
+            lineno=frame_info.lineno,
+        )
+
+
+class TraceData(BaseModel):  # pragma: no cov
+    stdout: str = Field(description="A standard output trace data.")
+    stderr: str = Field(description="A standard error trace data.")
+    meta: list[TraceMeda] = Field(
+        default_factory=list,
+        description=(
+            "A metadata mapping of this output and error before making it to "
+            "standard value."
+        ),
+    )
+
+    @classmethod
+    def from_path(cls, file: Path) -> Self:
+        data: DictStr = {"stdout": "", "stderr": "", "meta": []}
+
+        if (file / "stdout.txt").exists():
+            data["stdout"] = (file / "stdout.txt").read_text(encoding="utf-8")
+
+        if (file / "stderr.txt").exists():
+            data["stderr"] = (file / "stderr.txt").read_text(encoding="utf-8")
+
+        if (file / "metadata.json").exists():
+            data["meta"] = [
+                json.loads(line)
+                for line in (
+                    (file / "metadata.json")
+                    .read_text(encoding="utf-8")
+                    .splitlines()
+                )
+            ]
+
+        return cls.model_validate(data)
+
+
 @dataclass(frozen=True)
 class BaseTraceLog(ABC):  # pragma: no cov
     """Base Trace Log dataclass object."""
@@ -66,6 +126,14 @@ class BaseTraceLog(ABC):  # pragma: no cov
         raise NotImplementedError(
             "Create writer logic for this trace object before using."
         )
+
+    @abstractmethod
+    async def awriter(self, message: str, is_err: bool = False) -> None:
+        """Async Write a trace message after making to target pointer object.
+
+        :param message:
+        :param is_err:
+        """
 
     @abstractmethod
     def make_message(self, message: str) -> str:
@@ -134,50 +202,6 @@ class BaseTraceLog(ABC):  # pragma: no cov
         logger.exception(msg, stacklevel=2)
 
 
-class TraceMeda(BaseModel):  # pragma: no cov
-    mode: Literal["stdout", "stderr"]
-    datetime: str
-    process: int
-    thread: int
-    message: str
-    filename: str
-    lineno: int
-
-
-class TraceData(BaseModel):  # pragma: no cov
-    stdout: str = Field(description="A standard output trace data.")
-    stderr: str = Field(description="A standard error trace data.")
-    meta: list[TraceMeda] = Field(
-        default_factory=list,
-        description=(
-            "A metadata mapping of this output and error before making it to "
-            "standard value."
-        ),
-    )
-
-    @classmethod
-    def from_path(cls, file: Path) -> Self:
-        data: DictStr = {"stdout": "", "stderr": "", "meta": []}
-
-        if (file / "stdout.txt").exists():
-            data["stdout"] = (file / "stdout.txt").read_text(encoding="utf-8")
-
-        if (file / "stderr.txt").exists():
-            data["stderr"] = (file / "stderr.txt").read_text(encoding="utf-8")
-
-        if (file / "metadata.json").exists():
-            data["meta"] = [
-                json.loads(line)
-                for line in (
-                    (file / "metadata.json")
-                    .read_text(encoding="utf-8")
-                    .splitlines()
-                )
-            ]
-
-        return cls.model_validate(data)
-
-
 class FileTraceLog(BaseTraceLog):  # pragma: no cov
     """Trace Log object that write file to the local storage."""
 
@@ -227,7 +251,7 @@ class FileTraceLog(BaseTraceLog):  # pragma: no cov
     def make_message(self, message: str) -> str:
         """Prepare and Make a message before write and log processes.
 
-        :param message: A message that want to prepare and make before.
+        :param message: (str) A message that want to prepare and make before.
 
         :rtype: str
         """
@@ -249,40 +273,44 @@ class FileTraceLog(BaseTraceLog):  # pragma: no cov
         if not config.enable_write_log:
             return
 
-        frame_info: Traceback = getframeinfo(currentframe().f_back.f_back)
-        filename: str = frame_info.filename.split(os.path.sep)[-1]
-        lineno: int = frame_info.lineno
+        write_file: str = "stderr" if is_err else "stdout"
+        trace_meta: TraceMeda = TraceMeda.make(mode=write_file, message=message)
 
-        # NOTE: set process and thread IDs.
-        process: int = os.getpid()
-        thread: int = get_ident()
-
-        write_file: str = "stderr.txt" if is_err else "stdout.txt"
-        write_data: dict[str, Union[str, int]] = {
-            "datetime": get_dt_tznow().strftime(config.log_datetime_format),
-            "process": process,
-            "thread": thread,
-            "message": message,
-            "filename": filename,
-            "lineno": lineno,
-        }
-
-        with (self.pointer / write_file).open(mode="at", encoding="utf-8") as f:
-            msg_fmt: str = f"{config.log_format_file}\n"
-            f.write(msg_fmt.format(**write_data))
+        with (self.pointer / f"{write_file}.txt").open(
+            mode="at", encoding="utf-8"
+        ) as f:
+            f.write(
+                f"{config.log_format_file}\n".format(**trace_meta.model_dump())
+            )
 
         with (self.pointer / "metadata.json").open(
             mode="at", encoding="utf-8"
         ) as f:
-            f.write(
-                json.dumps({"mode": write_file.split(".")[0]} | write_data)
-                + "\n"
-            )
+            f.write(trace_meta.model_dump_json() + "\n")
 
     async def awriter(
         self, message: str, is_err: bool = False
-    ):  # pragma: no cov
+    ) -> None:  # pragma: no cov
         """TODO: Use `aiofiles` for make writer method support async."""
+        if not config.enable_write_log:
+            return
+
+        import aiofiles
+
+        write_file: str = "stderr" if is_err else "stdout"
+        trace_meta: TraceMeda = TraceMeda.make(mode=write_file, message=message)
+
+        async with aiofiles.open(
+            self.pointer / f"{write_file}.txt", mode="at", encoding="utf-8"
+        ) as f:
+            await f.write(
+                f"{config.log_format_file}\n".format(**trace_meta.model_dump())
+            )
+
+        async with aiofiles.open(
+            self.pointer / "metadata.json", mode="at", encoding="utf-8"
+        ) as f:
+            await f.write(trace_meta.model_dump_json() + "\n")
 
 
 class SQLiteTraceLog(BaseTraceLog):  # pragma: no cov
@@ -308,6 +336,8 @@ class SQLiteTraceLog(BaseTraceLog):  # pragma: no cov
     def make_message(self, message: str) -> str: ...
 
     def writer(self, message: str, is_err: bool = False) -> None: ...
+
+    def awriter(self, message: str, is_err: bool = False) -> None: ...
 
 
 TraceLog = Union[
