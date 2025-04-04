@@ -148,6 +148,15 @@ class BaseStage(BaseModel, ABC):
         """
         raise NotImplementedError("Stage should implement `execute` method.")
 
+    async def axecute(
+        self,
+        params: DictData,
+        *,
+        result: Result | None = None,
+        event: Event | None,
+    ) -> Result:  # pragma: no cov
+        ...
+
     def handler_execute(
         self,
         params: DictData,
@@ -370,9 +379,25 @@ class EmptyStage(BaseStage):
         return result.catch(status=Status.SUCCESS)
 
     # TODO: Draft async execute method for the perf improvement.
-    async def aexecute(
-        self, params: DictData, *, result: Result | None = None
+    async def axecute(
+        self,
+        params: DictData,
+        *,
+        result: Result | None = None,
+        event: Event | None,
     ) -> Result:  # pragma: no cov
+        """Async execution method for this Empty stage that only logging out to
+        stdout.
+
+        :param params: (DictData) A context data that want to add output result.
+            But this stage does not pass any output.
+        :param result: (Result) A result object for keeping context and status
+            data.
+        :param event: (Event) An event manager that use to track parent execute
+            was not force stopped.
+
+        :rtype: Result
+        """
         if result is None:  # pragma: no cov
             result: Result = Result(
                 run_id=gen_id(self.name + (self.id or ""), unique=True)
@@ -383,7 +408,11 @@ class EmptyStage(BaseStage):
             f"( {param2template(self.echo, params=params) or '...'} )"
         )
 
-        await asyncio.sleep(1)
+        if self.sleep > 0:
+            if self.sleep > 5:
+                result.trace.info(f"[STAGE]: ... sleep ({self.sleep} seconds)")
+            await asyncio.sleep(self.sleep)
+
         return result.catch(status=Status.SUCCESS)
 
 
@@ -1075,6 +1104,17 @@ class IfStage(BaseStage):  # pragma: no cov
 
 
 class RaiseStage(BaseStage):  # pragma: no cov
+    """Raise error stage that raise StageException that use a message field for
+    making error message before raise.
+
+    Data Validate:
+        >>> stage = {
+        ...     "name": "Raise stage",
+        ...     "raise": "raise this stage",
+        ... }
+
+    """
+
     message: str = Field(
         description="An error message that want to raise",
         alias="raise",
@@ -1087,6 +1127,13 @@ class RaiseStage(BaseStage):  # pragma: no cov
         result: Result | None = None,
         event: Event | None = None,
     ) -> Result:
+        """Raise the stage."""
+        if result is None:  # pragma: no cov
+            result: Result = Result(
+                run_id=gen_id(self.name + (self.id or ""), unique=True)
+            )
+
+        result.trace.error(f"[STAGE]: ... raise ( {self.message} )")
         raise StageException(self.message)
 
 
@@ -1109,7 +1156,9 @@ class HookStage(BaseStage):  # pragma: no cov
 class DockerStage(BaseStage):  # pragma: no cov
     """Docker container stage execution."""
 
-    image: str
+    image: str = Field(
+        description="A Docker image url with tag that want to run.",
+    )
     env: DictData = Field(default_factory=dict)
     volume: DictData = Field(default_factory=dict)
     auth: DictData = Field(default_factory=dict)

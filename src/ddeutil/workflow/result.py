@@ -35,6 +35,7 @@ class Status(IntEnum):
     SUCCESS: int = 0
     FAILED: int = 1
     WAIT: int = 2
+    SKIP: int = 3
 
 
 @dataclass(
