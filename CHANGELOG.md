@@ -2,6 +2,38 @@
 
 ## Latest Changes
 
+## 0.0.41
+
+### :stars: Highlight Features
+
+- :star: hl: add extras field on workflow, job, and stage model.
+- :star: hl: add event to stage execution.
+
+### :sparkles: Features
+
+- :dart: feat: add awriter method on trace object support async.
+- :dart: feat: update raise stage execution.
+- :dart: feat: draft job execution on the self-hosted.
+- :dart: feat: add filter empty file on simload object.
+- :dart: feat: add registries on extract_call func.
+
+### :bug: Bug fixes
+
+- :gear: fixed: change test filename.
+- :gear: fixed: change import caller that move to reusables.
+- :gear: fixed: change import audits from api component.
+- :gear: fixed: change audit import that cleaned.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: change import caller.
+
+### :broom: Deprecate & Clean
+
+- :recycle: clean: merge audit module to logs.
+- :recycle: clean: merge caller and templates module.
+- :recycle: clean: remove duplicate row on setting dotenv.
+
 ## 0.0.40
 
 ### :stars: Highlight Features
