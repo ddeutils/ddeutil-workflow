@@ -344,6 +344,10 @@ class Job(BaseModel):
         default_factory=Strategy,
         description="A strategy matrix that want to generate.",
     )
+    extras: DictData = Field(
+        default_factory=dict,
+        description="An extra override values.",
+    )
 
     @field_validator("desc", mode="after")
     def ___prepare_desc__(cls, value: str) -> str:
@@ -394,6 +398,8 @@ class Job(BaseModel):
         """
         for stage in self.stages:
             if stage_id == (stage.id or ""):
+                if self.extras:
+                    stage.extras = self.extras
                 return stage
         raise ValueError(f"Stage ID {stage_id} does not exists")
 

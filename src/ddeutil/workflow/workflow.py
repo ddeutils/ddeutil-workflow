@@ -271,6 +271,10 @@ class Workflow(BaseModel):
         default_factory=dict,
         description="A mapping of job ID and job model that already loaded.",
     )
+    extras: DictData = Field(
+        default_factory=dict,
+        description="An extra override values.",
+    )
 
     @classmethod
     def from_loader(
@@ -297,9 +301,10 @@ class Workflow(BaseModel):
             raise ValueError(f"Type {loader.type} does not match with {cls}")
 
         loader_data: DictData = copy.deepcopy(loader.data)
-
-        # NOTE: Add name to loader data
         loader_data["name"] = name.replace(" ", "_")
+        if externals:  # pragma: no cov
+            loader_data["extras"] = externals
+
         cls.__bypass_on__(
             loader_data, path=loader.conf_path, externals=externals
         )
@@ -333,9 +338,10 @@ class Workflow(BaseModel):
             raise ValueError(f"Type {loader.type} does not match with {cls}")
 
         loader_data: DictData = copy.deepcopy(loader.data)
-
-        # NOTE: Add name to loader data
         loader_data["name"] = name.replace(" ", "_")
+        if externals:  # pragma: no cov
+            loader_data["extras"] = externals
+
         cls.__bypass_on__(loader_data, path=path, externals=externals)
         return cls.model_validate(obj=loader_data)
 
@@ -446,7 +452,6 @@ class Workflow(BaseModel):
                     f"{self.name!r}."
                 )
 
-            # NOTE: update a job id with its job id from workflow template
             self.jobs[job].id = job
 
         # VALIDATE: Validate workflow name should not dynamic with params
@@ -476,7 +481,10 @@ class Workflow(BaseModel):
                 f"A Job {name!r} does not exists in this workflow, "
                 f"{self.name!r}"
             )
-        return self.jobs[name]
+        job: Job = self.jobs[name]
+        if self.extras:
+            job.extras = self.extras
+        return job
 
     def parameterize(self, params: DictData) -> DictData:
         """Prepare a passing parameters before use it in execution process.

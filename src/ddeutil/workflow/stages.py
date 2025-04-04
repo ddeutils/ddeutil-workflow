@@ -95,6 +95,10 @@ class BaseStage(BaseModel, ABC):
         description="A stage condition statement to allow stage executable.",
         alias="if",
     )
+    extras: DictData = Field(
+        default_factory=dict,
+        description="An extra override values.",
+    )
 
     @property
     def iden(self) -> str:
@@ -984,12 +988,14 @@ class ForEachStage(BaseStage):
         ),
     )
     stages: list[Stage] = Field(
+        default_factory=list,
         description=(
             "A list of stage that will run with each item in the foreach field."
         ),
     )
     concurrent: int = Field(
         default=1,
+        gt=0,
         description=(
             "A concurrent value allow to run each item at the same time. It "
             "will be sequential mode if this value equal 1."
@@ -1020,6 +1026,7 @@ class ForEachStage(BaseStage):
 
         rs: DictData = {"items": self.foreach, "foreach": {}}
         status = Status.SUCCESS
+        # TODO: Implement concurrent more than 1.
         for item in self.foreach:
             result.trace.debug(f"[STAGE]: Execute foreach item: {item!r}")
             params["item"] = item
@@ -1054,6 +1061,33 @@ class ForEachStage(BaseStage):
             rs["foreach"][item] = context
 
         return result.catch(status=status, context=rs)
+
+
+# TODO: Not implement this stages yet
+class UntilStage(BaseStage):  # pragma: no cov
+    """Until execution stage."""
+
+    until: str = Field(description="A until condition.")
+    item: Union[str, int, bool] = Field(description="An initial value.")
+    stages: list[Stage] = Field(
+        default_factory=list,
+        description=(
+            "A list of stage that will run with each item until condition "
+            "correct."
+        ),
+    )
+    max_until_not_change: int = Field(
+        default=3,
+        description="The maximum value of loop if condition not change.",
+    )
+
+    def execute(
+        self,
+        params: DictData,
+        *,
+        result: Result | None = None,
+        event: Event | None = None,
+    ) -> Result: ...
 
 
 # TODO: Not implement this stages yet

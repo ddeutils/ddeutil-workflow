@@ -4,7 +4,7 @@
 # license information.
 # ------------------------------------------------------------------------------
 # [x] Use config
-"""Template module."""
+"""Template module that keep any templating functions."""
 from __future__ import annotations
 
 import inspect
@@ -257,6 +257,7 @@ def str2template(
     params: DictData,
     *,
     filters: dict[str, FilterRegistry] | None = None,
+    registers: Optional[list[str]] = None,
 ) -> str:
     """(Sub-function) Pass param to template string that can search by
     ``RE_CALLER`` regular expression.
@@ -269,10 +270,13 @@ def str2template(
     :param params: (DictData) A parameter value that getting with matched
         regular expression.
     :param filters: A mapping of filter registry.
+    :param registers: (Optional[list[str]]) Override list of register.
 
     :rtype: str
     """
-    filters: dict[str, FilterRegistry] = filters or make_filter_registry()
+    filters: dict[str, FilterRegistry] = filters or make_filter_registry(
+        registers
+    )
 
     # NOTE: remove space before and after this string value.
     value: str = value.strip()
@@ -321,6 +325,8 @@ def param2template(
     value: T,
     params: DictData,
     filters: dict[str, FilterRegistry] | None = None,
+    *,
+    registers: Optional[list[str]] = None,
 ) -> T:
     """Pass param to template string that can search by ``RE_CALLER`` regular
     expression.
@@ -329,18 +335,29 @@ def param2template(
     :param params: A parameter value that getting with matched regular
         expression.
     :param filters: A filter mapping for mapping with `map_post_filter` func.
+    :param registers: (Optional[list[str]]) Override list of register.
 
     :rtype: T
     :returns: An any getter value from the params input.
     """
-    filters: dict[str, FilterRegistry] = filters or make_filter_registry()
+    filters: dict[str, FilterRegistry] = filters or make_filter_registry(
+        registers
+    )
     if isinstance(value, dict):
-        return {k: param2template(value[k], params, filters) for k in value}
+        return {
+            k: param2template(value[k], params, filters, registers=registers)
+            for k in value
+        }
     elif isinstance(value, (list, tuple, set)):
-        return type(value)([param2template(i, params, filters) for i in value])
+        return type(value)(
+            [
+                param2template(i, params, filters, registers=registers)
+                for i in value
+            ]
+        )
     elif not isinstance(value, str):
         return value
-    return str2template(value, params, filters=filters)
+    return str2template(value, params, filters=filters, registers=registers)
 
 
 @custom_filter("fmt")  # pragma: no cov

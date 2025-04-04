@@ -63,13 +63,15 @@ def tag(
 
         @wraps(func)
         def wrapped(*args: P.args, **kwargs: P.kwargs) -> TagFunc:
+            """Wrapped function."""
             return func(*args, **kwargs)
 
         @wraps(func)
-        async def awrapped(*args: P.args, **kwargs: P.kwargs) -> TagFunc:
+        async def async_wrapped(*args: P.args, **kwargs: P.kwargs) -> TagFunc:
+            """Wrapped async function."""
             return await func(*args, **kwargs)
 
-        return awrapped if inspect.iscoroutinefunction(func) else wrapped
+        return async_wrapped if inspect.iscoroutinefunction(func) else wrapped
 
     return func_internal
 

@@ -53,6 +53,17 @@ def test_workflow():
     with pytest.raises(ValidationError):
         Workflow(name="manual-workflow-${{ matrix.name }}")
 
+    # NOTE: Test passing extra value from workflow is work.
+    workflow: Workflow = Workflow(
+        name="manual-workflow",
+        jobs={"first-job": job, "second-job": job},
+        extras={"registries": ["foo", "bar"]},
+    )
+    assert workflow.jobs["first-job"].extras == {}
+
+    assert workflow.job("first-job").extras == {"registries": ["foo", "bar"]}
+    assert workflow.job("second-job").extras == {"registries": ["foo", "bar"]}
+
 
 def test_workflow_on(test_path):
 
