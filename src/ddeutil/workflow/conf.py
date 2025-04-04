@@ -24,6 +24,7 @@ PREFIX: str = "WORKFLOW"
 
 
 def env(var: str, default: str | None = None) -> str | None:  # pragma: no cov
+    """Get environment variable with uppercase and adding prefix string."""
     return os.getenv(f"{PREFIX}_{var.upper().replace(' ', '_')}", default)
 
 

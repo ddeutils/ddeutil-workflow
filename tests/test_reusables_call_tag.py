@@ -7,7 +7,7 @@ from pathlib import Path
 from textwrap import dedent
 
 import pytest
-from ddeutil.workflow.caller import Registry, make_registry
+from ddeutil.workflow.reusables import Registry, make_registry
 
 
 @pytest.fixture(scope="module")

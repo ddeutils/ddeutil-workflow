@@ -22,3 +22,6 @@ flowchart LR
         end
     end
 ```
+
+The core models of this package is `Workflow`, `Job`, and `Stage`.
+The other models is used to deploy these models.

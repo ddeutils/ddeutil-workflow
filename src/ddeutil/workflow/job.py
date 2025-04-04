@@ -39,8 +39,8 @@ from .exceptions import (
     UtilException,
 )
 from .result import Result, Status
+from .reusables import has_template, param2template
 from .stages import Stage
-from .templates import has_template, param2template
 from .utils import cross_product, filter_func, gen_id
 
 MatrixFilter = list[dict[str, Union[str, int]]]

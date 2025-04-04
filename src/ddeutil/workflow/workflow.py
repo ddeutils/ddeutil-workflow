@@ -38,7 +38,7 @@ from .exceptions import JobException, WorkflowException
 from .job import Job, TriggerState
 from .params import Param
 from .result import Result, Status
-from .templates import has_template, param2template
+from .reusables import has_template, param2template
 from .utils import (
     gen_id,
     get_dt_now,

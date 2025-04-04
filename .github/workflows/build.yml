@@ -8,6 +8,7 @@ on:
     paths-ignore:
       - 'docs/**'
       - '*.md'
+      - 'tests/'
 
 jobs:
 
@@ -34,21 +35,6 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
-
-      - uses: actions/cache@v4
-        id: cache
-        with:
-          path: .venv
-          key: ${{ runner.os }}-python-${{ steps.setup_python.outputs.python-version }}-${{ hashFiles('pyproject.toml') }}-build
-
-      - name: Install Python Dependencies
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          uv venv
-          uv pip install -U pip
-          uv pip install -U -e .[api]
-          uv pip list
 
       - name: Build Docker Image
         run: |
