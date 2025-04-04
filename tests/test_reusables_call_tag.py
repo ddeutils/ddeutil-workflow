@@ -95,6 +95,12 @@ def test_make_registry(call_function):
 def test_make_registry_from_env():
     rs: dict[str, Registry] = make_registry("tasks")
     print(rs)
+    assert set(rs.keys()) == {
+        "async-el-csv-to-parquet",
+        "mssql-proc",
+        "el-csv-to-parquet",
+        "return-type-not-valid",
+    }
 
 
 def test_make_registry_not_found():

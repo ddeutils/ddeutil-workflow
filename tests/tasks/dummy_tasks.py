@@ -9,8 +9,8 @@ import asyncio
 import logging
 from typing import Any
 
-from ddeutil.workflow.caller import tag
 from ddeutil.workflow.result import Result
+from ddeutil.workflow.reusables import tag
 
 logger = logging.getLogger("ddeutil.workflow")
 
