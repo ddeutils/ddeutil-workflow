@@ -10,8 +10,7 @@ from fastapi import APIRouter, Path, Query
 from fastapi import status as st
 from fastapi.responses import UJSONResponse
 
-from ...audit import get_audit
-from ...logs import get_trace_obj
+from ...logs import get_audit, get_trace_obj
 
 log_route = APIRouter(
     prefix="/logs",
