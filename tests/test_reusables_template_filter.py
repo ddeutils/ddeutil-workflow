@@ -27,14 +27,18 @@ def raise_util(_: str) -> None:  # pragma: no cov
     raise UtilException("Demo raise error from filter function")
 
 
+@mock.patch.object(
+    Config,
+    "regis_filter",
+    [
+        "ddeutil.workflow.utils",
+        "tests.test_reusables_template_filter",
+        "foo.bar",
+    ],
+)
 def test_make_registry_raise():
-    with mock.patch.object(
-        Config,
-        "regis_filter",
-        ["ddeutil.workflow.utils", "tests.test_templates_filter", "foo.bar"],
-    ):
-        assert isfunction(make_filter_registry()["foo"])
-        assert "bar" == make_filter_registry()["foo"]("")
+    assert isfunction(make_filter_registry()["foo"])
+    assert "bar" == make_filter_registry()["foo"]("")
 
 
 def test_get_args_const():
@@ -61,42 +65,44 @@ def test_get_args_const():
         get_args_const("foo(fmt=datetime.timedelta)")
 
 
+@mock.patch.object(
+    Config,
+    "regis_filter",
+    [
+        "ddeutil.workflow.utils",
+        "tests.test_reusables_template_filter",
+        "foo.bar",
+    ],
+)
 def test_map_post_filter():
-    with mock.patch.object(
-        Config,
-        "regis_filter",
-        ["ddeutil.workflow.utils", "tests.test_templates_filter", "foo.bar"],
-    ):
-        assert "bar" == map_post_filter("demo", ["foo"], make_filter_registry())
-        assert "'bar'" == map_post_filter(
-            "bar", ["rstr"], make_filter_registry()
+    assert "bar" == map_post_filter("demo", ["foo"], make_filter_registry())
+    assert "'bar'" == map_post_filter("bar", ["rstr"], make_filter_registry())
+
+    with pytest.raises(UtilException):
+        map_post_filter(
+            "demo",
+            ['rstr(fmt="foo")'],
+            make_filter_registry(),
         )
 
-        with pytest.raises(UtilException):
-            map_post_filter(
-                "demo",
-                ['rstr(fmt="foo")'],
-                make_filter_registry(),
-            )
+    with pytest.raises(UtilException):
+        map_post_filter(
+            "demo",
+            ["raise_err"],
+            make_filter_registry(),
+        )
 
-        with pytest.raises(UtilException):
-            map_post_filter(
-                "demo",
-                ["raise_err"],
-                make_filter_registry(),
-            )
+    with pytest.raises(UtilException):
+        map_post_filter(
+            "2024",
+            ["fmt"],
+            make_filter_registry(),
+        )
 
-        with pytest.raises(UtilException):
-            map_post_filter(
-                "2024",
-                ["fmt"],
-                make_filter_registry(),
-            )
-
-        # NOTE: Raise util exception inside filter function
-        with pytest.raises(UtilException):
-            map_post_filter(
-                "foo",
-                ["raise_util_exception"],
-                make_filter_registry(),
-            )
+    # NOTE: Raise util exception inside filter function
+    with pytest.raises(UtilException):
+        map_post_filter(
+            "foo",
+            ["raise_util_exception"],
+            make_filter_registry(),
+        )

@@ -95,11 +95,19 @@ class Config(BaseConfig):  # pragma: no cov
     # NOTE: Register
     @property
     def regis_call(self) -> list[str]:
+        """Register Caller module importer str.
+
+        :rtype: list[str]
+        """
         regis_call_str: str = env("CORE_REGISTRY", ".")
         return [r.strip() for r in regis_call_str.split(",")]
 
     @property
     def regis_filter(self) -> list[str]:
+        """Register Filter module.
+
+        :rtype: list[str]
+        """
         regis_filter_str: str = env(
             "CORE_REGISTRY_FILTER", "ddeutil.workflow.templates"
         )
