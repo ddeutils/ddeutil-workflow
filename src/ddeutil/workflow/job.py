@@ -398,17 +398,20 @@ class Job(BaseModel):
         """
         for stage in self.stages:
             if stage_id == (stage.id or ""):
-                if self.extras:
+                if self.extras:  # pragma: no cov
                     stage.extras = self.extras
                 return stage
         raise ValueError(f"Stage ID {stage_id} does not exists")
 
     def check_needs(
-        self, jobs: dict[str, Any]
+        self,
+        jobs: dict[str, Any],
     ) -> TriggerState:  # pragma: no cov
         """Return True if job's need exists in an input list of job's ID.
 
-        :param jobs: A mapping of job model and its ID.
+        :param jobs: A mapping of job ID and result context.
+
+        :raise NotImplementedError: If the job trigger rule out of scope.
 
         :rtype: TriggerState
         """
