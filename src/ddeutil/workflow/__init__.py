@@ -5,10 +5,6 @@
 # ------------------------------------------------------------------------------
 from .__cron import CronJob, CronRunner
 from .__types import Re
-from .audit import (
-    Audit,
-    get_audit,
-)
 from .conf import (
     Config,
     Loader,
@@ -36,8 +32,10 @@ from .job import (
     local_execute_strategy,
 )
 from .logs import (
+    Audit,
     TraceData,
     TraceLog,
+    get_audit,
     get_dt_tznow,
     get_trace,
 )

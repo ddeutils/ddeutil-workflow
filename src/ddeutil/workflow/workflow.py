@@ -31,11 +31,11 @@ from typing_extensions import Self
 
 from .__cron import CronJob, CronRunner
 from .__types import DictData, TupleStr
-from .audit import Audit, get_audit
 from .conf import Loader, SimLoad, config, get_logger
 from .cron import On
 from .exceptions import JobException, WorkflowException
 from .job import Job, TriggerState
+from .logs import Audit, get_audit
 from .params import Param
 from .result import Result, Status
 from .reusables import has_template, param2template

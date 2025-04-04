@@ -52,10 +52,10 @@ except ImportError:  # pragma: no cov
 
 from .__cron import CronRunner
 from .__types import DictData, TupleStr
-from .audit import Audit, get_audit
 from .conf import Loader, SimLoad, config, get_logger
 from .cron import On
 from .exceptions import ScheduleException, WorkflowException
+from .logs import Audit, get_audit
 from .result import Result, Status
 from .utils import batch, delay
 from .workflow import Release, ReleaseQueue, Workflow, WorkflowTask
