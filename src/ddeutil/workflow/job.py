@@ -481,7 +481,9 @@ class Job(BaseModel):
             #   should use the `re` module to validate eval-string before
             #   running.
             rs: bool = eval(
-                param2template(self.condition, params), globals() | params, {}
+                param2template(self.condition, params, extras=self.extras),
+                globals() | params,
+                {},
             )
             if not isinstance(rs, bool):
                 raise TypeError("Return type of condition does not be boolean")

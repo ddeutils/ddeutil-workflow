@@ -275,9 +275,11 @@ class BaseStage(BaseModel, ABC):
             return to
 
         _id: str = (
-            param2template(self.id, params=to)
+            param2template(self.id, params=to, extras=self.extras)
             if self.id
-            else gen_id(param2template(self.name, params=to))
+            else gen_id(
+                param2template(self.name, params=to, extras=self.extras)
+            )
         )
 
         errors: DictData = (
@@ -315,7 +317,9 @@ class BaseStage(BaseModel, ABC):
             #   should use the `re` module to validate eval-string before
             #   running.
             rs: bool = eval(
-                param2template(self.condition, params), globals() | params, {}
+                param2template(self.condition, params, extras=self.extras),
+                globals() | params,
+                {},
             )
             if not isinstance(rs, bool):
                 raise TypeError("Return type of condition does not be boolean")
@@ -375,7 +379,7 @@ class EmptyStage(BaseStage):
 
         result.trace.info(
             f"[STAGE]: Empty-Execute: {self.name!r}: "
-            f"( {param2template(self.echo, params=params) or '...'} )"
+            f"( {param2template(self.echo, params, extras=self.extras) or '...'} )"
         )
         if self.sleep > 0:
             if self.sleep > 5:
@@ -411,7 +415,7 @@ class EmptyStage(BaseStage):
 
         result.trace.info(
             f"[STAGE]: Empty-Execute: {self.name!r}: "
-            f"( {param2template(self.echo, params=params) or '...'} )"
+            f"( {param2template(self.echo, params, extras=self.extras) or '...'} )"
         )
 
         if self.sleep > 0:
@@ -511,12 +515,14 @@ class BashStage(BaseStage):
                 run_id=gen_id(self.name + (self.id or ""), unique=True)
             )
 
-        bash: str = param2template(dedent(self.bash), params)
+        bash: str = param2template(
+            dedent(self.bash), params, extras=self.extras
+        )
 
         result.trace.info(f"[STAGE]: Shell-Execute: {self.name}")
         with self.create_sh_file(
             bash=bash,
-            env=param2template(self.env, params),
+            env=param2template(self.env, params, extras=self.extras),
             run_id=result.run_id,
         ) as sh:
             result.trace.debug(f"... Start create `{sh[1]}` file.")
@@ -638,7 +644,7 @@ class PyStage(BaseStage):
         gb: DictData = (
             globals()
             | params
-            | param2template(self.vars, params)
+            | param2template(self.vars, params, extras=self.extras)
             | {"result": result}
         )
 
@@ -651,7 +657,9 @@ class PyStage(BaseStage):
 
         # WARNING: The exec build-in function is very dangerous. So, it
         #   should use the re module to validate exec-string before running.
-        exec(param2template(dedent(self.run), params), gb, lc)
+        exec(
+            param2template(dedent(self.run), params, extras=self.extras), gb, lc
+        )
 
         return result.catch(
             status=Status.SUCCESS, context={"locals": lc, "globals": gb}
@@ -719,11 +727,16 @@ class CallStage(BaseStage):
                 run_id=gen_id(self.name + (self.id or ""), unique=True)
             )
 
-        t_func: TagFunc = extract_call(param2template(self.uses, params))()
+        t_func: TagFunc = extract_call(
+            param2template(self.uses, params, extras=self.extras),
+            registries=self.extras.get("regis_call"),
+        )()
 
         # VALIDATE: check input task caller parameters that exists before
         #   calling.
-        args: DictData = {"result": result} | param2template(self.args, params)
+        args: DictData = {"result": result} | param2template(
+            self.args, params, extras=self.extras
+        )
         ips = inspect.signature(t_func)
         necessary_params: list[str] = [
             k
@@ -757,10 +770,12 @@ class CallStage(BaseStage):
         if inspect.iscoroutinefunction(t_func):  # pragma: no cov
             loop = asyncio.get_event_loop()
             rs: DictData = loop.run_until_complete(
-                t_func(**param2template(args, params))
+                t_func(**param2template(args, params, extras=self.extras))
             )
         else:
-            rs: DictData = t_func(**param2template(args, params))
+            rs: DictData = t_func(
+                **param2template(args, params, extras=self.extras)
+            )
 
         # VALIDATE:
         #   Check the result type from call function, it should be dict.
@@ -822,14 +837,14 @@ class TriggerStage(BaseStage):
             )
 
         # NOTE: Loading workflow object from trigger name.
-        _trigger: str = param2template(self.trigger, params=params)
+        _trigger: str = param2template(self.trigger, params, extras=self.extras)
 
         # NOTE: Set running workflow ID from running stage ID to external
         #   params on Loader object.
         workflow: Workflow = Workflow.from_loader(name=_trigger)
         result.trace.info(f"[STAGE]: Trigger-Execute: {_trigger!r}")
         return workflow.execute(
-            params=param2template(self.params, params),
+            params=param2template(self.params, params, extras=self.extras),
             result=result,
         )
 
@@ -1027,7 +1042,7 @@ class ForEachStage(BaseStage):
             )
 
         foreach: Union[list[str], list[int]] = (
-            param2template(self.foreach, params)
+            param2template(self.foreach, params, extras=self.extras)
             if isinstance(self.foreach, str)
             else self.foreach
         )

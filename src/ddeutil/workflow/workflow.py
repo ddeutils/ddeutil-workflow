@@ -616,7 +616,7 @@ class Workflow(BaseModel):
         #   ... {"params": ..., "jobs": ...}
         #
         self.execute(
-            params=param2template(params, release_params),
+            params=param2template(params, release_params, extras=self.extras),
             result=result,
             parent_run_id=result.parent_run_id,
         )

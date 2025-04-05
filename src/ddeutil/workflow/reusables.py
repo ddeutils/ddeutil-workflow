@@ -277,7 +277,7 @@ def str2template(
     :rtype: str
     """
     filters: dict[str, FilterRegistry] = filters or make_filter_registry(
-        registers
+        registers=registers
     )
 
     # NOTE: remove space before and after this string value.
@@ -328,7 +328,7 @@ def param2template(
     params: DictData,
     filters: dict[str, FilterRegistry] | None = None,
     *,
-    registers: Optional[list[str]] = None,
+    extras: Optional[DictData] = None,
 ) -> T:
     """Pass param to template string that can search by ``RE_CALLER`` regular
     expression.
@@ -337,25 +337,23 @@ def param2template(
     :param params: A parameter value that getting with matched regular
         expression.
     :param filters: A filter mapping for mapping with `map_post_filter` func.
-    :param registers: (Optional[list[str]]) Override list of register.
+    :param extras: (Optional[list[str]]) An Override extras.
 
     :rtype: T
     :returns: An any getter value from the params input.
     """
+    registers: Optional[list[str]] = extras.get("regis_filter")
     filters: dict[str, FilterRegistry] = filters or make_filter_registry(
         registers=registers
     )
     if isinstance(value, dict):
         return {
-            k: param2template(value[k], params, filters, registers=registers)
+            k: param2template(value[k], params, filters, extras=extras)
             for k in value
         }
     elif isinstance(value, (list, tuple, set)):
         return type(value)(
-            [
-                param2template(i, params, filters, registers=registers)
-                for i in value
-            ]
+            [param2template(i, params, filters, extras=extras) for i in value]
         )
     elif not isinstance(value, str):
         return value
