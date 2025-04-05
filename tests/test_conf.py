@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 import pytest
 import toml
 import yaml
-from ddeutil.workflow.conf import Config, Loader, SimLoad, config
+from ddeutil.workflow.conf import Config, Loader, SimLoad, config, dynamic
 from ddeutil.workflow.scheduler import Schedule
 from ddeutil.workflow.workflow import Workflow
 
@@ -141,3 +141,17 @@ def test_loader_find_schedule():
 def test_loader_find_workflow():
     for finding in Loader.finds(Workflow, excluded=[]):
         print(finding)
+
+
+def test_dynamic():
+    conf = dynamic("audit_path", extras={"audit_path": Path("/extras-audits")})
+    assert conf == Path("/extras-audits")
+
+    conf = dynamic("max_job_exec_timeout", f=10, extras={})
+    assert conf == 10
+
+    conf = dynamic("max_job_exec_timeout", f=None, extras={})
+    assert conf == 600
+
+    with pytest.raises(TypeError):
+        dynamic("audit_path", extras={"audit_path": "audits"})

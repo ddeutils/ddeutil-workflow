@@ -3,6 +3,7 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
+# [x] Use dynamic config
 """Job Model that use for keeping stages and node that running its stages.
 The job handle the lineage of stages and location of execution of stages that
 mean the job model able to define `runs-on` key that allow you to run this
@@ -32,7 +33,7 @@ from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
 from .__types import DictData, DictStr, Matrix, TupleStr
-from .conf import config
+from .conf import dynamic
 from .exceptions import (
     JobException,
     StageException,
@@ -522,7 +523,9 @@ class Job(BaseModel):
         if "jobs" not in to:
             to["jobs"] = {}
 
-        if self.id is None and not config.job_default_id:
+        if self.id is None and not dynamic(
+            "job_default_id", extras=self.extras
+        ):
             raise JobException(
                 "This job do not set the ID before setting execution output."
             )
@@ -709,8 +712,8 @@ def local_execute_strategy(
             )
         except (StageException, UtilException) as err:
             result.trace.error(f"[JOB]: {err.__class__.__name__}: {err}")
-            do_raise: bool = (
-                config.job_raise_error if raise_error is None else raise_error
+            do_raise: bool = dynamic(
+                "job_raise_error", f=raise_error, extras=job.extras
             )
             if do_raise:
                 raise JobException(
@@ -908,8 +911,8 @@ def self_hosted_execute(
     )
 
     if resp.status_code != 200:
-        do_raise: bool = (
-            config.job_raise_error if raise_error is None else raise_error
+        do_raise: bool = dynamic(
+            "job_raise_error", f=raise_error, extras=job.extras
         )
         if do_raise:
             raise JobException(

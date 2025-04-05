@@ -343,7 +343,7 @@ def param2template(
     :returns: An any getter value from the params input.
     """
     filters: dict[str, FilterRegistry] = filters or make_filter_registry(
-        registers
+        registers=registers
     )
     if isinstance(value, dict):
         return {

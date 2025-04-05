@@ -12,6 +12,7 @@ from collections.abc import Iterator
 from datetime import timedelta
 from functools import cached_property, lru_cache
 from pathlib import Path
+from typing import Any, Optional
 from zoneinfo import ZoneInfo
 
 from ddeutil.core import str2bool
@@ -35,6 +36,7 @@ __all__: TupleStr = (
     "SimLoad",
     "Loader",
     "config",
+    "dynamic",
 )
 
 
@@ -389,6 +391,20 @@ class Loader(SimLoad):
 
 
 config: Config = Config()
+
+
+def dynamic(
+    key: str, *, f: Optional[Any] = None, extras: Optional[DictData] = None
+) -> Any:
+    """Dynamic get config."""
+    rsx: Optional[Any] = extras[key] if key in extras else None
+    rs: Any = f or getattr(config, key)
+    if rsx is not None and not isinstance(rsx, type(rs)):
+        raise TypeError(
+            f"Type of config {key!r} from extras: {rsx!r} does not valid "
+            f"as config {type(rs)}."
+        )
+    return rsx or rs
 
 
 @lru_cache

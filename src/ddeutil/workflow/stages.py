@@ -3,7 +3,7 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-# [x] Use config
+# [x] Use dynamic config
 """Stage Model that use for getting stage data template from the Job Model.
 The stage handle the minimize task that run in some thread (same thread at
 its job owner) that mean it is the lowest executor of a workflow that can
@@ -50,7 +50,7 @@ from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
 from .__types import DictData, DictStr, TupleStr
-from .conf import config
+from .conf import dynamic
 from .exceptions import StageException, to_dict
 from .result import Result, Status
 from .reusables import TagFunc, extract_call, not_in_template, param2template
@@ -168,7 +168,7 @@ class BaseStage(BaseModel, ABC):
         run_id: str | None = None,
         parent_run_id: str | None = None,
         result: Result | None = None,
-        raise_error: bool = False,
+        raise_error: bool | None = None,
         to: DictData | None = None,
         event: Event | None = None,
     ) -> Result:
@@ -224,7 +224,7 @@ class BaseStage(BaseModel, ABC):
         except Exception as err:
             result.trace.error(f"[STAGE]: {err.__class__.__name__}: {err}")
 
-            if raise_error or config.stage_raise_error:
+            if dynamic("stage_raise_error", f=raise_error, extras=self.extras):
                 if isinstance(err, StageException):
                     raise
 
@@ -269,7 +269,9 @@ class BaseStage(BaseModel, ABC):
         if "stages" not in to:
             to["stages"] = {}
 
-        if self.id is None and not config.stage_default_id:
+        if self.id is None and not dynamic(
+            "stage_default_id", extras=self.extras
+        ):
             return to
 
         _id: str = (

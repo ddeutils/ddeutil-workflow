@@ -3,7 +3,6 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-# [ ] Use config
 """Utility function model."""
 from __future__ import annotations
 

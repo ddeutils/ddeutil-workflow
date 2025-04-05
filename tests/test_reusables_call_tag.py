@@ -97,6 +97,7 @@ def test_make_registry_from_env():
     print(rs)
     assert set(rs.keys()) == {
         "async-el-csv-to-parquet",
+        "get-items",
         "mssql-proc",
         "el-csv-to-parquet",
         "return-type-not-valid",
