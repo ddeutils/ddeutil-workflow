@@ -398,7 +398,7 @@ class Job(BaseModel):
         """
         for stage in self.stages:
             if stage_id == (stage.id or ""):
-                if self.extras:  # pragma: no cov
+                if self.extras:
                     stage.extras = self.extras
                 return stage
         raise ValueError(f"Stage ID {stage_id} does not exists")

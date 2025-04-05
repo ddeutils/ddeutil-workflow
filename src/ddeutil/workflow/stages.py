@@ -67,6 +67,7 @@ __all__: TupleStr = (
     "TriggerStage",
     "ForEachStage",
     "ParallelStage",
+    "RaiseStage",
     "Stage",
 )
 
@@ -1090,8 +1091,8 @@ class UntilStage(BaseStage):  # pragma: no cov
 
 
 # TODO: Not implement this stages yet
-class IfStage(BaseStage):  # pragma: no cov
-    """If execution stage.
+class CaseStage(BaseStage):  # pragma: no cov
+    """Case execution stage.
 
     Data Validate:
         >>> stage = {
@@ -1243,7 +1244,6 @@ class SensorStage(BaseStage):  # pragma: no cov
 #
 Stage = Annotated[
     Union[
-        EmptyStage,
         BashStage,
         CallStage,
         TriggerStage,
@@ -1251,6 +1251,7 @@ Stage = Annotated[
         ParallelStage,
         PyStage,
         RaiseStage,
+        EmptyStage,
     ],
     Field(union_mode="smart"),
 ]

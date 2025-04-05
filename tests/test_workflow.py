@@ -14,6 +14,7 @@ def test_workflow():
             {"name": "Run Hello World", "run": "print(f'Hello {x}')\n"},
             {
                 "name": "Run Sequence and use var from Above",
+                "id": "run-stage",
                 "run": (
                     "print(f'Receive x from above with {x}')\n\n" "x: int = 1\n"
                 ),
@@ -61,8 +62,16 @@ def test_workflow():
     )
     assert workflow.jobs["first-job"].extras == {}
 
+    # NOTE: Bypass extras to job model.
     assert workflow.job("first-job").extras == {"registries": ["foo", "bar"]}
     assert workflow.job("second-job").extras == {"registries": ["foo", "bar"]}
+
+    assert workflow.job("first-job").stages[0].extras == {}
+
+    # NOTE: Bypass extras to stage model.
+    assert workflow.job("first-job").stage("run-stage").extras == {
+        "registries": ["foo", "bar"]
+    }
 
 
 def test_workflow_on(test_path):

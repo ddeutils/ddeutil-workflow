@@ -2,7 +2,7 @@ import pytest
 from ddeutil.workflow.exceptions import StageException
 from ddeutil.workflow.result import Result
 from ddeutil.workflow.stages import EmptyStage, PyStage, Stage
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 
 
 def test_stage():
@@ -25,6 +25,11 @@ def test_stage():
     assert stage.id == "dummy"
     assert stage.iden == "dummy"
     assert not stage.is_skipped()
+
+    stage: Stage = TypeAdapter(Stage).validate_python(
+        {"name": "Empty Stage", "echo": "hello world"}
+    )
+    assert isinstance(stage, EmptyStage)
 
 
 def test_stage_empty_execute():
