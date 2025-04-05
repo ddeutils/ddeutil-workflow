@@ -982,7 +982,7 @@ class ForEachStage(BaseStage):
         ... }
     """
 
-    foreach: Union[list[str], list[int]] = Field(
+    foreach: Union[list[str], list[int], str] = Field(
         description=(
             "A items for passing to each stages via ${{ item }} template."
         ),
@@ -1024,10 +1024,20 @@ class ForEachStage(BaseStage):
                 run_id=gen_id(self.name + (self.id or ""), unique=True)
             )
 
-        rs: DictData = {"items": self.foreach, "foreach": {}}
+        foreach: Union[list[str], list[int]] = (
+            param2template(self.foreach, params)
+            if isinstance(self.foreach, str)
+            else self.foreach
+        )
+        if not isinstance(foreach, list):
+            raise StageException(
+                f"Foreach does not support foreach value: {foreach!r}"
+            )
+
+        rs: DictData = {"items": foreach, "foreach": {}}
         status = Status.SUCCESS
         # TODO: Implement concurrent more than 1.
-        for item in self.foreach:
+        for item in foreach:
             result.trace.debug(f"[STAGE]: Execute foreach item: {item!r}")
             params["item"] = item
             context = {"stages": {}}

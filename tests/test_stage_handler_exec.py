@@ -303,10 +303,20 @@ def test_stage_exec_foreach(test_path):
                       if: ${{ item }} == 4
                       echo: |
                         Final run
+                - name: "Foreach values type not valid"
+                  id: foreach-raise
+                  foreach: ${{ values.items }}
+                  stages:
+                    - name: "Echo stage"
+                      echo: |
+                        Start run with item ${{ item }}
+                    - name: "Final Echo"
+                      if: ${{ item }} == 4
+                      echo: |
+                        Final run
         """,
     ):
         workflow = Workflow.from_loader(name="tmp-wf-foreach")
-
         stage: Stage = workflow.job("first-job").stage("foreach-stage")
         rs = stage.set_outputs(stage.handler_execute({}).context, to={})
         assert rs == {
@@ -344,6 +354,11 @@ def test_stage_exec_foreach(test_path):
                 },
             },
         }
+
+        # NOTE: Raise because type of foreach does not match with list of item.
+        stage: Stage = workflow.job("first-job").stage("foreach-raise")
+        with pytest.raises(StageException):
+            stage.handler_execute({"values": {"items": "test"}})
 
 
 def test_stage_exec_parallel(test_path):

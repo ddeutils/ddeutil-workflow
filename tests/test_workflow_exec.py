@@ -510,3 +510,33 @@ def test_workflow_exec_call_with_prefix(test_path):
             },
         )
         print(rs)
+
+
+def test_workflow_exec_foreach(test_path):
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_foreach.yml",
+        data="""
+        tmp-wf-foreach:
+          type: Workflow
+          jobs:
+            transform:
+              stages:
+                - name: "Get Items before run foreach"
+                  id: get-items
+                  uses: tasks/get-items@demo
+                - name: "For-each item"
+                  id: foreach-stage
+                  foreach: ${{ stages.get-items.outputs.items }}
+                  stages:
+                    - name: "Echo stage"
+                      echo: |
+                        Start run with item ${{ item }}
+                    - name: "Final Echo"
+                      if: ${{ item }} == 4
+                      echo: |
+                        Final run
+        """,
+    ):
+        workflow = Workflow.from_loader(name="tmp-wf-foreach")
+        rs = workflow.execute(params={})
+        print(rs)

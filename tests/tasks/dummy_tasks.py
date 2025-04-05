@@ -82,3 +82,8 @@ def dummy_task_raise_return_type_not_valid():
 
 def simple_function():  # pragma: no cov
     return "bar"
+
+
+@tag("demo", alias="get-items")
+def get_items():
+    return {"items": [1, 2, 3, 4]}
