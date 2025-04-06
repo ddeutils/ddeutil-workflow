@@ -152,15 +152,6 @@ class BaseStage(BaseModel, ABC):
         """
         raise NotImplementedError("Stage should implement `execute` method.")
 
-    async def axecute(
-        self,
-        params: DictData,
-        *,
-        result: Result | None = None,
-        event: Event | None,
-    ) -> Result:  # pragma: no cov
-        ...
-
     def handler_execute(
         self,
         params: DictData,
@@ -328,7 +319,102 @@ class BaseStage(BaseModel, ABC):
             raise StageException(f"{err.__class__.__name__}: {err}") from err
 
 
-class EmptyStage(BaseStage):
+class BaseAsyncStage(BaseStage):
+
+    @abstractmethod
+    def execute(
+        self,
+        params: DictData,
+        *,
+        result: Result | None = None,
+        event: Event | None = None,
+    ) -> Result: ...
+
+    @abstractmethod
+    async def axecute(
+        self,
+        params: DictData,
+        *,
+        result: Result | None = None,
+        event: Event | None = None,
+    ) -> Result:
+        """Async execution method for this Empty stage that only logging out to
+        stdout.
+
+        :param params: (DictData) A context data that want to add output result.
+            But this stage does not pass any output.
+        :param result: (Result) A result object for keeping context and status
+            data.
+        :param event: (Event) An event manager that use to track parent execute
+            was not force stopped.
+
+        :rtype: Result
+        """
+        raise NotImplementedError(
+            "Async Stage should implement `axecute` method."
+        )
+
+    async def handler_axecute(
+        self,
+        params: DictData,
+        *,
+        run_id: str | None = None,
+        parent_run_id: str | None = None,
+        result: Result | None = None,
+        raise_error: bool | None = None,
+        to: DictData | None = None,
+        event: Event | None = None,
+    ) -> Result:
+        """Async Handler stage execution result from the stage `execute` method.
+
+        :param params: (DictData) A parameterize value data that use in this
+            stage execution.
+        :param run_id: (str) A running stage ID for this execution.
+        :param parent_run_id: (str) A parent workflow running ID for this
+            execution.
+        :param result: (Result) A result object for keeping context and status
+            data before execution.
+        :param raise_error: (bool) A flag that all this method raise error
+        :param to: (DictData) A target object for auto set the return output
+            after execution.
+        :param event: (Event) An event manager that pass to the stage execution.
+
+        :rtype: Result
+        """
+        result: Result = Result.construct_with_rs_or_id(
+            result,
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            id_logic=self.iden,
+        )
+
+        try:
+            rs: Result = await self.axecute(params, result=result, event=event)
+            if to is not None:
+                return self.set_outputs(rs.context, to=to)
+            return rs
+        except Exception as err:
+            await result.trace.aerror(
+                f"[STAGE]: {err.__class__.__name__}: {err}"
+            )
+
+            if dynamic("stage_raise_error", f=raise_error, extras=self.extras):
+                if isinstance(err, StageException):
+                    raise
+
+                raise StageException(
+                    f"{self.__class__.__name__}: \n\t"
+                    f"{err.__class__.__name__}: {err}"
+                ) from None
+
+            errors: DictData = {"errors": to_dict(err)}
+            if to is not None:
+                return self.set_outputs(errors, to=to)
+
+            return result.catch(status=Status.FAILED, context=errors)
+
+
+class EmptyStage(BaseAsyncStage):
     """Empty stage that do nothing (context equal empty stage) and logging the
     name of stage only to stdout.
 
@@ -393,8 +479,8 @@ class EmptyStage(BaseStage):
         params: DictData,
         *,
         result: Result | None = None,
-        event: Event | None,
-    ) -> Result:  # pragma: no cov
+        event: Event | None = None,
+    ) -> Result:
         """Async execution method for this Empty stage that only logging out to
         stdout.
 
@@ -412,14 +498,16 @@ class EmptyStage(BaseStage):
                 run_id=gen_id(self.name + (self.id or ""), unique=True)
             )
 
-        result.trace.info(
+        await result.trace.ainfo(
             f"[STAGE]: Empty-Execute: {self.name!r}: "
             f"( {param2template(self.echo, params, extras=self.extras) or '...'} )"
         )
 
         if self.sleep > 0:
             if self.sleep > 5:
-                result.trace.info(f"[STAGE]: ... sleep ({self.sleep} seconds)")
+                await result.trace.ainfo(
+                    f"[STAGE]: ... sleep ({self.sleep} seconds)"
+                )
             await asyncio.sleep(self.sleep)
 
         return result.catch(status=Status.SUCCESS)

@@ -56,7 +56,7 @@ jobs:
           uv venv
           uv pip install -U pip
           uv pip install -U -e .[all]
-          uv pip install -U pytest freezegun
+          uv pip install -U pytest freezegun pytest-asyncio
           uv pip list
 
       - name: Check GIL

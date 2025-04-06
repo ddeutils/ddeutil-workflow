@@ -161,7 +161,6 @@ class BaseTraceLog(ABC):  # pragma: no cov
         """
         msg: str = self.make_message(message)
 
-        # NOTE: Write file if debug mode was enabled.
         if config.debug:
             self.writer(msg)
 
@@ -205,6 +204,32 @@ class BaseTraceLog(ABC):  # pragma: no cov
         """
         msg: str = self.make_message(message)
         self.writer(msg, is_err=True)
+        logger.exception(msg, stacklevel=2)
+
+    async def adebug(self, message: str) -> None:  # pragma: no cov
+        msg: str = self.make_message(message)
+        if config.debug:
+            await self.awriter(msg)
+        logger.info(msg, stacklevel=2)
+
+    async def ainfo(self, message: str) -> None:  # pragma: no cov
+        msg: str = self.make_message(message)
+        await self.awriter(msg)
+        logger.info(msg, stacklevel=2)
+
+    async def awarning(self, message: str) -> None:  # pragma: no cov
+        msg: str = self.make_message(message)
+        await self.awriter(msg)
+        logger.warning(msg, stacklevel=2)
+
+    async def aerror(self, message: str) -> None:  # pragma: no cov
+        msg: str = self.make_message(message)
+        await self.awriter(msg, is_err=True)
+        logger.error(msg, stacklevel=2)
+
+    async def aexception(self, message: str) -> None:  # pragma: no cov
+        msg: str = self.make_message(message)
+        await self.awriter(msg, is_err=True)
         logger.exception(msg, stacklevel=2)
 
 
@@ -297,11 +322,13 @@ class FileTraceLog(BaseTraceLog):  # pragma: no cov
     async def awriter(
         self, message: str, is_err: bool = False
     ) -> None:  # pragma: no cov
-        """TODO: Use `aiofiles` for make writer method support async."""
         if not config.enable_write_log:
             return
 
-        import aiofiles
+        try:
+            import aiofiles
+        except ImportError as e:
+            raise ImportError("Async mode need aiofiles package") from e
 
         write_file: str = "stderr" if is_err else "stdout"
         trace_meta: TraceMeda = TraceMeda.make(mode=write_file, message=message)
@@ -469,9 +496,8 @@ class FileAudit(BaseAudit):
                 f"release={release:%Y%m%d%H%M%S} does not found."
             )
 
-        with max(pointer.glob("./*.log"), key=os.path.getctime).open(
-            mode="r", encoding="utf-8"
-        ) as f:
+        latest_file: Path = max(pointer.glob("./*.log"), key=os.path.getctime)
+        with latest_file.open(mode="r", encoding="utf-8") as f:
             return cls.model_validate(obj=json.load(f))
 
     @classmethod

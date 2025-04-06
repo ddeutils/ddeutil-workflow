@@ -38,7 +38,7 @@ jobs:
           uv venv
           uv pip install -U pip
           uv pip install -e .[all]
-          uv pip install -U "coverage[toml]" pytest freezegun
+          uv pip install -U "coverage[toml]" pytest freezegun pytest-asyncio
 
       - name: Use Python virtual environment
         run: |
