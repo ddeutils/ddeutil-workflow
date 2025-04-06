@@ -208,6 +208,25 @@ def test_workflow_exec_py_raise():
         },
     }
 
+    workflow = Workflow.from_conf(
+        "wf-run-python-raise", extras={"max_job_parallel": 1}
+    )
+    rs = workflow.execute(params={})
+    assert rs.status == 1
+    assert rs.context == {
+        "params": {},
+        "jobs": {},
+        "errors": {
+            "class": rs.context["errors"]["class"],
+            "name": "WorkflowException",
+            "message": (
+                "Get job execution error first-job: JobException: Stage "
+                "execution error: StageException: PyStage: \n\t"
+                "ValueError: Testing raise error inside PyStage!!!"
+            ),
+        },
+    }
+
 
 def test_workflow_exec_py_raise_parallel():
     workflow = Workflow.from_conf("wf-run-python-raise")
