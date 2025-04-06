@@ -928,13 +928,12 @@ class TriggerStage(BaseStage):
 
         # NOTE: Set running workflow ID from running stage ID to external
         #   params on Loader object.
-        workflow: Workflow = Workflow.from_conf(
-            name=_trigger, extras=self.extras
-        )
+        workflow: Workflow = Workflow.from_conf(_trigger, extras=self.extras)
         result.trace.info(f"[STAGE]: Trigger-Execute: {_trigger!r}")
         return workflow.execute(
             params=param2template(self.params, params, extras=self.extras),
             result=result,
+            event=event,
         )
 
 

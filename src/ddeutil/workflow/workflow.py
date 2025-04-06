@@ -1013,6 +1013,7 @@ class Workflow(BaseModel):
         timeout: int = 600,
         result: Result | None = None,
         max_job_parallel: int = 2,
+        event: Event | None = None,
     ) -> Result:
         """Execute workflow with passing a dynamic parameters to all jobs that
         included in this workflow model with ``jobs`` field.
@@ -1038,6 +1039,8 @@ class Workflow(BaseModel):
         :param result: (Result) A result object for keeping context and status
             data.
         :param max_job_parallel: (int) The maximum threads of job execution.
+        :param event: (Event) An event manager that pass to the
+            PoolThreadExecutor.
 
         :rtype: Result
         """
@@ -1087,6 +1090,7 @@ class Workflow(BaseModel):
                     ts=ts,
                     job_queue=jq,
                     timeout=timeout,
+                    event=event,
                 )
             else:
                 self.__exec_threading(
@@ -1095,6 +1099,7 @@ class Workflow(BaseModel):
                     ts=ts,
                     job_queue=jq,
                     timeout=timeout,
+                    event=event,
                 )
         except WorkflowException as err:
             status = Status.FAILED
@@ -1111,6 +1116,7 @@ class Workflow(BaseModel):
         *,
         timeout: int = 600,
         thread_timeout: int = 1800,
+        event: Event | None = None,
     ) -> DictData:
         """Workflow execution by threading strategy that use multithreading.
 
@@ -1124,6 +1130,8 @@ class Workflow(BaseModel):
         :param job_queue: (Queue) A job queue object.
         :param timeout: (int) A second value unit that bounding running time.
         :param thread_timeout: A timeout to waiting all futures complete.
+        :param event: (Event) An event manager that pass to the
+            PoolThreadExecutor.
 
         :rtype: DictData
         """
@@ -1131,7 +1139,7 @@ class Workflow(BaseModel):
         timeout: int = dynamic(
             "max_job_exec_timeout", f=timeout, extras=self.extras
         )
-        event: Event = Event()
+        event: Event = event or Event()
         result.trace.debug(f"[WORKFLOW]: Run {self.name!r} with threading.")
 
         # IMPORTANT: The job execution can run parallel and waiting by
@@ -1219,6 +1227,7 @@ class Workflow(BaseModel):
         job_queue: Queue,
         *,
         timeout: int = 600,
+        event: Event | None = None,
     ) -> DictData:
         """Workflow execution with non-threading strategy that use sequential
         job running and waiting previous job was run successful.
@@ -1231,6 +1240,8 @@ class Workflow(BaseModel):
         :param ts: (float) A start timestamp that use for checking execute time
             should time out.
         :param timeout: (int) A second value unit that bounding running time.
+        :param event: (Event) An event manager that pass to the
+            PoolThreadExecutor.
 
         :rtype: DictData
         """
@@ -1238,7 +1249,7 @@ class Workflow(BaseModel):
         timeout: int = dynamic(
             "max_job_exec_timeout", f=timeout, extras=self.extras
         )
-        event: Event = Event()
+        event: Event = event or Event()
         future: Future | None = None
         result.trace.debug(f"[WORKFLOW]: Run {self.name!r} with non-threading.")
 
