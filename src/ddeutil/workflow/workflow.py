@@ -3,7 +3,7 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-# [x] Use dynamic config exclude `max_on_per_workflow`
+# [x] Use dynamic config`
 """A Workflow module that is the core model of this package."""
 from __future__ import annotations
 
@@ -23,16 +23,16 @@ from pathlib import Path
 from queue import Queue
 from textwrap import dedent
 from threading import Event
-from typing import Optional
+from typing import Annotated, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo
 from pydantic.dataclasses import dataclass
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
 from .__cron import CronJob, CronRunner
 from .__types import DictData, TupleStr
-from .conf import Loader, SimLoad, config, dynamic, get_logger
+from .conf import Loader, SimLoad, dynamic, get_logger
 from .cron import On
 from .exceptions import JobException, WorkflowException
 from .job import Job, TriggerState
@@ -263,6 +263,14 @@ class Workflow(BaseModel):
     execute method on it.
     """
 
+    extras: Annotated[
+        DictData,
+        Field(
+            default_factory=dict,
+            description="An extra override config values.",
+        ),
+    ]
+
     name: str = Field(description="A workflow name.")
     desc: Optional[str] = Field(
         default=None,
@@ -281,10 +289,6 @@ class Workflow(BaseModel):
     jobs: dict[str, Job] = Field(
         default_factory=dict,
         description="A mapping of job ID and job model that already loaded.",
-    )
-    extras: DictData = Field(
-        default_factory=dict,
-        description="An extra override config values.",
     )
 
     @classmethod
@@ -413,7 +417,11 @@ class Workflow(BaseModel):
         return dedent(value)
 
     @field_validator("on", mode="after")
-    def __on_no_dup_and_reach_limit__(cls, value: list[On]) -> list[On]:
+    def __on_no_dup_and_reach_limit__(
+        cls,
+        value: list[On],
+        info: ValidationInfo,
+    ) -> list[On]:
         """Validate the on fields should not contain duplicate values and if it
         contains the every minute value more than one value, it will remove to
         only one value.
@@ -437,10 +445,12 @@ class Workflow(BaseModel):
         #         "only one value in the on field."
         #     )
 
-        if len(set_ons) > config.max_on_per_workflow:
+        extras: DictData = info.data.get("extras", {})
+        if len(set_ons) > (
+            conf := dynamic("max_on_per_workflow", extras=extras)
+        ):
             raise ValueError(
-                f"The number of the on should not more than "
-                f"{config.max_on_per_workflow} crontab."
+                f"The number of the on should not more than {conf} crontabs."
             )
         return value
 

@@ -388,7 +388,6 @@ class EmptyStage(BaseStage):
 
         return result.catch(status=Status.SUCCESS)
 
-    # TODO: Draft async execute method for the perf improvement.
     async def axecute(
         self,
         params: DictData,

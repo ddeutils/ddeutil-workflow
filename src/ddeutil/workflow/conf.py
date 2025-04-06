@@ -206,9 +206,6 @@ class Config(BaseConfig):  # pragma: no cov
     def max_on_per_workflow(self) -> int:
         """The maximum on value that store in workflow model.
 
-        Warning:
-            This config cannot override by extras values.
-
         :rtype: int
         """
         return int(env("CORE_MAX_CRON_PER_WORKFLOW", "5"))

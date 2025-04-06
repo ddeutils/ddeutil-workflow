@@ -72,17 +72,16 @@ class On(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    # NOTE: This is fields of the base schedule.
     extras: Annotated[
         DictData,
         Field(
             default_factory=dict,
-            description="An extras mapping parameters",
+            description="An extras mapping parameters.",
         ),
     ]
     cronjob: Annotated[
         CronJob,
-        Field(description="Cron job of this schedule"),
+        Field(description="A Cronjob object of this schedule."),
     ]
     tz: Annotated[
         str,
