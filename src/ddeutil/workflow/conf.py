@@ -103,7 +103,7 @@ class Config(BaseConfig):  # pragma: no cov
 
         :rtype: list[str]
         """
-        regis_call_str: str = env("CORE_REGISTRY", ".")
+        regis_call_str: str = env("CORE_REGISTRY_CALLER", ".")
         return [r.strip() for r in regis_call_str.split(",")]
 
     @property
