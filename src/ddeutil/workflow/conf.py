@@ -119,7 +119,7 @@ class Config(BaseConfig):  # pragma: no cov
     # NOTE: Log
     @property
     def log_path(self) -> Path:
-        return Path(env("LOG_PATH", "./logs"))
+        return Path(env("LOG_TRACE_PATH", "./logs"))
 
     @property
     def debug(self) -> bool:
@@ -148,16 +148,15 @@ class Config(BaseConfig):  # pragma: no cov
 
     @property
     def enable_write_log(self) -> bool:
-        return str2bool(env("LOG_ENABLE_WRITE", "false"))
+        return str2bool(env("LOG_TRACE_ENABLE_WRITE", "false"))
 
-    # NOTE: Audit Log
     @property
     def audit_path(self) -> Path:
-        return Path(env("AUDIT_PATH", "./audits"))
+        return Path(env("LOG_AUDIT_PATH", "./audits"))
 
     @property
     def enable_write_audit(self) -> bool:
-        return str2bool(env("AUDIT_ENABLE_WRITE", "false"))
+        return str2bool(env("LOG_AUDIT_ENABLE_WRITE", "false"))
 
     @property
     def log_datetime_format(self) -> str:
