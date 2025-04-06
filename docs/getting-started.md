@@ -32,10 +32,10 @@ project/
 Create initial config path at `.env`:
 
 ```dotenv
-WORKFLOW_AUDIT_ENABLE_WRITE=true
-WORKFLOW_LOG_ENABLE_WRITE=true
-WORKFLOW_CORE_REGISTRY=src
+WORKFLOW_CORE_REGISTRY_CALLER=src
 WORKFLOW_CORE_TIMEZONE=Asia/Bangkok
+WORKFLOW_LOG_AUDIT_ENABLE_WRITE=true
+WORKFLOW_LOG_TRACE_ENABLE_WRITE=true
 ```
 
 Create the first pipeline template at `./conf/manual-workflow.yml`:
@@ -63,7 +63,7 @@ from .https_call import *
 ```
 
 ```python title="./src/https_call.py"
-from ddeutil.workflow.caller import tag
+from ddeutil.workflow.reusables import tag
 from ddeutil.workflow.result import Result
 
 
@@ -87,7 +87,7 @@ from ddeutil.workflow.result import Result
 def call_execute():
     result: Result = (
         Workflow
-        .from_loader('wf-run-manual')
+        .from_conf('wf-run-manual')
         .execute(params={"run_date": "2024-08-01"})
     )
     print(result)
@@ -114,7 +114,7 @@ from ddeutil.workflow.result import Result
 def call_release():
     result: Result = (
         Workflow
-        .from_loader('wf-run-manual')
+        .from_conf('wf-run-manual')
         .release(
             datetime.now(tz=config.tz),
             params={"run_date": "2024-08-01"},

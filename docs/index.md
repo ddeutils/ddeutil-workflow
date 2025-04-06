@@ -159,7 +159,7 @@ execution time such as `run-date` should change base on that workflow running da
 ```python
 from ddeutil.workflow import Workflow, Result
 
-workflow: Workflow = Workflow.from_loader('run-py-local')
+workflow: Workflow = Workflow.from_conf('run-py-local')
 result: Result = workflow.execute(
    params={"source-extract": "USD-THB", "asat-dt": "2024-01-01"}
 )
@@ -193,7 +193,7 @@ from ddeutil.workflow import Schedule
 
 (
    Schedule
-   .from_loader("schedule-run-local-wf")
+   .from_conf("schedule-run-local-wf")
    .pending(stop=None)
 )
 ```

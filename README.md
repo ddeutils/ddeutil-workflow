@@ -168,7 +168,7 @@ execution time such as `run-date` should change base on that workflow running da
 ```python
 from ddeutil.workflow import Workflow, Result
 
-workflow: Workflow = Workflow.from_loader('run-py-local')
+workflow: Workflow = Workflow.from_conf('run-py-local')
 result: Result = workflow.execute(
    params={"source-extract": "USD-THB", "asat-dt": "2024-01-01"}
 )
@@ -202,7 +202,7 @@ from ddeutil.workflow import Schedule
 
 (
    Schedule
-   .from_loader("schedule-run-local-wf")
+   .from_conf("schedule-run-local-wf")
    .pending(stop=None)
 )
 ```
@@ -231,11 +231,11 @@ it will use default value and do not raise any error to you.
 | **MAX_CRON_PER_WORKFLOW**    |   Core    | `5`                                                                                                                             |                                                                                                                    |
 | **MAX_QUEUE_COMPLETE_HIST**  |   Core    | `16`                                                                                                                            |                                                                                                                    |
 | **GENERATE_ID_SIMPLE_MODE**  |   Core    | `true`                                                                                                                          | A flog that enable generating ID with `md5` algorithm.                                                             |
-| **TRACE_PATH**               |    Log    | `./logs`                                                                                                                        | The log path of the workflow saving log.                                                                           |
 | **DEBUG_MODE**               |    Log    | `true`                                                                                                                          | A flag that enable logging with debug level mode.                                                                  |
 | **FORMAT**                   |    Log    | `%(asctime)s.%(msecs)03d (%(name)-10s, %(process)-5d,%(thread)-5d) [%(levelname)-7s] %(message)-120s (%(filename)s:%(lineno)s)` |                                                                                                                    |
 | **FORMAT_FILE**              |    Log    | `{datetime} ({process:5d}, {thread:5d}) {message:120s} ({filename}:{lineno})`                                                   |                                                                                                                    |
 | **DATETIME_FORMAT**          |    Log    | `%Y-%m-%d %H:%M:%S`                                                                                                             |                                                                                                                    |
+| **TRACE_PATH**               |    Log    | `./logs`                                                                                                                        | The log path of the workflow saving log.                                                                           |
 | **TRACE_ENABLE_WRITE**       |    Log    | `false`                                                                                                                         |                                                                                                                    |
 | **AUDIT_PATH**               |    Log    | `./audits`                                                                                                                      |                                                                                                                    |
 | **AUDIT_ENABLE_WRITE**       |    Log    | `true`                                                                                                                          | A flag that enable logging object saving log to its destination.                                                   |
