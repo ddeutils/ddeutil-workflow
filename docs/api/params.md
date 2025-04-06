@@ -3,11 +3,17 @@
 The `Param` type constructs by:
 
 ```text
-Param = Union[
-    ChoiceParam,
-    DatetimeParam,
-    IntParam,
-    StrParam,
+Param = Annotated[
+    Union[
+        MapParam,
+        ArrayParam,
+        ChoiceParam,
+        DatetimeParam,
+        DateParam,
+        IntParam,
+        StrParam,
+    ],
+    Field(discriminator="type"),
 ]
 ```
 
@@ -34,4 +40,10 @@ Param = Union[
 
 ## DatetimeParam
 
+## DateParam
+
 ## ChoiceParam
+
+## MapParam
+
+## ArrayParam

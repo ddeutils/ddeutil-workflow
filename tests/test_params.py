@@ -4,10 +4,12 @@ from zoneinfo import ZoneInfo
 import pytest
 from ddeutil.workflow.exceptions import ParamValueException
 from ddeutil.workflow.params import (
+    ArrayParam,
     ChoiceParam,
     DateParam,
     DatetimeParam,
     IntParam,
+    MapParam,
     Param,
     StrParam,
 )
@@ -97,3 +99,28 @@ def test_param_choice():
 
     with pytest.raises(ParamValueException):
         ChoiceParam(options=["foo", "bar"]).receive("baz")
+
+
+def test_param_array():
+    assert [7, 8] == ArrayParam(default=[1]).receive([7, 8])
+    assert [1, 2, 3] == ArrayParam(default=[1]).receive("[1, 2, 3]")
+    assert [1] == ArrayParam(default=[1]).receive()
+
+    with pytest.raises(ParamValueException):
+        ArrayParam().receive('{"foo": 1}')
+
+    with pytest.raises(ParamValueException):
+        ArrayParam().receive("foo")
+
+
+def test_param_map():
+    assert {1: "test"} == MapParam(default={"key": "value"}).receive(
+        {1: "test"}
+    )
+    assert {"foo": "bar"} == MapParam(default={"key": "value"}).receive(
+        '{"foo": "bar"}'
+    )
+    assert {"key": "value"} == MapParam(default={"key": "value"}).receive()
+
+    with pytest.raises(ParamValueException):
+        MapParam().receive('["foo", 1]')

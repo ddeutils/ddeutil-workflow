@@ -18,6 +18,7 @@ from abc import ABC, abstractmethod
 from datetime import date, datetime
 from typing import Annotated, Any, Literal, Optional, TypeVar, Union
 
+from ddeutil.core import str2dict, str2list
 from pydantic import BaseModel, Field
 
 from .__types import TupleStr
@@ -31,6 +32,8 @@ __all__: TupleStr = (
     "IntParam",
     "Param",
     "StrParam",
+    "ArrayParam",
+    "MapParam",
 )
 
 T = TypeVar("T")
@@ -222,36 +225,67 @@ class ChoiceParam(BaseParam):
         return value
 
 
-# TODO: Not implement this parameter yet
 class MapParam(DefaultParam):  # pragma: no cov
+    """Map parameter."""
 
     type: Literal["map"] = "map"
     default: dict[Any, Any] = Field(default_factory=dict)
 
-    def receive(self, value: Optional[dict[Any, Any]] = None) -> dict[Any, Any]:
+    def receive(
+        self,
+        value: Optional[Union[dict[Any, Any], str]] = None,
+    ) -> dict[Any, Any]:
         if value is None:
             return self.default
+        if isinstance(value, str):
+            try:
+                value: dict[Any, Any] = str2dict(value)
+            except ValueError as e:
+                raise ParamValueException(
+                    f"Value that want to convert to map does not support for "
+                    f"type: {type(value)}"
+                ) from e
+        elif not isinstance(value, dict):
+            raise ParamValueException(
+                f"Value of map param support only string-dict or dict type, "
+                f"not {type(value)}"
+            )
+        return value
 
 
-# TODO: Not implement this parameter yet
 class ArrayParam(DefaultParam):  # pragma: no cov
+    """Array parameter."""
 
     type: Literal["array"] = "array"
     default: list[Any] = Field(default_factory=list)
 
-    def receive(self, value: Optional[list[T]] = None) -> list[T]:
+    def receive(
+        self, value: Optional[Union[list[T], tuple, str]] = None
+    ) -> list[T]:
         if value is None:
             return self.default
-        if not isinstance(value, list):
+        if isinstance(value, str):
+            try:
+                value: list[T] = str2list(value)
+            except ValueError as e:
+                raise ParamValueException(
+                    f"Value that want to convert to array does not support for "
+                    f"type: {type(value)}"
+                ) from e
+        elif isinstance(value, tuple):
+            return list(value)
+        elif not isinstance(value, list):
             raise ParamValueException(
-                f"Value that want to convert to array does not support for "
-                f"type: {type(value)}"
+                f"Value of map param support only string-list or list type, "
+                f"not {type(value)}"
             )
         return value
 
 
 Param = Annotated[
     Union[
+        MapParam,
+        ArrayParam,
         ChoiceParam,
         DatetimeParam,
         DateParam,
