@@ -3,6 +3,7 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
+# [x] Use dynamic config exclude `max_on_per_workflow`
 """A Workflow module that is the core model of this package."""
 from __future__ import annotations
 
@@ -31,7 +32,7 @@ from typing_extensions import Self
 
 from .__cron import CronJob, CronRunner
 from .__types import DictData, TupleStr
-from .conf import Loader, SimLoad, config, get_logger
+from .conf import Loader, SimLoad, config, dynamic, get_logger
 from .cron import On
 from .exceptions import JobException, WorkflowException
 from .job import Job, TriggerState
@@ -92,11 +93,15 @@ class Release:
         return f"{self.date:%Y-%m-%d %H:%M:%S}"
 
     @classmethod
-    def from_dt(cls, dt: datetime | str) -> Self:
+    def from_dt(
+        cls, dt: datetime | str, *, externals: Optional[DictData] = None
+    ) -> Self:
         """Construct Release via datetime object only.
 
         :param dt: (datetime | str) A datetime object or string that want to
             construct to the Release object.
+        :param externals: An external parameters that want to pass to override
+            config.
 
         :raise TypeError: If the type of the dt argument does not valid with
             datetime or str object.
@@ -115,7 +120,9 @@ class Release:
             date=dt,
             offset=0,
             end_date=dt + timedelta(days=1),
-            runner=CronJob("* * * * *").schedule(dt.replace(tzinfo=config.tz)),
+            runner=CronJob("* * * * *").schedule(
+                dt.replace(tzinfo=dynamic("tz", extras=externals))
+            ),
         )
 
     def __eq__(self, other: Release | datetime) -> bool:
@@ -150,6 +157,10 @@ class ReleaseQueue:
     queue: list[Release] = field(default_factory=list)
     running: list[Release] = field(default_factory=list)
     complete: list[Release] = field(default_factory=list)
+    extras: DictData = Field(
+        default_factory=dict,
+        description="An extra override config values.",
+    )
 
     @classmethod
     def from_list(
@@ -232,8 +243,8 @@ class ReleaseQueue:
 
         # NOTE: Remove complete queue on workflow that keep more than the
         #   maximum config.
-        num_complete_delete: int = (
-            len(self.complete) - config.max_queue_complete_hist
+        num_complete_delete: int = len(self.complete) - dynamic(
+            "max_queue_complete_hist", extras=self.extras
         )
 
         if num_complete_delete > 0:
@@ -273,7 +284,7 @@ class Workflow(BaseModel):
     )
     extras: DictData = Field(
         default_factory=dict,
-        description="An extra override values.",
+        description="An extra override config values.",
     )
 
     @classmethod
@@ -604,9 +615,11 @@ class Workflow(BaseModel):
         release_params: DictData = {
             "release": {
                 "logical_date": release.date,
-                "execute_date": datetime.now(tz=config.tz),
+                "execute_date": datetime.now(
+                    tz=dynamic("tz", extras=self.extras)
+                ),
                 "run_id": result.run_id,
-                "timezone": config.tz,
+                "timezone": dynamic("tz", extras=self.extras),
             }
         }
 
@@ -700,7 +713,9 @@ class Workflow(BaseModel):
         for on in self.on:
 
             runner: CronRunner = on.next(
-                get_dt_now(tz=config.tz, offset=offset).replace(microsecond=0)
+                get_dt_now(
+                    tz=dynamic("tz", extras=self.extras), offset=offset
+                ).replace(microsecond=0)
             )
 
             # NOTE: Skip this runner date if it more than the end date.
@@ -789,15 +804,15 @@ class Workflow(BaseModel):
             return result.catch(status=Status.SUCCESS, context={"outputs": []})
 
         # NOTE: Create the current date that change microsecond to 0
-        current_date: datetime = datetime.now(tz=config.tz).replace(
-            microsecond=0
-        )
+        current_date: datetime = datetime.now(
+            tz=dynamic("tz", extras=self.extras)
+        ).replace(microsecond=0)
 
         # NOTE: Create start_date and offset variables.
         if start_date and start_date <= current_date:
-            start_date = start_date.replace(tzinfo=config.tz).replace(
-                microsecond=0
-            )
+            start_date = start_date.replace(
+                tzinfo=dynamic("tz", extras=self.extras)
+            ).replace(microsecond=0)
             offset: float = (current_date - start_date).total_seconds()
         else:
             # NOTE: Force change start date if it gathers than the current date,
@@ -837,7 +852,7 @@ class Workflow(BaseModel):
         # NOTE: Start create the thread pool executor for running this poke
         #   process.
         with ThreadPoolExecutor(
-            max_workers=config.max_poking_pool_worker,
+            max_workers=dynamic("max_poking_pool_worker", extras=self.extras),
             thread_name_prefix="wf_poking_",
         ) as executor:
 
@@ -848,14 +863,22 @@ class Workflow(BaseModel):
                 # NOTE: Pop the latest Release object from the release queue.
                 release: Release = heappop(q.queue)
 
-                if reach_next_minute(release.date, tz=config.tz, offset=offset):
+                if reach_next_minute(
+                    release.date,
+                    tz=dynamic("tz", extras=self.extras),
+                    offset=offset,
+                ):
                     result.trace.debug(
                         f"[POKING]: The latest release, "
                         f"{release.date:%Y-%m-%d %H:%M:%S}, is not able to run "
                         f"on this minute"
                     )
                     heappush(q.queue, release)
-                    wait_to_next_minute(get_dt_now(tz=config.tz, offset=offset))
+                    wait_to_next_minute(
+                        get_dt_now(
+                            tz=dynamic("tz", extras=self.extras), offset=offset
+                        )
+                    )
 
                     # WARNING: I already call queue poking again because issue
                     #   about the every minute crontab.
@@ -1038,7 +1061,7 @@ class Workflow(BaseModel):
         context: DictData = self.parameterize(params)
         status: Status = Status.SUCCESS
         try:
-            if config.max_job_parallel == 1:
+            if dynamic("max_job_parallel", extras=self.extras) == 1:
                 self.__exec_non_threading(
                     result=result,
                     context=context,
@@ -1086,14 +1109,16 @@ class Workflow(BaseModel):
         :rtype: DictData
         """
         not_timeout_flag: bool = True
-        timeout: int = timeout or config.max_job_exec_timeout
+        timeout: int = dynamic(
+            "max_job_exec_timeout", f=timeout, extras=self.extras
+        )
         event: Event = Event()
         result.trace.debug(f"[WORKFLOW]: Run {self.name!r} with threading.")
 
         # IMPORTANT: The job execution can run parallel and waiting by
         #   needed.
         with ThreadPoolExecutor(
-            max_workers=config.max_job_parallel,
+            max_workers=dynamic("max_job_parallel", extras=self.extras),
             thread_name_prefix="wf_exec_threading_",
         ) as executor:
             futures: list[Future] = []
@@ -1191,7 +1216,9 @@ class Workflow(BaseModel):
         :rtype: DictData
         """
         not_timeout_flag: bool = True
-        timeout: int = timeout or config.max_job_exec_timeout
+        timeout: int = dynamic(
+            "max_job_exec_timeout", f=timeout, extras=self.extras
+        )
         event: Event = Event()
         future: Future | None = None
         result.trace.debug(f"[WORKFLOW]: Run {self.name!r} with non-threading.")

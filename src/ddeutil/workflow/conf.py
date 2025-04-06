@@ -12,7 +12,7 @@ from collections.abc import Iterator
 from datetime import timedelta
 from functools import cached_property, lru_cache
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional, TypeVar
 from zoneinfo import ZoneInfo
 
 from ddeutil.core import str2bool
@@ -21,6 +21,7 @@ from ddeutil.io.paths import glob_files, is_ignored, read_ignore
 
 from .__types import DictData, TupleStr
 
+T = TypeVar("T")
 PREFIX: str = "WORKFLOW"
 
 
@@ -203,6 +204,13 @@ class Config(BaseConfig):  # pragma: no cov
 
     @property
     def max_on_per_workflow(self) -> int:
+        """The maximum on value that store in workflow model.
+
+        Warning:
+            This config cannot override by extras values.
+
+        :rtype: int
+        """
         return int(env("CORE_MAX_CRON_PER_WORKFLOW", "5"))
 
     @property
@@ -394,11 +402,16 @@ config: Config = Config()
 
 
 def dynamic(
-    key: str, *, f: Optional[Any] = None, extras: Optional[DictData] = None
-) -> Any:
-    """Dynamic get config."""
-    rsx: Optional[Any] = extras[key] if key in extras else None
-    rs: Any = f or getattr(config, key)
+    key: str, *, f: Optional[T] = None, extras: Optional[DictData] = None
+) -> Optional[T]:
+    """Dynamic get config if extra value was passed at run-time.
+
+    :param key: (str) A config key that get from Config object.
+    :param f: An inner config function scope.
+    :param extras: An extra values that pass at run-time.
+    """
+    rsx: Optional[T] = extras[key] if key in extras else None
+    rs: Optional[T] = f or getattr(config, key)
     if rsx is not None and not isinstance(rsx, type(rs)):
         raise TypeError(
             f"Type of config {key!r} from extras: {rsx!r} does not valid "

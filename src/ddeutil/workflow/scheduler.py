@@ -3,8 +3,8 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-"""
-The main schedule running is `schedule_runner` function that trigger the
+# [x] Use fix config
+"""The main schedule running is `schedule_runner` function that trigger the
 multiprocess of `schedule_control` function for listing schedules on the
 config by `Loader.finds(Schedule)`.
 

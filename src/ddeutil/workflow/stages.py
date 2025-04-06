@@ -97,7 +97,7 @@ class BaseStage(BaseModel, ABC):
     )
     extras: DictData = Field(
         default_factory=dict,
-        description="An extra override values.",
+        description="An extra override config values.",
     )
 
     @property

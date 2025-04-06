@@ -3,7 +3,7 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-# [x] Use config
+# [x] Use dynamic config
 """Reusables module that keep any templating functions."""
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ from ddeutil.core import getdot, import_string, lazy
 from ddeutil.io import search_env_replace
 
 from .__types import DictData, Re
-from .conf import config
+from .conf import dynamic
 from .exceptions import UtilException
 
 T = TypeVar("T")
@@ -91,7 +91,7 @@ def make_filter_registry(
     :rtype: dict[str, FilterRegistry]
     """
     rs: dict[str, FilterRegistry] = {}
-    for module in registers or config.regis_filter:
+    for module in dynamic("regis_filter", f=registers):
         # NOTE: try to sequential import task functions
         try:
             importer = import_module(module)
@@ -445,8 +445,11 @@ def make_registry(
     :rtype: dict[str, Registry]
     """
     rs: dict[str, Registry] = {}
-    regis_calls: list[str] = registries or config.regis_call  # pragma: no cov
+    regis_calls: list[str] = dynamic(
+        "regis_call", f=registries
+    )  # pragma: no cov
     regis_calls.extend(["ddeutil.vendors"])
+
     for module in regis_calls:
         # NOTE: try to sequential import task functions
         try:
