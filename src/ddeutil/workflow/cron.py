@@ -92,12 +92,12 @@ class On(BaseModel):
     ] = "Etc/UTC"
 
     @classmethod
-    def from_value(cls, value: DictStr, externals: DictData) -> Self:
+    def from_value(cls, value: DictStr, extras: DictData) -> Self:
         """Constructor from values that will generate crontab by function.
 
         :param value: A mapping value that will generate crontab before create
             schedule model.
-        :param externals: An extras external parameter that will keep in extras.
+        :param extras: An extras parameter that will keep in extras.
         """
         passing: DictStr = {}
         if "timezone" in value:
@@ -105,7 +105,7 @@ class On(BaseModel):
         passing["cronjob"] = interval2crontab(
             **{v: value[v] for v in value if v in ("interval", "day", "time")}
         )
-        return cls(extras=externals | passing.pop("extras", {}), **passing)
+        return cls(extras=extras | passing.pop("extras", {}), **passing)
 
     @classmethod
     def from_conf(

@@ -152,3 +152,6 @@ def test_dynamic():
 
     with pytest.raises(TypeError):
         dynamic("audit_path", extras={"audit_path": "audits"})
+
+    conf = dynamic("max_job_exec_timeout", f=500, extras={})
+    print(conf)

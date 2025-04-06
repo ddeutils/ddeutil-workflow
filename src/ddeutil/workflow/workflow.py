@@ -1010,7 +1010,7 @@ class Workflow(BaseModel):
         *,
         run_id: str | None = None,
         parent_run_id: str | None = None,
-        timeout: int = 0,
+        timeout: int = 600,
         result: Result | None = None,
         max_job_parallel: int = 2,
     ) -> Result:

@@ -342,7 +342,9 @@ def param2template(
     :rtype: T
     :returns: An any getter value from the params input.
     """
-    registers: Optional[list[str]] = extras.get("regis_filter")
+    registers: Optional[list[str]] = (
+        extras.get("regis_filter") if extras else None
+    )
     filters: dict[str, FilterRegistry] = filters or make_filter_registry(
         registers=registers
     )
