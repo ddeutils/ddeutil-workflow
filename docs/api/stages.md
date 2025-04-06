@@ -14,15 +14,25 @@ handle stage error on this stage model. I think stage model should have a lot of
 use-case, and it does not worry when I want to create a new one.
 
 ```text
-Execution   --> Ok      --> Result with 0
-
-            --> Error   --> Result with 1 (if env var was set)
-                        --> Raise StageException(...)
+Execution   ┬-> Ok      --> Result with 0
+            │
+            ╰-> Error   ┬-> Result with 1 (if env var was set)
+                        │
+                        ╰-> Raise StageException(...)
 ```
 
 On the context I/O that pass to a stage object at execute process. The
 execute method receives a `params={"params": {...}}` value for mapping to
 template searching.
+
+All stages model inherit from `BaseStage` model that has the base fields:
+
+| field     | alias | data type   | default  | description                                                           |
+|-----------|-------|-------------|:--------:|-----------------------------------------------------------------------|
+| id        |       | str \| None |  `None`  | A stage ID that use to keep execution output or getting by job owner. |
+| name      |       | str         |          | A stage name that want to logging when start execution.               |
+| condition | if    | str \| None |  `None`  | A stage condition statement to allow stage executable.                |
+| extras    |       | dict        | `dict()` | An extra override config values.                                      |
 
 ## Empty Stage
 
@@ -63,8 +73,6 @@ stage only to stdout.
             sleep: 10
         ...
         ```
-
-### Fields
 
 | field | data type   | default | description                                     |
 |-------|-------------|:-------:|-------------------------------------------------|

@@ -1,6 +1,8 @@
 # Params
 
-```python
+The `Param` type constructs by:
+
+```text
 Param = Union[
     ChoiceParam,
     DatetimeParam,
@@ -16,11 +18,16 @@ Param = Union[
     === "Str"
 
         ```yaml
+        params:
+            value: str
         ```
 
     === "Str Default"
 
         ```yaml
+        params:
+            value: str
+            default: foo
         ```
 
 ## IntParam

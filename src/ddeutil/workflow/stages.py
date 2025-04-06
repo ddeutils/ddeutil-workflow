@@ -80,6 +80,10 @@ class BaseStage(BaseModel, ABC):
         This class is the abstraction class for any stage class.
     """
 
+    extras: DictData = Field(
+        default_factory=dict,
+        description="An extra override config values.",
+    )
     id: Optional[str] = Field(
         default=None,
         description=(
@@ -94,10 +98,6 @@ class BaseStage(BaseModel, ABC):
         default=None,
         description="A stage condition statement to allow stage executable.",
         alias="if",
-    )
-    extras: DictData = Field(
-        default_factory=dict,
-        description="An extra override config values.",
     )
 
     @property
