@@ -95,7 +95,7 @@ def test_workflow_on(test_path):
         """,
     ):
         with pytest.raises(ValidationError):
-            Workflow.from_loader(name="tmp-wf-scheduling-raise")
+            Workflow.from_conf(name="tmp-wf-scheduling-raise")
 
     # NOTE: Raise if values on the on field reach the maximum value.
     with dump_yaml_context(
@@ -122,18 +122,18 @@ def test_workflow_on(test_path):
         """,
     ):
         with pytest.raises(ValidationError):
-            Workflow.from_loader(name="tmp-wf-on-reach-max-value")
+            Workflow.from_conf(name="tmp-wf-on-reach-max-value")
 
 
 def test_workflow_desc():
-    workflow = Workflow.from_loader(name="wf-run-common")
+    workflow = Workflow.from_conf(name="wf-run-common")
     assert workflow.desc == (
         "## Run Python Workflow\n\nThis is a running python workflow\n"
     )
 
 
 def test_workflow_from_loader_without_job():
-    workflow = Workflow.from_loader(name="wf-without-jobs")
+    workflow = Workflow.from_conf(name="wf-without-jobs")
     assert workflow.name == "wf-without-jobs"
 
     rs = workflow.execute({})
@@ -170,7 +170,7 @@ def test_workflow_from_loader_raise(test_path):
     )
 
     with pytest.raises(ValueError):
-        Workflow.from_loader(name="wf-run-from-loader-raise")
+        Workflow.from_conf(name="wf-run-from-loader-raise")
 
     with pytest.raises(ValueError):
         Workflow.from_path(
@@ -198,7 +198,7 @@ def test_workflow_from_loader_raise(test_path):
     )
 
     with pytest.raises(TypeError):
-        Workflow.from_loader(name="wf-run-from-loader-raise")
+        Workflow.from_conf(name="wf-run-from-loader-raise")
 
     with pytest.raises(TypeError):
         Workflow.from_path(
@@ -225,7 +225,7 @@ def test_workflow_from_loader_raise(test_path):
     )
 
     with pytest.raises(WorkflowException):
-        Workflow.from_loader(name="wf-run-from-loader-raise")
+        Workflow.from_conf(name="wf-run-from-loader-raise")
 
     with pytest.raises(WorkflowException):
         Workflow.from_path(
@@ -255,7 +255,7 @@ def test_workflow_condition(test_path):
                     print(message)
                     """,
     ):
-        workflow = Workflow.from_loader(name="tmp-wf-condition")
+        workflow = Workflow.from_conf(name="tmp-wf-condition")
         rs: Result = workflow.execute(params={"name": "bar"})
         assert {
             "params": {"name": "bar"},
@@ -298,7 +298,7 @@ def test_workflow_parameterize(test_path):
                   echo: "Hello ${{ params.name }}"
         """,
     ):
-        workflow: Workflow = Workflow.from_loader(name="tmp-wf-params-required")
+        workflow: Workflow = Workflow.from_conf(name="tmp-wf-params-required")
 
         assert workflow.parameterize({"name": "foo"}) == {
             "params": {"name": "foo"},

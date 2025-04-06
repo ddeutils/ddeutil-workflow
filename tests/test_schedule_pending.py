@@ -10,4 +10,4 @@ from ddeutil.workflow.scheduler import Schedule
 @mock.patch.object(Config, "stop_boundary_delta", timedelta(minutes=1))
 @mock.patch.object(Config, "enable_write_audit", False)
 def test_schedule_pending():
-    Schedule.from_loader("schedule-every-minute-wf").pending()
+    Schedule.from_conf("schedule-every-minute-wf").pending()

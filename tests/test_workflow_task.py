@@ -19,7 +19,7 @@ from .utils import dump_yaml_context
 
 
 def test_workflow_task():
-    workflow: Workflow = Workflow.from_loader(name="wf-scheduling-common")
+    workflow: Workflow = Workflow.from_conf(name="wf-scheduling-common")
     runner = workflow.on[0].generate(datetime(2024, 1, 1, 1))
 
     task: WorkflowTask = WorkflowTask(
@@ -70,8 +70,8 @@ def test_workflow_task_queue(test_path):
                   echo: "Hello ${{ params.name | title }}"
         """,
     ):
-        workflow = Workflow.from_loader(name="tmp-wf-task-data-release")
-        runner: CronRunner = On.from_loader("every_minute_bkk").generate(
+        workflow = Workflow.from_conf(name="tmp-wf-task-data-release")
+        runner: CronRunner = On.from_conf("every_minute_bkk").generate(
             datetime(2024, 1, 1, 1)
         )
         queue = {
@@ -116,8 +116,8 @@ def test_workflow_task_release(test_path):
                   echo: "Hello ${{ params.name | title }}"
         """,
     ):
-        workflow = Workflow.from_loader(name="tmp-wf-task-data-release")
-        runner: CronRunner = On.from_loader("every_minute_bkk").generate(
+        workflow = Workflow.from_conf(name="tmp-wf-task-data-release")
+        runner: CronRunner = On.from_conf("every_minute_bkk").generate(
             datetime(2024, 1, 1, 1)
         )
         queue = {"demo": ReleaseQueue()}
@@ -174,10 +174,8 @@ def test_workflow_task_release_long_running(test_path):
                   sleep: 60
         """,
     ):
-        workflow = Workflow.from_loader(
-            name="tmp-wf-task-data-release-long-run"
-        )
-        runner: CronRunner = On.from_loader("every_minute_bkk").generate(
+        workflow = Workflow.from_conf(name="tmp-wf-task-data-release-long-run")
+        runner: CronRunner = On.from_conf("every_minute_bkk").generate(
             datetime(2024, 1, 1, 1)
         )
         queue = {

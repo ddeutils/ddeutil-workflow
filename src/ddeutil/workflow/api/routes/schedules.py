@@ -28,7 +28,7 @@ schedule_route = APIRouter(
 async def get_schedules(name: str):
     """Get schedule object."""
     try:
-        schedule: Schedule = Schedule.from_loader(name=name, externals={})
+        schedule: Schedule = Schedule.from_conf(name=name, extras={})
     except ValueError:
         raise HTTPException(
             status_code=st.HTTP_404_NOT_FOUND,
@@ -51,7 +51,7 @@ async def get_deploy_schedulers(request: Request):
 @schedule_route.get(path="/deploy/{name}", status_code=st.HTTP_200_OK)
 async def get_deploy_scheduler(request: Request, name: str):
     if name in request.state.scheduler:
-        schedule = Schedule.from_loader(name)
+        schedule = Schedule.from_conf(name)
         getter: list[dict[str, dict[str, list[datetime]]]] = []
         for workflow in schedule.workflows:
             getter.append(
@@ -94,7 +94,7 @@ async def add_deploy_scheduler(request: Request, name: str):
 
     # NOTE: Create a pair of workflow and on from schedule model.
     try:
-        schedule: Schedule = Schedule.from_loader(name)
+        schedule: Schedule = Schedule.from_conf(name)
     except ValueError as err:
         request.state.scheduler.remove(name)
         logger.exception(err)
@@ -107,7 +107,7 @@ async def add_deploy_scheduler(request: Request, name: str):
         schedule.tasks(
             start_date_waiting,
             queue=request.state.workflow_queue,
-            externals={},
+            extras={},
         ),
     )
     return {
@@ -124,7 +124,7 @@ async def del_deploy_scheduler(request: Request, name: str):
         # NOTE: Remove current schedule name from the state.
         request.state.scheduler.remove(name)
 
-        schedule: Schedule = Schedule.from_loader(name)
+        schedule: Schedule = Schedule.from_conf(name)
 
         for task in schedule.tasks(datetime.now(tz=config.tz), queue={}):
             if task in request.state.workflow_tasks:

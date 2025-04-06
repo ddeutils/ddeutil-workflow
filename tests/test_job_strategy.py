@@ -110,9 +110,7 @@ def test_strategy():
 
 
 def test_strategy_from_job():
-    workflow: Workflow = Workflow.from_loader(
-        name="wf-run-matrix", externals={}
-    )
+    workflow: Workflow = Workflow.from_conf(name="wf-run-matrix", extras={})
     job: Job = workflow.job("multiple-system")
     strategy = job.strategy
     assert [

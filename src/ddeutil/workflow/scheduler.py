@@ -86,9 +86,9 @@ class ScheduleWorkflow(BaseModel):
     model.
 
         This on field does not equal to the on field of Workflow model, but it
-    uses same logic to generate running release date with crontab object. It use
-    for override the on field if the schedule time was change but you do not
-    want to change on the workflow model.
+    uses same logic to generate running release date with crontab object. It
+    uses for override the on field if the schedule time was change, but you do
+    not want to change on the workflow model.
     """
 
     alias: Optional[str] = Field(
@@ -177,7 +177,7 @@ class ScheduleWorkflow(BaseModel):
         start_date: datetime,
         queue: dict[str, ReleaseQueue],
         *,
-        externals: DictData | None = None,
+        extras: DictData | None = None,
     ) -> list[WorkflowTask]:
         """Return the list of WorkflowTask object from the specific input
         datetime that mapping with the on field.
@@ -187,17 +187,17 @@ class ScheduleWorkflow(BaseModel):
 
         :param start_date: A start date that get from the workflow schedule.
         :param queue: A mapping of name and list of datetime for queue.
-        :param externals: An external parameters that pass to the Loader object.
+        :param extras: An extra parameters that pass to the Loader object.
 
         :rtype: list[WorkflowTask]
         :return: Return the list of WorkflowTask object from the specific
             input datetime that mapping with the on field.
         """
         workflow_tasks: list[WorkflowTask] = []
-        extras: DictData = externals or {}
+        extras: DictData = extras or {}
 
         # NOTE: Loading workflow model from the name of workflow.
-        wf: Workflow = Workflow.from_loader(self.name, externals=extras)
+        wf: Workflow = Workflow.from_conf(self.name, extras=extras)
         wf_queue: ReleaseQueue = queue[self.alias]
 
         # IMPORTANT: Create the default 'on' value if it does not pass the `on`
@@ -254,24 +254,24 @@ class Schedule(BaseModel):
         return dedent(value)
 
     @classmethod
-    def from_loader(
+    def from_conf(
         cls,
         name: str,
-        externals: DictData | None = None,
+        extras: DictData | None = None,
     ) -> Self:
         """Create Schedule instance from the Loader object that only receive
         an input schedule name. The loader object will use this schedule name to
         searching configuration data of this schedule model in conf path.
 
         :param name: (str) A schedule name that want to pass to Loader object.
-        :param externals: An external parameters that want to pass to Loader
+        :param extras: An extra parameters that want to pass to Loader
             object.
 
         :raise ValueError: If the type does not match with current object.
 
         :rtype: Self
         """
-        loader: Loader = Loader(name, externals=(externals or {}))
+        loader: Loader = Loader(name, externals=(extras or {}))
 
         # NOTE: Validate the config type match with current connection model
         if loader.type != cls.__name__:
@@ -325,16 +325,16 @@ class Schedule(BaseModel):
         start_date: datetime,
         queue: dict[str, ReleaseQueue],
         *,
-        externals: DictData | None = None,
+        extras: DictData | None = None,
     ) -> list[WorkflowTask]:
         """Return the list of WorkflowTask object from the specific input
         datetime that mapping with the on field from workflow schedule model.
 
         :param start_date: A start date that get from the workflow schedule.
-        :param queue: A mapping of name and list of datetime for queue.
-        :type queue: dict[str, ReleaseQueue]
-        :param externals: An external parameters that pass to the Loader object.
-        :type externals: DictData | None
+        :param queue: (dict[str, ReleaseQueue]) A mapping of name and list of
+            datetime for queue.
+        :param extras: (DictData) An extra parameters that pass to the Loader
+            object.
 
         :rtype: list[WorkflowTask]
         :return: Return the list of WorkflowTask object from the specific
@@ -348,7 +348,7 @@ class Schedule(BaseModel):
                 queue[workflow.alias] = ReleaseQueue()
 
             workflow_tasks.extend(
-                workflow.tasks(start_date, queue=queue, externals=externals)
+                workflow.tasks(start_date, queue=queue, extras=extras)
             )
 
         return workflow_tasks
@@ -357,14 +357,14 @@ class Schedule(BaseModel):
         self,
         *,
         stop: datetime | None = None,
-        externals: DictData | None = None,
+        extras: DictData | None = None,
         audit: type[Audit] | None = None,
         parent_run_id: str | None = None,
     ) -> Result:  # pragma: no cov
         """Pending this schedule tasks with the schedule package.
 
         :param stop: A datetime value that use to stop running schedule.
-        :param externals: An external parameters that pass to Loader.
+        :param extras: An extra parameters that pass to Loader.
         :param audit: An audit class that use on the workflow task release for
             writing its release audit context.
         :param parent_run_id: A parent workflow running ID for this release.
@@ -385,9 +385,7 @@ class Schedule(BaseModel):
         ) + timedelta(minutes=1)
 
         scheduler_pending(
-            tasks=self.tasks(
-                start_date_waiting, queue=queue, externals=externals
-            ),
+            tasks=self.tasks(start_date_waiting, queue=queue, extras=extras),
             stop=stop_date,
             queue=queue,
             threads=threads,
@@ -709,7 +707,7 @@ def scheduler_pending(
 def schedule_control(
     schedules: list[str],
     stop: datetime | None = None,
-    externals: DictData | None = None,
+    extras: DictData | None = None,
     *,
     audit: type[Audit] | None = None,
     parent_run_id: str | None = None,
@@ -720,7 +718,7 @@ def schedule_control(
 
     :param schedules: A list of workflow names that want to schedule running.
     :param stop: A datetime value that use to stop running schedule.
-    :param externals: An external parameters that pass to Loader.
+    :param extras: An extra parameters that pass to Loader.
     :param audit: An audit class that use on the workflow task release for
         writing its release audit context.
     :param parent_run_id: A parent workflow running ID for this release.
@@ -745,10 +743,10 @@ def schedule_control(
     tasks: list[WorkflowTask] = []
     for name in schedules:
         tasks.extend(
-            Schedule.from_loader(name, externals=externals).tasks(
+            Schedule.from_conf(name, extras=extras).tasks(
                 start_date_waiting,
                 queue=queue,
-                externals=externals,
+                extras=extras,
             ),
         )
 

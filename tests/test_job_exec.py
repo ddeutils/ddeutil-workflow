@@ -8,7 +8,7 @@ from ddeutil.workflow.result import Result
 
 
 def test_job_exec_py():
-    workflow: Workflow = Workflow.from_loader(name="wf-run-common")
+    workflow: Workflow = Workflow.from_conf(name="wf-run-common")
     job: Job = workflow.job("demo-run")
 
     # NOTE: Job params will change schema structure with {"params": { ... }}
@@ -38,8 +38,8 @@ def test_job_exec_py():
 
 
 def test_job_exec_py_raise():
-    workflow: Workflow = Workflow.from_loader(
-        name="wf-run-python-raise", externals={}
+    workflow: Workflow = Workflow.from_conf(
+        name="wf-run-python-raise", extras={}
     )
     first_job: Job = workflow.job("first-job")
 
@@ -49,8 +49,8 @@ def test_job_exec_py_raise():
 
 @mock.patch.object(Config, "stage_default_id", False)
 def test_job_exec_py_not_set_output():
-    workflow: Workflow = Workflow.from_loader(
-        name="wf-run-python-raise", externals={}
+    workflow: Workflow = Workflow.from_conf(
+        name="wf-run-python-raise", extras={}
     )
     job: Job = workflow.job("second-job")
     rs = job.execute(params={})
@@ -64,9 +64,7 @@ def test_job_exec_py_not_set_output():
 @mock.patch.object(Config, "job_raise_error", True)
 @mock.patch.object(Config, "stage_raise_error", True)
 def test_job_exec_py_fail_fast():
-    workflow: Workflow = Workflow.from_loader(
-        name="wf-run-python-raise-for-job"
-    )
+    workflow: Workflow = Workflow.from_conf(name="wf-run-python-raise-for-job")
     job: Job = workflow.job("job-fail-fast")
     rs: Result = job.execute({})
     assert rs.context == {
@@ -88,9 +86,7 @@ def test_job_exec_py_fail_fast():
 @mock.patch.object(Config, "job_raise_error", True)
 @mock.patch.object(Config, "stage_raise_error", True)
 def test_job_exec_py_fail_fast_raise_catch():
-    workflow: Workflow = Workflow.from_loader(
-        name="wf-run-python-raise-for-job"
-    )
+    workflow: Workflow = Workflow.from_conf(name="wf-run-python-raise-for-job")
     job: Job = workflow.job("job-fail-fast-raise")
     rs: Result = job.execute({})
     assert rs.context == {
@@ -121,9 +117,7 @@ def test_job_exec_py_fail_fast_raise_catch():
 @mock.patch.object(Config, "job_raise_error", True)
 @mock.patch.object(Config, "stage_raise_error", True)
 def test_job_exec_py_complete():
-    workflow: Workflow = Workflow.from_loader(
-        name="wf-run-python-raise-for-job"
-    )
+    workflow: Workflow = Workflow.from_conf(name="wf-run-python-raise-for-job")
     job: Job = workflow.job("job-complete")
     rs: Result = job.execute({})
     assert rs.context == {
@@ -145,9 +139,7 @@ def test_job_exec_py_complete():
 @mock.patch.object(Config, "job_raise_error", True)
 @mock.patch.object(Config, "stage_raise_error", True)
 def test_job_exec_py_complete_not_parallel():
-    workflow: Workflow = Workflow.from_loader(
-        name="wf-run-python-raise-for-job"
-    )
+    workflow: Workflow = Workflow.from_conf(name="wf-run-python-raise-for-job")
     job: Job = workflow.job("job-complete-not-parallel")
     rs: Result = job.execute({})
     assert rs.context == {
@@ -198,9 +190,7 @@ def test_job_exec_py_complete_not_parallel():
 @mock.patch.object(Config, "job_raise_error", True)
 @mock.patch.object(Config, "stage_raise_error", True)
 def test_job_exec_py_complete_raise():
-    workflow: Workflow = Workflow.from_loader(
-        name="wf-run-python-raise-for-job"
-    )
+    workflow: Workflow = Workflow.from_conf(name="wf-run-python-raise-for-job")
     job: Job = workflow.job("job-complete-raise")
     rs: Result = job.execute({})
     assert rs.context == {
@@ -225,9 +215,7 @@ def test_job_exec_py_complete_raise():
 @mock.patch.object(Config, "job_raise_error", True)
 @mock.patch.object(Config, "stage_raise_error", True)
 def test_job_exec_runs_on_not_implement():
-    workflow: Workflow = Workflow.from_loader(
-        name="wf-run-python-raise-for-job"
-    )
+    workflow: Workflow = Workflow.from_conf(name="wf-run-python-raise-for-job")
     job: Job = workflow.job("job-fail-runs-on")
 
     with pytest.raises(NotImplementedError):

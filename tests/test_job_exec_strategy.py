@@ -12,9 +12,7 @@ from ddeutil.workflow.workflow import Workflow
 
 
 def test_job_exec_strategy():
-    workflow: Workflow = Workflow.from_loader(
-        name="wf-run-python-raise-for-job"
-    )
+    workflow: Workflow = Workflow.from_conf(name="wf-run-python-raise-for-job")
     job: Job = workflow.job("job-complete")
     rs = local_execute_strategy(job, {"sleep": "0.1"}, {})
 
@@ -27,9 +25,7 @@ def test_job_exec_strategy():
 
 
 def test_job_exec_strategy_skip_stage():
-    workflow: Workflow = Workflow.from_loader(
-        name="wf-run-python-raise-for-job"
-    )
+    workflow: Workflow = Workflow.from_conf(name="wf-run-python-raise-for-job")
     job: Job = workflow.job("job-stage-condition")
     rs = local_execute_strategy(job, {"sleep": "1"}, {})
 
@@ -47,9 +43,7 @@ def test_job_exec_strategy_skip_stage():
 @mock.patch.object(Config, "job_raise_error", True)
 @mock.patch.object(Config, "stage_raise_error", False)
 def test_job_exec_strategy_catch_stage_error():
-    workflow: Workflow = Workflow.from_loader(
-        name="wf-run-python-raise-for-job"
-    )
+    workflow: Workflow = Workflow.from_conf(name="wf-run-python-raise-for-job")
     job: Job = workflow.job("final-job")
     rs = local_execute_strategy(job, {"name": "foo"}, {})
 
@@ -78,9 +72,7 @@ def test_job_exec_strategy_catch_stage_error():
 @mock.patch.object(Config, "job_raise_error", False)
 @mock.patch.object(Config, "stage_raise_error", True)
 def test_job_exec_strategy_catch_job_error():
-    workflow: Workflow = Workflow.from_loader(
-        name="wf-run-python-raise-for-job"
-    )
+    workflow: Workflow = Workflow.from_conf(name="wf-run-python-raise-for-job")
     job: Job = workflow.job("final-job")
     rs = local_execute_strategy(job, {"name": "foo"}, {})
     assert rs.context == {
@@ -100,9 +92,7 @@ def test_job_exec_strategy_catch_job_error():
 
 
 def test_job_exec_strategy_event_set():
-    workflow: Workflow = Workflow.from_loader(
-        name="wf-run-python-raise-for-job"
-    )
+    workflow: Workflow = Workflow.from_conf(name="wf-run-python-raise-for-job")
     job: Job = workflow.job("second-job")
     event = Event()
     with ThreadPoolExecutor(max_workers=1) as executor:
@@ -119,9 +109,7 @@ def test_job_exec_strategy_event_set():
 
 
 def test_job_exec_strategy_raise():
-    workflow: Workflow = Workflow.from_loader(
-        name="wf-run-python-raise-for-job"
-    )
+    workflow: Workflow = Workflow.from_conf(name="wf-run-python-raise-for-job")
     job: Job = workflow.job("first-job")
 
     with mock.patch.object(Config, "job_raise_error", False):

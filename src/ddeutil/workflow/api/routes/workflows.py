@@ -44,7 +44,7 @@ async def get_workflows() -> DictData:
 async def get_workflow_by_name(name: str) -> DictData:
     """Return model of workflow that passing an input workflow name."""
     try:
-        workflow: Workflow = Workflow.from_loader(name=name, externals={})
+        workflow: Workflow = Workflow.from_conf(name=name, extras={})
     except ValueError as err:
         logger.exception(err)
         raise HTTPException(
@@ -69,7 +69,7 @@ class ExecutePayload(BaseModel):
 async def workflow_execute(name: str, payload: ExecutePayload) -> DictData:
     """Return model of workflow that passing an input workflow name."""
     try:
-        workflow: Workflow = Workflow.from_loader(name=name, externals={})
+        workflow: Workflow = Workflow.from_conf(name=name, extras={})
     except ValueError:
         raise HTTPException(
             status_code=st.HTTP_404_NOT_FOUND,

@@ -288,24 +288,24 @@ class Workflow(BaseModel):
     )
 
     @classmethod
-    def from_loader(
+    def from_conf(
         cls,
         name: str,
-        externals: DictData | None = None,
+        extras: DictData | None = None,
     ) -> Self:
         """Create Workflow instance from the Loader object that only receive
         an input workflow name. The loader object will use this workflow name to
         searching configuration data of this workflow model in conf path.
 
         :param name: A workflow name that want to pass to Loader object.
-        :param externals: An external parameters that want to pass to Loader
+        :param extras: An extra parameters that want to pass to Loader
             object.
 
         :raise ValueError: If the type does not match with current object.
 
         :rtype: Self
         """
-        loader: Loader = Loader(name, externals=(externals or {}))
+        loader: Loader = Loader(name, externals=(extras or {}))
 
         # NOTE: Validate the config type match with current connection model
         if loader.type != cls.__name__:
@@ -313,12 +313,10 @@ class Workflow(BaseModel):
 
         loader_data: DictData = copy.deepcopy(loader.data)
         loader_data["name"] = name.replace(" ", "_")
-        if externals:  # pragma: no cov
-            loader_data["extras"] = externals
+        if extras:  # pragma: no cov
+            loader_data["extras"] = extras
 
-        cls.__bypass_on__(
-            loader_data, path=loader.conf_path, externals=externals
-        )
+        cls.__bypass_on__(loader_data, path=loader.conf_path, extras=extras)
         return cls.model_validate(obj=loader_data)
 
     @classmethod
@@ -326,7 +324,7 @@ class Workflow(BaseModel):
         cls,
         name: str,
         path: Path,
-        externals: DictData | None = None,
+        extras: DictData | None = None,
     ) -> Self:
         """Create Workflow instance from the specific path. The loader object
         will use this workflow name and path to searching configuration data of
@@ -334,7 +332,7 @@ class Workflow(BaseModel):
 
         :param name: (str) A workflow name that want to pass to Loader object.
         :param path: (Path) A config path that want to search.
-        :param externals: An external parameters that want to pass to Loader
+        :param extras: An extra parameters that want to pass to Loader
             object.
 
         :raise ValueError: If the type does not match with current object.
@@ -342,7 +340,7 @@ class Workflow(BaseModel):
         :rtype: Self
         """
         loader: SimLoad = SimLoad(
-            name, conf_path=path, externals=(externals or {})
+            name, conf_path=path, externals=(extras or {})
         )
         # NOTE: Validate the config type match with current connection model
         if loader.type != cls.__name__:
@@ -350,10 +348,10 @@ class Workflow(BaseModel):
 
         loader_data: DictData = copy.deepcopy(loader.data)
         loader_data["name"] = name.replace(" ", "_")
-        if externals:  # pragma: no cov
-            loader_data["extras"] = externals
+        if extras:  # pragma: no cov
+            loader_data["extras"] = extras
 
-        cls.__bypass_on__(loader_data, path=path, externals=externals)
+        cls.__bypass_on__(loader_data, path=path, extras=extras)
         return cls.model_validate(obj=loader_data)
 
     @classmethod
@@ -361,14 +359,15 @@ class Workflow(BaseModel):
         cls,
         data: DictData,
         path: Path,
-        externals: DictData | None = None,
+        extras: DictData | None = None,
     ) -> DictData:
         """Bypass the on data to loaded config data.
 
         :param data: A data to construct to this Workflow model.
         :param path: A config path.
-        :param externals: An external parameters that want to pass to SimLoad
+        :param extras: An extra parameters that want to pass to SimLoad
             object.
+
         :rtype: DictData
         """
         if on := data.pop("on", []):
@@ -381,7 +380,7 @@ class Workflow(BaseModel):
             #   field.
             data["on"] = [
                 (
-                    SimLoad(n, conf_path=path, externals=(externals or {})).data
+                    SimLoad(n, conf_path=path, externals=(extras or {})).data
                     if isinstance(n, str)
                     else n
                 )

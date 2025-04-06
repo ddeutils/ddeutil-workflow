@@ -109,19 +109,19 @@ class On(BaseModel):
         return cls(extras=externals | passing.pop("extras", {}), **passing)
 
     @classmethod
-    def from_loader(
+    def from_conf(
         cls,
         name: str,
-        externals: DictData | None = None,
+        extras: DictData | None = None,
     ) -> Self:
         """Constructor from the name of config that will use loader object for
         getting the data.
 
         :param name: A name of config that will get from loader.
-        :param externals: An extras external parameter that will keep in extras.
+        :param extras: An extra parameter that will keep in extras.
         """
-        externals: DictData = externals or {}
-        loader: Loader = Loader(name, externals=externals)
+        extras: DictData = extras or {}
+        loader: Loader = Loader(name, externals=extras)
 
         # NOTE: Validate the config type match with current connection model
         if loader.type != cls.__name__:
@@ -138,7 +138,7 @@ class On(BaseModel):
                             if v in ("interval", "day", "time")
                         }
                     ),
-                    extras=externals | loader_data.pop("extras", {}),
+                    extras=extras | loader_data.pop("extras", {}),
                     **loader_data,
                 )
             )
@@ -149,7 +149,7 @@ class On(BaseModel):
         return cls.model_validate(
             obj=dict(
                 cronjob=loader_data.pop("cronjob"),
-                extras=externals | loader_data.pop("extras", {}),
+                extras=extras | loader_data.pop("extras", {}),
                 **loader_data,
             )
         )

@@ -14,7 +14,7 @@ from .utils import dump_yaml_context
 
 
 def test_stage_exec_bash():
-    workflow: Workflow = Workflow.from_loader(name="wf-run-common")
+    workflow: Workflow = Workflow.from_conf(name="wf-run-common")
     stage: Stage = workflow.job("bash-run").stage("echo")
     rs: Result = stage.handler_execute({})
     assert {
@@ -37,7 +37,7 @@ def test_stage_exec_bash():
 
 
 def test_stage_exec_bash_env():
-    workflow: Workflow = Workflow.from_loader(name="wf-run-common")
+    workflow: Workflow = Workflow.from_conf(name="wf-run-common")
     stage: Stage = workflow.job("bash-run-env").stage("echo-env")
     rs: Result = stage.handler_execute({})
     assert {
@@ -48,7 +48,7 @@ def test_stage_exec_bash_env():
 
 
 def test_stage_exec_bash_env_raise():
-    workflow: Workflow = Workflow.from_loader(name="wf-run-common")
+    workflow: Workflow = Workflow.from_conf(name="wf-run-common")
     stage: Stage = workflow.job("bash-run-env").stage("raise-error")
 
     # NOTE: Raise error from bash that force exit 1.
@@ -99,7 +99,7 @@ def test_stage_exec_call(test_path):
                     sink: sink
         """,
     ):
-        workflow = Workflow.from_loader(name="tmp-wf-call-return-type")
+        workflow = Workflow.from_conf(name="tmp-wf-call-return-type")
 
         stage: Stage = workflow.job("second-job").stage("extract-load")
         rs: Result = stage.handler_execute({})
@@ -135,7 +135,7 @@ def test_stage_exec_call(test_path):
 
 @mock.patch.object(Config, "stage_raise_error", True)
 def test_stage_exec_py_raise():
-    workflow: Workflow = Workflow.from_loader(name="wf-run-common")
+    workflow: Workflow = Workflow.from_conf(name="wf-run-common")
     stage: Stage = workflow.job("raise-run").stage(stage_id="raise-error")
     with pytest.raises(StageException):
         stage.handler_execute(params={"x": "Foo"})
@@ -143,7 +143,7 @@ def test_stage_exec_py_raise():
 
 @mock.patch.object(Config, "stage_raise_error", False)
 def test_stage_exec_py_not_raise():
-    workflow: Workflow = Workflow.from_loader(name="wf-run-common")
+    workflow: Workflow = Workflow.from_conf(name="wf-run-common")
     stage: Stage = workflow.job("raise-run").stage(stage_id="raise-error")
 
     rs = stage.handler_execute(params={"x": "Foo"})
@@ -181,7 +181,7 @@ def test_stage_exec_py_not_raise():
 
 
 def test_stage_exec_py_with_vars():
-    workflow: Workflow = Workflow.from_loader(name="wf-run-common")
+    workflow: Workflow = Workflow.from_conf(name="wf-run-common")
     stage: Stage = workflow.job("demo-run").stage(stage_id="run-var")
     assert stage.id == "run-var"
 
@@ -202,7 +202,7 @@ def test_stage_exec_py_with_vars():
 
 
 def test_stage_exec_py_func():
-    workflow: Workflow = Workflow.from_loader(name="wf-run-python")
+    workflow: Workflow = Workflow.from_conf(name="wf-run-python")
     stage: Stage = workflow.job("second-job").stage(stage_id="create-func")
     rs = stage.set_outputs(stage.handler_execute(params={}).context, to={})
     assert ("var_inside", "echo") == tuple(
@@ -231,7 +231,7 @@ def test_stage_exec_py_result(test_path):
                     raise ValueError("test raise error")
         """,
     ):
-        workflow: Workflow = Workflow.from_loader(name="tmp-wf-py-result")
+        workflow: Workflow = Workflow.from_conf(name="tmp-wf-py-result")
         stage: Stage = workflow.job("first-job").stage(
             stage_id="py-result-stage"
         )
@@ -255,14 +255,14 @@ def test_stage_exec_py_result(test_path):
 
 
 def test_stage_exec_py_create_object():
-    workflow: Workflow = Workflow.from_loader(name="wf-run-python-filter")
+    workflow: Workflow = Workflow.from_conf(name="wf-run-python-filter")
     stage: Stage = workflow.job("create-job").stage(stage_id="create-stage")
     rs = stage.set_outputs(stage.handler_execute(params={}).context, to={})
     assert len(rs["stages"]["create-stage"]["outputs"]) == 1
 
 
 def test_stage_exec_trigger():
-    workflow = Workflow.from_loader(name="wf-trigger", externals={})
+    workflow = Workflow.from_conf(name="wf-trigger", extras={})
     stage: Stage = workflow.job("trigger-job").stage(stage_id="trigger-stage")
     rs: Result = stage.handler_execute(params={})
     assert all(k in ("params", "jobs") for k in rs.context.keys())
@@ -273,7 +273,7 @@ def test_stage_exec_trigger():
 
 
 def test_stage_exec_trigger_from_workflow():
-    workflow = Workflow.from_loader(name="wf-trigger", externals={})
+    workflow = Workflow.from_conf(name="wf-trigger", extras={})
     rs: Result = workflow.execute(params={})
     assert {
         "author-run": "Trigger Runner",
@@ -316,7 +316,7 @@ def test_stage_exec_foreach(test_path):
                         Final run
         """,
     ):
-        workflow = Workflow.from_loader(name="tmp-wf-foreach")
+        workflow = Workflow.from_conf(name="tmp-wf-foreach")
         stage: Stage = workflow.job("first-job").stage("foreach-stage")
         rs = stage.set_outputs(stage.handler_execute({}).context, to={})
         assert rs == {
@@ -385,7 +385,7 @@ def test_stage_exec_parallel(test_path):
                         sleep: 1
         """,
     ):
-        workflow = Workflow.from_loader(name="tmp-wf-parallel")
+        workflow = Workflow.from_conf(name="tmp-wf-parallel")
 
         stage: Stage = workflow.job("first-job").stage("parallel-stage")
         rs = stage.set_outputs(stage.handler_execute({}).context, to={})

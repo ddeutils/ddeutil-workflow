@@ -45,7 +45,7 @@ def test_schedule_from_loader_raise(test_path):
         )
 
     with pytest.raises(ValueError):
-        Schedule.from_loader("schedule-raise-wf")
+        Schedule.from_conf("schedule-raise-wf")
 
     with pytest.raises(ValueError):
         Schedule.from_path("schedule-raise-wf", path=test_path / "conf")
@@ -70,7 +70,7 @@ def test_schedule_from_loader_raise(test_path):
         )
 
     with pytest.raises(TypeError):
-        Schedule.from_loader("schedule-raise-wf")
+        Schedule.from_conf("schedule-raise-wf")
 
     with pytest.raises(TypeError):
         Schedule.from_path("schedule-raise-wf", path=test_path / "conf")
@@ -95,7 +95,7 @@ def test_schedule_from_loader_raise(test_path):
         )
 
     with pytest.raises(ValidationError):
-        Schedule.from_loader("schedule-raise-wf")
+        Schedule.from_conf("schedule-raise-wf")
 
     with pytest.raises(ValidationError):
         Schedule.from_path("schedule-raise-wf", path=test_path / "conf")
@@ -115,7 +115,7 @@ def test_schedule_default_on(test_path):
                 asat-dt: "${{ release.logical_date }}"
         """,
     ):
-        schedule = Schedule.from_loader("tmp-schedule-default-wf")
+        schedule = Schedule.from_conf("tmp-schedule-default-wf")
         for sch_wf in schedule.workflows:
             assert sch_wf.on == []
 
@@ -130,7 +130,7 @@ def test_schedule_remove_workflow_task():
     pipeline_tasks: list[WorkflowTask] = []
     start_date: datetime = datetime(2024, 1, 1, 1)
 
-    wf: Workflow = Workflow.from_loader("wf-scheduling")
+    wf: Workflow = Workflow.from_conf("wf-scheduling")
     for on in wf.on:
         pipeline_tasks.append(
             WorkflowTask(
@@ -142,7 +142,7 @@ def test_schedule_remove_workflow_task():
         )
     assert 2 == len(pipeline_tasks)
 
-    wf: Workflow = Workflow.from_loader("wf-scheduling")
+    wf: Workflow = Workflow.from_conf("wf-scheduling")
     for on in wf.on:
         pipeline_tasks.remove(
             WorkflowTask(
@@ -155,7 +155,7 @@ def test_schedule_remove_workflow_task():
 
     assert 0 == len(pipeline_tasks)
 
-    wf: Workflow = Workflow.from_loader("wf-scheduling")
+    wf: Workflow = Workflow.from_conf("wf-scheduling")
     for on in wf.on:
         pipeline_tasks.append(
             WorkflowTask(
@@ -169,7 +169,7 @@ def test_schedule_remove_workflow_task():
     remover = WorkflowTask(
         alias=wf.name,
         workflow=wf,
-        runner=On.from_loader(name="every_minute_bkk").generate(start_date),
+        runner=On.from_conf(name="every_minute_bkk").generate(start_date),
         values={"asat-dt": "${{ release.logical_date }}"},
     )
     pipeline_tasks.remove(remover)

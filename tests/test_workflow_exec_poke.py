@@ -31,7 +31,7 @@ def test_workflow_poke(test_path):
                   echo: "Hello ${{ params.asat-dt | fmt('%Y-%m-%d') }}"
         """,
     ):
-        workflow = Workflow.from_loader(name="tmp-wf-scheduling-minute")
+        workflow = Workflow.from_conf(name="tmp-wf-scheduling-minute")
 
         # NOTE: Poking with the current datetime.
         result: Result = workflow.poke(params={"asat-dt": datetime(2024, 1, 1)})
@@ -91,7 +91,7 @@ def test_workflow_poke_no_queue(test_path):
                 - name: "Empty stage"
         """,
     ):
-        workflow = Workflow.from_loader(name="tmp-wf-scheduling-daily")
+        workflow = Workflow.from_conf(name="tmp-wf-scheduling-daily")
 
         # NOTE: Poking with the current datetime.
         results: Result = workflow.poke(
@@ -102,7 +102,7 @@ def test_workflow_poke_no_queue(test_path):
 
 @pytest.mark.poke
 def test_workflow_poke_raise():
-    workflow = Workflow.from_loader(name="wf-scheduling-common")
+    workflow = Workflow.from_conf(name="wf-scheduling-common")
 
     # Raise: If a period value is lower than 0.
     with pytest.raises(WorkflowException):
@@ -131,7 +131,7 @@ def test_workflow_poke_with_start_date_and_period(test_path):
                   echo: "Hello ${{ params.name | title }}"
         """,
     ):
-        workflow = Workflow.from_loader(name="tmp-wf-scheduling-with-name")
+        workflow = Workflow.from_conf(name="tmp-wf-scheduling-with-name")
 
         # NOTE: Poking with specific start datetime.
         result: Result = workflow.poke(
@@ -166,6 +166,6 @@ def test_workflow_poke_no_on(test_path):
                   echo: "Hello ${{ params.name }}"
         """,
     ):
-        workflow = Workflow.from_loader(name="tmp-wf-poke-no-on")
+        workflow = Workflow.from_conf(name="tmp-wf-poke-no-on")
         result = workflow.poke(params={"name": "FOO"})
         assert result.context == {"outputs": []}

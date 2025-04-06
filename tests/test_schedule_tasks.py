@@ -21,7 +21,7 @@ def test_schedule_tasks(test_path):
                 asat-dt: "${{ release.logical_date }}"
         """,
     ):
-        schedule: Schedule = Schedule.from_loader("tmp-schedule-wf-tasks")
+        schedule: Schedule = Schedule.from_conf("tmp-schedule-wf-tasks")
         queue: dict[str, ReleaseQueue] = {}
 
         tasks = schedule.tasks(datetime(2024, 1, 1, 1), queue=queue)
@@ -36,7 +36,7 @@ def test_schedule_tasks(test_path):
         assert task != datetime(2024, 1, 1, 1)
         assert task == WorkflowTask(
             alias="wf-scheduling",
-            workflow=Workflow.from_loader(name="wf-scheduling"),
+            workflow=Workflow.from_conf(name="wf-scheduling"),
             runner=task.runner,
             values={},
         )
@@ -56,7 +56,7 @@ def test_schedule_tasks_release(test_path):
                 asat-dt: "${{ release.logical_date }}"
         """,
     ):
-        schedule: Schedule = Schedule.from_loader("tmp-schedule-common-wf")
+        schedule: Schedule = Schedule.from_conf("tmp-schedule-common-wf")
         queue: dict[str, ReleaseQueue] = {}
 
         for task in schedule.tasks(

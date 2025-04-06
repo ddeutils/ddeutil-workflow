@@ -30,7 +30,7 @@ def test_on():
         == "0,3,5-6,10,15,20,25,30,35,40,45,50,55 H(9-17)/2 H 1-3 1-5"
     )
 
-    schedule = On.from_loader(name="every_5_minute_bkk", externals={})
+    schedule = On.from_conf(name="every_5_minute_bkk", extras={})
     assert "Asia/Bangkok" == schedule.tz
     assert "*/5 * * * *" == str(schedule.cronjob)
 
@@ -64,7 +64,7 @@ def test_on_from_value():
             "day": "monday",
             "time": "12:00",
         },
-        externals={},
+        extras={},
     )
     assert "Etc/UTC" == schedule.tz
     assert "12 0 1 * 1" == str(schedule.cronjob)
@@ -76,7 +76,7 @@ def test_on_from_value():
             "time": "12:00",
             "timezone": "Etc/UTC",
         },
-        externals={},
+        extras={},
     )
     assert "Etc/UTC" == schedule.tz
     assert "12 0 1 * 1" == str(schedule.cronjob)
@@ -88,16 +88,16 @@ def test_on_from_value():
             "time": "12:00",
             "tz": "Etc/UTC",
         },
-        externals={},
+        extras={},
     )
     assert "Etc/UTC" == schedule.tz
     assert "12 0 1 * 1" == str(schedule.cronjob)
 
 
 def test_on_from_loader():
-    schedule = On.from_loader(
+    schedule = On.from_conf(
         name="every_day_noon",
-        externals={},
+        extras={},
     )
     assert "Etc/UTC" == schedule.tz
     assert "12 0 1 * 1" == str(schedule.cronjob)
@@ -119,9 +119,9 @@ def test_on_from_loader_raise(test_path):
         )
 
     with pytest.raises(ValueError):
-        On.from_loader(
+        On.from_conf(
             name="every_day_no_cron_raise",
-            externals={},
+            extras={},
         )
 
     with test_file.open(mode="w") as f:
@@ -135,9 +135,9 @@ def test_on_from_loader_raise(test_path):
         )
 
     with pytest.raises(ValueError):
-        On.from_loader(
+        On.from_conf(
             name="every_day_no_cron_raise",
-            externals={},
+            extras={},
         )
 
     with test_file.open(mode="w") as f:
@@ -153,26 +153,26 @@ def test_on_from_loader_raise(test_path):
         )
 
     with pytest.raises(ValidationError):
-        On.from_loader(
+        On.from_conf(
             name="every_day_no_cron_raise",
-            externals={},
+            extras={},
         )
 
     test_file.unlink()
 
 
 def test_on_aws():
-    schedule = YearOn.from_loader(
+    schedule = YearOn.from_conf(
         name="aws_every_5_minute_bkk",
-        externals={},
+        extras={},
     )
     assert "Asia/Bangkok" == schedule.tz
 
 
 def test_on_every_minute():
-    schedule = On.from_loader(
+    schedule = On.from_conf(
         name="every_minute_bkk",
-        externals={},
+        extras={},
     )
     current: datetime = datetime(2024, 8, 1, 12, 5, 45)
     adjust: datetime = current.replace(second=0, microsecond=0).astimezone(
@@ -183,13 +183,13 @@ def test_on_every_minute():
 
 
 def test_on_every_minute_with_second():
-    schedule = On.from_loader(name="every_minute_bkk")
+    schedule = On.from_conf(name="every_minute_bkk")
     gen = schedule.next(datetime(2024, 1, 1, 0, 0, 1))
     print(gen.date)
 
 
 def test_on_every_5_minute_bkk():
-    schedule = On.from_loader(name="every_5_minute_bkk")
+    schedule = On.from_conf(name="every_5_minute_bkk")
     schedule.generate("2024-01-01 01:12:00")
     schedule.next("2024-01-01 01:12:00")
 
@@ -201,8 +201,8 @@ def test_on_every_5_minute_bkk():
 
 
 def test_on_serialize():
-    schedule = On.from_loader(
+    schedule = On.from_conf(
         name="every_minute_bkk",
-        externals={},
+        extras={},
     )
     print(schedule.model_dump())

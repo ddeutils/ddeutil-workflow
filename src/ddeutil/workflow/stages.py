@@ -841,7 +841,9 @@ class TriggerStage(BaseStage):
 
         # NOTE: Set running workflow ID from running stage ID to external
         #   params on Loader object.
-        workflow: Workflow = Workflow.from_loader(name=_trigger)
+        workflow: Workflow = Workflow.from_conf(
+            name=_trigger, extras=self.extras
+        )
         result.trace.info(f"[STAGE]: Trigger-Execute: {_trigger!r}")
         return workflow.execute(
             params=param2template(self.params, params, extras=self.extras),
@@ -949,6 +951,9 @@ class ParallelStage(BaseStage):  # pragma: no cov
                 run_id=gen_id(self.name + (self.id or ""), unique=True)
             )
 
+        result.trace.info(
+            f"[STAGE]: Parallel-Execute with {self.max_parallel_core} cores."
+        )
         rs: DictData = {"parallel": {}}
         status = Status.SUCCESS
         with ThreadPoolExecutor(
@@ -1051,6 +1056,7 @@ class ForEachStage(BaseStage):
                 f"Foreach does not support foreach value: {foreach!r}"
             )
 
+        result.trace.info(f"[STAGE]: Foreach-Execute: {foreach!r}.")
         rs: DictData = {"items": foreach, "foreach": {}}
         status = Status.SUCCESS
         # TODO: Implement concurrent more than 1.
@@ -1092,10 +1098,24 @@ class ForEachStage(BaseStage):
 
 # TODO: Not implement this stages yet
 class UntilStage(BaseStage):  # pragma: no cov
-    """Until execution stage."""
+    """Until execution stage.
 
-    until: str = Field(description="A until condition.")
+    Data Validate:
+        >>> stage = {
+        ...     "name": "Until stage execution",
+        ...     "item": 1,
+        ...     "until": "${{ item }} > 3"
+        ...     "stages": [
+        ...         {
+        ...             "name": "Start increase item value.",
+        ...             "run": "item = ${{ item }}\\nitem += 1\\n"
+        ...         },
+        ...     ],
+        ... }
+    """
+
     item: Union[str, int, bool] = Field(description="An initial value.")
+    until: str = Field(description="A until condition.")
     stages: list[Stage] = Field(
         default_factory=list,
         description=(
@@ -1115,6 +1135,12 @@ class UntilStage(BaseStage):  # pragma: no cov
         result: Result | None = None,
         event: Event | None = None,
     ) -> Result: ...
+
+
+# TODO: Not implement this stages yet
+class Match(BaseModel):
+    case: Union[str, int]
+    stage: Stage
 
 
 # TODO: Not implement this stages yet
@@ -1153,7 +1179,7 @@ class CaseStage(BaseStage):  # pragma: no cov
     """
 
     case: str = Field(description="A case condition for routing.")
-    match: list[dict[str, Union[str, Stage]]]
+    match: list[Match]
 
     def execute(
         self,
@@ -1161,7 +1187,60 @@ class CaseStage(BaseStage):  # pragma: no cov
         *,
         result: Result | None = None,
         event: Event | None = None,
-    ) -> Result: ...
+    ) -> Result:
+        """Execute case-match condition that pass to the case field.
+
+        :param params: A parameter that want to pass before run any statement.
+        :param result: (Result) A result object for keeping context and status
+            data.
+        :param event: (Event) An event manager that use to track parent execute
+            was not force stopped.
+
+        :rtype: Result
+        """
+        if result is None:  # pragma: no cov
+            result: Result = Result(
+                run_id=gen_id(self.name + (self.id or ""), unique=True)
+            )
+        status = Status.SUCCESS
+        _case = param2template(self.case, params, extras=self.extras)
+        _else = None
+        context = {}
+        for match in self.match:
+            if (c := match.case) != "_":
+                _condition = param2template(c, params, extras=self.extras)
+            else:
+                _else = match
+                continue
+
+            if match == _condition:
+                stage: Stage = match.stage
+                try:
+                    stage.set_outputs(
+                        stage.handler_execute(
+                            params=params,
+                            run_id=result.run_id,
+                            parent_run_id=result.parent_run_id,
+                        ).context,
+                        to=context,
+                    )
+                except StageException as err:  # pragma: no cov
+                    status = Status.FAILED
+                    result.trace.error(
+                        f"[STAGE]: Catch:\n\t{err.__class__.__name__}:"
+                        f"\n\t{err}"
+                    )
+                    context.update(
+                        {
+                            "errors": {
+                                "class": err,
+                                "name": err.__class__.__name__,
+                                "message": f"{err.__class__.__name__}: {err}",
+                            },
+                        },
+                    )
+
+        return result.catch(status=status, context=context)
 
 
 class RaiseStage(BaseStage):  # pragma: no cov
@@ -1193,13 +1272,14 @@ class RaiseStage(BaseStage):  # pragma: no cov
             result: Result = Result(
                 run_id=gen_id(self.name + (self.id or ""), unique=True)
             )
-
-        result.trace.error(f"[STAGE]: ... raise ( {self.message} )")
+        result.trace.info(f"[STAGE]: Raise-Execute: {self.message!r}.")
         raise StageException(self.message)
 
 
 # TODO: Not implement this stages yet
 class HookStage(BaseStage):  # pragma: no cov
+    """Hook stage execution."""
+
     hook: str
     args: DictData
     callback: str
@@ -1215,7 +1295,20 @@ class HookStage(BaseStage):  # pragma: no cov
 
 # TODO: Not implement this stages yet
 class DockerStage(BaseStage):  # pragma: no cov
-    """Docker container stage execution."""
+    """Docker container stage execution.
+
+    Data Validate:
+        >>> stage = {
+        ...     "name": "Docker stage execution",
+        ...     "image": "image-name.pkg.com",
+        ...     "env": {
+        ...         "ENV": "dev",
+        ...     },
+        ...     "volume": {
+        ...         "secrets": "/secrets",
+        ...     },
+        ... }
+    """
 
     image: str = Field(
         description="A Docker image url with tag that want to run.",
@@ -1250,18 +1343,6 @@ class VirtualPyStage(PyStage):  # pragma: no cov
         event: Event | None = None,
     ) -> Result:
         return super().execute(params, result=result)
-
-
-# TODO: Not implement this stages yet
-class SensorStage(BaseStage):  # pragma: no cov
-
-    def execute(
-        self,
-        params: DictData,
-        *,
-        result: Result | None = None,
-        event: Event | None = None,
-    ) -> Result: ...
 
 
 # NOTE:

@@ -14,7 +14,7 @@ from ddeutil.workflow.workflow import (
 
 @mock.patch.object(Config, "enable_write_audit", False)
 def test_workflow_exec_release():
-    workflow: Workflow = Workflow.from_loader(name="wf-scheduling-common")
+    workflow: Workflow = Workflow.from_conf(name="wf-scheduling-common")
     current_date: datetime = datetime.now().replace(second=0, microsecond=0)
     release_date: datetime = workflow.on[0].next(current_date).date
 
@@ -46,7 +46,7 @@ def test_workflow_exec_release():
 
 @mock.patch.object(Config, "enable_write_audit", False)
 def test_workflow_exec_release_with_queue():
-    workflow: Workflow = Workflow.from_loader(name="wf-scheduling-common")
+    workflow: Workflow = Workflow.from_conf(name="wf-scheduling-common")
     current_date: datetime = datetime.now().replace(second=0, microsecond=0)
     release_date: datetime = workflow.on[0].next(current_date).date
     queue = ReleaseQueue(running=[Release.from_dt(release_date)])
@@ -81,7 +81,7 @@ def test_workflow_exec_release_with_queue():
 
 
 def test_workflow_exec_release_with_queue_raise():
-    workflow: Workflow = Workflow.from_loader(name="wf-scheduling-common")
+    workflow: Workflow = Workflow.from_conf(name="wf-scheduling-common")
     current_date: datetime = datetime.now().replace(second=0, microsecond=0)
     release_date: datetime = workflow.on[0].next(current_date).date
     queue = [Release.from_dt(release_date)]
@@ -97,7 +97,7 @@ def test_workflow_exec_release_with_queue_raise():
 
 @mock.patch.object(Config, "enable_write_audit", False)
 def test_workflow_exec_release_with_start_date():
-    workflow: Workflow = Workflow.from_loader(name="wf-scheduling-common")
+    workflow: Workflow = Workflow.from_conf(name="wf-scheduling-common")
     start_date: datetime = datetime(2024, 1, 1, 1, 1)
 
     rs: Result = workflow.release(

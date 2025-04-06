@@ -50,7 +50,7 @@ def test_workflow_exec_raise_timeout():
 
 
 def test_workflow_exec_py():
-    workflow = Workflow.from_loader(name="wf-run-python")
+    workflow = Workflow.from_conf(name="wf-run-python")
     rs: Result = workflow.execute(
         params={
             "author-run": "Local Workflow",
@@ -149,7 +149,7 @@ def test_workflow_exec_parallel_timeout():
 
 def test_workflow_exec_py_with_parallel():
     with mock.patch.object(Config, "max_job_parallel", 3):
-        workflow = Workflow.from_loader(name="wf-run-python")
+        workflow = Workflow.from_conf(name="wf-run-python")
         rs: Result = workflow.execute(
             params={
                 "author-run": "Local Workflow",
@@ -197,7 +197,7 @@ def test_workflow_exec_py_with_parallel():
 
 
 def test_workflow_exec_py_raise():
-    workflow = Workflow.from_loader("wf-run-python-raise")
+    workflow = Workflow.from_conf("wf-run-python-raise")
     rs = workflow.execute(params={})
     assert rs.status == 1
     assert rs.context == {
@@ -217,7 +217,7 @@ def test_workflow_exec_py_raise():
 
 @mock.patch.object(Config, "max_job_parallel", 2)
 def test_workflow_exec_py_raise_parallel():
-    workflow = Workflow.from_loader("wf-run-python-raise")
+    workflow = Workflow.from_conf("wf-run-python-raise")
     rs = workflow.execute(params={})
     assert rs.status == 1
     assert rs.context == {
@@ -240,7 +240,7 @@ def test_workflow_exec_py_raise_parallel():
 
 
 def test_workflow_exec_with_matrix():
-    workflow: Workflow = Workflow.from_loader(name="wf-run-matrix")
+    workflow: Workflow = Workflow.from_conf(name="wf-run-matrix")
     rs: Result = workflow.execute(params={"source": "src", "target": "tgt"})
     assert {
         "params": {"source": "src", "target": "tgt"},
@@ -309,7 +309,7 @@ def test_workflow_exec_with_matrix():
 
 
 def test_workflow_exec_needs():
-    workflow = Workflow.from_loader(name="wf-run-depends")
+    workflow = Workflow.from_conf(name="wf-run-depends")
     rs: Result = workflow.execute(params={"name": "bar"})
     assert {
         "params": {"name": "bar"},
@@ -340,7 +340,7 @@ def test_workflow_exec_needs():
 
 
 def test_workflow_exec_needs_condition():
-    workflow = Workflow.from_loader(name="wf-run-depends-condition")
+    workflow = Workflow.from_conf(name="wf-run-depends-condition")
     rs: Result = workflow.execute(params={"name": "bar"})
     assert {
         "params": {"name": "bar"},
@@ -360,7 +360,7 @@ def test_workflow_exec_needs_condition():
 
 def test_workflow_exec_needs_parallel():
     with mock.patch.object(Config, "max_job_parallel", 3):
-        workflow = Workflow.from_loader(name="wf-run-depends", externals={})
+        workflow = Workflow.from_conf(name="wf-run-depends", extras={})
         rs: Result = workflow.execute(params={"name": "bar"})
         assert {
             "params": {"name": "bar"},
@@ -411,9 +411,9 @@ def test_workflow_exec_call(test_path):
                     sink: ${{ params.sink }}
         """,
     ):
-        workflow = Workflow.from_loader(
+        workflow = Workflow.from_conf(
             name="tmp-wf-call-csv-to-parquet",
-            externals={},
+            extras={},
         )
 
         # NOTE: execute from the call stage model
@@ -500,7 +500,7 @@ def test_workflow_exec_call_with_prefix(test_path):
                       target: ${{ params.target_name }}
         """,
     ):
-        workflow = Workflow.from_loader(name="tmp-wf-call-mssql-proc")
+        workflow = Workflow.from_conf(name="tmp-wf-call-mssql-proc")
         rs = workflow.execute(
             params={
                 "run_date": datetime(2024, 1, 1),
@@ -537,6 +537,6 @@ def test_workflow_exec_foreach(test_path):
                         Final run
         """,
     ):
-        workflow = Workflow.from_loader(name="tmp-wf-foreach")
+        workflow = Workflow.from_conf(name="tmp-wf-foreach")
         rs = workflow.execute(params={})
         print(rs)
