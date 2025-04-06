@@ -20,7 +20,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import UJSONResponse
 
 from ..__about__ import __version__
-from ..conf import config, get_logger
+from ..conf import api_config, config, get_logger
 from ..scheduler import ReleaseThread, ReleaseThreads
 from ..workflow import ReleaseQueue, WorkflowTask
 from .repeat import repeat_at
@@ -96,24 +96,24 @@ async def health():
 
 
 # NOTE Add the jobs and logs routes by default.
-app.include_router(job, prefix=config.prefix_path)
-app.include_router(log, prefix=config.prefix_path)
+app.include_router(job, prefix=api_config.prefix_path)
+app.include_router(log, prefix=api_config.prefix_path)
 
 
 # NOTE: Enable the workflows route.
-if config.enable_route_workflow:
+if api_config.enable_route_workflow:
     from .routes import workflow
 
-    app.include_router(workflow, prefix=config.prefix_path)
+    app.include_router(workflow, prefix=api_config.prefix_path)
 
 
 # NOTE: Enable the schedules route.
-if config.enable_route_schedule:
+if api_config.enable_route_schedule:
     from ..logs import get_audit
     from ..scheduler import schedule_task
     from .routes import schedule
 
-    app.include_router(schedule, prefix=config.prefix_path)
+    app.include_router(schedule, prefix=api_config.prefix_path)
 
     @schedule.on_event("startup")
     @repeat_at(cron="* * * * *", delay=2)

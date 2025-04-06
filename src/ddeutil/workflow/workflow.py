@@ -23,7 +23,7 @@ from pathlib import Path
 from queue import Queue
 from textwrap import dedent
 from threading import Event
-from typing import Annotated, Optional
+from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo
 from pydantic.dataclasses import dataclass
@@ -263,13 +263,10 @@ class Workflow(BaseModel):
     execute method on it.
     """
 
-    extras: Annotated[
-        DictData,
-        Field(
-            default_factory=dict,
-            description="An extra override config values.",
-        ),
-    ]
+    extras: DictData = Field(
+        default_factory=dict,
+        description="An extra override config values.",
+    )
 
     name: str = Field(description="A workflow name.")
     desc: Optional[str] = Field(
@@ -769,6 +766,7 @@ class Workflow(BaseModel):
         audit: Audit | None = None,
         force_run: bool = False,
         timeout: int = 1800,
+        max_poking_pool_worker: int = 4,
     ) -> Result:
         """Poke function with a start datetime value that will pass to its
         `on` field on the threading executor pool for execute the `release`
@@ -789,6 +787,7 @@ class Workflow(BaseModel):
             that release was pointed.
         :param timeout: A second value for timeout while waiting all futures
             run completely.
+        :param max_poking_pool_worker: The maximum poking pool worker.
 
         :rtype: Result
         :return: A list of all results that return from `self.release` method.
@@ -861,7 +860,11 @@ class Workflow(BaseModel):
         # NOTE: Start create the thread pool executor for running this poke
         #   process.
         with ThreadPoolExecutor(
-            max_workers=dynamic("max_poking_pool_worker", extras=self.extras),
+            max_workers=dynamic(
+                "max_poking_pool_worker",
+                f=max_poking_pool_worker,
+                extras=self.extras,
+            ),
             thread_name_prefix="wf_poking_",
         ) as executor:
 
@@ -1009,6 +1012,7 @@ class Workflow(BaseModel):
         parent_run_id: str | None = None,
         timeout: int = 0,
         result: Result | None = None,
+        max_job_parallel: int = 2,
     ) -> Result:
         """Execute workflow with passing a dynamic parameters to all jobs that
         included in this workflow model with ``jobs`` field.
@@ -1033,6 +1037,7 @@ class Workflow(BaseModel):
             limit time. (default: 0)
         :param result: (Result) A result object for keeping context and status
             data.
+        :param max_job_parallel: (int) The maximum threads of job execution.
 
         :rtype: Result
         """
@@ -1070,7 +1075,12 @@ class Workflow(BaseModel):
         context: DictData = self.parameterize(params)
         status: Status = Status.SUCCESS
         try:
-            if dynamic("max_job_parallel", extras=self.extras) == 1:
+            if (
+                dynamic(
+                    "max_job_parallel", f=max_job_parallel, extras=self.extras
+                )
+                == 1
+            ):
                 self.__exec_non_threading(
                     result=result,
                     context=context,
@@ -1099,7 +1109,7 @@ class Workflow(BaseModel):
         ts: float,
         job_queue: Queue,
         *,
-        timeout: int = 0,
+        timeout: int = 600,
         thread_timeout: int = 1800,
     ) -> DictData:
         """Workflow execution by threading strategy that use multithreading.
@@ -1208,7 +1218,7 @@ class Workflow(BaseModel):
         ts: float,
         job_queue: Queue,
         *,
-        timeout: int = 0,
+        timeout: int = 600,
     ) -> DictData:
         """Workflow execution with non-threading strategy that use sequential
         job running and waiting previous job was run successful.

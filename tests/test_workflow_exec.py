@@ -1,8 +1,6 @@
 from datetime import datetime
-from unittest import mock
 
 from ddeutil.workflow import Workflow
-from ddeutil.workflow.conf import Config
 from ddeutil.workflow.job import Job
 from ddeutil.workflow.result import Result
 from ddeutil.workflow.stages import CallStage
@@ -10,7 +8,6 @@ from ddeutil.workflow.stages import CallStage
 from .utils import dump_yaml_context
 
 
-@mock.patch.object(Config, "max_job_parallel", 1)
 def test_workflow_exec():
     job: Job = Job(
         stages=[{"name": "Sleep", "run": "import time\ntime.sleep(2)"}],
@@ -18,7 +15,7 @@ def test_workflow_exec():
     workflow: Workflow = Workflow(
         name="demo-workflow", jobs={"sleep-run": job, "sleep-again-run": job}
     )
-    rs: Result = workflow.execute(params={})
+    rs: Result = workflow.execute(params={}, max_job_parallel=1)
     assert rs.status == 0
     assert rs.context == {
         "params": {},
@@ -30,7 +27,6 @@ def test_workflow_exec():
     }
 
 
-@mock.patch.object(Config, "max_job_parallel", 1)
 def test_workflow_exec_raise_timeout():
     job: Job = Job(
         stages=[
@@ -42,7 +38,7 @@ def test_workflow_exec_raise_timeout():
         name="demo-workflow",
         jobs={"sleep-run": job, "sleep-again-run": job},
     )
-    rs: Result = workflow.execute(params={}, timeout=1)
+    rs: Result = workflow.execute(params={}, timeout=1, max_job_parallel=1)
     assert rs.status == 1
     assert rs.context["errors"]["message"] == (
         "Execution: 'demo-workflow' was timeout."
@@ -97,7 +93,6 @@ def test_workflow_exec_py():
     } == rs.context
 
 
-@mock.patch.object(Config, "max_job_parallel", 2)
 def test_workflow_exec_parallel():
     job: Job = Job(
         stages=[{"name": "Sleep", "run": "import time\ntime.sleep(2)"}],
@@ -105,10 +100,9 @@ def test_workflow_exec_parallel():
     workflow: Workflow = Workflow(
         name="demo-workflow", jobs={"sleep-run": job, "sleep-again-run": job}
     )
-    workflow.execute(params={})
+    workflow.execute(params={}, max_job_parallel=2)
 
 
-@mock.patch.object(Config, "max_job_parallel", 2)
 def test_workflow_exec_parallel_timeout():
     job: Job = Job(
         stages=[
@@ -123,7 +117,7 @@ def test_workflow_exec_parallel_timeout():
             "sleep-again-run": job.model_copy(update={"needs": ["sleep-run"]}),
         },
     )
-    rs = workflow.execute(params={}, timeout=0.5)
+    rs = workflow.execute(params={}, timeout=0.5, max_job_parallel=2)
     assert rs.context == {
         "params": {},
         "jobs": {
@@ -148,52 +142,52 @@ def test_workflow_exec_parallel_timeout():
 
 
 def test_workflow_exec_py_with_parallel():
-    with mock.patch.object(Config, "max_job_parallel", 3):
-        workflow = Workflow.from_conf(name="wf-run-python")
-        rs: Result = workflow.execute(
-            params={
-                "author-run": "Local Workflow",
-                "run-date": "2024-01-01",
-            },
-        )
-        assert 0 == rs.status
-        assert {
-            "params": {
-                "author-run": "Local Workflow",
-                "run-date": datetime(2024, 1, 1, 0, 0),
-            },
-            "jobs": {
-                "first-job": {
-                    "stages": {
-                        "printing": {"outputs": {"x": "Local Workflow"}},
-                        "setting-x": {"outputs": {"x": 1}},
-                    },
+    workflow = Workflow.from_conf(name="wf-run-python")
+    rs: Result = workflow.execute(
+        params={
+            "author-run": "Local Workflow",
+            "run-date": "2024-01-01",
+        },
+        max_job_parallel=3,
+    )
+    assert 0 == rs.status
+    assert {
+        "params": {
+            "author-run": "Local Workflow",
+            "run-date": datetime(2024, 1, 1, 0, 0),
+        },
+        "jobs": {
+            "first-job": {
+                "stages": {
+                    "printing": {"outputs": {"x": "Local Workflow"}},
+                    "setting-x": {"outputs": {"x": 1}},
                 },
-                "second-job": {
-                    "stages": {
-                        "create-func": {
-                            "outputs": {
-                                "var_inside": "Create Function Inside",
-                                "echo": "echo",
-                            },
+            },
+            "second-job": {
+                "stages": {
+                    "create-func": {
+                        "outputs": {
+                            "var_inside": "Create Function Inside",
+                            "echo": "echo",
                         },
-                        "call-func": {"outputs": {}},
-                        "9150930869": {"outputs": {}},
                     },
-                },
-                "final-job": {
-                    "stages": {
-                        "1772094681": {
-                            "outputs": {
-                                "return_code": 0,
-                                "stdout": "Hello World",
-                                "stderr": None,
-                            }
-                        }
-                    },
+                    "call-func": {"outputs": {}},
+                    "9150930869": {"outputs": {}},
                 },
             },
-        } == rs.context
+            "final-job": {
+                "stages": {
+                    "1772094681": {
+                        "outputs": {
+                            "return_code": 0,
+                            "stdout": "Hello World",
+                            "stderr": None,
+                        }
+                    }
+                },
+            },
+        },
+    } == rs.context
 
 
 def test_workflow_exec_py_raise():
@@ -215,10 +209,9 @@ def test_workflow_exec_py_raise():
     }
 
 
-@mock.patch.object(Config, "max_job_parallel", 2)
 def test_workflow_exec_py_raise_parallel():
     workflow = Workflow.from_conf("wf-run-python-raise")
-    rs = workflow.execute(params={})
+    rs = workflow.execute(params={}, max_job_parallel=2)
     assert rs.status == 1
     assert rs.context == {
         "params": {},
@@ -359,35 +352,34 @@ def test_workflow_exec_needs_condition():
 
 
 def test_workflow_exec_needs_parallel():
-    with mock.patch.object(Config, "max_job_parallel", 3):
-        workflow = Workflow.from_conf(name="wf-run-depends", extras={})
-        rs: Result = workflow.execute(params={"name": "bar"})
-        assert {
-            "params": {"name": "bar"},
-            "jobs": {
-                "final-job": {
-                    "stages": {
-                        "8797330324": {
-                            "outputs": {},
-                        },
-                    },
-                },
-                "first-job": {
-                    "stages": {
-                        "7824513474": {
-                            "outputs": {},
-                        },
-                    },
-                },
-                "second-job": {
-                    "stages": {
-                        "1772094681": {
-                            "outputs": {},
-                        },
+    workflow = Workflow.from_conf(name="wf-run-depends", extras={})
+    rs: Result = workflow.execute(params={"name": "bar"}, max_job_parallel=3)
+    assert {
+        "params": {"name": "bar"},
+        "jobs": {
+            "final-job": {
+                "stages": {
+                    "8797330324": {
+                        "outputs": {},
                     },
                 },
             },
-        } == rs.context
+            "first-job": {
+                "stages": {
+                    "7824513474": {
+                        "outputs": {},
+                    },
+                },
+            },
+            "second-job": {
+                "stages": {
+                    "1772094681": {
+                        "outputs": {},
+                    },
+                },
+            },
+        },
+    } == rs.context
 
 
 def test_workflow_exec_call(test_path):

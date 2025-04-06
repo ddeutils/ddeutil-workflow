@@ -29,9 +29,6 @@ def adjust_config():
 def test_config(adjust_config):
 
     with pytest.raises(ValueError):
-        _ = Config().max_job_parallel
-
-    with pytest.raises(ValueError):
         _ = Config().stop_boundary_delta
 
     conf = Config()
@@ -147,11 +144,11 @@ def test_dynamic():
     conf = dynamic("audit_path", extras={"audit_path": Path("/extras-audits")})
     assert conf == Path("/extras-audits")
 
-    conf = dynamic("max_job_exec_timeout", f=10, extras={})
+    conf = dynamic("max_on_per_workflow", f=10, extras={})
     assert conf == 10
 
-    conf = dynamic("max_job_exec_timeout", f=None, extras={})
-    assert conf == 600
+    conf = dynamic("max_on_per_workflow", f=None, extras={})
+    assert conf == 5
 
     with pytest.raises(TypeError):
         dynamic("audit_path", extras={"audit_path": "audits"})

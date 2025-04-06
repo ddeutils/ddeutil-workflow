@@ -31,6 +31,7 @@ def env(var: str, default: str | None = None) -> str | None:  # pragma: no cov
 
 
 __all__: TupleStr = (
+    "api_config",
     "env",
     "get_logger",
     "Config",
@@ -180,27 +181,6 @@ class Config(BaseConfig):  # pragma: no cov
     def job_default_id(self) -> bool:
         return str2bool(env("CORE_JOB_DEFAULT_ID", "false"))
 
-    # NOTE: Workflow
-    @property
-    def max_job_parallel(self) -> int:
-        max_job_parallel = int(env("CORE_MAX_JOB_PARALLEL", "2"))
-
-        # VALIDATE: the MAX_JOB_PARALLEL value should not less than 0.
-        if max_job_parallel < 0:
-            raise ValueError(
-                f"``WORKFLOW_MAX_JOB_PARALLEL`` should more than 0 but got "
-                f"{max_job_parallel}."
-            )
-        return max_job_parallel
-
-    @property
-    def max_job_exec_timeout(self) -> int:
-        return int(env("CORE_MAX_JOB_EXEC_TIMEOUT", "600"))
-
-    @property
-    def max_poking_pool_worker(self) -> int:
-        return int(env("CORE_MAX_NUM_POKING", "4"))
-
     @property
     def max_on_per_workflow(self) -> int:
         """The maximum on value that store in workflow model.
@@ -235,7 +215,9 @@ class Config(BaseConfig):  # pragma: no cov
                 f"timedelta with {stop_boundary_delta_str}."
             ) from err
 
-    # NOTE: API
+
+class APIConfig:
+
     @property
     def prefix_path(self) -> str:
         return env("API_PREFIX_PATH", "/api/v1")
@@ -395,10 +377,14 @@ class Loader(SimLoad):
 
 
 config: Config = Config()
+api_config: APIConfig = APIConfig()
 
 
 def dynamic(
-    key: str, *, f: Optional[T] = None, extras: Optional[DictData] = None
+    key: Optional[str] = None,
+    *,
+    f: Optional[T] = None,
+    extras: Optional[DictData] = None,
 ) -> Optional[T]:
     """Dynamic get config if extra value was passed at run-time.
 
@@ -407,7 +393,7 @@ def dynamic(
     :param extras: An extra values that pass at run-time.
     """
     rsx: Optional[T] = extras[key] if key in extras else None
-    rs: Optional[T] = f or getattr(config, key)
+    rs: Optional[T] = f or getattr(config, key, None)
     if rsx is not None and not isinstance(rsx, type(rs)):
         raise TypeError(
             f"Type of config {key!r} from extras: {rsx!r} does not valid "
