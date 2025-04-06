@@ -104,6 +104,7 @@ markers = [
     "poke: marks tests as slow by poking (deselect with '-m \"not poke\"')",
     "schedule: marks tests as schedule (deselect with '-m \"not schedule\"')",
     "api: marks tests as api (deselect with '-m \"not api\"')",
+    "asyncio: marks async testcases",
 ]
 console_output_style = "count"
 addopts = [
