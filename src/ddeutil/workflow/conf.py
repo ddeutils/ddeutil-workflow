@@ -392,7 +392,7 @@ def dynamic(
     :param f: An inner config function scope.
     :param extras: An extra values that pass at run-time.
     """
-    rsx: Optional[T] = extras[key] if key in extras else None
+    rsx: Optional[T] = extras[key] if extras and key in extras else None
     rs: Optional[T] = f or getattr(config, key, None)
     if rsx is not None and not isinstance(rsx, type(rs)):
         raise TypeError(

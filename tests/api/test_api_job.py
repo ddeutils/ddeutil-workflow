@@ -1,9 +1,9 @@
-from src.ddeutil.workflow.conf import config
+from src.ddeutil.workflow.conf import api_config
 
 
 def tests_route_job_execute(client):
     response = client.post(
-        f"{config.prefix_path}/job/execute/",
+        f"{api_config.prefix_path}/job/execute/",
         json={
             "result": {
                 "context": {"demo": "test"},

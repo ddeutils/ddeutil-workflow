@@ -1,8 +1,8 @@
-from src.ddeutil.workflow.conf import config
+from src.ddeutil.workflow.conf import api_config
 
 
 def test_workflows_get_by_name(client):
-    response = client.get(f"{config.prefix_path}/workflows/wf-run-common")
+    response = client.get(f"{api_config.prefix_path}/workflows/wf-run-common")
     assert response.status_code == 200
     assert response.json() == {
         "name": "wf-run-common",
