@@ -192,7 +192,7 @@ def test_workflow_exec_py_with_parallel():
 
 def test_workflow_exec_py_raise():
     workflow = Workflow.from_conf("wf-run-python-raise")
-    rs = workflow.execute(params={})
+    rs = workflow.execute(params={}, max_job_parallel=1)
     assert rs.status == 1
     assert rs.context == {
         "params": {},
