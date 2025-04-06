@@ -675,7 +675,6 @@ class Workflow(BaseModel):
         return result.catch(
             status=Status.SUCCESS,
             context={
-                # NOTE: Update the real params that pass in this method.
                 "params": params,
                 "release": {
                     "type": release.type,
@@ -724,7 +723,6 @@ class Workflow(BaseModel):
                 ).replace(microsecond=0)
             )
 
-            # NOTE: Skip this runner date if it more than the end date.
             if runner.date > end_date:
                 continue
 
@@ -751,7 +749,6 @@ class Workflow(BaseModel):
             if runner.date > end_date:
                 continue
 
-            # NOTE: Push the Release object to queue.
             heappush(queue.queue, workflow_release)
 
         return queue
@@ -803,8 +800,6 @@ class Workflow(BaseModel):
                 "The period of poking should be int and grater or equal than 1."
             )
 
-        # NOTE: If this workflow does not set the on schedule, it will return
-        #   empty result.
         if len(self.on) == 0:
             result.trace.info(
                 f"[POKING]: {self.name!r} does not have any schedule to run."
@@ -970,12 +965,6 @@ class Workflow(BaseModel):
                 "job execution."
             )
 
-        # IMPORTANT:
-        #   This execution change all job running IDs to the current workflow
-        #   running ID, but it still trac log to the same parent running ID
-        #   (with passing `run_id` and `parent_run_id` to the job execution
-        #   arguments).
-        #
         try:
             job: Job = self.jobs[job_id]
             if job.is_skipped(params=params):
@@ -1141,9 +1130,6 @@ class Workflow(BaseModel):
         )
         event: Event = event or Event()
         result.trace.debug(f"[WORKFLOW]: Run {self.name!r} with threading.")
-
-        # IMPORTANT: The job execution can run parallel and waiting by
-        #   needed.
         with ThreadPoolExecutor(
             max_workers=dynamic("max_job_parallel", extras=self.extras),
             thread_name_prefix="wf_exec_threading_",
@@ -1205,7 +1191,6 @@ class Workflow(BaseModel):
                         result.trace.error(f"[WORKFLOW]: {err}")
                         raise WorkflowException(str(err))
 
-                    # NOTE: This getting result does not do anything.
                     future.result()
 
                 return context
@@ -1264,7 +1249,6 @@ class Workflow(BaseModel):
             job_id: str = job_queue.get()
             job: Job = self.jobs[job_id]
 
-            # NOTE: Waiting dependency job run successful before release.
             if (check := job.check_needs(context["jobs"])).is_waiting():
                 job_queue.task_done()
                 job_queue.put(job_id)
@@ -1313,13 +1297,9 @@ class Workflow(BaseModel):
                     f"that not running."
                 )
 
-            # NOTE: Mark this job queue done.
             job_queue.task_done()
 
         if not_timeout_flag:
-
-            # NOTE: Wait for all items to finish processing by `task_done()`
-            #   method.
             job_queue.join()
             executor.shutdown()
             return context
