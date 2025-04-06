@@ -2,6 +2,46 @@
 
 ## Latest Changes
 
+## 0.0.42
+
+### :stars: Highlight Features
+
+- :star: hl: change constuction from from_loader to from_conf.
+- :star: hl: add dynamic config that can override with extras.
+- :star: hl: add foreach support params template.
+
+### :sparkles: Features
+
+- :dart: feat: pass event from trigger stage to workflow execution.
+- :dart: feat: draft async function on stage.
+- :dart: feat: change config component for audit to log.
+- :dart: feat: change fix config on workflow module to fully-dynamic.
+- :dart: feat: add dynamic config and marking module that dynamic or not.
+- :dart: feat: add bypass extras to param2template.
+
+### :bug: Bug fixes
+
+- :fire: hotfix: add check extras on dynamic conf func.
+- :gear: fixed: rename registry config that change the name.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: add mark asyncio.
+- :test_tube: tests: add max job parallel for raise workflow testcase.
+- :test_tube: tests: update testcase for minor change of conf module.
+- :test_tube: tests: add testcase for get extras passing from workflow.
+- :art: styled: add docs-string and add no cov comment.
+
+### :broom: Deprecate & Clean
+
+- :recycle: clean: remove context module.
+- :recycle: clean: remove not-important comment.
+- :recycle: clean: remove config project scope.
+
+### :package: Build & Workflow
+
+- :toolbox: build: add pre-commit support test not schedule tag.
+
 ## 0.0.41
 
 ### :stars: Highlight Features
