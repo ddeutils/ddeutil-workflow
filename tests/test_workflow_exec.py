@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from ddeutil.core import getdot
 from ddeutil.workflow import Workflow
 from ddeutil.workflow.job import Job
 from ddeutil.workflow.result import Result
@@ -521,6 +522,17 @@ def test_workflow_exec_call_with_prefix(test_path):
             },
         )
         print(rs)
+
+
+def test_workflow_exec_trigger():
+    workflow = Workflow.from_conf(name="wf-trigger", extras={})
+    rs: Result = workflow.job("trigger-job").execute(params={})
+    assert {
+        "author-run": "Trigger Runner",
+        "run-date": datetime(2024, 8, 1),
+    } == getdot(
+        "jobs.trigger-job.stages.trigger-stage.outputs.params", rs.context
+    )
 
 
 def test_workflow_exec_foreach(test_path):

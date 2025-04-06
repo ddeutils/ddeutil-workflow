@@ -272,17 +272,6 @@ def test_stage_exec_trigger():
     } == rs.context["params"]
 
 
-def test_stage_exec_trigger_from_workflow():
-    workflow = Workflow.from_conf(name="wf-trigger", extras={})
-    rs: Result = workflow.execute(params={})
-    assert {
-        "author-run": "Trigger Runner",
-        "run-date": datetime(2024, 8, 1),
-    } == getdot(
-        "jobs.trigger-job.stages.trigger-stage.outputs.params", rs.context
-    )
-
-
 def test_stage_exec_foreach(test_path):
     with dump_yaml_context(
         test_path / "conf/demo/01_99_wf_test_wf_foreach.yml",
@@ -359,6 +348,84 @@ def test_stage_exec_foreach(test_path):
         stage: Stage = workflow.job("first-job").stage("foreach-raise")
         with pytest.raises(StageException):
             stage.handler_execute({"values": {"items": "test"}})
+
+
+def test_stage_exec_foreach_with_trigger(test_path):
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_foreach_with_trigger.yml",
+        data="""
+        tmp-wf-foreach-trigger-task:
+          type: Workflow
+          params:
+            item: int
+          jobs:
+            first-job:
+              stages:
+                - name: "Echo"
+                  id: hello
+                  echo: "Run trigger with item: ${{ params.item }}"
+
+        tmp-wf-foreach-trigger:
+          type: Workflow
+          jobs:
+            first-job:
+              stages:
+                - name: "Start run for-each stage"
+                  id: foreach-stage
+                  foreach: [1, 2]
+                  stages:
+                    - name: "Stage trigger"
+                      trigger: tmp-wf-foreach-trigger-task
+                      params:
+                        item: ${{ item }}
+        """,
+    ):
+        workflow = Workflow.from_conf(name="tmp-wf-foreach-trigger")
+        stage: Stage = workflow.job("first-job").stage("foreach-stage")
+        rs = stage.set_outputs(stage.handler_execute({}).context, to={})
+        assert rs == {
+            "stages": {
+                "foreach-stage": {
+                    "outputs": {
+                        "items": [1, 2],
+                        "foreach": {
+                            1: {
+                                "stages": {
+                                    "8713259197": {
+                                        "outputs": {
+                                            "params": {"item": 1},
+                                            "jobs": {
+                                                "first-job": {
+                                                    "stages": {
+                                                        "hello": {"outputs": {}}
+                                                    },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                            2: {
+                                "stages": {
+                                    "8713259197": {
+                                        "outputs": {
+                                            "params": {"item": 2},
+                                            "jobs": {
+                                                "first-job": {
+                                                    "stages": {
+                                                        "hello": {"outputs": {}}
+                                                    },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        }
 
 
 def test_stage_exec_parallel(test_path):
