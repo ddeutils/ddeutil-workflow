@@ -80,6 +80,8 @@ class TraceMeda(BaseModel):  # pragma: no cov
 
 
 class TraceData(BaseModel):  # pragma: no cov
+    """Trace Data model for keeping data for any Trace models."""
+
     stdout: str = Field(description="A standard output trace data.")
     stderr: str = Field(description="A standard error trace data.")
     meta: list[TraceMeda] = Field(
@@ -92,6 +94,12 @@ class TraceData(BaseModel):  # pragma: no cov
 
     @classmethod
     def from_path(cls, file: Path) -> Self:
+        """Construct this trace data model with a trace path.
+
+        :param file: (Path) A trace path.
+
+        :rtype: Self
+        """
         data: DictStr = {"stdout": "", "stderr": "", "meta": []}
 
         if (file / "stdout.txt").exists():
@@ -207,27 +215,52 @@ class BaseTraceLog(ABC):  # pragma: no cov
         logger.exception(msg, stacklevel=2)
 
     async def adebug(self, message: str) -> None:  # pragma: no cov
+        """Async write trace log with append mode and logging this message with
+        the DEBUG level.
+
+        :param message: (str) A message that want to log.
+        """
         msg: str = self.make_message(message)
         if config.debug:
             await self.awriter(msg)
         logger.info(msg, stacklevel=2)
 
     async def ainfo(self, message: str) -> None:  # pragma: no cov
+        """Async write trace log with append mode and logging this message with
+        the INFO level.
+
+        :param message: (str) A message that want to log.
+        """
         msg: str = self.make_message(message)
         await self.awriter(msg)
         logger.info(msg, stacklevel=2)
 
     async def awarning(self, message: str) -> None:  # pragma: no cov
+        """Async write trace log with append mode and logging this message with
+        the WARNING level.
+
+        :param message: (str) A message that want to log.
+        """
         msg: str = self.make_message(message)
         await self.awriter(msg)
         logger.warning(msg, stacklevel=2)
 
     async def aerror(self, message: str) -> None:  # pragma: no cov
+        """Async write trace log with append mode and logging this message with
+        the ERROR level.
+
+        :param message: (str) A message that want to log.
+        """
         msg: str = self.make_message(message)
         await self.awriter(msg, is_err=True)
         logger.error(msg, stacklevel=2)
 
     async def aexception(self, message: str) -> None:  # pragma: no cov
+        """Async write trace log with append mode and logging this message with
+        the EXCEPTION level.
+
+        :param message: (str) A message that want to log.
+        """
         msg: str = self.make_message(message)
         await self.awriter(msg, is_err=True)
         logger.exception(msg, stacklevel=2)
@@ -237,23 +270,29 @@ class FileTraceLog(BaseTraceLog):  # pragma: no cov
     """Trace Log object that write file to the local storage."""
 
     @classmethod
-    def find_logs(cls) -> Iterator[TraceData]:  # pragma: no cov
+    def find_logs(
+        cls, path: Path | None = None
+    ) -> Iterator[TraceData]:  # pragma: no cov
+        """Find trace logs."""
         for file in sorted(
-            config.log_path.glob("./run_id=*"),
+            (path or config.log_path).glob("./run_id=*"),
             key=lambda f: f.lstat().st_mtime,
         ):
             yield TraceData.from_path(file)
 
     @classmethod
     def find_log_with_id(
-        cls, run_id: str, force_raise: bool = True
+        cls, run_id: str, force_raise: bool = True, *, path: Path | None = None
     ) -> TraceData:
-        file: Path = config.log_path / f"run_id={run_id}"
+        """Find trace log with an input specific run ID."""
+        base_path: Path = path or config.log_path
+        file: Path = base_path / f"run_id={run_id}"
         if file.exists():
             return TraceData.from_path(file)
         elif force_raise:
             raise FileNotFoundError(
-                f"Trace log on path 'run_id={run_id}' does not found."
+                f"Trace log on path {base_path}, does not found trace "
+                f"'run_id={run_id}'."
             )
         return {}
 
