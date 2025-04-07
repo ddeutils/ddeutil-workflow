@@ -35,10 +35,10 @@ from .__types import DictData, TupleStr
 from .conf import Loader, SimLoad, dynamic, get_logger
 from .cron import On
 from .exceptions import JobException, WorkflowException
-from .job import Job, TriggerState
+from .job import Job
 from .logs import Audit, get_audit
 from .params import Param
-from .result import FAILED, SUCCESS, Result, Status
+from .result import FAILED, SKIP, SUCCESS, WAIT, Result, Status
 from .reusables import has_template, param2template
 from .utils import (
     gen_id,
@@ -1142,16 +1142,16 @@ class Workflow(BaseModel):
                 job_id: str = job_queue.get()
                 job: Job = self.jobs[job_id]
 
-                if (check := job.check_needs(context["jobs"])).is_waiting():
+                if (check := job.check_needs(context["jobs"])) == WAIT:
                     job_queue.task_done()
                     job_queue.put(job_id)
                     time.sleep(0.15)
                     continue
-                elif check == TriggerState.failed:  # pragma: no cov
+                elif check == FAILED:  # pragma: no cov
                     raise WorkflowException(
                         "Check job trigger rule was failed."
                     )
-                elif check == TriggerState.skipped:  # pragma: no cov
+                elif check == SKIP:  # pragma: no cov
                     result.trace.info(f"[JOB]: Skip job: {job_id!r}")
                     job.set_outputs({"SKIP": {"skipped": True}}, to=context)
                     job_queue.task_done()
@@ -1249,14 +1249,14 @@ class Workflow(BaseModel):
             job_id: str = job_queue.get()
             job: Job = self.jobs[job_id]
 
-            if (check := job.check_needs(context["jobs"])).is_waiting():
+            if (check := job.check_needs(context["jobs"])) == WAIT:
                 job_queue.task_done()
                 job_queue.put(job_id)
                 time.sleep(0.075)
                 continue
-            elif check == TriggerState.failed:  # pragma: no cov
+            elif check == FAILED:  # pragma: no cov
                 raise WorkflowException("Check job trigger rule was failed.")
-            elif check == TriggerState.skipped:  # pragma: no cov
+            elif check == SKIP:  # pragma: no cov
                 result.trace.info(f"[JOB]: Skip job: {job_id!r}")
                 job.set_outputs({"SKIP": {"skipped": True}}, to=context)
                 job_queue.task_done()

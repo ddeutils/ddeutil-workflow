@@ -10,8 +10,8 @@ from ddeutil.workflow.job import (
     RunsOnLocal,
     RunsOnSelfHosted,
     TriggerRules,
-    TriggerState,
 )
+from ddeutil.workflow.result import SUCCESS, WAIT
 from pydantic import TypeAdapter, ValidationError
 
 
@@ -44,8 +44,8 @@ def test_job():
     assert job.id == "final-job"
 
     # NOTE: Validate the `check_needs` method
-    assert job.check_needs({"job-before": "foo"}) == TriggerState.passed
-    assert job.check_needs({"job-after": "foo"}).is_waiting()
+    assert job.check_needs({"job-before": "foo"}) == SUCCESS
+    assert job.check_needs({"job-after": "foo"}) == WAIT
 
     job = Job.model_validate({"runs-on": {"type": "k8s"}})
     assert isinstance(job.runs_on, RunsOnK8s)

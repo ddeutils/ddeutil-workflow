@@ -39,7 +39,7 @@ from .exceptions import (
     StageException,
     UtilException,
 )
-from .result import FAILED, SUCCESS, Result, Status
+from .result import FAILED, SKIP, SUCCESS, WAIT, Result, Status
 from .reusables import has_template, param2template
 from .stages import Stage
 from .utils import cross_product, filter_func, gen_id
@@ -51,7 +51,6 @@ __all__: TupleStr = (
     "Strategy",
     "Job",
     "TriggerRules",
-    "TriggerState",
     "RunsOn",
     "RunsOnLocal",
     "RunsOnSelfHosted",
@@ -204,16 +203,6 @@ class TriggerRules(str, Enum):
     one_success: str = "one_success"
     none_failed: str = "none_failed"
     none_skipped: str = "none_skipped"
-
-
-class TriggerState(str, Enum):
-    waiting: str = "waiting"
-    passed: str = "passed"
-    skipped: str = "skipped"
-    failed: str = "failed"
-
-    def is_waiting(self):
-        return self.value == "waiting"
 
 
 class RunsOnType(str, Enum):
@@ -407,31 +396,31 @@ class Job(BaseModel):
     def check_needs(
         self,
         jobs: dict[str, Any],
-    ) -> TriggerState:  # pragma: no cov
-        """Return TriggerState enum for checking job's need trigger logic in an
+    ) -> Status:  # pragma: no cov
+        """Return Status enum for checking job's need trigger logic in an
         input list of job's ID.
 
         :param jobs: A mapping of job ID and result context.
 
         :raise NotImplementedError: If the job trigger rule out of scope.
 
-        :rtype: TriggerState
+        :rtype: Status
         """
         if not self.needs:
-            return TriggerState.passed
+            return SUCCESS
 
-        def make_return(result: bool) -> TriggerState:
-            return TriggerState.passed if result else TriggerState.failed
+        def make_return(result: bool) -> Status:
+            return SUCCESS if result else FAILED
 
         need_exist: dict[str, Any] = {
             need: jobs[need] for need in self.needs if need in jobs
         }
         if len(need_exist) != len(self.needs):
-            return TriggerState.waiting
+            return WAIT
         elif all("skipped" in need_exist[job] for job in need_exist):
-            return TriggerState.skipped
+            return SKIP
         elif self.trigger_rule == TriggerRules.all_done:
-            return TriggerState.passed
+            return SUCCESS
         elif self.trigger_rule == TriggerRules.all_success:
             rs = all(
                 k not in need_exist[job]

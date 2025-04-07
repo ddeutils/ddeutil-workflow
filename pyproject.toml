@@ -99,6 +99,7 @@ exclude_lines = [
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
+asyncio_default_fixture_loop_scope = "fuction"
 # NOTE: You can deslect multiple markers by '-m "not (poke or api)"'
 markers = [
     "poke: marks tests as slow by poking (deselect with '-m \"not poke\"')",
