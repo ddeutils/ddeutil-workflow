@@ -17,11 +17,11 @@ and do not raise any error to you.
 | **ROOT_PATH**                |   Core    | `.`                                                                                                                             |    No    | The root path of the workflow application.                                                                         |
 | **REGISTRY_CALLER**          |   Core    | `.`                                                                                                                             |   Yes    | List of importable string for the call stage.                                                                      |
 | **REGISTRY_FILTER**          |   Core    | `ddeutil.workflow.templates`                                                                                                    |   Yes    | List of importable string for the filter template.                                                                 |
-| **CONF_PATH**                |   Core    | `conf`                                                                                                                          |    No    | The config path that keep all template `.yaml` files.                                                              |
+| **CONF_PATH**                |   Core    | `conf`                                                                                                                          |   Yes    | The config path that keep all template `.yaml` files.                                                              |
 | **TIMEZONE**                 |   Core    | `Asia/Bangkok`                                                                                                                  |    No    | A Timezone string value that will pass to `ZoneInfo` object.                                                       |
-| **STAGE_DEFAULT_ID**         |   Core    | `true`                                                                                                                          |    No    | A flag that enable default stage ID that use for catch an execution output.                                        |
+| **STAGE_DEFAULT_ID**         |   Core    | `true`                                                                                                                          |   Yes    | A flag that enable default stage ID that use for catch an execution output.                                        |
 | **STAGE_RAISE_ERROR**        |   Core    | `false`                                                                                                                         |   Yes    | A flag that all stage raise StageException from stage execution.                                                   |
-| **JOB_DEFAULT_ID**           |   Core    | `false`                                                                                                                         |    No    | A flag that enable default job ID that use for catch an execution output. The ID that use will be sequence number. |
+| **JOB_DEFAULT_ID**           |   Core    | `false`                                                                                                                         |   Yes    | A flag that enable default job ID that use for catch an execution output. The ID that use will be sequence number. |
 | **JOB_RAISE_ERROR**          |   Core    | `true`                                                                                                                          |   Yes    | A flag that all job raise JobException from job strategy execution.                                                |
 | **MAX_CRON_PER_WORKFLOW**    |   Core    | `5`                                                                                                                             |    No    |                                                                                                                    |
 | **MAX_QUEUE_COMPLETE_HIST**  |   Core    | `16`                                                                                                                            |    No    |                                                                                                                    |
@@ -44,3 +44,16 @@ and do not raise any error to you.
 |:---------------------------|:-----------:|---------|------------------------------------------------------------------------------------|
 | **ENABLE_ROUTE_WORKFLOW**  |     API     | `true`  | A flag that enable workflow route to manage execute manually and workflow logging. |
 | **ENABLE_ROUTE_SCHEDULE**  |     API     | `true`  | A flag that enable run scheduler.                                                  |
+
+## Override
+
+Some config can override by an extra parameters.
+
+```python
+from pathlib import Path
+from ddeutil.workflow import Workflow
+
+workflow = Workflow.from_conf(
+    "wf-tester", extras={"conf_path": Path("."), "job_default_id": True}
+)
+```
