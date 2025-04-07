@@ -814,6 +814,8 @@ class CallStage(BaseStage):
                 run_id=gen_id(self.name + (self.id or ""), unique=True)
             )
 
+        print("Extras in CallStage", self.extras)
+
         t_func: TagFunc = extract_call(
             param2template(self.uses, params, extras=self.extras),
             registries=self.extras.get("regis_call"),
@@ -976,6 +978,8 @@ class ParallelStage(BaseStage):  # pragma: no cov
         params: DictData,
         result: Result,
         stages: list[Stage],
+        *,
+        extras: DictData | None = None,
     ) -> DictData:
         """Task execution method for passing a branch to each thread.
 
@@ -984,12 +988,16 @@ class ParallelStage(BaseStage):  # pragma: no cov
         :param result: (Result) A result object for keeping context and status
             data.
         :param stages:
+        :param extras
 
         :rtype: DictData
         """
         context = {"branch": branch, "stages": {}}
         result.trace.debug(f"[STAGE]: Execute parallel branch: {branch!r}")
         for stage in stages:
+            if extras:
+                stage.extras = extras
+
             try:
                 stage.set_outputs(
                     stage.handler_execute(
@@ -1048,6 +1056,7 @@ class ParallelStage(BaseStage):  # pragma: no cov
                         params=params,
                         result=result,
                         stages=self.parallel[branch],
+                        extras=self.extras,
                     )
                 )
 
@@ -1144,6 +1153,10 @@ class ForEachStage(BaseStage):
             context = {"stages": {}}
 
             for stage in self.stages:
+
+                if self.extras:
+                    stage.extras = self.extras
+
                 try:
                     stage.set_outputs(
                         stage.handler_execute(
@@ -1284,6 +1297,9 @@ class CaseStage(BaseStage):  # pragma: no cov
 
             if match == _condition:
                 stage: Stage = match.stage
+                if self.extras:
+                    stage.extras = self.extras
+
                 try:
                     stage.set_outputs(
                         stage.handler_execute(

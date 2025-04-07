@@ -641,6 +641,9 @@ def local_execute_strategy(
 
     for stage in job.stages:
 
+        if job.extras:
+            stage.extras = job.extras
+
         if stage.is_skipped(params=context):
             result.trace.info(f"[STAGE]: Skip stage: {stage.iden!r}")
             stage.set_outputs(output={"skipped": True}, to=context)

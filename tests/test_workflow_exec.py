@@ -1,8 +1,10 @@
+import shutil
 from datetime import datetime
+from textwrap import dedent
 from unittest import mock
 
 from ddeutil.core import getdot
-from ddeutil.workflow import SUCCESS, Workflow
+from ddeutil.workflow import SUCCESS, Workflow, extract_call
 from ddeutil.workflow.conf import Config
 from ddeutil.workflow.job import Job
 from ddeutil.workflow.result import FAILED, Result
@@ -486,6 +488,55 @@ def test_workflow_exec_call(test_path):
                 },
             },
         } == rs.context
+
+
+def test_workflow_exec_call_override_registry(test_path):
+    task_path = test_path.parent / "mock_tests"
+    task_path.mkdir(exist_ok=True)
+    (task_path / "__init__.py").open(mode="w")
+    (task_path / "mock_tasks").mkdir(exist_ok=True)
+
+    with (task_path / "mock_tasks/__init__.py").open(mode="w") as f:
+        f.write(
+            dedent(
+                """
+            from ddeutil.workflow import tag, Result
+
+            @tag("v1", alias="get-info")
+            def get_info(result: Result):
+                result.trace.info("... [CALLER]: Info from mock tasks")
+                return {"get-info": "success"}
+
+            """.strip(
+                    "\n"
+                )
+            )
+        )
+
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_exec_call_override.yml",
+        data="""
+        tmp-wf-exec-call-override:
+          type: Workflow
+          jobs:
+            first-job:
+              stages:
+                - name: "Call from mock tasks"
+                  uses: mock_tasks/get-info@v1
+        """,
+    ):
+        func = extract_call("mock_tasks/get-info@v1", registries=["mock_tests"])
+        assert func().name == "get-info"
+
+        workflow = Workflow.from_conf(
+            name="tmp-wf-exec-call-override",
+            extras={"regis_call": ["mock_tests"]},
+        )
+        rs = workflow.execute(params={})
+        assert rs.status == SUCCESS
+        print(rs.context)
+
+    shutil.rmtree(task_path)
 
 
 def test_workflow_exec_call_with_prefix(test_path):

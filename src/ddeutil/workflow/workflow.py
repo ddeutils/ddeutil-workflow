@@ -1139,7 +1139,7 @@ class Workflow(BaseModel):
                 not_timeout_flag := ((time.monotonic() - ts) < timeout)
             ):
                 job_id: str = job_queue.get()
-                job: Job = self.jobs[job_id]
+                job: Job = self.job(name=job_id)
 
                 if (check := job.check_needs(context["jobs"])) == WAIT:
                     job_queue.task_done()
@@ -1231,7 +1231,7 @@ class Workflow(BaseModel):
                 not_timeout_flag := ((time.monotonic() - ts) < timeout)
             ):
                 job_id: str = job_queue.get()
-                job: Job = self.jobs[job_id]
+                job: Job = self.job(name=job_id)
 
                 if (check := job.check_needs(context["jobs"])) == WAIT:
                     job_queue.task_done()
