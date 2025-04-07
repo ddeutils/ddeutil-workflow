@@ -40,7 +40,6 @@ def test_job_exec_strategy_skip_stage():
     }
 
 
-@mock.patch.object(Config, "job_raise_error", True)
 @mock.patch.object(Config, "stage_raise_error", False)
 def test_job_exec_strategy_catch_stage_error():
     workflow: Workflow = Workflow.from_conf(name="wf-run-python-raise-for-job")
@@ -63,7 +62,14 @@ def test_job_exec_strategy_catch_stage_error():
                         "message": "Testing raise error inside PyStage!!!",
                     },
                 },
-                "7761132585": {"outputs": {}},
+            },
+            "errors": {
+                "class": getdot("5027535057.errors.class", rs.context),
+                "name": "JobException",
+                "message": (
+                    "Job strategy was break because it has a stage, "
+                    "raise-error, failed without raise error."
+                ),
             },
         },
     }
