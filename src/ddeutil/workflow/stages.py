@@ -814,8 +814,6 @@ class CallStage(BaseStage):
                 run_id=gen_id(self.name + (self.id or ""), unique=True)
             )
 
-        print("Extras in CallStage", self.extras)
-
         t_func: TagFunc = extract_call(
             param2template(self.uses, params, extras=self.extras),
             registries=self.extras.get("regis_call"),
