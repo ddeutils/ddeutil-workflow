@@ -26,7 +26,10 @@ PREFIX: str = "WORKFLOW"
 
 
 def env(var: str, default: str | None = None) -> str | None:  # pragma: no cov
-    """Get environment variable with uppercase and adding prefix string."""
+    """Get environment variable with uppercase and adding prefix string.
+
+    :rtype: str | None
+    """
     return os.getenv(f"{PREFIX}_{var.upper().replace(' ', '_')}", default)
 
 
@@ -42,29 +45,7 @@ __all__: TupleStr = (
 )
 
 
-class BaseConfig:  # pragma: no cov
-    """BaseConfig object inheritable."""
-
-    __slots__ = ()
-
-    @property
-    def root_path(self) -> Path:
-        """Root path or the project path.
-
-        :rtype: Path
-        """
-        return Path(os.getenv("ROOT_PATH", "."))
-
-    @property
-    def conf_path(self) -> Path:
-        """Config path that use root_path class argument for this construction.
-
-        :rtype: Path
-        """
-        return self.root_path / os.getenv("CONF_PATH", "conf")
-
-
-class Config(BaseConfig):  # pragma: no cov
+class Config:  # pragma: no cov
     """Config object for keeping core configurations on the current session
     without changing when if the application still running.
 
@@ -217,6 +198,7 @@ class Config(BaseConfig):  # pragma: no cov
 
 
 class APIConfig:
+    """API Config object."""
 
     @property
     def prefix_path(self) -> str:
