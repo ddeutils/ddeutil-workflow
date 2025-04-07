@@ -72,6 +72,7 @@ class Result:
     ts: datetime = field(default_factory=get_dt_tznow, compare=False)
 
     trace: Optional[TraceLog] = field(default=None, compare=False, repr=False)
+    extras: DictData = field(default_factory=dict)
 
     @classmethod
     def construct_with_rs_or_id(
@@ -80,6 +81,8 @@ class Result:
         run_id: str | None = None,
         parent_run_id: str | None = None,
         id_logic: str | None = None,
+        *,
+        extras: DictData | None = None,
     ) -> Self:
         """Create the Result object or set parent running id if passing Result
         object.
@@ -88,16 +91,22 @@ class Result:
         :param run_id:
         :param parent_run_id:
         :param id_logic:
+        :param extras:
 
         :rtype: Self
         """
         if result is None:
-            result: Result = cls(
+            return cls(
                 run_id=(run_id or gen_id(id_logic or "", unique=True)),
                 parent_run_id=parent_run_id,
+                extras=(extras or {}),
             )
         elif parent_run_id:
             result.set_parent_run_id(parent_run_id)
+
+        if extras is not None:
+            result.extras.update(extras)
+
         return result
 
     @model_validator(mode="after")

@@ -38,7 +38,6 @@ dynamic = ["version"]
 all = [
     "fastapi>=0.115.0,<1.0.0",
     "httpx",
-    "ujson",
     "aiofiles",
     "aiohttp",
 ]
