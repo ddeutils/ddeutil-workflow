@@ -12,7 +12,7 @@ keywords = ['orchestration', 'workflow']
 classifiers = [
     "Topic :: Utilities",
     "Natural Language :: English",
-    "Development Status :: 5 - Production/Stable",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
