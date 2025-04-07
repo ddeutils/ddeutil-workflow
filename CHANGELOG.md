@@ -2,6 +2,23 @@
 
 ## Latest Changes
 
+## 0.0.43
+
+### :stars: Highlight Features
+
+- :star: hl: support for array and map param.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: update testcase that not valid.
+- :test_tube: tests: add testcase for support trigger stage in foreach stage.
+- :test_tube: tests: add workflow exec override conf by extras testcase.
+
+### :broom: Deprecate & Clean
+
+- :recycle: clean: change making error message to to_dict method.
+- :recycle: clean: remove trigger state object and use status instead.
+
 ## 0.0.42
 
 ### :stars: Highlight Features
