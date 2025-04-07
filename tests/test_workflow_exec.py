@@ -526,13 +526,12 @@ def test_workflow_exec_call_with_prefix(test_path):
 
 def test_workflow_exec_trigger():
     workflow = Workflow.from_conf(name="wf-trigger", extras={})
-    rs: Result = workflow.job("trigger-job").execute(params={})
+    job = workflow.job("trigger-job")
+    rs = job.set_outputs(job.execute(params={}).context, to={})
     assert {
         "author-run": "Trigger Runner",
         "run-date": datetime(2024, 8, 1),
-    } == getdot(
-        "jobs.trigger-job.stages.trigger-stage.outputs.params", rs.context
-    )
+    } == getdot("jobs.trigger-job.stages.trigger-stage.outputs.params", rs)
 
 
 def test_workflow_exec_foreach(test_path):

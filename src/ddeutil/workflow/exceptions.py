@@ -9,10 +9,20 @@ annotate for handle error only.
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import TypedDict
+
+ErrorData = TypedDict(
+    "ErrorData",
+    {
+        "class": Exception,
+        "name": str,
+        "message": str,
+    },
+)
 
 
-def to_dict(exception: Exception) -> dict[str, Any]:  # pragma: no cov
+def to_dict(exception: Exception) -> ErrorData:  # pragma: no cov
+    """Create dict data from exception instance."""
     return {
         "class": exception,
         "name": exception.__class__.__name__,
@@ -22,7 +32,7 @@ def to_dict(exception: Exception) -> dict[str, Any]:  # pragma: no cov
 
 class BaseWorkflowException(Exception):
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> ErrorData:
         return to_dict(self)
 
 
