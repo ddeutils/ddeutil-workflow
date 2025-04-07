@@ -223,10 +223,11 @@ class BaseStage(BaseModel, ABC):
                 ) from e
 
             errors: DictData = {"errors": to_dict(e)}
-            if to is not None:
-                return self.set_outputs(errors, to=to)
-
-            return result.catch(status=FAILED, context=errors)
+            return (
+                self.set_outputs(errors, to=to)
+                if to is not None
+                else result.catch(status=FAILED, context=errors)
+            )
 
     def set_outputs(self, output: DictData, to: DictData) -> DictData:
         """Set an outputs from execution process to the received context. The
@@ -326,7 +327,10 @@ class BaseAsyncStage(BaseStage):
         *,
         result: Result | None = None,
         event: Event | None = None,
-    ) -> Result: ...
+    ) -> Result:
+        raise NotImplementedError(
+            "Async Stage should implement `execute` method."
+        )
 
     @abstractmethod
     async def axecute(

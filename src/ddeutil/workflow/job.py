@@ -643,6 +643,7 @@ def local_execute_strategy(
     #       "stages": { ... }       <== Catching stage outputs
     #   }
     #
+    status: Status = SUCCESS
     context: DictData = copy.deepcopy(params)
     context.update({"matrix": strategy, "stages": {}})
 
@@ -693,15 +694,16 @@ def local_execute_strategy(
         #   execution arguments).
         #
         try:
-            stage.set_outputs(
-                stage.handler_execute(
-                    params=context,
-                    run_id=result.run_id,
-                    parent_run_id=result.parent_run_id,
-                    event=event,
-                ).context,
-                to=context,
+            rs: Result = stage.handler_execute(
+                params=context,
+                run_id=result.run_id,
+                parent_run_id=result.parent_run_id,
+                event=event,
             )
+            stage.set_outputs(rs.context, to=context)
+            if (status := rs.status) == FAILED:
+                break
+
         except (StageException, UtilException) as err:
             result.trace.error(f"[JOB]: {err.__class__.__name__}: {err}")
             do_raise: bool = dynamic(
@@ -725,7 +727,7 @@ def local_execute_strategy(
             )
 
     return result.catch(
-        status=SUCCESS,
+        status=status,
         context={
             strategy_id: {
                 "matrix": strategy,

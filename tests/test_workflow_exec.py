@@ -1,7 +1,9 @@
 from datetime import datetime
+from unittest import mock
 
 from ddeutil.core import getdot
 from ddeutil.workflow import Workflow
+from ddeutil.workflow.conf import Config
 from ddeutil.workflow.job import Job
 from ddeutil.workflow.result import Result
 from ddeutil.workflow.stages import CallStage
@@ -561,4 +563,32 @@ def test_workflow_exec_foreach(test_path):
     ):
         workflow = Workflow.from_conf(name="tmp-wf-foreach")
         rs = workflow.execute(params={})
+        print(rs)
+
+
+@mock.patch.object(Config, "stage_raise_error", False)
+def test_workflow_exec_raise_param(test_path):
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_exec_raise_param.yml",
+        data="""
+        tmp-wf-exec-raise-param:
+          type: Workflow
+          params:
+            name:
+              desc: "A name parameter of this workflow."
+              type: str
+          jobs:
+            start-job:
+              stages:
+                - name: "Get param that not set"
+                  id: get-param
+                  echo: "Passing name ${{ params.name }}"
+
+                - name: "Call after above stage raise"
+                  id: check
+                  echo: "Hello after Raise Error"
+        """,
+    ):
+        workflow = Workflow.from_conf(name="tmp-wf-exec-raise-param")
+        rs = workflow.execute(params={"stream": "demo-stream"})
         print(rs)

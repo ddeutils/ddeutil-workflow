@@ -981,11 +981,11 @@ class Workflow(BaseModel):
                     ).context,
                     to=params,
                 )
-        except JobException as err:
-            result.trace.error(f"[WORKFLOW]: {err.__class__.__name__}: {err}")
+        except JobException as e:
+            result.trace.error(f"[WORKFLOW]: {e.__class__.__name__}: {e}")
             if raise_error:
                 raise WorkflowException(
-                    f"Get job execution error {job_id}: JobException: {err}"
+                    f"Get job execution error {job_id}: JobException: {e}"
                 ) from None
             raise NotImplementedError(
                 "Handle error from the job execution does not support yet."
@@ -1090,9 +1090,9 @@ class Workflow(BaseModel):
                     timeout=timeout,
                     event=event,
                 )
-        except WorkflowException as err:
+        except WorkflowException as e:
             status = FAILED
-            context.update({"errors": err.to_dict()})
+            context.update({"errors": e.to_dict()})
 
         return result.catch(status=status, context=context)
 
@@ -1187,9 +1187,9 @@ class Workflow(BaseModel):
                 job_queue.join()
 
                 for future in as_completed(futures, timeout=thread_timeout):
-                    if err := future.exception():
-                        result.trace.error(f"[WORKFLOW]: {err}")
-                        raise WorkflowException(str(err))
+                    if e := future.exception():
+                        result.trace.error(f"[WORKFLOW]: {e}")
+                        raise WorkflowException(str(e))
 
                     future.result()
 
@@ -1281,9 +1281,9 @@ class Workflow(BaseModel):
                 result.trace.debug(f"[WORKFLOW]: Make future: {future}")
                 time.sleep(0.025)
             elif future.done():
-                if err := future.exception():
-                    result.trace.error(f"[WORKFLOW]: {err}")
-                    raise WorkflowException(str(err))
+                if e := future.exception():
+                    result.trace.error(f"[WORKFLOW]: {e}")
+                    raise WorkflowException(str(e))
 
                 future = None
                 job_queue.put(job_id)
