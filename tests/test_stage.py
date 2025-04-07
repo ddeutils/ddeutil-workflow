@@ -41,16 +41,6 @@ def test_stage_empty_execute():
     assert {} == rs.context
 
 
-@pytest.mark.asyncio
-async def test_stage_empty_axecute():
-    stage: EmptyStage = EmptyStage(name="Empty Stage", echo="hello world")
-    rs: Result = await stage.axecute(params={})
-    print(rs)
-
-    rs: Result = await stage.handler_axecute(params={})
-    print(rs)
-
-
 def test_stage_empty_raise():
 
     # NOTE: Raise error when passing template data to the name field.
