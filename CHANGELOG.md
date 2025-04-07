@@ -2,6 +2,24 @@
 
 ## Latest Changes
 
+## 0.0.46
+
+### :sparkles: Features
+
+- :dart: feat: add main file for future cli implementation.
+
+### :bug: Bug fixes
+
+- :gear: fixed: add override extras on workflow and job exections.
+
+### :broom: Deprecate & Clean
+
+- :recycle: clean: remove base config object.
+
+### :package: Build & Workflow
+
+- :toolbox: build: change beta to production grade.
+
 ## 0.0.45
 
 ### :stars: Highlight Features
