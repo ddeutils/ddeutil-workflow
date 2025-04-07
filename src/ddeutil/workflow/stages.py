@@ -4,18 +4,18 @@
 # license information.
 # ------------------------------------------------------------------------------
 # [x] Use dynamic config
-"""Stage Model that use for getting stage data template from the Job Model.
-The stage handle the minimize task that run in some thread (same thread at
-its job owner) that mean it is the lowest executor of a workflow that can
-tracking logs.
+"""Stage model. It stores all stage model that use for getting stage data template
+from the Job Model. The stage handle the minimize task that run in some thread
+(same thread at its job owner) that mean it is the lowest executor of a workflow
+that can tracking logs.
 
     The output of stage execution only return 0 status because I do not want to
 handle stage error on this stage model. I think stage model should have a lot of
 use-case, and it does not worry when I want to create a new one.
 
-    Execution   --> Ok      --> Result with 0
+    Execution   --> Ok      --> Result with SUCCESS
 
-                --> Error   ┬-> Result with 1 (if env var was set)
+                --> Error   ┬-> Result with FAILED (if env var was set)
                             ╰-> Raise StageException(...)
 
     On the context I/O that pass to a stage object at execute process. The
@@ -52,7 +52,7 @@ from typing_extensions import Self
 from .__types import DictData, DictStr, TupleStr
 from .conf import dynamic
 from .exceptions import StageException, to_dict
-from .result import Result, Status
+from .result import FAILED, SUCCESS, Result
 from .reusables import TagFunc, extract_call, not_in_template, param2template
 from .utils import (
     gen_id,
@@ -170,12 +170,12 @@ class BaseStage(BaseModel, ABC):
         specific environment variable,`WORKFLOW_CORE_STAGE_RAISE_ERROR`.
 
             Execution   --> Ok      --> Result
-                                        |-status: Status.SUCCESS
+                                        |-status: SUCCESS
                                         ╰-context:
                                             ╰-outputs: ...
 
                         --> Error   --> Result (if env var was set)
-                                        |-status: Status.FAILED
+                                        |-status: FAILED
                                         ╰-errors:
                                             |-class: ...
                                             |-name: ...
@@ -228,7 +228,7 @@ class BaseStage(BaseModel, ABC):
             if to is not None:
                 return self.set_outputs(errors, to=to)
 
-            return result.catch(status=Status.FAILED, context=errors)
+            return result.catch(status=FAILED, context=errors)
 
     def set_outputs(self, output: DictData, to: DictData) -> DictData:
         """Set an outputs from execution process to the received context. The
@@ -411,7 +411,7 @@ class BaseAsyncStage(BaseStage):
             if to is not None:
                 return self.set_outputs(errors, to=to)
 
-            return result.catch(status=Status.FAILED, context=errors)
+            return result.catch(status=FAILED, context=errors)
 
 
 class EmptyStage(BaseAsyncStage):
@@ -472,7 +472,7 @@ class EmptyStage(BaseAsyncStage):
                 result.trace.info(f"[STAGE]: ... sleep ({self.sleep} seconds)")
             time.sleep(self.sleep)
 
-        return result.catch(status=Status.SUCCESS)
+        return result.catch(status=SUCCESS)
 
     async def axecute(
         self,
@@ -510,7 +510,7 @@ class EmptyStage(BaseAsyncStage):
                 )
             await asyncio.sleep(self.sleep)
 
-        return result.catch(status=Status.SUCCESS)
+        return result.catch(status=SUCCESS)
 
 
 class BashStage(BaseStage):
@@ -629,7 +629,7 @@ class BashStage(BaseStage):
                 f"```bash\n{bash}\n```"
             )
         return result.catch(
-            status=Status.SUCCESS,
+            status=SUCCESS,
             context={
                 "return_code": rs.returncode,
                 "stdout": None if (out := rs.stdout.strip("\n")) == "" else out,
@@ -749,7 +749,7 @@ class PyStage(BaseStage):
         )
 
         return result.catch(
-            status=Status.SUCCESS, context={"locals": lc, "globals": gb}
+            status=SUCCESS, context={"locals": lc, "globals": gb}
         )
 
 
@@ -871,7 +871,7 @@ class CallStage(BaseStage):
                 f"Return type: '{t_func.name}@{t_func.tag}' does not serialize "
                 f"to result model, you change return type to `dict`."
             )
-        return result.catch(status=Status.SUCCESS, context=rs)
+        return result.catch(status=SUCCESS, context=rs)
 
 
 class TriggerStage(BaseStage):
@@ -1041,7 +1041,7 @@ class ParallelStage(BaseStage):  # pragma: no cov
             f"[STAGE]: Parallel-Execute with {self.max_parallel_core} cores."
         )
         rs: DictData = {"parallel": {}}
-        status = Status.SUCCESS
+        status = SUCCESS
         with ThreadPoolExecutor(
             max_workers=self.max_parallel_core,
             thread_name_prefix="parallel_stage_exec_",
@@ -1065,7 +1065,7 @@ class ParallelStage(BaseStage):  # pragma: no cov
                 rs["parallel"][context.pop("branch")] = context
 
                 if "errors" in context:
-                    status = Status.FAILED
+                    status = FAILED
 
         return result.catch(status=status, context=rs)
 
@@ -1144,7 +1144,7 @@ class ForEachStage(BaseStage):
 
         result.trace.info(f"[STAGE]: Foreach-Execute: {foreach!r}.")
         rs: DictData = {"items": foreach, "foreach": {}}
-        status = Status.SUCCESS
+        status = SUCCESS
         # TODO: Implement concurrent more than 1.
         for item in foreach:
             result.trace.debug(f"[STAGE]: Execute foreach item: {item!r}")
@@ -1162,7 +1162,7 @@ class ForEachStage(BaseStage):
                         to=context,
                     )
                 except StageException as err:  # pragma: no cov
-                    status = Status.FAILED
+                    status = FAILED
                     result.trace.error(
                         f"[STAGE]: Catch:\n\t{err.__class__.__name__}:"
                         f"\n\t{err}"
@@ -1288,7 +1288,7 @@ class CaseStage(BaseStage):  # pragma: no cov
             result: Result = Result(
                 run_id=gen_id(self.name + (self.id or ""), unique=True)
             )
-        status = Status.SUCCESS
+        status = SUCCESS
         _case = param2template(self.case, params, extras=self.extras)
         _else = None
         context = {}
@@ -1311,7 +1311,7 @@ class CaseStage(BaseStage):  # pragma: no cov
                         to=context,
                     )
                 except StageException as err:  # pragma: no cov
-                    status = Status.FAILED
+                    status = FAILED
                     result.trace.error(
                         f"[STAGE]: Catch:\n\t{err.__class__.__name__}:"
                         f"\n\t{err}"

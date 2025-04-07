@@ -38,7 +38,7 @@ from .exceptions import JobException, WorkflowException
 from .job import Job, TriggerState
 from .logs import Audit, get_audit
 from .params import Param
-from .result import Result, Status
+from .result import FAILED, SUCCESS, Result, Status
 from .reusables import has_template, param2template
 from .utils import (
     gen_id,
@@ -673,7 +673,7 @@ class Workflow(BaseModel):
         )
 
         return result.catch(
-            status=Status.SUCCESS,
+            status=SUCCESS,
             context={
                 "params": params,
                 "release": {
@@ -804,7 +804,7 @@ class Workflow(BaseModel):
             result.trace.info(
                 f"[POKING]: {self.name!r} does not have any schedule to run."
             )
-            return result.catch(status=Status.SUCCESS, context={"outputs": []})
+            return result.catch(status=SUCCESS, context={"outputs": []})
 
         # NOTE: Create the current date that change microsecond to 0
         current_date: datetime = datetime.now(
@@ -850,7 +850,7 @@ class Workflow(BaseModel):
             result.trace.info(
                 f"[POKING]: {self.name!r} does not have any queue."
             )
-            return result.catch(status=Status.SUCCESS, context={"outputs": []})
+            return result.catch(status=SUCCESS, context={"outputs": []})
 
         # NOTE: Start create the thread pool executor for running this poke
         #   process.
@@ -912,7 +912,7 @@ class Workflow(BaseModel):
                 context.append(future.result())
 
         return result.catch(
-            status=Status.SUCCESS,
+            status=SUCCESS,
             context={"outputs": context},
         )
 
@@ -991,7 +991,7 @@ class Workflow(BaseModel):
                 "Handle error from the job execution does not support yet."
             ) from None
 
-        return result.catch(status=Status.SUCCESS, context=params)
+        return result.catch(status=SUCCESS, context=params)
 
     def execute(
         self,
@@ -1048,7 +1048,7 @@ class Workflow(BaseModel):
             result.trace.warning(
                 f"[WORKFLOW]: {self.name!r} does not have any jobs"
             )
-            return result.catch(status=Status.SUCCESS, context=params)
+            return result.catch(status=SUCCESS, context=params)
 
         # NOTE: Create a job queue that keep the job that want to run after
         #   its dependency condition.
@@ -1065,7 +1065,7 @@ class Workflow(BaseModel):
         #   }
         #
         context: DictData = self.parameterize(params)
-        status: Status = Status.SUCCESS
+        status: Status = SUCCESS
         try:
             if (
                 dynamic(
@@ -1091,7 +1091,7 @@ class Workflow(BaseModel):
                     event=event,
                 )
         except WorkflowException as err:
-            status = Status.FAILED
+            status = FAILED
             context.update({"errors": err.to_dict()})
 
         return result.catch(status=status, context=context)

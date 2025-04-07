@@ -3,8 +3,8 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-"""This is the Result module. It is the data context transfer objects that use
-by all object in this package. This module provide Result dataclass.
+"""Result module. It is the data context transfer objects that use by all object
+in this package. This module provide Status enum object and Result dataclass.
 """
 from __future__ import annotations
 
@@ -23,13 +23,19 @@ from .logs import TraceLog, get_dt_tznow, get_trace
 from .utils import default_gen_id, gen_id
 
 __all__: TupleStr = (
+    "SUCCESS",
+    "FAILED",
+    "WAIT",
+    "SKIP",
     "Result",
     "Status",
 )
 
 
 class Status(IntEnum):
-    """Status Int Enum object."""
+    """Status Int Enum object that use for tracking execution status to the
+    Result dataclass object.
+    """
 
     SUCCESS: int = 0
     FAILED: int = 1
@@ -37,8 +43,17 @@ class Status(IntEnum):
     SKIP: int = 3
 
 
+SUCCESS = Status.SUCCESS
+FAILED = Status.FAILED
+WAIT = Status.WAIT
+SKIP = Status.SKIP
+
+
 @dataclass(
-    config=ConfigDict(arbitrary_types_allowed=True, use_enum_values=True)
+    config=ConfigDict(
+        arbitrary_types_allowed=True,
+        use_enum_values=True,
+    ),
 )
 class Result:
     """Result Pydantic Model for passing and receiving data context from any
@@ -49,8 +64,9 @@ class Result:
     and ``_run_id`` fields to comparing with other result instance.
     """
 
-    status: Status = field(default=Status.WAIT)
+    status: Status = field(default=WAIT)
     context: DictData = field(default_factory=dict)
+    errors: DictData = field(default_factory=dict)
     run_id: Optional[str] = field(default_factory=default_gen_id)
     parent_run_id: Optional[str] = field(default=None, compare=False)
     ts: datetime = field(default_factory=get_dt_tznow, compare=False)
@@ -64,9 +80,16 @@ class Result:
         run_id: str | None = None,
         parent_run_id: str | None = None,
         id_logic: str | None = None,
-    ) -> Self:  # pragma: no cov
+    ) -> Self:
         """Create the Result object or set parent running id if passing Result
         object.
+
+        :param result:
+        :param run_id:
+        :param parent_run_id:
+        :param id_logic:
+
+        :rtype: Self
         """
         if result is None:
             result: Result = cls(
@@ -101,18 +124,23 @@ class Result:
         self,
         status: int | Status,
         context: DictData | None = None,
+        error: DictData | None = None,
     ) -> Self:
         """Catch the status and context to this Result object. This method will
         use between a child execution return a result, and it wants to pass
         status and context to this object.
 
-        :param status:
-        :param context:
+        :param status: A status enum object.
+        :param context: A context data that will update to the current context.
+        :param error: An error data that will update to the current errors.
+
+        :rtype: Self
         """
         self.__dict__["status"] = (
             Status(status) if isinstance(status, int) else status
         )
         self.__dict__["context"].update(context or {})
+        self.__dict__["errors"].update(error or {})
         return self
 
     def alive_time(self) -> float:  # pragma: no cov

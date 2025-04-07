@@ -56,14 +56,13 @@ from .conf import Loader, SimLoad, config, get_logger
 from .cron import On
 from .exceptions import ScheduleException, WorkflowException
 from .logs import Audit, get_audit
-from .result import Result, Status
+from .result import SUCCESS, Result
 from .utils import batch, delay
 from .workflow import Release, ReleaseQueue, Workflow, WorkflowTask
 
 P = ParamSpec("P")
-logger = get_logger("ddeutil.workflow")
 
-# NOTE: Adjust logging level on the `schedule` package.
+logger = get_logger("ddeutil.workflow")
 logging.getLogger("schedule").setLevel(logging.INFO)
 
 
@@ -393,7 +392,7 @@ class Schedule(BaseModel):
             audit=audit,
         )
 
-        return result.catch(status=Status.SUCCESS)
+        return result.catch(status=SUCCESS)
 
 
 ResultOrCancel = Union[type[CancelJob], Result]
@@ -572,9 +571,7 @@ def schedule_task(
         f"[SCHEDULE]: End schedule task that run since "
         f"{current_date:%Y-%m-%d %H:%M:%S} {'=' * 30}"
     )
-    return result.catch(
-        status=Status.SUCCESS, context={"task_date": current_date}
-    )
+    return result.catch(status=SUCCESS, context={"task_date": current_date})
 
 
 def monitor(
@@ -690,7 +687,7 @@ def scheduler_pending(
         f"[SCHEDULE]: Queue: {[list(queue[wf].queue) for wf in queue]}"
     )
     return result.catch(
-        status=Status.SUCCESS,
+        status=SUCCESS,
         context={
             "threads": [
                 {
@@ -759,7 +756,7 @@ def schedule_control(
         audit=audit,
     )
 
-    return result.catch(status=Status.SUCCESS, context={"schedules": schedules})
+    return result.catch(status=SUCCESS, context={"schedules": schedules})
 
 
 def schedule_runner(

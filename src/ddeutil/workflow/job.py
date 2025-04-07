@@ -39,7 +39,7 @@ from .exceptions import (
     StageException,
     UtilException,
 )
-from .result import Result, Status
+from .result import FAILED, SUCCESS, Result, Status
 from .reusables import has_template, param2template
 from .stages import Stage
 from .utils import cross_product, filter_func, gen_id
@@ -408,7 +408,8 @@ class Job(BaseModel):
         self,
         jobs: dict[str, Any],
     ) -> TriggerState:  # pragma: no cov
-        """Return True if job's need exists in an input list of job's ID.
+        """Return TriggerState enum for checking job's need trigger logic in an
+        input list of job's ID.
 
         :param jobs: A mapping of job ID and result context.
 
@@ -674,7 +675,7 @@ def local_execute_strategy(
                 "strategy execution."
             )
             return result.catch(
-                status=Status.FAILED,
+                status=FAILED,
                 context={
                     strategy_id: {
                         "matrix": strategy,
@@ -724,7 +725,7 @@ def local_execute_strategy(
                 ) from None
 
             return result.catch(
-                status=Status.FAILED,
+                status=FAILED,
                 context={
                     strategy_id: {
                         "matrix": strategy,
@@ -735,7 +736,7 @@ def local_execute_strategy(
             )
 
     return result.catch(
-        status=Status.SUCCESS,
+        status=SUCCESS,
         context={
             strategy_id: {
                 "matrix": strategy,
@@ -790,7 +791,7 @@ def local_execute(
 
             if event and event.is_set():  # pragma: no cov
                 return result.catch(
-                    status=Status.FAILED,
+                    status=FAILED,
                     context={
                         "errors": JobException(
                             "Job strategy was canceled from event that had set "
@@ -808,7 +809,7 @@ def local_execute(
                 raise_error=raise_error,
             )
 
-        return result.catch(status=Status.SUCCESS)
+        return result.catch(status=SUCCESS)
 
     fail_fast_flag: bool = job.strategy.fail_fast
     ls: str = "Fail-Fast" if fail_fast_flag else "All-Completed"
@@ -819,7 +820,7 @@ def local_execute(
 
     if event and event.is_set():  # pragma: no cov
         return result.catch(
-            status=Status.FAILED,
+            status=FAILED,
             context={
                 "errors": JobException(
                     "Job strategy was canceled from event that had set "
@@ -849,7 +850,7 @@ def local_execute(
         ]
 
         context: DictData = {}
-        status: Status = Status.SUCCESS
+        status: Status = SUCCESS
 
         if not fail_fast_flag:
             done = as_completed(futures, timeout=1800)
@@ -875,7 +876,7 @@ def local_execute(
             try:
                 future.result()
             except JobException as err:
-                status = Status.FAILED
+                status = FAILED
                 result.trace.error(
                     f"[JOB]: {ls} Catch:\n\t{err.__class__.__name__}:"
                     f"\n\t{err}"
@@ -903,7 +904,7 @@ def self_hosted_execute(
     )
 
     if event and event.is_set():
-        return result.catch(status=Status.FAILED)
+        return result.catch(status=FAILED)
 
     import requests
 
@@ -922,5 +923,5 @@ def self_hosted_execute(
                 f"{job.runs_on.args.host!r}"
             )
 
-        return result.catch(status=Status.FAILED)
-    return result.catch(status=Status.SUCCESS)
+        return result.catch(status=FAILED)
+    return result.catch(status=SUCCESS)

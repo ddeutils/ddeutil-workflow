@@ -3,7 +3,6 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-# [ ] Use config
 """This module include all Param Pydantic Models that use for parsing an
 incoming parameters that was passed to the Workflow and Schedule objects before
 execution or release methods.
@@ -45,7 +44,10 @@ class BaseParam(BaseModel, ABC):
     """
 
     desc: Optional[str] = Field(
-        default=None, description="A description of parameter providing."
+        default=None,
+        description=(
+            "A description of this parameter provide to the workflow model."
+        ),
     )
     required: bool = Field(
         default=True,
@@ -55,6 +57,7 @@ class BaseParam(BaseModel, ABC):
 
     @abstractmethod
     def receive(self, value: Optional[T] = None) -> T:
+        """Abstract method receive value to this parameter model."""
         raise NotImplementedError(
             "Receive value and validate typing before return valid value."
         )
@@ -69,13 +72,14 @@ class DefaultParam(BaseParam):
         default=False,
         description="A require flag for the default-able parameter value.",
     )
-    default: Optional[str] = Field(
+    default: Optional[Any] = Field(
         default=None,
         description="A default value if parameter does not pass.",
     )
 
     @abstractmethod
     def receive(self, value: Optional[Any] = None) -> Any:
+        """Abstract method receive value to this parameter model."""
         raise NotImplementedError(
             "Receive value and validate typing before return valid value."
         )
@@ -85,7 +89,10 @@ class DateParam(DefaultParam):  # pragma: no cov
     """Date parameter model."""
 
     type: Literal["date"] = "date"
-    default: date = Field(default_factory=get_d_now)
+    default: date = Field(
+        default_factory=get_d_now,
+        description="A default date that make from the current date func.",
+    )
 
     def receive(self, value: Optional[str | datetime | date] = None) -> date:
         """Receive value that match with date. If an input value pass with
@@ -119,7 +126,12 @@ class DatetimeParam(DefaultParam):
     """Datetime parameter model."""
 
     type: Literal["datetime"] = "datetime"
-    default: datetime = Field(default_factory=get_dt_now)
+    default: datetime = Field(
+        default_factory=get_dt_now,
+        description=(
+            "A default datetime that make from the current datetime func."
+        ),
+    )
 
     def receive(self, value: str | datetime | date | None = None) -> datetime:
         """Receive value that match with datetime. If an input value pass with
@@ -170,10 +182,6 @@ class IntParam(DefaultParam):
     """Integer parameter."""
 
     type: Literal["int"] = "int"
-    default: Optional[int] = Field(
-        default=None,
-        description="A default value if parameter does not pass.",
-    )
 
     def receive(self, value: int | None = None) -> int | None:
         """Receive value that match with int.
@@ -229,14 +237,23 @@ class MapParam(DefaultParam):  # pragma: no cov
     """Map parameter."""
 
     type: Literal["map"] = "map"
-    default: dict[Any, Any] = Field(default_factory=dict)
+    default: dict[Any, Any] = Field(
+        default_factory=dict,
+        description="A default dict that make from the dict built-in func.",
+    )
 
     def receive(
         self,
         value: Optional[Union[dict[Any, Any], str]] = None,
     ) -> dict[Any, Any]:
+        """Receive value that match with map type.
+
+        :param value: A value that want to validate with map parameter type.
+        :rtype: dict[Any, Any]
+        """
         if value is None:
             return self.default
+
         if isinstance(value, str):
             try:
                 value: dict[Any, Any] = str2dict(value)
@@ -257,11 +274,19 @@ class ArrayParam(DefaultParam):  # pragma: no cov
     """Array parameter."""
 
     type: Literal["array"] = "array"
-    default: list[Any] = Field(default_factory=list)
+    default: list[Any] = Field(
+        default_factory=list,
+        description="A default list that make from the list built-in func.",
+    )
 
     def receive(
-        self, value: Optional[Union[list[T], tuple, str]] = None
+        self, value: Optional[Union[list[T], tuple[T, ...], str]] = None
     ) -> list[T]:
+        """Receive value that match with array type.
+
+        :param value: A value that want to validate with array parameter type.
+        :rtype: list[Any]
+        """
         if value is None:
             return self.default
         if isinstance(value, str):
@@ -272,7 +297,7 @@ class ArrayParam(DefaultParam):  # pragma: no cov
                     f"Value that want to convert to array does not support for "
                     f"type: {type(value)}"
                 ) from e
-        elif isinstance(value, tuple):
+        elif isinstance(value, (tuple, set)):
             return list(value)
         elif not isinstance(value, list):
             raise ParamValueException(

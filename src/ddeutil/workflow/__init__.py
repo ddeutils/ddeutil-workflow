@@ -4,7 +4,7 @@
 # license information.
 # ------------------------------------------------------------------------------
 from .__cron import CronJob, CronRunner
-from .__types import Re
+from .__types import DictData, DictStr, Matrix, Re, TupleStr
 from .conf import (
     Config,
     Loader,
@@ -47,6 +47,10 @@ from .params import (
     StrParam,
 )
 from .result import (
+    FAILED,
+    SKIP,
+    SUCCESS,
+    WAIT,
     Result,
     Status,
 )
