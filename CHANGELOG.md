@@ -2,6 +2,24 @@
 
 ## Latest Changes
 
+## 0.0.44
+
+### :bug: Bug fixes
+
+- :gear: fixed: add break job streategy exec method if stage was raised.
+
+### :black_nib: Code Changes
+
+- :art: styled: move async testcase to async folder.
+- :construction: refactored: change non-threading exec to context pool instead.
+- :test_tube: tests: fix testcase for stage not success.
+- :test_tube: tests: fixed testcase on job strategy exec.
+- :test_tube: tests: add testcase for testing job trigger check method return failed.
+
+### :broom: Deprecate & Clean
+
+- :recycle: clean: remove comment that not important.
+
 ## 0.0.43
 
 ### :stars: Highlight Features
