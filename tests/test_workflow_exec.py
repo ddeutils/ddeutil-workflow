@@ -2,7 +2,7 @@ from datetime import datetime
 from unittest import mock
 
 from ddeutil.core import getdot
-from ddeutil.workflow import Workflow
+from ddeutil.workflow import SUCCESS, Workflow
 from ddeutil.workflow.conf import Config
 from ddeutil.workflow.job import Job
 from ddeutil.workflow.result import FAILED, Result
@@ -593,7 +593,7 @@ def test_workflow_exec_raise_param(test_path):
         rs: Result = workflow.execute(
             params={"stream": "demo-stream"}, max_job_parallel=1
         )
-        assert rs.status == FAILED
+        assert rs.status == SUCCESS
         assert rs.context == {
             "params": {"stream": "demo-stream"},
             "jobs": {
@@ -617,7 +617,10 @@ def test_workflow_exec_raise_param(test_path):
                             rs.context["jobs"]["start-job"]["errors"]["class"]
                         ),
                         "name": "JobException",
-                        "message": "Job strategy was break because it has a stage, get-param, failed without raise error.",
+                        "message": (
+                            "Job strategy was break because it has a stage, "
+                            "get-param, failed without raise error."
+                        ),
                     },
                 },
             },

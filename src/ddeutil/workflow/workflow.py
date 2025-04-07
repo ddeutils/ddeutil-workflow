@@ -1042,16 +1042,12 @@ class Workflow(BaseModel):
         )
 
         result.trace.info(f"[WORKFLOW]: Start Execute: {self.name!r} ...")
-
-        # NOTE: It should not do anything if it does not have job.
         if not self.jobs:
             result.trace.warning(
                 f"[WORKFLOW]: {self.name!r} does not have any jobs"
             )
             return result.catch(status=SUCCESS, context=params)
 
-        # NOTE: Create a job queue that keep the job that want to run after
-        #   its dependency condition.
         jq: Queue = Queue()
         for job_id in self.jobs:
             jq.put(job_id)
@@ -1091,7 +1087,7 @@ class Workflow(BaseModel):
                     event=event,
                 )
         except WorkflowException as e:
-            status = FAILED
+            status: Status = FAILED
             context.update({"errors": e.to_dict()})
 
         return result.catch(status=status, context=context)

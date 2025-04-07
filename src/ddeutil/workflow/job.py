@@ -38,6 +38,7 @@ from .exceptions import (
     JobException,
     StageException,
     UtilException,
+    to_dict,
 )
 from .result import FAILED, SKIP, SUCCESS, WAIT, Result, Status
 from .reusables import has_template, param2template
@@ -631,19 +632,6 @@ def local_execute_strategy(
         result: Result = Result(run_id=gen_id(job.id or "not-set", unique=True))
 
     strategy_id: str = gen_id(strategy)
-
-    # PARAGRAPH:
-    #
-    #       Create strategy execution context and update a matrix and copied
-    #   of params. So, the context value will have structure like;
-    #
-    #   {
-    #       "params": { ... },      <== Current input params
-    #       "jobs": { ... },        <== Current input params
-    #       "matrix": { ... }       <== Current strategy value
-    #       "stages": { ... }       <== Catching stage outputs
-    #   }
-    #
     context: DictData = copy.deepcopy(params)
     context.update({"matrix": strategy, "stages": {}})
 
@@ -742,8 +730,8 @@ def local_execute(
     raise_error: bool | None = None,
 ) -> Result:
     """Local job execution with passing dynamic parameters from the workflow
-    execution. It will generate matrix values at the first step and run
-    multithread on this metrics to the `stages` field of this job.
+    execution or itself execution. It will generate matrix values at the first
+    step and run multithread on this metrics to the `stages` field of this job.
 
         This method does not raise any JobException if it runs with
     multi-threading strategy.
@@ -794,10 +782,7 @@ def local_execute(
                 raise_error=raise_error,
             )
 
-            if result.status == FAILED:
-                break
-
-        return result.catch(status=SUCCESS)
+        return result.catch(status=result.status)
 
     fail_fast_flag: bool = job.strategy.fail_fast
     ls: str = "Fail-Fast" if fail_fast_flag else "All-Completed"
@@ -817,8 +802,6 @@ def local_execute(
             },
         )
 
-    # IMPORTANT: Start running strategy execution by multithreading because
-    #   it will run by strategy values without waiting previous execution.
     with ThreadPoolExecutor(
         max_workers=job.strategy.max_parallel,
         thread_name_prefix="job_strategy_exec_",
@@ -884,6 +867,22 @@ def self_hosted_execute(
     event: Event | None = None,
     raise_error: bool | None = None,
 ) -> Result:  # pragma: no cov
+    """Self-Hosted job execution with passing dynamic parameters from the
+    workflow execution or itself execution. It will make request to the
+    self-hosted host url.
+
+    :param job: (Job) A job model that want to execute.
+    :param params: (DictData) An input parameters that use on job execution.
+    :param run_id: (str) A job running ID for this execution.
+    :param parent_run_id: (str) A parent workflow running ID for this release.
+    :param result: (Result) A result object for keeping context and status
+        data.
+    :param event: (Event) An event manager that pass to the PoolThreadExecutor.
+    :param raise_error: (bool) A flag that all this method raise error to the
+        strategy execution.
+
+    :rtype: Result
+    """
     result: Result = Result.construct_with_rs_or_id(
         result,
         run_id=run_id,
@@ -892,14 +891,31 @@ def self_hosted_execute(
     )
 
     if event and event.is_set():
-        return result.catch(status=FAILED)
+        return result.catch(
+            status=FAILED,
+            context={
+                "errors": JobException(
+                    "Job self-hosted execution was canceled from event that "
+                    "had set before start execution."
+                ).to_dict()
+            },
+        )
 
     import requests
 
-    resp = requests.post(
-        job.runs_on.args.host,
-        data={"job": job.model_dump(), "params": params},
-    )
+    try:
+        resp = requests.post(
+            job.runs_on.args.host,
+            headers={"Auth": f"Barer {job.runs_on.args.token}"},
+            data={
+                "job": job.model_dump(),
+                "params": params,
+                "result": result.__dict__,
+                "raise_error": raise_error,
+            },
+        )
+    except requests.exceptions.RequestException as e:
+        return result.catch(status=FAILED, context={"errors": to_dict(e)})
 
     if resp.status_code != 200:
         do_raise: bool = dynamic(

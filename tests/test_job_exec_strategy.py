@@ -45,7 +45,6 @@ def test_job_exec_strategy_catch_stage_error():
     workflow: Workflow = Workflow.from_conf(name="wf-run-python-raise-for-job")
     job: Job = workflow.job("final-job")
     rs = local_execute_strategy(job, {"name": "foo"}, {})
-
     assert rs.context == {
         "5027535057": {
             "matrix": {"name": "foo"},
