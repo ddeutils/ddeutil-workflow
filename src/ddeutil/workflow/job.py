@@ -794,6 +794,9 @@ def local_execute(
                 raise_error=raise_error,
             )
 
+            if result.status == FAILED:
+                break
+
         return result.catch(status=SUCCESS)
 
     fail_fast_flag: bool = job.strategy.fail_fast

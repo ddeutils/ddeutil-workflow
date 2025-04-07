@@ -1158,16 +1158,6 @@ class Workflow(BaseModel):
                     job_queue.task_done()
                     continue
 
-                # NOTE: Start workflow job execution with deep copy context data
-                #   before release.
-                #
-                #   Context:
-                #   ---
-                #   {
-                #       'params': <input-params>,
-                #       'jobs': { <job's-id>: ... },
-                #   }
-                #
                 futures.append(
                     executor.submit(
                         self.execute_job,
@@ -1178,7 +1168,6 @@ class Workflow(BaseModel):
                     ),
                 )
 
-                # NOTE: Mark this job queue done.
                 job_queue.task_done()
 
             if not_timeout_flag:
@@ -1266,14 +1255,6 @@ class Workflow(BaseModel):
                 job_queue.task_done()
                 continue
 
-            # NOTE: Start workflow job execution with deep copy context data
-            #   before release. This job execution process will run until
-            #   done before checking all execution timeout or not.
-            #
-            #   {
-            #       'params': <input-params>,
-            #       'jobs': {},
-            #   }
             if future is None:
                 future: Future = executor.submit(
                     self.execute_job,
@@ -1282,7 +1263,6 @@ class Workflow(BaseModel):
                     result=result,
                     event=event,
                 )
-                result.trace.debug(f"[WORKFLOW]: Make future: {future}")
                 time.sleep(0.025)
             elif future.done():
                 if e := future.exception():

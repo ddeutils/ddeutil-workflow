@@ -5,7 +5,7 @@ from ddeutil.core import getdot
 from ddeutil.workflow import Workflow
 from ddeutil.workflow.conf import Config
 from ddeutil.workflow.job import Job
-from ddeutil.workflow.result import Result
+from ddeutil.workflow.result import FAILED, Result
 from ddeutil.workflow.stages import CallStage
 
 from .utils import dump_yaml_context
@@ -590,16 +590,46 @@ def test_workflow_exec_raise_param(test_path):
         """,
     ):
         workflow = Workflow.from_conf(name="tmp-wf-exec-raise-param")
-        rs = workflow.execute(params={"stream": "demo-stream"})
-        print(rs)
+        rs: Result = workflow.execute(
+            params={"stream": "demo-stream"}, max_job_parallel=1
+        )
+        assert rs.status == FAILED
+        assert rs.context == {
+            "params": {"stream": "demo-stream"},
+            "jobs": {
+                "start-job": {
+                    "stages": {
+                        "get-param": {
+                            "outputs": {},
+                            "errors": {
+                                "class": (
+                                    rs.context["jobs"]["start-job"]["stages"][
+                                        "get-param"
+                                    ]["errors"]["class"]
+                                ),
+                                "name": "UtilException",
+                                "message": "Params does not set caller: 'params.name'.",
+                            },
+                        },
+                    },
+                    "errors": {
+                        "class": (
+                            rs.context["jobs"]["start-job"]["errors"]["class"]
+                        ),
+                        "name": "JobException",
+                        "message": "Job strategy was break because it has a stage, get-param, failed without raise error.",
+                    },
+                },
+            },
+        }
 
 
 @mock.patch.object(Config, "stage_raise_error", False)
-def test_workflow_exec_raise_job_need(test_path):
+def test_workflow_exec_raise_job_trigger(test_path):
     with dump_yaml_context(
-        test_path / "conf/demo/01_99_wf_test_wf_exec_raise_param.yml",
+        test_path / "conf/demo/01_99_wf_test_wf_exec_raise_job_trigger.yml",
         data="""
-        tmp-wf-exec-raise-param:
+        tmp-wf-exec-raise-job-trigger:
           type: Workflow
           params:
             name:
@@ -620,10 +650,11 @@ def test_workflow_exec_raise_job_need(test_path):
 
         """,
     ):
-        workflow = Workflow.from_conf(name="tmp-wf-exec-raise-param")
-        rs = workflow.execute(
+        workflow = Workflow.from_conf(name="tmp-wf-exec-raise-job-trigger")
+        rs: Result = workflow.execute(
             params={"stream": "demo-stream"}, max_job_parallel=1
         )
+        assert rs.status == FAILED
         assert rs.context == {
             "params": {"stream": "demo-stream"},
             "jobs": {
