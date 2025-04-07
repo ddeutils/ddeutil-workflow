@@ -341,41 +341,6 @@ class SimLoad:
         )
 
 
-class Loader(SimLoad):
-    """Loader Object that get the config `yaml` file from current path.
-
-    :param name: A name of config data that will read by Yaml Loader object.
-    :param externals: An external parameters
-    """
-
-    @classmethod
-    def finds(
-        cls,
-        obj: object,
-        *,
-        included: list[str] | None = None,
-        excluded: list[str] | None = None,
-        **kwargs,
-    ) -> Iterator[tuple[str, DictData]]:
-        """Override the find class method from the Simple Loader object.
-
-        :param obj: An object that want to validate matching before return.
-        :param included:
-        :param excluded:
-
-        :rtype: Iterator[tuple[str, DictData]]
-        """
-        return super().finds(
-            obj=obj,
-            conf_path=config.conf_path,
-            included=included,
-            excluded=excluded,
-        )
-
-    def __init__(self, name: str, externals: DictData) -> None:
-        super().__init__(name, conf_path=config.conf_path, externals=externals)
-
-
 config: Config = Config()
 api_config: APIConfig = APIConfig()
 
@@ -400,6 +365,47 @@ def dynamic(
             f"as config {type(rs)}."
         )
     return rsx or rs
+
+
+class Loader(SimLoad):
+    """Loader Object that get the config `yaml` file from current path.
+
+    :param name: A name of config data that will read by Yaml Loader object.
+    :param externals: An external parameters
+    """
+
+    @classmethod
+    def finds(
+        cls,
+        obj: object,
+        *,
+        included: list[str] | None = None,
+        excluded: list[str] | None = None,
+        path: Path | None = None,
+        **kwargs,
+    ) -> Iterator[tuple[str, DictData]]:
+        """Override the find class method from the Simple Loader object.
+
+        :param obj: An object that want to validate matching before return.
+        :param included:
+        :param excluded:
+        :param path:
+
+        :rtype: Iterator[tuple[str, DictData]]
+        """
+        return super().finds(
+            obj=obj,
+            conf_path=(path or config.conf_path),
+            included=included,
+            excluded=excluded,
+        )
+
+    def __init__(self, name: str, externals: DictData) -> None:
+        super().__init__(
+            name,
+            conf_path=dynamic("conf_path", extras=externals),
+            externals=externals,
+        )
 
 
 @lru_cache

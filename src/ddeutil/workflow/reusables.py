@@ -499,6 +499,7 @@ class CallSearchData:
 
 def extract_call(
     call: str,
+    *,
     registries: Optional[list[str]] = None,
 ) -> Callable[[], TagFunc]:
     """Extract Call function from string value to call partial function that

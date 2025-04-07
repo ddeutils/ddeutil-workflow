@@ -314,7 +314,8 @@ class Workflow(BaseModel):
 
         loader_data: DictData = copy.deepcopy(loader.data)
         loader_data["name"] = name.replace(" ", "_")
-        if extras:  # pragma: no cov
+
+        if extras:
             loader_data["extras"] = extras
 
         cls.__bypass_on__(loader_data, path=loader.conf_path, extras=extras)
@@ -325,6 +326,7 @@ class Workflow(BaseModel):
         cls,
         name: str,
         path: Path,
+        *,
         extras: DictData | None = None,
     ) -> Self:
         """Create Workflow instance from the specific path. The loader object
@@ -349,7 +351,8 @@ class Workflow(BaseModel):
 
         loader_data: DictData = copy.deepcopy(loader.data)
         loader_data["name"] = name.replace(" ", "_")
-        if extras:  # pragma: no cov
+
+        if extras:
             loader_data["extras"] = extras
 
         cls.__bypass_on__(loader_data, path=path, extras=extras)

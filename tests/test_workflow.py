@@ -1,3 +1,6 @@
+import shutil
+from pathlib import Path
+
 import pytest
 from ddeutil.workflow import Workflow
 from ddeutil.workflow.exceptions import WorkflowException
@@ -149,6 +152,54 @@ def test_workflow_from_path(test_path):
 
     rs = workflow.execute({})
     assert rs.context == {}
+
+
+def test_workflow_from_loader_override(test_path):
+    conf_path: Path = test_path / "mock_conf"
+    conf_path.mkdir(exist_ok=True)
+    (conf_path / "demo").mkdir(exist_ok=True)
+
+    with dump_yaml_context(
+        conf_path / "demo/01_99_wf_test_override_config.yml",
+        data="""
+        tmp-wf-override-conf:
+          type: Workflow
+          param: {name: str}
+          jobs:
+            first-job:
+              stages:
+                - name: "Hello"
+                  echo: "Hello ${{ params.name }}"
+
+        tmp-wf-override-conf-trigger:
+          type: Workflow
+          params: {name: str}
+          jobs:
+            trigger-job:
+              stages:
+                - name: "Trigger override"
+                  id: trigger-stage
+                  trigger: tmp-wf-override-conf
+                  params:
+                    name: ${{ params.name }}
+        """,
+    ):
+        workflow = Workflow.from_conf(
+            name="tmp-wf-override-conf", extras={"conf_path": conf_path}
+        )
+        rs: Result = workflow.execute(params={"name": "foo"})
+        print(rs.context)
+
+        workflow = Workflow.from_conf(
+            name="tmp-wf-override-conf-trigger", extras={"conf_path": conf_path}
+        )
+        stage = workflow.job(name="trigger-job").stage("trigger-stage")
+        assert stage.extras == {"conf_path": conf_path}
+
+        rs: Result = workflow.execute(params={"name": "bar"})
+        print(rs.context)
+
+    shutil.rmtree(conf_path)
 
 
 def test_workflow_from_loader_raise(test_path):
