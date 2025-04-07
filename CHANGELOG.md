@@ -2,6 +2,12 @@
 
 ## Latest Changes
 
+## 0.0.45
+
+### :stars: Highlight Features
+
+- :star: hl: implement conf_path override on loader object.
+
 ## 0.0.44
 
 ### :bug: Bug fixes
