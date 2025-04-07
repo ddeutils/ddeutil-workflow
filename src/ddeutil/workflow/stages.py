@@ -52,7 +52,7 @@ from typing_extensions import Self
 from .__types import DictData, DictStr, TupleStr
 from .conf import dynamic
 from .exceptions import StageException, to_dict
-from .result import FAILED, SUCCESS, Result
+from .result import FAILED, SUCCESS, Result, Status
 from .reusables import TagFunc, extract_call, not_in_template, param2template
 from .utils import (
     gen_id,
@@ -209,22 +209,20 @@ class BaseStage(BaseModel, ABC):
 
         try:
             rs: Result = self.execute(params, result=result, event=event)
-            if to is not None:
-                return self.set_outputs(rs.context, to=to)
-            return rs
-        except Exception as err:
-            result.trace.error(f"[STAGE]: {err.__class__.__name__}: {err}")
+            return self.set_outputs(rs.context, to=to) if to is not None else rs
+        except Exception as e:
+            result.trace.error(f"[STAGE]: {e.__class__.__name__}: {e}")
 
             if dynamic("stage_raise_error", f=raise_error, extras=self.extras):
-                if isinstance(err, StageException):
+                if isinstance(e, StageException):
                     raise
 
                 raise StageException(
                     f"{self.__class__.__name__}: \n\t"
-                    f"{err.__class__.__name__}: {err}"
-                ) from None
+                    f"{e.__class__.__name__}: {e}"
+                ) from e
 
-            errors: DictData = {"errors": to_dict(err)}
+            errors: DictData = {"errors": to_dict(e)}
             if to is not None:
                 return self.set_outputs(errors, to=to)
 
@@ -315,8 +313,8 @@ class BaseStage(BaseModel, ABC):
             if not isinstance(rs, bool):
                 raise TypeError("Return type of condition does not be boolean")
             return not rs
-        except Exception as err:
-            raise StageException(f"{err.__class__.__name__}: {err}") from err
+        except Exception as e:
+            raise StageException(f"{e.__class__.__name__}: {e}") from e
 
 
 class BaseAsyncStage(BaseStage):
@@ -393,21 +391,19 @@ class BaseAsyncStage(BaseStage):
             if to is not None:
                 return self.set_outputs(rs.context, to=to)
             return rs
-        except Exception as err:
-            await result.trace.aerror(
-                f"[STAGE]: {err.__class__.__name__}: {err}"
-            )
+        except Exception as e:
+            await result.trace.aerror(f"[STAGE]: {e.__class__.__name__}: {e}")
 
             if dynamic("stage_raise_error", f=raise_error, extras=self.extras):
-                if isinstance(err, StageException):
+                if isinstance(e, StageException):
                     raise
 
                 raise StageException(
                     f"{self.__class__.__name__}: \n\t"
-                    f"{err.__class__.__name__}: {err}"
+                    f"{e.__class__.__name__}: {e}"
                 ) from None
 
-            errors: DictData = {"errors": to_dict(err)}
+            errors: DictData = {"errors": to_dict(e)}
             if to is not None:
                 return self.set_outputs(errors, to=to)
 
@@ -619,13 +615,13 @@ class BashStage(BaseStage):
 
         if rs.returncode > 0:
             # NOTE: Prepare stderr message that returning from subprocess.
-            err: str = (
+            e: str = (
                 rs.stderr.encode("utf-8").decode("utf-16")
                 if "\\x00" in rs.stderr
                 else rs.stderr
             ).removesuffix("\n")
             raise StageException(
-                f"Subprocess: {err}\nRunning Statement:\n---\n"
+                f"Subprocess: {e}\nRunning Statement:\n---\n"
                 f"```bash\n{bash}\n```"
             )
         return result.catch(
@@ -999,19 +995,11 @@ class ParallelStage(BaseStage):  # pragma: no cov
                     ).context,
                     to=context,
                 )
-            except StageException as err:  # pragma: no cov
+            except StageException as e:  # pragma: no cov
                 result.trace.error(
-                    f"[STAGE]: Catch:\n\t{err.__class__.__name__}:" f"\n\t{err}"
+                    f"[STAGE]: Catch:\n\t{e.__class__.__name__}:" f"\n\t{e}"
                 )
-                context.update(
-                    {
-                        "errors": {
-                            "class": err,
-                            "name": err.__class__.__name__,
-                            "message": f"{err.__class__.__name__}: {err}",
-                        },
-                    },
-                )
+                context.update({"errors": e.to_dict()})
         return context
 
     def execute(
@@ -1144,7 +1132,7 @@ class ForEachStage(BaseStage):
 
         result.trace.info(f"[STAGE]: Foreach-Execute: {foreach!r}.")
         rs: DictData = {"items": foreach, "foreach": {}}
-        status = SUCCESS
+        status: Status = SUCCESS
         # TODO: Implement concurrent more than 1.
         for item in foreach:
             result.trace.debug(f"[STAGE]: Execute foreach item: {item!r}")
@@ -1161,21 +1149,12 @@ class ForEachStage(BaseStage):
                         ).context,
                         to=context,
                     )
-                except StageException as err:  # pragma: no cov
+                except StageException as e:  # pragma: no cov
                     status = FAILED
                     result.trace.error(
-                        f"[STAGE]: Catch:\n\t{err.__class__.__name__}:"
-                        f"\n\t{err}"
+                        f"[STAGE]: Catch:\n\t{e.__class__.__name__}:" f"\n\t{e}"
                     )
-                    context.update(
-                        {
-                            "errors": {
-                                "class": err,
-                                "name": err.__class__.__name__,
-                                "message": f"{err.__class__.__name__}: {err}",
-                            },
-                        },
-                    )
+                    context.update({"errors": e.to_dict()})
 
             rs["foreach"][item] = context
 
@@ -1310,21 +1289,12 @@ class CaseStage(BaseStage):  # pragma: no cov
                         ).context,
                         to=context,
                     )
-                except StageException as err:  # pragma: no cov
+                except StageException as e:  # pragma: no cov
                     status = FAILED
                     result.trace.error(
-                        f"[STAGE]: Catch:\n\t{err.__class__.__name__}:"
-                        f"\n\t{err}"
+                        f"[STAGE]: Catch:\n\t{e.__class__.__name__}:" f"\n\t{e}"
                     )
-                    context.update(
-                        {
-                            "errors": {
-                                "class": err,
-                                "name": err.__class__.__name__,
-                                "message": f"{err.__class__.__name__}: {err}",
-                            },
-                        },
-                    )
+                    context.update({"errors": e.to_dict()})
 
         return result.catch(status=status, context=context)
 
