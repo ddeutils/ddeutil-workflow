@@ -1167,11 +1167,7 @@ class Workflow(BaseModel):
                 job_queue.task_done()
 
             if not_timeout_flag:
-
-                # NOTE: Wait for all items to finish processing by `task_done()`
-                #   method.
                 job_queue.join()
-
                 for future in as_completed(futures, timeout=thread_timeout):
                     if e := future.exception():
                         result.trace.error(f"[WORKFLOW]: {e}")
@@ -1221,72 +1217,74 @@ class Workflow(BaseModel):
             "max_job_exec_timeout", f=timeout, extras=self.extras
         )
         event: Event = event or Event()
-        future: Future | None = None
         result.trace.debug(f"[WORKFLOW]: Run {self.name!r} with non-threading.")
-
-        executor = ThreadPoolExecutor(
+        with ThreadPoolExecutor(
             max_workers=1,
             thread_name_prefix="wf_exec_non_threading_",
-        )
+        ) as executor:
+            future: Future | None = None
 
-        while not job_queue.empty() and (
-            not_timeout_flag := ((time.monotonic() - ts) < timeout)
-        ):
-            job_id: str = job_queue.get()
-            job: Job = self.jobs[job_id]
+            while not job_queue.empty() and (
+                not_timeout_flag := ((time.monotonic() - ts) < timeout)
+            ):
+                job_id: str = job_queue.get()
+                job: Job = self.jobs[job_id]
 
-            if (check := job.check_needs(context["jobs"])) == WAIT:
+                if (check := job.check_needs(context["jobs"])) == WAIT:
+                    job_queue.task_done()
+                    job_queue.put(job_id)
+                    time.sleep(0.075)
+                    continue
+                elif check == FAILED:
+                    raise WorkflowException(
+                        f"Validate job trigger rule was failed with "
+                        f"{job.trigger_rule.value!r}."
+                    )
+                elif check == SKIP:  # pragma: no cov
+                    result.trace.info(f"[JOB]: Skip job: {job_id!r}")
+                    job.set_outputs({"SKIP": {"skipped": True}}, to=context)
+                    job_queue.task_done()
+                    continue
+
+                if future is None:
+                    future: Future = executor.submit(
+                        self.execute_job,
+                        job_id=job_id,
+                        params=context,
+                        result=result,
+                        event=event,
+                    )
+                    time.sleep(0.025)
+                elif future.done():
+                    if e := future.exception():
+                        result.trace.error(f"[WORKFLOW]: {e}")
+                        raise WorkflowException(str(e))
+
+                    future = None
+                    job_queue.put(job_id)
+                elif future.running():
+                    time.sleep(0.075)
+                    job_queue.put(job_id)
+                else:  # pragma: no cov
+                    job_queue.put(job_id)
+                    result.trace.debug(
+                        f"Execution non-threading does not handle case: {future} "
+                        f"that not running."
+                    )
+
                 job_queue.task_done()
-                job_queue.put(job_id)
-                time.sleep(0.075)
-                continue
-            elif check == FAILED:
-                raise WorkflowException(
-                    f"Validate job trigger rule was failed with "
-                    f"{job.trigger_rule.value!r}."
-                )
-            elif check == SKIP:  # pragma: no cov
-                result.trace.info(f"[JOB]: Skip job: {job_id!r}")
-                job.set_outputs({"SKIP": {"skipped": True}}, to=context)
-                job_queue.task_done()
-                continue
 
-            if future is None:
-                future: Future = executor.submit(
-                    self.execute_job,
-                    job_id=job_id,
-                    params=context,
-                    result=result,
-                    event=event,
-                )
-                time.sleep(0.025)
-            elif future.done():
-                if e := future.exception():
-                    result.trace.error(f"[WORKFLOW]: {e}")
-                    raise WorkflowException(str(e))
+            if not_timeout_flag:
+                job_queue.join()
+                return context
 
-                future = None
-                job_queue.put(job_id)
-            elif future.running():
-                time.sleep(0.075)
-                job_queue.put(job_id)
-            else:  # pragma: no cov
-                job_queue.put(job_id)
-                result.trace.debug(
-                    f"Execution non-threading does not handle case: {future} "
-                    f"that not running."
-                )
+            result.trace.error(
+                f"[WORKFLOW]: Execution: {self.name!r} was timeout."
+            )
+            event.set()
+            if future:
+                future.cancel()
 
-            job_queue.task_done()
-
-        if not_timeout_flag:
-            job_queue.join()
-            executor.shutdown()
-            return context
-
-        result.trace.error(f"[WORKFLOW]: Execution: {self.name!r} was timeout.")
-        event.set()
-        executor.shutdown()
         raise WorkflowException(f"Execution: {self.name!r} was timeout.")
 
 
