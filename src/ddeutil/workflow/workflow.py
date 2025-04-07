@@ -1149,7 +1149,8 @@ class Workflow(BaseModel):
                     continue
                 elif check == FAILED:  # pragma: no cov
                     raise WorkflowException(
-                        "Check job trigger rule was failed."
+                        f"Validate job trigger rule was failed with "
+                        f"{job.trigger_rule.value!r}."
                     )
                 elif check == SKIP:  # pragma: no cov
                     result.trace.info(f"[JOB]: Skip job: {job_id!r}")
@@ -1254,8 +1255,11 @@ class Workflow(BaseModel):
                 job_queue.put(job_id)
                 time.sleep(0.075)
                 continue
-            elif check == FAILED:  # pragma: no cov
-                raise WorkflowException("Check job trigger rule was failed.")
+            elif check == FAILED:
+                raise WorkflowException(
+                    f"Validate job trigger rule was failed with "
+                    f"{job.trigger_rule.value!r}."
+                )
             elif check == SKIP:  # pragma: no cov
                 result.trace.info(f"[JOB]: Skip job: {job_id!r}")
                 job.set_outputs({"SKIP": {"skipped": True}}, to=context)

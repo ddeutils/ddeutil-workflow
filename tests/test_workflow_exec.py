@@ -592,3 +592,75 @@ def test_workflow_exec_raise_param(test_path):
         workflow = Workflow.from_conf(name="tmp-wf-exec-raise-param")
         rs = workflow.execute(params={"stream": "demo-stream"})
         print(rs)
+
+
+@mock.patch.object(Config, "stage_raise_error", False)
+def test_workflow_exec_raise_job_need(test_path):
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_exec_raise_param.yml",
+        data="""
+        tmp-wf-exec-raise-param:
+          type: Workflow
+          params:
+            name:
+              desc: "A name parameter of this workflow."
+              type: str
+          jobs:
+            final-job:
+              needs: [ "start-job" ]
+              stages:
+                - name: "Call after above stage raise"
+                  id: check
+                  echo: "Hello after Raise Error"
+            start-job:
+              stages:
+                - name: "Get param that not set"
+                  id: get-param
+                  echo: "Passing name ${{ params.name }}"
+
+        """,
+    ):
+        workflow = Workflow.from_conf(name="tmp-wf-exec-raise-param")
+        rs = workflow.execute(
+            params={"stream": "demo-stream"}, max_job_parallel=1
+        )
+        assert rs.context == {
+            "params": {"stream": "demo-stream"},
+            "jobs": {
+                "start-job": {
+                    "stages": {
+                        "get-param": {
+                            "outputs": {},
+                            "errors": {
+                                "class": (
+                                    rs.context["jobs"]["start-job"]["stages"][
+                                        "get-param"
+                                    ]["errors"]["class"]
+                                ),
+                                "name": "UtilException",
+                                "message": (
+                                    "Params does not set caller: 'params.name'."
+                                ),
+                            },
+                        },
+                    },
+                    "errors": {
+                        "class": (
+                            rs.context["jobs"]["start-job"]["errors"]["class"]
+                        ),
+                        "name": "JobException",
+                        "message": (
+                            "Job strategy was break because it has a stage, "
+                            "get-param, failed without raise error."
+                        ),
+                    },
+                },
+            },
+            "errors": {
+                "class": rs.context["errors"]["class"],
+                "name": "WorkflowException",
+                "message": (
+                    "Validate job trigger rule was failed with 'all_success'."
+                ),
+            },
+        }

@@ -415,6 +415,7 @@ class Job(BaseModel):
         need_exist: dict[str, Any] = {
             need: jobs[need] for need in self.needs if need in jobs
         }
+
         if len(need_exist) != len(self.needs):
             return WAIT
         elif all("skipped" in need_exist[job] for job in need_exist):
@@ -643,7 +644,6 @@ def local_execute_strategy(
     #       "stages": { ... }       <== Catching stage outputs
     #   }
     #
-    status: Status = SUCCESS
     context: DictData = copy.deepcopy(params)
     context.update({"matrix": strategy, "stages": {}})
 
@@ -651,7 +651,6 @@ def local_execute_strategy(
         result.trace.info(f"[JOB]: Execute Strategy ID: {strategy_id}")
         result.trace.info(f"[JOB]: ... Matrix: {strategy_id}")
 
-    # IMPORTANT: The stage execution only run sequentially one-by-one.
     for stage in job.stages:
 
         if stage.is_skipped(params=context):
@@ -675,24 +674,6 @@ def local_execute_strategy(
                 },
             )
 
-        # PARAGRAPH:
-        #
-        #       This step will add the stage result to `stages` key in that
-        #   stage id. It will have structure like;
-        #
-        #   {
-        #       "params": { ... },
-        #       "jobs": { ... },
-        #       "matrix": { ... },
-        #       "stages": { { "stage-id-01": { "outputs": { ... } } }, ... }
-        #   }
-        #
-        # IMPORTANT:
-        #   This execution change all stage running IDs to the current job
-        #   running ID, but it still trac log to the same parent running ID
-        #   (with passing `run_id` and `parent_run_id` to the stage
-        #   execution arguments).
-        #
         try:
             rs: Result = stage.handler_execute(
                 params=context,
@@ -701,8 +682,21 @@ def local_execute_strategy(
                 event=event,
             )
             stage.set_outputs(rs.context, to=context)
-            if (status := rs.status) == FAILED:
-                break
+            if rs.status == FAILED:
+                error_msg: str = (
+                    f"Job strategy was break because it has a stage, "
+                    f"{stage.iden}, failed without raise error."
+                )
+                return result.catch(
+                    status=FAILED,
+                    context={
+                        strategy_id: {
+                            "matrix": strategy,
+                            "stages": context.pop("stages", {}),
+                            "errors": JobException(error_msg).to_dict(),
+                        },
+                    },
+                )
 
         except (StageException, UtilException) as err:
             result.trace.error(f"[JOB]: {err.__class__.__name__}: {err}")
@@ -727,7 +721,7 @@ def local_execute_strategy(
             )
 
     return result.catch(
-        status=status,
+        status=SUCCESS,
         context={
             strategy_id: {
                 "matrix": strategy,
