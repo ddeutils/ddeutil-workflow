@@ -534,8 +534,7 @@ def extract_call(
 
     call: CallSearchData = CallSearchData(**found.groupdict())
     rgt: dict[str, Registry] = make_registry(
-        submodule=f"{call.path}",
-        registries=registries,
+        submodule=f"{call.path}", registries=registries
     )
 
     if call.func not in rgt:

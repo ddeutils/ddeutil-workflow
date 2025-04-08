@@ -222,15 +222,13 @@ class SimLoad:
     :param externals: An external parameters
 
     Noted:
-
         The config data should have ``type`` key for modeling validation that
     make this loader know what is config should to do pass to.
 
         ... <identity-key>:
         ...     type: <importable-object>
-        ...     <key-data>: <value-data>
-        ...     ...
-
+        ...     <key-data-1>: <value-data-1>
+        ...     <key-data-2>: <value-data-2>
     """
 
     def __init__(
@@ -253,7 +251,10 @@ class SimLoad:
 
         # VALIDATE: check the data that reading should not empty.
         if not self.data:
-            raise ValueError(f"Config {name!r} does not found on conf path")
+            raise ValueError(
+                f"Config {name!r} does not found on conf path: "
+                f"{self.conf_path}."
+            )
 
         self.data.update(self.externals)
 
@@ -299,10 +300,25 @@ class SimLoad:
 
     @classmethod
     def is_ignore(cls, file: Path, conf_path: Path) -> bool:
+        """Check this file was ignored.
+
+        :param file: (Path) A file path that want to check.
+        :param conf_path: (Path) A config path that want to read the config
+            ignore file.
+
+        :rtype: bool
+        """
         return is_ignored(file, read_ignore(conf_path / ".confignore"))
 
     @classmethod
     def filter_yaml(cls, file: Path, name: str | None = None) -> DictData:
+        """Read a YAML file context from an input file path and specific name.
+
+        :param file: (Path)
+        :param name: (str)
+
+        :rtype: DictData
+        """
         if any(file.suffix.endswith(s) for s in (".yml", ".yaml")):
             values: DictData = YamlFlResolve(file).read()
             if values is not None:
