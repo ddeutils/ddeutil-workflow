@@ -19,8 +19,9 @@ from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
 from .__types import DictData
+from .conf import dynamic
 from .logs import TraceLog, get_dt_tznow, get_trace
-from .utils import default_gen_id, gen_id
+from .utils import default_gen_id, gen_id, get_dt_now
 
 
 class Status(IntEnum):
@@ -67,7 +68,7 @@ class Result:
     ts: datetime = field(default_factory=get_dt_tznow, compare=False)
 
     trace: Optional[TraceLog] = field(default=None, compare=False, repr=False)
-    extras: DictData = field(default_factory=dict)
+    extras: DictData = field(default_factory=dict, compare=False, repr=False)
 
     @classmethod
     def construct_with_rs_or_id(
@@ -111,7 +112,9 @@ class Result:
         :rtype: Self
         """
         if self.trace is None:  # pragma: no cov
-            self.trace: TraceLog = get_trace(self.run_id, self.parent_run_id)
+            self.trace: TraceLog = get_trace(
+                self.run_id, self.parent_run_id, extras=self.extras
+            )
         return self
 
     def set_parent_run_id(self, running_id: str) -> Self:
@@ -121,7 +124,9 @@ class Result:
         :rtype: Self
         """
         self.parent_run_id: str = running_id
-        self.trace: TraceLog = get_trace(self.run_id, running_id)
+        self.trace: TraceLog = get_trace(
+            self.run_id, running_id, extras=self.extras
+        )
         return self
 
     def catch(
@@ -152,4 +157,6 @@ class Result:
 
         :rtype: float
         """
-        return (get_dt_tznow() - self.ts).total_seconds()
+        return (
+            get_dt_now(tz=dynamic("tz", extras=self.extras)) - self.ts
+        ).total_seconds()

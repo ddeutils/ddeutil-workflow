@@ -12,6 +12,7 @@ import json
 import os
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
+from dataclasses import field
 from datetime import datetime
 from inspect import Traceback, currentframe, getframeinfo
 from pathlib import Path
@@ -24,7 +25,7 @@ from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
 from .__types import DictData, DictStr, TupleStr
-from .conf import config, get_logger
+from .conf import config, dynamic, get_logger
 from .utils import cut_id, get_dt_now
 
 logger = get_logger("ddeutil.workflow")
@@ -63,14 +64,27 @@ class TraceMeda(BaseModel):  # pragma: no cov
     lineno: int
 
     @classmethod
-    def make(cls, mode: Literal["stdout", "stderr"], message: str) -> Self:
-        """Make a TraceMeda instance."""
+    def make(
+        cls,
+        mode: Literal["stdout", "stderr"],
+        message: str,
+        extras: Optional[DictData] = None,
+    ) -> Self:
+        """Make the current TraceMeda instance that catching local state.
+
+        :rtype: Self
+        """
         frame_info: Traceback = getframeinfo(
             currentframe().f_back.f_back.f_back
         )
+        extras: DictData = extras or {}
         return cls(
             mode=mode,
-            datetime=get_dt_tznow().strftime(config.log_datetime_format),
+            datetime=(
+                get_dt_now(tz=dynamic("tz", extras=extras)).strftime(
+                    dynamic("log_datetime_format", extras=extras)
+                )
+            ),
             process=os.getpid(),
             thread=get_ident(),
             message=message,
@@ -127,6 +141,7 @@ class BaseTraceLog(ABC):  # pragma: no cov
 
     run_id: str
     parent_run_id: Optional[str] = None
+    extras: DictData = field(default_factory=dict, compare=False, repr=False)
 
     @abstractmethod
     def writer(self, message: str, is_err: bool = False) -> None:
@@ -148,6 +163,9 @@ class BaseTraceLog(ABC):  # pragma: no cov
         :param message:
         :param is_err:
         """
+        raise NotImplementedError(
+            "Create async writer logic for this trace object before using."
+        )
 
     @abstractmethod
     def make_message(self, message: str) -> str:
@@ -169,7 +187,7 @@ class BaseTraceLog(ABC):  # pragma: no cov
         """
         msg: str = self.make_message(message)
 
-        if config.debug:
+        if dynamic("debug", extras=self.extras):
             self.writer(msg)
 
         logger.debug(msg, stacklevel=2)
@@ -221,7 +239,7 @@ class BaseTraceLog(ABC):  # pragma: no cov
         :param message: (str) A message that want to log.
         """
         msg: str = self.make_message(message)
-        if config.debug:
+        if dynamic("debug", extras=self.extras):
             await self.awriter(msg)
         logger.info(msg, stacklevel=2)
 
@@ -273,7 +291,10 @@ class FileTraceLog(BaseTraceLog):  # pragma: no cov
     def find_logs(
         cls, path: Path | None = None
     ) -> Iterator[TraceData]:  # pragma: no cov
-        """Find trace logs."""
+        """Find trace logs.
+
+        :param path: (Path)
+        """
         for file in sorted(
             (path or config.log_path).glob("./run_id=*"),
             key=lambda f: f.lstat().st_mtime,
@@ -299,7 +320,8 @@ class FileTraceLog(BaseTraceLog):  # pragma: no cov
     @property
     def pointer(self) -> Path:
         log_file: Path = (
-            config.log_path / f"run_id={self.parent_run_id or self.run_id}"
+            dynamic("log_path", extras=self.extras)
+            / f"run_id={self.parent_run_id or self.run_id}"
         )
         if not log_file.exists():
             log_file.mkdir(parents=True)
@@ -419,15 +441,30 @@ TraceLog = Union[
 
 
 def get_trace(
-    run_id: str, parent_run_id: str | None = None
+    run_id: str,
+    parent_run_id: str | None = None,
+    *,
+    extras: Optional[DictData] = None,
 ) -> TraceLog:  # pragma: no cov
-    """Get dynamic TraceLog object from the setting config."""
-    if config.log_path.is_file():
-        return SQLiteTraceLog(run_id, parent_run_id=parent_run_id)
-    return FileTraceLog(run_id, parent_run_id=parent_run_id)
+    """Get dynamic TraceLog object from the setting config.
+
+    :param run_id: A running ID.
+    :param parent_run_id: A parent running ID.
+    :param extras: An extra parameter that want to override the core config.
+
+    :rtype: TraceLog
+    """
+    if dynamic("log_path", extras=extras).is_file():
+        return SQLiteTraceLog(
+            run_id, parent_run_id=parent_run_id, extras=(extras or {})
+        )
+    return FileTraceLog(
+        run_id, parent_run_id=parent_run_id, extras=(extras or {})
+    )
 
 
 def get_trace_obj() -> type[TraceLog]:  # pragma: no cov
+    """Get trace object."""
     if config.log_path.is_file():
         return SQLiteTraceLog
     return FileTraceLog
@@ -439,6 +476,10 @@ class BaseAudit(BaseModel, ABC):
     subclass like file, sqlite, etc.
     """
 
+    extras: DictData = Field(
+        default_factory=dict,
+        description="An extras parameter that want to override core config",
+    )
     name: str = Field(description="A workflow name.")
     release: datetime = Field(description="A release datetime.")
     type: str = Field(description="A running type before logging.")

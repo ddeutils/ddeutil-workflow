@@ -231,6 +231,11 @@ class Schedule(BaseModel):
     enhance the workflow object by adding the alias and values fields.
     """
 
+    extras: DictData = Field(
+        default_factory=dict,
+        description="An extra override config values.",
+    )
+
     desc: Optional[str] = Field(
         default=None,
         description=(
@@ -281,6 +286,9 @@ class Schedule(BaseModel):
         # NOTE: Add name to loader data
         loader_data["name"] = name.replace(" ", "_")
 
+        if extras:
+            loader_data["extras"] = extras
+
         return cls.model_validate(obj=loader_data)
 
     @classmethod
@@ -288,7 +296,7 @@ class Schedule(BaseModel):
         cls,
         name: str,
         path: Path,
-        externals: DictData | None = None,
+        extras: DictData | None = None,
     ) -> Self:
         """Create Schedule instance from the SimLoad object that receive an
         input schedule name and conf path. The loader object will use this
@@ -297,7 +305,7 @@ class Schedule(BaseModel):
 
         :param name: (str) A schedule name that want to pass to Loader object.
         :param path: (Path) A config path that want to search.
-        :param externals: An external parameters that want to pass to Loader
+        :param extras: An external parameters that want to pass to Loader
             object.
 
         :raise ValueError: If the type does not match with current object.
@@ -305,7 +313,7 @@ class Schedule(BaseModel):
         :rtype: Self
         """
         loader: SimLoad = SimLoad(
-            name, conf_path=path, externals=(externals or {})
+            name, conf_path=path, externals=(extras or {})
         )
 
         # NOTE: Validate the config type match with current connection model
@@ -316,6 +324,9 @@ class Schedule(BaseModel):
 
         # NOTE: Add name to loader data
         loader_data["name"] = name.replace(" ", "_")
+
+        if extras:
+            loader_data["extras"] = extras
 
         return cls.model_validate(obj=loader_data)
 
