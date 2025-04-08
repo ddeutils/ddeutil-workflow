@@ -815,6 +815,7 @@ class CallStage(BaseStage):
                 run_id=gen_id(self.name + (self.id or ""), unique=True)
             )
 
+        has_keyword: bool = False
         call_func: TagFunc = extract_call(
             param2template(self.uses, params, extras=self.extras),
             registries=self.extras.get("regis_call"),
@@ -826,15 +827,17 @@ class CallStage(BaseStage):
             self.args, params, extras=self.extras
         )
         ips = inspect.signature(call_func)
-        necessary_params: list[str] = [
-            k
-            for k in ips.parameters
+        necessary_params: list[str] = []
+        for k in ips.parameters:
             if (
-                (v := ips.parameters[k]).default == Parameter.empty
-                and v.kind
-                not in (Parameter.VAR_KEYWORD, Parameter.VAR_POSITIONAL)
-            )
-        ]
+                v := ips.parameters[k]
+            ).default == Parameter.empty and v.kind not in (
+                Parameter.VAR_KEYWORD,
+                Parameter.VAR_POSITIONAL,
+            ):
+                necessary_params.append(k)
+            elif v.kind == Parameter.VAR_KEYWORD:
+                has_keyword = True
 
         if any(
             (k.removeprefix("_") not in args and k not in args)
@@ -845,7 +848,7 @@ class CallStage(BaseStage):
                 f"does not set to args, {list(args.keys())}."
             )
 
-        if "result" not in ips.parameters:
+        if "result" not in ips.parameters and not has_keyword:
             args.pop("result")
 
         result.trace.info(

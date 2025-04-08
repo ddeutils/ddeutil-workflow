@@ -22,7 +22,7 @@ def dummy_task_polars_dir(
     result: Result,
     conversion: Optional[dict[str, Any]] = None,
 ) -> dict[str, int]:
-    result.trace.info("[HOOK]: el-csv-to-parquet@polars-dir")
+    result.trace.info("[CALLER]: el-csv-to-parquet@polars-dir")
     result.trace.debug("... Start EL for CSV to Parquet with Polars Engine")
     result.trace.debug(f"... Reading data from {source}")
 
@@ -40,7 +40,7 @@ async def dummy_async_task_polars_dir(
     result: Result,
     conversion: dict[str, Any] | None = None,
 ) -> dict[str, int]:
-    result.trace.info("[HOOK]: async-el-csv-to-parquet@polars-dir")
+    result.trace.info("[CALLER]: async-el-csv-to-parquet@polars-dir")
     result.trace.debug("... Start EL for CSV to Parquet with Polars Engine")
     result.trace.debug(f"... Reading data from {source}")
 
@@ -59,7 +59,7 @@ def dummy_task_polars_dir_scan(
     result: Result,
     conversion: Optional[dict[str, Any]] | None = None,
 ) -> dict[str, int]:
-    result.trace.info("[HOOK]: el-csv-to-parquet@polars-dir-scan")
+    result.trace.info("[CALLER]: el-csv-to-parquet@polars-dir-scan")
     result.trace.debug("... Start EL for CSV to Parquet with Polars Engine")
     result.trace.debug("... ---")
     result.trace.debug(f"... Reading data from {source}")
@@ -100,7 +100,6 @@ def get_types(
     args1: str,
     args2: Path,
     args3: MockModel,
-    result: Result,
     *args,
     kwargs1: Optional[datetime] = None,
     **kwargs,
@@ -109,7 +108,7 @@ def get_types(
     _ = args2
     _ = args
     _ = kwargs1
-    _ = kwargs
-    result.trace.info("... [CALLER]: Test task type.")
+    result = kwargs["result"]
+    result.trace.info("[CALLER]: Test task type.")
     result.trace.info(f"... {type(args3)}: {args3}")
     return MockModel(name="foo", data={"key": "value"})
