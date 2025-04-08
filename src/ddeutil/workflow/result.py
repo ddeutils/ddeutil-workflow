@@ -18,18 +18,9 @@ from pydantic.dataclasses import dataclass
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
-from .__types import DictData, TupleStr
+from .__types import DictData
 from .logs import TraceLog, get_dt_tznow, get_trace
 from .utils import default_gen_id, gen_id
-
-__all__: TupleStr = (
-    "SUCCESS",
-    "FAILED",
-    "WAIT",
-    "SKIP",
-    "Result",
-    "Status",
-)
 
 
 class Status(IntEnum):
@@ -62,6 +53,10 @@ class Result:
 
         For comparison property, this result will use ``status``, ``context``,
     and ``_run_id`` fields to comparing with other result instance.
+
+    Warning:
+        I use dataclass object instead of Pydantic model object because context
+    field that keep dict value change its ID when update new value to it.
     """
 
     status: Status = field(default=WAIT)
@@ -87,11 +82,11 @@ class Result:
         """Create the Result object or set parent running id if passing Result
         object.
 
-        :param result:
-        :param run_id:
-        :param parent_run_id:
-        :param id_logic:
-        :param extras:
+        :param result: A Result instance.
+        :param run_id: A running ID.
+        :param parent_run_id: A parent running ID.
+        :param id_logic: A logic function that use to generate a running ID.
+        :param extras: An extra parameter that want to override the core config.
 
         :rtype: Self
         """

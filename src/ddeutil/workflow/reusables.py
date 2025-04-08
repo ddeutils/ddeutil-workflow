@@ -10,7 +10,6 @@ from __future__ import annotations
 import inspect
 import logging
 from ast import Call, Constant, Expr, Module, Name, parse
-from dataclasses import dataclass
 from datetime import datetime
 from functools import wraps
 from importlib import import_module
@@ -23,6 +22,7 @@ except ImportError:
 
 from ddeutil.core import getdot, import_string, lazy
 from ddeutil.io import search_env_replace
+from pydantic.dataclasses import dataclass
 
 from .__types import DictData, Re
 from .conf import dynamic
@@ -437,6 +437,7 @@ Registry = dict[str, Callable[[], TagFunc]]
 
 def make_registry(
     submodule: str,
+    *,
     registries: Optional[list[str]] = None,
 ) -> dict[str, Registry]:
     """Return registries of all functions that able to called with task.
@@ -539,13 +540,13 @@ def extract_call(
 
     if call.func not in rgt:
         raise NotImplementedError(
-            f"`REGISTER-MODULES.{call.path}.registries` not implement "
+            f"`REGISTERS.{call.path}.registries` not implement "
             f"registry: {call.func!r}."
         )
 
     if call.tag not in rgt[call.func]:
         raise NotImplementedError(
             f"tag: {call.tag!r} not found on registry func: "
-            f"`REGISTER-MODULES.{call.path}.registries.{call.func}`"
+            f"`REGISTER.{call.path}.registries.{call.func}`"
         )
     return rgt[call.func][call.tag]
