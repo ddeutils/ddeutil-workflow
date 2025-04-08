@@ -2,6 +2,28 @@
 
 ## Latest Changes
 
+## 0.0.47
+
+### :stars: Highlight Features
+
+- :star: hl: add parsing pydantic model on the call stage.
+
+### :sparkles: Features
+
+- :dart: feat: support add result dataclass instance to kwargs parameter.
+
+### :bug: Bug fixes
+
+- :gear: fixed: remove debug code.
+
+### :broom: Deprecate & Clean
+
+- :recycle: clean: clean the result module.
+
+### :package: Build & Workflow
+
+- :toolbox: build: remove production metadata that not push to testpypi.
+
 ## 0.0.46
 
 ### :sparkles: Features
