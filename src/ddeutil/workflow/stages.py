@@ -38,12 +38,13 @@ from concurrent.futures import (
     ThreadPoolExecutor,
     as_completed,
 )
+from dataclasses import is_dataclass
 from inspect import Parameter
 from pathlib import Path
 from subprocess import CompletedProcess
 from textwrap import dedent
 from threading import Event
-from typing import Annotated, Optional, Union
+from typing import Annotated, Any, Optional, Union, get_type_hints
 
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
@@ -814,7 +815,7 @@ class CallStage(BaseStage):
                 run_id=gen_id(self.name + (self.id or ""), unique=True)
             )
 
-        t_func: TagFunc = extract_call(
+        call_func: TagFunc = extract_call(
             param2template(self.uses, params, extras=self.extras),
             registries=self.extras.get("regis_call"),
         )()
@@ -824,54 +825,89 @@ class CallStage(BaseStage):
         args: DictData = {"result": result} | param2template(
             self.args, params, extras=self.extras
         )
-        ips = inspect.signature(t_func)
+        ips = inspect.signature(call_func)
         necessary_params: list[str] = [
             k
             for k in ips.parameters
             if (
                 (v := ips.parameters[k]).default == Parameter.empty
-                and (
-                    v.kind != Parameter.VAR_KEYWORD
-                    or v.kind != Parameter.VAR_POSITIONAL
-                )
+                and v.kind
+                not in (Parameter.VAR_KEYWORD, Parameter.VAR_POSITIONAL)
             )
         ]
+
         if any(
             (k.removeprefix("_") not in args and k not in args)
             for k in necessary_params
         ):
             raise ValueError(
                 f"Necessary params, ({', '.join(necessary_params)}, ), "
-                f"does not set to args"
+                f"does not set to args, {list(args.keys())}."
             )
-
-        # NOTE: add '_' prefix if it wants to use.
-        for k in ips.parameters:
-            if k.removeprefix("_") in args:
-                args[k] = args.pop(k.removeprefix("_"))
 
         if "result" not in ips.parameters:
             args.pop("result")
 
-        result.trace.info(f"[STAGE]: Call-Execute: {t_func.name}@{t_func.tag}")
-        if inspect.iscoroutinefunction(t_func):  # pragma: no cov
+        result.trace.info(
+            f"[STAGE]: Call-Execute: {call_func.name}@{call_func.tag}"
+        )
+
+        args = self.parse_model_args(call_func, args, result)
+        if inspect.iscoroutinefunction(call_func):
             loop = asyncio.get_event_loop()
             rs: DictData = loop.run_until_complete(
-                t_func(**param2template(args, params, extras=self.extras))
+                call_func(**param2template(args, params, extras=self.extras))
             )
         else:
-            rs: DictData = t_func(
+            rs: DictData = call_func(
                 **param2template(args, params, extras=self.extras)
             )
 
         # VALIDATE:
         #   Check the result type from call function, it should be dict.
-        if not isinstance(rs, dict):
+        if isinstance(rs, BaseModel):
+            rs: DictData = rs.model_dump()
+        elif not isinstance(rs, dict):
             raise TypeError(
-                f"Return type: '{t_func.name}@{t_func.tag}' does not serialize "
-                f"to result model, you change return type to `dict`."
+                f"Return type: '{call_func.name}@{call_func.tag}' does not "
+                f"serialize to result model, you change return type to `dict`."
             )
         return result.catch(status=SUCCESS, context=rs)
+
+    @staticmethod
+    def parse_model_args(
+        func: TagFunc,
+        args: DictData,
+        result: Result,
+    ) -> DictData:
+        """Parse Pydantic model from any dict data before parsing to target
+        caller function.
+        """
+        try:
+            type_hints: dict[str, Any] = get_type_hints(func)
+        except TypeError as e:
+            result.trace.warning(
+                f"[STAGE]: Get type hint raise TypeError: {e}, so, it skip "
+                f"parsing model args process."
+            )
+            return args
+
+        for arg in type_hints:
+
+            if arg == "return":
+                continue
+
+            if arg.removeprefix("_") in args:
+                args[arg] = args.pop(arg.removeprefix("_"))
+
+            t: Any = type_hints[arg]
+            if is_dataclass(t) and t.__name__ == "Result" and arg not in args:
+                args[arg] = result
+
+            if issubclass(t, BaseModel) and arg in args:
+                args[arg] = t.model_validate(obj=args[arg])
+
+        return args
 
 
 class TriggerStage(BaseStage):

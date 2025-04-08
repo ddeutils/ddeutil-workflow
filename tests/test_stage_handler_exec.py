@@ -97,20 +97,29 @@ def test_stage_exec_call(test_path):
                   with:
                     source: src
                     sink: sink
+                - name: "Return with Pydantic Model"
+                  id: return-model
+                  uses: tasks/gen-type@demo
+                  with:
+                    args1: foo
+                    args2: conf/path
+                    args3:
+                      name: test
+                      data:
+                        input: hello
         """,
     ):
         workflow = Workflow.from_conf(name="tmp-wf-call-return-type")
 
         stage: Stage = workflow.job("second-job").stage("extract-load")
         rs: Result = stage.handler_execute({})
-        print(rs)
+        assert 0 == rs.status
+        assert {"records": 1} == rs.context
 
         stage: Stage = workflow.job("second-job").stage("async-extract-load")
         rs: Result = stage.handler_execute({})
-        print(rs)
-
-        assert 0 == rs.status
-        assert {"records": 1} == rs.context
+        assert rs.status == 0
+        assert rs.context == {"records": 1}
 
         # NOTE: Raise because invalid return type.
         with pytest.raises(StageException):
@@ -131,6 +140,11 @@ def test_stage_exec_call(test_path):
         with pytest.raises(StageException):
             stage: Stage = workflow.job("first-job").stage("call-not-register")
             stage.handler_execute({})
+
+        stage: Stage = workflow.job("second-job").stage("return-model")
+        rs: Result = stage.handler_execute({})
+        assert rs.status == 0
+        assert rs.context == {"name": "foo", "data": {"key": "value"}}
 
 
 @mock.patch.object(Config, "stage_raise_error", True)

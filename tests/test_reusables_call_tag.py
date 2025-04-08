@@ -3,11 +3,14 @@ from __future__ import annotations
 import asyncio
 import inspect
 import shutil
+import typing
+from dataclasses import is_dataclass
 from pathlib import Path
 from textwrap import dedent
 
 import pytest
-from ddeutil.workflow.reusables import Registry, make_registry
+from ddeutil.workflow.reusables import Registry, extract_call, make_registry
+from pydantic import BaseModel
 
 
 @pytest.fixture(scope="module")
@@ -94,10 +97,10 @@ def test_make_registry(call_function):
 
 def test_make_registry_from_env():
     rs: dict[str, Registry] = make_registry("tasks")
-    print(rs)
     assert set(rs.keys()) == {
         "async-el-csv-to-parquet",
         "get-items",
+        "gen-type",
         "mssql-proc",
         "el-csv-to-parquet",
         "return-type-not-valid",
@@ -116,12 +119,36 @@ def test_make_registry_raise(call_function_dup):
         make_registry("new_tasks_dup")
 
 
+def test_extract_call():
+    func = extract_call("tasks/el-csv-to-parquet@polars-dir")
+    call_func = func()
+    assert call_func.name == "el-csv-to-parquet"
+    assert call_func.tag == "polars-dir"
+
+
+def test_extract_call_args_type():
+    func = extract_call("tasks/gen-type@demo")
+    call_func = func()
+
+    get_types = typing.get_type_hints(call_func)
+    for p in get_types:
+        if is_dataclass(get_types[p]) and get_types[p].__name__ == "Result":
+            print("found result", p, get_types[p])
+        if issubclass(get_types[p], BaseModel):
+            print(p, "with type:", get_types[p])
+
+
 @pytest.mark.skip("Skip because it uses for local test only.")
 def test_inspec_func():
 
     def demo_func(
         args_1: str, args_2: Path, *args, kwargs_1: str | None = None, **kwargs
     ):  # pragma: no cov
+        _ = args_1
+        _ = args_2
+        _ = args
+        _ = kwargs_1
+        _ = kwargs
         pass
 
     assert inspect.isfunction(demo_func)
@@ -141,6 +168,11 @@ def test_inspec_func():
         args_1: str, args_2: Path, *args, kwargs_1: str | None = None, **kwargs
     ):  # pragma: no cov
         await asyncio.sleep(0.1)
+        _ = args_1
+        _ = args_2
+        _ = args
+        _ = kwargs_1
+        _ = kwargs
         pass
 
     print(inspect.isfunction(ademo_func))
@@ -158,3 +190,61 @@ def test_inspec_func():
     #     print(v.default)
     #     print(v.kind, " (", type(v.kind), ")")
     #     print("-----")
+
+
+class MockModel(BaseModel):  # pragma: no cov
+    name: str
+
+
+def outside_func(args: MockModel) -> MockModel:  # pragma: no cov
+    _ = args
+    pass
+
+
+@pytest.mark.skip("Skip because it uses for local test only.")
+def test_inspec_with_pydantic_model_args():
+    from pydantic import BaseModel
+
+    class MockModelLocal(BaseModel):
+        name: str
+
+    def demo_func(
+        args_1: MockModel,
+        args_2: MockModelLocal,
+        *args,
+        kwargs_1: str = None,
+        **kwargs,
+    ) -> MockModel:  # pragma: no cov
+        _ = args_1
+        _ = args_2
+        _ = args
+        _ = kwargs_1
+        _ = kwargs
+        pass
+
+    # ips = inspect.signature(demo_func)
+    # for k, v in ips.parameters.items():
+    #     print(k)
+    #     print(ips.parameters[k].default)
+    #     print(v)
+    #     print(v.name)
+    #     print(v.annotation, "type:", type(v.annotation))
+    #     print(v.default)
+    #     print(v.kind, " (", type(v.kind), ")")
+    #     print("-----")
+    #
+    # print(ips.return_annotation, "type:", type(ips.return_annotation))
+    # print(ips.return_annotation is MockModel)
+    # print(ips.return_annotation.__parameter__)
+
+    import typing
+
+    rs = typing.get_type_hints(demo_func, localns=locals(), globalns=globals())
+    print(rs)
+
+    print(demo_func.__annotations__)
+    print(globals()["MockModel"])
+    print(locals()["MockModelLocal"])
+
+    rs = typing.get_type_hints(outside_func)
+    print(rs)
