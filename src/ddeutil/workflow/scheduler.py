@@ -725,7 +725,7 @@ def schedule_control(
 
     :param schedules: A list of workflow names that want to schedule running.
     :param stop: A datetime value that use to stop running schedule.
-    :param extras: An extra parameters that pass to Loader.
+    :param extras: An extra parameters that want to override core config.
     :param audit: An audit class that use on the workflow task release for
         writing its release audit context.
     :param parent_run_id: A parent workflow running ID for this release.
@@ -771,7 +771,7 @@ def schedule_control(
 
 def schedule_runner(
     stop: datetime | None = None,
-    externals: DictData | None = None,
+    extras: DictData | None = None,
     excluded: list[str] | None = None,
 ) -> Result:  # pragma: no cov
     """Schedule runner function it the multiprocess controller function for
@@ -780,7 +780,7 @@ def schedule_runner(
     path by `WORKFLOW_APP_MAX_SCHEDULE_PER_PROCESS` value.
 
     :param stop: A stop datetime object that force stop running scheduler.
-    :param externals:
+    :param extras: An extra parameter that want to override core config.
     :param excluded: A list of schedule name that want to exclude from finding.
 
         This function will get all workflows that include on value that was
@@ -811,7 +811,7 @@ def schedule_runner(
                 schedule_control,
                 schedules=[load[0] for load in loader],
                 stop=stop,
-                externals=(externals or {}),
+                extras=(extras or {}),
                 parent_run_id=result.parent_run_id,
             )
             for loader in batch(

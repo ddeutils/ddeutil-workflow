@@ -3,7 +3,7 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-# [x] Use dynamic config`
+# [x] Use dynamic config
 """A Workflow module that is the core model of this package."""
 from __future__ import annotations
 
@@ -73,10 +73,10 @@ class Release:
     that use with the `workflow.release` method.
     """
 
-    date: datetime = field()
-    offset: float = field()
-    end_date: datetime = field()
-    runner: CronRunner = field()
+    date: datetime
+    offset: float
+    end_date: datetime
+    runner: CronRunner
     type: ReleaseType = field(default=ReleaseType.DEFAULT)
 
     def __repr__(self) -> str:
@@ -92,13 +92,13 @@ class Release:
 
     @classmethod
     def from_dt(
-        cls, dt: datetime | str, *, externals: Optional[DictData] = None
+        cls, dt: datetime | str, *, extras: Optional[DictData] = None
     ) -> Self:
         """Construct Release via datetime object only.
 
         :param dt: (datetime | str) A datetime object or string that want to
             construct to the Release object.
-        :param externals: An external parameters that want to pass to override
+        :param extras: An extra parameters that want to pass to override
             config.
 
         :raise TypeError: If the type of the dt argument does not valid with
@@ -118,8 +118,10 @@ class Release:
             date=dt,
             offset=0,
             end_date=dt + timedelta(days=1),
-            runner=CronJob("* * * * *").schedule(
-                dt.replace(tzinfo=dynamic("tz", extras=externals))
+            runner=(
+                CronJob("* * * * *").schedule(
+                    dt.replace(tzinfo=dynamic("tz", extras=extras))
+                )
             ),
         )
 
@@ -162,10 +164,15 @@ class ReleaseQueue:
 
     @classmethod
     def from_list(
-        cls, queue: list[datetime] | list[Release] | None = None
+        cls,
+        queue: list[datetime] | list[Release] | None = None,
+        extras: Optional[DictData] = None,
     ) -> Self:
         """Construct ReleaseQueue object from an input queue value that passing
         with list of datetime or list of Release.
+
+        :param queue:
+        :param extras: An extra parameter that want to override core config.
 
         :raise TypeError: If the type of input queue does not valid.
 
@@ -177,7 +184,11 @@ class ReleaseQueue:
         if isinstance(queue, list):
 
             if all(isinstance(q, datetime) for q in queue):
-                return cls(queue=[Release.from_dt(q) for q in queue])
+                return cls(
+                    queue=[
+                        Release.from_dt(q, extras=(extras or {})) for q in queue
+                    ]
+                )
 
             if all(isinstance(q, Release) for q in queue):
                 return cls(queue=queue)
@@ -214,7 +225,7 @@ class ReleaseQueue:
         :rtype: bool
         """
         if isinstance(value, datetime):
-            value = Release.from_dt(value)
+            value = Release.from_dt(value, extras=self.extras)
 
         return (
             (value in self.queue)
@@ -610,7 +621,7 @@ class Workflow(BaseModel):
 
         # VALIDATE: Change release value to Release object.
         if isinstance(release, datetime):
-            release: Release = Release.from_dt(release)
+            release: Release = Release.from_dt(release, extras=self.extras)
 
         result.trace.debug(
             f"[RELEASE]: Start release - {name!r} : "
