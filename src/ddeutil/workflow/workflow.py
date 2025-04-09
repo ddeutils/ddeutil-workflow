@@ -612,6 +612,7 @@ class Workflow(BaseModel):
             run_id=run_id,
             parent_run_id=parent_run_id,
             id_logic=name,
+            extras=self.extras,
         )
 
         if queue is not None and not isinstance(queue, ReleaseQueue):
@@ -1051,6 +1052,7 @@ class Workflow(BaseModel):
             run_id=run_id,
             parent_run_id=parent_run_id,
             id_logic=self.name,
+            extras=self.extras,
         )
 
         result.trace.info(f"[WORKFLOW]: Start Execute: {self.name!r} ...")

@@ -38,7 +38,6 @@ from concurrent.futures import (
     ThreadPoolExecutor,
     as_completed,
 )
-from dataclasses import is_dataclass
 from inspect import Parameter
 from pathlib import Path
 from subprocess import CompletedProcess
@@ -206,6 +205,7 @@ class BaseStage(BaseModel, ABC):
             run_id=run_id,
             parent_run_id=parent_run_id,
             id_logic=self.iden,
+            extras=self.extras,
         )
 
         try:
@@ -389,14 +389,15 @@ class BaseAsyncStage(BaseStage):
             run_id=run_id,
             parent_run_id=parent_run_id,
             id_logic=self.iden,
+            extras=self.extras,
         )
 
         try:
             rs: Result = await self.axecute(params, result=result, event=event)
-            if to is not None:
+            if to is not None:  # pragma: no cov
                 return self.set_outputs(rs.context, to=to)
             return rs
-        except Exception as e:
+        except Exception as e:  # pragma: no cov
             await result.trace.aerror(f"[STAGE]: {e.__class__.__name__}: {e}")
 
             if dynamic("stage_raise_error", f=raise_error, extras=self.extras):
@@ -856,6 +857,7 @@ class CallStage(BaseStage):
         )
 
         args = self.parse_model_args(call_func, args, result)
+
         if inspect.iscoroutinefunction(call_func):
             loop = asyncio.get_event_loop()
             rs: DictData = loop.run_until_complete(
@@ -904,8 +906,11 @@ class CallStage(BaseStage):
                 args[arg] = args.pop(arg.removeprefix("_"))
 
             t: Any = type_hints[arg]
-            if is_dataclass(t) and t.__name__ == "Result" and arg not in args:
-                args[arg] = result
+
+            # NOTE: Check Result argument was passed to this caller function.
+            #
+            # if is_dataclass(t) and t.__name__ == "Result" and arg not in args:
+            #     args[arg] = result
 
             if issubclass(t, BaseModel) and arg in args:
                 args[arg] = t.model_validate(obj=args[arg])

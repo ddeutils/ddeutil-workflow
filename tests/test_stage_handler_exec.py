@@ -394,7 +394,10 @@ def test_stage_exec_foreach_with_trigger(test_path):
                         item: ${{ item }}
         """,
     ):
-        workflow = Workflow.from_conf(name="tmp-wf-foreach-trigger")
+        workflow = Workflow.from_conf(
+            name="tmp-wf-foreach-trigger",
+            extras={"test": "demo"},
+        )
         stage: Stage = workflow.job("first-job").stage("foreach-stage")
         rs = stage.set_outputs(stage.handler_execute({}).context, to={})
         assert rs == {

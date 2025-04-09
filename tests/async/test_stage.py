@@ -8,3 +8,10 @@ async def test_stage_empty_axecute():
     rs: Result = await stage.handler_axecute(params={})
     assert rs.status == SUCCESS
     assert rs.context == {}
+
+    stage: EmptyStage = EmptyStage(
+        name="Empty Stage", echo="hello world", sleep=6
+    )
+    rs: Result = await stage.handler_axecute(params={})
+    assert rs.status == SUCCESS
+    assert rs.context == {}

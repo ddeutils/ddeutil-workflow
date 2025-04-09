@@ -132,10 +132,12 @@ def test_extract_call_args_type():
 
     get_types = typing.get_type_hints(call_func)
     for p in get_types:
-        if is_dataclass(get_types[p]) and get_types[p].__name__ == "Result":
-            print("found result", p, get_types[p])
-        if issubclass(get_types[p], BaseModel):
-            print(p, "with type:", get_types[p])
+        t = get_types[p]
+        print(t)
+        if is_dataclass(t) and t.__name__ == "Result":
+            print("[x] found result", p, t)
+        if issubclass(t, BaseModel):
+            print("[x]", p, "with type:", t)
 
 
 @pytest.mark.skip("Skip because it uses for local test only.")

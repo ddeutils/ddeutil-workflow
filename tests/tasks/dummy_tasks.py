@@ -102,12 +102,14 @@ def get_types(
     args3: MockModel,
     *args,
     kwargs1: Optional[datetime] = None,
+    kwargs2: Optional[Result] = None,
     **kwargs,
 ) -> MockModel:
     _ = args1
     _ = args2
     _ = args
     _ = kwargs1
+    _ = kwargs2
     result = kwargs["result"]
     result.trace.info("[CALLER]: Test task type.")
     result.trace.info(f"... {type(args3)}: {args3}")

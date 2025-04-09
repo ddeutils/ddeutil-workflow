@@ -570,6 +570,7 @@ class Job(BaseModel):
             run_id=run_id,
             parent_run_id=parent_run_id,
             id_logic=(self.id or "not-set"),
+            extras=self.extras,
         )
 
         if self.runs_on.type == RunsOnType.LOCAL:
@@ -756,6 +757,7 @@ def local_execute(
         run_id=run_id,
         parent_run_id=parent_run_id,
         id_logic=(job.id or "not-set"),
+        extras=job.extras,
     )
     event: Event = Event() if event is None else event
 
@@ -891,6 +893,7 @@ def self_hosted_execute(
         run_id=run_id,
         parent_run_id=parent_run_id,
         id_logic=(job.id or "not-set"),
+        extras=job.extras,
     )
 
     if event and event.is_set():
