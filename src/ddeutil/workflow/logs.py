@@ -3,7 +3,8 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-# [x] Use fix config
+# [x] Use dynamic config
+# [x] Use fix config for `get_logger`, and Model initialize step.
 """A Logs module contain TraceLog dataclass and AuditLog model.
 """
 from __future__ import annotations

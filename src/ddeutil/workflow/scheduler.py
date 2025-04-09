@@ -3,7 +3,7 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-# [x] Use fix config
+# [x] Use dynamic config
 """The main schedule running is `schedule_runner` function that trigger the
 multiprocess of `schedule_control` function for listing schedules on the
 config by `Loader.finds(Schedule)`.
@@ -36,7 +36,7 @@ from textwrap import dedent
 from threading import Thread
 from typing import Callable, Optional, TypedDict, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationInfo
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
@@ -52,7 +52,7 @@ except ImportError:  # pragma: no cov
 
 from .__cron import CronRunner
 from .__types import DictData, TupleStr
-from .conf import Loader, SimLoad, config
+from .conf import Loader, SimLoad, dynamic
 from .cron import On
 from .exceptions import ScheduleException, WorkflowException
 from .logs import Audit, get_audit
@@ -88,6 +88,11 @@ class ScheduleWorkflow(BaseModel):
     uses for override the on field if the schedule time was change, but you do
     not want to change on the workflow model.
     """
+
+    extras: DictData = Field(
+        default_factory=dict,
+        description="An extra override config values.",
+    )
 
     alias: Optional[str] = Field(
         default=None,
@@ -150,7 +155,7 @@ class ScheduleWorkflow(BaseModel):
         return data
 
     @field_validator("on", mode="after")
-    def __on_no_dup__(cls, value: list[On]) -> list[On]:
+    def __on_no_dup__(cls, value: list[On], info: ValidationInfo) -> list[On]:
         """Validate the on fields should not contain duplicate values and if it
         contains every minute value, it should have only one on value.
 
@@ -162,10 +167,12 @@ class ScheduleWorkflow(BaseModel):
                 "The on fields should not contain duplicate on value."
             )
 
-        if len(set_ons) > config.max_on_per_workflow:
+        extras: Optional[DictData] = info.data.get("extras")
+        if len(set_ons) > (
+            conf := dynamic("max_on_per_workflow", extras=extras)
+        ):
             raise ValueError(
-                f"The number of the on should not more than "
-                f"{config.max_on_per_workflow} crontab."
+                f"The number of the on should not more than {conf} crontabs."
             )
 
         return value
@@ -352,6 +359,8 @@ class Schedule(BaseModel):
         workflow_tasks: list[WorkflowTask] = []
 
         for workflow in self.workflows:
+            if self.extras:
+                workflow.extras = self.extras
 
             if workflow.alias not in queue:
                 queue[workflow.alias] = ReleaseQueue()
@@ -382,8 +391,12 @@ class Schedule(BaseModel):
         result: Result = Result().set_parent_run_id(parent_run_id)
 
         # NOTE: Create the start and stop datetime.
-        start_date: datetime = datetime.now(tz=config.tz)
-        stop_date: datetime = stop or (start_date + config.stop_boundary_delta)
+        start_date: datetime = datetime.now(
+            tz=dynamic("tz", extras=self.extras)
+        )
+        stop_date: datetime = stop or (
+            start_date + dynamic("stop_boundary_delta", extras=self.extras)
+        )
 
         # IMPORTANT: Create main mapping of queue and thread object.
         queue: dict[str, ReleaseQueue] = {}
@@ -469,6 +482,7 @@ def schedule_task(
     audit: type[Audit],
     *,
     parent_run_id: str | None = None,
+    extras: Optional[DictData] = None,
 ) -> ResultOrCancel:
     """Schedule task function that generate thread of workflow task release
     method in background. This function do the same logic as the workflow poke
@@ -483,12 +497,13 @@ def schedule_task(
     :param threads: A mapping of alias name and Thread object.
     :param audit: An audit class that want to make audit object.
     :param parent_run_id: A parent workflow running ID for this release.
+    :param extras: An extra parameter that want to override the core config.
 
     :rtype: ResultOrCancel
     """
     result: Result = Result().set_parent_run_id(parent_run_id)
-    current_date: datetime = datetime.now(tz=config.tz)
-    if current_date > stop.replace(tzinfo=config.tz):
+    current_date: datetime = datetime.now(tz=dynamic("tz", extras=extras))
+    if current_date > stop.replace(tzinfo=dynamic("tz", extras=extras)):
         return CancelJob
 
     # IMPORTANT:
@@ -569,7 +584,7 @@ def schedule_task(
 
         threads[thread_name] = {
             "thread": thread,
-            "start_date": datetime.now(tz=config.tz),
+            "start_date": datetime.now(tz=dynamic("tz", extras=extras)),
             "release_date": release.date,
         }
 
@@ -714,8 +729,8 @@ def scheduler_pending(
 def schedule_control(
     schedules: list[str],
     stop: datetime | None = None,
-    extras: DictData | None = None,
     *,
+    extras: DictData | None = None,
     audit: type[Audit] | None = None,
     parent_run_id: str | None = None,
 ) -> Result:  # pragma: no cov
@@ -736,8 +751,10 @@ def schedule_control(
     result: Result = Result().set_parent_run_id(parent_run_id)
 
     # NOTE: Create the start and stop datetime.
-    start_date: datetime = datetime.now(tz=config.tz)
-    stop_date: datetime = stop or (start_date + config.stop_boundary_delta)
+    start_date: datetime = datetime.now(tz=dynamic("tz", extras=extras))
+    stop_date: datetime = stop or (
+        start_date + dynamic("stop_boundary_delta", extras=extras)
+    )
 
     # IMPORTANT: Create main mapping of queue and thread object.
     queue: dict[str, ReleaseQueue] = {}
@@ -803,7 +820,7 @@ def schedule_runner(
     context: DictData = {"schedules": [], "threads": []}
 
     with ProcessPoolExecutor(
-        max_workers=config.max_schedule_process,
+        max_workers=dynamic("max_schedule_process", extras=extras),
     ) as executor:
 
         futures: list[Future] = [
@@ -816,7 +833,7 @@ def schedule_runner(
             )
             for loader in batch(
                 Loader.finds(Schedule, excluded=excluded),
-                n=config.max_schedule_per_process,
+                n=dynamic("max_schedule_per_process", extras=extras),
             )
         ]
 
