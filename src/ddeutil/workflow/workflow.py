@@ -454,7 +454,7 @@ class Workflow(BaseModel):
         #         "only one value in the on field."
         #     )
 
-        extras: DictData = info.data.get("extras", {})
+        extras: Optional[DictData] = info.data.get("extras")
         if len(set_ons) > (
             conf := dynamic("max_on_per_workflow", extras=extras)
         ):
@@ -605,7 +605,7 @@ class Workflow(BaseModel):
 
         :rtype: Result
         """
-        audit: type[Audit] = audit or get_audit()
+        audit: type[Audit] = audit or get_audit(extras=self.extras)
         name: str = override_log_name or self.name
         result: Result = Result.construct_with_rs_or_id(
             result,
@@ -669,6 +669,7 @@ class Workflow(BaseModel):
                 parent_run_id=result.parent_run_id,
                 run_id=result.run_id,
                 execution_time=result.alive_time(),
+                extras=self.extras,
             ).save(excluded=None)
         )
 

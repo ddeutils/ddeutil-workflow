@@ -21,7 +21,7 @@ from pathlib import Path
 from threading import get_ident
 from typing import ClassVar, Literal, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationInfo
 from pydantic.dataclasses import dataclass
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
@@ -101,6 +101,7 @@ class TraceMeta(BaseModel):  # pragma: no cov
         cls,
         mode: Literal["stdout", "stderr"],
         message: str,
+        *,
         extras: Optional[DictData] = None,
     ) -> Self:
         """Make the current TraceMeta instance that catching local state.
@@ -322,24 +323,38 @@ class FileTraceLog(BaseTraceLog):  # pragma: no cov
 
     @classmethod
     def find_logs(
-        cls, path: Path | None = None
+        cls,
+        path: Path | None = None,
+        extras: Optional[DictData] = None,
     ) -> Iterator[TraceData]:  # pragma: no cov
         """Find trace logs.
 
         :param path: (Path)
+        :param extras: An extra parameter that want to override core config.
         """
         for file in sorted(
-            (path or config.log_path).glob("./run_id=*"),
+            (path or dynamic("log_path", extras=extras)).glob("./run_id=*"),
             key=lambda f: f.lstat().st_mtime,
         ):
             yield TraceData.from_path(file)
 
     @classmethod
     def find_log_with_id(
-        cls, run_id: str, force_raise: bool = True, *, path: Path | None = None
+        cls,
+        run_id: str,
+        force_raise: bool = True,
+        *,
+        path: Path | None = None,
+        extras: Optional[DictData] = None,
     ) -> TraceData:
-        """Find trace log with an input specific run ID."""
-        base_path: Path = path or config.log_path
+        """Find trace log with an input specific run ID.
+
+        :param run_id: A running ID of trace log.
+        :param force_raise:
+        :param path:
+        :param extras: An extra parameter that want to override core config.
+        """
+        base_path: Path = path or dynamic("log_path", extras=extras)
         file: Path = base_path / f"run_id={run_id}"
         if file.exists():
             return TraceData.from_path(file)
@@ -395,7 +410,7 @@ class FileTraceLog(BaseTraceLog):  # pragma: no cov
         :param message: A message after making.
         :param is_err: A flag for writing with an error trace or not.
         """
-        if not config.enable_write_log:
+        if not dynamic("enable_write_log", extras=self.extras):
             return
 
         write_file: str = "stderr" if is_err else "stdout"
@@ -404,9 +419,8 @@ class FileTraceLog(BaseTraceLog):  # pragma: no cov
         with (self.pointer / f"{write_file}.txt").open(
             mode="at", encoding="utf-8"
         ) as f:
-            f.write(
-                f"{config.log_format_file}\n".format(**trace_meta.model_dump())
-            )
+            fmt: str = dynamic("log_format_file", extras=self.extras)
+            f.write(f"{fmt}\n".format(**trace_meta.model_dump()))
 
         with (self.pointer / "metadata.json").open(
             mode="at", encoding="utf-8"
@@ -416,7 +430,7 @@ class FileTraceLog(BaseTraceLog):  # pragma: no cov
     async def awriter(
         self, message: str, is_err: bool = False
     ) -> None:  # pragma: no cov
-        if not config.enable_write_log:
+        if not dynamic("enable_write_log", extras=self.extras):
             return
 
         try:
@@ -430,9 +444,8 @@ class FileTraceLog(BaseTraceLog):  # pragma: no cov
         async with aiofiles.open(
             self.pointer / f"{write_file}.txt", mode="at", encoding="utf-8"
         ) as f:
-            await f.write(
-                f"{config.log_format_file}\n".format(**trace_meta.model_dump())
-            )
+            fmt: str = dynamic("log_format_file", extras=self.extras)
+            await f.write(f"{fmt}\n".format(**trace_meta.model_dump()))
 
         async with aiofiles.open(
             self.pointer / "metadata.json", mode="at", encoding="utf-8"
@@ -496,9 +509,16 @@ def get_trace(
     )
 
 
-def get_trace_obj() -> type[TraceLog]:  # pragma: no cov
-    """Get trace object."""
-    if config.log_path.is_file():
+def get_trace_obj(
+    extras: Optional[DictData] = None,
+) -> type[TraceLog]:  # pragma: no cov
+    """Get trace object.
+
+    :param extras: An extra parameter that want to override the core config.
+
+    :rtype: type[TraceLog]
+    """
+    if dynamic("log_path", extras=extras).is_file():
         return SQLiteTraceLog
     return FileTraceLog
 
@@ -528,12 +548,12 @@ class BaseAudit(BaseModel, ABC):
     execution_time: float = Field(default=0, description="An execution time.")
 
     @model_validator(mode="after")
-    def __model_action(self) -> Self:
+    def __model_action(self, info: ValidationInfo) -> Self:
         """Do before the Audit action with WORKFLOW_AUDIT_ENABLE_WRITE env variable.
 
         :rtype: Self
         """
-        if config.enable_write_audit:
+        if dynamic("enable_write_audit", extras=info.data.get("extras")):
             self.do_before()
         return self
 
@@ -561,15 +581,20 @@ class FileAudit(BaseAudit):
         self.pointer().mkdir(parents=True, exist_ok=True)
 
     @classmethod
-    def find_audits(cls, name: str) -> Iterator[Self]:
+    def find_audits(
+        cls, name: str, *, extras: Optional[DictData] = None
+    ) -> Iterator[Self]:
         """Generate the audit data that found from logs path with specific a
         workflow name.
 
         :param name: A workflow name that want to search release logging data.
+        :param extras: An extra parameter that want to override core config.
 
         :rtype: Iterator[Self]
         """
-        pointer: Path = config.audit_path / f"workflow={name}"
+        pointer: Path = (
+            dynamic("audit_path", extras=extras) / f"workflow={name}"
+        )
         if not pointer.exists():
             raise FileNotFoundError(f"Pointer: {pointer.absolute()}.")
 
@@ -582,13 +607,16 @@ class FileAudit(BaseAudit):
         cls,
         name: str,
         release: datetime | None = None,
+        *,
+        extras: Optional[DictData] = None,
     ) -> Self:
         """Return the audit data that found from logs path with specific
         workflow name and release values. If a release does not pass to an input
         argument, it will return the latest release from the current log path.
 
-        :param name: A workflow name that want to search log.
-        :param release: A release datetime that want to search log.
+        :param name: (str) A workflow name that want to search log.
+        :param release: (datetime) A release datetime that want to search log.
+        :param extras: An extra parameter that want to override core config.
 
         :raise FileNotFoundError:
         :raise NotImplementedError: If an input release does not pass to this
@@ -600,7 +628,7 @@ class FileAudit(BaseAudit):
             raise NotImplementedError("Find latest log does not implement yet.")
 
         pointer: Path = (
-            config.audit_path
+            dynamic("audit_path", extras=extras)
             / f"workflow={name}/release={release:%Y%m%d%H%M%S}"
         )
         if not pointer.exists():
@@ -614,24 +642,31 @@ class FileAudit(BaseAudit):
             return cls.model_validate(obj=json.load(f))
 
     @classmethod
-    def is_pointed(cls, name: str, release: datetime) -> bool:
+    def is_pointed(
+        cls,
+        name: str,
+        release: datetime,
+        *,
+        extras: Optional[DictData] = None,
+    ) -> bool:
         """Check the release log already pointed or created at the destination
         log path.
 
-        :param name: A workflow name.
-        :param release: A release datetime.
+        :param name: (str) A workflow name.
+        :param release: (datetime) A release datetime.
+        :param extras: An extra parameter that want to override core config.
 
         :rtype: bool
         :return: Return False if the release log was not pointed or created.
         """
         # NOTE: Return False if enable writing log flag does not set.
-        if not config.enable_write_audit:
+        if not dynamic("enable_write_audit", extras=extras):
             return False
 
         # NOTE: create pointer path that use the same logic of pointer method.
-        pointer: Path = config.audit_path / cls.filename_fmt.format(
-            name=name, release=release
-        )
+        pointer: Path = dynamic(
+            "audit_path", extras=extras
+        ) / cls.filename_fmt.format(name=name, release=release)
 
         return pointer.exists()
 
@@ -640,9 +675,9 @@ class FileAudit(BaseAudit):
 
         :rtype: Path
         """
-        return config.audit_path / self.filename_fmt.format(
-            name=self.name, release=self.release
-        )
+        return dynamic(
+            "audit_path", extras=self.extras
+        ) / self.filename_fmt.format(name=self.name, release=self.release)
 
     def save(self, excluded: list[str] | None) -> Self:
         """Save logging data that receive a context data from a workflow
@@ -656,7 +691,7 @@ class FileAudit(BaseAudit):
         trace: TraceLog = get_trace(self.run_id, self.parent_run_id)
 
         # NOTE: Check environ variable was set for real writing.
-        if not config.enable_write_audit:
+        if not dynamic("enable_write_audit", extras=self.extras):
             trace.debug("[LOG]: Skip writing log cause config was set")
             return self
 
@@ -698,7 +733,7 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
         trace: TraceLog = get_trace(self.run_id, self.parent_run_id)
 
         # NOTE: Check environ variable was set for real writing.
-        if not config.enable_write_audit:
+        if not dynamic("enable_write_audit", extras=self.extras):
             trace.debug("[LOG]: Skip writing log cause config was set")
             return self
 
@@ -723,11 +758,15 @@ Audit = Union[
 ]
 
 
-def get_audit() -> type[Audit]:  # pragma: no cov
+def get_audit(
+    extras: Optional[DictData] = None,
+) -> type[Audit]:  # pragma: no cov
     """Get an audit class that dynamic base on the config audit path value.
+
+    :param extras: An extra parameter that want to override the core config.
 
     :rtype: type[Audit]
     """
-    if config.audit_path.is_file():
+    if dynamic("audit_path", extras=extras).is_file():
         return SQLiteAudit
     return FileAudit
