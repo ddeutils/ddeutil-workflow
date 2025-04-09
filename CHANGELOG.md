@@ -2,6 +2,23 @@
 
 ## Latest Changes
 
+## 0.0.48
+
+### :sparkles: Features
+
+- :dart: feat: add extras bypass to audit and trace objects on workflow module.
+- :dart: feat: add extras argument passing to Release object.
+- :dart: feat: add extras field on trace dataclass object.
+
+### :bug: Bug fixes
+
+- :gear: fixed: change import of get logger func.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: make coverage report.
+- :construction: refactored: move get_logger to logs module instead of conf.
+
 ## 0.0.47
 
 ### :stars: Highlight Features
