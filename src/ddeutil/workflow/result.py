@@ -3,6 +3,7 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
+# [x] Use dynamic config
 """Result module. It is the data context transfer objects that use by all object
 in this package. This module provide Status enum object and Result dataclass.
 """
@@ -120,7 +121,8 @@ class Result:
     def set_parent_run_id(self, running_id: str) -> Self:
         """Set a parent running ID.
 
-        :param running_id: A running ID that want to update on this model.
+        :param running_id: (str) A running ID that want to update on this model.
+
         :rtype: Self
         """
         self.parent_run_id: str = running_id

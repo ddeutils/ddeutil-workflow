@@ -13,7 +13,8 @@ from functools import wraps
 from starlette.concurrency import run_in_threadpool
 
 from ..__cron import CronJob
-from ..conf import config, get_logger
+from ..conf import config
+from ..logs import get_logger
 
 logger = get_logger("uvicorn.error")
 

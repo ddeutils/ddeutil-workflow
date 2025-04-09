@@ -9,11 +9,13 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from dataclasses import field
 from datetime import datetime
+from functools import lru_cache
 from inspect import Traceback, currentframe, getframeinfo
 from pathlib import Path
 from threading import get_ident
@@ -25,8 +27,36 @@ from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
 from .__types import DictData, DictStr, TupleStr
-from .conf import config, dynamic, get_logger
+from .conf import config, dynamic
 from .utils import cut_id, get_dt_now
+
+
+@lru_cache
+def get_logger(name: str):
+    """Return logger object with an input module name.
+
+    :param name: A module name that want to log.
+    """
+    lg = logging.getLogger(name)
+
+    # NOTE: Developers using this package can then disable all logging just for
+    #   this package by;
+    #
+    #   `logging.getLogger('ddeutil.workflow').propagate = False`
+    #
+    lg.addHandler(logging.NullHandler())
+
+    formatter = logging.Formatter(
+        fmt=config.log_format,
+        datefmt=config.log_datetime_format,
+    )
+    stream = logging.StreamHandler()
+    stream.setFormatter(formatter)
+    lg.addHandler(stream)
+
+    lg.setLevel(logging.DEBUG if config.debug else logging.INFO)
+    return lg
+
 
 logger = get_logger("ddeutil.workflow")
 
@@ -34,9 +64,10 @@ __all__: TupleStr = (
     "FileTraceLog",
     "SQLiteTraceLog",
     "TraceData",
-    "TraceMeda",
+    "TraceMeta",
     "TraceLog",
     "get_dt_tznow",
+    "get_logger",
     "get_trace",
     "get_trace_obj",
     "get_audit",
@@ -54,7 +85,9 @@ def get_dt_tznow() -> datetime:  # pragma: no cov
     return get_dt_now(tz=config.tz)
 
 
-class TraceMeda(BaseModel):  # pragma: no cov
+class TraceMeta(BaseModel):  # pragma: no cov
+    """Trace Meta model."""
+
     mode: Literal["stdout", "stderr"]
     datetime: str
     process: int
@@ -70,7 +103,7 @@ class TraceMeda(BaseModel):  # pragma: no cov
         message: str,
         extras: Optional[DictData] = None,
     ) -> Self:
-        """Make the current TraceMeda instance that catching local state.
+        """Make the current TraceMeta instance that catching local state.
 
         :rtype: Self
         """
@@ -98,7 +131,7 @@ class TraceData(BaseModel):  # pragma: no cov
 
     stdout: str = Field(description="A standard output trace data.")
     stderr: str = Field(description="A standard error trace data.")
-    meta: list[TraceMeda] = Field(
+    meta: list[TraceMeta] = Field(
         default_factory=list,
         description=(
             "A metadata mapping of this output and error before making it to "
@@ -140,7 +173,7 @@ class BaseTraceLog(ABC):  # pragma: no cov
     """Base Trace Log dataclass object."""
 
     run_id: str
-    parent_run_id: Optional[str] = None
+    parent_run_id: Optional[str] = field(default=None)
     extras: DictData = field(default_factory=dict, compare=False, repr=False)
 
     @abstractmethod
@@ -366,7 +399,7 @@ class FileTraceLog(BaseTraceLog):  # pragma: no cov
             return
 
         write_file: str = "stderr" if is_err else "stdout"
-        trace_meta: TraceMeda = TraceMeda.make(mode=write_file, message=message)
+        trace_meta: TraceMeta = TraceMeta.make(mode=write_file, message=message)
 
         with (self.pointer / f"{write_file}.txt").open(
             mode="at", encoding="utf-8"
@@ -392,7 +425,7 @@ class FileTraceLog(BaseTraceLog):  # pragma: no cov
             raise ImportError("Async mode need aiofiles package") from e
 
         write_file: str = "stderr" if is_err else "stdout"
-        trace_meta: TraceMeda = TraceMeda.make(mode=write_file, message=message)
+        trace_meta: TraceMeta = TraceMeta.make(mode=write_file, message=message)
 
         async with aiofiles.open(
             self.pointer / f"{write_file}.txt", mode="at", encoding="utf-8"

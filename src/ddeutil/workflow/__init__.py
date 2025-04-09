@@ -10,7 +10,6 @@ from .conf import (
     Loader,
     config,
     env,
-    get_logger,
 )
 from .cron import (
     On,

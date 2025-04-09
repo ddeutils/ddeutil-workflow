@@ -52,7 +52,7 @@ except ImportError:  # pragma: no cov
 
 from .__cron import CronRunner
 from .__types import DictData, TupleStr
-from .conf import Loader, SimLoad, config, get_logger
+from .conf import Loader, SimLoad, config
 from .cron import On
 from .exceptions import ScheduleException, WorkflowException
 from .logs import Audit, get_audit
@@ -62,7 +62,6 @@ from .workflow import Release, ReleaseQueue, Workflow, WorkflowTask
 
 P = ParamSpec("P")
 
-logger = get_logger("ddeutil.workflow")
 logging.getLogger("schedule").setLevel(logging.INFO)
 
 

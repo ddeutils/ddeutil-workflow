@@ -32,7 +32,7 @@ from typing_extensions import Self
 
 from .__cron import CronJob, CronRunner
 from .__types import DictData, TupleStr
-from .conf import Loader, SimLoad, dynamic, get_logger
+from .conf import Loader, SimLoad, dynamic
 from .cron import On
 from .exceptions import JobException, WorkflowException
 from .job import Job
@@ -46,8 +46,6 @@ from .utils import (
     reach_next_minute,
     wait_to_next_minute,
 )
-
-logger = get_logger("ddeutil.workflow")
 
 __all__: TupleStr = (
     "Release",

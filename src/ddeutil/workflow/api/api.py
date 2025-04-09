@@ -20,7 +20,8 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import UJSONResponse
 
 from ..__about__ import __version__
-from ..conf import api_config, config, get_logger
+from ..conf import api_config, config
+from ..logs import get_logger
 from ..scheduler import ReleaseThread, ReleaseThreads
 from ..workflow import ReleaseQueue, WorkflowTask
 from .repeat import repeat_at

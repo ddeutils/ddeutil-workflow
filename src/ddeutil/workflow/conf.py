@@ -6,11 +6,10 @@
 from __future__ import annotations
 
 import json
-import logging
 import os
 from collections.abc import Iterator
 from datetime import timedelta
-from functools import cached_property, lru_cache
+from functools import cached_property
 from pathlib import Path
 from typing import Optional, TypeVar
 from zoneinfo import ZoneInfo
@@ -36,7 +35,6 @@ def env(var: str, default: str | None = None) -> str | None:  # pragma: no cov
 __all__: TupleStr = (
     "api_config",
     "env",
-    "get_logger",
     "Config",
     "SimLoad",
     "Loader",
@@ -55,7 +53,8 @@ class Config:  # pragma: no cov
     # NOTE: Core
     @property
     def root_path(self) -> Path:
-        """Root path or the project path.
+        """Root path or the project path for this workflow engine that use for
+        combine with `conf_path` value.
 
         :rtype: Path
         """
@@ -63,7 +62,7 @@ class Config:  # pragma: no cov
 
     @property
     def conf_path(self) -> Path:
-        """Config path that use root_path class argument for this construction.
+        """Config path that keep all workflow template YAML files.
 
         :rtype: Path
         """
@@ -71,6 +70,11 @@ class Config:  # pragma: no cov
 
     @property
     def tz(self) -> ZoneInfo:
+        """Timezone value that return with the `ZoneInfo` object and use for all
+        datetime object in this workflow engine.
+
+        :rtype: ZoneInfo
+        """
         return ZoneInfo(env("CORE_TIMEZONE", "UTC"))
 
     @property
@@ -80,7 +84,8 @@ class Config:  # pragma: no cov
     # NOTE: Register
     @property
     def regis_call(self) -> list[str]:
-        """Register Caller module importer str.
+        """Register Caller that is a list of importable string for the call
+        stage model can get.
 
         :rtype: list[str]
         """
@@ -89,7 +94,8 @@ class Config:  # pragma: no cov
 
     @property
     def regis_filter(self) -> list[str]:
-        """Register Filter module.
+        """Register Filter that is a list of importable string for the filter
+        template.
 
         :rtype: list[str]
         """
@@ -404,30 +410,3 @@ class Loader(SimLoad):
             conf_path=dynamic("conf_path", extras=externals),
             externals=externals,
         )
-
-
-@lru_cache
-def get_logger(name: str):
-    """Return logger object with an input module name.
-
-    :param name: A module name that want to log.
-    """
-    logger = logging.getLogger(name)
-
-    # NOTE: Developers using this package can then disable all logging just for
-    #   this package by;
-    #
-    #   `logging.getLogger('ddeutil.workflow').propagate = False`
-    #
-    logger.addHandler(logging.NullHandler())
-
-    formatter = logging.Formatter(
-        fmt=config.log_format,
-        datefmt=config.log_datetime_format,
-    )
-    stream = logging.StreamHandler()
-    stream.setFormatter(formatter)
-    logger.addHandler(stream)
-
-    logger.setLevel(logging.DEBUG if config.debug else logging.INFO)
-    return logger
