@@ -12,9 +12,9 @@ from fastapi.responses import UJSONResponse
 from pydantic import BaseModel
 
 from ...__types import DictData
-from ...conf import get_logger
 from ...exceptions import JobException
 from ...job import Job
+from ...logs import get_logger
 from ...result import Result
 
 logger = get_logger("uvicorn.error")

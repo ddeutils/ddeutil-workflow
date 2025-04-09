@@ -12,7 +12,8 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi import status as st
 from fastapi.responses import UJSONResponse
 
-from ...conf import config, get_logger
+from ...conf import config
+from ...logs import get_logger
 from ...scheduler import Schedule
 
 logger = get_logger("uvicorn.error")
