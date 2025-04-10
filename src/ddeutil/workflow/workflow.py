@@ -4,7 +4,9 @@
 # license information.
 # ------------------------------------------------------------------------------
 # [x] Use dynamic config
-"""A Workflow module that is the core model of this package."""
+"""A Workflow module that is the core module of this package. It keeps Release
+and Workflow Pydantic models.
+"""
 from __future__ import annotations
 
 import copy
@@ -262,6 +264,69 @@ class ReleaseQueue:
 
         return self
 
+    def gen(
+        self,
+        end_date: datetime,
+        audit: type[Audit],
+        runner: CronRunner,
+        name: str,
+        *,
+        offset: float = 0,
+        force_run: bool = False,
+        extras: Optional[DictData] = None,
+    ) -> Self:
+        """Generate Release model to queue.
+
+        Steps:
+            - Create Release object from the current date that not reach the end
+              date.
+            - Check this release do not store on the release queue object.
+              Generate the next date if it exists.
+            - Push this release to the release queue
+
+        :param offset: An offset in second unit for time travel.
+        :param end_date: An end datetime object.
+        :param audit: An audit class that want to make audit object.
+        :param runner: A CronRunner object.
+        :param name: A target name that want to check at pointer of audit.
+        :param force_run: A flag that allow to release workflow if the audit
+            with that release was pointed.
+        :param extras: An extra parameter that want to override core config.
+
+        :rtype: ReleaseQueue
+
+        """
+        if runner.date > end_date:
+            return self
+
+        workflow_release = Release(
+            date=runner.date,
+            offset=offset,
+            end_date=end_date,
+            runner=runner,
+            type=ReleaseType.POKE,
+        )
+
+        while self.check_queue(workflow_release) or (
+            audit.is_pointed(
+                name=name, release=workflow_release.date, extras=extras
+            )
+            and not force_run
+        ):
+            workflow_release = Release(
+                date=runner.next,
+                offset=offset,
+                end_date=end_date,
+                runner=runner,
+                type=ReleaseType.POKE,
+            )
+
+        if runner.date > end_date:
+            return self
+
+        heappush(self.queue, workflow_release)
+        return self
+
 
 class Workflow(BaseModel):
     """Workflow Pydantic model.
@@ -494,8 +559,9 @@ class Workflow(BaseModel):
         return self
 
     def job(self, name: str) -> Job:
-        """Return the workflow's job model that searching with an input job's
-        name or job's ID.
+        """Return the workflow's Job model that getting by an input job's name
+        or job's ID. This method will pass an extra parameter from this model
+        to the returned Job model.
 
         :param name: (str) A job name or ID that want to get from a mapping of
             job models.
@@ -712,14 +778,6 @@ class Workflow(BaseModel):
         """Generate Release from all on values from the on field and store them
         to the ReleaseQueue object.
 
-        Steps:
-            - For-loop all the on value in the on field.
-            - Create Release object from the current date that not reach the end
-              date.
-            - Check this release do not store on the release queue object.
-              Generate the next date if it exists.
-            - Push this release to the release queue
-
         :param offset: An offset in second unit for time travel.
         :param end_date: An end datetime object.
         :param queue: A workflow queue object.
@@ -731,39 +789,18 @@ class Workflow(BaseModel):
         """
         for on in self.on:
 
-            runner: CronRunner = on.next(
-                get_dt_now(
-                    tz=dynamic("tz", extras=self.extras), offset=offset
-                ).replace(microsecond=0)
-            )
-
-            if runner.date > end_date:
-                continue
-
-            workflow_release = Release(
-                date=runner.date,
+            queue.gen(
+                end_date,
+                audit,
+                on.next(
+                    get_dt_now(
+                        tz=dynamic("tz", extras=self.extras), offset=offset
+                    ).replace(microsecond=0)
+                ),
+                self.name,
                 offset=offset,
-                end_date=end_date,
-                runner=runner,
-                type=ReleaseType.POKE,
+                force_run=force_run,
             )
-
-            while queue.check_queue(workflow_release) or (
-                audit.is_pointed(name=self.name, release=workflow_release.date)
-                and not force_run
-            ):
-                workflow_release = Release(
-                    date=runner.next,
-                    offset=offset,
-                    end_date=end_date,
-                    runner=runner,
-                    type=ReleaseType.POKE,
-                )
-
-            if runner.date > end_date:
-                continue
-
-            heappush(queue.queue, workflow_release)
 
         return queue
 
@@ -1315,10 +1352,11 @@ class WorkflowTask:
     arguments before passing to the parent release method.
     """
 
-    alias: str = field()
-    workflow: Workflow = field()
-    runner: CronRunner = field()
+    alias: str
+    workflow: Workflow
+    runner: CronRunner
     values: DictData = field(default_factory=dict)
+    extras: DictData = field(default_factory=dict)
 
     def release(
         self,
@@ -1395,34 +1433,14 @@ class WorkflowTask:
 
         :rtype: ReleaseQueue
         """
-        if self.runner.date > end_date:
-            return queue
-
-        workflow_release = Release(
-            date=self.runner.date,
-            offset=0,
-            end_date=end_date,
-            runner=self.runner,
-            type=ReleaseType.TASK,
+        return queue.gen(
+            end_date,
+            audit,
+            self.runner,
+            self.alias,
+            force_run=force_run,
+            extras=self.extras,
         )
-
-        while queue.check_queue(workflow_release) or (
-            audit.is_pointed(name=self.alias, release=workflow_release.date)
-            and not force_run
-        ):
-            workflow_release = Release(
-                date=self.runner.next,
-                offset=0,
-                end_date=end_date,
-                runner=self.runner,
-                type=ReleaseType.TASK,
-            )
-
-        if self.runner.date > end_date:
-            return queue
-
-        heappush(queue.queue, workflow_release)
-        return queue
 
     def __repr__(self) -> str:
         """Override the `__repr__` method.

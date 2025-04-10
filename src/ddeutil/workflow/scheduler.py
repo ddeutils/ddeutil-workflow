@@ -227,6 +227,7 @@ class ScheduleWorkflow(BaseModel):
                     workflow=wf,
                     runner=runner,
                     values=self.values,
+                    extras=(extras or self.extras),
                 ),
             )
 
@@ -352,18 +353,19 @@ class Schedule(BaseModel):
         :param start_date: A start date that get from the workflow schedule.
         :param queue: (dict[str, ReleaseQueue]) A mapping of name and list of
             datetime for queue.
-        :param extras: (DictData) An extra parameters that pass to the Loader
-            object.
+        :param extras: (DictData) An extra parameters that want to override core
+            config.
 
         :rtype: list[WorkflowTask]
         :return: Return the list of WorkflowTask object from the specific
             input datetime that mapping with the on field.
         """
         workflow_tasks: list[WorkflowTask] = []
+        extras: DictData = extras or self.extras
 
         for workflow in self.workflows:
             if self.extras:
-                workflow.extras = self.extras
+                workflow.extras = extras
 
             if workflow.alias not in queue:
                 queue[workflow.alias] = ReleaseQueue()
@@ -750,7 +752,7 @@ def schedule_control(
 
     :rtype: Result
     """
-    audit: type[Audit] = audit or get_audit()
+    audit: type[Audit] = audit or get_audit(extras=extras)
     result: Result = Result().set_parent_run_id(parent_run_id)
 
     # NOTE: Create the start and stop datetime.
@@ -791,6 +793,7 @@ def schedule_control(
 
 def schedule_runner(
     stop: datetime | None = None,
+    *,
     extras: DictData | None = None,
     excluded: list[str] | None = None,
 ) -> Result:  # pragma: no cov
@@ -831,7 +834,7 @@ def schedule_runner(
                 schedule_control,
                 schedules=[load[0] for load in loader],
                 stop=stop,
-                extras=(extras or {}),
+                extras=extras,
                 parent_run_id=result.parent_run_id,
             )
             for loader in batch(
@@ -851,4 +854,4 @@ def schedule_runner(
             context["schedule"].extend(rs.context.get("schedules", []))
             context["threads"].extend(rs.context.get("threads", []))
 
-    return result.catch(status=0, context=context)
+    return result.catch(status=SUCCESS, context=context)
