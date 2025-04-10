@@ -1134,7 +1134,8 @@ class ForEachStage(BaseStage):
     )
     concurrent: int = Field(
         default=1,
-        gt=0,
+        ge=1,
+        lt=10,
         description=(
             "A concurrent value allow to run each item at the same time. It "
             "will be sequential mode if this value equal 1."
@@ -1145,11 +1146,20 @@ class ForEachStage(BaseStage):
         self,
         item: Union[str, int],
         params: DictData,
+        context: DictData,
         result: Result,
     ) -> tuple[Status, DictData]:
+        """Execute foreach item from list of item.
+
+        :param item:
+        :param params: (DictData) A parameter that want to pass to stage
+            execution.
+        :param context: (DictData)
+        :param result: (Result)
+        """
         result.trace.debug(f"[STAGE]: Execute foreach item: {item!r}")
         params["item"] = item
-        context: DictData = {"stages": {}}
+        to: DictData = {"item": item, "stages": {}}
         status: Status = SUCCESS
         for stage in self.stages:
 
@@ -1163,14 +1173,16 @@ class ForEachStage(BaseStage):
                         run_id=result.run_id,
                         parent_run_id=result.parent_run_id,
                     ).context,
-                    to=context,
+                    to=to,
                 )
             except StageException as e:  # pragma: no cov
                 status = FAILED
                 result.trace.error(
                     f"[STAGE]: Catch:\n\t{e.__class__.__name__}:" f"\n\t{e}"
                 )
-                context.update({"errors": e.to_dict()})
+                to.update({"errors": e.to_dict()})
+
+        context["foreach"][item] = to
         return status, context
 
     def execute(
@@ -1206,13 +1218,24 @@ class ForEachStage(BaseStage):
             )
 
         result.trace.info(f"[STAGE]: Foreach-Execute: {foreach!r}.")
-        rs: DictData = {"items": foreach, "foreach": {}}
-        status: Status = SUCCESS
-        for item in foreach:
-            status, context = self.execute_item(item, params, result=result)
-            rs["foreach"][item] = context
+        context: DictData = {"items": foreach, "foreach": {}}
+        statuses: list[Union[SUCCESS, FAILED]] = []
+        with ThreadPoolExecutor(max_workers=self.concurrent) as executor:
+            futures: list[Future] = [
+                executor.submit(
+                    self.execute_item,
+                    item=item,
+                    params=params.copy(),
+                    context=context,
+                    result=result,
+                )
+                for item in foreach
+            ]
+            for future in as_completed(futures):
+                status, context = future.result()
+                statuses.append(status)
 
-        return result.catch(status=status, context=rs)
+        return result.catch(status=max(statuses), context=context)
 
 
 # TODO: Not implement this stages yet

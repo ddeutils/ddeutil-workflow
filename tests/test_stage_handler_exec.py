@@ -329,24 +329,28 @@ def test_stage_exec_foreach(test_path):
                         "items": [1, 2, 3, 4],
                         "foreach": {
                             1: {
+                                "item": 1,
                                 "stages": {
                                     "2709471980": {"outputs": {}},
                                     "9263488742": {"outputs": {}},
                                 },
                             },
                             2: {
+                                "item": 2,
                                 "stages": {
                                     "2709471980": {"outputs": {}},
                                     "9263488742": {"outputs": {}},
                                 },
                             },
                             3: {
+                                "item": 3,
                                 "stages": {
                                     "2709471980": {"outputs": {}},
                                     "9263488742": {"outputs": {}},
                                 },
                             },
                             4: {
+                                "item": 4,
                                 "stages": {
                                     "2709471980": {"outputs": {}},
                                     "9263488742": {"outputs": {}},
@@ -362,6 +366,73 @@ def test_stage_exec_foreach(test_path):
         stage: Stage = workflow.job("first-job").stage("foreach-raise")
         with pytest.raises(StageException):
             stage.handler_execute({"values": {"items": "test"}})
+
+
+def test_stage_exec_foreach_concurrent(test_path):
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_foreach.yml",
+        data="""
+        tmp-wf-foreach:
+          type: Workflow
+          jobs:
+            first-job:
+              stages:
+                - name: "Start run for-each stage"
+                  id: foreach-stage
+                  foreach: [1, 2, 3, 4]
+                  concurrent: 3
+                  stages:
+                    - name: "Echo stage"
+                      echo: |
+                        Start run with item ${{ item }}
+                    - name: "Final Echo"
+                      if: ${{ item }} == 4
+                      echo: |
+                        Final run
+        """,
+    ):
+        workflow = Workflow.from_conf(name="tmp-wf-foreach")
+        stage: Stage = workflow.job("first-job").stage("foreach-stage")
+        rs = stage.set_outputs(stage.handler_execute({}).context, to={})
+        assert rs == {
+            "stages": {
+                "foreach-stage": {
+                    "outputs": {
+                        "items": [1, 2, 3, 4],
+                        "foreach": {
+                            1: {
+                                "item": 1,
+                                "stages": {
+                                    "2709471980": {"outputs": {}},
+                                    "9263488742": {"outputs": {}},
+                                },
+                            },
+                            2: {
+                                "item": 2,
+                                "stages": {
+                                    "2709471980": {"outputs": {}},
+                                    "9263488742": {"outputs": {}},
+                                },
+                            },
+                            3: {
+                                "item": 3,
+                                "stages": {
+                                    "2709471980": {"outputs": {}},
+                                    "9263488742": {"outputs": {}},
+                                },
+                            },
+                            4: {
+                                "item": 4,
+                                "stages": {
+                                    "2709471980": {"outputs": {}},
+                                    "9263488742": {"outputs": {}},
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        }
 
 
 def test_stage_exec_foreach_with_trigger(test_path):
