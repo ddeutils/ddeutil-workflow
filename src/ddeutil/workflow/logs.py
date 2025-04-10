@@ -511,15 +511,17 @@ TraceModel = Union[
 
 def get_trace(
     run_id: str,
-    parent_run_id: str | None = None,
     *,
+    parent_run_id: str | None = None,
     extras: Optional[DictData] = None,
 ) -> TraceModel:  # pragma: no cov
-    """Get dynamic TraceLog object from the setting config.
+    """Get dynamic Trace instance from the core config (it can override by an
+    extras argument) that passing running ID and parent running ID.
 
-    :param run_id: A running ID.
-    :param parent_run_id: A parent running ID.
-    :param extras: An extra parameter that want to override the core config.
+    :param run_id: (str) A running ID.
+    :param parent_run_id: (str) A parent running ID.
+    :param extras: (DictData) An extra parameter that want to override the core
+        config values.
 
     :rtype: TraceLog
     """
@@ -731,7 +733,9 @@ class FileAudit(BaseAudit):
         :rtype: Self
         """
         trace: Trace = get_trace(
-            self.run_id, self.parent_run_id, extras=self.extras
+            self.run_id,
+            parent_run_id=self.parent_run_id,
+            extras=self.extras,
         )
 
         # NOTE: Check environ variable was set for real writing.
@@ -798,7 +802,9 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
         execution result.
         """
         trace: Trace = get_trace(
-            self.run_id, self.parent_run_id, extras=self.extras
+            self.run_id,
+            parent_run_id=self.parent_run_id,
+            extras=self.extras,
         )
 
         # NOTE: Check environ variable was set for real writing.

@@ -30,10 +30,9 @@ def dotenv_setting() -> None:
         #
         env_str: str = dedent(
             f"""
-            WORKFLOW_CORE_ROOT_PATH={OUTSIDE_PATH.absolute()}
             WORKFLOW_CORE_REGISTRY_CALLER=tests
             WORKFLOW_CORE_REGISTRY_FILTER=src.ddeutil.workflow.reusables
-            WORKFLOW_CORE_CONF_PATH=tests/conf
+            WORKFLOW_CORE_CONF_PATH={(OUTSIDE_PATH / "tests/conf").absolute()}
             WORKFLOW_CORE_TIMEZONE=Asia/Bangkok
             WORKFLOW_CORE_STAGE_DEFAULT_ID=true
             WORKFLOW_CORE_STAGE_RAISE_ERROR=true

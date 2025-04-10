@@ -100,8 +100,8 @@ class Release:
 
         :param dt: (datetime | str) A datetime object or string that want to
             construct to the Release object.
-        :param extras: An extra parameters that want to pass to override
-            config.
+        :param extras: (DictData) An extra parameters that want to pass to
+            override config values.
 
         :raise TypeError: If the type of the dt argument does not valid with
             datetime or str object.
@@ -161,7 +161,7 @@ class ReleaseQueue:
     complete: list[Release] = field(default_factory=list)
     extras: DictData = Field(
         default_factory=dict,
-        description="An extra override config values.",
+        description="An extra parameters that want to override config values.",
     )
 
     @classmethod
@@ -174,7 +174,8 @@ class ReleaseQueue:
         with list of datetime or list of Release.
 
         :param queue:
-        :param extras: An extra parameter that want to override core config.
+        :param extras: An extra parameter that want to override core config
+            values.
 
         :raise TypeError: If the type of input queue does not valid.
 
@@ -253,7 +254,7 @@ class ReleaseQueue:
         heappush(self.complete, value)
 
         # NOTE: Remove complete queue on workflow that keep more than the
-        #   maximum config.
+        #   maximum config value.
         num_complete_delete: int = len(self.complete) - dynamic(
             "max_queue_complete_hist", extras=self.extras
         )
@@ -284,11 +285,12 @@ class ReleaseQueue:
               Generate the next date if it exists.
             - Push this release to the release queue
 
-        :param offset: An offset in second unit for time travel.
-        :param end_date: An end datetime object.
-        :param audit: An audit class that want to make audit object.
-        :param runner: A CronRunner object.
-        :param name: A target name that want to check at pointer of audit.
+        :param end_date: (datetime) An end datetime object.
+        :param audit: (type[Audit]) An audit class that want to make audit
+            instance.
+        :param runner: (CronRunner) A CronRunner object.
+        :param name: (str) A target name that want to check at pointer of audit.
+        :param offset: (float) An offset in second unit for time travel.
         :param force_run: A flag that allow to release workflow if the audit
             with that release was pointed.
         :param extras: An extra parameter that want to override core config.
@@ -339,7 +341,7 @@ class Workflow(BaseModel):
 
     extras: DictData = Field(
         default_factory=dict,
-        description="An extra override config values.",
+        description="An extra parameters that want to override config values.",
     )
 
     name: str = Field(description="A workflow name.")
@@ -409,8 +411,8 @@ class Workflow(BaseModel):
 
         :param name: (str) A workflow name that want to pass to Loader object.
         :param path: (Path) A config path that want to search.
-        :param extras: An extra parameters that want to pass to Loader
-            object.
+        :param extras: (DictData) An extra parameters that want to override core
+            config values.
 
         :raise ValueError: If the type does not match with current object.
 
@@ -441,10 +443,10 @@ class Workflow(BaseModel):
     ) -> DictData:
         """Bypass the on data to loaded config data.
 
-        :param data: A data to construct to this Workflow model.
-        :param path: A config path.
-        :param extras: An extra parameters that want to pass to SimLoad
-            object.
+        :param data: (DictData) A data to construct to this Workflow model.
+        :param path: (Path) A config path.
+        :param extras: (DictData) An extra parameters that want to override core
+            config values.
 
         :rtype: DictData
         """

@@ -52,21 +52,12 @@ class Config:  # pragma: no cov
 
     # NOTE: Core
     @property
-    def root_path(self) -> Path:
-        """Root path or the project path for this workflow engine that use for
-        combine with `conf_path` value.
-
-        :rtype: Path
-        """
-        return Path(env("CORE_ROOT_PATH", "."))
-
-    @property
     def conf_path(self) -> Path:
         """Config path that keep all workflow template YAML files.
 
         :rtype: Path
         """
-        return self.root_path / env("CORE_CONF_PATH", "conf")
+        return Path(env("CORE_CONF_PATH", "./conf"))
 
     @property
     def tz(self) -> ZoneInfo:
@@ -305,23 +296,31 @@ class SimLoad:
                     )
 
     @classmethod
-    def is_ignore(cls, file: Path, conf_path: Path) -> bool:
+    def is_ignore(
+        cls,
+        file: Path,
+        conf_path: Path,
+        *,
+        ignore_filename: Optional[str] = None,
+    ) -> bool:
         """Check this file was ignored.
 
         :param file: (Path) A file path that want to check.
         :param conf_path: (Path) A config path that want to read the config
             ignore file.
+        :param ignore_filename: (str) An ignore filename.
 
         :rtype: bool
         """
-        return is_ignored(file, read_ignore(conf_path / ".confignore"))
+        ignore_filename: str = ignore_filename or ".confignore"
+        return is_ignored(file, read_ignore(conf_path / ignore_filename))
 
     @classmethod
     def filter_yaml(cls, file: Path, name: str | None = None) -> DictData:
         """Read a YAML file context from an input file path and specific name.
 
-        :param file: (Path)
-        :param name: (str)
+        :param file: (Path) A file path that want to extract YAML context.
+        :param name: (str) A key name that search on a YAML context.
 
         :rtype: DictData
         """
@@ -383,17 +382,19 @@ class Loader(SimLoad):
         cls,
         obj: object,
         *,
+        path: Path | None = None,
         included: list[str] | None = None,
         excluded: list[str] | None = None,
-        path: Path | None = None,
         **kwargs,
     ) -> Iterator[tuple[str, DictData]]:
         """Override the find class method from the Simple Loader object.
 
         :param obj: An object that want to validate matching before return.
-        :param included:
-        :param excluded:
-        :param path:
+        :param path: (Path) A override config path.
+        :param included: An excluded list of data key that want to reject this
+            data if any key exist.
+        :param excluded: An included list of data key that want to filter from
+            data.
 
         :rtype: Iterator[tuple[str, DictData]]
         """

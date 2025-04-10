@@ -91,7 +91,7 @@ class ScheduleWorkflow(BaseModel):
 
     extras: DictData = Field(
         default_factory=dict,
-        description="An extra override config values.",
+        description="An extra parameters that want to override config values.",
     )
 
     alias: Optional[str] = Field(
@@ -239,7 +239,7 @@ class Schedule(BaseModel):
 
     extras: DictData = Field(
         default_factory=dict,
-        description="An extra override config values.",
+        description="An extra parameters that want to override config values.",
     )
 
     desc: Optional[str] = Field(
