@@ -57,7 +57,7 @@ def test_conf_log_file_do_first(root_path):
 
 
 @mock.patch.object(Config, "enable_write_audit", True)
-def test_conf_log_file_find_logs(root_path):
+def test_conf_log_file_find_traces(root_path):
     log = FileAudit.model_validate(
         obj={
             "name": "wf-scheduling",
@@ -93,7 +93,7 @@ def test_conf_log_file_find_logs(root_path):
         )
 
 
-def test_conf_log_file_find_logs_raise():
+def test_conf_log_file_find_traces_raise():
     with pytest.raises(FileNotFoundError):
         next(FileAudit.find_audits(name="wf-file-not-found"))
 

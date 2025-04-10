@@ -32,8 +32,11 @@ from .job import (
 )
 from .logs import (
     Audit,
+    AuditModel,
+    Trace,
     TraceData,
-    TraceLog,
+    TraceMeta,
+    TraceModel,
     get_audit,
     get_dt_tznow,
     get_trace,

@@ -10,7 +10,8 @@ from fastapi import APIRouter, Path, Query
 from fastapi import status as st
 from fastapi.responses import UJSONResponse
 
-from ...logs import get_audit, get_trace_obj
+from ...logs import get_audit
+from ...result import Result
 
 log_route = APIRouter(
     prefix="/logs",
@@ -33,6 +34,7 @@ async def get_traces(
     """Return all trace logs from the current trace log path that config with
     `WORKFLOW_LOG_PATH` environment variable name.
     """
+    result = Result()
     return {
         "message": (
             f"Getting trace logs with offset: {offset} and limit: {limit}"
@@ -44,7 +46,7 @@ async def get_traces(
                 exclude_unset=True,
                 exclude_defaults=True,
             )
-            for trace in get_trace_obj().find_logs()
+            for trace in result.trace.find_traces()
         ],
     }
 
@@ -63,12 +65,11 @@ async def get_trace_with_id(run_id: str):
     - **run_id**: A running ID that want to search a trace log from the log
         path.
     """
+    result = Result()
     return {
         "message": f"Getting trace log with specific running ID: {run_id}",
         "trace": (
-            get_trace_obj()
-            .find_log_with_id(run_id)
-            .model_dump(
+            result.trace.find_trace_with_id(run_id).model_dump(
                 by_alias=True,
                 exclude_none=True,
                 exclude_unset=True,

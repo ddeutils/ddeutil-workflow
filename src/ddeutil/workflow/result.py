@@ -21,7 +21,7 @@ from typing_extensions import Self
 
 from .__types import DictData
 from .conf import dynamic
-from .logs import TraceLog, get_dt_tznow, get_trace
+from .logs import Trace, get_dt_tznow, get_trace
 from .utils import default_gen_id, gen_id, get_dt_now
 
 
@@ -68,7 +68,7 @@ class Result:
     parent_run_id: Optional[str] = field(default=None, compare=False)
     ts: datetime = field(default_factory=get_dt_tznow, compare=False)
 
-    trace: Optional[TraceLog] = field(default=None, compare=False, repr=False)
+    trace: Optional[Trace] = field(default=None, compare=False, repr=False)
     extras: DictData = field(default_factory=dict, compare=False, repr=False)
 
     @classmethod
@@ -113,7 +113,7 @@ class Result:
         :rtype: Self
         """
         if self.trace is None:  # pragma: no cov
-            self.trace: TraceLog = get_trace(
+            self.trace: Trace = get_trace(
                 self.run_id, self.parent_run_id, extras=self.extras
             )
         return self
@@ -126,7 +126,7 @@ class Result:
         :rtype: Self
         """
         self.parent_run_id: str = running_id
-        self.trace: TraceLog = get_trace(
+        self.trace: Trace = get_trace(
             self.run_id, running_id, extras=self.extras
         )
         return self

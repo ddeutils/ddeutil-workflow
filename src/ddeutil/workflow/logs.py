@@ -5,7 +5,7 @@
 # ------------------------------------------------------------------------------
 # [x] Use dynamic config
 # [x] Use fix config for `get_logger`, and Model initialize step.
-"""A Logs module contain TraceLog dataclass and AuditLog model.
+"""A Logs module contain Trace dataclass and Audit Pydantic model.
 """
 from __future__ import annotations
 
@@ -20,14 +20,14 @@ from functools import lru_cache
 from inspect import Traceback, currentframe, getframeinfo
 from pathlib import Path
 from threading import get_ident
-from typing import ClassVar, Literal, Optional, Union
+from typing import ClassVar, Literal, Optional, TypeVar, Union
 
 from pydantic import BaseModel, Field
 from pydantic.dataclasses import dataclass
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
-from .__types import DictData, DictStr, TupleStr
+from .__types import DictData, DictStr
 from .conf import config, dynamic
 from .utils import cut_id, get_dt_now
 
@@ -60,22 +60,6 @@ def get_logger(name: str):
 
 
 logger = get_logger("ddeutil.workflow")
-
-__all__: TupleStr = (
-    "FileTraceLog",
-    "SQLiteTraceLog",
-    "TraceData",
-    "TraceMeta",
-    "TraceLog",
-    "get_dt_tznow",
-    "get_logger",
-    "get_trace",
-    "get_trace_obj",
-    "get_audit",
-    "FileAudit",
-    "SQLiteAudit",
-    "Audit",
-)
 
 
 def get_dt_tznow() -> datetime:  # pragma: no cov
@@ -171,12 +155,38 @@ class TraceData(BaseModel):  # pragma: no cov
 
 
 @dataclass(frozen=True)
-class BaseTraceLog(ABC):  # pragma: no cov
-    """Base Trace Log dataclass object."""
+class BaseTrace(ABC):  # pragma: no cov
+    """Base Trace dataclass with abstraction class property."""
 
     run_id: str
     parent_run_id: Optional[str] = field(default=None)
     extras: DictData = field(default_factory=dict, compare=False, repr=False)
+
+    @classmethod
+    @abstractmethod
+    def find_traces(
+        cls,
+        path: Path | None = None,
+        extras: Optional[DictData] = None,
+    ) -> Iterator[TraceData]:  # pragma: no cov
+        raise NotImplementedError(
+            "Trace dataclass should implement `find_traces` class-method."
+        )
+
+    @classmethod
+    @abstractmethod
+    def find_trace_with_id(
+        cls,
+        run_id: str,
+        force_raise: bool = True,
+        *,
+        path: Path | None = None,
+        extras: Optional[DictData] = None,
+    ) -> TraceData:
+        raise NotImplementedError(
+            "Trace dataclass should implement `find_trace_with_id` "
+            "class-method."
+        )
 
     @abstractmethod
     def writer(self, message: str, is_err: bool = False) -> None:
@@ -319,11 +329,11 @@ class BaseTraceLog(ABC):  # pragma: no cov
         logger.exception(msg, stacklevel=2)
 
 
-class FileTraceLog(BaseTraceLog):  # pragma: no cov
-    """Trace Log object that write file to the local storage."""
+class FileTrace(BaseTrace):  # pragma: no cov
+    """File Trace dataclass that write file to the local storage."""
 
     @classmethod
-    def find_logs(
+    def find_traces(
         cls,
         path: Path | None = None,
         extras: Optional[DictData] = None,
@@ -340,7 +350,7 @@ class FileTraceLog(BaseTraceLog):  # pragma: no cov
             yield TraceData.from_path(file)
 
     @classmethod
-    def find_log_with_id(
+    def find_trace_with_id(
         cls,
         run_id: str,
         force_raise: bool = True,
@@ -454,8 +464,8 @@ class FileTraceLog(BaseTraceLog):  # pragma: no cov
             await f.write(trace_meta.model_dump_json() + "\n")
 
 
-class SQLiteTraceLog(BaseTraceLog):  # pragma: no cov
-    """Trace Log object that write trace log to the SQLite database file."""
+class SQLiteTrace(BaseTrace):  # pragma: no cov
+    """SQLite Trace dataclass that write trace log to the SQLite database file."""
 
     table_name: ClassVar[str] = "audits"
     schemas: ClassVar[
@@ -469,10 +479,21 @@ class SQLiteTraceLog(BaseTraceLog):  # pragma: no cov
         """
 
     @classmethod
-    def find_logs(cls) -> Iterator[DictStr]: ...
+    def find_traces(
+        cls,
+        path: Path | None = None,
+        extras: Optional[DictData] = None,
+    ) -> Iterator[TraceData]: ...
 
     @classmethod
-    def find_log_with_id(cls, run_id: str) -> DictStr: ...
+    def find_trace_with_id(
+        cls,
+        run_id: str,
+        force_raise: bool = True,
+        *,
+        path: Path | None = None,
+        extras: Optional[DictData] = None,
+    ) -> TraceData: ...
 
     def make_message(self, message: str) -> str: ...
 
@@ -481,9 +502,10 @@ class SQLiteTraceLog(BaseTraceLog):  # pragma: no cov
     def awriter(self, message: str, is_err: bool = False) -> None: ...
 
 
-TraceLog = Union[
-    FileTraceLog,
-    SQLiteTraceLog,
+Trace = TypeVar("Trace", bound=BaseTrace)
+TraceModel = Union[
+    FileTrace,
+    SQLiteTrace,
 ]
 
 
@@ -492,7 +514,7 @@ def get_trace(
     parent_run_id: str | None = None,
     *,
     extras: Optional[DictData] = None,
-) -> TraceLog:  # pragma: no cov
+) -> TraceModel:  # pragma: no cov
     """Get dynamic TraceLog object from the setting config.
 
     :param run_id: A running ID.
@@ -502,26 +524,10 @@ def get_trace(
     :rtype: TraceLog
     """
     if dynamic("log_path", extras=extras).is_file():
-        return SQLiteTraceLog(
+        return SQLiteTrace(
             run_id, parent_run_id=parent_run_id, extras=(extras or {})
         )
-    return FileTraceLog(
-        run_id, parent_run_id=parent_run_id, extras=(extras or {})
-    )
-
-
-def get_trace_obj(
-    extras: Optional[DictData] = None,
-) -> type[TraceLog]:  # pragma: no cov
-    """Get trace object.
-
-    :param extras: An extra parameter that want to override the core config.
-
-    :rtype: type[TraceLog]
-    """
-    if dynamic("log_path", extras=extras).is_file():
-        return SQLiteTraceLog
-    return FileTraceLog
+    return FileTrace(run_id, parent_run_id=parent_run_id, extras=(extras or {}))
 
 
 class BaseAudit(BaseModel, ABC):
@@ -557,6 +563,41 @@ class BaseAudit(BaseModel, ABC):
         if dynamic("enable_write_audit", extras=self.extras):
             self.do_before()
         return self
+
+    @classmethod
+    @abstractmethod
+    def is_pointed(
+        cls,
+        name: str,
+        release: datetime,
+        *,
+        extras: Optional[DictData] = None,
+    ) -> bool:
+        raise NotImplementedError(
+            "Audit should implement `is_pointed` class-method"
+        )
+
+    @classmethod
+    @abstractmethod
+    def find_audits(
+        cls, name: str, *, extras: Optional[DictData] = None
+    ) -> Iterator[Self]:
+        raise NotImplementedError(
+            "Audit should implement `find_audits` class-method"
+        )
+
+    @classmethod
+    @abstractmethod
+    def find_audit_with_release(
+        cls,
+        name: str,
+        release: datetime | None = None,
+        *,
+        extras: Optional[DictData] = None,
+    ) -> Self:
+        raise NotImplementedError(
+            "Audit should implement `find_audit_with_release` class-method"
+        )
 
     def do_before(self) -> None:  # pragma: no cov
         """To something before end up of initial log model."""
@@ -689,7 +730,9 @@ class FileAudit(BaseAudit):
 
         :rtype: Self
         """
-        trace: TraceLog = get_trace(self.run_id, self.parent_run_id)
+        trace: Trace = get_trace(
+            self.run_id, self.parent_run_id, extras=self.extras
+        )
 
         # NOTE: Check environ variable was set for real writing.
         if not dynamic("enable_write_audit", extras=self.extras):
@@ -727,11 +770,36 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
         primary key ( run_id )
         """
 
+    @classmethod
+    def is_pointed(
+        cls,
+        name: str,
+        release: datetime,
+        *,
+        extras: Optional[DictData] = None,
+    ) -> bool: ...
+
+    @classmethod
+    def find_audits(
+        cls, name: str, *, extras: Optional[DictData] = None
+    ) -> Iterator[Self]: ...
+
+    @classmethod
+    def find_audit_with_release(
+        cls,
+        name: str,
+        release: datetime | None = None,
+        *,
+        extras: Optional[DictData] = None,
+    ) -> Self: ...
+
     def save(self, excluded: list[str] | None) -> SQLiteAudit:
         """Save logging data that receive a context data from a workflow
         execution result.
         """
-        trace: TraceLog = get_trace(self.run_id, self.parent_run_id)
+        trace: Trace = get_trace(
+            self.run_id, self.parent_run_id, extras=self.extras
+        )
 
         # NOTE: Check environ variable was set for real writing.
         if not dynamic("enable_write_audit", extras=self.extras):
@@ -741,19 +809,8 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
         raise NotImplementedError("SQLiteAudit does not implement yet.")
 
 
-class RemoteFileAudit(FileAudit):  # pragma: no cov
-    """Remote File Audit Pydantic Model."""
-
-    def save(self, excluded: list[str] | None) -> RemoteFileAudit: ...
-
-
-class RedisAudit(BaseAudit):  # pragma: no cov
-    """Redis Audit Pydantic Model."""
-
-    def save(self, excluded: list[str] | None) -> RedisAudit: ...
-
-
-Audit = Union[
+Audit = TypeVar("Audit", bound=BaseAudit)
+AuditModel = Union[
     FileAudit,
     SQLiteAudit,
 ]
@@ -761,7 +818,7 @@ Audit = Union[
 
 def get_audit(
     extras: Optional[DictData] = None,
-) -> type[Audit]:  # pragma: no cov
+) -> type[AuditModel]:  # pragma: no cov
     """Get an audit class that dynamic base on the config audit path value.
 
     :param extras: An extra parameter that want to override the core config.

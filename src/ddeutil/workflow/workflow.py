@@ -840,7 +840,7 @@ class Workflow(BaseModel):
         :rtype: Result
         :return: A list of all results that return from `self.release` method.
         """
-        audit: type[Audit] = audit or get_audit()
+        audit: type[Audit] = audit or get_audit(extras=self.extras)
         result: Result = Result(
             run_id=(run_id or gen_id(self.name, unique=True))
         )
@@ -1383,7 +1383,7 @@ class WorkflowTask:
 
         :rtype: Result
         """
-        audit: type[Audit] = audit or get_audit()
+        audit: type[Audit] = audit or get_audit(extras=self.extras)
 
         if release is None:
 

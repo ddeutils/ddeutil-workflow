@@ -392,15 +392,14 @@ class Schedule(BaseModel):
             writing its release audit context.
         :param parent_run_id: A parent workflow running ID for this release.
         """
-        audit: type[Audit] = audit or get_audit()
+        extras: DictData = extras or self.extras
+        audit: type[Audit] = audit or get_audit(extras=extras)
         result: Result = Result().set_parent_run_id(parent_run_id)
 
         # NOTE: Create the start and stop datetime.
-        start_date: datetime = datetime.now(
-            tz=dynamic("tz", extras=self.extras)
-        )
+        start_date: datetime = datetime.now(tz=dynamic("tz", extras=extras))
         stop_date: datetime = stop or (
-            start_date + dynamic("stop_boundary_delta", extras=self.extras)
+            start_date + dynamic("stop_boundary_delta", extras=extras)
         )
 
         # IMPORTANT: Create main mapping of queue and thread object.
