@@ -807,7 +807,7 @@ class CallStage(BaseStage):
         has_keyword: bool = False
         call_func: TagFunc = extract_call(
             param2template(self.uses, params, extras=self.extras),
-            registries=self.extras.get("regis_call"),
+            registries=self.extras.get("registry_caller"),
         )()
 
         # VALIDATE: check input task caller parameters that exists before

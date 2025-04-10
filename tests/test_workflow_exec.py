@@ -530,7 +530,7 @@ def test_workflow_exec_call_override_registry(test_path):
 
         workflow = Workflow.from_conf(
             name="tmp-wf-exec-call-override",
-            extras={"regis_call": ["mock_tests"]},
+            extras={"registry_caller": ["mock_tests"]},
         )
         rs = workflow.execute(params={})
         assert rs.status == SUCCESS

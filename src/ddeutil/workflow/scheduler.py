@@ -172,7 +172,7 @@ class ScheduleWorkflow(BaseModel):
 
         extras: Optional[DictData] = info.data.get("extras")
         if len(set_ons) > (
-            conf := dynamic("max_on_per_workflow", extras=extras)
+            conf := dynamic("max_cron_per_workflow", extras=extras)
         ):
             raise ValueError(
                 f"The number of the on should not more than {conf} crontabs."

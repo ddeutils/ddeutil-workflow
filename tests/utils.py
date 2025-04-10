@@ -73,7 +73,7 @@ def dump_yaml(
 ) -> None:  # pragma: no cov
     """Dump the context data to the target yaml file.
 
-    :param filename:
+    :param filename: (str | Path) A file path or filename of a YAML config.
     :param data: A YAML data context that want to write to the target file path.
     """
     with Path(filename).open(mode="w") as f:
@@ -89,7 +89,7 @@ def dump_yaml_context(
 ) -> None:  # pragma: no cov
     """Dump the context data to the target yaml file.
 
-    :param filename:
+    :param filename: (str | Path) A file path or filename of a YAML config.
     :param data: A YAML data context that want to write to the target file path.
     """
     test_file: Path = Path(filename) if isinstance(filename, str) else filename

@@ -72,12 +72,12 @@ class Config:  # pragma: no cov
         return ZoneInfo(env("CORE_TIMEZONE", "UTC"))
 
     @property
-    def gen_id_simple_mode(self) -> bool:
+    def generate_id_simple_mode(self) -> bool:
         return str2bool(env("CORE_GENERATE_ID_SIMPLE_MODE", "true"))
 
     # NOTE: Register
     @property
-    def regis_call(self) -> list[str]:
+    def registry_caller(self) -> list[str]:
         """Register Caller that is a list of importable string for the call
         stage model can get.
 
@@ -87,7 +87,7 @@ class Config:  # pragma: no cov
         return [r.strip() for r in regis_call_str.split(",")]
 
     @property
-    def regis_filter(self) -> list[str]:
+    def registry_filter(self) -> list[str]:
         """Register Filter that is a list of importable string for the filter
         template.
 
@@ -100,7 +100,7 @@ class Config:  # pragma: no cov
 
     # NOTE: Log
     @property
-    def log_path(self) -> Path:
+    def trace_path(self) -> Path:
         return Path(env("LOG_TRACE_PATH", "./logs"))
 
     @property
@@ -163,7 +163,7 @@ class Config:  # pragma: no cov
         return str2bool(env("CORE_JOB_DEFAULT_ID", "false"))
 
     @property
-    def max_on_per_workflow(self) -> int:
+    def max_cron_per_workflow(self) -> int:
         """The maximum on value that store in workflow model.
 
         :rtype: int

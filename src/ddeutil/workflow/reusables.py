@@ -91,7 +91,7 @@ def make_filter_registry(
     :rtype: dict[str, FilterRegistry]
     """
     rs: dict[str, FilterRegistry] = {}
-    for module in dynamic("regis_filter", f=registers):
+    for module in dynamic("registry_filter", f=registers):
         # NOTE: try to sequential import task functions
         try:
             importer = import_module(module)
@@ -343,7 +343,7 @@ def param2template(
     :returns: An any getter value from the params input.
     """
     registers: Optional[list[str]] = (
-        extras.get("regis_filter") if extras else None
+        extras.get("registry_filter") if extras else None
     )
     filters: dict[str, FilterRegistry] = filters or make_filter_registry(
         registers=registers
@@ -449,7 +449,7 @@ def make_registry(
     """
     rs: dict[str, Registry] = {}
     regis_calls: list[str] = dynamic(
-        "regis_call", f=registries
+        "registry_caller", f=registries
     )  # pragma: no cov
     regis_calls.extend(["ddeutil.vendors"])
 

@@ -142,7 +142,7 @@ def gen_id(
     if not isinstance(value, str):
         value: str = str(value)
 
-    if config.gen_id_simple_mode:
+    if config.generate_id_simple_mode:
         return (
             f"{datetime.now(tz=config.tz):%Y%m%d%H%M%S%f}T" if unique else ""
         ) + hash_str(f"{(value if sensitive else value.lower())}", n=10)

@@ -29,7 +29,7 @@ def raise_util(_: str) -> None:  # pragma: no cov
 
 @mock.patch.object(
     Config,
-    "regis_filter",
+    "registry_filter",
     [
         "ddeutil.workflow.utils",
         "tests.test_reusables_template_filter",
@@ -67,7 +67,7 @@ def test_get_args_const():
 
 @mock.patch.object(
     Config,
-    "regis_filter",
+    "registry_filter",
     [
         "ddeutil.workflow.utils",
         "tests.test_reusables_template_filter",

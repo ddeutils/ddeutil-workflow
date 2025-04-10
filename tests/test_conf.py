@@ -144,10 +144,10 @@ def test_dynamic():
     conf = dynamic("audit_path", extras={"audit_path": Path("/extras-audits")})
     assert conf == Path("/extras-audits")
 
-    conf = dynamic("max_on_per_workflow", f=10, extras={})
+    conf = dynamic("max_cron_per_workflow", f=10, extras={})
     assert conf == 10
 
-    conf = dynamic("max_on_per_workflow", f=None, extras={})
+    conf = dynamic("max_cron_per_workflow", f=None, extras={})
     assert conf == 5
 
     with pytest.raises(TypeError):

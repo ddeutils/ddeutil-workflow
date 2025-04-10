@@ -344,7 +344,7 @@ class FileTrace(BaseTrace):  # pragma: no cov
         :param extras: An extra parameter that want to override core config.
         """
         for file in sorted(
-            (path or dynamic("log_path", extras=extras)).glob("./run_id=*"),
+            (path or dynamic("trace_path", extras=extras)).glob("./run_id=*"),
             key=lambda f: f.lstat().st_mtime,
         ):
             yield TraceData.from_path(file)
@@ -365,7 +365,7 @@ class FileTrace(BaseTrace):  # pragma: no cov
         :param path:
         :param extras: An extra parameter that want to override core config.
         """
-        base_path: Path = path or dynamic("log_path", extras=extras)
+        base_path: Path = path or dynamic("trace_path", extras=extras)
         file: Path = base_path / f"run_id={run_id}"
         if file.exists():
             return TraceData.from_path(file)
@@ -379,7 +379,7 @@ class FileTrace(BaseTrace):  # pragma: no cov
     @property
     def pointer(self) -> Path:
         log_file: Path = (
-            dynamic("log_path", extras=self.extras)
+            dynamic("trace_path", extras=self.extras)
             / f"run_id={self.parent_run_id or self.run_id}"
         )
         if not log_file.exists():
@@ -525,7 +525,7 @@ def get_trace(
 
     :rtype: TraceLog
     """
-    if dynamic("log_path", extras=extras).is_file():
+    if dynamic("trace_path", extras=extras).is_file():
         return SQLiteTrace(
             run_id, parent_run_id=parent_run_id, extras=(extras or {})
         )
