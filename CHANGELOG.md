@@ -2,6 +2,37 @@
 
 ## Latest Changes
 
+## 0.0.49
+
+### :stars: Highlight Features
+
+- :star: hl: add support for case match stage.
+- :star: hl: add support for until stage.
+- :star: hl: add support concurrent on the foreach stage.
+
+### :sparkles: Features
+
+- :dart: feat: split execution on the foreach stage.
+- :dart: feat: add bypass extras argument to workflow task object.
+- :dart: feat: add dynamic config on scheduler module.
+
+### :bug: Bug fixes
+
+- :gear: fixed: remove default on virtual python stage for make differ union.
+- :gear: fixed: change config property name that not match with env key.
+- :gear: fixed: remove extras that force pass on scheduler method.
+- :gear: fixed: remove validate info for after mode model validation.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: fixed assert not valid with respec value.
+- :construction: refactored: change logs object type and abstract method.
+
+### :broom: Deprecate & Clean
+
+- :recycle: clean: remove set default id config.
+- :recycle: clean: remove root path on the config object.
+
 ## 0.0.48
 
 ### :sparkles: Features
