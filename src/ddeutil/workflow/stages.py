@@ -1622,7 +1622,6 @@ class VirtualPyStage(PyStage):  # pragma: no cov
     """Python Virtual Environment stage execution."""
 
     deps: list[str] = Field(
-        default_factory=list,
         description=(
             "list of Python dependency that want to install before execution "
             "stage."
