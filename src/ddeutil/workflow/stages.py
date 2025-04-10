@@ -43,7 +43,7 @@ from pathlib import Path
 from subprocess import CompletedProcess
 from textwrap import dedent
 from threading import Event
-from typing import Annotated, Any, Optional, Union, get_type_hints
+from typing import Annotated, Any, Optional, TypeVar, Union, get_type_hints
 
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
@@ -58,6 +58,8 @@ from .utils import (
     gen_id,
     make_exec,
 )
+
+T = TypeVar("T")
 
 
 class BaseStage(BaseModel, ABC):
@@ -271,6 +273,25 @@ class BaseStage(BaseModel, ABC):
         )
         to["stages"][_id] = {"outputs": output, **skipping, **errors}
         return to
+
+    def get_outputs(self, outputs: DictData) -> DictData:
+        """Get the outputs from stages data.
+
+        :rtype: DictData
+        """
+        if self.id is None and not dynamic(
+            "stage_default_id", extras=self.extras
+        ):
+            return {}
+
+        _id: str = (
+            param2template(self.id, params=outputs, extras=self.extras)
+            if self.id
+            else gen_id(
+                param2template(self.name, params=outputs, extras=self.extras)
+            )
+        )
+        return outputs.get("stages", {}).get(_id, {})
 
     def is_skipped(self, params: DictData | None = None) -> bool:
         """Return true if condition of this stage do not correct. This process
@@ -1265,10 +1286,53 @@ class UntilStage(BaseStage):  # pragma: no cov
             "correct."
         ),
     )
-    max_until_not_change: int = Field(
-        default=3,
-        description="The maximum value of loop if condition not change.",
+    max_until_loop: int = Field(
+        default=10,
+        ge=1,
+        lt=100,
+        description="The maximum value of loop for this until stage.",
     )
+
+    def execute_item(
+        self,
+        item: T,
+        loop: int,
+        params: DictData,
+        context: DictData,
+        result: Result,
+    ) -> tuple[Status, DictData, T]:
+        result.trace.debug(f"[STAGE]: Execute until item: {item!r}")
+        params["item"] = item
+        to: DictData = {"item": item, "stages": {}}
+        status: Status = SUCCESS
+        next_item: T = None
+        for stage in self.stages:
+
+            if self.extras:
+                stage.extras = self.extras
+
+            try:
+                stage.set_outputs(
+                    stage.handler_execute(
+                        params=params,
+                        run_id=result.run_id,
+                        parent_run_id=result.parent_run_id,
+                    ).context,
+                    to=to,
+                )
+                if "item" in (
+                    outputs := stage.get_outputs(to).get("outputs", {})
+                ):
+                    next_item = outputs["item"]
+            except StageException as e:
+                status = FAILED
+                result.trace.error(
+                    f"[STAGE]: Catch:\n\t{e.__class__.__name__}:" f"\n\t{e}"
+                )
+                to.update({"errors": e.to_dict()})
+
+        context["until"][loop] = to
+        return status, context, next_item
 
     def execute(
         self,
@@ -1276,10 +1340,58 @@ class UntilStage(BaseStage):  # pragma: no cov
         *,
         result: Result | None = None,
         event: Event | None = None,
-    ) -> Result: ...
+    ) -> Result:
+        item: Union[str, int, bool] = param2template(
+            self.item, params, extras=self.extras
+        )
+        result.trace.info(f"[STAGE]: Until-Execution: {self.until}")
+        track: bool = True
+        exceed_loop: bool = False
+        loop: int = 1
+        context: DictData = {"until": {}}
+        statuses: list[Union[SUCCESS, FAILED]] = []
+        while track and not (exceed_loop := loop >= self.max_until_loop):
+            status, context, item = self.execute_item(
+                item=item,
+                loop=loop,
+                params=params.copy(),
+                context=context,
+                result=result,
+            )
+
+            loop += 1
+            if item is None:
+                result.trace.warning(
+                    "... Does not have set item stage. It will use loop by "
+                    "default."
+                )
+                item = loop
+
+            next_track: bool = eval(
+                param2template(
+                    self.until, params | {"item": item}, extras=self.extras
+                ),
+                globals() | params | {"item": item},
+                {},
+            )
+            if not isinstance(next_track, bool):
+                raise TypeError(
+                    "Return type of until condition does not be boolean, it"
+                    f"return: {next_track!r}"
+                )
+            track = not next_track
+            statuses.append(status)
+
+        if exceed_loop:
+            raise StageException(
+                f"The until loop was exceed {self.max_until_loop} loops"
+            )
+        return result.catch(status=max(statuses), context=context)
 
 
 class Match(BaseModel):
+    """Match model for the Case Stage."""
+
     case: Union[str, int]
     stage: Stage
 
@@ -1491,6 +1603,7 @@ Stage = Annotated[
         CallStage,
         TriggerStage,
         ForEachStage,
+        UntilStage,
         ParallelStage,
         PyStage,
         RaiseStage,
