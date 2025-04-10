@@ -184,8 +184,6 @@ class ScheduleWorkflow(BaseModel):
         self,
         start_date: datetime,
         queue: dict[str, ReleaseQueue],
-        *,
-        extras: DictData | None = None,
     ) -> list[WorkflowTask]:
         """Return the list of WorkflowTask object from the specific input
         datetime that mapping with the on field.
@@ -195,17 +193,15 @@ class ScheduleWorkflow(BaseModel):
 
         :param start_date: A start date that get from the workflow schedule.
         :param queue: A mapping of name and list of datetime for queue.
-        :param extras: An extra parameters that pass to the Loader object.
 
         :rtype: list[WorkflowTask]
         :return: Return the list of WorkflowTask object from the specific
             input datetime that mapping with the on field.
         """
         workflow_tasks: list[WorkflowTask] = []
-        extras: DictData = extras or {}
 
         # NOTE: Loading workflow model from the name of workflow.
-        wf: Workflow = Workflow.from_conf(self.name, extras=extras)
+        wf: Workflow = Workflow.from_conf(self.name, extras=self.extras)
         wf_queue: ReleaseQueue = queue[self.alias]
 
         # IMPORTANT: Create the default 'on' value if it does not pass the `on`
@@ -227,7 +223,7 @@ class ScheduleWorkflow(BaseModel):
                     workflow=wf,
                     runner=runner,
                     values=self.values,
-                    extras=(extras or self.extras),
+                    extras=self.extras,
                 ),
             )
 
@@ -344,8 +340,6 @@ class Schedule(BaseModel):
         self,
         start_date: datetime,
         queue: dict[str, ReleaseQueue],
-        *,
-        extras: DictData | None = None,
     ) -> list[WorkflowTask]:
         """Return the list of WorkflowTask object from the specific input
         datetime that mapping with the on field from workflow schedule model.
@@ -353,26 +347,21 @@ class Schedule(BaseModel):
         :param start_date: A start date that get from the workflow schedule.
         :param queue: (dict[str, ReleaseQueue]) A mapping of name and list of
             datetime for queue.
-        :param extras: (DictData) An extra parameters that want to override core
-            config.
 
         :rtype: list[WorkflowTask]
         :return: Return the list of WorkflowTask object from the specific
             input datetime that mapping with the on field.
         """
         workflow_tasks: list[WorkflowTask] = []
-        extras: DictData = extras or self.extras
 
         for workflow in self.workflows:
             if self.extras:
-                workflow.extras = extras
+                workflow.extras = self.extras
 
             if workflow.alias not in queue:
                 queue[workflow.alias] = ReleaseQueue()
 
-            workflow_tasks.extend(
-                workflow.tasks(start_date, queue=queue, extras=extras)
-            )
+            workflow_tasks.extend(workflow.tasks(start_date, queue=queue))
 
         return workflow_tasks
 
@@ -380,26 +369,25 @@ class Schedule(BaseModel):
         self,
         *,
         stop: datetime | None = None,
-        extras: DictData | None = None,
         audit: type[Audit] | None = None,
         parent_run_id: str | None = None,
     ) -> Result:  # pragma: no cov
         """Pending this schedule tasks with the schedule package.
 
         :param stop: A datetime value that use to stop running schedule.
-        :param extras: An extra parameters that pass to Loader.
         :param audit: An audit class that use on the workflow task release for
             writing its release audit context.
         :param parent_run_id: A parent workflow running ID for this release.
         """
-        extras: DictData = extras or self.extras
-        audit: type[Audit] = audit or get_audit(extras=extras)
+        audit: type[Audit] = audit or get_audit(extras=self.extras)
         result: Result = Result().set_parent_run_id(parent_run_id)
 
         # NOTE: Create the start and stop datetime.
-        start_date: datetime = datetime.now(tz=dynamic("tz", extras=extras))
+        start_date: datetime = datetime.now(
+            tz=dynamic("tz", extras=self.extras)
+        )
         stop_date: datetime = stop or (
-            start_date + dynamic("stop_boundary_delta", extras=extras)
+            start_date + dynamic("stop_boundary_delta", extras=self.extras)
         )
 
         # IMPORTANT: Create main mapping of queue and thread object.
@@ -411,7 +399,7 @@ class Schedule(BaseModel):
         ) + timedelta(minutes=1)
 
         scheduler_pending(
-            tasks=self.tasks(start_date_waiting, queue=queue, extras=extras),
+            tasks=self.tasks(start_date_waiting, queue=queue),
             stop=stop_date,
             queue=queue,
             threads=threads,
@@ -771,10 +759,10 @@ def schedule_control(
     tasks: list[WorkflowTask] = []
     for name in schedules:
         tasks.extend(
-            Schedule.from_conf(name, extras=extras).tasks(
-                start_date_waiting,
-                queue=queue,
-                extras=extras,
+            (
+                Schedule.from_conf(name, extras=extras).tasks(
+                    start_date_waiting, queue=queue
+                )
             ),
         )
 
