@@ -126,14 +126,17 @@ class ScheduleWorkflow(BaseModel):
         if not values.get("alias"):
             values["alias"] = values.get("name")
 
-        cls.__bypass_on(values)
+        cls.__bypass_on(values, extras=values.get("extras"))
         return values
 
     @classmethod
-    def __bypass_on(cls, data: DictData) -> DictData:
+    def __bypass_on(
+        cls, data: DictData, *, extras: Optional[DictData] = None
+    ) -> DictData:
         """Bypass and prepare the on data to loaded config data.
 
         :param data: A data that want to validate for model initialization.
+        :param extras: An extra parameter that want to override core config.
 
         :rtype: DictData
         """
@@ -148,7 +151,7 @@ class ScheduleWorkflow(BaseModel):
             # NOTE: Pass on value to Loader and keep on model object to on
             #   field.
             data["on"] = [
-                Loader(n, externals={}).data if isinstance(n, str) else n
+                Loader(n, externals=extras).data if isinstance(n, str) else n
                 for n in on
             ]
 

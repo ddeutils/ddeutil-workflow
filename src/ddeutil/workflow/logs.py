@@ -22,7 +22,7 @@ from pathlib import Path
 from threading import get_ident
 from typing import ClassVar, Literal, Optional, Union
 
-from pydantic import BaseModel, Field, ValidationInfo
+from pydantic import BaseModel, Field
 from pydantic.dataclasses import dataclass
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
@@ -549,12 +549,12 @@ class BaseAudit(BaseModel, ABC):
     execution_time: float = Field(default=0, description="An execution time.")
 
     @model_validator(mode="after")
-    def __model_action(self, info: ValidationInfo) -> Self:
+    def __model_action(self) -> Self:
         """Do before the Audit action with WORKFLOW_AUDIT_ENABLE_WRITE env variable.
 
         :rtype: Self
         """
-        if dynamic("enable_write_audit", extras=info.data.get("extras")):
+        if dynamic("enable_write_audit", extras=self.extras):
             self.do_before()
         return self
 
