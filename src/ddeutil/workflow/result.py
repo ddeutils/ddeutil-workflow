@@ -114,7 +114,9 @@ class Result:
         """
         if self.trace is None:  # pragma: no cov
             self.trace: Trace = get_trace(
-                self.run_id, self.parent_run_id, extras=self.extras
+                self.run_id,
+                parent_run_id=self.parent_run_id,
+                extras=self.extras,
             )
         return self
 
@@ -127,7 +129,7 @@ class Result:
         """
         self.parent_run_id: str = running_id
         self.trace: Trace = get_trace(
-            self.run_id, running_id, extras=self.extras
+            self.run_id, parent_run_id=running_id, extras=self.extras
         )
         return self
 

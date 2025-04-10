@@ -11,7 +11,7 @@ from collections.abc import Iterator
 from datetime import timedelta
 from functools import cached_property
 from pathlib import Path
-from typing import Optional, TypeVar
+from typing import Final, Optional, TypeVar
 from zoneinfo import ZoneInfo
 
 from ddeutil.core import str2bool
@@ -21,11 +21,14 @@ from ddeutil.io.paths import glob_files, is_ignored, read_ignore
 from .__types import DictData, TupleStr
 
 T = TypeVar("T")
-PREFIX: str = "WORKFLOW"
+PREFIX: Final[str] = "WORKFLOW"
 
 
 def env(var: str, default: str | None = None) -> str | None:  # pragma: no cov
     """Get environment variable with uppercase and adding prefix string.
+
+    :param var: (str) A env variable name.
+    :param default: (str | None) A default value if an env var does not set.
 
     :rtype: str | None
     """
@@ -373,8 +376,8 @@ def dynamic(
 class Loader(SimLoad):
     """Loader Object that get the config `yaml` file from current path.
 
-    :param name: A name of config data that will read by Yaml Loader object.
-    :param externals: An external parameters
+    :param name: (str) A name of config data that will read by Yaml Loader object.
+    :param externals: (DictData) An external parameters
     """
 
     @classmethod

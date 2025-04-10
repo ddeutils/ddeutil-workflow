@@ -59,18 +59,6 @@ from .utils import (
     make_exec,
 )
 
-__all__: TupleStr = (
-    "EmptyStage",
-    "BashStage",
-    "PyStage",
-    "CallStage",
-    "TriggerStage",
-    "ForEachStage",
-    "ParallelStage",
-    "RaiseStage",
-    "Stage",
-)
-
 
 class BaseStage(BaseModel, ABC):
     """Base Stage Model that keep only id and name fields for the stage
@@ -1153,6 +1141,38 @@ class ForEachStage(BaseStage):
         ),
     )
 
+    def execute_item(
+        self,
+        item: Union[str, int],
+        params: DictData,
+        result: Result,
+    ) -> tuple[Status, DictData]:
+        result.trace.debug(f"[STAGE]: Execute foreach item: {item!r}")
+        params["item"] = item
+        context: DictData = {"stages": {}}
+        status: Status = SUCCESS
+        for stage in self.stages:
+
+            if self.extras:
+                stage.extras = self.extras
+
+            try:
+                stage.set_outputs(
+                    stage.handler_execute(
+                        params=params,
+                        run_id=result.run_id,
+                        parent_run_id=result.parent_run_id,
+                    ).context,
+                    to=context,
+                )
+            except StageException as e:  # pragma: no cov
+                status = FAILED
+                result.trace.error(
+                    f"[STAGE]: Catch:\n\t{e.__class__.__name__}:" f"\n\t{e}"
+                )
+                context.update({"errors": e.to_dict()})
+        return status, context
+
     def execute(
         self,
         params: DictData,
@@ -1188,33 +1208,8 @@ class ForEachStage(BaseStage):
         result.trace.info(f"[STAGE]: Foreach-Execute: {foreach!r}.")
         rs: DictData = {"items": foreach, "foreach": {}}
         status: Status = SUCCESS
-        # TODO: Implement concurrent more than 1.
         for item in foreach:
-            result.trace.debug(f"[STAGE]: Execute foreach item: {item!r}")
-            params["item"] = item
-            context = {"stages": {}}
-
-            for stage in self.stages:
-
-                if self.extras:
-                    stage.extras = self.extras
-
-                try:
-                    stage.set_outputs(
-                        stage.handler_execute(
-                            params=params,
-                            run_id=result.run_id,
-                            parent_run_id=result.parent_run_id,
-                        ).context,
-                        to=context,
-                    )
-                except StageException as e:  # pragma: no cov
-                    status = FAILED
-                    result.trace.error(
-                        f"[STAGE]: Catch:\n\t{e.__class__.__name__}:" f"\n\t{e}"
-                    )
-                    context.update({"errors": e.to_dict()})
-
+            status, context = self.execute_item(item, params, result=result)
             rs["foreach"][item] = context
 
         return result.catch(status=status, context=rs)
@@ -1261,7 +1256,6 @@ class UntilStage(BaseStage):  # pragma: no cov
     ) -> Result: ...
 
 
-# TODO: Not implement this stages yet
 class Match(BaseModel):
     case: Union[str, int]
     stage: Stage
@@ -1303,7 +1297,7 @@ class CaseStage(BaseStage):  # pragma: no cov
     """
 
     case: str = Field(description="A case condition for routing.")
-    match: list[Match]
+    match: list[Match] = Field(description="A list of Match model")
 
     def execute(
         self,

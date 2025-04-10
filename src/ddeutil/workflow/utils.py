@@ -15,7 +15,7 @@ from inspect import isfunction
 from itertools import chain, islice, product
 from pathlib import Path
 from random import randrange
-from typing import Any, TypeVar
+from typing import Any, Final, TypeVar
 from zoneinfo import ZoneInfo
 
 from ddeutil.core import hash_str
@@ -23,7 +23,7 @@ from ddeutil.core import hash_str
 from .__types import DictData, Matrix
 
 T = TypeVar("T")
-UTC = ZoneInfo("UTC")
+UTC: Final[ZoneInfo] = ZoneInfo("UTC")
 
 
 def get_dt_now(
