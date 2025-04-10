@@ -635,3 +635,63 @@ def test_stage_exec_until(test_path):
                 }
             }
         }
+
+
+def test_stage_exec_case_match(test_path):
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_case_match.yml",
+        data="""
+        tmp-wf-case-match:
+          type: Workflow
+          params: { name: str }
+          jobs:
+            first-job:
+              stages:
+                - name: "Start run case-match stage"
+                  id: case-stage
+                  case: ${{ params.name }}
+                  match:
+                    - case: "bar"
+                      stage:
+                        name: Match name with Bar
+                        echo: Hello ${{ params.name }}
+
+                    - case: "foo"
+                      stage:
+                        name: Match name with For
+                        echo: Hello ${{ params.name }}
+
+                    - case: "_"
+                      stage:
+                        name: Else stage
+                        echo: Not match any case.
+                - name: "Stage raise not has else condition"
+                  id: raise-else
+                  case: ${{ params.name }}
+                  match:
+                    - case: "bar"
+                      stage:
+                        name: Match name with Bar
+                        echo: Hello ${{ params.name }}
+        """,
+    ):
+        workflow = Workflow.from_conf(name="tmp-wf-case-match")
+        stage: Stage = workflow.job("first-job").stage("case-stage")
+        rs = stage.set_outputs(
+            stage.handler_execute({"params": {"name": "bar"}}).context, to={}
+        )
+        assert rs == {"stages": {"case-stage": {"outputs": {}}}}
+
+        rs = stage.set_outputs(
+            stage.handler_execute({"params": {"name": "foo"}}).context, to={}
+        )
+        assert rs == {"stages": {"case-stage": {"outputs": {}}}}
+
+        rs = stage.set_outputs(
+            stage.handler_execute({"params": {"name": "test"}}).context, to={}
+        )
+        assert rs == {"stages": {"case-stage": {"outputs": {}}}}
+
+        stage: Stage = workflow.job("first-job").stage("raise-else")
+        with pytest.raises(StageException):
+            stage.handler_execute({"params": {"name": "test"}})

@@ -1172,11 +1172,13 @@ class ForEachStage(BaseStage):
     ) -> tuple[Status, DictData]:
         """Execute foreach item from list of item.
 
-        :param item:
+        :param item: (str | int) An item that want to execution.
         :param params: (DictData) A parameter that want to pass to stage
             execution.
         :param context: (DictData)
         :param result: (Result)
+
+        :rtype: tuple[Status, DictData]
         """
         result.trace.debug(f"[STAGE]: Execute foreach item: {item!r}")
         params["item"] = item
@@ -1259,7 +1261,6 @@ class ForEachStage(BaseStage):
         return result.catch(status=max(statuses), context=context)
 
 
-# TODO: Not implement this stages yet
 class UntilStage(BaseStage):  # pragma: no cov
     """Until execution stage.
 
@@ -1301,6 +1302,18 @@ class UntilStage(BaseStage):  # pragma: no cov
         context: DictData,
         result: Result,
     ) -> tuple[Status, DictData, T]:
+        """Execute until item set item by some stage or by default loop
+        variable.
+
+        :param item: (T) An item that want to execution.
+        :param loop: (int) A number of loop.
+        :param params: (DictData) A parameter that want to pass to stage
+            execution.
+        :param context: (DictData)
+        :param result: (Result)
+
+        :rtype: tuple[Status, DictData, T]
+        """
         result.trace.debug(f"[STAGE]: Execute until item: {item!r}")
         params["item"] = item
         to: DictData = {"item": item, "stages": {}}
@@ -1341,6 +1354,22 @@ class UntilStage(BaseStage):  # pragma: no cov
         result: Result | None = None,
         event: Event | None = None,
     ) -> Result:
+        """Execute the stages that pass item from until condition field and
+        setter step.
+
+        :param params: A parameter that want to pass before run any statement.
+        :param result: (Result) A result object for keeping context and status
+            data.
+        :param event: (Event) An event manager that use to track parent execute
+            was not force stopped.
+
+        :rtype: Result
+        """
+        if result is None:  # pragma: no cov
+            result: Result = Result(
+                run_id=gen_id(self.name + (self.id or ""), unique=True)
+            )
+
         item: Union[str, int, bool] = param2template(
             self.item, params, extras=self.extras
         )
@@ -1396,7 +1425,6 @@ class Match(BaseModel):
     stage: Stage
 
 
-# TODO: Not implement this stages yet
 class CaseStage(BaseStage):  # pragma: no cov
     """Case execution stage.
 
@@ -1432,7 +1460,9 @@ class CaseStage(BaseStage):  # pragma: no cov
     """
 
     case: str = Field(description="A case condition for routing.")
-    match: list[Match] = Field(description="A list of Match model")
+    match: list[Match] = Field(
+        description="A list of Match model that should not be an empty list.",
+    )
 
     def execute(
         self,
@@ -1455,10 +1485,14 @@ class CaseStage(BaseStage):  # pragma: no cov
             result: Result = Result(
                 run_id=gen_id(self.name + (self.id or ""), unique=True)
             )
-        status = SUCCESS
+
         _case = param2template(self.case, params, extras=self.extras)
+
+        result.trace.info(f"[STAGE]: Case-Execute: {_case!r}.")
         _else = None
+        stage: Optional[Stage] = None
         context = {}
+        status = SUCCESS
         for match in self.match:
             if (c := match.case) != "_":
                 _condition = param2template(c, params, extras=self.extras)
@@ -1466,27 +1500,35 @@ class CaseStage(BaseStage):  # pragma: no cov
                 _else = match
                 continue
 
-            if match == _condition:
+            if stage is None and _case == _condition:
                 stage: Stage = match.stage
-                if self.extras:
-                    stage.extras = self.extras
 
-                try:
-                    stage.set_outputs(
-                        stage.handler_execute(
-                            params=params,
-                            run_id=result.run_id,
-                            parent_run_id=result.parent_run_id,
-                        ).context,
-                        to=context,
-                    )
-                except StageException as e:  # pragma: no cov
-                    status = FAILED
-                    result.trace.error(
-                        f"[STAGE]: Catch:\n\t{e.__class__.__name__}:" f"\n\t{e}"
-                    )
-                    context.update({"errors": e.to_dict()})
+        if stage is None:
+            if _else is None:
+                raise StageException(
+                    "This stage does not set else for support not match "
+                    "any case."
+                )
 
+            stage: Stage = _else.stage
+
+        if self.extras:
+            stage.extras = self.extras
+
+        try:
+            context.update(
+                stage.handler_execute(
+                    params=params,
+                    run_id=result.run_id,
+                    parent_run_id=result.parent_run_id,
+                ).context
+            )
+        except StageException as e:  # pragma: no cov
+            status = FAILED
+            result.trace.error(
+                f"[STAGE]: Catch:\n\t{e.__class__.__name__}:" f"\n\t{e}"
+            )
+            context.update({"errors": e.to_dict()})
         return result.catch(status=status, context=context)
 
 
@@ -1537,7 +1579,8 @@ class HookStage(BaseStage):  # pragma: no cov
         *,
         result: Result | None = None,
         event: Event | None = None,
-    ) -> Result: ...
+    ) -> Result:
+        raise NotImplementedError("Hook Stage does not implement yet.")
 
 
 # TODO: Not implement this stages yet
@@ -1570,15 +1613,21 @@ class DockerStage(BaseStage):  # pragma: no cov
         *,
         result: Result | None = None,
         event: Event | None = None,
-    ) -> Result: ...
+    ) -> Result:
+        raise NotImplementedError("Docker Stage does not implement yet.")
 
 
 # TODO: Not implement this stages yet
 class VirtualPyStage(PyStage):  # pragma: no cov
     """Python Virtual Environment stage execution."""
 
-    run: str
-    vars: DictData
+    deps: list[str] = Field(
+        default_factory=list,
+        description=(
+            "list of Python dependency that want to install before execution "
+            "stage."
+        ),
+    )
 
     def create_py_file(self, py: str, run_id: str | None): ...
 
@@ -1589,7 +1638,25 @@ class VirtualPyStage(PyStage):  # pragma: no cov
         result: Result | None = None,
         event: Event | None = None,
     ) -> Result:
-        return super().execute(params, result=result)
+        """Execute the Python statement via Python virtual environment.
+
+        :param params: A parameter that want to pass before run any statement.
+        :param result: (Result) A result object for keeping context and status
+            data.
+        :param event: (Event) An event manager that use to track parent execute
+            was not force stopped.
+
+        :rtype: Result
+        """
+        if result is None:  # pragma: no cov
+            result: Result = Result(
+                run_id=gen_id(self.name + (self.id or ""), unique=True)
+            )
+
+        result.trace.info(f"[STAGE]: Py-Virtual-Execute: {self.name}")
+        raise NotImplementedError(
+            "Python Virtual Stage does not implement yet."
+        )
 
 
 # NOTE:
@@ -1599,12 +1666,16 @@ class VirtualPyStage(PyStage):  # pragma: no cov
 #
 Stage = Annotated[
     Union[
+        DockerStage,
         BashStage,
         CallStage,
+        HookStage,
         TriggerStage,
         ForEachStage,
         UntilStage,
         ParallelStage,
+        CaseStage,
+        VirtualPyStage,
         PyStage,
         RaiseStage,
         EmptyStage,
