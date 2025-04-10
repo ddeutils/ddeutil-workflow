@@ -483,7 +483,13 @@ class Job(BaseModel):
         except Exception as err:
             raise JobException(f"{err.__class__.__name__}: {err}") from err
 
-    def set_outputs(self, output: DictData, to: DictData) -> DictData:
+    def set_outputs(
+        self,
+        output: DictData,
+        to: DictData,
+        *,
+        job_id: Optional[None] = None,
+    ) -> DictData:
         """Set an outputs from execution process to the received context. The
         result from execution will pass to value of `strategies` key.
 
@@ -511,22 +517,21 @@ class Job(BaseModel):
 
         :param output: An output context.
         :param to: A context data that want to add output result.
+        :param job_id: A job ID if the id field does not set.
 
         :rtype: DictData
         """
         if "jobs" not in to:
             to["jobs"] = {}
 
-        if self.id is None and not dynamic(
-            "job_default_id", extras=self.extras
-        ):
+        if self.id is None and job_id is None:
             raise JobException(
                 "This job do not set the ID before setting execution output."
             )
 
         # NOTE: If the job ID did not set, it will use index of jobs key
         #   instead.
-        _id: str = self.id or str(len(to["jobs"]) + 1)
+        _id: str = self.id or job_id
 
         errors: DictData = (
             {"errors": output.pop("errors", {})} if "errors" in output else {}

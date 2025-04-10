@@ -1,7 +1,4 @@
-from unittest import mock
-
 import pytest
-from ddeutil.workflow.conf import Config
 from ddeutil.workflow.exceptions import JobException
 from ddeutil.workflow.job import (
     Job,
@@ -90,17 +87,19 @@ def test_job_set_outputs():
         "jobs": {"final-job": {}}
     }
 
+    # NOTE: Raise because job ID does not set.
     with pytest.raises(JobException):
-        Job().set_outputs({}, {})
+        Job().set_outputs({}, {}, job_id=None)
 
-    with mock.patch.object(Config, "job_default_id", True):
-        assert Job().set_outputs({}, {"jobs": {}}) == {"jobs": {"1": {}}}
+    assert Job().set_outputs({}, {"jobs": {}}, job_id="1") == {
+        "jobs": {"1": {}}
+    }
 
-        assert (
-            Job(strategy={"matrix": {"table": ["customer"]}}).set_outputs(
-                {}, {"jobs": {}}
-            )
-        ) == {"jobs": {"1": {"strategies": {}}}}
+    assert (
+        Job(strategy={"matrix": {"table": ["customer"]}}).set_outputs(
+            {}, {"jobs": {}}, job_id="foo"
+        )
+    ) == {"jobs": {"foo": {"strategies": {}}}}
 
 
 def test_job_if_condition():

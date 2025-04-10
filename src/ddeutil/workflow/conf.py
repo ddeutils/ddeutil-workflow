@@ -159,10 +159,6 @@ class Config:  # pragma: no cov
         return str2bool(env("CORE_JOB_RAISE_ERROR", "true"))
 
     @property
-    def job_default_id(self) -> bool:
-        return str2bool(env("CORE_JOB_DEFAULT_ID", "false"))
-
-    @property
     def max_cron_per_workflow(self) -> int:
         """The maximum on value that store in workflow model.
 
