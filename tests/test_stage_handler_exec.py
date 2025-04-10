@@ -478,6 +478,7 @@ def test_stage_exec_foreach_with_trigger(test_path):
                         "items": [1, 2],
                         "foreach": {
                             1: {
+                                "item": 1,
                                 "stages": {
                                     "8713259197": {
                                         "outputs": {
@@ -494,6 +495,7 @@ def test_stage_exec_foreach_with_trigger(test_path):
                                 },
                             },
                             2: {
+                                "item": 2,
                                 "stages": {
                                     "8713259197": {
                                         "outputs": {
