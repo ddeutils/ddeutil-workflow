@@ -49,6 +49,7 @@ from .params import (
     StrParam,
 )
 from .result import (
+    CANCEL,
     FAILED,
     SKIP,
     SUCCESS,

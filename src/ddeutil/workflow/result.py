@@ -35,12 +35,14 @@ class Status(IntEnum):
     FAILED: int = 1
     WAIT: int = 2
     SKIP: int = 3
+    CANCEL: int = 4
 
 
 SUCCESS = Status.SUCCESS
 FAILED = Status.FAILED
 WAIT = Status.WAIT
 SKIP = Status.SKIP
+CANCEL = Status.CANCEL
 
 
 @dataclass(
