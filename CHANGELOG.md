@@ -2,6 +2,30 @@
 
 ## Latest Changes
 
+## 0.0.50
+
+### :sparkles: Features
+
+- :dart: feat: add cancel status.
+- :dart: feat: revise until stage execution.
+- :dart: feat: add result handle update nested key in context data.
+- :dart: feat: add error handler on trigger stage.
+- :dart: feat: add raise stage error when trigger stage return failed status.
+- :dart: feat: revise cut running id func.
+- :dart: feat: draft az batch job exec.
+- :dart: feat: draft docker stage execution task.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: remove testcase that does not use.
+- :test_tube: tests: add testcase for utils module.
+- :construction: refactored: change rule and runs-on model.
+
+### :broom: Deprecate & Clean
+
+- :recycle: clean: remove job raise error config.
+- :recycle: clean: remove raise_error from job exec on workflow module.
+
 ## 0.0.49
 
 ### :stars: Highlight Features
