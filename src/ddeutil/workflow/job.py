@@ -948,7 +948,7 @@ def azure_batch_execute(
     result: Result | None = None,
     event: Event | None = None,
     raise_error: bool | None = None,
-):  # pragma no cov
+) -> Result:  # pragma no cov
     """Azure Batch job execution that will run all job's stages on the Azure
     Batch Node and extract the result file to be returning context result.
 

@@ -9,6 +9,7 @@ from ddeutil.workflow.conf import Config
 from ddeutil.workflow.exceptions import StageException
 from ddeutil.workflow.result import Result
 from ddeutil.workflow.stages import Stage
+from pydantic import TypeAdapter
 
 from .utils import dump_yaml_context
 
@@ -249,11 +250,15 @@ def test_stage_exec_py_result(test_path):
         stage: Stage = workflow.job("first-job").stage(
             stage_id="py-result-stage"
         )
-        rs: dict = stage.handler_execute(params={}, to={})
+        rs: dict = stage.set_outputs(
+            stage.handler_execute(params={}).context, to={}
+        )
         assert rs == {"stages": {"py-result-stage": {"outputs": {}}}}
 
         stage: Stage = workflow.job("first-job").stage(stage_id="py-raise")
-        rs: dict = stage.handler_execute(params={}, to={})
+        rs: dict = stage.set_outputs(
+            stage.handler_execute(params={}).context, to={}
+        )
         assert rs == {
             "stages": {
                 "py-raise": {
@@ -284,6 +289,18 @@ def test_stage_exec_trigger():
         "author-run": "Trigger Runner",
         "run-date": datetime(2024, 8, 1),
     } == rs.context["params"]
+
+
+def test_stage_exec_trigger_raise():
+    stage: Stage = TypeAdapter(Stage).validate_python(
+        {
+            "name": "Trigger to raise workflow",
+            "trigger": "wf-run-python-raise",
+            "params": {},
+        }
+    )
+    with pytest.raises(StageException):
+        stage.handler_execute(params={})
 
 
 def test_stage_exec_foreach(test_path):

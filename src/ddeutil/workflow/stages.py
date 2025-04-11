@@ -151,9 +151,8 @@ class BaseStage(BaseModel, ABC):
         parent_run_id: str | None = None,
         result: Result | None = None,
         raise_error: bool | None = None,
-        to: DictData | None = None,
         event: Event | None = None,
-    ) -> Result:
+    ) -> Result | DictData:
         """Handler stage execution result from the stage `execute` method.
 
             This stage exception handler still use ok-error concept, but it
@@ -185,8 +184,6 @@ class BaseStage(BaseModel, ABC):
         :param result: (Result) A result object for keeping context and status
             data before execution.
         :param raise_error: (bool) A flag that all this method raise error
-        :param to: (DictData) A target object for auto set the return output
-            after execution.
         :param event: (Event) An event manager that pass to the stage execution.
 
         :rtype: Result
@@ -201,7 +198,7 @@ class BaseStage(BaseModel, ABC):
 
         try:
             rs: Result = self.execute(params, result=result, event=event)
-            return self.set_outputs(rs.context, to=to) if to is not None else rs
+            return rs
         except Exception as e:
             result.trace.error(f"[STAGE]: {e.__class__.__name__}: {e}")
 
@@ -215,11 +212,7 @@ class BaseStage(BaseModel, ABC):
                 ) from e
 
             errors: DictData = {"errors": to_dict(e)}
-            return (
-                self.set_outputs(errors, to=to)
-                if to is not None
-                else result.catch(status=FAILED, context=errors)
-            )
+            return result.catch(status=FAILED, context=errors)
 
     def set_outputs(self, output: DictData, to: DictData) -> DictData:
         """Set an outputs from execution process to the received context. The
@@ -378,7 +371,6 @@ class BaseAsyncStage(BaseStage):
         parent_run_id: str | None = None,
         result: Result | None = None,
         raise_error: bool | None = None,
-        to: DictData | None = None,
         event: Event | None = None,
     ) -> Result:
         """Async Handler stage execution result from the stage `execute` method.
@@ -391,8 +383,6 @@ class BaseAsyncStage(BaseStage):
         :param result: (Result) A result object for keeping context and status
             data before execution.
         :param raise_error: (bool) A flag that all this method raise error
-        :param to: (DictData) A target object for auto set the return output
-            after execution.
         :param event: (Event) An event manager that pass to the stage execution.
 
         :rtype: Result
@@ -407,8 +397,6 @@ class BaseAsyncStage(BaseStage):
 
         try:
             rs: Result = await self.axecute(params, result=result, event=event)
-            if to is not None:  # pragma: no cov
-                return self.set_outputs(rs.context, to=to)
             return rs
         except Exception as e:  # pragma: no cov
             await result.trace.aerror(f"[STAGE]: {e.__class__.__name__}: {e}")
@@ -423,9 +411,6 @@ class BaseAsyncStage(BaseStage):
                 ) from None
 
             errors: DictData = {"errors": to_dict(e)}
-            if to is not None:
-                return self.set_outputs(errors, to=to)
-
             return result.catch(status=FAILED, context=errors)
 
 
@@ -976,26 +961,30 @@ class TriggerStage(BaseStage):
 
         :rtype: Result
         """
-        # NOTE: Lazy import this workflow object.
-        from . import Workflow
+        from .workflow import Workflow
 
-        if result is None:  # pragma: no cov
+        if result is None:
             result: Result = Result(
                 run_id=gen_id(self.name + (self.id or ""), unique=True)
             )
 
         _trigger: str = param2template(self.trigger, params, extras=self.extras)
-        workflow: Workflow = Workflow.from_conf(
-            _trigger,
-            extras=self.extras | {"stage_raise_error": True},
-        )
-
         result.trace.info(f"[STAGE]: Trigger-Execute: {_trigger!r}")
-        return workflow.execute(
+        rs: Result = Workflow.from_conf(
+            _trigger, extras=self.extras | {"stage_raise_error": True}
+        ).execute(
             params=param2template(self.params, params, extras=self.extras),
             result=result,
             event=event,
         )
+        if rs.status == FAILED:
+            err_msg: str | None = (
+                f" with:\n{msg}"
+                if (msg := rs.context.get("errors", {}).get("message"))
+                else ""
+            )
+            raise StageException(f"Trigger workflow was failed{err_msg}.")
+        return rs
 
 
 class ParallelStage(BaseStage):  # pragma: no cov
