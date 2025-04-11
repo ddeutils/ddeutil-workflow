@@ -3,7 +3,6 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-# [x] Use dynamic config
 """Job Model that use for keeping stages and node that running its stages.
 The job handle the lineage of stages and location of execution of stages that
 mean the job model able to define `runs-on` key that allow you to run this
@@ -33,7 +32,6 @@ from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
 from .__types import DictData, DictStr, Matrix, TupleStr
-from .conf import dynamic
 from .exceptions import (
     JobException,
     StageException,
@@ -555,6 +553,7 @@ class Job(BaseModel):
         parent_run_id: str | None = None,
         result: Result | None = None,
         event: Event | None = None,
+        raise_error: bool = True,
     ) -> Result:
         """Job execution with passing dynamic parameters from the workflow
         execution. It will generate matrix values at the first step and run
@@ -567,6 +566,8 @@ class Job(BaseModel):
             data.
         :param event: (Event) An event manager that pass to the
             PoolThreadExecutor.
+        :param raise_error: (bool) A flag that all this method raise error to the
+            strategy execution. Default is `True`.
 
         :rtype: Result
         """
@@ -578,12 +579,14 @@ class Job(BaseModel):
             extras=self.extras,
         )
 
+        result.trace.info(f"[JOB]: Start execute job: {self.id!r}")
         if self.runs_on.type == RunsOn.LOCAL:
             return local_execute(
                 job=self,
                 params=params,
                 result=result,
                 event=event,
+                raise_error=raise_error,
             )
         elif self.runs_on.type == RunsOn.SELF_HOSTED:  # pragma: no cov
             pass
@@ -608,7 +611,7 @@ def local_execute_strategy(
     *,
     result: Result | None = None,
     event: Event | None = None,
-    raise_error: bool | None = None,
+    raise_error: bool = True,
 ) -> Result:
     """Local job strategy execution with passing dynamic parameters from the
     workflow execution to strategy matrix.
@@ -665,7 +668,7 @@ def local_execute_strategy(
                 context={
                     strategy_id: {
                         "matrix": strategy,
-                        "stages": context.pop("stages", {}),
+                        "stages": filter_func(context.pop("stages", {})),
                         "errors": JobException(error_msg).to_dict(),
                     },
                 },
@@ -689,7 +692,7 @@ def local_execute_strategy(
                     context={
                         strategy_id: {
                             "matrix": strategy,
-                            "stages": context.pop("stages", {}),
+                            "stages": filter_func(context.pop("stages", {})),
                             "errors": JobException(error_msg).to_dict(),
                         },
                     },
@@ -697,10 +700,7 @@ def local_execute_strategy(
 
         except (StageException, UtilException) as err:
             result.trace.error(f"[JOB]: {err.__class__.__name__}: {err}")
-            do_raise: bool = dynamic(
-                "job_raise_error", f=raise_error, extras=job.extras
-            )
-            if do_raise:
+            if raise_error:
                 raise JobException(
                     f"Stage execution error: {err.__class__.__name__}: "
                     f"{err}"
@@ -711,7 +711,7 @@ def local_execute_strategy(
                 context={
                     strategy_id: {
                         "matrix": strategy,
-                        "stages": context.pop("stages", {}),
+                        "stages": filter_func(context.pop("stages", {})),
                         "errors": err.to_dict(),
                     },
                 },
@@ -736,7 +736,7 @@ def local_execute(
     parent_run_id: str | None = None,
     result: Result | None = None,
     event: Event | None = None,
-    raise_error: bool | None = None,
+    raise_error: bool = True,
 ) -> Result:
     """Local job execution with passing dynamic parameters from the workflow
     execution or itself execution. It will generate matrix values at the first
@@ -753,7 +753,7 @@ def local_execute(
         data.
     :param event: (Event) An event manager that pass to the PoolThreadExecutor.
     :param raise_error: (bool) A flag that all this method raise error to the
-        strategy execution.
+        strategy execution. Default is `True`.
 
     :rtype: Result
     """
@@ -784,9 +784,9 @@ def local_execute(
                 )
 
             local_execute_strategy(
-                job=job,
-                strategy=strategy,
-                params=params,
+                job,
+                strategy,
+                params,
                 result=result,
                 event=event,
                 raise_error=raise_error,
@@ -875,7 +875,7 @@ def self_hosted_execute(
     parent_run_id: str | None = None,
     result: Result | None = None,
     event: Event | None = None,
-    raise_error: bool | None = None,
+    raise_error: bool = True,
 ) -> Result:  # pragma: no cov
     """Self-Hosted job execution with passing dynamic parameters from the
     workflow execution or itself execution. It will make request to the
@@ -929,10 +929,7 @@ def self_hosted_execute(
         return result.catch(status=FAILED, context={"errors": to_dict(e)})
 
     if resp.status_code != 200:
-        do_raise: bool = dynamic(
-            "job_raise_error", f=raise_error, extras=job.extras
-        )
-        if do_raise:
+        if raise_error:
             raise JobException(
                 f"Job execution error from request to self-hosted: "
                 f"{job.runs_on.args.host!r}"

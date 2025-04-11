@@ -1017,10 +1017,10 @@ class Workflow(BaseModel):
         try:
             job: Job = self.jobs[job_id]
             if job.is_skipped(params=params):
-                result.trace.info(f"[JOB]: Skip job: {job_id!r}")
+                result.trace.info(f"[WORKFLOW]: Skip job: {job_id!r}")
                 job.set_outputs(output={"SKIP": {"skipped": True}}, to=params)
             else:
-                result.trace.info(f"[JOB]: Start execute job: {job_id!r}")
+                result.trace.info(f"[WORKFLOW]: Execute: {job_id!r}")
                 job.set_outputs(
                     job.execute(
                         params=params,

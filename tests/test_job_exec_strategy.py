@@ -74,12 +74,11 @@ def test_job_exec_strategy_catch_stage_error():
     }
 
 
-@mock.patch.object(Config, "job_raise_error", False)
 @mock.patch.object(Config, "stage_raise_error", True)
 def test_job_exec_strategy_catch_job_error():
     workflow: Workflow = Workflow.from_conf(name="wf-run-python-raise-for-job")
     job: Job = workflow.job("final-job")
-    rs = local_execute_strategy(job, {"name": "foo"}, {})
+    rs = local_execute_strategy(job, {"name": "foo"}, {}, raise_error=False)
     assert rs.context == {
         "5027535057": {
             "matrix": {"name": "foo"},
@@ -117,12 +116,11 @@ def test_job_exec_strategy_raise():
     workflow: Workflow = Workflow.from_conf(name="wf-run-python-raise-for-job")
     job: Job = workflow.job("first-job")
 
-    with mock.patch.object(Config, "job_raise_error", False):
-        rs: Result = local_execute_strategy(job, {}, {})
-        assert isinstance(
-            rs.context["1354680202"]["errors"]["class"], StageException
-        )
-        assert rs.status == 1
+    rs: Result = local_execute_strategy(job, {}, {}, raise_error=False)
+    assert isinstance(
+        rs.context["1354680202"]["errors"]["class"], StageException
+    )
+    assert rs.status == 1
 
     with pytest.raises(JobException):
-        local_execute_strategy(job, {}, {})
+        local_execute_strategy(job, {}, {}, raise_error=True)

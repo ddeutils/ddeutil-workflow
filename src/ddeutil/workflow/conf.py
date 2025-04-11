@@ -153,11 +153,6 @@ class Config:  # pragma: no cov
     def stage_default_id(self) -> bool:
         return str2bool(env("CORE_STAGE_DEFAULT_ID", "false"))
 
-    # NOTE: Job
-    @property
-    def job_raise_error(self) -> bool:
-        return str2bool(env("CORE_JOB_RAISE_ERROR", "true"))
-
     @property
     def max_cron_per_workflow(self) -> int:
         """The maximum on value that store in workflow model.

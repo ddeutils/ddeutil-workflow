@@ -61,7 +61,6 @@ def test_job_exec_py_not_set_output():
     assert output == {"jobs": {"second-job": {"stages": {}}}}
 
 
-@mock.patch.object(Config, "job_raise_error", True)
 @mock.patch.object(Config, "stage_raise_error", True)
 def test_job_exec_py_fail_fast():
     workflow: Workflow = Workflow.from_conf(name="wf-run-python-raise-for-job")
@@ -83,7 +82,6 @@ def test_job_exec_py_fail_fast():
     }
 
 
-@mock.patch.object(Config, "job_raise_error", True)
 @mock.patch.object(Config, "stage_raise_error", True)
 def test_job_exec_py_fail_fast_raise_catch():
     workflow: Workflow = Workflow.from_conf(name="wf-run-python-raise-for-job")
@@ -114,7 +112,6 @@ def test_job_exec_py_fail_fast_raise_catch():
     }
 
 
-@mock.patch.object(Config, "job_raise_error", True)
 @mock.patch.object(Config, "stage_raise_error", True)
 def test_job_exec_py_complete():
     workflow: Workflow = Workflow.from_conf(name="wf-run-python-raise-for-job")
@@ -136,7 +133,6 @@ def test_job_exec_py_complete():
     }
 
 
-@mock.patch.object(Config, "job_raise_error", True)
 @mock.patch.object(Config, "stage_raise_error", True)
 def test_job_exec_py_complete_not_parallel():
     workflow: Workflow = Workflow.from_conf(name="wf-run-python-raise-for-job")
@@ -187,7 +183,6 @@ def test_job_exec_py_complete_not_parallel():
     }
 
 
-@mock.patch.object(Config, "job_raise_error", True)
 @mock.patch.object(Config, "stage_raise_error", True)
 def test_job_exec_py_complete_raise():
     workflow: Workflow = Workflow.from_conf(name="wf-run-python-raise-for-job")
@@ -212,7 +207,6 @@ def test_job_exec_py_complete_raise():
     }
 
 
-@mock.patch.object(Config, "job_raise_error", True)
 @mock.patch.object(Config, "stage_raise_error", True)
 def test_job_exec_runs_on_not_implement():
     workflow: Workflow = Workflow.from_conf(name="wf-run-python-raise-for-job")
