@@ -212,6 +212,7 @@ class RunsOnType(str, Enum):
     LOCAL: str = "local"
     SELF_HOSTED: str = "self_hosted"
     K8S: str = "k8s"
+    AZ_BATCH: str = "azure_batch"
 
 
 class BaseRunsOn(BaseModel):  # pragma: no cov
@@ -939,4 +940,60 @@ def self_hosted_execute(
             )
 
         return result.catch(status=FAILED)
+    return result.catch(status=SUCCESS)
+
+
+def azure_batch_execute(
+    job: Job,
+    params: DictData,
+    *,
+    run_id: str | None = None,
+    parent_run_id: str | None = None,
+    result: Result | None = None,
+    event: Event | None = None,
+    raise_error: bool | None = None,
+):  # pragma no cov
+    """Azure Batch job execution that will run all job's stages on the Azure
+    Batch Node and extract the result file to be returning context result.
+
+    Steps:
+        - Create a Batch account and a Batch pool.
+        - Create a Batch job and add tasks to the job. Each task represents a
+          command to run on a compute node.
+        - Specify the command to run the Python script in the task. You can use
+          the cmd /c command to run the script with the Python interpreter.
+        - Upload the Python script and any required input files to Azure Storage
+          Account.
+        - Configure the task to download the input files from Azure Storage to
+          the compute node before running the script.
+        - Monitor the job and retrieve the output files from Azure Storage.
+
+    :param job:
+    :param params:
+    :param run_id:
+    :param parent_run_id:
+    :param result:
+    :param event:
+    :param raise_error:
+    :return:
+    """
+    result: Result = Result.construct_with_rs_or_id(
+        result,
+        run_id=run_id,
+        parent_run_id=parent_run_id,
+        id_logic=(job.id or "not-set"),
+        extras=job.extras,
+    )
+    if event and event.is_set():
+        return result.catch(
+            status=FAILED,
+            context={
+                "errors": JobException(
+                    "Job azure-batch execution was canceled from event that "
+                    "had set before start execution."
+                ).to_dict()
+            },
+        )
+    print(params)
+    print(raise_error)
     return result.catch(status=SUCCESS)

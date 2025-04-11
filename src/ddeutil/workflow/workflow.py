@@ -1276,7 +1276,7 @@ class Workflow(BaseModel):
             max_workers=1,
             thread_name_prefix="wf_exec_non_threading_",
         ) as executor:
-            future: Future | None = None
+            future: Optional[Future] = None
 
             while not job_queue.empty() and (
                 not_timeout_flag := ((time.monotonic() - ts) < timeout)
@@ -1316,14 +1316,13 @@ class Workflow(BaseModel):
 
                     future = None
                     job_queue.put(job_id)
-                elif future.running():
+                elif future.running() or "state=pending" in str(future):
                     time.sleep(0.075)
                     job_queue.put(job_id)
                 else:  # pragma: no cov
                     job_queue.put(job_id)
-                    result.trace.debug(
-                        f"Execution non-threading does not handle case: {future} "
-                        f"that not running."
+                    result.trace.warning(
+                        f"... Execution non-threading not handle: {future}."
                     )
 
                 job_queue.task_done()
@@ -1352,6 +1351,12 @@ class WorkflowTask:
 
         This dataclass has the release method for itself that prepare necessary
     arguments before passing to the parent release method.
+
+    :param alias: (str) An alias name of Workflow model.
+    :param workflow: (Workflow) A Workflow model instance.
+    :param runner: (CronRunner)
+    :param values:
+    :param extras:
     """
 
     alias: str
