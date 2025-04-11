@@ -746,30 +746,43 @@ def test_stage_exec_until(test_path):
                     "outputs": {
                         "until": {
                             1: {
+                                "loop": 1,
                                 "item": 1,
                                 "stages": {
                                     "2709471980": {"outputs": {}},
-                                    "9263488742": {"outputs": {}},
+                                    "9263488742": {
+                                        "outputs": {},
+                                        "skipped": True,
+                                    },
                                     "3635623619": {"outputs": {"item": 2}},
                                 },
                             },
                             2: {
+                                "loop": 2,
                                 "item": 2,
                                 "stages": {
                                     "2709471980": {"outputs": {}},
-                                    "9263488742": {"outputs": {}},
+                                    "9263488742": {
+                                        "outputs": {},
+                                        "skipped": True,
+                                    },
                                     "3635623619": {"outputs": {"item": 3}},
                                 },
                             },
                             3: {
+                                "loop": 3,
                                 "item": 3,
                                 "stages": {
                                     "2709471980": {"outputs": {}},
-                                    "9263488742": {"outputs": {}},
+                                    "9263488742": {
+                                        "outputs": {},
+                                        "skipped": True,
+                                    },
                                     "3635623619": {"outputs": {"item": 4}},
                                 },
                             },
                             4: {
+                                "loop": 4,
                                 "item": 4,
                                 "stages": {
                                     "2709471980": {"outputs": {}},

@@ -1177,15 +1177,16 @@ class ForEachStage(BaseStage):
         :param item: (str | int) An item that want to execution.
         :param params: (DictData) A parameter that want to pass to stage
             execution.
-        :param result: (Result)
+        :param result: (Result) A result object for keeping context and status
+            data.
         :param event: (Event) An event manager that use to track parent execute
             was not force stopped.
 
         :rtype: Result
         """
+        result.trace.debug(f"[STAGE]: Execute item: {item!r}")
         context: DictData = copy.deepcopy(params)
         context.update({"item": item, "stages": {}})
-        result.trace.debug(f"[STAGE]: Execute item: {item!r}")
         for stage in self.stages:
 
             if self.extras:
@@ -1378,9 +1379,9 @@ class UntilStage(BaseStage):  # pragma: no cov
         item: T,
         loop: int,
         params: DictData,
-        context: DictData,
         result: Result,
-    ) -> tuple[Status, DictData, T]:
+        event: Event | None = None,
+    ) -> tuple[Result, T]:
         """Execute until item set item by some stage or by default loop
         variable.
 
@@ -1388,43 +1389,80 @@ class UntilStage(BaseStage):  # pragma: no cov
         :param loop: (int) A number of loop.
         :param params: (DictData) A parameter that want to pass to stage
             execution.
-        :param context: (DictData)
-        :param result: (Result)
+        :param result: (Result) A result object for keeping context and status
+            data.
+        :param event: (Event) An event manager that use to track parent execute
+            was not force stopped.
 
-        :rtype: tuple[Status, DictData, T]
+        :rtype: tuple[Result, T]
         """
         result.trace.debug(f"[STAGE]: Execute until item: {item!r}")
-        params["item"] = item
-        to: DictData = {"item": item, "stages": {}}
-        status: Status = SUCCESS
+        context: DictData = copy.deepcopy(params)
+        context.update({"loop": loop, "item": item, "stages": {}})
         next_item: T = None
         for stage in self.stages:
 
             if self.extras:
                 stage.extras = self.extras
 
-            try:
-                stage.set_outputs(
-                    stage.handler_execute(
-                        params=params,
-                        run_id=result.run_id,
-                        parent_run_id=result.parent_run_id,
-                    ).context,
-                    to=to,
+            if stage.is_skipped(params=context):
+                result.trace.info(f"[STAGE]: Skip stage: {stage.iden!r}")
+                stage.set_outputs(output={"skipped": True}, to=context)
+                continue
+
+            if event and event.is_set():
+                error_msg: str = (
+                    "Item-Stage was canceled from event that had set before "
+                    "stage item execution."
                 )
+                return (
+                    result.catch(
+                        status=FAILED,
+                        until={
+                            loop: {
+                                "loop": loop,
+                                "item": item,
+                                "stages": filter_func(
+                                    context.pop("stages", {})
+                                ),
+                                "errors": StageException(error_msg).to_dict(),
+                            }
+                        },
+                    ),
+                    next_item,
+                )
+
+            try:
+                rs: Result = stage.handler_execute(
+                    params=context,
+                    run_id=result.run_id,
+                    parent_run_id=result.parent_run_id,
+                    raise_error=True,
+                )
+                stage.set_outputs(rs.context, to=context)
                 if "item" in (
-                    outputs := stage.get_outputs(to).get("outputs", {})
+                    outputs := stage.get_outputs(context).get("outputs", {})
                 ):
                     next_item = outputs["item"]
-            except StageException as e:
-                status = FAILED
-                result.trace.error(
-                    f"[STAGE]: Catch:\n\t{e.__class__.__name__}:" f"\n\t{e}"
-                )
-                to.update({"errors": e.to_dict()})
+            except (StageException, UtilException) as e:
+                result.trace.error(f"[STAGE]: {e.__class__.__name__}: {e}")
+                raise StageException(
+                    f"Sub-Stage execution error: {e.__class__.__name__}: {e}"
+                ) from None
 
-        context["until"][loop] = to
-        return status, context, next_item
+        return (
+            result.catch(
+                status=SUCCESS,
+                until={
+                    loop: {
+                        "loop": loop,
+                        "item": item,
+                        "stages": filter_func(context.pop("stages", {})),
+                    }
+                },
+            ),
+            next_item,
+        )
 
     def execute(
         self,
@@ -1448,28 +1486,31 @@ class UntilStage(BaseStage):  # pragma: no cov
             result: Result = Result(
                 run_id=gen_id(self.name + (self.id or ""), unique=True)
             )
+        result.trace.info(f"[STAGE]: Until-Execution: {self.until}")
         item: Union[str, int, bool] = param2template(
             self.item, params, extras=self.extras
         )
-        result.trace.info(f"[STAGE]: Until-Execution: {self.until}")
+        loop: int = 1
         track: bool = True
         exceed_loop: bool = False
-        loop: int = 1
-        context: DictData = {"until": {}}
-        statuses: list[Union[SUCCESS, FAILED]] = []
+        result.catch(status=WAIT, context={"until": {}})
         while track and not (exceed_loop := loop >= self.max_until_loop):
 
             if event and event.is_set():
                 return result.catch(
                     status=FAILED,
-                    context=context,
+                    context={
+                        "errors": StageException(
+                            "Stage was canceled from event that had set "
+                            "before stage until execution."
+                        ).to_dict()
+                    },
                 )
 
-            status, context, item = self.execute_item(
+            result, item = self.execute_item(
                 item=item,
                 loop=loop,
-                params=params.copy(),
-                context=context,
+                params=params,
                 result=result,
             )
 
@@ -1483,31 +1524,32 @@ class UntilStage(BaseStage):  # pragma: no cov
 
             next_track: bool = eval(
                 param2template(
-                    self.until, params | {"item": item}, extras=self.extras
+                    self.until,
+                    params | {"item": item, "loop": loop},
+                    extras=self.extras,
                 ),
                 globals() | params | {"item": item},
                 {},
             )
             if not isinstance(next_track, bool):
-                raise TypeError(
+                raise StageException(
                     "Return type of until condition does not be boolean, it"
                     f"return: {next_track!r}"
                 )
             track = not next_track
-            statuses.append(status)
 
         if exceed_loop:
             raise StageException(
                 f"The until loop was exceed {self.max_until_loop} loops"
             )
-        return result.catch(status=max(statuses), context=context)
+        return result.catch(status=SUCCESS)
 
 
 class Match(BaseModel):
     """Match model for the Case Stage."""
 
-    case: Union[str, int]
-    stage: Stage
+    case: Union[str, int] = Field(description="A match case.")
+    stage: Stage = Field(description="A stage to execution for this case.")
 
 
 class CaseStage(BaseStage):  # pragma: no cov

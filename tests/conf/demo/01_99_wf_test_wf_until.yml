@@ -1,0 +1,22 @@
+tmp-wf-until:
+  type: Workflow
+  jobs:
+    first-job:
+      stages:
+        - name: "Start run until stage"
+          id: until-stage
+          item: 1
+          until: "${{ item }} > 4"
+          max_until_loop: 5
+          stages:
+            - name: "Echo stage"
+              echo: |
+                Start run with item ${{ item }}
+            - name: "Final Echo"
+              if: ${{ item }} == 4
+              echo: |
+                Final run
+            - name: "Set item"
+              run: |
+                item = ${{ item }}
+                item += 1
