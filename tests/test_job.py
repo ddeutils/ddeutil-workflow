@@ -2,37 +2,37 @@ import pytest
 from ddeutil.workflow.exceptions import JobException
 from ddeutil.workflow.job import (
     Job,
-    RunsOn,
-    RunsOnK8s,
-    RunsOnLocal,
-    RunsOnSelfHosted,
-    TriggerRules,
+    OnK8s,
+    OnLocal,
+    OnSelfHosted,
+    Rule,
+    RunsOnModel,
 )
 from ddeutil.workflow.result import SUCCESS, WAIT
 from pydantic import TypeAdapter, ValidationError
 
 
 def test_run_ons():
-    model = TypeAdapter(RunsOn).validate_python(
+    model = TypeAdapter(RunsOnModel).validate_python(
         {
             "type": "self_hosted",
             "with": {"host": "localhost:88"},
         },
     )
-    assert isinstance(model, RunsOnSelfHosted)
+    assert isinstance(model, OnSelfHosted)
     assert model.args.host == "localhost:88"
 
-    model = TypeAdapter(RunsOn).validate_python({"type": "k8s"})
-    assert isinstance(model, RunsOnK8s)
+    model = TypeAdapter(RunsOnModel).validate_python({"type": "k8s"})
+    assert isinstance(model, OnK8s)
 
-    model = TypeAdapter(RunsOn).validate_python({})
-    assert isinstance(model, RunsOnLocal)
+    model = TypeAdapter(RunsOnModel).validate_python({})
+    assert isinstance(model, OnLocal)
 
 
 def test_job():
     job = Job()
     assert "all_success" == job.trigger_rule
-    assert TriggerRules.all_success == job.trigger_rule
+    assert Rule.ALL_SUCCESS == job.trigger_rule
 
     job = Job(desc="\t# Desc\n\tThis is a demo job.")
     assert job.desc == "# Desc\nThis is a demo job."
@@ -45,7 +45,7 @@ def test_job():
     assert job.check_needs({"job-after": "foo"}) == WAIT
 
     job = Job.model_validate({"runs-on": {"type": "k8s"}})
-    assert isinstance(job.runs_on, RunsOnK8s)
+    assert isinstance(job.runs_on, OnK8s)
 
 
 def test_job_raise():

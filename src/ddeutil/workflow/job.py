@@ -51,11 +51,12 @@ MatrixFilter = list[dict[str, Union[str, int]]]
 __all__: TupleStr = (
     "Strategy",
     "Job",
-    "TriggerRules",
+    "Rule",
     "RunsOn",
-    "RunsOnLocal",
-    "RunsOnSelfHosted",
-    "RunsOnK8s",
+    "RunsOnModel",
+    "OnLocal",
+    "OnSelfHosted",
+    "OnK8s",
     "make",
     "local_execute_strategy",
     "local_execute",
@@ -194,19 +195,19 @@ class Strategy(BaseModel):
         return make(self.matrix, self.include, self.exclude)
 
 
-class TriggerRules(str, Enum):
+class Rule(str, Enum):
     """Trigger rules enum object."""
 
-    all_success: str = "all_success"
-    all_failed: str = "all_failed"
-    all_done: str = "all_done"
-    one_failed: str = "one_failed"
-    one_success: str = "one_success"
-    none_failed: str = "none_failed"
-    none_skipped: str = "none_skipped"
+    ALL_SUCCESS: str = "all_success"
+    ALL_FAILED: str = "all_failed"
+    ALL_DONE: str = "all_done"
+    ONE_FAILED: str = "one_failed"
+    ONE_SUCCESS: str = "one_success"
+    NONE_FAILED: str = "none_failed"
+    NONE_SKIPPED: str = "none_skipped"
 
 
-class RunsOnType(str, Enum):
+class RunsOn(str, Enum):
     """Runs-On enum object."""
 
     LOCAL: str = "local"
@@ -222,47 +223,45 @@ class BaseRunsOn(BaseModel):  # pragma: no cov
 
     model_config = ConfigDict(use_enum_values=True)
 
-    type: Literal[RunsOnType.LOCAL]
+    type: Literal[RunsOn.LOCAL]
     args: DictData = Field(
         default_factory=dict,
         alias="with",
     )
 
 
-class RunsOnLocal(BaseRunsOn):  # pragma: no cov
+class OnLocal(BaseRunsOn):  # pragma: no cov
     """Runs-on local."""
 
-    type: Literal[RunsOnType.LOCAL] = Field(default=RunsOnType.LOCAL)
+    type: Literal[RunsOn.LOCAL] = Field(default=RunsOn.LOCAL)
 
 
 class SelfHostedArgs(BaseModel):
     host: str
 
 
-class RunsOnSelfHosted(BaseRunsOn):  # pragma: no cov
+class OnSelfHosted(BaseRunsOn):  # pragma: no cov
     """Runs-on self-hosted."""
 
-    type: Literal[RunsOnType.SELF_HOSTED] = Field(
-        default=RunsOnType.SELF_HOSTED
-    )
+    type: Literal[RunsOn.SELF_HOSTED] = Field(default=RunsOn.SELF_HOSTED)
     args: SelfHostedArgs = Field(alias="with")
 
 
-class RunsOnK8s(BaseRunsOn):  # pragma: no cov
+class OnK8s(BaseRunsOn):  # pragma: no cov
     """Runs-on Kubernetes."""
 
-    type: Literal[RunsOnType.K8S] = Field(default=RunsOnType.K8S)
+    type: Literal[RunsOn.K8S] = Field(default=RunsOn.K8S)
 
 
 def get_discriminator_runs_on(model: dict[str, Any]) -> str:
     return model.get("type", "local")
 
 
-RunsOn = Annotated[
+RunsOnModel = Annotated[
     Union[
-        Annotated[RunsOnK8s, Tag(RunsOnType.K8S)],
-        Annotated[RunsOnSelfHosted, Tag(RunsOnType.SELF_HOSTED)],
-        Annotated[RunsOnLocal, Tag(RunsOnType.LOCAL)],
+        Annotated[OnK8s, Tag(RunsOn.K8S)],
+        Annotated[OnSelfHosted, Tag(RunsOn.SELF_HOSTED)],
+        Annotated[OnLocal, Tag(RunsOn.LOCAL)],
     ],
     Discriminator(get_discriminator_runs_on),
 ]
@@ -306,8 +305,8 @@ class Job(BaseModel):
         default=None,
         description="A job description that can be string of markdown content.",
     )
-    runs_on: RunsOn = Field(
-        default_factory=RunsOnLocal,
+    runs_on: RunsOnModel = Field(
+        default_factory=OnLocal,
         description="A target node for this job to use for execution.",
         alias="runs-on",
     )
@@ -320,8 +319,8 @@ class Job(BaseModel):
         default_factory=list,
         description="A list of Stage of this job.",
     )
-    trigger_rule: TriggerRules = Field(
-        default=TriggerRules.all_success,
+    trigger_rule: Rule = Field(
+        default=Rule.ALL_SUCCESS,
         description=(
             "A trigger rule of tracking needed jobs if feature will use when "
             "the `raise_error` did not set from job and stage executions."
@@ -422,27 +421,27 @@ class Job(BaseModel):
             return WAIT
         elif all("skipped" in need_exist[job] for job in need_exist):
             return SKIP
-        elif self.trigger_rule == TriggerRules.all_done:
+        elif self.trigger_rule == Rule.ALL_DONE:
             return SUCCESS
-        elif self.trigger_rule == TriggerRules.all_success:
+        elif self.trigger_rule == Rule.ALL_SUCCESS:
             rs = all(
                 k not in need_exist[job]
                 for k in ("errors", "skipped")
                 for job in need_exist
             )
-        elif self.trigger_rule == TriggerRules.all_failed:
+        elif self.trigger_rule == Rule.ALL_FAILED:
             rs = all("errors" in need_exist[job] for job in need_exist)
-        elif self.trigger_rule == TriggerRules.one_success:
+        elif self.trigger_rule == Rule.ONE_SUCCESS:
             rs = sum(
                 k not in need_exist[job]
                 for k in ("errors", "skipped")
                 for job in need_exist
             ) + 1 == len(self.needs)
-        elif self.trigger_rule == TriggerRules.one_failed:
+        elif self.trigger_rule == Rule.ONE_FAILED:
             rs = sum("errors" in need_exist[job] for job in need_exist) == 1
-        elif self.trigger_rule == TriggerRules.none_skipped:
+        elif self.trigger_rule == Rule.NONE_SKIPPED:
             rs = all("skipped" not in need_exist[job] for job in need_exist)
-        elif self.trigger_rule == TriggerRules.none_failed:
+        elif self.trigger_rule == Rule.NONE_FAILED:
             rs = all("errors" not in need_exist[job] for job in need_exist)
         else:  # pragma: no cov
             raise NotImplementedError(
@@ -579,16 +578,16 @@ class Job(BaseModel):
             extras=self.extras,
         )
 
-        if self.runs_on.type == RunsOnType.LOCAL:
+        if self.runs_on.type == RunsOn.LOCAL:
             return local_execute(
                 job=self,
                 params=params,
                 result=result,
                 event=event,
             )
-        elif self.runs_on.type == RunsOnType.SELF_HOSTED:  # pragma: no cov
+        elif self.runs_on.type == RunsOn.SELF_HOSTED:  # pragma: no cov
             pass
-        elif self.runs_on.type == RunsOnType.K8S:  # pragma: no cov
+        elif self.runs_on.type == RunsOn.K8S:  # pragma: no cov
             pass
 
         # pragma: no cov

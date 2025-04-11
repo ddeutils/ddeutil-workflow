@@ -59,18 +59,16 @@ job execution.
 
 ### Fields
 
-| field        | data type    |          default           | alias | description |
-|--------------|--------------|:--------------------------:|-------|-------------|
-| id           | str \| None  |           `None`           |       |             |
-| desc         | str \| None  |           `None`           |       |             |
-| runs_on      | str \| None  |           `None`           |       |             |
-| condition    |              |           `None`           | if    |             |
-| stages       | list[Stage]  |          `list()`          |       |             |
-| trigger_rule | TriggerRules | `TriggerRules.all_success` |       |             |
-| needs        | list[str]    |          `list()`          |       |             |
-| strategy     | Strategy     |        `Strategy()`        |       |             |
+| field        | data type   |       default       | alias | description |
+|--------------|-------------|:-------------------:|-------|-------------|
+| id           | str \| None |       `None`        |       |             |
+| desc         | str \| None |       `None`        |       |             |
+| runs_on      | str \| None |       `None`        |       |             |
+| condition    |             |       `None`        | if    |             |
+| stages       | list[Stage] |      `list()`       |       |             |
+| trigger_rule | Rule        | `Rule.all_success`  |       |             |
+| needs        | list[str]   |      `list()`       |       |             |
+| strategy     | Strategy    |    `Strategy()`     |       |             |
 
 
-## TriggerRule
-
-## TriggerState
+## Rule
