@@ -394,7 +394,7 @@ class FileTrace(BaseTrace):  # pragma: no cov
         """
         cut_run_id: str = cut_id(self.run_id)
         if not self.parent_run_id:
-            return f"{cut_run_id} -> {' ' * 18}"
+            return f"{cut_run_id}"
 
         cut_parent_run_id: str = cut_id(self.parent_run_id)
         return f"{cut_parent_run_id} -> {cut_run_id}"

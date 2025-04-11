@@ -339,6 +339,7 @@ def test_stage_exec_foreach(test_path):
         workflow = Workflow.from_conf(name="tmp-wf-foreach")
         stage: Stage = workflow.job("first-job").stage("foreach-stage")
         rs = stage.set_outputs(stage.handler_execute({}).context, to={})
+        print(rs)
         assert rs == {
             "stages": {
                 "foreach-stage": {
@@ -349,21 +350,30 @@ def test_stage_exec_foreach(test_path):
                                 "item": 1,
                                 "stages": {
                                     "2709471980": {"outputs": {}},
-                                    "9263488742": {"outputs": {}},
+                                    "9263488742": {
+                                        "outputs": {},
+                                        "skipped": True,
+                                    },
                                 },
                             },
                             2: {
                                 "item": 2,
                                 "stages": {
                                     "2709471980": {"outputs": {}},
-                                    "9263488742": {"outputs": {}},
+                                    "9263488742": {
+                                        "outputs": {},
+                                        "skipped": True,
+                                    },
                                 },
                             },
                             3: {
                                 "item": 3,
                                 "stages": {
                                     "2709471980": {"outputs": {}},
-                                    "9263488742": {"outputs": {}},
+                                    "9263488742": {
+                                        "outputs": {},
+                                        "skipped": True,
+                                    },
                                 },
                             },
                             4: {
@@ -489,7 +499,49 @@ def test_stage_exec_foreach_concurrent_with_raise(test_path):
         workflow = Workflow.from_conf(name="tmp-wf-foreach-concurrent-raise")
         stage: Stage = workflow.job("first-job").stage("foreach-stage")
         rs = stage.set_outputs(stage.handler_execute({}).context, to={})
-        print(rs)
+        assert rs == {
+            "stages": {
+                "foreach-stage": {
+                    "outputs": {
+                        "items": [1, 2, 3, 4],
+                        "foreach": {
+                            3: {
+                                "item": 3,
+                                "stages": {
+                                    "2495665187": {
+                                        "outputs": {},
+                                        "skipped": True,
+                                    },
+                                    "2709471980": {"outputs": {}},
+                                    "9940141347": {"outputs": {}},
+                                },
+                            },
+                            1: {
+                                "item": 1,
+                                "stages": {
+                                    "2495665187": {
+                                        "outputs": {},
+                                        "skipped": True,
+                                    },
+                                    "2709471980": {"outputs": {}},
+                                    "9940141347": {"outputs": {}},
+                                },
+                            },
+                        },
+                    },
+                    "errors": {
+                        "class": rs["stages"]["foreach-stage"]["errors"][
+                            "class"
+                        ],
+                        "name": "StageException",
+                        "message": (
+                            "Sub-Stage execution error: StageException: Raise "
+                            "error when item match 2"
+                        ),
+                    },
+                }
+            }
+        }
 
 
 def test_stage_exec_foreach_with_trigger(test_path):
@@ -507,6 +559,17 @@ def test_stage_exec_foreach_with_trigger(test_path):
                   id: hello
                   echo: "Run trigger with item: ${{ params.item }}"
 
+        tmp-wf-foreach-trigger-task-raise:
+          type: Workflow
+          params:
+            item: int
+          jobs:
+            first-job:
+              stages:
+                - name: "Echo"
+                  id: raise-stage
+                  raise: "Raise trigger with item: ${{ params.item }}"
+
         tmp-wf-foreach-trigger:
           type: Workflow
           jobs:
@@ -518,6 +581,14 @@ def test_stage_exec_foreach_with_trigger(test_path):
                   stages:
                     - name: "Stage trigger"
                       trigger: tmp-wf-foreach-trigger-task
+                      params:
+                        item: ${{ item }}
+                - name: "Raise run for-each stage"
+                  id: foreach-raise
+                  foreach: [1, 2]
+                  stages:
+                    - name: "Stage trigger for raise"
+                      trigger: tmp-wf-foreach-trigger-task-raise
                       params:
                         item: ${{ item }}
         """,
@@ -572,6 +643,23 @@ def test_stage_exec_foreach_with_trigger(test_path):
                     },
                 },
             },
+        }
+
+        stage: Stage = workflow.job("first-job").stage("foreach-raise")
+        rs = stage.set_outputs(stage.handler_execute({}).context, to={})
+        assert rs == {
+            "stages": {
+                "foreach-raise": {
+                    "outputs": {"items": [1, 2], "foreach": {}},
+                    "errors": {
+                        "class": rs["stages"]["foreach-raise"]["errors"][
+                            "class"
+                        ],
+                        "name": "StageException",
+                        "message": "Sub-Stage execution error: StageException: Trigger workflow was failed with:\nGet job execution error first-job: JobException: Stage execution error: StageException: Raise trigger with item: 1.",
+                    },
+                }
+            }
         }
 
 

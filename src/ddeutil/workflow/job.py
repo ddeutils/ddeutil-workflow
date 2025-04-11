@@ -478,8 +478,8 @@ class Job(BaseModel):
             if not isinstance(rs, bool):
                 raise TypeError("Return type of condition does not be boolean")
             return not rs
-        except Exception as err:
-            raise JobException(f"{err.__class__.__name__}: {err}") from err
+        except Exception as e:
+            raise JobException(f"{e.__class__.__name__}: {e}") from e
 
     def set_outputs(
         self,
@@ -698,12 +698,11 @@ def local_execute_strategy(
                     },
                 )
 
-        except (StageException, UtilException) as err:
-            result.trace.error(f"[JOB]: {err.__class__.__name__}: {err}")
+        except (StageException, UtilException) as e:
+            result.trace.error(f"[JOB]: {e.__class__.__name__}: {e}")
             if raise_error:
                 raise JobException(
-                    f"Stage execution error: {err.__class__.__name__}: "
-                    f"{err}"
+                    f"Stage execution error: {e.__class__.__name__}: {e}"
                 ) from None
 
             return result.catch(
@@ -712,7 +711,7 @@ def local_execute_strategy(
                     strategy_id: {
                         "matrix": strategy,
                         "stages": filter_func(context.pop("stages", {})),
-                        "errors": err.to_dict(),
+                        "errors": e.to_dict(),
                     },
                 },
             )
@@ -856,13 +855,12 @@ def local_execute(
         for future in done:
             try:
                 future.result()
-            except JobException as err:
+            except JobException as e:
                 status = FAILED
                 result.trace.error(
-                    f"[JOB]: {ls} Catch:\n\t{err.__class__.__name__}:"
-                    f"\n\t{err}"
+                    f"[JOB]: {ls} Catch:\n\t{e.__class__.__name__}:\n\t{e}"
                 )
-                context.update({"errors": err.to_dict()})
+                context.update({"errors": e.to_dict()})
 
     return result.catch(status=status, context=context)
 

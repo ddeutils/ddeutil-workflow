@@ -35,9 +35,11 @@ import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from concurrent.futures import (
+    FIRST_EXCEPTION,
     Future,
     ThreadPoolExecutor,
     as_completed,
+    wait,
 )
 from datetime import datetime
 from inspect import Parameter
@@ -53,10 +55,11 @@ from typing_extensions import Self
 
 from .__types import DictData, DictStr, TupleStr
 from .conf import dynamic
-from .exceptions import StageException, to_dict
-from .result import FAILED, SUCCESS, Result, Status
+from .exceptions import StageException, UtilException, to_dict
+from .result import FAILED, SUCCESS, WAIT, Result, Status
 from .reusables import TagFunc, extract_call, not_in_template, param2template
 from .utils import (
+    filter_func,
     gen_id,
     make_exec,
 )
@@ -1122,10 +1125,10 @@ class ParallelStage(BaseStage):  # pragma: no cov
 
 class ForEachStage(BaseStage):
     """For-Each execution stage that execute child stages with an item in list
-    of item values.
+    of item values. This stage is not the low-level stage model because it runs
+    muti-stages in this stage execution.
 
-        This stage is not the low-level stage model because it runs muti-stages
-    in this stage execution.
+        The concept of this stage use the same logic of the Job execution.
 
     Data Validate:
         >>> stage = {
@@ -1165,74 +1168,90 @@ class ForEachStage(BaseStage):
         self,
         item: Union[str, int],
         params: DictData,
-        context: DictData,
         result: Result,
         *,
         event: Event | None = None,
-    ) -> tuple[Status, DictData]:
+    ) -> Result:
         """Execute foreach item from list of item.
 
         :param item: (str | int) An item that want to execution.
         :param params: (DictData) A parameter that want to pass to stage
             execution.
-        :param context: (DictData)
         :param result: (Result)
         :param event: (Event) An event manager that use to track parent execute
             was not force stopped.
 
-        :rtype: tuple[Status, DictData]
+        :rtype: Result
         """
-        result.trace.debug(f"[STAGE]: Execute foreach item: {item!r}")
-        to: DictData = copy.deepcopy(params)
-        to.update({"item": item, "stages": {}})
-        status: Status = SUCCESS
+        context: DictData = copy.deepcopy(params)
+        context.update({"item": item, "stages": {}})
+        result.trace.debug(f"[STAGE]: Execute item: {item!r}")
         for stage in self.stages:
+
             if self.extras:
                 stage.extras = self.extras
 
-            if stage.is_skipped(params=to):
+            if stage.is_skipped(params=context):
                 result.trace.info(f"[STAGE]: Skip stage: {stage.iden!r}")
-                stage.set_outputs(output={"skipped": True}, to=to)
+                stage.set_outputs(output={"skipped": True}, to=context)
                 continue
 
             if event and event.is_set():
                 error_msg: str = (
-                    "Job strategy was canceled from event that had set before "
-                    "strategy execution."
+                    "Item-Stage was canceled from event that had set before "
+                    "stage item execution."
                 )
-                context["foreach"][item] = {
-                    "item": item,
-                    "stages": to.pop("stages", {}),
-                    "errors": StageException(error_msg).to_dict(),
-                }
-                return FAILED, context
+                return result.catch(
+                    status=FAILED,
+                    foreach={
+                        item: {
+                            "item": item,
+                            "stages": filter_func(context.pop("stages", {})),
+                            "errors": StageException(error_msg).to_dict(),
+                        }
+                    },
+                )
 
             try:
-                stage.set_outputs(
-                    stage.handler_execute(
-                        params=to,
-                        run_id=result.run_id,
-                        parent_run_id=result.parent_run_id,
-                        raise_error=True,
-                    ).context,
-                    to=to,
+                rs: Result = stage.handler_execute(
+                    params=context,
+                    run_id=result.run_id,
+                    parent_run_id=result.parent_run_id,
+                    raise_error=True,
                 )
-            except StageException as e:  # pragma: no cov
-                result.trace.error(
-                    f"[STAGE]: Catch:\n\t{e.__class__.__name__}:" f"\n\t{e}"
-                )
-                context["foreach"][item] = {
-                    "item": item,
-                    "stages": to.pop("stages", {}),
-                    "errors": e.to_dict(),
-                }
-                return FAILED, context
+                stage.set_outputs(rs.context, to=context)
+                if rs.status == FAILED:
+                    error_msg: str = (
+                        f"Item-Stage was break because it has a sub stage, "
+                        f"{stage.iden}, failed without raise error."
+                    )
+                    return result.catch(
+                        status=FAILED,
+                        foreach={
+                            item: {
+                                "item": item,
+                                "stages": filter_func(
+                                    context.pop("stages", {})
+                                ),
+                                "errors": StageException(error_msg).to_dict(),
+                            },
+                        },
+                    )
+            except (StageException, UtilException) as e:
+                result.trace.error(f"[STAGE]: {e.__class__.__name__}: {e}")
+                raise StageException(
+                    f"Sub-Stage execution error: {e.__class__.__name__}: {e}"
+                ) from None
 
-        context["foreach"][item] = {
-            "item": item,
-            "stages": to.pop("stages", {}),
-        }
-        return status, context
+        return result.catch(
+            status=SUCCESS,
+            foreach={
+                item: {
+                    "item": item,
+                    "stages": filter_func(context.pop("stages", {})),
+                },
+            },
+        )
 
     def execute(
         self,
@@ -1253,7 +1272,8 @@ class ForEachStage(BaseStage):
         """
         if result is None:  # pragma: no cov
             result: Result = Result(
-                run_id=gen_id(self.name + (self.id or ""), unique=True)
+                run_id=gen_id(self.name + (self.id or ""), unique=True),
+                extras=self.extras,
             )
         event: Event = Event() if event is None else event
         foreach: Union[list[str], list[int]] = (
@@ -1267,35 +1287,57 @@ class ForEachStage(BaseStage):
             )
 
         result.trace.info(f"[STAGE]: Foreach-Execute: {foreach!r}.")
-        context: DictData = {"items": foreach, "foreach": {}}
-        is_error: bool = False
-        statuses: list[Union[SUCCESS, FAILED]] = []
-        with ThreadPoolExecutor(max_workers=self.concurrent) as executor:
+        result.catch(status=WAIT, context={"items": foreach, "foreach": {}})
+        if event and event.is_set():  # pragma: no cov
+            return result.catch(
+                status=FAILED,
+                context={
+                    "errors": StageException(
+                        "Stage was canceled from event that had set "
+                        "before stage foreach execution."
+                    ).to_dict()
+                },
+            )
+
+        with ThreadPoolExecutor(
+            max_workers=self.concurrent, thread_name_prefix="stage_foreach_"
+        ) as executor:
+
             futures: list[Future] = [
                 executor.submit(
                     self.execute_item,
                     item=item,
-                    params=params.copy(),
-                    context=context,
+                    params=params,
                     result=result,
                 )
                 for item in foreach
             ]
-            for future in as_completed(futures):
-                status, context = future.result()
-                statuses.append(status)
-                result.trace.warning(statuses)
-                if status == FAILED:
-                    if event:
-                        event.set()
-                    is_error = True
-                    break
+            context: DictData = {}
+            status: Status = SUCCESS
 
-            if is_error:
-                for future in futures:
+            done, not_done = wait(
+                futures, timeout=1800, return_when=FIRST_EXCEPTION
+            )
+
+            if len(done) != len(futures):
+                result.trace.warning(
+                    "[STAGE]: Set the event for stop running stage."
+                )
+                event.set()
+                for future in not_done:
                     future.cancel()
 
-        return result.catch(status=max(statuses), context=context)
+            for future in done:
+                try:
+                    future.result()
+                except StageException as e:
+                    status = FAILED
+                    result.trace.error(
+                        f"[STAGE]: Catch:\n\t{e.__class__.__name__}:\n\t{e}"
+                    )
+                    context.update({"errors": e.to_dict()})
+
+        return result.catch(status=status, context=context)
 
 
 class UntilStage(BaseStage):  # pragma: no cov
@@ -1406,7 +1448,6 @@ class UntilStage(BaseStage):  # pragma: no cov
             result: Result = Result(
                 run_id=gen_id(self.name + (self.id or ""), unique=True)
             )
-
         item: Union[str, int, bool] = param2template(
             self.item, params, extras=self.extras
         )
@@ -1417,6 +1458,13 @@ class UntilStage(BaseStage):  # pragma: no cov
         context: DictData = {"until": {}}
         statuses: list[Union[SUCCESS, FAILED]] = []
         while track and not (exceed_loop := loop >= self.max_until_loop):
+
+            if event and event.is_set():
+                return result.catch(
+                    status=FAILED,
+                    context=context,
+                )
+
             status, context, item = self.execute_item(
                 item=item,
                 loop=loop,

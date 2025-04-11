@@ -39,6 +39,9 @@ class BaseWorkflowException(Exception):
 class UtilException(BaseWorkflowException): ...
 
 
+class ResultException(UtilException): ...
+
+
 class StageException(BaseWorkflowException): ...
 
 

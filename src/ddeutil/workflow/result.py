@@ -21,6 +21,7 @@ from typing_extensions import Self
 
 from .__types import DictData
 from .conf import dynamic
+from .exceptions import ResultException
 from .logs import Trace, get_dt_tznow, get_trace
 from .utils import default_gen_id, gen_id, get_dt_now
 
@@ -63,7 +64,6 @@ class Result:
 
     status: Status = field(default=WAIT)
     context: DictData = field(default_factory=dict)
-    errors: DictData = field(default_factory=dict)
     run_id: Optional[str] = field(default_factory=default_gen_id)
     parent_run_id: Optional[str] = field(default=None, compare=False)
     ts: datetime = field(default_factory=get_dt_tznow, compare=False)
@@ -137,7 +137,7 @@ class Result:
         self,
         status: int | Status,
         context: DictData | None = None,
-        error: DictData | None = None,
+        **kwargs,
     ) -> Self:
         """Catch the status and context to this Result object. This method will
         use between a child execution return a result, and it wants to pass
@@ -145,7 +145,6 @@ class Result:
 
         :param status: A status enum object.
         :param context: A context data that will update to the current context.
-        :param error: An error data that will update to the current errors.
 
         :rtype: Self
         """
@@ -153,7 +152,14 @@ class Result:
             Status(status) if isinstance(status, int) else status
         )
         self.__dict__["context"].update(context or {})
-        self.__dict__["errors"].update(error or {})
+        if kwargs:
+            for k in kwargs:
+                if k in self.__dict__["context"]:
+                    self.__dict__["context"][k].update(kwargs[k])
+                else:
+                    raise ResultException(
+                        f"The key {k!r} does not exists on context data."
+                    )
         return self
 
     def alive_time(self) -> float:  # pragma: no cov
