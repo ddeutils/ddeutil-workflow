@@ -976,7 +976,6 @@ class Workflow(BaseModel):
         *,
         result: Result | None = None,
         event: Event | None = None,
-        raise_error: bool = True,
     ) -> Result:
         """Job execution with passing dynamic parameters from the main workflow
         execution to the target job object via job's ID.
@@ -987,7 +986,6 @@ class Workflow(BaseModel):
 
         :raise WorkflowException: If execute with not exist job's ID.
         :raise WorkflowException: If the job execution raise JobException.
-        :raise NotImplementedError: If set raise_error argument to False.
 
         :param job_id: A job ID that want to execute.
         :param params: A params that was parameterized from workflow execution.
@@ -995,8 +993,6 @@ class Workflow(BaseModel):
             data.
         :param event: (Event) An event manager that pass to the
             PoolThreadExecutor.
-        :param raise_error: A flag that raise error instead catching to result
-            if it gets exception from job execution.
 
         :rtype: Result
         :return: Return the result object that receive the job execution result
@@ -1036,12 +1032,8 @@ class Workflow(BaseModel):
                 )
         except JobException as e:
             result.trace.error(f"[WORKFLOW]: {e.__class__.__name__}: {e}")
-            if raise_error:
-                raise WorkflowException(
-                    f"Get job execution error {job_id}: JobException: {e}"
-                ) from None
-            raise NotImplementedError(
-                "Handle error from the job execution does not support yet."
+            raise WorkflowException(
+                f"Get job execution error {job_id}: JobException: {e}"
             ) from None
 
         return result.catch(status=SUCCESS, context=params)
