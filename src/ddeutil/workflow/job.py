@@ -38,7 +38,7 @@ from .exceptions import (
     UtilException,
     to_dict,
 )
-from .result import FAILED, SKIP, SUCCESS, WAIT, Result, Status
+from .result import CANCEL, FAILED, SKIP, SUCCESS, WAIT, Result, Status
 from .reusables import has_template, param2template
 from .stages import Stage
 from .utils import cross_product, filter_func, gen_id
@@ -664,7 +664,7 @@ def local_execute_strategy(
                 "strategy execution."
             )
             return result.catch(
-                status=FAILED,
+                status=CANCEL,
                 context={
                     strategy_id: {
                         "matrix": strategy,
@@ -773,7 +773,7 @@ def local_execute(
 
             if event and event.is_set():  # pragma: no cov
                 return result.catch(
-                    status=FAILED,
+                    status=CANCEL,
                     context={
                         "errors": JobException(
                             "Job strategy was canceled from event that had set "
@@ -802,7 +802,7 @@ def local_execute(
 
     if event and event.is_set():  # pragma: no cov
         return result.catch(
-            status=FAILED,
+            status=CANCEL,
             context={
                 "errors": JobException(
                     "Job strategy was canceled from event that had set "
@@ -901,7 +901,7 @@ def self_hosted_execute(
 
     if event and event.is_set():
         return result.catch(
-            status=FAILED,
+            status=CANCEL,
             context={
                 "errors": JobException(
                     "Job self-hosted execution was canceled from event that "
@@ -980,7 +980,7 @@ def azure_batch_execute(
     )
     if event and event.is_set():
         return result.catch(
-            status=FAILED,
+            status=CANCEL,
             context={
                 "errors": JobException(
                     "Job azure-batch execution was canceled from event that "

@@ -56,9 +56,10 @@ from typing_extensions import Self
 from .__types import DictData, DictStr, TupleStr
 from .conf import dynamic
 from .exceptions import StageException, UtilException, to_dict
-from .result import FAILED, SUCCESS, WAIT, Result, Status
+from .result import CANCEL, FAILED, SUCCESS, WAIT, Result, Status
 from .reusables import TagFunc, extract_call, not_in_template, param2template
 from .utils import (
+    delay,
     filter_func,
     gen_id,
     make_exec,
@@ -1025,12 +1026,13 @@ class ParallelStage(BaseStage):  # pragma: no cov
     max_parallel_core: int = Field(default=2)
 
     @staticmethod
-    def task(
+    def execute_task(
         branch: str,
         params: DictData,
         result: Result,
         stages: list[Stage],
         *,
+        event: Event | None = None,
         extras: DictData | None = None,
     ) -> DictData:
         """Task execution method for passing a branch to each thread.
@@ -1040,31 +1042,81 @@ class ParallelStage(BaseStage):  # pragma: no cov
         :param result: (Result) A result object for keeping context and status
             data.
         :param stages:
-        :param extras
+        :param event: (Event) An event manager that use to track parent execute
+            was not force stopped.
+        :param extras: (DictData) An extra parameters that want to override
+            config values.
 
         :rtype: DictData
         """
-        context = {"branch": branch, "stages": {}}
-        result.trace.debug(f"[STAGE]: Execute parallel branch: {branch!r}")
+        result.trace.debug(f"[STAGE]: Execute branch: {branch!r}")
+        context: DictData = copy.deepcopy(params)
+        context.update({"branch": branch, "stages": {}})
         for stage in stages:
+
             if extras:
                 stage.extras = extras
 
+            if stage.is_skipped(params=context):
+                result.trace.info(f"[STAGE]: Skip stage: {stage.iden!r}")
+                stage.set_outputs(output={"skipped": True}, to=context)
+                continue
+
+            if event and event.is_set():
+                error_msg: str = (
+                    "Branch-Stage was canceled from event that had set before "
+                    "stage item execution."
+                )
+                return result.catch(
+                    status=CANCEL,
+                    parallel={
+                        branch: {
+                            "branch": branch,
+                            "stages": filter_func(context.pop("stages", {})),
+                            "errors": StageException(error_msg).to_dict(),
+                        }
+                    },
+                )
+
             try:
-                stage.set_outputs(
-                    stage.handler_execute(
-                        params=params,
-                        run_id=result.run_id,
-                        parent_run_id=result.parent_run_id,
-                    ).context,
-                    to=context,
+                rs: Result = stage.handler_execute(
+                    params=context,
+                    run_id=result.run_id,
+                    parent_run_id=result.parent_run_id,
+                    raise_error=True,
                 )
+                stage.set_outputs(rs.context, to=context)
+                if rs.status == FAILED:
+                    error_msg: str = (
+                        f"Item-Stage was break because it has a sub stage, "
+                        f"{stage.iden}, failed without raise error."
+                    )
+                    return result.catch(
+                        status=FAILED,
+                        parallel={
+                            branch: {
+                                "branch": branch,
+                                "stages": filter_func(
+                                    context.pop("stages", {})
+                                ),
+                                "errors": StageException(error_msg).to_dict(),
+                            },
+                        },
+                    )
             except StageException as e:  # pragma: no cov
-                result.trace.error(
-                    f"[STAGE]: Catch:\n\t{e.__class__.__name__}:" f"\n\t{e}"
-                )
-                context.update({"errors": e.to_dict()})
-        return context
+                result.trace.error(f"[STAGE]: {e.__class__.__name__}: {e}")
+                raise StageException(
+                    f"Sub-Stage execution error: {e.__class__.__name__}: {e}"
+                ) from None
+        return result.catch(
+            status=SUCCESS,
+            parallel={
+                branch: {
+                    "branch": branch,
+                    "stages": filter_func(context.pop("stages", {})),
+                },
+            },
+        )
 
     def execute(
         self,
@@ -1086,41 +1138,47 @@ class ParallelStage(BaseStage):  # pragma: no cov
         """
         if result is None:  # pragma: no cov
             result: Result = Result(
-                run_id=gen_id(self.name + (self.id or ""), unique=True)
+                run_id=gen_id(self.name + (self.id or ""), unique=True),
+                extras=self.extras,
             )
-
+        event: Event = Event() if event is None else event
         result.trace.info(
-            f"[STAGE]: Parallel-Execute with {self.max_parallel_core} cores."
+            f"[STAGE]: Parallel-Execute: {self.max_parallel_core} cores."
         )
-        rs: DictData = {"parallel": {}}
-        status = SUCCESS
+        result.catch(status=WAIT, context={"parallel": {}})
         with ThreadPoolExecutor(
             max_workers=self.max_parallel_core,
             thread_name_prefix="parallel_stage_exec_",
         ) as executor:
 
-            futures: list[Future] = []
-            for branch in self.parallel:
-                futures.append(
-                    executor.submit(
-                        self.task,
-                        branch=branch,
-                        params=params,
-                        result=result,
-                        stages=self.parallel[branch],
-                        extras=self.extras,
-                    )
+            context: DictData = {}
+            status: Status = SUCCESS
+
+            futures: list[Future] = (
+                executor.submit(
+                    self.execute_task,
+                    branch=branch,
+                    params=params,
+                    result=result,
+                    stages=self.parallel[branch],
+                    event=event,
+                    extras=self.extras,
                 )
+                for branch in self.parallel
+            )
 
             done = as_completed(futures, timeout=1800)
             for future in done:
-                context: DictData = future.result()
-                rs["parallel"][context.pop("branch")] = context
-
-                if "errors" in context:
+                try:
+                    future.result()
+                except StageException as e:
                     status = FAILED
+                    result.trace.error(
+                        f"[STAGE]: Catch:\n\t{e.__class__.__name__}:\n\t{e}"
+                    )
+                    context.update({"errors": e.to_dict()})
 
-        return result.catch(status=status, context=rs)
+        return result.catch(status=status, context=context)
 
 
 class ForEachStage(BaseStage):
@@ -1203,7 +1261,7 @@ class ForEachStage(BaseStage):
                     "stage item execution."
                 )
                 return result.catch(
-                    status=FAILED,
+                    status=CANCEL,
                     foreach={
                         item: {
                             "item": item,
@@ -1291,7 +1349,7 @@ class ForEachStage(BaseStage):
         result.catch(status=WAIT, context={"items": foreach, "foreach": {}})
         if event and event.is_set():  # pragma: no cov
             return result.catch(
-                status=FAILED,
+                status=CANCEL,
                 context={
                     "errors": StageException(
                         "Stage was canceled from event that had set "
@@ -1417,7 +1475,7 @@ class UntilStage(BaseStage):  # pragma: no cov
                 )
                 return (
                     result.catch(
-                        status=FAILED,
+                        status=CANCEL,
                         until={
                             loop: {
                                 "loop": loop,
@@ -1498,7 +1556,7 @@ class UntilStage(BaseStage):  # pragma: no cov
 
             if event and event.is_set():
                 return result.catch(
-                    status=FAILED,
+                    status=CANCEL,
                     context={
                         "errors": StageException(
                             "Stage was canceled from event that had set "
@@ -1536,7 +1594,8 @@ class UntilStage(BaseStage):  # pragma: no cov
                     "Return type of until condition does not be boolean, it"
                     f"return: {next_track!r}"
                 )
-            track = not next_track
+            track: bool = not next_track
+            delay(0.025)
 
         if exceed_loop:
             raise StageException(

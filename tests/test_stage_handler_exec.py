@@ -679,12 +679,11 @@ def test_stage_exec_parallel(test_path):
                       - name: "Echo branch01 stage"
                         echo: |
                           Start run with branch 1
-                        sleep: 5
+                        sleep: 1
                     branch02:
                       - name: "Echo branch02 stage"
                         echo: |
                           Start run with branch 2
-                        sleep: 1
         """,
     ):
         workflow = Workflow.from_conf(name="tmp-wf-parallel")
@@ -697,9 +696,11 @@ def test_stage_exec_parallel(test_path):
                     "outputs": {
                         "parallel": {
                             "branch02": {
+                                "branch": "branch02",
                                 "stages": {"4967824305": {"outputs": {}}},
                             },
                             "branch01": {
+                                "branch": "branch01",
                                 "stages": {"0573477600": {"outputs": {}}},
                             },
                         },
