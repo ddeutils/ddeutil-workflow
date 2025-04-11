@@ -387,9 +387,9 @@ def test_stage_exec_foreach(test_path):
 
 def test_stage_exec_foreach_concurrent(test_path):
     with dump_yaml_context(
-        test_path / "conf/demo/01_99_wf_test_wf_foreach.yml",
+        test_path / "conf/demo/01_99_wf_test_wf_foreach_concurrent.yml",
         data="""
-        tmp-wf-foreach:
+        tmp-wf-foreach-concurrent:
           type: Workflow
           jobs:
             first-job:
@@ -408,7 +408,7 @@ def test_stage_exec_foreach_concurrent(test_path):
                         Final run
         """,
     ):
-        workflow = Workflow.from_conf(name="tmp-wf-foreach")
+        workflow = Workflow.from_conf(name="tmp-wf-foreach-concurrent")
         stage: Stage = workflow.job("first-job").stage("foreach-stage")
         rs = stage.set_outputs(stage.handler_execute({}).context, to={})
         assert rs == {
@@ -421,21 +421,30 @@ def test_stage_exec_foreach_concurrent(test_path):
                                 "item": 1,
                                 "stages": {
                                     "2709471980": {"outputs": {}},
-                                    "9263488742": {"outputs": {}},
+                                    "9263488742": {
+                                        "outputs": {},
+                                        "skipped": True,
+                                    },
                                 },
                             },
                             2: {
                                 "item": 2,
                                 "stages": {
                                     "2709471980": {"outputs": {}},
-                                    "9263488742": {"outputs": {}},
+                                    "9263488742": {
+                                        "outputs": {},
+                                        "skipped": True,
+                                    },
                                 },
                             },
                             3: {
                                 "item": 3,
                                 "stages": {
                                     "2709471980": {"outputs": {}},
-                                    "9263488742": {"outputs": {}},
+                                    "9263488742": {
+                                        "outputs": {},
+                                        "skipped": True,
+                                    },
                                 },
                             },
                             4: {
@@ -450,6 +459,37 @@ def test_stage_exec_foreach_concurrent(test_path):
                 },
             },
         }
+
+
+def test_stage_exec_foreach_concurrent_with_raise(test_path):
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_foreach_concurrent_raise.yml",
+        data="""
+        tmp-wf-foreach-concurrent-raise:
+          type: Workflow
+          jobs:
+            first-job:
+              stages:
+                - name: "Start run for-each stage"
+                  id: foreach-stage
+                  foreach: [1, 2, 3, 4]
+                  concurrent: 2
+                  stages:
+                    - name: "Raise"
+                      if: ${{ item }} == 2
+                      raise: "Raise error when item match ${{ item }}"
+                    - name: "Echo stage"
+                      echo: |
+                        Start run with item: ${{ item }}
+                      sleep: 2
+                    - name: "Final"
+                      echo: "Final stage of item: ${{ item }}"
+        """,
+    ):
+        workflow = Workflow.from_conf(name="tmp-wf-foreach-concurrent-raise")
+        stage: Stage = workflow.job("first-job").stage("foreach-stage")
+        rs = stage.set_outputs(stage.handler_execute({}).context, to={})
+        print(rs)
 
 
 def test_stage_exec_foreach_with_trigger(test_path):

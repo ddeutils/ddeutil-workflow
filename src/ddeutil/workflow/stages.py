@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import copy
 import inspect
 import subprocess
 import sys
@@ -1166,6 +1167,8 @@ class ForEachStage(BaseStage):
         params: DictData,
         context: DictData,
         result: Result,
+        *,
+        event: Event | None = None,
     ) -> tuple[Status, DictData]:
         """Execute foreach item from list of item.
 
@@ -1174,22 +1177,40 @@ class ForEachStage(BaseStage):
             execution.
         :param context: (DictData)
         :param result: (Result)
+        :param event: (Event) An event manager that use to track parent execute
+            was not force stopped.
 
         :rtype: tuple[Status, DictData]
         """
         result.trace.debug(f"[STAGE]: Execute foreach item: {item!r}")
-        params["item"] = item
-        to: DictData = {"item": item, "stages": {}}
+        to: DictData = copy.deepcopy(params)
+        to.update({"item": item, "stages": {}})
         status: Status = SUCCESS
         for stage in self.stages:
-
             if self.extras:
                 stage.extras = self.extras
+
+            if stage.is_skipped(params=to):
+                result.trace.info(f"[STAGE]: Skip stage: {stage.iden!r}")
+                stage.set_outputs(output={"skipped": True}, to=to)
+                continue
+
+            if event and event.is_set():
+                error_msg: str = (
+                    "Job strategy was canceled from event that had set before "
+                    "strategy execution."
+                )
+                context["foreach"][item] = {
+                    "item": item,
+                    "stages": to.pop("stages", {}),
+                    "errors": StageException(error_msg).to_dict(),
+                }
+                return FAILED, context
 
             try:
                 stage.set_outputs(
                     stage.handler_execute(
-                        params=params,
+                        params=to,
                         run_id=result.run_id,
                         parent_run_id=result.parent_run_id,
                         raise_error=True,
@@ -1197,13 +1218,20 @@ class ForEachStage(BaseStage):
                     to=to,
                 )
             except StageException as e:  # pragma: no cov
-                status = FAILED
                 result.trace.error(
                     f"[STAGE]: Catch:\n\t{e.__class__.__name__}:" f"\n\t{e}"
                 )
-                to.update({"errors": e.to_dict()})
+                context["foreach"][item] = {
+                    "item": item,
+                    "stages": to.pop("stages", {}),
+                    "errors": e.to_dict(),
+                }
+                return FAILED, context
 
-        context["foreach"][item] = to
+        context["foreach"][item] = {
+            "item": item,
+            "stages": to.pop("stages", {}),
+        }
         return status, context
 
     def execute(
@@ -1227,7 +1255,7 @@ class ForEachStage(BaseStage):
             result: Result = Result(
                 run_id=gen_id(self.name + (self.id or ""), unique=True)
             )
-
+        event: Event = Event() if event is None else event
         foreach: Union[list[str], list[int]] = (
             param2template(self.foreach, params, extras=self.extras)
             if isinstance(self.foreach, str)
@@ -1256,8 +1284,10 @@ class ForEachStage(BaseStage):
             for future in as_completed(futures):
                 status, context = future.result()
                 statuses.append(status)
+                result.trace.warning(statuses)
                 if status == FAILED:
-                    event.set()
+                    if event:
+                        event.set()
                     is_error = True
                     break
 
@@ -1575,8 +1605,9 @@ class RaiseStage(BaseStage):  # pragma: no cov
             result: Result = Result(
                 run_id=gen_id(self.name + (self.id or ""), unique=True)
             )
-        result.trace.info(f"[STAGE]: Raise-Execute: {self.message!r}.")
-        raise StageException(self.message)
+        message: str = param2template(self.message, params, extras=self.extras)
+        result.trace.info(f"[STAGE]: Raise-Execute: {message!r}.")
+        raise StageException(message)
 
 
 # TODO: Not implement this stages yet
