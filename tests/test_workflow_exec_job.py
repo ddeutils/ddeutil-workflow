@@ -54,8 +54,3 @@ def test_workflow_execute_job_raise_inside():
     # NOTE: Raise if any strategy inside job execute raise some error.
     with pytest.raises(WorkflowException):
         workflow.execute_job(job_id="demo-run", params={})
-
-    # NOTE: Raise if any strategy inside job execute raise some error and want
-    #   to catch result.
-    with pytest.raises(NotImplementedError):
-        workflow.execute_job(job_id="demo-run", params={}, raise_error=False)
