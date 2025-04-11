@@ -240,16 +240,19 @@ def batch(iterable: Iterator[Any] | range, n: int) -> Iterator[Any]:
         yield chain((first_el,), chunk_it)
 
 
-def cut_id(run_id: str, *, num: int = 8) -> str:
+def cut_id(run_id: str, *, num: int = 6) -> str:
     """Cutting running ID with length.
 
     Example:
-        >>> cut_id(run_id='668931127320241228100331254567')
-        '254567'
+        >>> cut_id(run_id='20240101081330000000T1354680202')
+        '202401010813680202'
 
     :param run_id: A running ID That want to cut
     :param num:
 
     :rtype: str
     """
-    return run_id[-num:]
+    if "T" in run_id:
+        dt, simple = run_id.split("T", maxsplit=1)
+        return dt[:12] + simple[-num:]
+    return run_id[:12] + run_id[-num:]
