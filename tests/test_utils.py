@@ -11,6 +11,7 @@ from ddeutil.workflow.utils import (
     filter_func,
     gen_id,
     get_d_now,
+    get_diff_sec,
     get_dt_now,
     make_exec,
     reach_next_minute,
@@ -43,6 +44,22 @@ def test_get_dt_now():
 def test_gen_id():
     assert "1354680202" == gen_id("{}")
     assert "1354680202" == gen_id("{}", sensitive=False)
+
+
+@freeze_time("2024-01-01 01:13:30")
+def test_gen_id_unique():
+    assert "20240101081330000000T1354680202" == gen_id("{}", unique=True)
+    assert "20240101081330000000T1354680202" == gen_id(
+        "{}", unique=True, sensitive=False
+    )
+
+
+@freeze_time("2024-01-01 01:13:30")
+def test_get_diff_sec():
+    assert 2820 == get_diff_sec(datetime(2024, 1, 1, 2, 0, 30, tzinfo=UTC))
+    assert 2819 == get_diff_sec(
+        datetime(2024, 1, 1, 2, 0, 30, tzinfo=UTC), offset=1
+    )
 
 
 def test_gen_id_not_simple(adjust_config_gen_id):

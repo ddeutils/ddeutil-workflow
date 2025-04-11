@@ -923,15 +923,11 @@ class Workflow(BaseModel):
                 # NOTE: Pop the latest Release object from the release queue.
                 release: Release = heappop(q.queue)
 
-                if reach_next_minute(
-                    release.date,
-                    tz=dynamic("tz", extras=self.extras),
-                    offset=offset,
-                ):
+                if reach_next_minute(release.date, offset=offset):
                     result.trace.debug(
-                        f"[POKING]: The latest release, "
-                        f"{release.date:%Y-%m-%d %H:%M:%S}, is not able to run "
-                        f"on this minute"
+                        f"[POKING]: Latest Release, "
+                        f"{release.date:%Y-%m-%d %H:%M:%S}, can not run on "
+                        f"this time"
                     )
                     heappush(q.queue, release)
                     wait_to_next_minute(

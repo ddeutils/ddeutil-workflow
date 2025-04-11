@@ -53,7 +53,6 @@ class Config:  # pragma: no cov
         The config value can change when you call that config property again.
     """
 
-    # NOTE: Core
     @property
     def conf_path(self) -> Path:
         """Config path that keep all workflow template YAML files.
@@ -73,9 +72,13 @@ class Config:  # pragma: no cov
 
     @property
     def generate_id_simple_mode(self) -> bool:
+        """Flag for generate running ID with simple mode. That does not use
+        `md5` function after generate simple mode.
+
+        :rtype: bool
+        """
         return str2bool(env("CORE_GENERATE_ID_SIMPLE_MODE", "true"))
 
-    # NOTE: Register
     @property
     def registry_caller(self) -> list[str]:
         """Register Caller that is a list of importable string for the call
@@ -98,13 +101,16 @@ class Config:  # pragma: no cov
         )
         return [r.strip() for r in regis_filter_str.split(",")]
 
-    # NOTE: Log
     @property
     def trace_path(self) -> Path:
         return Path(env("LOG_TRACE_PATH", "./logs"))
 
     @property
     def debug(self) -> bool:
+        """Debug flag for echo log that use DEBUG mode.
+
+        :rtype: bool
+        """
         return str2bool(env("LOG_DEBUG_MODE", "true"))
 
     @property
@@ -144,7 +150,6 @@ class Config:  # pragma: no cov
     def log_datetime_format(self) -> str:
         return env("LOG_DATETIME_FORMAT", "%Y-%m-%d %H:%M:%S")
 
-    # NOTE: Stage
     @property
     def stage_raise_error(self) -> bool:
         return str2bool(env("CORE_STAGE_RAISE_ERROR", "false"))

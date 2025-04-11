@@ -26,9 +26,11 @@ T = TypeVar("T")
 UTC: Final[ZoneInfo] = ZoneInfo("UTC")
 
 
-def get_dt_now(
-    tz: ZoneInfo | None = None, offset: float = 0.0
-) -> datetime:  # pragma: no cov
+def replace_sec(dt: datetime) -> datetime:
+    return dt.replace(second=0, microsecond=0)
+
+
+def get_dt_now(tz: ZoneInfo | None = None, offset: float = 0.0) -> datetime:
     """Return the current datetime object.
 
     :param tz: A ZoneInfo object for replace timezone of return datetime object.
@@ -54,42 +56,31 @@ def get_d_now(
     return (datetime.now(tz=(tz or UTC)) - timedelta(seconds=offset)).date()
 
 
-def get_diff_sec(
-    dt: datetime, tz: ZoneInfo | None = None, offset: float = 0.0
-) -> int:  # pragma: no cov
+def get_diff_sec(dt: datetime, offset: float = 0.0) -> int:
     """Return second value that come from diff of an input datetime and the
     current datetime with specific timezone.
 
-    :param dt:
-    :param tz: A ZoneInfo object for replace timezone of return datetime object.
-    :param offset: An offset second value.
+    :param dt: (datetime) A datetime object that want to get different second value.
+    :param offset: (float) An offset second value.
 
     :rtype: int
     """
     return round(
         (
-            dt - datetime.now(tz=(tz or UTC)) - timedelta(seconds=offset)
+            dt - datetime.now(tz=dt.tzinfo) - timedelta(seconds=offset)
         ).total_seconds()
     )
 
 
-def reach_next_minute(
-    dt: datetime, tz: ZoneInfo | None = None, offset: float = 0.0
-) -> bool:
+def reach_next_minute(dt: datetime, offset: float = 0.0) -> bool:
     """Check this datetime object is not in range of minute level on the current
     datetime.
 
-    :param dt:
-    :param tz: A ZoneInfo object for replace timezone of return datetime object.
-    :param offset: An offset second value.
+    :param dt: (datetime) A datetime object that want to check.
+    :param offset: (float) An offset second value.
     """
     diff: float = (
-        dt.replace(second=0, microsecond=0)
-        - (
-            get_dt_now(tz=(tz or UTC), offset=offset).replace(
-                second=0, microsecond=0
-            )
-        )
+        replace_sec(dt) - replace_sec(get_dt_now(tz=dt.tzinfo, offset=offset))
     ).total_seconds()
     if diff >= 60:
         return True
@@ -106,7 +97,7 @@ def wait_to_next_minute(
     dt: datetime, second: float = 0
 ) -> None:  # pragma: no cov
     """Wait with sleep to the next minute with an offset second value."""
-    future = dt.replace(second=0, microsecond=0) + timedelta(minutes=1)
+    future: datetime = replace_sec(dt) + timedelta(minutes=1)
     time.sleep((future - dt).total_seconds() + second)
 
 
@@ -114,7 +105,7 @@ def delay(second: float = 0) -> None:  # pragma: no cov
     """Delay time that use time.sleep with random second value between
     0.00 - 0.99 seconds.
 
-    :param second: A second number that want to adds-on random value.
+    :param second: (float) A second number that want to adds-on random value.
     """
     time.sleep(second + randrange(0, 99, step=10) / 100)
 
@@ -124,32 +115,42 @@ def gen_id(
     *,
     sensitive: bool = True,
     unique: bool = False,
+    simple_mode: bool | None = None,
+    extras: DictData | None = None,
 ) -> str:
-    """Generate running ID for able to tracking. This generates process use `md5`
-    algorithm function if ``WORKFLOW_CORE_WORKFLOW_ID_SIMPLE_MODE`` set to
-    false. But it will cut this hashing value length to 10 it the setting value
-    set to true.
+    """Generate running ID for able to tracking. This generates process use
+    `md5` algorithm function if `WORKFLOW_CORE_WORKFLOW_ID_SIMPLE_MODE` set
+    to false. But it will cut this hashing value length to 10 it the setting
+    value set to true.
+
+    Simple Mode:
+
+        ... 0000 00    00  00   00     00     000000        T   0000000000
+        ... year month day hour minute second microsecond   sep simple-id
 
     :param value: A value that want to add to prefix before hashing with md5.
     :param sensitive: A flag that convert the value to lower case before hashing
     :param unique: A flag that add timestamp at microsecond level to value
         before hashing.
+    :param simple_mode: A flag for generate ID by simple mode.
+    :param extras: An extra parameter that use for override config value.
 
     :rtype: str
     """
-    from .conf import config
+    from .conf import dynamic
 
     if not isinstance(value, str):
         value: str = str(value)
 
-    if config.generate_id_simple_mode:
-        return (
-            f"{datetime.now(tz=config.tz):%Y%m%d%H%M%S%f}T" if unique else ""
-        ) + hash_str(f"{(value if sensitive else value.lower())}", n=10)
+    dt: datetime = datetime.now(tz=dynamic("tz", extras=extras))
+    if dynamic("generate_id_simple_mode", f=simple_mode, extras=extras):
+        return (f"{dt:%Y%m%d%H%M%S%f}T" if unique else "") + hash_str(
+            f"{(value if sensitive else value.lower())}", n=10
+        )
 
     return md5(
         (
-            (f"{datetime.now(tz=config.tz):%Y%m%d%H%M%S%f}T" if unique else "")
+            (f"{dt}T" if unique else "")
             + f"{(value if sensitive else value.lower())}"
         ).encode()
     ).hexdigest()
@@ -239,14 +240,14 @@ def batch(iterable: Iterator[Any] | range, n: int) -> Iterator[Any]:
         yield chain((first_el,), chunk_it)
 
 
-def cut_id(run_id: str, *, num: int = 6) -> str:
+def cut_id(run_id: str, *, num: int = 8) -> str:
     """Cutting running ID with length.
 
     Example:
         >>> cut_id(run_id='668931127320241228100331254567')
         '254567'
 
-    :param run_id:
+    :param run_id: A running ID That want to cut
     :param num:
 
     :rtype: str
