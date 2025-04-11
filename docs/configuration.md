@@ -45,13 +45,21 @@ and do not raise any error to you.
 
 ## Override
 
-Some config can override by an extra parameters.
+Some config can override by an extra parameters. For the below example, I override
+the `conf_path` and `stage_default_id` config values at the execution time.
+
+That is mean, it does not impact to running workflow that do not override and use
+the current environment config values.
 
 ```python
 from pathlib import Path
 from ddeutil.workflow import Workflow
 
 workflow = Workflow.from_conf(
-    "wf-tester", extras={"conf_path": Path("./new/conf"), "stage_default_id": True}
+    "wf-tester",
+    extras={
+        "conf_path": Path("./new/conf"),
+        "stage_default_id": True,
+    }
 )
 ```

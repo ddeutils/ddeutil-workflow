@@ -38,6 +38,7 @@ from concurrent.futures import (
     ThreadPoolExecutor,
     as_completed,
 )
+from datetime import datetime
 from inspect import Parameter
 from pathlib import Path
 from subprocess import CompletedProcess
@@ -275,7 +276,10 @@ class BaseStage(BaseModel, ABC):
         return to
 
     def get_outputs(self, outputs: DictData) -> DictData:
-        """Get the outputs from stages data.
+        """Get the outputs from stages data. It will get this stage ID from
+        the stage outputs mapping.
+
+        :param outputs: (DictData) A stage outputs that want to get by stage ID.
 
         :rtype: DictData
         """
@@ -880,7 +884,7 @@ class CallStage(BaseStage):
         # VALIDATE:
         #   Check the result type from call function, it should be dict.
         if isinstance(rs, BaseModel):
-            rs: DictData = rs.model_dump()
+            rs: DictData = rs.model_dump(by_alias=True)
         elif not isinstance(rs, dict):
             raise TypeError(
                 f"Return type: '{call_func.name}@{call_func.tag}' does not "
@@ -896,6 +900,10 @@ class CallStage(BaseStage):
     ) -> DictData:
         """Parse Pydantic model from any dict data before parsing to target
         caller function.
+
+        :param func:
+        :param args:
+        :param result: (Result)
         """
         try:
             type_hints: dict[str, Any] = get_type_hints(func)
@@ -942,7 +950,7 @@ class TriggerStage(BaseStage):
 
     trigger: str = Field(
         description=(
-            "A trigger workflow name that should already exist on the config."
+            "A trigger workflow name that should exist on the config path."
         ),
     )
     params: DictData = Field(
@@ -976,12 +984,12 @@ class TriggerStage(BaseStage):
                 run_id=gen_id(self.name + (self.id or ""), unique=True)
             )
 
-        # NOTE: Loading workflow object from trigger name.
         _trigger: str = param2template(self.trigger, params, extras=self.extras)
+        workflow: Workflow = Workflow.from_conf(
+            _trigger,
+            extras=self.extras | {"stage_raise_error": True},
+        )
 
-        # NOTE: Set running workflow ID from running stage ID to external
-        #   params on Loader object.
-        workflow: Workflow = Workflow.from_conf(_trigger, extras=self.extras)
         result.trace.info(f"[STAGE]: Trigger-Execute: {_trigger!r}")
         return workflow.execute(
             params=param2template(self.params, params, extras=self.extras),
@@ -1195,6 +1203,7 @@ class ForEachStage(BaseStage):
                         params=params,
                         run_id=result.run_id,
                         parent_run_id=result.parent_run_id,
+                        raise_error=True,
                     ).context,
                     to=to,
                 )
@@ -1242,6 +1251,7 @@ class ForEachStage(BaseStage):
 
         result.trace.info(f"[STAGE]: Foreach-Execute: {foreach!r}.")
         context: DictData = {"items": foreach, "foreach": {}}
+        is_error: bool = False
         statuses: list[Union[SUCCESS, FAILED]] = []
         with ThreadPoolExecutor(max_workers=self.concurrent) as executor:
             futures: list[Future] = [
@@ -1257,6 +1267,14 @@ class ForEachStage(BaseStage):
             for future in as_completed(futures):
                 status, context = future.result()
                 statuses.append(status)
+                if status == FAILED:
+                    event.set()
+                    is_error = True
+                    break
+
+            if is_error:
+                for future in futures:
+                    future.cancel()
 
         return result.catch(status=max(statuses), context=context)
 
@@ -1533,8 +1551,8 @@ class CaseStage(BaseStage):  # pragma: no cov
 
 
 class RaiseStage(BaseStage):  # pragma: no cov
-    """Raise error stage that raise StageException that use a message field for
-    making error message before raise.
+    """Raise error stage execution that raise StageException that use a message
+    field for making error message before raise.
 
     Data Validate:
         >>> stage = {
@@ -1556,7 +1574,14 @@ class RaiseStage(BaseStage):  # pragma: no cov
         result: Result | None = None,
         event: Event | None = None,
     ) -> Result:
-        """Raise the stage."""
+        """Raise the StageException object with the message field execution.
+
+        :param params: A parameter that want to pass before run any statement.
+        :param result: (Result) A result object for keeping context and status
+            data.
+        :param event: (Event) An event manager that use to track parent execute
+            was not force stopped.
+        """
         if result is None:  # pragma: no cov
             result: Result = Result(
                 run_id=gen_id(self.name + (self.id or ""), unique=True)
@@ -1570,7 +1595,7 @@ class HookStage(BaseStage):  # pragma: no cov
     """Hook stage execution."""
 
     hook: str
-    args: DictData
+    args: DictData = Field(default_factory=dict)
     callback: str
 
     def execute(
@@ -1603,9 +1628,69 @@ class DockerStage(BaseStage):  # pragma: no cov
     image: str = Field(
         description="A Docker image url with tag that want to run.",
     )
+    tag: str = Field(default="latest", description="An Docker image tag.")
     env: DictData = Field(default_factory=dict)
     volume: DictData = Field(default_factory=dict)
-    auth: DictData = Field(default_factory=dict)
+    auth: DictData = Field(
+        default_factory=dict,
+        description=(
+            "An authentication of the Docker registry that use in pulling step."
+        ),
+    )
+
+    def execute_task(
+        self,
+        result: Result,
+    ):
+        from docker import DockerClient
+        from docker.errors import ContainerError
+
+        client = DockerClient(
+            base_url="unix://var/run/docker.sock", version="auto"
+        )
+
+        resp = client.api.pull(
+            repository=f"{self.image}",
+            tag=self.tag,
+            # NOTE: For pulling from GCS.
+            # {
+            #     "username": "_json_key",
+            #     "password": credential-json-string,
+            # }
+            auth_config=self.auth,
+            stream=True,
+            decode=True,
+        )
+        for line in resp:
+            result.trace.info(f"... {line}")
+
+        unique_image_name: str = f"{self.image}_{datetime.now():%Y%m%d%H%M%S}"
+        container = client.containers.run(
+            image=f"{self.image}:{self.tag}",
+            name=unique_image_name,
+            environment=self.env,
+            volumes=(
+                {Path.cwd() / ".docker.logs": {"bind": "/logs", "mode": "rw"}}
+                | self.volume
+            ),
+            detach=True,
+        )
+
+        for line in container.logs(stream=True, timestamps=True):
+            result.trace.info(f"... {line.strip().decode()}")
+
+        # NOTE: This code copy from the docker package.
+        exit_status: int = container.wait()["StatusCode"]
+        if exit_status != 0:
+            out = container.logs(stdout=False, stderr=True)
+            container.remove()
+            raise ContainerError(
+                container,
+                exit_status,
+                None,
+                f"{self.image}:{self.tag}",
+                out,
+            )
 
     def execute(
         self,
@@ -1638,6 +1723,11 @@ class VirtualPyStage(PyStage):  # pragma: no cov
         event: Event | None = None,
     ) -> Result:
         """Execute the Python statement via Python virtual environment.
+
+        Steps:
+            - Create python file.
+            - Create `.venv` and install necessary Python deps.
+            - Execution python file with uv and specific `.venv`.
 
         :param params: A parameter that want to pass before run any statement.
         :param result: (Result) A result object for keeping context and status

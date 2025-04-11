@@ -49,6 +49,9 @@ async = [
     "aiofiles",
     "aiohttp",
 ]
+docker = [
+    "docker==7.1.0"
+]
 
 [project.urls]
 Homepage = "https://github.com/ddeutils/ddeutil-workflow/"
