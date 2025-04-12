@@ -40,6 +40,13 @@ def test_stage_empty_execute():
     assert 0 == rs.status
     assert {} == rs.context
 
+    stage: EmptyStage = EmptyStage(
+        name="Empty Stage", echo="hello world\nand this is newline to echo"
+    )
+    rs: Result = stage.handler_execute(params={})
+    assert 0 == rs.status
+    assert {} == rs.context
+
 
 def test_stage_empty_raise():
 

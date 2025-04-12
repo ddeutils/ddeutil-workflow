@@ -433,12 +433,13 @@ class EmptyStage(BaseAsyncStage):
 
     echo: Optional[str] = Field(
         default=None,
-        description="A string statement that want to logging",
+        description="A string message that want to show on the stdout.",
     )
     sleep: float = Field(
         default=0,
-        description="A second value to sleep before start execution",
+        description="A second value to sleep before start execution.",
         ge=0,
+        lt=1800,
     )
 
     def execute(
@@ -465,12 +466,23 @@ class EmptyStage(BaseAsyncStage):
         :rtype: Result
         """
         result: Result = result or Result(
-            run_id=gen_id(self.name + (self.id or ""), unique=True)
+            run_id=gen_id(self.name + (self.id or ""), unique=True),
+            extras=self.extras,
         )
 
+        if not self.echo:
+            message: str = "..."
+        else:
+            message: str = param2template(
+                dedent(self.echo), params, extras=self.extras
+            )
+            if "\n" in self.echo:
+                message: str = "\n\t" + message.replace("\n", "\n\t").strip(
+                    "\n"
+                )
+
         result.trace.info(
-            f"[STAGE]: Empty-Execute: {self.name!r}: "
-            f"( {param2template(self.echo, params, extras=self.extras) or '...'} )"
+            f"[STAGE]: Empty-Execute: {self.name!r}: ( {message} )"
         )
         if self.sleep > 0:
             if self.sleep > 5:
@@ -500,7 +512,8 @@ class EmptyStage(BaseAsyncStage):
         """
         if result is None:  # pragma: no cov
             result: Result = Result(
-                run_id=gen_id(self.name + (self.id or ""), unique=True)
+                run_id=gen_id(self.name + (self.id or ""), unique=True),
+                extras=self.extras,
             )
 
         await result.trace.ainfo(
@@ -541,8 +554,8 @@ class BashStage(BaseStage):
     env: DictStr = Field(
         default_factory=dict,
         description=(
-            "An environment variable mapping that want to set before execute "
-            "this shell statement."
+            "An environment variables that set before start execute by adding "
+            "on the header of the `.sh` file."
         ),
     )
 
@@ -604,7 +617,8 @@ class BashStage(BaseStage):
         """
         if result is None:  # pragma: no cov
             result: Result = Result(
-                run_id=gen_id(self.name + (self.id or ""), unique=True)
+                run_id=gen_id(self.name + (self.id or ""), unique=True),
+                extras=self.extras,
             )
 
         bash: str = param2template(
@@ -617,7 +631,7 @@ class BashStage(BaseStage):
             env=param2template(self.env, params, extras=self.extras),
             run_id=result.run_id,
         ) as sh:
-            result.trace.debug(f"... Start create `{sh[1]}` file.")
+            result.trace.debug(f"... Create `{sh[1]}` file.")
             rs: CompletedProcess = subprocess.run(
                 sh, shell=False, capture_output=True, text=True
             )
@@ -661,18 +675,20 @@ class PyStage(BaseStage):
     """
 
     run: str = Field(
-        description="A Python string statement that want to run with exec.",
+        description="A Python string statement that want to run with `exec`.",
     )
     vars: DictData = Field(
         default_factory=dict,
         description=(
-            "A mapping to variable that want to pass to globals in exec."
+            "A variable mapping that want to pass to globals parameter in the "
+            "`exec` func."
         ),
     )
 
     @staticmethod
     def filter_locals(values: DictData) -> Iterator[str]:
-        """Filter a locals input values.
+        """Filter a locals mapping values that be module, class, or
+        __annotations__.
 
         :param values: (DictData) A locals values that want to filter.
 
@@ -729,7 +745,8 @@ class PyStage(BaseStage):
         """
         if result is None:  # pragma: no cov
             result: Result = Result(
-                run_id=gen_id(self.name + (self.id or ""), unique=True)
+                run_id=gen_id(self.name + (self.id or ""), unique=True),
+                extras=self.extras,
             )
 
         lc: DictData = {}
@@ -816,7 +833,8 @@ class CallStage(BaseStage):
         """
         if result is None:  # pragma: no cov
             result: Result = Result(
-                run_id=gen_id(self.name + (self.id or ""), unique=True)
+                run_id=gen_id(self.name + (self.id or ""), unique=True),
+                extras=self.extras,
             )
 
         has_keyword: bool = False
@@ -970,7 +988,8 @@ class TriggerStage(BaseStage):
 
         if result is None:
             result: Result = Result(
-                run_id=gen_id(self.name + (self.id or ""), unique=True)
+                run_id=gen_id(self.name + (self.id or ""), unique=True),
+                extras=self.extras,
             )
 
         _trigger: str = param2template(self.trigger, params, extras=self.extras)
@@ -1669,7 +1688,8 @@ class CaseStage(BaseStage):  # pragma: no cov
         """
         if result is None:  # pragma: no cov
             result: Result = Result(
-                run_id=gen_id(self.name + (self.id or ""), unique=True)
+                run_id=gen_id(self.name + (self.id or ""), unique=True),
+                extras=self.extras,
             )
 
         _case = param2template(self.case, params, extras=self.extras)
@@ -1731,7 +1751,9 @@ class RaiseStage(BaseStage):  # pragma: no cov
     """
 
     message: str = Field(
-        description="An error message that want to raise",
+        description=(
+            "An error message that want to raise with StageException class"
+        ),
         alias="raise",
     )
 
@@ -1752,7 +1774,8 @@ class RaiseStage(BaseStage):  # pragma: no cov
         """
         if result is None:  # pragma: no cov
             result: Result = Result(
-                run_id=gen_id(self.name + (self.id or ""), unique=True)
+                run_id=gen_id(self.name + (self.id or ""), unique=True),
+                extras=self.extras,
             )
         message: str = param2template(self.message, params, extras=self.extras)
         result.trace.info(f"[STAGE]: Raise-Execute: {message!r}.")
