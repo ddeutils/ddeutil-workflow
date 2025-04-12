@@ -909,9 +909,12 @@ class CallStage(BaseStage):
         """Parse Pydantic model from any dict data before parsing to target
         caller function.
 
-        :param func:
-        :param args:
-        :param result: (Result)
+        :param func: A tag function that want to get typing.
+        :param args: An arguments before passing to this tag function.
+        :param result: (Result) A result object for keeping context and status
+            data.
+
+        :rtype: DictData
         """
         try:
             type_hints: dict[str, Any] = get_type_hints(func)

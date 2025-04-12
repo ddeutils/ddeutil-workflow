@@ -491,7 +491,7 @@ def test_stage_exec_foreach_concurrent_with_raise(test_path):
                     - name: "Echo stage"
                       echo: |
                         Start run with item: ${{ item }}
-                      sleep: 2
+                      sleep: 3
                     - name: "Final"
                       echo: "Final stage of item: ${{ item }}"
         """,

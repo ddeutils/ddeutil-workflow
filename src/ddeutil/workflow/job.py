@@ -212,6 +212,7 @@ class RunsOn(str, Enum):
     SELF_HOSTED: str = "self_hosted"
     K8S: str = "k8s"
     AZ_BATCH: str = "azure_batch"
+    DOCKER: str = "docker"
 
 
 class BaseRunsOn(BaseModel):  # pragma: no cov
@@ -235,6 +236,8 @@ class OnLocal(BaseRunsOn):  # pragma: no cov
 
 
 class SelfHostedArgs(BaseModel):
+    """Self-Hosted arguments."""
+
     host: str
 
 
@@ -249,6 +252,18 @@ class OnK8s(BaseRunsOn):  # pragma: no cov
     """Runs-on Kubernetes."""
 
     type: Literal[RunsOn.K8S] = Field(default=RunsOn.K8S)
+
+
+class DockerArgs(BaseModel):
+    tag: str = Field(default="latest")
+    volume: DictData = Field(default_factory=dict)
+
+
+class OnDocker(BaseRunsOn):  # pragma: no cov
+    """Runs-on Docker container."""
+
+    type: Literal[RunsOn.DOCKER] = Field(default=RunsOn.DOCKER)
+    args: DockerArgs = Field(alias="with")
 
 
 def get_discriminator_runs_on(model: dict[str, Any]) -> str:
