@@ -1040,16 +1040,23 @@ class ParallelStage(BaseStage):  # pragma: no cov
     """
 
     parallel: dict[str, list[Stage]] = Field(
-        description="A mapping of parallel branch ID.",
+        description="A mapping of parallel branch name and stages.",
     )
-    max_parallel_core: int = Field(default=2)
+    max_workers: int = Field(
+        default=2,
+        ge=1,
+        lt=20,
+        description=(
+            "The maximum thread pool worker size for execution parallel."
+        ),
+        alias="max-workers",
+    )
 
-    @staticmethod
     def execute_task(
+        self,
         branch: str,
         params: DictData,
         result: Result,
-        stages: list[Stage],
         *,
         event: Event | None = None,
         extras: DictData | None = None,
@@ -1060,7 +1067,6 @@ class ParallelStage(BaseStage):  # pragma: no cov
         :param params: A parameter data that want to use in this execution.
         :param result: (Result) A result object for keeping context and status
             data.
-        :param stages:
         :param event: (Event) An event manager that use to track parent execute
             was not force stopped.
         :param extras: (DictData) An extra parameters that want to override
@@ -1071,7 +1077,7 @@ class ParallelStage(BaseStage):  # pragma: no cov
         result.trace.debug(f"[STAGE]: Execute branch: {branch!r}")
         context: DictData = copy.deepcopy(params)
         context.update({"branch": branch, "stages": {}})
-        for stage in stages:
+        for stage in self.parallel[branch]:
 
             if extras:
                 stage.extras = extras
@@ -1163,11 +1169,11 @@ class ParallelStage(BaseStage):  # pragma: no cov
             )
         event: Event = Event() if event is None else event
         result.trace.info(
-            f"[STAGE]: Parallel-Execute: {self.max_parallel_core} cores."
+            f"[STAGE]: Parallel-Execute: {self.max_workers} workers."
         )
         result.catch(status=WAIT, context={"parallel": {}})
         with ThreadPoolExecutor(
-            max_workers=self.max_parallel_core,
+            max_workers=self.max_workers,
             thread_name_prefix="parallel_stage_exec_",
         ) as executor:
 
@@ -1180,7 +1186,6 @@ class ParallelStage(BaseStage):  # pragma: no cov
                     branch=branch,
                     params=params,
                     result=result,
-                    stages=self.parallel[branch],
                     event=event,
                     extras=self.extras,
                 )
@@ -1194,7 +1199,7 @@ class ParallelStage(BaseStage):  # pragma: no cov
                 except StageException as e:
                     status = FAILED
                     result.trace.error(
-                        f"[STAGE]: Catch:\n\t{e.__class__.__name__}:\n\t{e}"
+                        f"[STAGE]: {e.__class__.__name__}:\n\t{e}"
                     )
                     context.update({"errors": e.to_dict()})
 
@@ -1447,11 +1452,12 @@ class UntilStage(BaseStage):  # pragma: no cov
             "correct."
         ),
     )
-    max_until_loop: int = Field(
+    max_loop: int = Field(
         default=10,
         ge=1,
         lt=100,
         description="The maximum value of loop for this until stage.",
+        alias="max-loop",
     )
 
     def execute_item(
@@ -1575,7 +1581,7 @@ class UntilStage(BaseStage):  # pragma: no cov
         track: bool = True
         exceed_loop: bool = False
         result.catch(status=WAIT, context={"until": {}})
-        while track and not (exceed_loop := loop >= self.max_until_loop):
+        while track and not (exceed_loop := loop >= self.max_loop):
 
             if event and event.is_set():
                 return result.catch(
@@ -1623,7 +1629,7 @@ class UntilStage(BaseStage):  # pragma: no cov
 
         if exceed_loop:
             raise StageException(
-                f"The until loop was exceed {self.max_until_loop} loops"
+                f"The until loop was exceed {self.max_loop} loops"
             )
         return result.catch(status=SUCCESS)
 
@@ -1635,7 +1641,7 @@ class Match(BaseModel):
     stage: Stage = Field(description="A stage to execution for this case.")
 
 
-class CaseStage(BaseStage):  # pragma: no cov
+class CaseStage(BaseStage):
     """Case execution stage.
 
     Data Validate:
@@ -1672,6 +1678,14 @@ class CaseStage(BaseStage):  # pragma: no cov
     case: str = Field(description="A case condition for routing.")
     match: list[Match] = Field(
         description="A list of Match model that should not be an empty list.",
+    )
+    skip_not_match: bool = Field(
+        default=False,
+        description=(
+            "A flag for making skip if it does not match and else condition "
+            "does not set too."
+        ),
+        alias="skip-not-match",
     )
 
     def execute(
@@ -1715,9 +1729,21 @@ class CaseStage(BaseStage):  # pragma: no cov
 
         if stage is None:
             if _else is None:
-                raise StageException(
-                    "This stage does not set else for support not match "
-                    "any case."
+                if not self.skip_not_match:
+                    raise StageException(
+                        "This stage does not set else for support not match "
+                        "any case."
+                    )
+                result.trace.info(
+                    "... Skip this stage because it does not match."
+                )
+                error_msg: str = (
+                    "Case-Stage was canceled because it does not match any "
+                    "case and else condition does not set too."
+                )
+                return result.catch(
+                    status=CANCEL,
+                    context={"errors": StageException(error_msg).to_dict()},
                 )
             stage: Stage = _else.stage
 

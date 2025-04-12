@@ -511,9 +511,18 @@ def test_stage_exec_foreach_concurrent_with_raise(test_path):
                                     "2495665187": {
                                         "outputs": {},
                                         "skipped": True,
-                                    },
-                                    "2709471980": {"outputs": {}},
-                                    "9940141347": {"outputs": {}},
+                                    }
+                                },
+                                "errors": {
+                                    "class": rs["stages"]["foreach-stage"][
+                                        "outputs"
+                                    ]["foreach"][3]["errors"]["class"],
+                                    "name": "StageException",
+                                    "message": (
+                                        "Item-Stage was canceled from event "
+                                        "that had set before stage item "
+                                        "execution."
+                                    ),
                                 },
                             },
                             1: {
@@ -524,7 +533,17 @@ def test_stage_exec_foreach_concurrent_with_raise(test_path):
                                         "skipped": True,
                                     },
                                     "2709471980": {"outputs": {}},
-                                    "9940141347": {"outputs": {}},
+                                },
+                                "errors": {
+                                    "class": rs["stages"]["foreach-stage"][
+                                        "outputs"
+                                    ]["foreach"][1]["errors"]["class"],
+                                    "name": "StageException",
+                                    "message": (
+                                        "Item-Stage was canceled from event "
+                                        "that had set before stage item "
+                                        "execution."
+                                    ),
                                 },
                             },
                         },
@@ -534,10 +553,7 @@ def test_stage_exec_foreach_concurrent_with_raise(test_path):
                             "class"
                         ],
                         "name": "StageException",
-                        "message": (
-                            "Sub-Stage execution error: StageException: Raise "
-                            "error when item match 2"
-                        ),
+                        "message": "Sub-Stage execution error: StageException: Raise error when item match 2",
                     },
                 }
             }
@@ -723,7 +739,7 @@ def test_stage_exec_until(test_path):
                   id: until-stage
                   item: 1
                   until: "${{ item }} > 4"
-                  max_until_loop: 5
+                  max-loop: 5
                   stages:
                     - name: "Echo stage"
                       echo: |
@@ -834,6 +850,15 @@ def test_stage_exec_case_match(test_path):
                       stage:
                         name: Match name with Bar
                         echo: Hello ${{ params.name }}
+                - name: "Stage skip not has else condition"
+                  id: not-else
+                  case: ${{ params.name }}
+                  skip-not-match: true
+                  match:
+                    - case: "bar"
+                      stage:
+                        name: Match name with Bar
+                        echo: Hello ${{ params.name }}
         """,
     ):
         workflow = Workflow.from_conf(name="tmp-wf-case-match")
@@ -853,6 +878,28 @@ def test_stage_exec_case_match(test_path):
         )
         assert rs == {"stages": {"case-stage": {"outputs": {}}}}
 
+        # NOTE: Raise because else condition does not set.
         stage: Stage = workflow.job("first-job").stage("raise-else")
         with pytest.raises(StageException):
             stage.handler_execute({"params": {"name": "test"}})
+
+        stage: Stage = workflow.job("first-job").stage("not-else")
+        rs = stage.set_outputs(
+            stage.handler_execute({"params": {"name": "test"}}).context,
+            to={},
+        )
+        assert rs == {
+            "stages": {
+                "not-else": {
+                    "outputs": {},
+                    "errors": {
+                        "class": rs["stages"]["not-else"]["errors"]["class"],
+                        "name": "StageException",
+                        "message": (
+                            "Case-Stage was canceled because it does not match "
+                            "any case and else condition does not set too."
+                        ),
+                    },
+                }
+            }
+        }
