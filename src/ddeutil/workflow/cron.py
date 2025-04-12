@@ -16,18 +16,13 @@ from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
 from .__cron import WEEKDAYS, CronJob, CronJobYear, CronRunner, Options
-from .__types import DictData, DictStr, TupleStr
+from .__types import DictData, DictStr
 from .conf import Loader
-
-__all__: TupleStr = (
-    "On",
-    "YearOn",
-    "interval2crontab",
-)
 
 
 def interval2crontab(
     interval: Literal["daily", "weekly", "monthly"],
+    *,
     day: str | None = None,
     time: str = "00:00",
 ) -> str:
@@ -67,7 +62,7 @@ class On(BaseModel):
     """On Pydantic model (Warped crontab object by model).
 
     See Also:
-        * ``generate()`` is the main use-case of this schedule object.
+        * `generate()` is the main use-case of this schedule object.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -142,9 +137,7 @@ class On(BaseModel):
                 )
             )
         if "cronjob" not in loader_data:
-            raise ValueError(
-                "Config does not set ``cronjob`` or ``interval`` keys"
-            )
+            raise ValueError("Config does not set `cronjob` or `interval` keys")
         return cls.model_validate(
             obj=dict(
                 cronjob=loader_data.pop("cronjob"),
@@ -170,8 +163,8 @@ class On(BaseModel):
         try:
             _ = ZoneInfo(value)
             return value
-        except ZoneInfoNotFoundError as err:
-            raise ValueError(f"Invalid timezone: {value}") from err
+        except ZoneInfoNotFoundError as e:
+            raise ValueError(f"Invalid timezone: {value}") from e
 
     @field_validator(
         "cronjob", mode="before", json_schema_input_type=Union[CronJob, str]
@@ -246,7 +239,7 @@ class YearOn(On):
     ]
 
     @field_validator(
-        "cronjob", mode="before", json_schema_input_type=Union[CronJob, str]
+        "cronjob", mode="before", json_schema_input_type=Union[CronJobYear, str]
     )
     def __prepare_cronjob(
         cls, value: str | CronJobYear, info: ValidationInfo

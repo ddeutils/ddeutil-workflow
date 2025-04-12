@@ -332,6 +332,7 @@ class BaseStage(BaseModel, ABC):
 
 
 class BaseAsyncStage(BaseStage):
+    """Base Async Stage model."""
 
     @abstractmethod
     def execute(
@@ -1423,7 +1424,7 @@ class ForEachStage(BaseStage):
                 except StageException as e:
                     status = FAILED
                     result.trace.error(
-                        f"[STAGE]: Catch:\n\t{e.__class__.__name__}:\n\t{e}"
+                        f"[STAGE]: {e.__class__.__name__}:\n\t{e}"
                     )
                     context.update({"errors": e.to_dict()})
 

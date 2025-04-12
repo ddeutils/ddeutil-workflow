@@ -19,6 +19,7 @@ from .cron import (
 from .exceptions import (
     JobException,
     ParamValueException,
+    ResultException,
     StageException,
     UtilException,
     WorkflowException,

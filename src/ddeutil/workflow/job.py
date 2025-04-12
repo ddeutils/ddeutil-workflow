@@ -120,7 +120,6 @@ def make(
 
         add.append(inc)
 
-    # NOTE: Merge all matrix together.
     final.extend(add)
     return final
 
@@ -267,6 +266,7 @@ class OnDocker(BaseRunsOn):  # pragma: no cov
 
 
 def get_discriminator_runs_on(model: dict[str, Any]) -> str:
+    """Get discriminator of the RunsOn models."""
     return model.get("type", "local")
 
 
@@ -303,7 +303,6 @@ class Job(BaseModel):
         ...             "name": "Some stage",
         ...             "run": "print('Hello World')",
         ...         },
-        ...         ...
         ...     ],
         ... }
     """
@@ -342,7 +341,7 @@ class Job(BaseModel):
     )
     needs: list[str] = Field(
         default_factory=list,
-        description="A list of the job ID that want to run before this job.",
+        description="A list of the job that want to run before this job model.",
     )
     strategy: Strategy = Field(
         default_factory=Strategy,
@@ -374,7 +373,7 @@ class Job(BaseModel):
             name: str = stage.iden
             if name in rs:
                 raise ValueError(
-                    "Stage name in jobs object should not be duplicate."
+                    f"Stage name, {name!r}, should not be duplicate."
                 )
             rs.append(name)
         return value
@@ -387,7 +386,9 @@ class Job(BaseModel):
         """
         # VALIDATE: Validate job id should not dynamic with params template.
         if has_template(self.id):
-            raise ValueError("Job ID should not has any template.")
+            raise ValueError(
+                f"Job ID, {self.id!r}, should not has any template."
+            )
 
         return self
 
@@ -405,7 +406,7 @@ class Job(BaseModel):
                 if self.extras:
                     stage.extras = self.extras
                 return stage
-        raise ValueError(f"Stage ID {stage_id} does not exists")
+        raise ValueError(f"Stage {stage_id!r} does not exists in this job.")
 
     def check_needs(
         self,
@@ -599,7 +600,9 @@ class Job(BaseModel):
             extras=self.extras,
         )
 
-        result.trace.info(f"[JOB]: Start execute job: {self.id!r}")
+        result.trace.info(
+            f"[JOB]: Execute: {self.id!r} on {self.runs_on.type.value!r}"
+        )
         if self.runs_on.type == RunsOn.LOCAL:
             return local_execute(
                 job=self,
