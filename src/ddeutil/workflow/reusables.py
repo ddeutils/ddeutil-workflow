@@ -400,12 +400,14 @@ DecoratorTagFunc = Callable[[Callable[[...], Any]], ReturnTagFunc]
 
 
 def tag(
-    name: str, alias: str | None = None
+    name: Optional[str] = None,
+    alias: Optional[str] = None,
 ) -> DecoratorTagFunc:  # pragma: no cov
     """Tag decorator function that set function attributes, ``tag`` and ``name``
     for making registries variable.
 
     :param: name: (str) A tag name for make different use-case of a function.
+        It will use 'latest' if this tag name does not set.
     :param: alias: (str) A alias function name that keeping in registries.
         If this value does not supply, it will use original function name
         from `__name__` argument.
@@ -414,7 +416,7 @@ def tag(
     """
 
     def func_internal(func: Callable[[...], Any]) -> ReturnTagFunc:
-        func.tag = name
+        func.tag = name or "latest"
         func.name = alias or func.__name__.replace("_", "-")
 
         @wraps(func)
