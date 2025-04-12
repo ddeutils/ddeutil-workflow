@@ -1822,9 +1822,14 @@ class DockerStage(BaseStage):  # pragma: no cov
         ...     "image": "image-name.pkg.com",
         ...     "env": {
         ...         "ENV": "dev",
+        ...         "DEBUG": "true",
         ...     },
         ...     "volume": {
         ...         "secrets": "/secrets",
+        ...     },
+        ...     "auth": {
+        ...         "username": "__json_key",
+        ...         "password": "${GOOGLE_CREDENTIAL_JSON_STRING}",
         ...     },
         ... }
     """
@@ -1844,6 +1849,7 @@ class DockerStage(BaseStage):  # pragma: no cov
 
     def execute_task(
         self,
+        params: DictData,
         result: Result,
     ):
         from docker import DockerClient
@@ -1856,26 +1862,32 @@ class DockerStage(BaseStage):  # pragma: no cov
         resp = client.api.pull(
             repository=f"{self.image}",
             tag=self.tag,
-            # NOTE: For pulling from GCS.
-            # {
-            #     "username": "_json_key",
-            #     "password": credential-json-string,
-            # }
-            auth_config=self.auth,
+            auth_config=param2template(self.auth, params, extras=self.extras),
             stream=True,
             decode=True,
         )
         for line in resp:
             result.trace.info(f"... {line}")
 
-        unique_image_name: str = f"{self.image}_{datetime.now():%Y%m%d%H%M%S}"
+        unique_image_name: str = f"{self.image}_{datetime.now():%Y%m%d%H%M%S%f}"
         container = client.containers.run(
             image=f"{self.image}:{self.tag}",
             name=unique_image_name,
             environment=self.env,
             volumes=(
-                {Path.cwd() / ".docker.logs": {"bind": "/logs", "mode": "rw"}}
-                | self.volume
+                {
+                    Path.cwd()
+                    / f".docker.{result.run_id}.logs": {
+                        "bind": "/logs",
+                        "mode": "rw",
+                    },
+                }
+                | {
+                    Path.cwd() / source: {"bind": target, "mode": "rw"}
+                    for source, target in (
+                        volume.split(":", maxsplit=1) for volume in self.volume
+                    )
+                }
             ),
             detach=True,
         )
