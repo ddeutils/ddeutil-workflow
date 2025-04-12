@@ -162,6 +162,38 @@ run-py-local:
                  aws_access_client_secret: ${AWS_ACCESS_CLIENT_SECRET}
 ```
 
+Before execute this workflow, you should implement caller function first.
+
+```text
+registry-caller/
+  ╰─ tasks.py
+```
+
+This function will store as module that will import from `WORKFLOW_CORE_REGISTRY_CALLER`
+value (This config can override by extra parameters with `registry_caller` key).
+
+```python
+from ddeutil.workflow import Result, tag
+from ddeutil.workflow.exceptions import StageException
+
+@tag("requests", alias="get-api-with-oauth-to-s3")
+def get_api_with_oauth_to_s3(
+    method: str,
+    url: str,
+    body: dict[str, str],
+    auth: dict[str, str],
+    writing_node: str,
+    aws_s3_path: str,
+    aws_access_client_id: str,
+    aws_access_client_secret: str,
+    result: Result,
+) -> dict[str, int]:
+    result.trace.info("[CALLER]: Start get data via RestAPI to S3.")
+    if method != "post":
+       raise StageException(f"RestAPI does not support for {method} action.")
+    return {"records": 1000}
+```
+
 The above workflow template is main executor pipeline that you want to do. If you
 want to schedule this workflow, you want to dynamic its parameters change base on
 execution time such as `run-date` should change base on that workflow running date.
