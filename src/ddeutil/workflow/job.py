@@ -561,7 +561,7 @@ class Job(BaseModel):
                 "this job does not set strategy."
             )
         else:
-            _output: DictData = output.get(list(k)[0], {})
+            _output: DictData = {} if len(k) == 0 else output[list(k)[0]]
             _output.pop("matrix", {})
             to["jobs"][_id] = {**_output, **skipping, **errors}
         return to
@@ -601,7 +601,7 @@ class Job(BaseModel):
         )
 
         result.trace.info(
-            f"[JOB]: Execute: {self.id!r} on {self.runs_on.type.value!r}"
+            f"[JOB]: Execute: {self.id!r} on {self.runs_on.type!r}"
         )
         if self.runs_on.type == RunsOn.LOCAL:
             return local_execute(
