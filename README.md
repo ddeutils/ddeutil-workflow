@@ -94,7 +94,8 @@ flowchart LR
 
 ## 📦 Installation
 
-This project need `ddeutil` and `ddeutil-io` extension namespace packages.
+This project need `ddeutil` and `ddeutil-io` extension namespace packages to be
+the base deps.
 If you want to install this package with application add-ons, you should add
 `app` in installation;
 
@@ -253,13 +254,15 @@ only.
 ## :rocket: Deployment
 
 This package able to run as an application service for receive manual trigger
-from the master node via RestAPI or use to be Scheduler background service
-like crontab job but via Python API.
+from any node via RestAPI or use to be Scheduler background application
+like crontab job but via Python API or FastAPI app.
 
 ### API Server
 
+This server use FastAPI package to be the base application.
+
 ```shell
-(venv) $ uvicorn ddeutil.workflow.api:app \
+(.venv) $ uvicorn ddeutil.workflow.api:app \
   --host 127.0.0.1 \
   --port 80 \
   --no-access-log
@@ -269,7 +272,18 @@ like crontab job but via Python API.
 > If this package already deploy, it is able to use multiprocess;
 > `uvicorn ddeutil.workflow.api:app --host 127.0.0.1 --port 80 --workers 4`
 
+### Local Schedule
+
+> [!WARNING]
+> This CLI does not implement yet.
+
+```shell
+(.venv) $ ddeutil-workflow schedule
+```
+
 ### Docker Container
+
+Build a Docker container from this package.
 
 ```shell
 $ docker build -t ddeutil-workflow:latest -f .container/Dockerfile .

@@ -781,6 +781,7 @@ def schedule_control(
 def schedule_runner(
     stop: datetime | None = None,
     *,
+    max_process: int | None = None,
     extras: DictData | None = None,
     excluded: list[str] | None = None,
 ) -> Result:  # pragma: no cov
@@ -790,6 +791,7 @@ def schedule_runner(
     path by `WORKFLOW_APP_MAX_SCHEDULE_PER_PROCESS` value.
 
     :param stop: A stop datetime object that force stop running scheduler.
+    :param max_process: (int) The maximum process that want to run this func.
     :param extras: An extra parameter that want to override core config.
     :param excluded: A list of schedule name that want to exclude from finding.
 
@@ -813,7 +815,9 @@ def schedule_runner(
     context: DictData = {"schedules": [], "threads": []}
 
     with ProcessPoolExecutor(
-        max_workers=dynamic("max_schedule_process", extras=extras),
+        max_workers=dynamic(
+            "max_schedule_process", f=max_process, extras=extras
+        ),
     ) as executor:
 
         futures: list[Future] = [
