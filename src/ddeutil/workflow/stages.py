@@ -73,7 +73,8 @@ class BaseStage(BaseModel, ABC):
     metadata. If you want to implement any custom stage, you can use this class
     to parent and implement ``self.execute()`` method only.
 
-        This class is the abstraction class for any stage class.
+        This class is the abstraction class for any stage model that want to
+    implement to workflow model.
     """
 
     extras: DictData = Field(
@@ -227,7 +228,7 @@ class BaseStage(BaseModel, ABC):
         and want to set on the `to` like;
 
             ... (i)   output: {'foo': bar}
-            ... (ii)  to: {}
+            ... (ii)  to: {'stages': {}}
 
             The result of the `to` argument will be;
 
@@ -235,7 +236,7 @@ class BaseStage(BaseModel, ABC):
                         'stages': {
                             '<stage-id>': {
                                 'outputs': {'foo': 'bar'},
-                                'skipped': False
+                                'skipped': False,
                             }
                         }
                     }

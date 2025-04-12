@@ -1014,7 +1014,7 @@ class Workflow(BaseModel):
             job: Job = self.jobs[job_id]
             if job.is_skipped(params=params):
                 result.trace.info(f"[WORKFLOW]: Skip job: {job_id!r}")
-                job.set_outputs(output={"SKIP": {"skipped": True}}, to=params)
+                job.set_outputs(output={"skipped": True}, to=params)
             else:
                 result.trace.info(f"[WORKFLOW]: Execute: {job_id!r}")
                 job.set_outputs(
@@ -1192,7 +1192,7 @@ class Workflow(BaseModel):
                     )
                 elif check == SKIP:  # pragma: no cov
                     result.trace.info(f"[JOB]: Skip job: {job_id!r}")
-                    job.set_outputs({"SKIP": {"skipped": True}}, to=context)
+                    job.set_outputs(output={"skipped": True}, to=context)
                     job_queue.task_done()
                     continue
 
@@ -1284,7 +1284,7 @@ class Workflow(BaseModel):
                     )
                 elif check == SKIP:  # pragma: no cov
                     result.trace.info(f"[JOB]: Skip job: {job_id!r}")
-                    job.set_outputs({"SKIP": {"skipped": True}}, to=context)
+                    job.set_outputs(output={"skipped": True}, to=context)
                     job_queue.task_done()
                     continue
 

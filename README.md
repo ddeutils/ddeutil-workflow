@@ -104,7 +104,7 @@ If you want to install this package with application add-ons, you should add
 | Python         | `ddeutil-workflow`       | :heavy_check_mark:  |
 | FastAPI Server | `ddeutil-workflow[api]`  | :heavy_check_mark:  |
 
-## :beers: Usage
+## 🎯 Usage
 
 This is examples that use workflow file for running common Data Engineering
 use-case.
@@ -154,12 +154,13 @@ run-py-local:
 
                  # Arguments of target data that want to land.
                  writing_mode: flatten
-                 aws_s3_path: my-data/open-data/${{ params.source-extract }}
+                 aws:
+                    path: my-data/open-data/${{ params.source-extract }}
 
-                 # This Authentication code should implement with your custom call
-                 # function. The template allow you to use environment variable.
-                 aws_access_client_id: ${AWS_ACCESS_CLIENT_ID}
-                 aws_access_client_secret: ${AWS_ACCESS_CLIENT_SECRET}
+                    # This Authentication code should implement with your custom call
+                    # function. The template allow you to use environment variable.
+                    access_client_id: ${AWS_ACCESS_CLIENT_ID}
+                    access_client_secret: ${AWS_ACCESS_CLIENT_SECRET}
 ```
 
 Before execute this workflow, you should implement caller function first.
@@ -175,20 +176,29 @@ value (This config can override by extra parameters with `registry_caller` key).
 ```python
 from ddeutil.workflow import Result, tag
 from ddeutil.workflow.exceptions import StageException
+from pydantic import BaseModel, Secret
+
+class AwsCredential(BaseModel):
+    path: str
+    access_client_id: str
+    access_client_secret: Secret
+
+class RestAuth(BaseModel):
+    type: str
+    keys: Secret
 
 @tag("requests", alias="get-api-with-oauth-to-s3")
 def get_api_with_oauth_to_s3(
     method: str,
     url: str,
     body: dict[str, str],
-    auth: dict[str, str],
+    auth: RestAuth,
     writing_node: str,
-    aws_s3_path: str,
-    aws_access_client_id: str,
-    aws_access_client_secret: str,
+    aws: AwsCredential,
     result: Result,
 ) -> dict[str, int]:
     result.trace.info("[CALLER]: Start get data via RestAPI to S3.")
+    result.trace.info(f"... {method}: {url}")
     if method != "post":
        raise StageException(f"RestAPI does not support for {method} action.")
     return {"records": 1000}

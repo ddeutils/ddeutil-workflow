@@ -512,14 +512,14 @@ class Job(BaseModel):
             ... (i)   output: {'strategy-01': bar, 'strategy-02': bar}
             ... (ii)  to: {'jobs': {}}
 
-        The result of the `to` variable will be;
+        The result of the `to` argument will be;
 
             ... (iii) to: {
                         'jobs': {
                             '<job-id>': {
                                 'strategies': {
                                     'strategy-01': bar,
-                                    'strategy-02': bar
+                                    'strategy-02': bar,
                                 }
                             }
                         }
@@ -542,22 +542,27 @@ class Job(BaseModel):
                 "This job do not set the ID before setting execution output."
             )
 
-        # NOTE: If the job ID did not set, it will use index of jobs key
-        #   instead.
         _id: str = self.id or job_id
-
         errors: DictData = (
             {"errors": output.pop("errors", {})} if "errors" in output else {}
         )
+        skipping: dict[str, bool] = (
+            {"skipped": output.pop("skipped", False)}
+            if "skipped" in output
+            else {}
+        )
 
-        if "SKIP" in output:  # pragma: no cov
-            to["jobs"][_id] = output["SKIP"]
-        elif self.strategy.is_set():
-            to["jobs"][_id] = {"strategies": output, **errors}
+        if self.strategy.is_set():
+            to["jobs"][_id] = {"strategies": output, **skipping, **errors}
+        elif len(k := output.keys()) > 1:  # pragma: no cov
+            raise JobException(
+                "Strategy output from execution return more than one ID while "
+                "this job does not set strategy."
+            )
         else:
-            _output = output.get(next(iter(output), "FIRST"), {})
+            _output: DictData = output.get(list(k)[0], {})
             _output.pop("matrix", {})
-            to["jobs"][_id] = {**_output, **errors}
+            to["jobs"][_id] = {**_output, **skipping, **errors}
         return to
 
     def execute(
