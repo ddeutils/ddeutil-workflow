@@ -1103,6 +1103,7 @@ class ParallelStage(BaseStage):  # pragma: no cov
                     run_id=result.run_id,
                     parent_run_id=result.parent_run_id,
                     raise_error=True,
+                    event=event,
                 )
                 stage.set_outputs(rs.context, to=context)
                 if rs.status == FAILED:
@@ -1296,6 +1297,7 @@ class ForEachStage(BaseStage):
                     run_id=result.run_id,
                     parent_run_id=result.parent_run_id,
                     raise_error=True,
+                    event=event,
                 )
                 stage.set_outputs(rs.context, to=context)
                 if rs.status == FAILED:
@@ -1387,6 +1389,7 @@ class ForEachStage(BaseStage):
                     item=item,
                     params=params,
                     result=result,
+                    event=event,
                 )
                 for item in foreach
             ]
@@ -1515,6 +1518,7 @@ class UntilStage(BaseStage):  # pragma: no cov
                     run_id=result.run_id,
                     parent_run_id=result.parent_run_id,
                     raise_error=True,
+                    event=event,
                 )
                 stage.set_outputs(rs.context, to=context)
                 if "item" in (
@@ -1589,6 +1593,7 @@ class UntilStage(BaseStage):  # pragma: no cov
                 loop=loop,
                 params=params,
                 result=result,
+                event=event,
             )
 
             loop += 1
@@ -1692,20 +1697,19 @@ class CaseStage(BaseStage):  # pragma: no cov
                 extras=self.extras,
             )
 
-        _case = param2template(self.case, params, extras=self.extras)
+        _case: Optional[str] = param2template(
+            self.case, params, extras=self.extras
+        )
 
         result.trace.info(f"[STAGE]: Case-Execute: {_case!r}.")
-        _else = None
+        _else: Optional[Match] = None
         stage: Optional[Stage] = None
-        context = {}
-        status = SUCCESS
         for match in self.match:
-            if (c := match.case) != "_":
-                _condition = param2template(c, params, extras=self.extras)
-            else:
-                _else = match
+            if (c := match.case) == "_":
+                _else: Match = match
                 continue
 
+            _condition: str = param2template(c, params, extras=self.extras)
             if stage is None and _case == _condition:
                 stage: Stage = match.stage
 
@@ -1715,27 +1719,35 @@ class CaseStage(BaseStage):  # pragma: no cov
                     "This stage does not set else for support not match "
                     "any case."
                 )
-
             stage: Stage = _else.stage
 
         if self.extras:
             stage.extras = self.extras
 
+        if event and event.is_set():  # pragma: no cov
+            return result.catch(
+                status=CANCEL,
+                context={
+                    "errors": StageException(
+                        "Stage was canceled from event that had set before "
+                        "case-stage execution."
+                    ).to_dict()
+                },
+            )
+
         try:
-            context.update(
-                stage.handler_execute(
+            return result.catch(
+                status=SUCCESS,
+                context=stage.handler_execute(
                     params=params,
                     run_id=result.run_id,
                     parent_run_id=result.parent_run_id,
-                ).context
+                    event=event,
+                ).context,
             )
         except StageException as e:  # pragma: no cov
-            status = FAILED
-            result.trace.error(
-                f"[STAGE]: Catch:\n\t{e.__class__.__name__}:" f"\n\t{e}"
-            )
-            context.update({"errors": e.to_dict()})
-        return result.catch(status=status, context=context)
+            result.trace.error(f"[STAGE]: {e.__class__.__name__}:" f"\n\t{e}")
+            return result.catch(status=FAILED, context={"errors": e.to_dict()})
 
 
 class RaiseStage(BaseStage):  # pragma: no cov
