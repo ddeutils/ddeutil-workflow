@@ -20,10 +20,10 @@ configuration. It called **Metadata Driven Data Workflow**.
 
 **:pushpin: <u>Rules of This Workflow engine</u>**:
 
-1. The Minimum frequency unit of scheduling is **1 minute** :warning:
-2. Can not re-run only failed stage and its pending downstream :rotating_light:
-3. All parallel tasks inside workflow engine use Multi-Threading
-   (Python 3.13 unlock GIL :unlock:)
+1. The Minimum frequency unit of built-in scheduling is **1 Minute** 🕘
+2. **Can not** re-run only failed stage and its pending downstream ↩️
+3. All parallel tasks inside workflow core engine use **Multi-Threading** pool
+   (Python 3.13 unlock GIL 🐍🔓)
 
 ---
 
@@ -87,15 +87,17 @@ flowchart LR
 
 ## :round_pushpin: Installation
 
-This project need `ddeutil-io` extension namespace packages. If you want to install
-this package with application add-ons, you should add `app` in installation;
+This project need `ddeutil` and `ddeutil-io` extension namespace packages to be
+the base deps.
+If you want to install this package with application add-ons, you should add
+`app` in installation;
 
 | Use-case       | Install Optional                         |       Support       |
 |----------------|------------------------------------------|:-------------------:|
 | Python         | `pip install ddeutil-workflow`           | :heavy_check_mark:  |
 | FastAPI Server | `pip install ddeutil-workflow[api]`      | :heavy_check_mark:  |
 
-## :beers: Usage
+## 🎯 Usage
 
 This is examples that use workflow file for running common Data Engineering
 use-case.
@@ -124,6 +126,8 @@ run-py-local:
       run-date: datetime
    jobs:
       getting-api-data:
+         runs-on:
+            type: local
          stages:
             - name: "Retrieve API Data"
               id: retrieve-api
@@ -144,12 +148,54 @@ run-py-local:
 
                  # Arguments of target data that want to land.
                  writing_mode: flatten
-                 aws_s3_path: my-data/open-data/${{ params.source-extract }}
+                 aws:
+                    path: my-data/open-data/${{ params.source-extract }}
 
-                 # This Authentication code should implement with your custom call
-                 # function. The template allow you to use environment variable.
-                 aws_access_client_id: ${AWS_ACCESS_CLIENT_ID}
-                 aws_access_client_secret: ${AWS_ACCESS_CLIENT_SECRET}
+                    # This Authentication code should implement with your custom call
+                    # function. The template allow you to use environment variable.
+                    access_client_id: ${AWS_ACCESS_CLIENT_ID}
+                    access_client_secret: ${AWS_ACCESS_CLIENT_SECRET}
+```
+
+Before execute this workflow, you should implement caller function first.
+
+```text
+registry-caller/
+  ╰─ tasks.py
+```
+
+This function will store as module that will import from `WORKFLOW_CORE_REGISTRY_CALLER`
+value (This config can override by extra parameters with `registry_caller` key).
+
+```python
+from ddeutil.workflow import Result, tag
+from ddeutil.workflow.exceptions import StageException
+from pydantic import BaseModel, Secret
+
+class AwsCredential(BaseModel):
+    path: str
+    access_client_id: str
+    access_client_secret: Secret
+
+class RestAuth(BaseModel):
+    type: str
+    keys: Secret
+
+@tag("requests", alias="get-api-with-oauth-to-s3")
+def get_api_with_oauth_to_s3(
+    method: str,
+    url: str,
+    body: dict[str, str],
+    auth: RestAuth,
+    writing_node: str,
+    aws: AwsCredential,
+    result: Result,
+) -> dict[str, int]:
+    result.trace.info("[CALLER]: Start get data via RestAPI to S3.")
+    result.trace.info(f"... {method}: {url}")
+    if method != "post":
+       raise StageException(f"RestAPI does not support for {method} action.")
+    return {"records": 1000}
 ```
 
 The above workflow template is main executor pipeline that you want to do. If you
