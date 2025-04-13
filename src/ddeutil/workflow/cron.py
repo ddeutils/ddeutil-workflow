@@ -76,7 +76,11 @@ class On(BaseModel):
     ]
     cronjob: Annotated[
         CronJob,
-        Field(description="A Cronjob object of this schedule."),
+        Field(
+            description=(
+                "A Cronjob object that use for validate and generate datetime.",
+            ),
+        ),
     ]
     tz: Annotated[
         str,
@@ -235,7 +239,11 @@ class YearOn(On):
     # NOTE: This is fields of the base schedule.
     cronjob: Annotated[
         CronJobYear,
-        Field(description="Cron job of this schedule"),
+        Field(
+            description=(
+                "A Cronjob object that use for validate and generate datetime.",
+            ),
+        ),
     ]
 
     @field_validator(
