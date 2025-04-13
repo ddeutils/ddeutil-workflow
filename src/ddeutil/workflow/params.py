@@ -189,6 +189,34 @@ class IntParam(DefaultParam):
         return value
 
 
+class FloatParam(DefaultParam):  # pragma: no cov
+    type: Literal["float"] = "float"
+    precision: int = 6
+
+    def rounding(self, value: float) -> float:
+        round_str: str = f"{{0:.{self.precision}f}}"
+        return float(round_str.format(round(value, self.precision)))
+
+    def receive(self, value: Optional[Union[float, int, str]] = None) -> float:
+
+        if value in None:
+            return self.default
+
+        if isinstance(value, float):
+            return self.rounding(value)
+        elif isinstance(value, int):
+            return self.rounding(float(value))
+        elif not isinstance(value, str):
+            raise TypeError(
+                "Received value type does not math with str, float, or int."
+            )
+
+        try:
+            return self.rounding(float(value))
+        except Exception:
+            raise
+
+
 class DecimalParam(DefaultParam):  # pragma: no cov
     """Decimal parameter."""
 
@@ -324,6 +352,7 @@ Param = Annotated[
         ChoiceParam,
         DatetimeParam,
         DateParam,
+        FloatParam,
         DecimalParam,
         IntParam,
         StrParam,
