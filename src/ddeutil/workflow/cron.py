@@ -71,7 +71,9 @@ class On(BaseModel):
         DictData,
         Field(
             default_factory=dict,
-            description="An extras mapping parameters.",
+            description=(
+                "An extras parameters that want to pass to the CronJob field."
+            ),
         ),
     ]
     cronjob: Annotated[
@@ -117,6 +119,8 @@ class On(BaseModel):
 
         :param name: A name of config that will get from loader.
         :param extras: An extra parameter that will keep in extras.
+
+        :rtype: Self
         """
         extras: DictData = extras or {}
         loader: Loader = Loader(name, externals=extras)
@@ -152,7 +156,13 @@ class On(BaseModel):
 
     @model_validator(mode="before")
     def __prepare_values(cls, values: DictData) -> DictData:
-        """Extract tz key from value and change name to timezone key."""
+        """Extract tz key from value and change name to timezone key.
+
+        :param values: (DictData) A data that want to pass for create an On
+            model.
+
+        :rtype: DictData
+        """
         if tz := values.pop("tz", None):
             values["timezone"] = tz
         return values
@@ -177,8 +187,12 @@ class On(BaseModel):
         cls, value: str | CronJob, info: ValidationInfo
     ) -> CronJob:
         """Prepare crontab value that able to receive with string type.
-        This step will get options kwargs from extras and pass to the
+        This step will get options kwargs from extras field and pass to the
         CronJob object.
+
+        :param value: (str | CronJobYear) A cronjob value that want to create.
+        :param info: (ValidationInfo) A validation info object that use to get
+            the extra parameters for create cronjob.
 
         :rtype: CronJob
         """
@@ -200,12 +214,17 @@ class On(BaseModel):
     def __serialize_cronjob(self, value: CronJob) -> str:
         """Serialize the cronjob field that store with CronJob object.
 
+        :param value: (CronJob) The CronJob field.
+
         :rtype: str
         """
         return str(value)
 
     def generate(self, start: str | datetime) -> CronRunner:
-        """Return Cron runner object.
+        """Return CronRunner object from an initial datetime.
+
+        :param start: (str | datetime) A string or datetime for generate the
+            CronRunner object.
 
         :rtype: CronRunner
         """
@@ -253,6 +272,12 @@ class YearOn(On):
         cls, value: str | CronJobYear, info: ValidationInfo
     ) -> CronJobYear:
         """Prepare crontab value that able to receive with string type.
+        This step will get options kwargs from extras field and pass to the
+        CronJobYear object.
+
+        :param value: (str | CronJobYear) A cronjob value that want to create.
+        :param info: (ValidationInfo) A validation info object that use to get
+            the extra parameters for create cronjob.
 
         :rtype: CronJobYear
         """

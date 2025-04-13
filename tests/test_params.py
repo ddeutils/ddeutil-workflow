@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -8,6 +9,7 @@ from ddeutil.workflow.params import (
     ChoiceParam,
     DateParam,
     DatetimeParam,
+    DecimalParam,
     IntParam,
     MapParam,
     Param,
@@ -124,3 +126,18 @@ def test_param_map():
 
     with pytest.raises(ParamValueException):
         MapParam().receive('["foo", 1]')
+
+
+def test_param_decimal():
+    rs = DecimalParam().receive(value="1.015")
+    respect = DecimalParam().rounding(Decimal(1.015))
+    assert rs == respect
+    assert not (rs > respect)
+    assert not (rs < respect)
+    assert not (rs == 1.015)
+
+    with pytest.raises(TypeError):
+        DecimalParam().receive(value=[1.2])
+
+    with pytest.raises(ValueError):
+        DecimalParam().receive(value="a1.015")

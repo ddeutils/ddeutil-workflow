@@ -12,28 +12,16 @@ passing an input value to target execution method.
 """
 from __future__ import annotations
 
-import decimal
 from abc import ABC, abstractmethod
 from datetime import date, datetime
+from decimal import Decimal, InvalidOperation
 from typing import Annotated, Any, Literal, Optional, TypeVar, Union
 
 from ddeutil.core import str2dict, str2list
 from pydantic import BaseModel, Field
 
-from .__types import TupleStr
 from .exceptions import ParamValueException
 from .utils import get_d_now, get_dt_now
-
-__all__: TupleStr = (
-    "ChoiceParam",
-    "DatetimeParam",
-    "DateParam",
-    "IntParam",
-    "Param",
-    "StrParam",
-    "ArrayParam",
-    "MapParam",
-)
 
 T = TypeVar("T")
 
@@ -201,11 +189,32 @@ class IntParam(DefaultParam):
         return value
 
 
-# TODO: Not implement this parameter yet
 class DecimalParam(DefaultParam):  # pragma: no cov
-    type: Literal["decimal"] = "decimal"
+    """Decimal parameter."""
 
-    def receive(self, value: float | None = None) -> decimal.Decimal: ...
+    type: Literal["decimal"] = "decimal"
+    precision: int = 6
+
+    def rounding(self, value: Decimal) -> Decimal:
+        return value.quantize(Decimal(10) ** -self.precision)
+
+    def receive(self, value: float | Decimal | None = None) -> Decimal:
+
+        if isinstance(value, float):
+            return self.rounding(Decimal(value))
+        elif isinstance(value, Decimal):
+            return self.rounding(value)
+        elif not isinstance(value, str):
+            raise TypeError(
+                "Received value type does not math with str, float, or decimal."
+            )
+
+        try:
+            return self.rounding(Decimal(value))
+        except InvalidOperation as e:
+            raise ValueError(
+                "String that want to convert to decimal type does not valid."
+            ) from e
 
 
 class ChoiceParam(BaseParam):
@@ -223,7 +232,8 @@ class ChoiceParam(BaseParam):
         :rtype: str
         """
         # NOTE:
-        #   Return the first value in options if it does not pass any input value
+        #   Return the first value in options if it does not pass any input
+        #   value.
         if value is None:
             return self.options[0]
         if value not in self.options:
@@ -314,6 +324,7 @@ Param = Annotated[
         ChoiceParam,
         DatetimeParam,
         DateParam,
+        DecimalParam,
         IntParam,
         StrParam,
     ],
