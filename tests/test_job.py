@@ -8,7 +8,7 @@ from ddeutil.workflow.job import (
     Rule,
     RunsOnModel,
 )
-from ddeutil.workflow.result import SUCCESS, WAIT
+from ddeutil.workflow.result import FAILED, SKIP, SUCCESS, WAIT
 from pydantic import TypeAdapter, ValidationError
 
 
@@ -112,3 +112,11 @@ def test_job_if_condition_raise():
     job = Job.model_validate({"if": '"${{ params.name }}"'})
     with pytest.raises(JobException):
         job.is_skipped({"params": {"name": "foo"}})
+
+
+def test_job_check_needs():
+    job = Job(id="foo", needs=["deps"])
+    assert job.check_needs({}) == WAIT
+    assert job.check_needs({"deps": {}}) == SUCCESS
+    assert job.check_needs({"deps": {"errors": {}}}) == FAILED
+    assert job.check_needs({"deps": {"skipped": True}}) == SKIP
