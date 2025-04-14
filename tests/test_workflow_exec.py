@@ -677,6 +677,104 @@ def test_workflow_exec_foreach(test_path):
         }
 
 
+def test_workflow_exec_foreach_get_inside(test_path):
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_foreach_get_inside.yml",
+        data="""
+        tmp-wf-foreach-inside:
+          type: Workflow
+          jobs:
+            transform:
+              stages:
+                - name: "Get Items before run foreach"
+                  id: get-items
+                  uses: tasks/get-items@demo
+                - name: "Create variable"
+                  id: create-variable
+                  run: |
+                    foo: str = "bar"
+                - name: "For-each item"
+                  id: foreach-stage
+                  foreach: ${{ stages.get-items.outputs.items }}
+                  stages:
+                    - name: "Echo stage"
+                      id: prepare-variable
+                      run: |
+                        foo: str = 'baz${{ item }}'
+                    - name: "Final Echo"
+                      if: ${{ item }} == 4
+                      echo: |
+                        This is the final foo, it be: ${{ stages.prepare-variable.outputs.foo }}
+        """,
+    ):
+        workflow = Workflow.from_conf(name="tmp-wf-foreach-inside")
+        rs = workflow.execute(params={})
+        assert rs.status == SUCCESS
+        assert rs.context == {
+            "params": {},
+            "jobs": {
+                "transform": {
+                    "stages": {
+                        "get-items": {"outputs": {"items": [1, 2, 3, 4]}},
+                        "create-variable": {"outputs": {"foo": "bar"}},
+                        "foreach-stage": {
+                            "outputs": {
+                                "items": [1, 2, 3, 4],
+                                "foreach": {
+                                    1: {
+                                        "item": 1,
+                                        "stages": {
+                                            "prepare-variable": {
+                                                "outputs": {"foo": "baz1"}
+                                            },
+                                            "9263488742": {
+                                                "outputs": {},
+                                                "skipped": True,
+                                            },
+                                        },
+                                    },
+                                    2: {
+                                        "item": 2,
+                                        "stages": {
+                                            "prepare-variable": {
+                                                "outputs": {"foo": "baz2"}
+                                            },
+                                            "9263488742": {
+                                                "outputs": {},
+                                                "skipped": True,
+                                            },
+                                        },
+                                    },
+                                    3: {
+                                        "item": 3,
+                                        "stages": {
+                                            "prepare-variable": {
+                                                "outputs": {"foo": "baz3"}
+                                            },
+                                            "9263488742": {
+                                                "outputs": {},
+                                                "skipped": True,
+                                            },
+                                        },
+                                    },
+                                    4: {
+                                        "item": 4,
+                                        "stages": {
+                                            "prepare-variable": {
+                                                "outputs": {"foo": "baz4"}
+                                            },
+                                            "9263488742": {"outputs": {}},
+                                        },
+                                    },
+                                },
+                            }
+                        },
+                    }
+                }
+            },
+        }
+
+
 @mock.patch.object(Config, "stage_raise_error", False)
 def test_workflow_exec_raise_param(test_path):
     with dump_yaml_context(

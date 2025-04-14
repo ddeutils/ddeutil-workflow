@@ -42,7 +42,7 @@ from concurrent.futures import (
     wait,
 )
 from datetime import datetime
-from inspect import Parameter
+from inspect import Parameter, isclass, isfunction, ismodule
 from pathlib import Path
 from subprocess import CompletedProcess
 from textwrap import dedent
@@ -266,7 +266,7 @@ class BaseStage(BaseModel, ABC):
                 param2template(self.name, params=to, extras=self.extras)
             )
         )
-
+        output: DictData = copy.deepcopy(output)
         errors: DictData = (
             {"errors": output.pop("errors", {})} if "errors" in output else {}
         )
@@ -302,7 +302,7 @@ class BaseStage(BaseModel, ABC):
                 param2template(self.name, params=outputs, extras=self.extras)
             )
         )
-        return outputs.get("stages", {}).get(_id, {})
+        return outputs.get("stages", {}).get(_id, {}).get("outputs", {})
 
     def is_skipped(self, params: DictData | None = None) -> bool:
         """Return true if condition of this stage do not correct. This process
@@ -704,12 +704,11 @@ class PyStage(BaseStage):
 
         :rtype: Iterator[str]
         """
-        from inspect import isclass, ismodule
-
         for value in values:
 
             if (
                 value == "__annotations__"
+                or (value.startswith("__") and value.endswith("__"))
                 or ismodule(values[value])
                 or isclass(values[value])
             ):
@@ -727,11 +726,10 @@ class PyStage(BaseStage):
 
         :rtype: DictData
         """
+        output: DictData = output.copy()
         lc: DictData = output.pop("locals", {})
         gb: DictData = output.pop("globals", {})
-        super().set_outputs(
-            {k: lc[k] for k in self.filter_locals(lc)} | output, to=to
-        )
+        super().set_outputs(lc | output, to=to)
         to.update({k: gb[k] for k in to if k in gb})
         return to
 
@@ -762,26 +760,36 @@ class PyStage(BaseStage):
         lc: DictData = {}
         gb: DictData = (
             globals()
-            | params
             | param2template(self.vars, params, extras=self.extras)
             | {"result": result}
         )
 
-        # NOTE: Start exec the run statement.
         result.trace.info(f"[STAGE]: Py-Execute: {self.name}")
-        # result.trace.warning(
-        #     "[STAGE]: This stage allow use `eval` function, so, please "
-        #     "check your statement be safe before execute."
-        # )
-        #
+
         # WARNING: The exec build-in function is very dangerous. So, it
         #   should use the re module to validate exec-string before running.
         exec(
-            param2template(dedent(self.run), params, extras=self.extras), gb, lc
+            param2template(dedent(self.run), params, extras=self.extras),
+            gb,
+            lc,
         )
 
         return result.catch(
-            status=SUCCESS, context={"locals": lc, "globals": gb}
+            status=SUCCESS,
+            context={
+                "locals": {k: lc[k] for k in self.filter_locals(lc)},
+                "globals": {
+                    k: gb[k]
+                    for k in gb
+                    if (
+                        not k.startswith("__")
+                        and k != "annotations"
+                        and not ismodule(gb[k])
+                        and not isclass(gb[k])
+                        and not isfunction(gb[k])
+                    )
+                },
+            },
         )
 
 
@@ -1099,17 +1107,17 @@ class ParallelStage(BaseStage):  # pragma: no cov
         :rtype: DictData
         """
         result.trace.debug(f"... Execute branch: {branch!r}")
-        _params: DictData = copy.deepcopy(params)
-        _params.update({"branch": branch})
-        context: DictData = {"branch": branch, "stages": {}}
+        context: DictData = copy.deepcopy(params)
+        context.update({"branch": branch})
+        output: DictData = {"branch": branch, "stages": {}}
         for stage in self.parallel[branch]:
 
             if extras:
                 stage.extras = extras
 
-            if stage.is_skipped(params=_params):
+            if stage.is_skipped(params=context):
                 result.trace.info(f"... Skip stage: {stage.iden!r}")
-                stage.set_outputs(output={"skipped": True}, to=context)
+                stage.set_outputs(output={"skipped": True}, to=output)
                 continue
 
             if event and event.is_set():
@@ -1122,7 +1130,7 @@ class ParallelStage(BaseStage):  # pragma: no cov
                     parallel={
                         branch: {
                             "branch": branch,
-                            "stages": filter_func(context.pop("stages", {})),
+                            "stages": filter_func(output.pop("stages", {})),
                             "errors": StageException(error_msg).to_dict(),
                         }
                     },
@@ -1130,14 +1138,15 @@ class ParallelStage(BaseStage):  # pragma: no cov
 
             try:
                 rs: Result = stage.handler_execute(
-                    params=_params,
+                    params=context,
                     run_id=result.run_id,
                     parent_run_id=result.parent_run_id,
                     raise_error=True,
                     event=event,
                 )
-                stage.set_outputs(rs.context, to=context)
-            except StageException as e:  # pragma: no cov
+                stage.set_outputs(rs.context, to=output)
+                stage.set_outputs(stage.get_outputs(output), to=context)
+            except (StageException, UtilException) as e:  # pragma: no cov
                 result.trace.error(f"[STAGE]: {e.__class__.__name__}: {e}")
                 raise StageException(
                     f"Sub-Stage execution error: {e.__class__.__name__}: {e}"
@@ -1153,7 +1162,7 @@ class ParallelStage(BaseStage):  # pragma: no cov
                     parallel={
                         branch: {
                             "branch": branch,
-                            "stages": filter_func(context.pop("stages", {})),
+                            "stages": filter_func(output.pop("stages", {})),
                             "errors": StageException(error_msg).to_dict(),
                         },
                     },
@@ -1164,7 +1173,7 @@ class ParallelStage(BaseStage):  # pragma: no cov
             parallel={
                 branch: {
                     "branch": branch,
-                    "stages": filter_func(context.pop("stages", {})),
+                    "stages": filter_func(output.pop("stages", {})),
                 },
             },
         )
@@ -1294,18 +1303,17 @@ class ForEachStage(BaseStage):
 
         :rtype: Result
         """
-        result.trace.debug(f"... Execute item: {item!r}")
-        _params: DictData = copy.deepcopy(params)
-        _params.update({"item": item})
-        context: DictData = {"item": item, "stages": {}}
+        result.trace.debug(f"[STAGE]: Execute item: {item!r}")
+        context: DictData = copy.deepcopy(params)
+        context.update({"item": item})
+        output: DictData = {"item": item, "stages": {}}
         for stage in self.stages:
-
             if self.extras:
                 stage.extras = self.extras
 
-            if stage.is_skipped(params=_params):
+            if stage.is_skipped(params=context):
                 result.trace.info(f"... Skip stage: {stage.iden!r}")
-                stage.set_outputs(output={"skipped": True}, to=context)
+                stage.set_outputs(output={"skipped": True}, to=output)
                 continue
 
             if event and event.is_set():  # pragma: no cov
@@ -1318,7 +1326,7 @@ class ForEachStage(BaseStage):
                     foreach={
                         item: {
                             "item": item,
-                            "stages": filter_func(context.pop("stages", {})),
+                            "stages": filter_func(output.pop("stages", {})),
                             "errors": StageException(error_msg).to_dict(),
                         }
                     },
@@ -1326,13 +1334,14 @@ class ForEachStage(BaseStage):
 
             try:
                 rs: Result = stage.handler_execute(
-                    params=_params,
+                    params=context,
                     run_id=result.run_id,
                     parent_run_id=result.parent_run_id,
                     raise_error=True,
                     event=event,
                 )
-                stage.set_outputs(rs.context, to=context)
+                stage.set_outputs(rs.context, to=output)
+                stage.set_outputs(stage.get_outputs(output), to=context)
             except (StageException, UtilException) as e:
                 result.trace.error(f"[STAGE]: {e.__class__.__name__}: {e}")
                 raise StageException(
@@ -1349,18 +1358,17 @@ class ForEachStage(BaseStage):
                     foreach={
                         item: {
                             "item": item,
-                            "stages": filter_func(context.pop("stages", {})),
+                            "stages": filter_func(output.pop("stages", {})),
                             "errors": StageException(error_msg).to_dict(),
                         },
                     },
                 )
-
         return result.catch(
             status=SUCCESS,
             foreach={
                 item: {
                     "item": item,
-                    "stages": filter_func(context.pop("stages", {})),
+                    "stages": filter_func(output.pop("stages", {})),
                 },
             },
         )
@@ -1515,18 +1523,18 @@ class UntilStage(BaseStage):  # pragma: no cov
         :rtype: tuple[Result, T]
         """
         result.trace.debug(f"... Execute until item: {item!r}")
-        _params: DictData = copy.deepcopy(params)
-        _params.update({"item": item})
-        context: DictData = {"loop": loop, "item": item, "stages": {}}
+        context: DictData = copy.deepcopy(params)
+        context.update({"item": item})
+        output: DictData = {"loop": loop, "item": item, "stages": {}}
         next_item: T = None
         for stage in self.stages:
 
             if self.extras:
                 stage.extras = self.extras
 
-            if stage.is_skipped(params=_params):
+            if stage.is_skipped(params=context):
                 result.trace.info(f"... Skip stage: {stage.iden!r}")
-                stage.set_outputs(output={"skipped": True}, to=context)
+                stage.set_outputs(output={"skipped": True}, to=output)
                 continue
 
             if event and event.is_set():
@@ -1541,9 +1549,7 @@ class UntilStage(BaseStage):  # pragma: no cov
                             loop: {
                                 "loop": loop,
                                 "item": item,
-                                "stages": filter_func(
-                                    context.pop("stages", {})
-                                ),
+                                "stages": filter_func(output.pop("stages", {})),
                                 "errors": StageException(error_msg).to_dict(),
                             }
                         },
@@ -1553,17 +1559,18 @@ class UntilStage(BaseStage):  # pragma: no cov
 
             try:
                 rs: Result = stage.handler_execute(
-                    params=_params,
+                    params=context,
                     run_id=result.run_id,
                     parent_run_id=result.parent_run_id,
                     raise_error=True,
                     event=event,
                 )
-                stage.set_outputs(rs.context, to=context)
-                if "item" in (
-                    outputs := stage.get_outputs(context).get("outputs", {})
-                ):
-                    next_item = outputs["item"]
+                stage.set_outputs(rs.context, to=output)
+
+                if "item" in (_output := stage.get_outputs(output)):
+                    next_item = _output["item"]
+
+                stage.set_outputs(_output, to=context)
             except (StageException, UtilException) as e:
                 result.trace.error(f"[STAGE]: {e.__class__.__name__}: {e}")
                 raise StageException(
@@ -1577,7 +1584,7 @@ class UntilStage(BaseStage):  # pragma: no cov
                     loop: {
                         "loop": loop,
                         "item": item,
-                        "stages": filter_func(context.pop("stages", {})),
+                        "stages": filter_func(output.pop("stages", {})),
                     }
                 },
             ),
@@ -1685,24 +1692,21 @@ class CaseStage(BaseStage):
         ...     "match": [
         ...         {
         ...             "case": "1",
-        ...             "stage": {
-        ...                 "name": "Stage case 1",
-        ...                 "eche": "Hello case 1",
-        ...             },
-        ...         },
-        ...         {
-        ...             "case": "2",
-        ...             "stage": {
-        ...                 "name": "Stage case 2",
-        ...                 "eche": "Hello case 2",
-        ...             },
+        ...             "stages": [
+        ...                 {
+        ...                     "name": "Stage case 1",
+        ...                     "eche": "Hello case 1",
+        ...                 },
+        ...             ],
         ...         },
         ...         {
         ...             "case": "_",
-        ...             "stage": {
-        ...                 "name": "Stage else",
-        ...                 "eche": "Hello case else",
-        ...             },
+        ...             "stages": [
+        ...                 {
+        ...                     "name": "Stage else",
+        ...                     "eche": "Hello case else",
+        ...                 },
+        ...             ],
         ...         },
         ...     ],
         ... }

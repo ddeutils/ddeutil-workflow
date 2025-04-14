@@ -555,6 +555,7 @@ class Job(BaseModel):
             )
 
         _id: str = self.id or job_id
+        output: DictData = copy.deepcopy(output)
         errors: DictData = (
             {"errors": output.pop("errors", {})} if "errors" in output else {}
         )
