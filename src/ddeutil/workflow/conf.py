@@ -360,7 +360,7 @@ def dynamic(
     :param extras: An extra values that pass at run-time.
     """
     rsx: Optional[T] = extras[key] if extras and key in extras else None
-    rs: Optional[T] = f or getattr(config, key, None)
+    rs: Optional[T] = getattr(config, key, None) if f is None else f
     if rsx is not None and not isinstance(rsx, type(rs)):
         raise TypeError(
             f"Type of config {key!r} from extras: {rsx!r} does not valid "

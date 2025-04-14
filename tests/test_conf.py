@@ -154,4 +154,7 @@ def test_dynamic():
         dynamic("audit_path", extras={"audit_path": "audits"})
 
     conf = dynamic("max_job_exec_timeout", f=500, extras={})
-    print(conf)
+    assert conf == 500
+
+    conf = dynamic("max_job_exec_timeout", f=0, extras={})
+    assert conf == 0
