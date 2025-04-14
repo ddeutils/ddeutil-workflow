@@ -241,6 +241,10 @@ class BaseStage(BaseModel, ABC):
                         }
                     }
 
+        Important:
+            This method is use for reconstruct the result context and transfer
+        to the `to` argument.
+
         :param output: (DictData) An output data that want to extract to an
             output key.
         :param to: (DictData) A context data that want to add output result.
@@ -271,7 +275,11 @@ class BaseStage(BaseModel, ABC):
             if "skipped" in output
             else {}
         )
-        to["stages"][_id] = {"outputs": output, **skipping, **errors}
+        to["stages"][_id] = {
+            "outputs": copy.deepcopy(output),
+            **skipping,
+            **errors,
+        }
         return to
 
     def get_outputs(self, outputs: DictData) -> DictData:
@@ -761,11 +769,11 @@ class PyStage(BaseStage):
 
         # NOTE: Start exec the run statement.
         result.trace.info(f"[STAGE]: Py-Execute: {self.name}")
-        result.trace.warning(
-            "[STAGE]: This stage allow use `eval` function, so, please "
-            "check your statement be safe before execute."
-        )
-
+        # result.trace.warning(
+        #     "[STAGE]: This stage allow use `eval` function, so, please "
+        #     "check your statement be safe before execute."
+        # )
+        #
         # WARNING: The exec build-in function is very dangerous. So, it
         #   should use the re module to validate exec-string before running.
         exec(
@@ -830,6 +838,11 @@ class CallStage(BaseStage):
             data.
         :param event: (Event) An event manager that use to track parent execute
             was not force stopped.
+
+        :raise ValueError: If necessary arguments does not pass from the `args`
+            field.
+        :raise TypeError: If the result from the caller function does not by
+            a `dict` type.
 
         :rtype: Result
         """
@@ -989,6 +1002,7 @@ class TriggerStage(BaseStage):
 
         :rtype: Result
         """
+        from .exceptions import WorkflowException
         from .workflow import Workflow
 
         if result is None:
@@ -999,20 +1013,24 @@ class TriggerStage(BaseStage):
 
         _trigger: str = param2template(self.trigger, params, extras=self.extras)
         result.trace.info(f"[STAGE]: Trigger-Execute: {_trigger!r}")
-        rs: Result = Workflow.from_conf(
-            _trigger, extras=self.extras | {"stage_raise_error": True}
-        ).execute(
-            params=param2template(self.params, params, extras=self.extras),
-            result=result,
-            event=event,
-        )
-        if rs.status == FAILED:
-            err_msg: str | None = (
-                f" with:\n{msg}"
-                if (msg := rs.context.get("errors", {}).get("message"))
-                else ""
+        try:
+            rs: Result = Workflow.from_conf(
+                name=_trigger,
+                extras=self.extras | {"stage_raise_error": True},
+            ).execute(
+                params=param2template(self.params, params, extras=self.extras),
+                result=result,
+                event=event,
             )
-            raise StageException(f"Trigger workflow was failed{err_msg}.")
+            if rs.status == FAILED:
+                err_msg: str | None = (
+                    f" with:\n{msg}"
+                    if (msg := rs.context.get("errors", {}).get("message"))
+                    else ""
+                )
+                raise StageException(f"Trigger workflow was failed{err_msg}.")
+        except WorkflowException as e:
+            raise StageException("Trigger workflow stage was failed") from e
         return rs
 
 
@@ -1079,7 +1097,7 @@ class ParallelStage(BaseStage):  # pragma: no cov
 
         :rtype: DictData
         """
-        result.trace.debug(f"[STAGE]: Execute branch: {branch!r}")
+        result.trace.debug(f"... Execute branch: {branch!r}")
         context: DictData = copy.deepcopy(params)
         context.update({"branch": branch, "stages": {}})
         for stage in self.parallel[branch]:
@@ -1088,7 +1106,7 @@ class ParallelStage(BaseStage):  # pragma: no cov
                 stage.extras = extras
 
             if stage.is_skipped(params=context):
-                result.trace.info(f"[STAGE]: Skip stage: {stage.iden!r}")
+                result.trace.info(f"... Skip stage: {stage.iden!r}")
                 stage.set_outputs(output={"skipped": True}, to=context)
                 continue
 
@@ -1274,7 +1292,7 @@ class ForEachStage(BaseStage):
 
         :rtype: Result
         """
-        result.trace.debug(f"[STAGE]: Execute item: {item!r}")
+        result.trace.debug(f"... Execute item: {item!r}")
         context: DictData = copy.deepcopy(params)
         context.update({"item": item, "stages": {}})
         for stage in self.stages:
@@ -1283,7 +1301,7 @@ class ForEachStage(BaseStage):
                 stage.extras = self.extras
 
             if stage.is_skipped(params=context):
-                result.trace.info(f"[STAGE]: Skip stage: {stage.iden!r}")
+                result.trace.info(f"... Skip stage: {stage.iden!r}")
                 stage.set_outputs(output={"skipped": True}, to=context)
                 continue
 
@@ -1450,7 +1468,12 @@ class UntilStage(BaseStage):  # pragma: no cov
         ... }
     """
 
-    item: Union[str, int, bool] = Field(description="An initial value.")
+    item: Union[str, int, bool] = Field(
+        default=0,
+        description=(
+            "An initial value that can be any value in str, int, or bool type."
+        ),
+    )
     until: str = Field(description="A until condition.")
     stages: list[Stage] = Field(
         default_factory=list,
@@ -1489,7 +1512,7 @@ class UntilStage(BaseStage):  # pragma: no cov
 
         :rtype: tuple[Result, T]
         """
-        result.trace.debug(f"[STAGE]: Execute until item: {item!r}")
+        result.trace.debug(f"... Execute until item: {item!r}")
         context: DictData = copy.deepcopy(params)
         context.update({"loop": loop, "item": item, "stages": {}})
         next_item: T = None
@@ -1499,7 +1522,7 @@ class UntilStage(BaseStage):  # pragma: no cov
                 stage.extras = self.extras
 
             if stage.is_skipped(params=context):
-                result.trace.info(f"[STAGE]: Skip stage: {stage.iden!r}")
+                result.trace.info(f"... Skip stage: {stage.iden!r}")
                 stage.set_outputs(output={"skipped": True}, to=context)
                 continue
 
@@ -1580,6 +1603,7 @@ class UntilStage(BaseStage):  # pragma: no cov
             result: Result = Result(
                 run_id=gen_id(self.name + (self.id or ""), unique=True)
             )
+
         result.trace.info(f"[STAGE]: Until-Execution: {self.until}")
         item: Union[str, int, bool] = param2template(
             self.item, params, extras=self.extras
