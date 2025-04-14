@@ -93,3 +93,25 @@ def test_stage_if_condition_raise(test_path):
 
     with pytest.raises(StageException):
         stage.is_skipped({"params": {"name": "foo"}})
+
+
+def test_stage_get_outputs():
+    stage: Stage = EmptyStage.model_validate(
+        {"name": "Empty Stage", "echo": "hello world"}
+    )
+    outputs = {
+        "stages": {
+            "first-stage": {"outputs": {"foo": "bar"}},
+            "4083404693": {"outputs": {"foo": "baz"}},
+        },
+    }
+    stage.extras = {"stage_default_id": False}
+    assert stage.get_outputs(outputs) == {}
+
+    stage.extras = {"stage_default_id": True}
+    assert stage.get_outputs(outputs) == {"outputs": {"foo": "baz"}}
+
+    stage: Stage = EmptyStage.model_validate(
+        {"id": "first-stage", "name": "Empty Stage", "echo": "hello world"}
+    )
+    assert stage.get_outputs(outputs) == {"outputs": {"foo": "bar"}}

@@ -512,7 +512,7 @@ class EmptyStage(BaseAsyncStage):
 
         :rtype: Result
         """
-        if result is None:  # pragma: no cov
+        if result is None:
             result: Result = Result(
                 run_id=gen_id(self.name + (self.id or ""), unique=True),
                 extras=self.extras,
@@ -1270,6 +1270,8 @@ class ForEachStage(BaseStage):
         :param event: (Event) An event manager that use to track parent execute
             was not force stopped.
 
+        :raise StageException: If the stage execution raise errors.
+
         :rtype: Result
         """
         result.trace.debug(f"[STAGE]: Execute item: {item!r}")
@@ -1285,7 +1287,7 @@ class ForEachStage(BaseStage):
                 stage.set_outputs(output={"skipped": True}, to=context)
                 continue
 
-            if event and event.is_set():
+            if event and event.is_set():  # pragma: no cov
                 error_msg: str = (
                     "Item-Stage was canceled from event that had set before "
                     "stage item execution."

@@ -366,7 +366,7 @@ def dynamic(
             f"Type of config {key!r} from extras: {rsx!r} does not valid "
             f"as config {type(rs)}."
         )
-    return rsx or rs
+    return rsx if rsx is not None else rs
 
 
 class Loader(SimLoad):
