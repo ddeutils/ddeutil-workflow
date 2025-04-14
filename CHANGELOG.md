@@ -2,6 +2,22 @@
 
 ## Latest Changes
 
+## 0.0.52
+
+### :sparkles: Features
+
+- :dart: feat: draft dynamic loader object on from_conf construction.
+
+### :bug: Bug fixes
+
+- :gear: fixed: remove use enum value config on job model.
+- :gear: fixed: revise foreach stage does not pass stages variable from outside.
+- :gear: fixed: enum type does not validate by default on job module.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: update testcase foreach stage that use multiple time.
+
 ## 0.0.51
 
 ### :sparkles: Features
