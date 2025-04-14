@@ -1,13 +1,16 @@
 # Job
 
-This job module include Strategy and Job objects.
+Job Model that use for keeping stages and node that running its stages.
+The job handle the lineage of stages and location of execution of stages that
+mean the job model able to define `runs-on` key that allow you to run this
+job.
+
+This module include Strategy Model that use on the job strategy field.
 
 ## Strategy
 
 A strategy is a for-parallel/for-loop generated object that use to control the
 job execution.
-
-### Fields
 
 | field        | data type      | default  | description                                                                             |
 |--------------|----------------|:--------:|-----------------------------------------------------------------------------------------|
@@ -57,8 +60,6 @@ job execution.
         ...
         ```
 
-### Fields
-
 | field        | data type   |       default       | alias | description |
 |--------------|-------------|:-------------------:|-------|-------------|
 | id           | str \| None |       `None`        |       |             |
@@ -72,3 +73,9 @@ job execution.
 
 
 ## Rule
+
+Trigger rules enum object.
+
+## RunsOn
+
+Runs-On enum object.

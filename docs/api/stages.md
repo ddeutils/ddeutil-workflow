@@ -115,8 +115,6 @@ issue.
         ...
         ```
 
-### Fields
-
 | field   | data type      | default  | description                                                                           |
 |---------|----------------|:--------:|---------------------------------------------------------------------------------------|
 | bash    | str            |          | A bash statement that want to execute.                                                |
@@ -143,8 +141,6 @@ such as import your installed package.
                 print(sys.version_info)
         ...
         ```
-
-### Fields
 
 | field | data type      | default  | description                                                 |
 |-------|----------------|:--------:|-------------------------------------------------------------|
@@ -176,8 +172,6 @@ objective to invoked by this stage object.
         ...
         ```
 
-### Fields
-
 | field  | alias | data type           | default  | description                                                  |
 |--------|-------|---------------------|:--------:|--------------------------------------------------------------|
 | uses   |       | str                 |          | A pointer that want to load function from the call registry. |
@@ -200,16 +194,43 @@ dynamic parameters workflow for common use-case.
         ...
         ```
 
-### Fields
-
 | field     | data type      | default  | description                                                      |
 |-----------|----------------|:--------:|------------------------------------------------------------------|
 | trigger   | str            |          | A trigger workflow name that should already exist on the config. |
 | params    | dict[str, Any] | `dict()` | A parameter that want to pass to workflow execution.             |
 
 
-## ForEach Stage
-
 ## Parallel Stage
 
+!!! warning
+
+    This stage is nested stage.
+
+## ForEach Stage
+
+!!! warning
+
+    This stage is nested stage.
+
+## Until Stage
+
+!!! warning
+
+    This stage is nested stage.
+
+## Case Stage
+
+!!! warning
+
+    This stage is nested stage.
+
 ## Raise Stage
+
+Raise error stage execution that raise StageException that use a message field
+for making error message before raise.
+
+## Hook Stage
+
+## Docker Stage
+
+## Virtual Python Stage
