@@ -66,8 +66,8 @@ def test_job_exec_strategy_catch_stage_error():
                 "class": getdot("5027535057.errors.class", rs.context),
                 "name": "JobException",
                 "message": (
-                    "Job strategy was break because it has a stage, "
-                    "raise-error, failed without raise error."
+                    "Job strategy was break because stage, raise-error, failed "
+                    "without raise error."
                 ),
             },
         },
