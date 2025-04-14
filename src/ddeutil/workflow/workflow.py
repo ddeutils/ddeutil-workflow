@@ -371,7 +371,9 @@ class Workflow(BaseModel):
     def from_conf(
         cls,
         name: str,
+        *,
         extras: DictData | None = None,
+        loader: type[Loader] = None,
     ) -> Self:
         """Create Workflow instance from the Loader object that only receive
         an input workflow name. The loader object will use this workflow name to
@@ -380,12 +382,13 @@ class Workflow(BaseModel):
         :param name: A workflow name that want to pass to Loader object.
         :param extras: An extra parameters that want to pass to Loader
             object.
+        :param loader: A loader class for override default loader object.
 
         :raise ValueError: If the type does not match with current object.
 
         :rtype: Self
         """
-        loader: Loader = Loader(name, externals=(extras or {}))
+        loader: Loader = (loader or Loader)(name, externals=(extras or {}))
 
         # NOTE: Validate the config type match with current connection model
         if loader.type != cls.__name__:
@@ -407,6 +410,7 @@ class Workflow(BaseModel):
         path: Path,
         *,
         extras: DictData | None = None,
+        loader: type[Loader] = None,
     ) -> Self:
         """Create Workflow instance from the specific path. The loader object
         will use this workflow name and path to searching configuration data of
@@ -416,12 +420,13 @@ class Workflow(BaseModel):
         :param path: (Path) A config path that want to search.
         :param extras: (DictData) An extra parameters that want to override core
             config values.
+        :param loader: A loader class for override default loader object.
 
         :raise ValueError: If the type does not match with current object.
 
         :rtype: Self
         """
-        loader: SimLoad = SimLoad(
+        loader: SimLoad = (loader or SimLoad)(
             name, conf_path=path, externals=(extras or {})
         )
         # NOTE: Validate the config type match with current connection model
