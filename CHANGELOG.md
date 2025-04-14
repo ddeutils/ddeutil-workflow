@@ -2,6 +2,46 @@
 
 ## Latest Changes
 
+## 0.0.51
+
+### :sparkles: Features
+
+- :dart: feat: add error handler on trigger stage model.
+- :dart: feat: update code to catch error on non-threading exec.
+- :dart: feat: draft float params.
+- :dart: feat: add decimal parameter.
+- :dart: feat: add default tag name to latest.
+- :dart: feat: revise job set outputs method.
+- :dart: feat: draft runs-on docker mode.
+- :dart: feat: add skip-not-match args for skip if it does not match any case.
+- :dart: feat: update draft for docker stage.
+- :dart: feat: add extras to gen running id func on stages module.
+- :dart: feat: revise parallel stage execution method.
+
+### :bug: Bug fixes
+
+- :gear: fixed: change expect result on job exec testcase.
+- :gear: fixed: dynamic does not get funcitonal config if it convert boolean to False.
+- :gear: fixed: empty ouput for setting job exec result.
+- :gear: fixed: pass event to exec item on stages module.
+
+### :black_nib: Code Changes
+
+- :art: styled: format code on core module.
+- :test_tube: tests: update testcase for job needs.
+- :test_tube: tests: add testcase for make coverage.
+- :art: styled: add docs-string and reformat code.
+
+### :broom: Deprecate & Clean
+
+- :recycle: clean: remove runs-on k8s type.
+- :recycle: clean: revise workflow and logs code.
+
+### :postbox: Dependencies
+
+- :pushpin: deps: update ddeutil-io from 0.2.10 to 0.2.11.
+- :pushpin: deps: update ddeutil from 0.4.6 to 0.4.7.
+
 ## 0.0.50
 
 ### :sparkles: Features
