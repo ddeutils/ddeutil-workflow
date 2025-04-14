@@ -219,7 +219,9 @@ class BaseRunsOn(BaseModel):  # pragma: no cov
 class OnLocal(BaseRunsOn):  # pragma: no cov
     """Runs-on local."""
 
-    type: Literal[RunsOn.LOCAL] = Field(default=RunsOn.LOCAL)
+    type: Literal[RunsOn.LOCAL] = Field(
+        default=RunsOn.LOCAL, validate_default=True
+    )
 
 
 class SelfHostedArgs(BaseModel):
@@ -231,7 +233,9 @@ class SelfHostedArgs(BaseModel):
 class OnSelfHosted(BaseRunsOn):  # pragma: no cov
     """Runs-on self-hosted."""
 
-    type: Literal[RunsOn.SELF_HOSTED] = Field(default=RunsOn.SELF_HOSTED)
+    type: Literal[RunsOn.SELF_HOSTED] = Field(
+        default=RunsOn.SELF_HOSTED, validate_default=True
+    )
     args: SelfHostedArgs = Field(alias="with")
 
 
@@ -245,7 +249,9 @@ class AzBatchArgs(BaseModel):
 
 class OnAzBatch(BaseRunsOn):  # pragma: no cov
 
-    type: Literal[RunsOn.AZ_BATCH] = Field(default=RunsOn.AZ_BATCH)
+    type: Literal[RunsOn.AZ_BATCH] = Field(
+        default=RunsOn.AZ_BATCH, validate_default=True
+    )
     args: AzBatchArgs = Field(alias="with")
 
 
@@ -264,13 +270,16 @@ class DockerArgs(BaseModel):
 class OnDocker(BaseRunsOn):  # pragma: no cov
     """Runs-on Docker container."""
 
-    type: Literal[RunsOn.DOCKER] = Field(default=RunsOn.DOCKER)
+    type: Literal[RunsOn.DOCKER] = Field(
+        default=RunsOn.DOCKER, validate_default=True
+    )
     args: DockerArgs = Field(alias="with", default_factory=DockerArgs)
 
 
-def get_discriminator_runs_on(model: dict[str, Any]) -> str:
+def get_discriminator_runs_on(model: dict[str, Any]) -> RunsOn:
     """Get discriminator of the RunsOn models."""
-    return model.get("type", "local")
+    t = model.get("type")
+    return RunsOn(t) if t else RunsOn.LOCAL
 
 
 RunsOnModel = Annotated[
@@ -310,6 +319,8 @@ class Job(BaseModel):
         ... }
     """
 
+    model_config = ConfigDict(use_enum_values=True)
+
     id: Optional[str] = Field(
         default=None,
         description=(
@@ -341,6 +352,7 @@ class Job(BaseModel):
             "the `raise_error` did not set from job and stage executions."
         ),
         alias="trigger-rule",
+        validate_default=True,
     )
     needs: list[str] = Field(
         default_factory=list,
