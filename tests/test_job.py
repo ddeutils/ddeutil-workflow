@@ -2,7 +2,7 @@ import pytest
 from ddeutil.workflow.exceptions import JobException
 from ddeutil.workflow.job import (
     Job,
-    OnK8s,
+    OnDocker,
     OnLocal,
     OnSelfHosted,
     Rule,
@@ -22,8 +22,8 @@ def test_run_ons():
     assert isinstance(model, OnSelfHosted)
     assert model.args.host == "localhost:88"
 
-    model = TypeAdapter(RunsOnModel).validate_python({"type": "k8s"})
-    assert isinstance(model, OnK8s)
+    model = TypeAdapter(RunsOnModel).validate_python({"type": "docker"})
+    assert isinstance(model, OnDocker)
 
     model = TypeAdapter(RunsOnModel).validate_python({})
     assert isinstance(model, OnLocal)
@@ -44,8 +44,8 @@ def test_job():
     assert job.check_needs({"job-before": "foo"}) == SUCCESS
     assert job.check_needs({"job-after": "foo"}) == WAIT
 
-    job = Job.model_validate({"runs-on": {"type": "k8s"}})
-    assert isinstance(job.runs_on, OnK8s)
+    job = Job.model_validate({"runs-on": {"type": "docker"}})
+    assert isinstance(job.runs_on, OnDocker)
 
 
 def test_job_raise():

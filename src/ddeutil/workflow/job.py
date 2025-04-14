@@ -31,7 +31,7 @@ from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
-from .__types import DictData, DictStr, Matrix, TupleStr
+from .__types import DictData, DictStr, Matrix
 from .exceptions import (
     JobException,
     StageException,
@@ -44,21 +44,6 @@ from .stages import Stage
 from .utils import cross_product, filter_func, gen_id
 
 MatrixFilter = list[dict[str, Union[str, int]]]
-
-
-__all__: TupleStr = (
-    "Strategy",
-    "Job",
-    "Rule",
-    "RunsOn",
-    "RunsOnModel",
-    "OnLocal",
-    "OnSelfHosted",
-    "OnK8s",
-    "make",
-    "local_execute_strategy",
-    "local_execute",
-)
 
 
 @freeze_args
@@ -221,10 +206,14 @@ class BaseRunsOn(BaseModel):  # pragma: no cov
 
     model_config = ConfigDict(use_enum_values=True)
 
-    type: Literal[RunsOn.LOCAL]
+    type: RunsOn = Field(description="A runs-on type.")
     args: DictData = Field(
         default_factory=dict,
         alias="with",
+        description=(
+            "An argument that pass to the runs-on execution function. This "
+            "args will override by this child-model with specific args model."
+        ),
     )
 
 
@@ -237,7 +226,7 @@ class OnLocal(BaseRunsOn):  # pragma: no cov
 class SelfHostedArgs(BaseModel):
     """Self-Hosted arguments."""
 
-    host: str
+    host: str = Field(description="A host URL of the target self-hosted.")
 
 
 class OnSelfHosted(BaseRunsOn):  # pragma: no cov
@@ -247,14 +236,14 @@ class OnSelfHosted(BaseRunsOn):  # pragma: no cov
     args: SelfHostedArgs = Field(alias="with")
 
 
-class OnK8s(BaseRunsOn):  # pragma: no cov
-    """Runs-on Kubernetes."""
-
-    type: Literal[RunsOn.K8S] = Field(default=RunsOn.K8S)
-
-
 class DockerArgs(BaseModel):
-    tag: str = Field(default="latest")
+    image: str = Field(
+        default="ubuntu-latest",
+        description=(
+            "An image that want to run like `ubuntu-22.04`, `windows-latest`, "
+            ", `ubuntu-24.04-arm`, or `macos-14`"
+        ),
+    )
     env: DictData = Field(default_factory=dict)
     volume: DictData = Field(default_factory=dict)
 
@@ -263,7 +252,7 @@ class OnDocker(BaseRunsOn):  # pragma: no cov
     """Runs-on Docker container."""
 
     type: Literal[RunsOn.DOCKER] = Field(default=RunsOn.DOCKER)
-    args: DockerArgs = Field(alias="with")
+    args: DockerArgs = Field(alias="with", default_factory=DockerArgs)
 
 
 def get_discriminator_runs_on(model: dict[str, Any]) -> str:
@@ -273,10 +262,9 @@ def get_discriminator_runs_on(model: dict[str, Any]) -> str:
 
 RunsOnModel = Annotated[
     Union[
-        Annotated[OnK8s, Tag(RunsOn.K8S)],
         Annotated[OnSelfHosted, Tag(RunsOn.SELF_HOSTED)],
-        Annotated[OnLocal, Tag(RunsOn.LOCAL)],
         Annotated[OnDocker, Tag(RunsOn.DOCKER)],
+        Annotated[OnLocal, Tag(RunsOn.LOCAL)],
     ],
     Discriminator(get_discriminator_runs_on),
 ]
@@ -997,7 +985,8 @@ def azure_batch_execute(
     :param result:
     :param event:
     :param raise_error:
-    :return:
+
+    :rtype: Result
     """
     result: Result = Result.construct_with_rs_or_id(
         result,
@@ -1012,6 +1001,45 @@ def azure_batch_execute(
             context={
                 "errors": JobException(
                     "Job azure-batch execution was canceled from event that "
+                    "had set before start execution."
+                ).to_dict()
+            },
+        )
+    print(params)
+    print(raise_error)
+    return result.catch(status=SUCCESS)
+
+
+def docker_execution(
+    job: Job,
+    params: DictData,
+    *,
+    run_id: str | None = None,
+    parent_run_id: str | None = None,
+    result: Result | None = None,
+    event: Event | None = None,
+    raise_error: bool | None = None,
+):
+    """Docker job execution.
+
+    Steps:
+        - Pull the image
+        - Install this workflow package
+        - Start push job to run to target Docker container.
+    """
+    result: Result = Result.construct_with_rs_or_id(
+        result,
+        run_id=run_id,
+        parent_run_id=parent_run_id,
+        id_logic=(job.id or "not-set"),
+        extras=job.extras,
+    )
+    if event and event.is_set():
+        return result.catch(
+            status=CANCEL,
+            context={
+                "errors": JobException(
+                    "Job Docker execution was canceled from event that "
                     "had set before start execution."
                 ).to_dict()
             },
