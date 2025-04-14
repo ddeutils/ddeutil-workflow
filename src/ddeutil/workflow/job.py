@@ -27,7 +27,7 @@ from threading import Event
 from typing import Annotated, Any, Literal, Optional, Union
 
 from ddeutil.core import freeze_args
-from pydantic import BaseModel, ConfigDict, Discriminator, Field, SecretStr, Tag
+from pydantic import BaseModel, Discriminator, Field, SecretStr, Tag
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
@@ -178,7 +178,7 @@ class Strategy(BaseModel):
 
 
 class Rule(str, Enum):
-    """Trigger rules enum object."""
+    """Rule enum object for assign trigger option."""
 
     ALL_SUCCESS: str = "all_success"
     ALL_FAILED: str = "all_failed"
@@ -202,8 +202,6 @@ class BaseRunsOn(BaseModel):  # pragma: no cov
     """Base Runs-On Model for generate runs-on types via inherit this model
     object and override execute method.
     """
-
-    model_config = ConfigDict(use_enum_values=True)
 
     type: RunsOn = Field(description="A runs-on type.")
     args: DictData = Field(
@@ -319,8 +317,6 @@ class Job(BaseModel):
         ... }
     """
 
-    model_config = ConfigDict(use_enum_values=True)
-
     id: Optional[str] = Field(
         default=None,
         description=(
@@ -347,12 +343,12 @@ class Job(BaseModel):
     )
     trigger_rule: Rule = Field(
         default=Rule.ALL_SUCCESS,
+        validate_default=True,
         description=(
             "A trigger rule of tracking needed jobs if feature will use when "
             "the `raise_error` did not set from job and stage executions."
         ),
         alias="trigger-rule",
-        validate_default=True,
     )
     needs: list[str] = Field(
         default_factory=list,
@@ -621,7 +617,7 @@ class Job(BaseModel):
         )
 
         result.trace.info(
-            f"[JOB]: Execute: {self.id!r} on {self.runs_on.type!r}"
+            f"[JOB]: Execute: {self.id!r} on {self.runs_on.type.value!r}"
         )
         if self.runs_on.type == RunsOn.LOCAL:
             return local_execute(
