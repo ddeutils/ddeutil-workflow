@@ -1297,7 +1297,7 @@ class Workflow(BaseModel):
                         event=event,
                     )
                     time.sleep(0.025)
-                elif future.done():
+                elif future.done() or future.cancelled():
                     if e := future.exception():
                         result.trace.error(f"[WORKFLOW]: {e}")
                         raise WorkflowException(str(e))
@@ -1317,6 +1317,13 @@ class Workflow(BaseModel):
 
             if not_timeout_flag:
                 job_queue.join()
+                if future:  # pragma: no cov
+                    if e := future.exception():
+                        result.trace.error(f"[WORKFLOW]: {e}")
+                        raise WorkflowException(str(e))
+
+                    future.result()
+
                 return context
 
             result.trace.error(
