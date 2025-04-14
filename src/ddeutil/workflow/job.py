@@ -27,7 +27,7 @@ from threading import Event
 from typing import Annotated, Any, Literal, Optional, Union
 
 from ddeutil.core import freeze_args
-from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag
+from pydantic import BaseModel, ConfigDict, Discriminator, Field, SecretStr, Tag
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
@@ -194,7 +194,6 @@ class RunsOn(str, Enum):
 
     LOCAL: str = "local"
     SELF_HOSTED: str = "self_hosted"
-    K8S: str = "k8s"
     AZ_BATCH: str = "azure_batch"
     DOCKER: str = "docker"
 
@@ -234,6 +233,20 @@ class OnSelfHosted(BaseRunsOn):  # pragma: no cov
 
     type: Literal[RunsOn.SELF_HOSTED] = Field(default=RunsOn.SELF_HOSTED)
     args: SelfHostedArgs = Field(alias="with")
+
+
+class AzBatchArgs(BaseModel):
+    batch_account_name: str
+    batch_account_key: SecretStr
+    batch_account_url: str
+    storage_account_name: str
+    storage_account_key: SecretStr
+
+
+class OnAzBatch(BaseRunsOn):  # pragma: no cov
+
+    type: Literal[RunsOn.AZ_BATCH] = Field(default=RunsOn.AZ_BATCH)
+    args: AzBatchArgs = Field(alias="with")
 
 
 class DockerArgs(BaseModel):
@@ -600,16 +613,24 @@ class Job(BaseModel):
         )
         if self.runs_on.type == RunsOn.LOCAL:
             return local_execute(
-                job=self,
-                params=params,
-                result=result,
+                self,
+                params,
+                run_id=run_id,
+                parent_run_id=parent_run_id,
                 event=event,
                 raise_error=raise_error,
             )
         elif self.runs_on.type == RunsOn.SELF_HOSTED:  # pragma: no cov
             pass
-        elif self.runs_on.type == RunsOn.K8S:  # pragma: no cov
-            pass
+        elif self.runs_on.type == RunsOn.DOCKER:  # pragma: no cov
+            docker_execution(
+                self,
+                params,
+                run_id=run_id,
+                parent_run_id=parent_run_id,
+                event=event,
+                raise_error=raise_error,
+            )
 
         # pragma: no cov
         result.trace.error(
@@ -638,6 +659,8 @@ def local_execute_strategy(
 
         The result of this execution will return result with strategy ID
     that generated from the `gen_id` function with an input strategy value.
+    For each stage that execution with this strategy metrix, it will use the
+    `set_outputs` method for reconstruct result context data.
 
     :raise JobException: If it has any error from `StageException` or
         `UtilException`.
@@ -661,8 +684,10 @@ def local_execute_strategy(
     context.update({"matrix": strategy, "stages": {}})
 
     if strategy:
-        result.trace.info(f"[JOB]: Execute Strategy ID: {strategy_id}")
-        result.trace.info(f"[JOB]: ... Matrix: {strategy_id}")
+        result.trace.info(f"[JOB]: Execute Strategy: {strategy_id!r}")
+        result.trace.info(f"[JOB]: ... matrix: {strategy!r}")
+    else:
+        result.trace.info("[JOB]: Execute Empty-Strategy")
 
     for stage in job.stages:
 
@@ -670,7 +695,7 @@ def local_execute_strategy(
             stage.extras = job.extras
 
         if stage.is_skipped(params=context):
-            result.trace.info(f"[STAGE]: Skip stage: {stage.iden!r}")
+            result.trace.info(f"[JOB]: Skip Stage: {stage.iden!r}")
             stage.set_outputs(output={"skipped": True}, to=context)
             continue
 
@@ -691,6 +716,7 @@ def local_execute_strategy(
             )
 
         try:
+            result.trace.info(f"[JOB]: Execute Stage: {stage.iden!r}")
             rs: Result = stage.handler_execute(
                 params=context,
                 run_id=result.run_id,
@@ -698,22 +724,6 @@ def local_execute_strategy(
                 event=event,
             )
             stage.set_outputs(rs.context, to=context)
-            if rs.status == FAILED:
-                error_msg: str = (
-                    f"Job strategy was break because it has a stage, "
-                    f"{stage.iden}, failed without raise error."
-                )
-                return result.catch(
-                    status=FAILED,
-                    context={
-                        strategy_id: {
-                            "matrix": strategy,
-                            "stages": filter_func(context.pop("stages", {})),
-                            "errors": JobException(error_msg).to_dict(),
-                        },
-                    },
-                )
-
         except (StageException, UtilException) as e:
             result.trace.error(f"[JOB]: {e.__class__.__name__}: {e}")
             if raise_error:
@@ -728,6 +738,22 @@ def local_execute_strategy(
                         "matrix": strategy,
                         "stages": filter_func(context.pop("stages", {})),
                         "errors": e.to_dict(),
+                    },
+                },
+            )
+
+        if rs.status == FAILED:
+            error_msg: str = (
+                f"Job strategy was break because stage, {stage.iden}, "
+                f"failed without raise error."
+            )
+            return result.catch(
+                status=FAILED,
+                context={
+                    strategy_id: {
+                        "matrix": strategy,
+                        "stages": filter_func(context.pop("stages", {})),
+                        "errors": JobException(error_msg).to_dict(),
                     },
                 },
             )
@@ -749,7 +775,6 @@ def local_execute(
     *,
     run_id: str | None = None,
     parent_run_id: str | None = None,
-    result: Result | None = None,
     event: Event | None = None,
     raise_error: bool = True,
 ) -> Result:
@@ -764,8 +789,6 @@ def local_execute(
     :param params: (DictData) An input parameters that use on job execution.
     :param run_id: (str) A job running ID for this execution.
     :param parent_run_id: (str) A parent workflow running ID for this release.
-    :param result: (Result) A result object for keeping context and status
-        data.
     :param event: (Event) An event manager that pass to the PoolThreadExecutor.
     :param raise_error: (bool) A flag that all this method raise error to the
         strategy execution. Default is `True`.
@@ -773,12 +796,12 @@ def local_execute(
     :rtype: Result
     """
     result: Result = Result.construct_with_rs_or_id(
-        result,
         run_id=run_id,
         parent_run_id=parent_run_id,
         id_logic=(job.id or "not-set"),
         extras=job.extras,
     )
+
     event: Event = Event() if event is None else event
 
     # NOTE: Normal Job execution without parallel strategy matrix. It uses
@@ -887,7 +910,6 @@ def self_hosted_execute(
     *,
     run_id: str | None = None,
     parent_run_id: str | None = None,
-    result: Result | None = None,
     event: Event | None = None,
     raise_error: bool = True,
 ) -> Result:  # pragma: no cov
@@ -899,8 +921,6 @@ def self_hosted_execute(
     :param params: (DictData) An input parameters that use on job execution.
     :param run_id: (str) A job running ID for this execution.
     :param parent_run_id: (str) A parent workflow running ID for this release.
-    :param result: (Result) A result object for keeping context and status
-        data.
     :param event: (Event) An event manager that pass to the PoolThreadExecutor.
     :param raise_error: (bool) A flag that all this method raise error to the
         strategy execution.
@@ -908,7 +928,6 @@ def self_hosted_execute(
     :rtype: Result
     """
     result: Result = Result.construct_with_rs_or_id(
-        result,
         run_id=run_id,
         parent_run_id=parent_run_id,
         id_logic=(job.id or "not-set"),
@@ -959,7 +978,6 @@ def azure_batch_execute(
     *,
     run_id: str | None = None,
     parent_run_id: str | None = None,
-    result: Result | None = None,
     event: Event | None = None,
     raise_error: bool | None = None,
 ) -> Result:  # pragma no cov
@@ -978,18 +996,19 @@ def azure_batch_execute(
           the compute node before running the script.
         - Monitor the job and retrieve the output files from Azure Storage.
 
+    References:
+        - https://docs.azure.cn/en-us/batch/tutorial-parallel-python
+
     :param job:
     :param params:
     :param run_id:
     :param parent_run_id:
-    :param result:
     :param event:
     :param raise_error:
 
     :rtype: Result
     """
     result: Result = Result.construct_with_rs_or_id(
-        result,
         run_id=run_id,
         parent_run_id=parent_run_id,
         id_logic=(job.id or "not-set"),
@@ -1016,7 +1035,6 @@ def docker_execution(
     *,
     run_id: str | None = None,
     parent_run_id: str | None = None,
-    result: Result | None = None,
     event: Event | None = None,
     raise_error: bool | None = None,
 ):
@@ -1028,7 +1046,6 @@ def docker_execution(
         - Start push job to run to target Docker container.
     """
     result: Result = Result.construct_with_rs_or_id(
-        result,
         run_id=run_id,
         parent_run_id=parent_run_id,
         id_logic=(job.id or "not-set"),

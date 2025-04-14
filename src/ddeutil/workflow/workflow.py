@@ -686,6 +686,7 @@ class Workflow(BaseModel):
             extras=self.extras,
         )
 
+        # VALIDATE: check type of queue that valid with ReleaseQueue.
         if queue and not isinstance(queue, ReleaseQueue):
             raise TypeError(
                 "The queue argument should be ReleaseQueue object only."
@@ -698,22 +699,21 @@ class Workflow(BaseModel):
         result.trace.debug(
             f"[RELEASE]: Start {name!r} : {release.date:%Y-%m-%d %H:%M:%S}"
         )
-
-        # NOTE: Release parameters that use to templating on the schedule
-        #   config data.
-        release_params: DictData = {
-            "release": {
-                "logical_date": release.date,
-                "execute_date": datetime.now(
-                    tz=dynamic("tz", extras=self.extras)
-                ),
-                "run_id": result.run_id,
-                "timezone": dynamic("tz", extras=self.extras),
-            }
-        }
-
         self.execute(
-            params=param2template(params, release_params, extras=self.extras),
+            params=param2template(
+                params,
+                params={
+                    "release": {
+                        "logical_date": release.date,
+                        "execute_date": datetime.now(
+                            tz=dynamic("tz", extras=self.extras)
+                        ),
+                        "run_id": result.run_id,
+                        "timezone": dynamic("tz", extras=self.extras),
+                    }
+                },
+                extras=self.extras,
+            ),
             result=result,
             parent_run_id=result.parent_run_id,
             timeout=timeout,
@@ -1004,22 +1004,31 @@ class Workflow(BaseModel):
             )
 
         try:
-            result.trace.info(f"[WORKFLOW]: Execute: {job_id!r}")
-            job.set_outputs(
-                job.execute(
-                    params=params,
-                    run_id=result.run_id,
-                    parent_run_id=result.parent_run_id,
-                    event=event,
-                ).context,
-                to=params,
+            result.trace.info(f"[WORKFLOW]: Execute Job: {job_id!r}")
+            rs: Result = job.execute(
+                params=params,
+                run_id=result.run_id,
+                parent_run_id=result.parent_run_id,
+                event=event,
             )
+            job.set_outputs(rs.context, to=params)
         except (JobException, UtilException) as e:
             result.trace.error(f"[WORKFLOW]: {e.__class__.__name__}: {e}")
             raise WorkflowException(
                 f"Get job execution error {job_id}: JobException: {e}"
             ) from None
 
+        if rs.status == FAILED:
+            error_msg: str = (
+                f"Workflow job, {job.id}, failed without raise error."
+            )
+            return result.catch(
+                status=FAILED,
+                context={
+                    "errors": WorkflowException(error_msg).to_dict(),
+                    **params,
+                },
+            )
         return result.catch(status=SUCCESS, context=params)
 
     def execute(

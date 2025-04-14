@@ -669,11 +669,16 @@ def test_workflow_exec_raise_param(test_path):
                         ),
                         "name": "JobException",
                         "message": (
-                            "Job strategy was break because it has a stage, "
-                            "get-param, failed without raise error."
+                            "Job strategy was break because stage, get-param, "
+                            "failed without raise error."
                         ),
                     },
                 },
+            },
+            "errors": {
+                "class": rs.context["errors"]["class"],
+                "message": "Workflow job, start-job, failed without raise error.",
+                "name": "WorkflowException",
             },
         }
 
@@ -735,8 +740,8 @@ def test_workflow_exec_raise_job_trigger(test_path):
                         ),
                         "name": "JobException",
                         "message": (
-                            "Job strategy was break because it has a stage, "
-                            "get-param, failed without raise error."
+                            "Job strategy was break because stage, get-param, "
+                            "failed without raise error."
                         ),
                     },
                 },

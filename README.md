@@ -176,16 +176,16 @@ value (This config can override by extra parameters with `registry_caller` key).
 ```python
 from ddeutil.workflow import Result, tag
 from ddeutil.workflow.exceptions import StageException
-from pydantic import BaseModel, Secret
+from pydantic import BaseModel, SecretStr
 
 class AwsCredential(BaseModel):
     path: str
     access_client_id: str
-    access_client_secret: Secret
+    access_client_secret: SecretStr
 
 class RestAuth(BaseModel):
     type: str
-    keys: Secret
+    keys: SecretStr
 
 @tag("requests", alias="get-api-with-oauth-to-s3")
 def get_api_with_oauth_to_s3(

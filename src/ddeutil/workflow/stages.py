@@ -1019,18 +1019,19 @@ class TriggerStage(BaseStage):
                 extras=self.extras | {"stage_raise_error": True},
             ).execute(
                 params=param2template(self.params, params, extras=self.extras),
-                result=result,
+                parent_run_id=result.run_id,
                 event=event,
             )
-            if rs.status == FAILED:
-                err_msg: str | None = (
-                    f" with:\n{msg}"
-                    if (msg := rs.context.get("errors", {}).get("message"))
-                    else ""
-                )
-                raise StageException(f"Trigger workflow was failed{err_msg}.")
         except WorkflowException as e:
             raise StageException("Trigger workflow stage was failed") from e
+
+        if rs.status == FAILED:
+            err_msg: str | None = (
+                f" with:\n{msg}"
+                if (msg := rs.context.get("errors", {}).get("message"))
+                else ""
+            )
+            raise StageException(f"Trigger workflow was failed{err_msg}.")
         return rs
 
 
@@ -1135,28 +1136,28 @@ class ParallelStage(BaseStage):  # pragma: no cov
                     event=event,
                 )
                 stage.set_outputs(rs.context, to=context)
-                if rs.status == FAILED:
-                    error_msg: str = (
-                        f"Item-Stage was break because it has a sub stage, "
-                        f"{stage.iden}, failed without raise error."
-                    )
-                    return result.catch(
-                        status=FAILED,
-                        parallel={
-                            branch: {
-                                "branch": branch,
-                                "stages": filter_func(
-                                    context.pop("stages", {})
-                                ),
-                                "errors": StageException(error_msg).to_dict(),
-                            },
-                        },
-                    )
             except StageException as e:  # pragma: no cov
                 result.trace.error(f"[STAGE]: {e.__class__.__name__}: {e}")
                 raise StageException(
                     f"Sub-Stage execution error: {e.__class__.__name__}: {e}"
                 ) from None
+
+            if rs.status == FAILED:
+                error_msg: str = (
+                    f"Item-Stage was break because it has a sub stage, "
+                    f"{stage.iden}, failed without raise error."
+                )
+                return result.catch(
+                    status=FAILED,
+                    parallel={
+                        branch: {
+                            "branch": branch,
+                            "stages": filter_func(context.pop("stages", {})),
+                            "errors": StageException(error_msg).to_dict(),
+                        },
+                    },
+                )
+
         return result.catch(
             status=SUCCESS,
             parallel={
@@ -1330,28 +1331,27 @@ class ForEachStage(BaseStage):
                     event=event,
                 )
                 stage.set_outputs(rs.context, to=context)
-                if rs.status == FAILED:
-                    error_msg: str = (
-                        f"Item-Stage was break because it has a sub stage, "
-                        f"{stage.iden}, failed without raise error."
-                    )
-                    return result.catch(
-                        status=FAILED,
-                        foreach={
-                            item: {
-                                "item": item,
-                                "stages": filter_func(
-                                    context.pop("stages", {})
-                                ),
-                                "errors": StageException(error_msg).to_dict(),
-                            },
-                        },
-                    )
             except (StageException, UtilException) as e:
                 result.trace.error(f"[STAGE]: {e.__class__.__name__}: {e}")
                 raise StageException(
                     f"Sub-Stage execution error: {e.__class__.__name__}: {e}"
                 ) from None
+
+            if rs.status == FAILED:
+                error_msg: str = (
+                    f"Item-Stage was break because it has a sub stage, "
+                    f"{stage.iden}, failed without raise error."
+                )
+                return result.catch(
+                    status=FAILED,
+                    foreach={
+                        item: {
+                            "item": item,
+                            "stages": filter_func(context.pop("stages", {})),
+                            "errors": StageException(error_msg).to_dict(),
+                        },
+                    },
+                )
 
         return result.catch(
             status=SUCCESS,
