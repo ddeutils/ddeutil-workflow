@@ -6,6 +6,9 @@
 # [x] Use dynamic config
 """A Workflow module that is the core module of this package. It keeps Release
 and Workflow Pydantic models.
+
+    I will implement timeout on the workflow execution layer only because the
+main propose of this package in Workflow model.
 """
 from __future__ import annotations
 
@@ -36,7 +39,7 @@ from .__cron import CronJob, CronRunner
 from .__types import DictData, TupleStr
 from .conf import Loader, SimLoad, dynamic
 from .cron import On
-from .exceptions import JobException, WorkflowException
+from .exceptions import JobException, UtilException, WorkflowException
 from .job import Job
 from .logs import Audit, get_audit
 from .params import Param
@@ -636,20 +639,20 @@ class Workflow(BaseModel):
         run_id: str | None = None,
         parent_run_id: str | None = None,
         audit: type[Audit] = None,
-        queue: ReleaseQueue | None = None,
+        queue: Optional[ReleaseQueue] = None,
         override_log_name: str | None = None,
-        result: Result | None = None,
+        result: Optional[Result] = None,
+        timeout: int = 600,
     ) -> Result:
         """Release the workflow execution with overriding parameter with the
         release templating that include logical date (release date), execution
         date, or running id to the params.
 
             This method allow workflow use audit object to save the execution
-        result to audit destination like file audit to the local `/logs`
-        directory.
+        result to audit destination like file audit to the local `./logs` path.
 
         Steps:
-            - Initialize ReleaseQueue and Release if they do not pass.
+            - Initialize Release and validate ReleaseQueue.
             - Create release data for pass to parameter templating function.
             - Execute this workflow with mapping release data to its parameters.
             - Writing result audit
@@ -658,15 +661,15 @@ class Workflow(BaseModel):
 
         :param release: A release datetime or Release object.
         :param params: A workflow parameter that pass to execute method.
-        :param queue: A ReleaseQueue that use for mark complete.
-        :param run_id: A workflow running ID for this release.
-        :param parent_run_id: A parent workflow running ID for this release.
+        :param run_id: (str) A workflow running ID.
+        :param parent_run_id: (str) A parent workflow running ID.
         :param audit: An audit class that want to save the execution result.
-        :param queue: A ReleaseQueue object.
-        :param override_log_name: An override logging name that use instead
-            the workflow name.
+        :param queue: (ReleaseQueue) A ReleaseQueue object.
+        :param override_log_name: (str) An override logging name that use
+            instead the workflow name.
         :param result: (Result) A result object for keeping context and status
             data.
+        :param timeout: (int) A workflow execution time out in second unit.
 
         :raise TypeError: If a queue parameter does not match with ReleaseQueue
             type.
@@ -683,7 +686,7 @@ class Workflow(BaseModel):
             extras=self.extras,
         )
 
-        if queue is not None and not isinstance(queue, ReleaseQueue):
+        if queue and not isinstance(queue, ReleaseQueue):
             raise TypeError(
                 "The queue argument should be ReleaseQueue object only."
             )
@@ -693,8 +696,7 @@ class Workflow(BaseModel):
             release: Release = Release.from_dt(release, extras=self.extras)
 
         result.trace.debug(
-            f"[RELEASE]: Start release - {name!r} : "
-            f"{release.date:%Y-%m-%d %H:%M:%S}"
+            f"[RELEASE]: Start {name!r} : {release.date:%Y-%m-%d %H:%M:%S}"
         )
 
         # NOTE: Release parameters that use to templating on the schedule
@@ -710,19 +712,14 @@ class Workflow(BaseModel):
             }
         }
 
-        # NOTE: Execute workflow with templating params from release mapping.
-        #   The result context that return from execution method is:
-        #
-        #   ... {"params": ..., "jobs": ...}
-        #
         self.execute(
             params=param2template(params, release_params, extras=self.extras),
             result=result,
             parent_run_id=result.parent_run_id,
+            timeout=timeout,
         )
         result.trace.debug(
-            f"[RELEASE]: End release - {name!r} : "
-            f"{release.date:%Y-%m-%d %H:%M:%S}"
+            f"[RELEASE]: End {name!r} : {release.date:%Y-%m-%d %H:%M:%S}"
         )
 
         # NOTE: Saving execution result to destination of the input audit
@@ -741,18 +738,9 @@ class Workflow(BaseModel):
             ).save(excluded=None)
         )
 
-        # NOTE: Remove this release from running.
-        if queue is not None:
+        if queue:
             queue.remove_running(release)
             queue.mark_complete(release)
-
-        # NOTE: Remove the params key from the result context for deduplicate.
-        #   This step is prepare result context for this release method.
-        context: DictData = result.context
-        jobs: DictData = context.pop("jobs", {})
-        errors: DictData = (
-            {"errors": context.pop("errors", {})} if "errors" in context else {}
-        )
 
         return result.catch(
             status=SUCCESS,
@@ -763,8 +751,7 @@ class Workflow(BaseModel):
                     "logical_date": release.date,
                     "release": release,
                 },
-                "outputs": {"jobs": jobs},
-                **errors,
+                "outputs": {"jobs": result.context.pop("jobs", {})},
             },
         )
 
@@ -1004,6 +991,12 @@ class Workflow(BaseModel):
                 f"workflow."
             )
 
+        job: Job = self.job(name=job_id)
+        if job.is_skipped(params=params):
+            result.trace.info(f"[WORKFLOW]: Skip job: {job_id!r}")
+            job.set_outputs(output={"skipped": True}, to=params)
+            return result.catch(status=SKIP, context=params)
+
         if event and event.is_set():  # pragma: no cov
             raise WorkflowException(
                 "Workflow job was canceled from event that had set before "
@@ -1011,22 +1004,17 @@ class Workflow(BaseModel):
             )
 
         try:
-            job: Job = self.jobs[job_id]
-            if job.is_skipped(params=params):
-                result.trace.info(f"[WORKFLOW]: Skip job: {job_id!r}")
-                job.set_outputs(output={"skipped": True}, to=params)
-            else:
-                result.trace.info(f"[WORKFLOW]: Execute: {job_id!r}")
-                job.set_outputs(
-                    job.execute(
-                        params=params,
-                        run_id=result.run_id,
-                        parent_run_id=result.parent_run_id,
-                        event=event,
-                    ).context,
-                    to=params,
-                )
-        except JobException as e:
+            result.trace.info(f"[WORKFLOW]: Execute: {job_id!r}")
+            job.set_outputs(
+                job.execute(
+                    params=params,
+                    run_id=result.run_id,
+                    parent_run_id=result.parent_run_id,
+                    event=event,
+                ).context,
+                to=params,
+            )
+        except (JobException, UtilException) as e:
             result.trace.error(f"[WORKFLOW]: {e.__class__.__name__}: {e}")
             raise WorkflowException(
                 f"Get job execution error {job_id}: JobException: {e}"
@@ -1083,7 +1071,7 @@ class Workflow(BaseModel):
             extras=self.extras,
         )
 
-        result.trace.info(f"[WORKFLOW]: Start Execute: {self.name!r} ...")
+        result.trace.info(f"[WORKFLOW]: Execute: {self.name!r} ...")
         if not self.jobs:
             result.trace.warning(
                 f"[WORKFLOW]: {self.name!r} does not have any jobs"
@@ -1128,7 +1116,7 @@ class Workflow(BaseModel):
                     timeout=timeout,
                     event=event,
                 )
-        except WorkflowException as e:
+        except (WorkflowException, JobException) as e:
             status: Status = FAILED
             context.update({"errors": e.to_dict()})
 
@@ -1167,7 +1155,7 @@ class Workflow(BaseModel):
             "max_job_exec_timeout", f=timeout, extras=self.extras
         )
         event: Event = event or Event()
-        result.trace.debug(f"[WORKFLOW]: Run {self.name!r} with threading.")
+        result.trace.debug(f"... Run {self.name!r} with threading.")
         with ThreadPoolExecutor(
             max_workers=dynamic("max_job_parallel", extras=self.extras),
             thread_name_prefix="wf_exec_threading_",
@@ -1259,7 +1247,7 @@ class Workflow(BaseModel):
             "max_job_exec_timeout", f=timeout, extras=self.extras
         )
         event: Event = event or Event()
-        result.trace.debug(f"[WORKFLOW]: Run {self.name!r} with non-threading.")
+        result.trace.debug(f"... Run {self.name!r} with non-threading.")
         with ThreadPoolExecutor(
             max_workers=1,
             thread_name_prefix="wf_exec_non_threading_",

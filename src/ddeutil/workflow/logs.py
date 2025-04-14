@@ -224,18 +224,30 @@ class BaseTrace(ABC):  # pragma: no cov
             "Adjust make message method for this trace object before using."
         )
 
+    def __logging(
+        self, message: str, mode: str, *, is_err: bool = False
+    ) -> None:
+        """Write trace log with append mode and logging this message with any
+        logging level.
+
+        :param message: (str) A message that want to log.
+        """
+        msg: str = self.make_message(message)
+
+        if mode != "debug" or (
+            mode == "debug" and dynamic("debug", extras=self.extras)
+        ):
+            self.writer(msg, is_err=is_err)
+
+        getattr(logger, mode)(msg, stacklevel=3)
+
     def debug(self, message: str):
         """Write trace log with append mode and logging this message with the
         DEBUG level.
 
         :param message: (str) A message that want to log.
         """
-        msg: str = self.make_message(message)
-
-        if dynamic("debug", extras=self.extras):
-            self.writer(msg)
-
-        logger.debug(msg, stacklevel=2)
+        self.__logging(message, mode="debug")
 
     def info(self, message: str) -> None:
         """Write trace log with append mode and logging this message with the
@@ -243,9 +255,7 @@ class BaseTrace(ABC):  # pragma: no cov
 
         :param message: (str) A message that want to log.
         """
-        msg: str = self.make_message(message)
-        self.writer(msg)
-        logger.info(msg, stacklevel=2)
+        self.__logging(message, mode="info")
 
     def warning(self, message: str) -> None:
         """Write trace log with append mode and logging this message with the
@@ -253,9 +263,7 @@ class BaseTrace(ABC):  # pragma: no cov
 
         :param message: (str) A message that want to log.
         """
-        msg: str = self.make_message(message)
-        self.writer(msg)
-        logger.warning(msg, stacklevel=2)
+        self.__logging(message, mode="warning")
 
     def error(self, message: str) -> None:
         """Write trace log with append mode and logging this message with the
@@ -263,9 +271,7 @@ class BaseTrace(ABC):  # pragma: no cov
 
         :param message: (str) A message that want to log.
         """
-        msg: str = self.make_message(message)
-        self.writer(msg, is_err=True)
-        logger.error(msg, stacklevel=2)
+        self.__logging(message, mode="error", is_err=True)
 
     def exception(self, message: str) -> None:
         """Write trace log with append mode and logging this message with the
@@ -273,9 +279,7 @@ class BaseTrace(ABC):  # pragma: no cov
 
         :param message: (str) A message that want to log.
         """
-        msg: str = self.make_message(message)
-        self.writer(msg, is_err=True)
-        logger.exception(msg, stacklevel=2)
+        self.__logging(message, mode="exception", is_err=True)
 
     async def adebug(self, message: str) -> None:  # pragma: no cov
         """Async write trace log with append mode and logging this message with

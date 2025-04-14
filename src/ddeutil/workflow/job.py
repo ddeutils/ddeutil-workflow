@@ -255,6 +255,7 @@ class OnK8s(BaseRunsOn):  # pragma: no cov
 
 class DockerArgs(BaseModel):
     tag: str = Field(default="latest")
+    env: DictData = Field(default_factory=dict)
     volume: DictData = Field(default_factory=dict)
 
 
@@ -275,6 +276,7 @@ RunsOnModel = Annotated[
         Annotated[OnK8s, Tag(RunsOn.K8S)],
         Annotated[OnSelfHosted, Tag(RunsOn.SELF_HOSTED)],
         Annotated[OnLocal, Tag(RunsOn.LOCAL)],
+        Annotated[OnDocker, Tag(RunsOn.DOCKER)],
     ],
     Discriminator(get_discriminator_runs_on),
 ]
@@ -580,6 +582,9 @@ class Job(BaseModel):
         execution. It will generate matrix values at the first step and run
         multithread on this metrics to the `stages` field of this job.
 
+            This method be execution routing for call dynamic execution function
+        with specific target `runs-on` value.
+
         :param params: An input parameters that use on job execution.
         :param run_id: (str) A job running ID.
         :param parent_run_id: (str) A parent workflow running ID.
@@ -587,8 +592,10 @@ class Job(BaseModel):
             data.
         :param event: (Event) An event manager that pass to the
             PoolThreadExecutor.
-        :param raise_error: (bool) A flag that all this method raise error to the
-            strategy execution. Default is `True`.
+        :param raise_error: (bool) A flag that all this method raise error to
+            the strategy execution. Default is `True`.
+
+        :raise NotImplementedError: If the `runs-on` value does not implement.
 
         :rtype: Result
         """
@@ -618,12 +625,10 @@ class Job(BaseModel):
 
         # pragma: no cov
         result.trace.error(
-            f"[JOB]: Job executor does not support for runs-on type: "
-            f"{self.runs_on.type} yet"
+            f"[JOB]: Execution not support runs-on: {self.runs_on.type!r} yet."
         )
         raise NotImplementedError(
-            f"The job runs-on other type: {self.runs_on.type} does not "
-            f"support yet."
+            f"Execution runs-on type: {self.runs_on.type} does not support yet."
         )
 
 
@@ -814,7 +819,7 @@ def local_execute(
                 raise_error=raise_error,
             )
 
-        return result.catch(status=result.status)
+        return result
 
     fail_fast_flag: bool = job.strategy.fail_fast
     ls: str = "Fail-Fast" if fail_fast_flag else "All-Completed"
@@ -864,7 +869,7 @@ def local_execute(
 
             if len(done) != len(futures):
                 result.trace.warning(
-                    "[JOB]: Set the event for stop running stage."
+                    "[JOB]: Set event for stop pending stage future."
                 )
                 event.set()
                 for future in not_done:
@@ -873,7 +878,7 @@ def local_execute(
             nd: str = (
                 f", the strategies do not run is {not_done}" if not_done else ""
             )
-            result.trace.debug(f"[JOB]: Strategy is set Fail Fast{nd}")
+            result.trace.debug(f"[JOB]: Strategy set Fail-Fast{nd}")
 
         for future in done:
             try:

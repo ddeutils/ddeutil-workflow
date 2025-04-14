@@ -3,7 +3,7 @@ from unittest import mock
 
 import pytest
 from ddeutil.workflow.conf import Config
-from ddeutil.workflow.result import Result
+from ddeutil.workflow.result import SUCCESS, Result
 from ddeutil.workflow.workflow import (
     Release,
     ReleaseQueue,
@@ -23,7 +23,7 @@ def test_workflow_exec_release():
         release=release_date,
         params={"asat-dt": datetime(2024, 10, 1)},
     )
-    assert rs.status == 0
+    assert rs.status == SUCCESS
     assert rs.context == {
         "params": {"asat-dt": datetime(2024, 10, 1, 0, 0)},
         "release": {
@@ -57,7 +57,7 @@ def test_workflow_exec_release_with_queue():
         params={"asat-dt": datetime(2024, 10, 1)},
         queue=queue,
     )
-    assert rs.status == 0
+    assert rs.status == SUCCESS
     assert rs.context == {
         "params": {"asat-dt": datetime(2024, 10, 1, 0, 0)},
         "release": {
@@ -104,7 +104,7 @@ def test_workflow_exec_release_with_start_date():
         release=start_date,
         params={"asat-dt": datetime(2024, 10, 1)},
     )
-    assert rs.status == 0
+    assert rs.status == SUCCESS
     assert rs.context == {
         "params": {"asat-dt": datetime(2024, 10, 1, 0, 0)},
         "release": {
