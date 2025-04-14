@@ -599,6 +599,10 @@ def test_workflow_exec_foreach(test_path):
                 - name: "Get Items before run foreach"
                   id: get-items
                   uses: tasks/get-items@demo
+                - name: "Create variable"
+                  id: create-variable
+                  run: |
+                    foo: str = "bar"
                 - name: "For-each item"
                   id: foreach-stage
                   foreach: ${{ stages.get-items.outputs.items }}
@@ -606,6 +610,7 @@ def test_workflow_exec_foreach(test_path):
                     - name: "Echo stage"
                       echo: |
                         Start run with item ${{ item }}
+                        Import variable ${{ stages.create-variable.outputs.foo }}
                     - name: "Final Echo"
                       if: ${{ item }} == 4
                       echo: |
@@ -614,7 +619,62 @@ def test_workflow_exec_foreach(test_path):
     ):
         workflow = Workflow.from_conf(name="tmp-wf-foreach")
         rs = workflow.execute(params={})
-        print(rs)
+        assert rs.status == SUCCESS
+        assert rs.context == {
+            "params": {},
+            "jobs": {
+                "transform": {
+                    "stages": {
+                        "get-items": {"outputs": {"items": [1, 2, 3, 4]}},
+                        "create-variable": {"outputs": {"foo": "bar"}},
+                        "foreach-stage": {
+                            "outputs": {
+                                "items": [1, 2, 3, 4],
+                                "foreach": {
+                                    1: {
+                                        "item": 1,
+                                        "stages": {
+                                            "2709471980": {"outputs": {}},
+                                            "9263488742": {
+                                                "outputs": {},
+                                                "skipped": True,
+                                            },
+                                        },
+                                    },
+                                    2: {
+                                        "item": 2,
+                                        "stages": {
+                                            "2709471980": {"outputs": {}},
+                                            "9263488742": {
+                                                "outputs": {},
+                                                "skipped": True,
+                                            },
+                                        },
+                                    },
+                                    3: {
+                                        "item": 3,
+                                        "stages": {
+                                            "2709471980": {"outputs": {}},
+                                            "9263488742": {
+                                                "outputs": {},
+                                                "skipped": True,
+                                            },
+                                        },
+                                    },
+                                    4: {
+                                        "item": 4,
+                                        "stages": {
+                                            "2709471980": {"outputs": {}},
+                                            "9263488742": {"outputs": {}},
+                                        },
+                                    },
+                                },
+                            }
+                        },
+                    }
+                }
+            },
+        }
 
 
 @mock.patch.object(Config, "stage_raise_error", False)

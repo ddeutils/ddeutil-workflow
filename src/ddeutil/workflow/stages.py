@@ -1099,14 +1099,15 @@ class ParallelStage(BaseStage):  # pragma: no cov
         :rtype: DictData
         """
         result.trace.debug(f"... Execute branch: {branch!r}")
-        context: DictData = copy.deepcopy(params)
-        context.update({"branch": branch, "stages": {}})
+        _params: DictData = copy.deepcopy(params)
+        _params.update({"branch": branch})
+        context: DictData = {"branch": branch, "stages": {}}
         for stage in self.parallel[branch]:
 
             if extras:
                 stage.extras = extras
 
-            if stage.is_skipped(params=context):
+            if stage.is_skipped(params=_params):
                 result.trace.info(f"... Skip stage: {stage.iden!r}")
                 stage.set_outputs(output={"skipped": True}, to=context)
                 continue
@@ -1129,7 +1130,7 @@ class ParallelStage(BaseStage):  # pragma: no cov
 
             try:
                 rs: Result = stage.handler_execute(
-                    params=context,
+                    params=_params,
                     run_id=result.run_id,
                     parent_run_id=result.parent_run_id,
                     raise_error=True,
@@ -1294,14 +1295,15 @@ class ForEachStage(BaseStage):
         :rtype: Result
         """
         result.trace.debug(f"... Execute item: {item!r}")
-        context: DictData = copy.deepcopy(params)
-        context.update({"item": item, "stages": {}})
+        _params: DictData = copy.deepcopy(params)
+        _params.update({"item": item})
+        context: DictData = {"item": item, "stages": {}}
         for stage in self.stages:
 
             if self.extras:
                 stage.extras = self.extras
 
-            if stage.is_skipped(params=context):
+            if stage.is_skipped(params=_params):
                 result.trace.info(f"... Skip stage: {stage.iden!r}")
                 stage.set_outputs(output={"skipped": True}, to=context)
                 continue
@@ -1324,7 +1326,7 @@ class ForEachStage(BaseStage):
 
             try:
                 rs: Result = stage.handler_execute(
-                    params=context,
+                    params=_params,
                     run_id=result.run_id,
                     parent_run_id=result.parent_run_id,
                     raise_error=True,
@@ -1513,15 +1515,16 @@ class UntilStage(BaseStage):  # pragma: no cov
         :rtype: tuple[Result, T]
         """
         result.trace.debug(f"... Execute until item: {item!r}")
-        context: DictData = copy.deepcopy(params)
-        context.update({"loop": loop, "item": item, "stages": {}})
+        _params: DictData = copy.deepcopy(params)
+        _params.update({"item": item})
+        context: DictData = {"loop": loop, "item": item, "stages": {}}
         next_item: T = None
         for stage in self.stages:
 
             if self.extras:
                 stage.extras = self.extras
 
-            if stage.is_skipped(params=context):
+            if stage.is_skipped(params=_params):
                 result.trace.info(f"... Skip stage: {stage.iden!r}")
                 stage.set_outputs(output={"skipped": True}, to=context)
                 continue
@@ -1550,7 +1553,7 @@ class UntilStage(BaseStage):  # pragma: no cov
 
             try:
                 rs: Result = stage.handler_execute(
-                    params=context,
+                    params=_params,
                     run_id=result.run_id,
                     parent_run_id=result.parent_run_id,
                     raise_error=True,
