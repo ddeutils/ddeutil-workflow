@@ -1092,3 +1092,29 @@ def test_stage_exec_case_match(test_path):
                 }
             }
         }
+
+
+def test_stage_py_virtual(test_path):
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_py_virtual.yml",
+        data="""
+        tmp-wf-py-virtual:
+          type: Workflow
+          jobs:
+            first-job:
+              stages:
+                - name: "Start run Python on the new Virtual"
+                  id: py-virtual
+                  deps:
+                    - pandas
+                  run: |
+                    import pandas as pd
+                    print(pd)
+        """,
+    ):
+        workflow = Workflow.from_conf(name="tmp-wf-py-virtual")
+        stage: Stage = workflow.job("first-job").stage("py-virtual")
+        rs = stage.set_outputs(
+            stage.handler_execute({"params": {}}).context, to={}
+        )
+        print(rs)

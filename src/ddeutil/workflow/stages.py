@@ -1941,7 +1941,6 @@ class RaiseStage(BaseStage):  # pragma: no cov
         raise StageException(message)
 
 
-# TODO: Not implement this stages yet
 class HookStage(BaseStage):  # pragma: no cov
     """Hook stage execution."""
 
@@ -1959,9 +1958,13 @@ class HookStage(BaseStage):  # pragma: no cov
         raise NotImplementedError("Hook Stage does not implement yet.")
 
 
-# TODO: Not implement this stages yet
 class DockerStage(BaseStage):  # pragma: no cov
-    """Docker container stage execution.
+    """Docker container stage execution that will pull the specific Docker image
+    with custom authentication and run this image by passing environment
+    variables and mounting local volume to this Docker container.
+
+        The volume path that mount to this Docker container will limit. That is
+    this stage does not allow you to mount any path to this container.
 
     Data Validate:
         >>> stage = {
@@ -1969,10 +1972,7 @@ class DockerStage(BaseStage):  # pragma: no cov
         ...     "image": "image-name.pkg.com",
         ...     "env": {
         ...         "ENV": "dev",
-        ...         "DEBUG": "true",
-        ...     },
-        ...     "volume": {
-        ...         "secrets": "/secrets",
+        ...         "SECRET": "${SPECIFIC_SECRET}",
         ...     },
         ...     "auth": {
         ...         "username": "__json_key",
@@ -1985,8 +1985,16 @@ class DockerStage(BaseStage):  # pragma: no cov
         description="A Docker image url with tag that want to run.",
     )
     tag: str = Field(default="latest", description="An Docker image tag.")
-    env: DictData = Field(default_factory=dict)
-    volume: DictData = Field(default_factory=dict)
+    env: DictData = Field(
+        default_factory=dict,
+        description=(
+            "An environment variable that want pass to Docker container.",
+        ),
+    )
+    volume: DictData = Field(
+        default_factory=dict,
+        description="A mapping of local and target mounting path.",
+    )
     auth: DictData = Field(
         default_factory=dict,
         description=(
@@ -2065,10 +2073,12 @@ class DockerStage(BaseStage):  # pragma: no cov
         raise NotImplementedError("Docker Stage does not implement yet.")
 
 
-# TODO: Not implement this stages yet
 class VirtualPyStage(PyStage):  # pragma: no cov
     """Python Virtual Environment stage execution."""
 
+    version: str = Field(
+        default="3.9", description="A Python version that want to run."
+    )
     deps: list[str] = Field(
         description=(
             "list of Python dependency that want to install before execution "
@@ -2076,7 +2086,54 @@ class VirtualPyStage(PyStage):  # pragma: no cov
         ),
     )
 
-    def create_py_file(self, py: str, run_id: str | None): ...
+    @contextlib.contextmanager
+    def create_py_file(
+        self,
+        py: str,
+        values: DictData,
+        deps: list[str],
+        run_id: str | None = None,
+    ) -> Iterator[str]:
+        """Create the .py file with an input Python string statement.
+
+        :param py: A Python string statement.
+        :param values: A variable that want to set before running this
+        :param deps: An additional Python dependencies that want install before
+            run this python stage.
+        :param run_id: (str | None) A running ID of this stage execution.
+        """
+        run_id: str = run_id or uuid.uuid4()
+        f_name: str = f"{run_id}.py"
+        with open(f"./{f_name}", mode="w", newline="\n") as f:
+            # NOTE: Create variable mapping that write before running statement.
+            vars_str: str = "\n ".join(
+                f"{var} = {value!r}" for var, value in values.items()
+            )
+
+            # NOTE: uv supports PEP 723 — inline TOML metadata.
+            f.write(
+                dedent(
+                    f"""
+                    # /// script
+                    # dependencies = [{', '.join(f'"{dep}"' for dep in deps)}]
+                    # ///
+                    {vars_str}
+                    """.strip(
+                        "\n"
+                    )
+                )
+            )
+
+            # NOTE: make sure that py script file does not have `\r` char.
+            f.write("\n" + py.replace("\r\n", "\n"))
+
+        # NOTE: Make this .py file able to executable.
+        make_exec(f"./{f_name}")
+
+        yield f_name
+
+        # Note: Remove .py file that use to run Python.
+        Path(f"./{f_name}").unlink()
 
     def execute(
         self,
@@ -2088,9 +2145,8 @@ class VirtualPyStage(PyStage):  # pragma: no cov
         """Execute the Python statement via Python virtual environment.
 
         Steps:
-            - Create python file.
-            - Create `.venv` and install necessary Python deps.
-            - Execution python file with uv and specific `.venv`.
+            - Create python file with the `uv` syntax.
+            - Execution python file with `uv run` via Python subprocess module.
 
         :param params: A parameter that want to pass before run any statement.
         :param result: (Result) A result object for keeping context and status
@@ -2106,8 +2162,40 @@ class VirtualPyStage(PyStage):  # pragma: no cov
             )
 
         result.trace.info(f"[STAGE]: Py-Virtual-Execute: {self.name}")
-        raise NotImplementedError(
-            "Python Virtual Stage does not implement yet."
+        run: str = param2template(dedent(self.run), params, extras=self.extras)
+        with self.create_py_file(
+            py=run,
+            values=param2template(self.vars, params, extras=self.extras),
+            deps=param2template(self.deps, params, extras=self.extras),
+            run_id=result.run_id,
+        ) as py:
+            result.trace.debug(f"... Create `{py}` file.")
+            rs: CompletedProcess = subprocess.run(
+                ["uv", "run", py, "--no-cache"],
+                # ["uv", "run", "--python", "3.9", py],
+                shell=False,
+                capture_output=True,
+                text=True,
+            )
+
+        if rs.returncode > 0:
+            # NOTE: Prepare stderr message that returning from subprocess.
+            e: str = (
+                rs.stderr.encode("utf-8").decode("utf-16")
+                if "\\x00" in rs.stderr
+                else rs.stderr
+            ).removesuffix("\n")
+            raise StageException(
+                f"Subprocess: {e}\nRunning Statement:\n---\n"
+                f"```python\n{run}\n```"
+            )
+        return result.catch(
+            status=SUCCESS,
+            context={
+                "return_code": rs.returncode,
+                "stdout": None if (out := rs.stdout.strip("\n")) == "" else out,
+                "stderr": None if (out := rs.stderr.strip("\n")) == "" else out,
+            },
         )
 
 
