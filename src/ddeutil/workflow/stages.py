@@ -9,14 +9,18 @@ of this workflow engine. The stage handle the minimize task that run in some
 thread (same thread at its job owner) that mean it is the lowest executor that
 you can track logs.
 
-    The output of stage execution only return 0 status because I do not want to
-handle stage error on this stage model. I think stage model should have a lot of
-use-case, and it does not worry when I want to create a new one.
+    The output of stage execution only return SUCCESS or CANCEL status because
+I do not want to handle stage error on this stage execution. I think stage model
+have a lot of use-case, and it should does not worry about it error output.
 
-    Execution   --> Ok      --> Result with SUCCESS
+    So, I will create `handler_execution` for any error that raise from the
+stage execution method.
 
-                --> Error   ┬-> Result with FAILED (if set `raise_error` flag)
-                            ╰-> Raise StageException(...)
+    Execution   --> Ok      ---( handler )--> Result with `SUCCESS` or `CANCEL`
+
+                --> Error   ┬--( handler )-> Result with `FAILED` (Set `raise_error` flag)
+                            |
+                            ╰--( handler )-> Raise StageException(...)
 
     On the context I/O that pass to a stage object at execute process. The
 execute method receives a `params={"params": {...}}` value for passing template
@@ -34,7 +38,7 @@ import sys
 import time
 import uuid
 from abc import ABC, abstractmethod
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from concurrent.futures import (
     FIRST_EXCEPTION,
     Future,
@@ -72,8 +76,8 @@ T = TypeVar("T")
 class BaseStage(BaseModel, ABC):
     """Base Stage Model that keep only necessary fields like `id`, `name` or
     `condition` for the stage metadata. If you want to implement any custom
-    stage, you can use this class to parent and implement `self.execute()`
-    method only.
+    stage, you can inherit this class and implement `self.execute()` method
+    only.
 
         This class is the abstraction class for any inherit stage model that
     want to implement on this workflow package.
@@ -95,14 +99,17 @@ class BaseStage(BaseModel, ABC):
     )
     condition: Optional[str] = Field(
         default=None,
-        description="A stage condition statement to allow stage executable.",
+        description=(
+            "A stage condition statement to allow stage executable. This field "
+            "alise with `if` field."
+        ),
         alias="if",
     )
 
     @property
     def iden(self) -> str:
-        """Return identity of this stage object that return the id field first.
-        If the id does not set, it will use name field instead.
+        """Return this stage identity that return the `id` field first and if
+        this `id` field does not set, it will use the `name` field instead.
 
         :rtype: str
         """
@@ -158,8 +165,8 @@ class BaseStage(BaseModel, ABC):
         run_id: str | None = None,
         parent_run_id: str | None = None,
         result: Result | None = None,
-        raise_error: bool | None = None,
         event: Event | None = None,
+        raise_error: bool | None = None,
     ) -> Result | DictData:
         """Handler stage execution result from the stage `execute` method.
 
@@ -181,18 +188,17 @@ class BaseStage(BaseModel, ABC):
 
                         --> Error   --> Raise StageException(...)
 
-            On the last step, it will set the running ID on a return result object
-        from current stage ID before release the final result.
+            On the last step, it will set the running ID on a return result
+        object from the current stage ID before release the final result.
 
-        :param params: (DictData) A parameterize value data that use in this
-            stage execution.
+        :param params: (DictData) A parameter data.
         :param run_id: (str) A running stage ID for this execution.
         :param parent_run_id: (str) A parent workflow running ID for this
             execution.
         :param result: (Result) A result object for keeping context and status
             data before execution.
-        :param raise_error: (bool) A flag that all this method raise error
         :param event: (Event) An event manager that pass to the stage execution.
+        :param raise_error: (bool) A flag that all this method raise error
 
         :rtype: Result
         """
@@ -208,7 +214,7 @@ class BaseStage(BaseModel, ABC):
             rs: Result = self.execute(params, result=result, event=event)
             return rs
         except Exception as e:
-            result.trace.error(f"[STAGE]: {e.__class__.__name__}: {e}")
+            result.trace.error(f"[STAGE]: Handler: {e.__class__.__name__}: {e}")
 
             if dynamic("stage_raise_error", f=raise_error, extras=self.extras):
                 if isinstance(e, StageException):
@@ -219,37 +225,39 @@ class BaseStage(BaseModel, ABC):
                     f"{e.__class__.__name__}: {e}"
                 ) from e
 
-            errors: DictData = {"errors": to_dict(e)}
-            return result.catch(status=FAILED, context=errors)
+            return result.catch(status=FAILED, context={"errors": to_dict(e)})
 
     def set_outputs(self, output: DictData, to: DictData) -> DictData:
-        """Set an outputs from execution process to the received context. The
-        result from execution will pass to value of `outputs` key.
+        """Set an outputs from execution result context to the received context
+        with a `to` input parameter. The result context from stage execution
+        will be set with `outputs` key in this stage ID key.
 
             For example of setting output method, If you receive execute output
         and want to set on the `to` like;
 
-            ... (i)   output: {'foo': bar}
+            ... (i)   output: {'foo': 'bar', 'skipped': True}
             ... (ii)  to: {'stages': {}}
 
-            The result of the `to` argument will be;
+            The received context in the `to` argument will be;
 
             ... (iii) to: {
                         'stages': {
                             '<stage-id>': {
                                 'outputs': {'foo': 'bar'},
-                                'skipped': False,
+                                'skipped': True,
                             }
                         }
                     }
 
         Important:
-            This method is use for reconstruct the result context and transfer
-        to the `to` argument.
 
-        :param output: (DictData) An output data that want to extract to an
-            output key.
-        :param to: (DictData) A context data that want to add output result.
+            This method is use for reconstruct the result context and transfer
+        to the `to` argument. The result context was soft copied before set
+        output step.
+
+        :param output: (DictData) A result data context that want to extract
+            and transfer to the `outputs` key in receive context.
+        :param to: (DictData) A received context data.
 
         :rtype: DictData
         """
@@ -284,11 +292,12 @@ class BaseStage(BaseModel, ABC):
         }
         return to
 
-    def get_outputs(self, outputs: DictData) -> DictData:
+    def get_outputs(self, output: DictData) -> DictData:
         """Get the outputs from stages data. It will get this stage ID from
         the stage outputs mapping.
 
-        :param outputs: (DictData) A stage outputs that want to get by stage ID.
+        :param output: (DictData) A stage output context that want to get this
+            stage ID `outputs` key.
 
         :rtype: DictData
         """
@@ -298,32 +307,30 @@ class BaseStage(BaseModel, ABC):
             return {}
 
         _id: str = (
-            param2template(self.id, params=outputs, extras=self.extras)
+            param2template(self.id, params=output, extras=self.extras)
             if self.id
             else gen_id(
-                param2template(self.name, params=outputs, extras=self.extras)
+                param2template(self.name, params=output, extras=self.extras)
             )
         )
-        return outputs.get("stages", {}).get(_id, {}).get("outputs", {})
+        return output.get("stages", {}).get(_id, {}).get("outputs", {})
 
-    def is_skipped(self, params: DictData | None = None) -> bool:
+    def is_skipped(self, params: DictData) -> bool:
         """Return true if condition of this stage do not correct. This process
         use build-in eval function to execute the if-condition.
+
+        :param params: (DictData) A parameters that want to pass to condition
+            template.
 
         :raise StageException: When it has any error raise from the eval
             condition statement.
         :raise StageException: When return type of the eval condition statement
             does not return with boolean type.
 
-        :param params: (DictData) A parameters that want to pass to condition
-            template.
-
         :rtype: bool
         """
         if self.condition is None:
             return False
-
-        params: DictData = {} if params is None else params
 
         try:
             # WARNING: The eval build-in function is very dangerous. So, it
@@ -343,7 +350,9 @@ class BaseStage(BaseModel, ABC):
 
 class BaseAsyncStage(BaseStage):
     """Base Async Stage model to make any stage model allow async execution for
-    optimize CPU and Memory on the current node.
+    optimize CPU and Memory on the current node. If you want to implement any
+    custom async stage, you can inherit this class and implement
+    `self.axecute()` (async + execute = axecute) method only.
 
         This class is the abstraction class for any inherit asyncable stage
     model.
@@ -392,20 +401,18 @@ class BaseAsyncStage(BaseStage):
         run_id: str | None = None,
         parent_run_id: str | None = None,
         result: Result | None = None,
-        raise_error: bool | None = None,
         event: Event | None = None,
+        raise_error: bool | None = None,
     ) -> Result:
         """Async Handler stage execution result from the stage `execute` method.
 
-        :param params: (DictData) A parameterize value data that use in this
-            stage execution.
+        :param params: (DictData) A parameter data.
         :param run_id: (str) A running stage ID for this execution.
         :param parent_run_id: (str) A parent workflow running ID for this
             execution.
-        :param result: (Result) A result object for keeping context and status
-            data before execution.
-        :param raise_error: (bool) A flag that all this method raise error
+        :param result: (Result) A Result instance for return context and status.
         :param event: (Event) An event manager that pass to the stage execution.
+        :param raise_error: (bool) A flag that all this method raise error
 
         :rtype: Result
         """
@@ -421,7 +428,9 @@ class BaseAsyncStage(BaseStage):
             rs: Result = await self.axecute(params, result=result, event=event)
             return rs
         except Exception as e:  # pragma: no cov
-            await result.trace.aerror(f"[STAGE]: {e.__class__.__name__}: {e}")
+            await result.trace.aerror(
+                f"[STAGE]: Handler {e.__class__.__name__}: {e}"
+            )
 
             if dynamic("stage_raise_error", f=raise_error, extras=self.extras):
                 if isinstance(e, StageException):
@@ -432,13 +441,15 @@ class BaseAsyncStage(BaseStage):
                     f"{e.__class__.__name__}: {e}"
                 ) from None
 
-            errors: DictData = {"errors": to_dict(e)}
-            return result.catch(status=FAILED, context=errors)
+            return result.catch(status=FAILED, context={"errors": to_dict(e)})
 
 
 class EmptyStage(BaseAsyncStage):
-    """Empty stage that do nothing (context equal empty stage) and logging the
-    name of stage only to stdout.
+    """Empty stage that do nothing and log the `message` field to stdout only.
+    It can use for tracking a template parameter on the workflow or debug step.
+
+        You can pass a sleep value in second unit to this stage for waiting
+    after log message.
 
     Data Validate:
         >>> stage = {
@@ -450,11 +461,14 @@ class EmptyStage(BaseAsyncStage):
 
     echo: Optional[str] = Field(
         default=None,
-        description="A string message that want to show on the stdout.",
+        description="A message that want to show on the stdout.",
     )
     sleep: float = Field(
         default=0,
-        description="A second value to sleep before start execution.",
+        description=(
+            "A second value to sleep before start execution. This value should "
+            "gather or equal 0, and less than 1800 seconds."
+        ),
         ge=0,
         lt=1800,
     )
@@ -473,12 +487,10 @@ class EmptyStage(BaseAsyncStage):
             The result context should be empty and do not process anything
         without calling logging function.
 
-        :param params: (DictData) A context data that want to add output result.
-            But this stage does not pass any output.
-        :param result: (Result) A result object for keeping context and status
-            data.
-        :param event: (Event) An event manager that use to track parent execute
-            was not force stopped.
+        :param params: (DictData) A parameter data.
+        :param result: (Result) A Result instance for return context and status.
+        :param event: (Event) An Event manager instance that use to cancel this
+            execution if it forces stopped by parent execution.
 
         :rtype: Result
         """
@@ -491,21 +503,19 @@ class EmptyStage(BaseAsyncStage):
             message: str = "..."
         else:
             message: str = param2template(
-                dedent(self.echo), params, extras=self.extras
+                dedent(self.echo.strip("\n")), params, extras=self.extras
             )
-            if "\n" in self.echo:
-                message: str = "\n\t" + message.replace("\n", "\n\t").strip(
-                    "\n"
-                )
+            if "\n" in message:
+                newline: str = "\n\t...\t"
+                message: str = newline + message.replace("\n", newline)
 
         result.trace.info(
             f"[STAGE]: Empty-Execute: {self.name!r}: ( {message} )"
         )
         if self.sleep > 0:
             if self.sleep > 5:
-                result.trace.info(f"[STAGE]: ... sleep ({self.sleep} seconds)")
+                result.trace.info(f"[STAGE]: ... sleep ({self.sleep} sec)")
             time.sleep(self.sleep)
-
         return result.catch(status=SUCCESS)
 
     async def axecute(
@@ -518,12 +528,10 @@ class EmptyStage(BaseAsyncStage):
         """Async execution method for this Empty stage that only logging out to
         stdout.
 
-        :param params: (DictData) A context data that want to add output result.
-            But this stage does not pass any output.
-        :param result: (Result) A result object for keeping context and status
-            data.
-        :param event: (Event) An event manager that use to track parent execute
-            was not force stopped.
+        :param params: (DictData) A parameter data.
+        :param result: (Result) A Result instance for return context and status.
+        :param event: (Event) An Event manager instance that use to cancel this
+            execution if it forces stopped by parent execution.
 
         :rtype: Result
         """
@@ -533,29 +541,37 @@ class EmptyStage(BaseAsyncStage):
                 extras=self.extras,
             )
 
-        await result.trace.ainfo(
-            f"[STAGE]: Empty-Execute: {self.name!r}: "
-            f"( {param2template(self.echo, params, extras=self.extras) or '...'} )"
-        )
+        if not self.echo:
+            message: str = "..."
+        else:
+            message: str = param2template(
+                dedent(self.echo.strip("\n")), params, extras=self.extras
+            )
+            if "\n" in message:
+                newline: str = "\n\t...\t"
+                message: str = newline + message.replace("\n", newline)
 
+        result.trace.info(
+            f"[STAGE]: Empty-Execute: {self.name!r}: ( {message} )"
+        )
         if self.sleep > 0:
             if self.sleep > 5:
                 await result.trace.ainfo(
-                    f"[STAGE]: ... sleep ({self.sleep} seconds)"
+                    f"[STAGE]: ... sleep ({self.sleep} sec)"
                 )
             await asyncio.sleep(self.sleep)
-
         return result.catch(status=SUCCESS)
 
 
 class BashStage(BaseStage):
     """Bash execution stage that execute bash script on the current OS.
-    If your current OS is Windows, it will run on the bash in the WSL.
+    If your current OS is Windows, it will run on the bash from the current WSL.
+    It will use `bash` for Windows OS and use `sh` for Linux OS.
 
-        I get some limitation when I run shell statement with the built-in
-    subprocess package. It does not good enough to use multiline statement.
-    Thus, I add writing `.sh` file before execution process for fix this
-    issue.
+        This stage has some limitation when it runs shell statement with the
+    built-in subprocess package. It does not good enough to use multiline
+    statement. Thus, it will write the `.sh` file before start running bash
+    command for fix this issue.
 
     Data Validate:
         >>> stage = {
@@ -567,14 +583,45 @@ class BashStage(BaseStage):
         ... }
     """
 
-    bash: str = Field(description="A bash statement that want to execute.")
+    bash: str = Field(
+        description=(
+            "A bash statement that want to execute via Python subprocess."
+        )
+    )
     env: DictStr = Field(
         default_factory=dict,
         description=(
-            "An environment variables that set before start execute by adding "
-            "on the header of the `.sh` file."
+            "An environment variables that set before run bash command. It "
+            "will add on the header of the `.sh` file."
         ),
     )
+
+    @contextlib.asynccontextmanager
+    async def acreate_sh_file(
+        self, bash: str, env: DictStr, run_id: str | None = None
+    ) -> AsyncIterator:  # pragma no cov
+        import aiofiles
+
+        f_name: str = f"{run_id or uuid.uuid4()}.sh"
+        f_shebang: str = "bash" if sys.platform.startswith("win") else "sh"
+
+        async with aiofiles.open(f"./{f_name}", mode="w", newline="\n") as f:
+            # NOTE: write header of `.sh` file
+            await f.write(f"#!/bin/{f_shebang}\n\n")
+
+            # NOTE: add setting environment variable before bash skip statement.
+            await f.writelines([f"{k}='{env[k]}';\n" for k in env])
+
+            # NOTE: make sure that shell script file does not have `\r` char.
+            await f.write("\n" + bash.replace("\r\n", "\n"))
+
+        # NOTE: Make this .sh file able to executable.
+        make_exec(f"./{f_name}")
+
+        yield [f_shebang, f_name]
+
+        # Note: Remove .sh file that use to run bash.
+        Path(f"./{f_name}").unlink()
 
     @contextlib.contextmanager
     def create_sh_file(
@@ -584,16 +631,14 @@ class BashStage(BaseStage):
         step will write the `.sh` file before giving this file name to context.
         After that, it will auto delete this file automatic.
 
-        :param bash: (str) A bash statement that want to execute.
-        :param env: (DictStr) An environment variable that use on this bash
-            statement.
+        :param bash: (str) A bash statement.
+        :param env: (DictStr) An environment variable that set before run bash.
         :param run_id: (str | None) A running stage ID that use for writing sh
             file instead generate by UUID4.
 
         :rtype: Iterator[TupleStr]
         """
-        run_id: str = run_id or uuid.uuid4()
-        f_name: str = f"{run_id}.sh"
+        f_name: str = f"{run_id or uuid.uuid4()}.sh"
         f_shebang: str = "bash" if sys.platform.startswith("win") else "sh"
 
         with open(f"./{f_name}", mode="w", newline="\n") as f:
@@ -621,14 +666,12 @@ class BashStage(BaseStage):
         result: Result | None = None,
         event: Event | None = None,
     ) -> Result:
-        """Execute the Bash statement with the Python build-in `subprocess`
-        package.
+        """Execute bash statement with the Python build-in `subprocess` package.
 
         :param params: (DictData) A parameter data.
-        :param result: (Result) A result object for keeping context and status
-            data.
-        :param event: (Event) An event manager that use to track parent execute
-            was not force stopped.
+        :param result: (Result) A Result instance for return context and status.
+        :param event: (Event) An Event manager instance that use to cancel this
+            execution if it forces stopped by parent execution.
 
         :rtype: Result
         """

@@ -24,7 +24,7 @@ def test_stage():
     )
     assert stage.id == "dummy"
     assert stage.iden == "dummy"
-    assert not stage.is_skipped()
+    assert not stage.is_skipped(params={})
 
     stage: Stage = TypeAdapter(Stage).validate_python(
         {"name": "Empty Stage", "echo": "hello world"}
