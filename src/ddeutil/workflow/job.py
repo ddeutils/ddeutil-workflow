@@ -3,12 +3,13 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-"""Job Model that use for keeping stages and node that running its stages.
-The job handle the lineage of stages and location of execution of stages that
-mean the job model able to define `runs-on` key that allow you to run this
-job.
+"""Job model that use for store Stage models and node parameter that use for
+running these stages. The job model handle the lineage of stages and location of
+execution that mean you can define `runs-on` field with the Self-Hosted mode
+for execute on target machine instead of the current local machine.
 
-    This module include Strategy Model that use on the job strategy field.
+    This module include Strategy model that use on the job `strategy` field for
+making matrix values before execution parallelism stage execution.
 """
 from __future__ import annotations
 
@@ -59,10 +60,12 @@ def make(
         This function use the `lru_cache` decorator function increase
     performance for duplicate matrix value scenario.
 
-    :param matrix: A matrix values that want to cross product to possible
-        parallelism values.
-    :param include: A list of additional matrix that want to adds-in.
-    :param exclude: A list of exclude matrix that want to filter-out.
+    :param matrix: (Matrix) A matrix values that want to cross product to
+        possible parallelism values.
+    :param include: (MatrixFilter) A list of additional matrix that want to
+        adds-in from generated matrix.
+    :param exclude: (MatrixFilter) A list of exclude matrix that want to
+        filter-out from generated matrix.
 
     :rtype: list[DictStr]
     """

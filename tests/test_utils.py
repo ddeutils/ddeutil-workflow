@@ -96,7 +96,7 @@ def test_batch():
 
 
 def test_make_exec():
-    test_file: str = "./tmp_test_exec.txt"
+    test_file: str = "./tmp_test_make_exec.txt"
 
     with open(test_file, mode="w") as f:
         f.write("Hello world")

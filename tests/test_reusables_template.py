@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from typing import Any
 
@@ -17,6 +18,10 @@ def test_str2template():
 
     value = str2template("${{ stages?.message }}", params={})
     assert value is None
+
+    os.environ["ENV_VAR"] = "foo"
+    value = str2template("${ ENV_VAR }", params={})
+    assert value == "null"
 
 
 def test_param2template():

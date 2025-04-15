@@ -4,10 +4,10 @@
 # license information.
 # ------------------------------------------------------------------------------
 # [x] Use dynamic config
-"""Stage model. It stores all stage model that use for getting stage data template
-from the Job Model. The stage handle the minimize task that run in some thread
-(same thread at its job owner) that mean it is the lowest executor of a workflow
-that can tracking logs.
+"""Stage model include all stage model that use be the minimum execution layer
+of this workflow engine. The stage handle the minimize task that run in some
+thread (same thread at its job owner) that mean it is the lowest executor that
+you can track logs.
 
     The output of stage execution only return 0 status because I do not want to
 handle stage error on this stage model. I think stage model should have a lot of
@@ -15,12 +15,12 @@ use-case, and it does not worry when I want to create a new one.
 
     Execution   --> Ok      --> Result with SUCCESS
 
-                --> Error   ┬-> Result with FAILED (if env var was set)
+                --> Error   ┬-> Result with FAILED (if set `raise_error` flag)
                             ╰-> Raise StageException(...)
 
     On the context I/O that pass to a stage object at execute process. The
-execute method receives a `params={"params": {...}}` value for mapping to
-template searching.
+execute method receives a `params={"params": {...}}` value for passing template
+searching.
 """
 from __future__ import annotations
 
@@ -70,12 +70,13 @@ T = TypeVar("T")
 
 
 class BaseStage(BaseModel, ABC):
-    """Base Stage Model that keep only id and name fields for the stage
-    metadata. If you want to implement any custom stage, you can use this class
-    to parent and implement ``self.execute()`` method only.
+    """Base Stage Model that keep only necessary fields like `id`, `name` or
+    `condition` for the stage metadata. If you want to implement any custom
+    stage, you can use this class to parent and implement `self.execute()`
+    method only.
 
-        This class is the abstraction class for any stage model that want to
-    implement to workflow model.
+        This class is the abstraction class for any inherit stage model that
+    want to implement on this workflow package.
     """
 
     extras: DictData = Field(
@@ -171,7 +172,7 @@ class BaseStage(BaseModel, ABC):
                                         ╰-context:
                                             ╰-outputs: ...
 
-                        --> Error   --> Result (if env var was set)
+                        --> Error   --> Result (if `raise_error` was set)
                                         |-status: FAILED
                                         ╰-errors:
                                             |-class: ...
@@ -341,7 +342,12 @@ class BaseStage(BaseModel, ABC):
 
 
 class BaseAsyncStage(BaseStage):
-    """Base Async Stage model."""
+    """Base Async Stage model to make any stage model allow async execution for
+    optimize CPU and Memory on the current node.
+
+        This class is the abstraction class for any inherit asyncable stage
+    model.
+    """
 
     @abstractmethod
     def execute(
@@ -548,7 +554,7 @@ class BashStage(BaseStage):
 
         I get some limitation when I run shell statement with the built-in
     subprocess package. It does not good enough to use multiline statement.
-    Thus, I add writing ``.sh`` file before execution process for fix this
+    Thus, I add writing `.sh` file before execution process for fix this
     issue.
 
     Data Validate:
@@ -615,10 +621,10 @@ class BashStage(BaseStage):
         result: Result | None = None,
         event: Event | None = None,
     ) -> Result:
-        """Execute the Bash statement with the Python build-in ``subprocess``
+        """Execute the Bash statement with the Python build-in `subprocess`
         package.
 
-        :param params: A parameter data that want to use in this execution.
+        :param params: (DictData) A parameter data.
         :param result: (Result) A result object for keeping context and status
             data.
         :param event: (Event) An event manager that use to track parent execute
@@ -742,9 +748,9 @@ class PyStage(BaseStage):
         event: Event | None = None,
     ) -> Result:
         """Execute the Python statement that pass all globals and input params
-        to globals argument on ``exec`` build-in function.
+        to globals argument on `exec` build-in function.
 
-        :param params: A parameter that want to pass before run any statement.
+        :param params: (DictData) A parameter data.
         :param result: (Result) A result object for keeping context and status
             data.
         :param event: (Event) An event manager that use to track parent execute
@@ -796,10 +802,10 @@ class PyStage(BaseStage):
 
 class CallStage(BaseStage):
     """Call executor that call the Python function from registry with tag
-    decorator function in ``utils`` module and run it with input arguments.
+    decorator function in `reusables` module and run it with input arguments.
 
         This stage is different with PyStage because the PyStage is just calling
-    a Python statement with the ``eval`` and pass that locale before eval that
+    a Python statement with the `eval` and pass that locale before eval that
     statement. So, you can create your function complexly that you can for your
     objective to invoked by this stage object.
 
@@ -818,12 +824,12 @@ class CallStage(BaseStage):
 
     uses: str = Field(
         description=(
-            "A pointer that want to load function from the call registry."
+            "A pointer that want to load function from the caller registry."
         ),
     )
     args: DictData = Field(
         default_factory=dict,
-        description="An arguments that want to pass to the call function.",
+        description="An arguments that want to pass to the caller function.",
         alias="with",
     )
 
@@ -834,15 +840,9 @@ class CallStage(BaseStage):
         result: Result | None = None,
         event: Event | None = None,
     ) -> Result:
-        """Execute the Call function that already in the call registry.
+        """Execute the Caller function that already in the caller registry.
 
-        :raise ValueError: When the necessary arguments of call function do not
-            set from the input params argument.
-        :raise TypeError: When the return type of call function does not be
-            dict type.
-
-        :param params: (DictData) A parameter that want to pass before run any
-            statement.
+        :param params: (DictData) A parameter data.
         :param result: (Result) A result object for keeping context and status
             data.
         :param event: (Event) An event manager that use to track parent execute
@@ -1003,7 +1003,7 @@ class TriggerStage(BaseStage):
         """Trigger another workflow execution. It will wait the trigger
         workflow running complete before catching its result.
 
-        :param params: A parameter data that want to use in this execution.
+        :param params: (DictData) A parameter data.
         :param result: (Result) A result object for keeping context and status
             data.
         :param event: (Event) An event manager that use to track parent execute
@@ -1085,25 +1085,22 @@ class ParallelStage(BaseStage):  # pragma: no cov
         alias="max-workers",
     )
 
-    def execute_task(
+    def execute_branch(
         self,
         branch: str,
         params: DictData,
         result: Result,
         *,
         event: Event | None = None,
-        extras: DictData | None = None,
     ) -> DictData:
         """Task execution method for passing a branch to each thread.
 
-        :param branch: A branch ID.
-        :param params: A parameter data that want to use in this execution.
+        :param branch: (str) A branch ID.
+        :param params: (DictData) A parameter data.
         :param result: (Result) A result object for keeping context and status
             data.
         :param event: (Event) An event manager that use to track parent execute
             was not force stopped.
-        :param extras: (DictData) An extra parameters that want to override
-            config values.
 
         :rtype: DictData
         """
@@ -1113,8 +1110,8 @@ class ParallelStage(BaseStage):  # pragma: no cov
         output: DictData = {"branch": branch, "stages": {}}
         for stage in self.parallel[branch]:
 
-            if extras:
-                stage.extras = extras
+            if self.extras:
+                stage.extras = self.extras
 
             if stage.is_skipped(params=context):
                 result.trace.info(f"... Skip stage: {stage.iden!r}")
@@ -1217,12 +1214,11 @@ class ParallelStage(BaseStage):  # pragma: no cov
 
             futures: list[Future] = (
                 executor.submit(
-                    self.execute_task,
+                    self.execute_branch,
                     branch=branch,
                     params=params,
                     result=result,
                     event=event,
-                    extras=self.extras,
                 )
                 for branch in self.parallel
             )
@@ -1384,7 +1380,7 @@ class ForEachStage(BaseStage):
     ) -> Result:
         """Execute the stages that pass each item form the foreach field.
 
-        :param params: A parameter that want to pass before run any statement.
+        :param params: (DictData) A parameter data
         :param result: (Result) A result object for keeping context and status
             data.
         :param event: (Event) An event manager that use to track parent execute
@@ -1515,8 +1511,7 @@ class UntilStage(BaseStage):  # pragma: no cov
 
         :param item: (T) An item that want to execution.
         :param loop: (int) A number of loop.
-        :param params: (DictData) A parameter that want to pass to stage
-            execution.
+        :param params: (DictData) A parameter data.
         :param result: (Result) A result object for keeping context and status
             data.
         :param event: (Event) An event manager that use to track parent execute
@@ -1743,8 +1738,7 @@ class CaseStage(BaseStage):
 
         :param case: (str) A case that want to execution.
         :param stages: (list[Stage]) A list of stage.
-        :param params: (DictData) A parameter that want to pass to stage
-            execution.
+        :param params: (DictData) A parameter data.
         :param result: (Result) A result object for keeping context and status
             data.
         :param event: (Event) An event manager that use to track parent execute
@@ -1831,7 +1825,7 @@ class CaseStage(BaseStage):
     ) -> Result:
         """Execute case-match condition that pass to the case field.
 
-        :param params: A parameter that want to pass before run any statement.
+        :param params: (DictData) A parameter data.
         :param result: (Result) A result object for keeping context and status
             data.
         :param event: (Event) An event manager that use to track parent execute
@@ -1912,7 +1906,7 @@ class RaiseStage(BaseStage):  # pragma: no cov
 
     message: str = Field(
         description=(
-            "An error message that want to raise with StageException class"
+            "An error message that want to raise with `StageException` class"
         ),
         alias="raise",
     )
@@ -1926,7 +1920,7 @@ class RaiseStage(BaseStage):  # pragma: no cov
     ) -> Result:
         """Raise the StageException object with the message field execution.
 
-        :param params: A parameter that want to pass before run any statement.
+        :param params: (DictData) A parameter data.
         :param result: (Result) A result object for keeping context and status
             data.
         :param event: (Event) An event manager that use to track parent execute
@@ -2085,7 +2079,8 @@ class VirtualPyStage(PyStage):  # pragma: no cov
     """Python Virtual Environment stage execution."""
 
     version: str = Field(
-        default="3.9", description="A Python version that want to run."
+        default="3.9",
+        description="A Python version that want to run.",
     )
     deps: list[str] = Field(
         description=(
@@ -2208,7 +2203,7 @@ class VirtualPyStage(PyStage):  # pragma: no cov
 
 
 # NOTE:
-#   An order of parsing stage model on the Job model with ``stages`` field.
+#   An order of parsing stage model on the Job model with `stages` field.
 #   From the current build-in stages, they do not have stage that have the same
 #   fields that because of parsing on the Job's stages key.
 #
