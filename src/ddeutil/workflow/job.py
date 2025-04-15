@@ -10,6 +10,10 @@ for execute on target machine instead of the current local machine.
 
     This module include Strategy model that use on the job `strategy` field for
 making matrix values before execution parallelism stage execution.
+
+    The Job model does not implement `handler_execute` same as Stage model
+because the job should raise only `JobException` class from the execution
+method.
 """
 from __future__ import annotations
 
@@ -62,10 +66,8 @@ def make(
 
     :param matrix: (Matrix) A matrix values that want to cross product to
         possible parallelism values.
-    :param include: (MatrixFilter) A list of additional matrix that want to
-        adds-in from generated matrix.
-    :param exclude: (MatrixFilter) A list of exclude matrix that want to
-        filter-out from generated matrix.
+    :param include: (A list of additional matrix that want to adds-in.
+    :param exclude: (A list of exclude matrix that want to filter-out.
 
     :rtype: list[DictStr]
     """
@@ -323,12 +325,13 @@ class Job(BaseModel):
     id: Optional[str] = Field(
         default=None,
         description=(
-            "A job ID that it will add from workflow after validation process."
+            "A job ID that was set from Workflow model after initialize step. "
+            "If this model create standalone, it will be None."
         ),
     )
     desc: Optional[str] = Field(
         default=None,
-        description="A job description that can be string of markdown content.",
+        description="A job description that can be markdown syntax.",
     )
     runs_on: RunsOnModel = Field(
         default_factory=OnLocal,
@@ -342,7 +345,7 @@ class Job(BaseModel):
     )
     stages: list[Stage] = Field(
         default_factory=list,
-        description="A list of Stage of this job.",
+        description="A list of Stage model of this job.",
     )
     trigger_rule: Rule = Field(
         default=Rule.ALL_SUCCESS,
@@ -376,7 +379,7 @@ class Job(BaseModel):
 
     @field_validator("stages", mode="after")
     def __validate_stage_id__(cls, value: list[Stage]) -> list[Stage]:
-        """Validate a stage ID of all stage in stages field should not be
+        """Validate stage ID of each stage in the `stages` field should not be
         duplicate.
 
         :rtype: list[Stage]
@@ -394,11 +397,10 @@ class Job(BaseModel):
 
     @model_validator(mode="after")
     def __validate_job_id__(self) -> Self:
-        """Validate job id should not have templating syntax.
+        """Validate job id should not dynamic with params template.
 
         :rtype: Self
         """
-        # VALIDATE: Validate job id should not dynamic with params template.
         if has_template(self.id):
             raise ValueError(
                 f"Job ID, {self.id!r}, should not has any template."
@@ -422,14 +424,11 @@ class Job(BaseModel):
                 return stage
         raise ValueError(f"Stage {stage_id!r} does not exists in this job.")
 
-    def check_needs(
-        self,
-        jobs: dict[str, Any],
-    ) -> Status:  # pragma: no cov
-        """Return Status enum for checking job's need trigger logic in an
-        input list of job's ID.
+    def check_needs(self, jobs: dict[str, Any]) -> Status:  # pragma: no cov
+        """Return trigger status from checking job's need trigger rule logic was
+        valid. The return status should be SUCCESS, FAILED, WAIT, or SKIP.
 
-        :param jobs: A mapping of job ID and result context.
+        :param jobs: A mapping of job ID and its context data.
 
         :raise NotImplementedError: If the job trigger rule out of scope.
 
@@ -472,29 +471,25 @@ class Job(BaseModel):
         elif self.trigger_rule == Rule.NONE_FAILED:
             rs = all("errors" not in need_exist[job] for job in need_exist)
         else:  # pragma: no cov
-            raise NotImplementedError(
-                f"Trigger rule: {self.trigger_rule} does not support yet."
-            )
+            return FAILED
         return make_return(rs)
 
-    def is_skipped(self, params: DictData | None = None) -> bool:
+    def is_skipped(self, params: DictData) -> bool:
         """Return true if condition of this job do not correct. This process
         use build-in eval function to execute the if-condition.
+
+        :param params: (DictData) A parameter value that want to pass to condition
+            template.
 
         :raise JobException: When it has any error raise from the eval
             condition statement.
         :raise JobException: When return type of the eval condition statement
             does not return with boolean type.
 
-        :param params: (DictData) A parameters that want to pass to condition
-            template.
-
         :rtype: bool
         """
         if self.condition is None:
             return False
-
-        params: DictData = {} if params is None else params
 
         try:
             # WARNING: The eval build-in function is very dangerous. So, it
@@ -516,15 +511,20 @@ class Job(BaseModel):
         output: DictData,
         to: DictData,
         *,
-        job_id: Optional[None] = None,
+        job_id: Optional[str] = None,
     ) -> DictData:
-        """Set an outputs from execution process to the received context. The
-        result from execution will pass to value of `strategies` key.
+        """Set an outputs from execution result context to the received context
+        with a `to` input parameter. The result context from job strategy
+        execution will be set with `strategies` key in this job ID key.
 
             For example of setting output method, If you receive execute output
         and want to set on the `to` like;
 
-            ... (i)   output: {'strategy-01': bar, 'strategy-02': bar}
+            ... (i)   output: {
+                        'strategy-01': 'foo',
+                        'strategy-02': 'bar',
+                        'skipped': True,
+                    }
             ... (ii)  to: {'jobs': {}}
 
         The result of the `to` argument will be;
@@ -533,9 +533,10 @@ class Job(BaseModel):
                         'jobs': {
                             '<job-id>': {
                                 'strategies': {
-                                    'strategy-01': bar,
-                                    'strategy-02': bar,
-                                }
+                                    'strategy-01': 'foo',
+                                    'strategy-02': 'bar',
+                                },
+                                'skipped': True,
                             }
                         }
                     }
@@ -543,9 +544,10 @@ class Job(BaseModel):
         :raise JobException: If the job's ID does not set and the setting
             default job ID flag does not set.
 
-        :param output: An output context.
-        :param to: A context data that want to add output result.
-        :param job_id: A job ID if the id field does not set.
+        :param output: (DictData) A result data context that want to extract
+            and transfer to the `strategies` key in receive context.
+        :param to: (DictData) A received context data.
+        :param job_id: (str | None) A job ID if the `id` field does not set.
 
         :rtype: DictData
         """
@@ -558,7 +560,7 @@ class Job(BaseModel):
             )
 
         _id: str = self.id or job_id
-        output: DictData = copy.deepcopy(output)
+        output: DictData = output.copy()
         errors: DictData = (
             {"errors": output.pop("errors", {})} if "errors" in output else {}
         )
@@ -587,7 +589,6 @@ class Job(BaseModel):
         *,
         run_id: str | None = None,
         parent_run_id: str | None = None,
-        result: Result | None = None,
         event: Event | None = None,
         raise_error: bool = True,
     ) -> Result:
@@ -598,22 +599,20 @@ class Job(BaseModel):
             This method be execution routing for call dynamic execution function
         with specific target `runs-on` value.
 
-        :param params: An input parameters that use on job execution.
+        :param params: (DictData) A parameter data.
         :param run_id: (str) A job running ID.
         :param parent_run_id: (str) A parent workflow running ID.
-        :param result: (Result) A result object for keeping context and status
-            data.
-        :param event: (Event) An event manager that pass to the
-            PoolThreadExecutor.
+        :param event: (Event) An Event manager instance that use to cancel this
+            execution if it forces stopped by parent execution.
         :param raise_error: (bool) A flag that all this method raise error to
             the strategy execution. Default is `True`.
 
-        :raise NotImplementedError: If the `runs-on` value does not implement.
+        :raise NotImplementedError: If the `runs-on` value does not implement on
+            this execution.
 
         :rtype: Result
         """
         result: Result = Result.construct_with_rs_or_id(
-            result,
             run_id=run_id,
             parent_run_id=parent_run_id,
             id_logic=(self.id or "not-set"),
@@ -635,7 +634,7 @@ class Job(BaseModel):
         elif self.runs_on.type == RunsOn.SELF_HOSTED:  # pragma: no cov
             pass
         elif self.runs_on.type == RunsOn.DOCKER:  # pragma: no cov
-            docker_execution(
+            rs = docker_execution(
                 self,
                 params,
                 run_id=run_id,
@@ -643,13 +642,14 @@ class Job(BaseModel):
                 event=event,
                 raise_error=raise_error,
             )
+            print(rs)
 
         # pragma: no cov
         result.trace.error(
-            f"[JOB]: Execution not support runs-on: {self.runs_on.type!r} yet."
+            f"[JOB]: Execute not support runs-on: {self.runs_on.type!r} yet."
         )
         raise NotImplementedError(
-            f"Execution runs-on type: {self.runs_on.type} does not support yet."
+            f"Execute runs-on type: {self.runs_on.type} does not support yet."
         )
 
 
@@ -674,22 +674,24 @@ def local_execute_strategy(
     For each stage that execution with this strategy metrix, it will use the
     `set_outputs` method for reconstruct result context data.
 
-    :raise JobException: If it has any error from `StageException` or
-        `UtilException`.
-
     :param job: (Job) A job model that want to execute.
     :param strategy: A strategy metrix value that use on this execution.
         This value will pass to the `matrix` key for templating.
-    :param params: A dynamic parameters that will deepcopy to the context.
-    :param result: (Result) A result object for keeping context and status
-        data.
-    :param event: (Event) An event manager that pass to the PoolThreadExecutor.
+    :param params: (DictData) A parameter data.
+    :param result: (Result) A Result instance for return context and status.
+    :param event: (Event) An Event manager instance that use to cancel this
+        execution if it forces stopped by parent execution.
     :param raise_error: (bool) A flag that all this method raise error
+
+    :raise JobException: If it has any error from `StageException` or
+        `UtilException`.
 
     :rtype: Result
     """
-    if result is None:
-        result: Result = Result(run_id=gen_id(job.id or "not-set", unique=True))
+    result: Result = result or Result(
+        run_id=gen_id(job.id or "not-set", unique=True),
+        extras=job.extras,
+    )
 
     strategy_id: str = gen_id(strategy)
     context: DictData = copy.deepcopy(params)
@@ -798,10 +800,11 @@ def local_execute(
     multi-threading strategy.
 
     :param job: (Job) A job model that want to execute.
-    :param params: (DictData) An input parameters that use on job execution.
-    :param run_id: (str) A job running ID for this execution.
-    :param parent_run_id: (str) A parent workflow running ID for this release.
-    :param event: (Event) An event manager that pass to the PoolThreadExecutor.
+    :param params: (DictData) A parameter data.
+    :param run_id: (str) A job running ID.
+    :param parent_run_id: (str) A parent workflow running ID.
+    :param event: (Event) An Event manager instance that use to cancel this
+        execution if it forces stopped by parent execution.
     :param raise_error: (bool) A flag that all this method raise error to the
         strategy execution. Default is `True`.
 
@@ -930,10 +933,11 @@ def self_hosted_execute(
     self-hosted host url.
 
     :param job: (Job) A job model that want to execute.
-    :param params: (DictData) An input parameters that use on job execution.
-    :param run_id: (str) A job running ID for this execution.
-    :param parent_run_id: (str) A parent workflow running ID for this release.
-    :param event: (Event) An event manager that pass to the PoolThreadExecutor.
+    :param params: (DictData) A parameter data.
+    :param run_id: (str) A job running ID.
+    :param parent_run_id: (str) A parent workflow running ID.
+    :param event: (Event) An Event manager instance that use to cancel this
+        execution if it forces stopped by parent execution.
     :param raise_error: (bool) A flag that all this method raise error to the
         strategy execution.
 

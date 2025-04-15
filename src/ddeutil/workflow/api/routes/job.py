@@ -39,7 +39,7 @@ async def job_execute(
     job: Job,
     params: dict[str, Any],
 ):
-    """Execute job via API."""
+    """Execute job via RestAPI."""
     rs: Result = Result(
         context=result.context,
         run_id=result.run_id,
@@ -56,7 +56,7 @@ async def job_execute(
             to=context,
         )
     except JobException as err:
-        rs.trace.error(f"[WORKFLOW]: {err.__class__.__name__}: {err}")
+        rs.trace.error(f"[JOB]: {err.__class__.__name__}: {err}")
 
     return {
         "message": "Start execute job via API.",

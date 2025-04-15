@@ -24,8 +24,8 @@ from ..conf import api_config, config
 from ..logs import get_logger
 from ..scheduler import ReleaseThread, ReleaseThreads
 from ..workflow import ReleaseQueue, WorkflowTask
-from .repeat import repeat_at
 from .routes import job, log
+from .utils import repeat_at
 
 load_dotenv()
 logger = get_logger("uvicorn.error")

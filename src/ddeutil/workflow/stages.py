@@ -13,8 +13,8 @@ you can track logs.
 I do not want to handle stage error on this stage execution. I think stage model
 have a lot of use-case, and it should does not worry about it error output.
 
-    So, I will create `handler_execution` for any error that raise from the
-stage execution method.
+    So, I will create `handler_execute` for any exeption class that raise from
+the stage execution method.
 
     Execution   --> Ok      ---( handler )--> Result with `SUCCESS` or `CANCEL`
 
@@ -408,11 +408,11 @@ class BaseAsyncStage(BaseStage):
         """Async Handler stage execution result from the stage `execute` method.
 
         :param params: (DictData) A parameter data.
-        :param run_id: (str) A running stage ID for this execution.
-        :param parent_run_id: (str) A parent workflow running ID for this
-            execution.
+        :param run_id: (str) A stage running ID.
+        :param parent_run_id: (str) A parent job running ID.
         :param result: (Result) A Result instance for return context and status.
-        :param event: (Event) An event manager that pass to the stage execution.
+        :param event: (Event) An Event manager instance that use to cancel this
+            execution if it forces stopped by parent execution.
         :param raise_error: (bool) A flag that all this method raise error
 
         :rtype: Result

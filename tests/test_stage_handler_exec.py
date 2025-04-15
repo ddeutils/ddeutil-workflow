@@ -673,7 +673,13 @@ def test_stage_exec_foreach_with_trigger(test_path):
                             "class"
                         ],
                         "name": "StageException",
-                        "message": "Sub-Stage execution error: StageException: Trigger workflow was failed with:\nGet job execution error first-job: JobException: Stage execution error: StageException: Raise trigger with item: 1.",
+                        "message": (
+                            "Sub-Stage execution error: StageException: "
+                            "Trigger workflow return failed status with:\n"
+                            "Get job execution error first-job: JobException: "
+                            "Stage execution error: StageException: "
+                            "Raise trigger with item: 1."
+                        ),
                     },
                 }
             }
