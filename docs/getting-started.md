@@ -151,6 +151,7 @@ the release running ID from `run_id` attribute of the return Result object.
 project/
  ╰─ logs/
      ╰─ run_id=820626787820250106163236493894/
+         ├─ metadata.json
          ├─ stderr.txt
          ╰─ stdout.txt
 ```

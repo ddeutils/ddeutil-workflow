@@ -849,8 +849,8 @@ class CallStage(BaseStage):
 
         :raise ValueError: If necessary arguments does not pass from the `args`
             field.
-        :raise TypeError: If the result from the caller function does not by
-            a `dict` type.
+        :raise TypeError: If the result from the caller function does not match
+            with a `dict` type.
 
         :rtype: Result
         """
