@@ -1941,23 +1941,6 @@ class RaiseStage(BaseStage):  # pragma: no cov
         raise StageException(message)
 
 
-class HookStage(BaseStage):  # pragma: no cov
-    """Hook stage execution."""
-
-    hook: str
-    args: DictData = Field(default_factory=dict)
-    callback: str
-
-    def execute(
-        self,
-        params: DictData,
-        *,
-        result: Result | None = None,
-        event: Event | None = None,
-    ) -> Result:
-        raise NotImplementedError("Hook Stage does not implement yet.")
-
-
 class DockerStage(BaseStage):  # pragma: no cov
     """Docker container stage execution that will pull the specific Docker image
     with custom authentication and run this image by passing environment
@@ -2209,7 +2192,6 @@ Stage = Annotated[
         DockerStage,
         BashStage,
         CallStage,
-        HookStage,
         TriggerStage,
         ForEachStage,
         UntilStage,

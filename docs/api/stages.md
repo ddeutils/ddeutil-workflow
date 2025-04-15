@@ -229,8 +229,8 @@ dynamic parameters workflow for common use-case.
 Raise error stage execution that raise StageException that use a message field
 for making error message before raise.
 
-## Hook Stage
-
 ## Docker Stage
 
 ## Virtual Python Stage
+
+Execution Python statement on the new Python virtual environment.
