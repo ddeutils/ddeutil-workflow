@@ -992,36 +992,36 @@ def test_stage_exec_case_match(test_path):
                   case: ${{ params.name }}
                   match:
                     - case: "bar"
-                      stage:
-                        name: Match name with Bar
-                        echo: Hello ${{ params.name }}
+                      stages:
+                        - name: Match name with Bar
+                          echo: Hello ${{ params.name }}
 
                     - case: "foo"
-                      stage:
-                        name: Match name with For
-                        echo: Hello ${{ params.name }}
+                      stages:
+                        - name: Match name with For
+                          echo: Hello ${{ params.name }}
 
                     - case: "_"
-                      stage:
-                        name: Else stage
-                        echo: Not match any case.
+                      stages:
+                        - name: Else stage
+                          echo: Not match any case.
                 - name: "Stage raise not has else condition"
                   id: raise-else
                   case: ${{ params.name }}
                   match:
                     - case: "bar"
-                      stage:
-                        name: Match name with Bar
-                        echo: Hello ${{ params.name }}
+                      stages:
+                        - name: Match name with Bar
+                          echo: Hello ${{ params.name }}
                 - name: "Stage skip not has else condition"
                   id: not-else
                   case: ${{ params.name }}
                   skip-not-match: true
                   match:
                     - case: "bar"
-                      stage:
-                        name: Match name with Bar
-                        echo: Hello ${{ params.name }}
+                      stages:
+                        - name: Match name with Bar
+                          echo: Hello ${{ params.name }}
         """,
     ):
         workflow = Workflow.from_conf(name="tmp-wf-case-match")
@@ -1029,17 +1029,44 @@ def test_stage_exec_case_match(test_path):
         rs = stage.set_outputs(
             stage.handler_execute({"params": {"name": "bar"}}).context, to={}
         )
-        assert rs == {"stages": {"case-stage": {"outputs": {}}}}
+        assert rs == {
+            "stages": {
+                "case-stage": {
+                    "outputs": {
+                        "case": "bar",
+                        "stages": {"3616274431": {"outputs": {}}},
+                    },
+                },
+            },
+        }
 
         rs = stage.set_outputs(
             stage.handler_execute({"params": {"name": "foo"}}).context, to={}
         )
-        assert rs == {"stages": {"case-stage": {"outputs": {}}}}
+        assert rs == {
+            "stages": {
+                "case-stage": {
+                    "outputs": {
+                        "case": "foo",
+                        "stages": {"4740784512": {"outputs": {}}},
+                    }
+                }
+            }
+        }
 
         rs = stage.set_outputs(
             stage.handler_execute({"params": {"name": "test"}}).context, to={}
         )
-        assert rs == {"stages": {"case-stage": {"outputs": {}}}}
+        assert rs == {
+            "stages": {
+                "case-stage": {
+                    "outputs": {
+                        "case": "_",
+                        "stages": {"5883888894": {"outputs": {}}},
+                    }
+                }
+            }
+        }
 
         # NOTE: Raise because else condition does not set.
         stage: Stage = workflow.job("first-job").stage("raise-else")
@@ -1048,8 +1075,7 @@ def test_stage_exec_case_match(test_path):
 
         stage: Stage = workflow.job("first-job").stage("not-else")
         rs = stage.set_outputs(
-            stage.handler_execute({"params": {"name": "test"}}).context,
-            to={},
+            stage.handler_execute({"params": {"name": "test"}}).context, to={}
         )
         assert rs == {
             "stages": {

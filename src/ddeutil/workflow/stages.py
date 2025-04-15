@@ -1308,6 +1308,7 @@ class ForEachStage(BaseStage):
         context.update({"item": item})
         output: DictData = {"item": item, "stages": {}}
         for stage in self.stages:
+
             if self.extras:
                 stage.extras = self.extras
 
@@ -1679,7 +1680,9 @@ class Match(BaseModel):
     """Match model for the Case Stage."""
 
     case: Union[str, int] = Field(description="A match case.")
-    stage: Stage = Field(description="A stage to execution for this case.")
+    stages: list[Stage] = Field(
+        description="A list of stage to execution for this case."
+    )
 
 
 class CaseStage(BaseStage):
@@ -1726,6 +1729,98 @@ class CaseStage(BaseStage):
         alias="skip-not-match",
     )
 
+    def execute_case(
+        self,
+        case: str,
+        stages: list[Stage],
+        params: DictData,
+        result: Result,
+        *,
+        event: Event | None = None,
+    ) -> Result:
+        """Execute case.
+
+        :param case: (str) A case that want to execution.
+        :param stages: (list[Stage]) A list of stage.
+        :param params: (DictData) A parameter that want to pass to stage
+            execution.
+        :param result: (Result) A result object for keeping context and status
+            data.
+        :param event: (Event) An event manager that use to track parent execute
+            was not force stopped.
+
+        :rtype: Result
+        """
+        context: DictData = copy.deepcopy(params)
+        context.update({"case": case})
+        output: DictData = {"case": case, "stages": {}}
+
+        for stage in stages:
+
+            if self.extras:
+                stage.extras = self.extras
+
+            if stage.is_skipped(params=context):
+                result.trace.info(f"... Skip stage: {stage.iden!r}")
+                stage.set_outputs(output={"skipped": True}, to=output)
+                continue
+
+            if event and event.is_set():  # pragma: no cov
+                error_msg: str = (
+                    "Case-Stage was canceled from event that had set before "
+                    "stage case execution."
+                )
+                return result.catch(
+                    status=CANCEL,
+                    context={
+                        "case": case,
+                        "stages": filter_func(output.pop("stages", {})),
+                        "errors": StageException(error_msg).to_dict(),
+                    },
+                )
+
+            try:
+                rs: Result = stage.handler_execute(
+                    params=context,
+                    run_id=result.run_id,
+                    parent_run_id=result.parent_run_id,
+                    raise_error=True,
+                    event=event,
+                )
+                stage.set_outputs(rs.context, to=output)
+                stage.set_outputs(stage.get_outputs(output), to=context)
+            except (StageException, UtilException) as e:  # pragma: no cov
+                result.trace.error(f"[STAGE]: {e.__class__.__name__}: {e}")
+                return result.catch(
+                    status=FAILED,
+                    context={
+                        "case": case,
+                        "stages": filter_func(output.pop("stages", {})),
+                        "errors": e.to_dict(),
+                    },
+                )
+
+            if rs.status == FAILED:
+                error_msg: str = (
+                    f"Case-Stage was break because it has a sub stage, "
+                    f"{stage.iden}, failed without raise error."
+                )
+                return result.catch(
+                    status=FAILED,
+                    context={
+                        "case": case,
+                        "stages": filter_func(output.pop("stages", {})),
+                        "errors": StageException(error_msg).to_dict(),
+                    },
+                )
+        return result.catch(
+            status=SUCCESS,
+            context={
+                "case": case,
+                "stages": filter_func(output.pop("stages", {})),
+            },
+        )
+
     def execute(
         self,
         params: DictData,
@@ -1755,17 +1850,17 @@ class CaseStage(BaseStage):
 
         result.trace.info(f"[STAGE]: Case-Execute: {_case!r}.")
         _else: Optional[Match] = None
-        stage: Optional[Stage] = None
+        stages: Optional[list[Stage]] = None
         for match in self.match:
             if (c := match.case) == "_":
                 _else: Match = match
                 continue
 
             _condition: str = param2template(c, params, extras=self.extras)
-            if stage is None and _case == _condition:
-                stage: Stage = match.stage
+            if stages is None and _case == _condition:
+                stages: list[Stage] = match.stages
 
-        if stage is None:
+        if stages is None:
             if _else is None:
                 if not self.skip_not_match:
                     raise StageException(
@@ -1783,10 +1878,8 @@ class CaseStage(BaseStage):
                     status=CANCEL,
                     context={"errors": StageException(error_msg).to_dict()},
                 )
-            stage: Stage = _else.stage
-
-        if self.extras:
-            stage.extras = self.extras
+            _case: str = "_"
+            stages: list[Stage] = _else.stages
 
         if event and event.is_set():  # pragma: no cov
             return result.catch(
@@ -1799,19 +1892,9 @@ class CaseStage(BaseStage):
                 },
             )
 
-        try:
-            return result.catch(
-                status=SUCCESS,
-                context=stage.handler_execute(
-                    params=params,
-                    run_id=result.run_id,
-                    parent_run_id=result.parent_run_id,
-                    event=event,
-                ).context,
-            )
-        except StageException as e:  # pragma: no cov
-            result.trace.error(f"[STAGE]: {e.__class__.__name__}:" f"\n\t{e}")
-            return result.catch(status=FAILED, context={"errors": e.to_dict()})
+        return self.execute_case(
+            case=_case, stages=stages, params=params, result=result, event=event
+        )
 
 
 class RaiseStage(BaseStage):  # pragma: no cov
