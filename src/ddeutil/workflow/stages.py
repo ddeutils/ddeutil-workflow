@@ -28,6 +28,7 @@ import asyncio
 import contextlib
 import copy
 import inspect
+import json
 import subprocess
 import sys
 import time
@@ -1989,7 +1990,8 @@ class DockerStage(BaseStage):  # pragma: no cov
         self,
         params: DictData,
         result: Result,
-    ):
+    ) -> Result:
+        """Execute Docker container task."""
         from docker import DockerClient
         from docker.errors import ContainerError
 
@@ -2045,6 +2047,13 @@ class DockerStage(BaseStage):  # pragma: no cov
                 f"{self.image}:{self.tag}",
                 out,
             )
+        output_file: Path = Path(f".docker.{result.run_id}.logs/outputs.json")
+        if not output_file.exists():
+            return result.catch(status=SUCCESS)
+
+        with output_file.open(mode="rt") as f:
+            data = json.load(f)
+        return result.catch(status=SUCCESS, context=data)
 
     def execute(
         self,
@@ -2053,6 +2062,22 @@ class DockerStage(BaseStage):  # pragma: no cov
         result: Result | None = None,
         event: Event | None = None,
     ) -> Result:
+        """Execute the Docker image via Python API.
+
+        :param params: A parameter that want to pass before run any statement.
+        :param result: (Result) A result object for keeping context and status
+            data.
+        :param event: (Event) An event manager that use to track parent execute
+            was not force stopped.
+
+        :rtype: Result
+        """
+        if result is None:  # pragma: no cov
+            result: Result = Result(
+                run_id=gen_id(self.name + (self.id or ""), unique=True)
+            )
+        result.trace.info(f"[STAGE]: Docker-Execute: {self.image}:{self.tag}")
+
         raise NotImplementedError("Docker Stage does not implement yet.")
 
 
