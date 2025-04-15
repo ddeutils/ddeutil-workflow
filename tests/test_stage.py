@@ -109,9 +109,9 @@ def test_stage_get_outputs():
     assert stage.get_outputs(outputs) == {}
 
     stage.extras = {"stage_default_id": True}
-    assert stage.get_outputs(outputs) == {"outputs": {"foo": "baz"}}
+    assert stage.get_outputs(outputs) == {"foo": "baz"}
 
     stage: Stage = EmptyStage.model_validate(
         {"id": "first-stage", "name": "Empty Stage", "echo": "hello world"}
     )
-    assert stage.get_outputs(outputs) == {"outputs": {"foo": "bar"}}
+    assert stage.get_outputs(outputs) == {"foo": "bar"}

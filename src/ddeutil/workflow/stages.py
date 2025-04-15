@@ -266,7 +266,7 @@ class BaseStage(BaseModel, ABC):
                 param2template(self.name, params=to, extras=self.extras)
             )
         )
-        output: DictData = copy.deepcopy(output)
+        output: DictData = output.copy()
         errors: DictData = (
             {"errors": output.pop("errors", {})} if "errors" in output else {}
         )
