@@ -63,15 +63,10 @@ extra:
 nav:
   - Home:
     - index.md
-    - Introduction: introduction.md
     - Get Started: getting-started.md
     - Configuration: configuration.md
     - Logging: logging.md
     - Context: context.md
-    - Examples:
-      - RestAPI: examples/workflow_api.md
-      - Postgres: examples/workflow_pg.md
-
   - API references:
     - Library:
       - Stages: api/stages.md
@@ -81,11 +76,13 @@ nav:
       - Scheduler: api/scheduler.md
       - Params: api/params.md
       - Result: api/result.md
-      - Caller: api/caller.md
-      - Templates: api/templates.md
+      - Reusables: api/reusables.md
       - Logs: api/logs.md
       - Utils: api/utils.md
       - Exceptions: api/exceptions.md
+  - Examples:
+      - RestAPI: examples/api.md
+      - Postgres: examples/pg.md
 
 plugins:
   - tags

@@ -17,12 +17,6 @@ by a `.yaml` template.
 > use the workflow stage to process any large volume data which use a lot of compute
 > resource :cold_sweat:.
 
-In my opinion, I think it should not create duplicate workflow codes if I can
-write with dynamic input parameters on the one template workflow that just change
-the input parameters per use-case instead.
-This way I can handle a lot of logical workflows in our orgs with only metadata
-configuration. It called **Metadata Driven Data Workflow**.
-
 ---
 
 **:pushpin: <u>Rules of This Workflow engine</u>**:

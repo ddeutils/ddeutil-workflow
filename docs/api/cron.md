@@ -15,26 +15,26 @@ datetime value with next or previous with any start point of an input datetime.
           cron: "*/5 * * * *"
         ```
 
-### Fields
-
 | field          | data type   |    default    | description |
 |----------------|-------------|:-------------:|-------------|
 
-### Usage
+!!! note "Usage"
 
-```python
-from ddeutil.workflow.cron import On
+    ```python
+    from ddeutil.workflow.cron import On
 
-# NOTE: Start load the on data from `.yaml` template file with this key.
-schedule = On.from_loader(name='on_every_5_min', externals={})
+    # NOTE: Start load the on data from `.yaml` template file with this key.
+    schedule = On.from_conf(name='on_every_5_min', extras={})
 
-assert '*/5 * * * *' == str(schedule.cronjob)
+    assert '*/5 * * * *' == str(schedule.cronjob)
 
-cron_iter = schedule.generate('2022-01-01 00:00:00')
+    cron_iter = schedule.generate('2022-01-01 00:00:00')
 
-assert "2022-01-01 00:05:00" f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
-assert "2022-01-01 00:10:00" f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
-assert "2022-01-01 00:15:00" f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
-```
+    assert "2022-01-01 00:05:00" f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
+    assert "2022-01-01 00:10:00" f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
+    assert "2022-01-01 00:15:00" f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
+    ```
 
 ## YearOn
+
+The `On` model that add year layer.
