@@ -2,6 +2,17 @@
 
 ## Latest Changes
 
+## 0.0.53
+
+### :stars: Highlight Features
+
+- :star: hl: upgrade case-stage handle multiple stages.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: fix testcase that not valid.
+- :test_tube: tests: update testcase for getting stage outputs inside foreach.
+
 ## 0.0.52
 
 ### :sparkles: Features
