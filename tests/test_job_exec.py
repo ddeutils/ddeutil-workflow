@@ -37,16 +37,28 @@ def test_job_exec_py():
 
 
 def test_job_exec_py_raise():
-    workflow: Workflow = Workflow.from_conf(name="wf-run-python-raise")
-    rs: Result = workflow.job("first-job").execute(params={})
+    rs: Result = (
+        Workflow.from_conf(name="wf-run-python-raise")
+        .job("first-job")
+        .execute(params={})
+    )
     assert rs.status == FAILED
     assert rs.context == {
+        "1354680202": {
+            "errors": {
+                "class": rs.context["1354680202"]["errors"]["class"],
+                "message": "PyStage: \n\tValueError: Testing raise error inside PyStage!!!",
+                "name": "StageException",
+            },
+            "matrix": {},
+            "stages": {},
+        },
         "errors": [
             {
                 "class": rs.context["errors"][0]["class"],
                 "name": "JobException",
                 "message": (
-                    "Stage execution error: StageException: PyStage: \n\t"
+                    "Stage raise: StageException: PyStage: \n\t"
                     "ValueError: Testing raise error inside PyStage!!!"
                 ),
             },
@@ -87,12 +99,28 @@ def test_job_exec_py_fail_fast():
     }
 
 
-@mock.patch.object(Config, "stage_raise_error", True)
 def test_job_exec_py_fail_fast_raise_catch():
-    workflow: Workflow = Workflow.from_conf(name="wf-run-python-raise-for-job")
-    job: Job = workflow.job("job-fail-fast-raise")
-    rs: Result = job.execute({})
+    rs: Result = (
+        Workflow.from_conf(
+            name="wf-run-python-raise-for-job",
+            extras={"stage_raise_error": True},
+        )
+        .job("job-fail-fast-raise")
+        .execute({})
+    )
     assert rs.context == {
+        "2150810470": {
+            "errors": {
+                "class": rs.context["2150810470"]["errors"]["class"],
+                "message": (
+                    "PyStage: \n\tValueError: Testing raise error inside "
+                    "PyStage with the sleep not equal 4!!!"
+                ),
+                "name": "StageException",
+            },
+            "matrix": {"sleep": "1"},
+            "stages": {"1181478804": {"outputs": {}}},
+        },
         "9112472804": {
             "matrix": {"sleep": "4"},
             "stages": {"1181478804": {"outputs": {}}},
@@ -110,7 +138,7 @@ def test_job_exec_py_fail_fast_raise_catch():
                 "class": rs.context["errors"][0]["class"],
                 "name": "JobException",
                 "message": (
-                    "Stage execution error: StageException: PyStage: \n\t"
+                    "Stage raise: StageException: PyStage: \n\t"
                     "ValueError: Testing raise error inside PyStage with the "
                     "sleep not equal 4!!!"
                 ),
@@ -190,11 +218,40 @@ def test_job_exec_py_complete_not_parallel():
     }
 
 
-@mock.patch.object(Config, "stage_raise_error", True)
 def test_job_exec_py_complete_raise():
-    workflow: Workflow = Workflow.from_conf(name="wf-run-python-raise-for-job")
-    rs: Result = workflow.job("job-complete-raise").execute({})
+    rs: Result = (
+        Workflow.from_conf(
+            "wf-run-python-raise-for-job",
+            extras={"stage_raise_error": True},
+        )
+        .job("job-complete-raise")
+        .execute(params={})
+    )
     assert rs.context == {
+        "2150810470": {
+            "errors": {
+                "class": rs.context["2150810470"]["errors"]["class"],
+                "message": (
+                    "PyStage: \n\tValueError: Testing raise error inside "
+                    "PyStage!!!"
+                ),
+                "name": "StageException",
+            },
+            "matrix": {"sleep": "1"},
+            "stages": {"7972360640": {"outputs": {}}},
+        },
+        "9112472804": {
+            "errors": {
+                "class": rs.context["9112472804"]["errors"]["class"],
+                "message": (
+                    "PyStage: \n\tValueError: Testing raise error inside "
+                    "PyStage!!!"
+                ),
+                "name": "StageException",
+            },
+            "matrix": {"sleep": "4"},
+            "stages": {"7972360640": {"outputs": {}}},
+        },
         "9873503202": {
             "matrix": {"sleep": "0.1"},
             "stages": {
@@ -207,7 +264,7 @@ def test_job_exec_py_complete_raise():
                 "class": rs.context["errors"][0]["class"],
                 "name": "JobException",
                 "message": (
-                    "Stage execution error: StageException: PyStage: \n\t"
+                    "Stage raise: StageException: PyStage: \n\t"
                     "ValueError: Testing raise error inside PyStage!!!"
                 ),
             },
@@ -215,7 +272,7 @@ def test_job_exec_py_complete_raise():
                 "class": rs.context["errors"][1]["class"],
                 "name": "JobException",
                 "message": (
-                    "Stage execution error: StageException: PyStage: \n\t"
+                    "Stage raise: StageException: PyStage: \n\t"
                     "ValueError: Testing raise error inside PyStage!!!"
                 ),
             },

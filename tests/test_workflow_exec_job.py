@@ -57,7 +57,7 @@ def test_workflow_execute_job_raise_inside():
         "errors": {
             "class": rs.context["errors"]["class"],
             "name": "WorkflowException",
-            "message": "Workflow job, demo-run, failed without raise error.",
+            "message": "Workflow job, 'demo-run', return FAILED status.",
         },
         "jobs": {
             "demo-run": {
@@ -68,7 +68,7 @@ def test_workflow_execute_job_raise_inside():
                         ],
                         "name": "JobException",
                         "message": (
-                            "Stage execution error: StageException: PyStage: "
+                            "Stage raise: StageException: PyStage: "
                             "\n\tNotImplementedError: "
                         ),
                     }

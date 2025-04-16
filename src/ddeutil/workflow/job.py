@@ -789,7 +789,7 @@ def local_execute(
         This method does not raise any `JobException` if it runs with
     multi-threading strategy.
 
-    :param job: (Job) A job model that want to execute.
+    :param job: (Job) A job model.
     :param params: (DictData) A parameter data.
     :param run_id: (str) A job running ID.
     :param parent_run_id: (str) A parent workflow running ID.

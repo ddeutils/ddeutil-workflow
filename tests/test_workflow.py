@@ -140,18 +140,17 @@ def test_workflow_from_loader_without_job():
     assert workflow.name == "wf-without-jobs"
 
     rs = workflow.execute({})
-    assert rs.context == {}
+    assert rs.context == {"params": {}, "jobs": {}}
 
 
 def test_workflow_from_path(test_path):
     workflow = Workflow.from_path(
-        name="wf-without-jobs",
-        path=test_path / "conf",
+        name="wf-without-jobs", path=test_path / "conf"
     )
     assert workflow.name == "wf-without-jobs"
 
     rs = workflow.execute({})
-    assert rs.context == {}
+    assert rs.context == {"params": {}, "jobs": {}}
 
 
 def test_workflow_from_loader_override(test_path):

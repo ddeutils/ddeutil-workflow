@@ -1111,10 +1111,10 @@ class TriggerStage(BaseStage):
             err_msg: str | None = (
                 f" with:\n{msg}"
                 if (msg := rs.context.get("errors", {}).get("message"))
-                else ""
+                else "."
             )
             raise StageException(
-                f"Trigger workflow return failed status{err_msg}."
+                f"Trigger workflow return failed status{err_msg}"
             )
         return rs
 
