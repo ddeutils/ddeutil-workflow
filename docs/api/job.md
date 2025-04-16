@@ -1,11 +1,16 @@
 # Job
 
-Job Model that use for keeping stages and node that running its stages.
-The job handle the lineage of stages and location of execution of stages that
-mean the job model able to define `runs-on` key that allow you to run this
-job.
+Job model that use for store Stage models and node parameter that use for
+running these stages. The job model handle the lineage of stages and location of
+execution that mean you can define `runs-on` field with the Self-Hosted mode
+for execute on target machine instead of the current local machine.
 
-This module include Strategy Model that use on the job strategy field.
+This module include Strategy model that use on the job `strategy` field for
+making matrix values before execution parallelism stage execution.
+
+The Job model does not implement `handler_execute` same as Stage model
+because the job should raise only `JobException` class from the execution
+method.
 
 ## Strategy
 

@@ -463,7 +463,7 @@ class Workflow(BaseModel):
             if isinstance(on, str):
                 on: list[str] = [on]
             if any(not isinstance(i, (dict, str)) for i in on):
-                raise TypeError("The ``on`` key should be list of str or dict")
+                raise TypeError("The `on` key should be list of str or dict")
 
             # NOTE: Pass on value to SimLoad and keep on model object to the on
             #   field.
@@ -603,8 +603,8 @@ class Workflow(BaseModel):
             ...     "jobs": {}
             ... }
 
-        :param params: A parameter mapping that receive from workflow execution.
-        :type params: DictData
+        :param params: (DictData) A parameter data that receive from workflow
+            execute method.
 
         :raise WorkflowException: If parameter value that want to validate does
             not include the necessary parameter that had required flag.
@@ -624,7 +624,7 @@ class Workflow(BaseModel):
                 f"{', '.join(check_key)}."
             )
 
-        # NOTE: Mapping type of param before adding it to the ``params`` key.
+        # NOTE: Mapping type of param before adding it to the `params` key.
         return {
             "params": (
                 params
@@ -970,7 +970,7 @@ class Workflow(BaseModel):
         execution to the target job object via job's ID.
 
             This execution is the minimum level of execution of this workflow
-        model. It different with ``self.execute`` because this method run only
+        model. It different with `self.execute` because this method run only
         one job and return with context of this job data.
 
         :raise WorkflowException: If execute with not exist job's ID.
@@ -1045,7 +1045,7 @@ class Workflow(BaseModel):
         max_job_parallel: int = 2,
     ) -> Result:
         """Execute workflow with passing a dynamic parameters to all jobs that
-        included in this workflow model with ``jobs`` field.
+        included in this workflow model with `jobs` field.
 
             The result of execution process for each job and stages on this
         workflow will keep in dict which able to catch out with all jobs and

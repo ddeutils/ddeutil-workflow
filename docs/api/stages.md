@@ -1,43 +1,47 @@
 # Stages
 
-A stage is the minimum object for this package that use to do a task with it
-propose such as the empty stage is doing nothing without printing custom statement
-to stdout.
+Stages module include all stage model that use be the minimum execution layer
+of this workflow engine. The stage handle the minimize task that run in some
+thread (same thread at its job owner) that mean it is the lowest executor that
+you can track logs.
 
-Stage Model that use for getting stage data template from the Job Model.
-The stage handle the minimize task that run in some thread (same thread at
-its job owner) that mean it is the lowest executor of a workflow that can
-tracking logs.
+The output of stage execution only return SUCCESS or CANCEL status because
+I do not want to handle stage error on this stage execution. I think stage model
+have a lot of use-case, and it should does not worry about it error output.
 
-The output of stage execution only return 0 status because I do not want to
-handle stage error on this stage model. I think stage model should have a lot of
-use-case, and it does not worry when I want to create a new one.
+So, I will create `handler_execute` for any exception class that raise from
+the stage execution method.
 
 ```text
-Execution   ┬-> Ok      --> Result with 0
+Execution   ┬-> Ok      ---( handler )--> Result with SUCCESS/CANCEL
             │
-            ╰-> Error   ┬-> Result with 1 (if env var was set)
+            ╰-> Error   ┬--( handler )--> Result with FAILED (Set `raise_error` flag)
                         │
-                        ╰-> Raise StageException(...)
+                        ╰--( handler )--> Raise StageException(...)
 ```
 
 On the context I/O that pass to a stage object at execute process. The
 execute method receives a `params={"params": {...}}` value for mapping to
 template searching.
 
-All stages model inherit from `BaseStage` model that has the base fields:
+All stages model inherit from `BaseStage` or `AsyncBaseStage` models that has the
+base fields:
 
 | field     | alias | data type   | default  | description                                                           |
 |-----------|-------|-------------|:--------:|-----------------------------------------------------------------------|
 | id        |       | str \| None |  `None`  | A stage ID that use to keep execution output or getting by job owner. |
 | name      |       | str         |          | A stage name that want to logging when start execution.               |
 | condition | if    | str \| None |  `None`  | A stage condition statement to allow stage executable.                |
-| extras    |       | dict        | `dict()` | An extra override config values.                                      |
+| extras    |       | dict        | `dict()` | An extra parameter that override core config values.                  |
 
 ## Empty Stage
 
-Empty stage that do nothing (context equal empty stage) and logging the name of
-stage only to stdout.
+Empty stage executor that do nothing and log the `message` field to
+stdout only. It can use for tracking a template parameter on the workflow or
+debug step.
+
+You can pass a sleep value in second unit to this stage for waiting after log
+message.
 
 !!! example "YAML"
 
@@ -74,10 +78,10 @@ stage only to stdout.
         ...
         ```
 
-| field | data type   | default | description                                     |
-|-------|-------------|:-------:|-------------------------------------------------|
-| echo  | str \| None | `None`  | A string statement that want to logging         |
-| sleep | float       |   `0`   | A second value to sleep before finish execution |
+| field | data type   | default | description                                                                                                      |
+|-------|-------------|:-------:|------------------------------------------------------------------------------------------------------------------|
+| echo  | str \| None | `None`  | A message that want to show on the stdout.                                                                       |
+| sleep | float       |   `0`   | A second value to sleep before start execution. This value should gather or equal 0, and less than 1800 seconds. |
 
 ## Bash Stage
 
