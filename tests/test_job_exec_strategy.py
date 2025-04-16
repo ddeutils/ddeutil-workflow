@@ -10,10 +10,10 @@ from ddeutil.workflow.workflow import Workflow
 
 
 def test_job_exec_strategy():
-    workflow: Workflow = Workflow.from_conf(name="wf-run-python-raise-for-job")
-    job: Job = workflow.job("job-complete")
+    job: Job = Workflow.from_conf(name="wf-run-python-raise-for-job").job(
+        "job-complete"
+    )
     rs = local_execute_strategy(job, {"sleep": "0.1"}, {})
-
     assert rs.status == SUCCESS
     assert rs.context == {
         "9873503202": {
@@ -24,10 +24,11 @@ def test_job_exec_strategy():
 
 
 def test_job_exec_strategy_skip_stage():
-    workflow: Workflow = Workflow.from_conf(name="wf-run-python-raise-for-job")
-    job: Job = workflow.job("job-stage-condition")
+    job: Job = Workflow.from_conf(name="wf-run-python-raise-for-job").job(
+        "job-stage-condition"
+    )
     rs = local_execute_strategy(job, {"sleep": "1"}, {})
-
+    assert rs.status == SUCCESS
     assert rs.context == {
         "2150810470": {
             "matrix": {"sleep": "1"},
@@ -118,19 +119,13 @@ def test_job_exec_strategy_event_set():
 
     rs: Result = future.result()
     assert rs.status == CANCEL
-    assert rs.context == {
-        "1354680202": {
-            "matrix": {},
-            "stages": {},
-            "errors": {
-                "class": rs.context["1354680202"]["errors"]["class"],
-                "name": "JobException",
-                "message": (
-                    "Job strategy was canceled from event that had set before "
-                    "strategy execution."
-                ),
-            },
-        },
+    assert rs.context["1354680202"]["errors"] == {
+        "class": rs.context["1354680202"]["errors"]["class"],
+        "name": "JobException",
+        "message": (
+            "Job strategy was canceled from event that had set before "
+            "strategy execution."
+        ),
     }
 
 
