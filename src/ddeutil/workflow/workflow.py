@@ -1054,16 +1054,19 @@ class Workflow(BaseModel):
             For example with non-strategy job, when I want to use the output
         from previous stage, I can access it with syntax:
 
-            ... ${job-id}.stages.${stage-id}.outputs.${key}
-            ... ${job-id}.stages.${stage-id}.errors.${key}
+        ... ${job-id}.stages.${stage-id}.outputs.${key}
+        ... ${job-id}.stages.${stage-id}.errors.${key}
 
             But example for strategy job:
 
-            ... ${job-id}.strategies.${strategy-id}.stages.${stage-id}.outputs.${key}
-            ... ${job-id}.strategies.${strategy-id}.stages.${stage-id}.errors.${key}
+        ... ${job-id}.strategies.${strategy-id}.stages.${stage-id}.outputs.${key}
+        ... ${job-id}.strategies.${strategy-id}.stages.${stage-id}.errors.${key}
 
-        :param params: An input parameters that use on workflow execution that
-            will parameterize before using it.
+            This method already handle all exception class that can raise from
+        the job execution. It will warp that error and keep it in the key `errors`
+        at the result context.
+
+        :param params: A parameter data that will parameterize before execution.
         :param run_id: (str | None) A workflow running ID.
         :param parent_run_id: (str | None) A parent workflow running ID.
         :param result: (Result) A Result instance for return context and status.
@@ -1116,7 +1119,6 @@ class Workflow(BaseModel):
             ):
                 job_id: str = job_queue.get()
                 job: Job = self.job(name=job_id)
-
                 if (check := job.check_needs(context["jobs"])) == WAIT:
                     job_queue.task_done()
                     job_queue.put(job_id)
@@ -1227,8 +1229,8 @@ class WorkflowTask:
     :param alias: (str) An alias name of Workflow model.
     :param workflow: (Workflow) A Workflow model instance.
     :param runner: (CronRunner)
-    :param values:
-    :param extras:
+    :param values: A value data that want to parameterize.
+    :param extras: An extra parameter that use to override core config values.
     """
 
     alias: str
