@@ -2,7 +2,7 @@ import pytest
 from ddeutil.workflow import Workflow
 from ddeutil.workflow.exceptions import WorkflowException
 from ddeutil.workflow.job import Job
-from ddeutil.workflow.result import Result
+from ddeutil.workflow.result import FAILED, Result
 
 
 def test_workflow_execute_job():
@@ -51,6 +51,28 @@ def test_workflow_execute_job_raise_inside():
             },
         )
 
-    # NOTE: Raise if any strategy inside job execute raise some error.
-    with pytest.raises(WorkflowException):
-        workflow.execute_job(job_id="demo-run", params={})
+    rs: Result = workflow.execute_job(job_id="demo-run", params={})
+    assert rs.status == FAILED
+    assert rs.context == {
+        "errors": {
+            "class": rs.context["errors"]["class"],
+            "name": "WorkflowException",
+            "message": "Workflow job, demo-run, failed without raise error.",
+        },
+        "jobs": {
+            "demo-run": {
+                "errors": [
+                    {
+                        "class": rs.context["jobs"]["demo-run"]["errors"][0][
+                            "class"
+                        ],
+                        "name": "JobException",
+                        "message": (
+                            "Stage execution error: StageException: PyStage: "
+                            "\n\tNotImplementedError: "
+                        ),
+                    }
+                ]
+            }
+        },
+    }

@@ -64,6 +64,7 @@ from .exceptions import StageException, UtilException, to_dict
 from .result import CANCEL, FAILED, SUCCESS, WAIT, Result, Status
 from .reusables import TagFunc, extract_call, not_in_template, param2template
 from .utils import (
+    NEWLINE,
     delay,
     filter_func,
     gen_id,
@@ -86,7 +87,7 @@ class BaseStage(BaseModel, ABC):
 
     extras: DictData = Field(
         default_factory=dict,
-        description="An extra override config values.",
+        description="An extra parameter that override core config values.",
     )
     id: Optional[str] = Field(
         default=None,
@@ -216,7 +217,6 @@ class BaseStage(BaseModel, ABC):
             return rs
         except Exception as e:
             result.trace.error(f"[STAGE]: Handler: {e.__class__.__name__}: {e}")
-
             if dynamic("stage_raise_error", f=raise_error, extras=self.extras):
                 if isinstance(e, StageException):
                     raise
@@ -507,8 +507,7 @@ class EmptyStage(BaseAsyncStage):
                 dedent(self.echo.strip("\n")), params, extras=self.extras
             )
             if "\n" in message:
-                newline: str = "\n\t...\t"
-                message: str = newline + message.replace("\n", newline)
+                message: str = NEWLINE + message.replace("\n", NEWLINE)
 
         result.trace.info(
             f"[STAGE]: Empty-Execute: {self.name!r}: ( {message} )"
@@ -549,8 +548,7 @@ class EmptyStage(BaseAsyncStage):
                 dedent(self.echo.strip("\n")), params, extras=self.extras
             )
             if "\n" in message:
-                newline: str = "\n\t...\t"
-                message: str = newline + message.replace("\n", newline)
+                message: str = NEWLINE + message.replace("\n", NEWLINE)
 
         result.trace.info(
             f"[STAGE]: Empty-Execute: {self.name!r}: ( {message} )"

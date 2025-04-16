@@ -46,7 +46,7 @@ from .exceptions import (
 from .result import CANCEL, FAILED, SKIP, SUCCESS, WAIT, Result, Status
 from .reusables import has_template, param2template
 from .stages import Stage
-from .utils import cross_product, filter_func, gen_id
+from .utils import NEWLINE, cross_product, filter_func, gen_id
 
 MatrixFilter = list[dict[str, Union[str, int]]]
 
@@ -604,8 +604,8 @@ class Job(BaseModel):
         :param parent_run_id: (str) A parent workflow running ID.
         :param event: (Event) An Event manager instance that use to cancel this
             execution if it forces stopped by parent execution.
-        :param raise_error: (bool) A flag that all this method raise error to
-            the strategy execution. Default is `True`.
+        :param raise_error: (bool) A flag that disable error handler from
+            execution. Default is `True`.
 
         :raise NotImplementedError: If the `runs-on` value does not implement on
             this execution.
@@ -634,7 +634,7 @@ class Job(BaseModel):
         elif self.runs_on.type == RunsOn.SELF_HOSTED:  # pragma: no cov
             pass
         elif self.runs_on.type == RunsOn.DOCKER:  # pragma: no cov
-            rs = docker_execution(
+            docker_execution(
                 self,
                 params,
                 run_id=run_id,
@@ -642,7 +642,6 @@ class Job(BaseModel):
                 event=event,
                 raise_error=raise_error,
             )
-            print(rs)
 
         # pragma: no cov
         result.trace.error(
@@ -681,7 +680,8 @@ def local_execute_strategy(
     :param result: (Result) A Result instance for return context and status.
     :param event: (Event) An Event manager instance that use to cancel this
         execution if it forces stopped by parent execution.
-    :param raise_error: (bool) A flag that all this method raise error
+    :param raise_error: (bool) A flag that disable error handler from
+        execution. Default is `True`.
 
     :raise JobException: If it has any error from `StageException` or
         `UtilException`.
@@ -796,7 +796,7 @@ def local_execute(
     execution or itself execution. It will generate matrix values at the first
     step and run multithread on this metrics to the `stages` field of this job.
 
-        This method does not raise any JobException if it runs with
+        This method does not raise any `JobException` if it runs with
     multi-threading strategy.
 
     :param job: (Job) A job model that want to execute.
@@ -805,8 +805,8 @@ def local_execute(
     :param parent_run_id: (str) A parent workflow running ID.
     :param event: (Event) An Event manager instance that use to cancel this
         execution if it forces stopped by parent execution.
-    :param raise_error: (bool) A flag that all this method raise error to the
-        strategy execution. Default is `True`.
+    :param raise_error: (bool) A flag that disable error handler from
+        execution. Default is `True`.
 
     :rtype: Result
     """
@@ -818,40 +818,11 @@ def local_execute(
     )
 
     event: Event = Event() if event is None else event
-
-    # NOTE: Normal Job execution without parallel strategy matrix. It uses
-    #   for-loop to control strategy execution sequentially.
-    if (not job.strategy.is_set()) or job.strategy.max_parallel == 1:
-
-        for strategy in job.strategy.make():
-
-            if event and event.is_set():  # pragma: no cov
-                return result.catch(
-                    status=CANCEL,
-                    context={
-                        "errors": JobException(
-                            "Job strategy was canceled from event that had set "
-                            "before strategy execution."
-                        ).to_dict()
-                    },
-                )
-
-            local_execute_strategy(
-                job,
-                strategy,
-                params,
-                result=result,
-                event=event,
-                raise_error=raise_error,
-            )
-
-        return result
-
     fail_fast_flag: bool = job.strategy.fail_fast
     ls: str = "Fail-Fast" if fail_fast_flag else "All-Completed"
     result.trace.info(
-        f"[JOB]: Start multithreading: {job.strategy.max_parallel} threads "
-        f"with {ls} mode."
+        f"[JOB]: {ls}-Execute: {job.id} with {job.strategy.max_parallel} "
+        f"workers."
     )
 
     if event and event.is_set():  # pragma: no cov
@@ -859,8 +830,8 @@ def local_execute(
             status=CANCEL,
             context={
                 "errors": JobException(
-                    "Job strategy was canceled from event that had set "
-                    "before strategy execution."
+                    "Job was canceled from event that had set before "
+                    "local execution."
                 ).to_dict()
             },
         )
@@ -887,12 +858,9 @@ def local_execute(
         status: Status = SUCCESS
 
         if not fail_fast_flag:
-            done = as_completed(futures, timeout=1800)
+            done: list[Future] = as_completed(futures)
         else:
-            done, not_done = wait(
-                futures, timeout=1800, return_when=FIRST_EXCEPTION
-            )
-
+            done, not_done = wait(futures, return_when=FIRST_EXCEPTION)
             if len(done) != len(futures):
                 result.trace.warning(
                     "[JOB]: Set event for stop pending stage future."
@@ -901,10 +869,8 @@ def local_execute(
                 for future in not_done:
                     future.cancel()
 
-            nd: str = (
-                f", the strategies do not run is {not_done}" if not_done else ""
-            )
-            result.trace.debug(f"[JOB]: Strategy set Fail-Fast{nd}")
+            nd: str = f", strategies not run: {not_done}" if not_done else ""
+            result.trace.debug(f"... Strategy set Fail-Fast{nd}")
 
         for future in done:
             try:
@@ -912,10 +878,12 @@ def local_execute(
             except JobException as e:
                 status = FAILED
                 result.trace.error(
-                    f"[JOB]: {ls} Catch:\n\t{e.__class__.__name__}:\n\t{e}"
+                    f"[JOB]: {ls}: {e.__class__.__name__}:{NEWLINE}{e}"
                 )
-                context.update({"errors": e.to_dict()})
-
+                if "errors" in context:
+                    context["errors"].append(e.to_dict())
+                else:
+                    context["errors"] = [e.to_dict()]
     return result.catch(status=status, context=context)
 
 
@@ -938,8 +906,8 @@ def self_hosted_execute(
     :param parent_run_id: (str) A parent workflow running ID.
     :param event: (Event) An Event manager instance that use to cancel this
         execution if it forces stopped by parent execution.
-    :param raise_error: (bool) A flag that all this method raise error to the
-        strategy execution.
+    :param raise_error: (bool) A flag that disable error handler from
+        execution. Default is `True`.
 
     :rtype: Result
     """
@@ -955,8 +923,8 @@ def self_hosted_execute(
             status=CANCEL,
             context={
                 "errors": JobException(
-                    "Job self-hosted execution was canceled from event that "
-                    "had set before start execution."
+                    "Job was canceled from event that had set before start "
+                    "self-hosted execution."
                 ).to_dict()
             },
         )
@@ -1035,8 +1003,8 @@ def azure_batch_execute(
             status=CANCEL,
             context={
                 "errors": JobException(
-                    "Job azure-batch execution was canceled from event that "
-                    "had set before start execution."
+                    "Job was canceled from event that had set before start "
+                    "azure-batch execution."
                 ).to_dict()
             },
         )

@@ -24,6 +24,7 @@ from .__types import DictData, Matrix
 
 T = TypeVar("T")
 UTC: Final[ZoneInfo] = ZoneInfo("UTC")
+NEWLINE: Final[str] = "\n\t...\t"
 
 
 def replace_sec(dt: datetime) -> datetime:
@@ -200,7 +201,7 @@ def filter_func(value: T) -> T:
 def cross_product(matrix: Matrix) -> Iterator[DictData]:
     """Iterator of products value from matrix.
 
-    :param matrix:
+    :param matrix: (Matrix)
 
     :rtype: Iterator[DictData]
     """
@@ -223,7 +224,7 @@ def batch(iterable: Iterator[Any] | range, n: int) -> Iterator[Any]:
         ['G']
 
     :param iterable:
-    :param n:
+    :param n: (int) A number of returning batch size.
 
     :rtype: Iterator[Any]
     """
@@ -247,8 +248,8 @@ def cut_id(run_id: str, *, num: int = 6) -> str:
         >>> cut_id(run_id='20240101081330000000T1354680202')
         '202401010813680202'
 
-    :param run_id: A running ID That want to cut
-    :param num:
+    :param run_id: (str) A running ID That want to cut.
+    :param num: (int) A number of cutting length.
 
     :rtype: str
     """

@@ -975,16 +975,13 @@ class Workflow(BaseModel):
         :raise WorkflowException: If execute with not exist job's ID.
         :raise WorkflowException: If the job execution raise JobException.
 
-        :param job_id: A job ID that want to execute.
-        :param params: A params that was parameterized from workflow execution.
-        :param result: (Result) A result object for keeping context and status
-            data.
-        :param event: (Event) An event manager that pass to the
-            PoolThreadExecutor.
+        :param job_id: A job ID.
+        :param params: (DictData) A parameter data.
+        :param result: (Result) A Result instance for return context and status.
+        :param event: (Event) An Event manager instance that use to cancel this
+            execution if it forces stopped by parent execution.
 
         :rtype: Result
-        :return: Return the result object that receive the job execution result
-            context.
         """
         if result is None:  # pragma: no cov
             result: Result = Result(run_id=gen_id(self.name, unique=True))
@@ -1087,23 +1084,13 @@ class Workflow(BaseModel):
 
         result.trace.info(f"[WORKFLOW]: Execute: {self.name!r} ...")
         if not self.jobs:
-            result.trace.warning(
-                f"[WORKFLOW]: {self.name!r} does not have any jobs"
-            )
+            result.trace.warning(f"[WORKFLOW]: {self.name!r} does not set jobs")
             return result.catch(status=SUCCESS, context=params)
 
         jq: Queue = Queue()
         for job_id in self.jobs:
             jq.put(job_id)
 
-        # NOTE: Create data context that will pass to any job executions
-        #   on this workflow.
-        #
-        #   {
-        #       'params': <input-params>,
-        #       'jobs': {},
-        #   }
-        #
         context: DictData = self.parameterize(params)
         status: Status = SUCCESS
         try:
@@ -1144,7 +1131,6 @@ class Workflow(BaseModel):
         job_queue: Queue,
         *,
         timeout: int = 600,
-        thread_timeout: int = 1800,
         event: Event | None = None,
     ) -> DictData:
         """Workflow execution by threading strategy that use multithreading.
@@ -1158,7 +1144,6 @@ class Workflow(BaseModel):
             time out.
         :param job_queue: (Queue) A job queue object.
         :param timeout: (int) A second value unit that bounding running time.
-        :param thread_timeout: A timeout to waiting all futures complete.
         :param event: (Event) An event manager that pass to the
             PoolThreadExecutor.
 
@@ -1212,7 +1197,7 @@ class Workflow(BaseModel):
 
             if not_timeout_flag:
                 job_queue.join()
-                for future in as_completed(futures, timeout=thread_timeout):
+                for future in as_completed(futures):
                     if e := future.exception():
                         result.trace.error(f"[WORKFLOW]: {e}")
                         raise WorkflowException(str(e))
@@ -1266,7 +1251,7 @@ class Workflow(BaseModel):
             max_workers=1,
             thread_name_prefix="wf_exec_non_threading_",
         ) as executor:
-            future: Optional[Future] = None
+            futures: list[Future] = []
 
             while not job_queue.empty() and (
                 not_timeout_flag := ((time.monotonic() - ts) < timeout)
@@ -1290,27 +1275,29 @@ class Workflow(BaseModel):
                     job_queue.task_done()
                     continue
 
-                if future is None:
-                    future: Future = executor.submit(
-                        self.execute_job,
-                        job_id=job_id,
-                        params=context,
-                        result=result,
-                        event=event,
+                if len(futures) < 1:
+                    futures.append(
+                        executor.submit(
+                            self.execute_job,
+                            job_id=job_id,
+                            params=context,
+                            result=result,
+                            event=event,
+                        )
                     )
                     time.sleep(0.025)
-                elif future.done() or future.cancelled():
+                elif (future := futures.pop(0)).done() or future.cancelled():
                     if e := future.exception():
                         result.trace.error(f"[WORKFLOW]: {e}")
                         raise WorkflowException(str(e))
-
-                    future = None
                     job_queue.put(job_id)
                 elif future.running() or "state=pending" in str(future):
                     time.sleep(0.075)
+                    futures.insert(0, future)
                     job_queue.put(job_id)
                 else:  # pragma: no cov
                     job_queue.put(job_id)
+                    futures.insert(0, future)
                     result.trace.warning(
                         f"... Execution non-threading not handle: {future}."
                     )
@@ -1319,7 +1306,7 @@ class Workflow(BaseModel):
 
             if not_timeout_flag:
                 job_queue.join()
-                if future:  # pragma: no cov
+                for future in as_completed(futures):  # pragma: no cov
                     if e := future.exception():
                         result.trace.error(f"[WORKFLOW]: {e}")
                         raise WorkflowException(str(e))
@@ -1332,7 +1319,7 @@ class Workflow(BaseModel):
                 f"[WORKFLOW]: Execution: {self.name!r} was timeout."
             )
             event.set()
-            if future:
+            for future in futures:
                 future.cancel()
 
         raise WorkflowException(f"Execution: {self.name!r} was timeout.")
