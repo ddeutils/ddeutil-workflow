@@ -2,6 +2,30 @@
 
 ## Latest Changes
 
+## 0.0.54
+
+### :stars: Highlight Features
+
+- :star: hl: remove raise error on job execution.
+- :star: hl: merge seperate threading method on workflow model.
+
+### :sparkles: Features
+
+- :dart: feat: add pass context before raise stage error on foreach stage.
+- :dart: feat: draft convert step of bash stage to async mode.
+- :dart: feat: draft docker stage task exec func.
+- :dart: feat: draft python virtual stage.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: update expect value that differenct.
+- :test_tube: tests: update testcase for change raise message.
+- :art: styled: change code format on job module.
+
+### :postbox: Dependencies
+
+- :pushpin: deps: remove hook stage.
+
 ## 0.0.53
 
 ### :stars: Highlight Features
