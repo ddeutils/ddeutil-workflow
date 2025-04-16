@@ -44,10 +44,8 @@ def test_workflow_exec_raise_timeout():
         jobs={"sleep-run": job, "sleep-again-run": job},
     )
     rs: Result = workflow.execute(params={}, timeout=1, max_job_parallel=1)
-    assert rs.status == 1
-    assert rs.context["errors"]["message"] == (
-        "Execution: 'demo-workflow' was timeout."
-    )
+    assert rs.status == FAILED
+    assert rs.context["errors"]["message"] == "'demo-workflow' was timeout."
 
 
 def test_workflow_exec_py():
@@ -141,7 +139,7 @@ def test_workflow_exec_parallel_timeout():
         "errors": {
             "class": rs.context["errors"]["class"],
             "name": "WorkflowException",
-            "message": "Execution: 'demo-workflow' was timeout.",
+            "message": "'demo-workflow' was timeout.",
         },
     }
 
@@ -204,7 +202,7 @@ def test_workflow_exec_py_raise():
         "errors": {
             "class": rs.context["errors"]["class"],
             "name": "WorkflowException",
-            "message": "Workflow job, 'first-job', failed without raise error.",
+            "message": "Workflow job, 'first-job', return FAILED status.",
         },
         "params": {},
         "jobs": {
@@ -220,7 +218,8 @@ def test_workflow_exec_py_raise():
                             "ValueError: Testing raise error inside PyStage!!!"
                         ),
                     }
-                ]
+                ],
+                "stages": {},
             },
             "second-job": {"stages": {"1772094681": {"outputs": {}}}},
         },
@@ -236,7 +235,7 @@ def test_workflow_exec_py_raise_parallel():
         "errors": {
             "class": rs.context["errors"]["class"],
             "name": "WorkflowException",
-            "message": "Workflow job, 'first-job', failed without raise error.",
+            "message": "Workflow job, 'first-job', return FAILED status.",
         },
         "params": {},
         "jobs": {
@@ -252,7 +251,8 @@ def test_workflow_exec_py_raise_parallel():
                             "ValueError: Testing raise error inside PyStage!!!"
                         ),
                     }
-                ]
+                ],
+                "stages": {},
             },
             "second-job": {"stages": {"1772094681": {"outputs": {}}}},
         },
@@ -805,7 +805,7 @@ def test_workflow_exec_raise_param(test_path):
             "tmp-wf-exec-raise-param",
             extras={"stage_raise_error": False},
         ).execute(params={"stream": "demo-stream"}, max_job_parallel=1)
-        assert rs.status == SUCCESS
+        assert rs.status == FAILED
         assert rs.context == {
             "params": {"stream": "demo-stream"},
             "jobs": {
@@ -824,17 +824,24 @@ def test_workflow_exec_raise_param(test_path):
                             },
                         }
                     },
-                    "errors": {
-                        "class": rs.context["jobs"]["start-job"]["errors"][
-                            "class"
-                        ],
-                        "name": "JobException",
-                        "message": (
-                            "Job strategy was break because stage, get-param, "
-                            "failed without raise error."
-                        ),
-                    },
+                    "errors": [
+                        {
+                            "class": rs.context["jobs"]["start-job"]["errors"][
+                                0
+                            ]["class"],
+                            "name": "JobException",
+                            "message": (
+                                "Strategy break because stage, 'get-param', "
+                                "return FAILED status."
+                            ),
+                        },
+                    ],
                 }
+            },
+            "errors": {
+                "class": rs.context["errors"]["class"],
+                "message": "Workflow job, 'start-job', return FAILED status.",
+                "name": "WorkflowException",
             },
         }
 
@@ -890,16 +897,20 @@ def test_workflow_exec_raise_job_trigger(test_path):
                             },
                         },
                     },
-                    "errors": {
-                        "class": (
-                            rs.context["jobs"]["start-job"]["errors"]["class"]
-                        ),
-                        "name": "JobException",
-                        "message": (
-                            "Job strategy was break because stage, get-param, "
-                            "failed without raise error."
-                        ),
-                    },
+                    "errors": [
+                        {
+                            "class": (
+                                rs.context["jobs"]["start-job"]["errors"][0][
+                                    "class"
+                                ]
+                            ),
+                            "name": "JobException",
+                            "message": (
+                                "Strategy break because stage, 'get-param', "
+                                "return FAILED status."
+                            ),
+                        },
+                    ],
                 },
             },
             "errors": {

@@ -46,6 +46,7 @@ from .params import Param
 from .result import FAILED, SKIP, SUCCESS, WAIT, Result
 from .reusables import has_template, param2template
 from .utils import (
+    NEWLINE,
     gen_id,
     get_dt_now,
     reach_next_minute,
@@ -1012,7 +1013,6 @@ class Workflow(BaseModel):
                 run_id=result.run_id,
                 parent_run_id=result.parent_run_id,
                 event=event,
-                raise_error=True,
             )
             job.set_outputs(rs.context, to=params)
         except (JobException, UtilException) as e:
@@ -1022,9 +1022,8 @@ class Workflow(BaseModel):
             ) from None
 
         if rs.status == FAILED:
-            error_msg: str = (
-                f"Workflow job, {job.id!r}, failed without raise error."
-            )
+            error_msg: str = f"Workflow job, {job.id!r}, return FAILED status."
+            result.trace.warning(f"[WORKFLOW]: {error_msg}")
             return result.catch(
                 status=FAILED,
                 context={
@@ -1040,10 +1039,10 @@ class Workflow(BaseModel):
         *,
         run_id: str | None = None,
         parent_run_id: str | None = None,
-        timeout: int = 600,
         result: Result | None = None,
-        max_job_parallel: int = 2,
         event: Event | None = None,
+        timeout: int = 3600,
+        max_job_parallel: int = 2,
     ) -> Result:
         """Execute workflow with passing a dynamic parameters to all jobs that
         included in this workflow model with ``jobs`` field.
@@ -1052,25 +1051,30 @@ class Workflow(BaseModel):
         workflow will keep in dict which able to catch out with all jobs and
         stages by dot annotation.
 
-            For example, when I want to use the output from previous stage, I
-        can access it with syntax:
+            For example with non-strategy job, when I want to use the output
+        from previous stage, I can access it with syntax:
 
-            ... ${job-name}.stages.${stage-id}.outputs.${key}
-            ... ${job-name}.stages.${stage-id}.errors.${key}
+            ... ${job-id}.stages.${stage-id}.outputs.${key}
+            ... ${job-id}.stages.${stage-id}.errors.${key}
+
+            But example for strategy job:
+
+            ... ${job-id}.strategies.${strategy-id}.stages.${stage-id}.outputs.${key}
+            ... ${job-id}.strategies.${strategy-id}.stages.${stage-id}.errors.${key}
 
         :param params: An input parameters that use on workflow execution that
-            will parameterize before using it. Default is None.
-        :param run_id: A workflow running ID for this job execution.
-        :param parent_run_id: A parent workflow running ID for this release.
+            will parameterize before using it.
+        :param run_id: (str | None) A workflow running ID.
+        :param parent_run_id: (str | None) A parent workflow running ID.
+        :param result: (Result) A Result instance for return context and status.
+        :param event: (Event) An Event manager instance that use to cancel this
+            execution if it forces stopped by parent execution.
         :param timeout: (int) A workflow execution time out in second unit that
             use for limit time of execution and waiting job dependency. This
             value does not force stop the task that still running more than this
-            limit time. (default: 0)
-        :param result: (Result) A result object for keeping context and status
-            data.
-        :param max_job_parallel: (int) The maximum threads of job execution.
-        :param event: (Event) An event manager that pass to the
-            PoolThreadExecutor.
+            limit time. (Default: 60 * 60 seconds)
+        :param max_job_parallel: (int) The maximum workers that use for job
+            execution in `PoolThreadExecutor` object. (Default: 2 workers)
 
         :rtype: Result
         """
@@ -1178,26 +1182,23 @@ class Workflow(BaseModel):
 
             if not_timeout_flag:
                 job_queue.join()
-                for future in as_completed(futures):  # pragma: no cov
+                for future in as_completed(futures):
                     try:
                         future.result()
-                    except Exception as e:
-                        result.trace.error(f"[WORKFLOW]: {e}")
+                    except WorkflowException as e:
+                        result.trace.error(f"[WORKFLOW]: Handler:{NEWLINE}{e}")
                         return result.catch(
                             status=FAILED,
                             context={
                                 "errors": WorkflowException(str(e)).to_dict()
                             },
                         )
-
                 return result.catch(
                     status=FAILED if "errors" in result.context else SUCCESS,
                     context=context,
                 )
 
-            result.trace.error(
-                f"[WORKFLOW]: Execution: {self.name!r} was timeout."
-            )
+            result.trace.error(f"[WORKFLOW]: {self.name!r} was timeout.")
             event.set()
             for future in futures:
                 future.cancel()
@@ -1206,7 +1207,7 @@ class Workflow(BaseModel):
             status=FAILED,
             context={
                 "errors": WorkflowException(
-                    f"Execution: {self.name!r} was timeout."
+                    f"{self.name!r} was timeout."
                 ).to_dict()
             },
         )

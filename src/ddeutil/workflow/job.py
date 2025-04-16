@@ -455,7 +455,6 @@ class Job(BaseModel):
                 for k in ("errors", "skipped")
                 for job in need_exist
             )
-            print("All success return", rs)
         elif self.trigger_rule == Rule.ALL_FAILED:
             rs = all("errors" in need_exist[job] for job in need_exist)
         elif self.trigger_rule == Rule.ONE_SUCCESS:
@@ -590,7 +589,6 @@ class Job(BaseModel):
         run_id: str | None = None,
         parent_run_id: str | None = None,
         event: Event | None = None,
-        raise_error: bool = True,
     ) -> Result:
         """Job execution with passing dynamic parameters from the workflow
         execution. It will generate matrix values at the first step and run
@@ -604,8 +602,6 @@ class Job(BaseModel):
         :param parent_run_id: (str) A parent workflow running ID.
         :param event: (Event) An Event manager instance that use to cancel this
             execution if it forces stopped by parent execution.
-        :param raise_error: (bool) A flag that disable error handler from
-            execution. Default is `True`.
 
         :raise NotImplementedError: If the `runs-on` value does not implement on
             this execution.
@@ -629,7 +625,6 @@ class Job(BaseModel):
                 run_id=run_id,
                 parent_run_id=parent_run_id,
                 event=event,
-                raise_error=raise_error,
             )
         elif self.runs_on.type == RunsOn.SELF_HOSTED:  # pragma: no cov
             pass
@@ -640,7 +635,6 @@ class Job(BaseModel):
                 run_id=run_id,
                 parent_run_id=parent_run_id,
                 event=event,
-                raise_error=raise_error,
             )
 
         # pragma: no cov
@@ -659,7 +653,6 @@ def local_execute_strategy(
     *,
     result: Result | None = None,
     event: Event | None = None,
-    raise_error: bool = True,
 ) -> Result:
     """Local job strategy execution with passing dynamic parameters from the
     workflow execution to strategy matrix.
@@ -680,8 +673,6 @@ def local_execute_strategy(
     :param result: (Result) A Result instance for return context and status.
     :param event: (Event) An Event manager instance that use to cancel this
         execution if it forces stopped by parent execution.
-    :param raise_error: (bool) A flag that disable error handler from
-        execution. Default is `True`.
 
     :raise JobException: If it has any error from `StageException` or
         `UtilException`.
@@ -698,10 +689,10 @@ def local_execute_strategy(
     context.update({"matrix": strategy, "stages": {}})
 
     if strategy:
-        result.trace.info(f"[JOB]: Execute Strategy: {strategy_id!r}")
+        result.trace.info(f"[JOB]: Start Strategy: {strategy_id!r}")
         result.trace.info(f"[JOB]: ... matrix: {strategy!r}")
     else:
-        result.trace.info("[JOB]: Execute Empty-Strategy")
+        result.trace.info("[JOB]: Start Strategy: EMPTY")
 
     for stage in job.stages:
 
@@ -740,12 +731,7 @@ def local_execute_strategy(
             stage.set_outputs(rs.context, to=context)
         except (StageException, UtilException) as e:
             result.trace.error(f"[JOB]: {e.__class__.__name__}: {e}")
-            if raise_error:
-                raise JobException(
-                    f"Stage raise: {e.__class__.__name__}: {e}"
-                ) from None
-
-            return result.catch(
+            result.catch(
                 status=FAILED,
                 context={
                     strategy_id: {
@@ -755,13 +741,17 @@ def local_execute_strategy(
                     },
                 },
             )
+            raise JobException(
+                f"Stage raise: {e.__class__.__name__}: {e}"
+            ) from e
 
         if rs.status == FAILED:
             error_msg: str = (
-                f"Job strategy was break because stage, {stage.iden}, "
-                f"failed without raise error."
+                f"Strategy break because stage, {stage.iden!r}, return FAILED "
+                f"status."
             )
-            return result.catch(
+            result.trace.warning(f"[JOB]: {error_msg}")
+            result.catch(
                 status=FAILED,
                 context={
                     strategy_id: {
@@ -771,6 +761,7 @@ def local_execute_strategy(
                     },
                 },
             )
+            raise JobException(error_msg)
 
     return result.catch(
         status=SUCCESS,
@@ -790,7 +781,6 @@ def local_execute(
     run_id: str | None = None,
     parent_run_id: str | None = None,
     event: Event | None = None,
-    raise_error: bool = True,
 ) -> Result:
     """Local job execution with passing dynamic parameters from the workflow
     execution or itself execution. It will generate matrix values at the first
@@ -805,8 +795,6 @@ def local_execute(
     :param parent_run_id: (str) A parent workflow running ID.
     :param event: (Event) An Event manager instance that use to cancel this
         execution if it forces stopped by parent execution.
-    :param raise_error: (bool) A flag that disable error handler from
-        execution. Default is `True`.
 
     :rtype: Result
     """
@@ -849,7 +837,6 @@ def local_execute(
                 params=params,
                 result=result,
                 event=event,
-                raise_error=raise_error,
             )
             for strategy in job.strategy.make()
         ]
@@ -894,7 +881,6 @@ def self_hosted_execute(
     run_id: str | None = None,
     parent_run_id: str | None = None,
     event: Event | None = None,
-    raise_error: bool = True,
 ) -> Result:  # pragma: no cov
     """Self-Hosted job execution with passing dynamic parameters from the
     workflow execution or itself execution. It will make request to the
@@ -906,8 +892,6 @@ def self_hosted_execute(
     :param parent_run_id: (str) A parent workflow running ID.
     :param event: (Event) An Event manager instance that use to cancel this
         execution if it forces stopped by parent execution.
-    :param raise_error: (bool) A flag that disable error handler from
-        execution. Default is `True`.
 
     :rtype: Result
     """
@@ -939,20 +923,17 @@ def self_hosted_execute(
                 "job": job.model_dump(),
                 "params": params,
                 "result": result.__dict__,
-                "raise_error": raise_error,
             },
         )
     except requests.exceptions.RequestException as e:
         return result.catch(status=FAILED, context={"errors": to_dict(e)})
 
     if resp.status_code != 200:
-        if raise_error:
-            raise JobException(
-                f"Job execution error from request to self-hosted: "
-                f"{job.runs_on.args.host!r}"
-            )
+        raise JobException(
+            f"Job execution error from request to self-hosted: "
+            f"{job.runs_on.args.host!r}"
+        )
 
-        return result.catch(status=FAILED)
     return result.catch(status=SUCCESS)
 
 
@@ -963,7 +944,6 @@ def azure_batch_execute(
     run_id: str | None = None,
     parent_run_id: str | None = None,
     event: Event | None = None,
-    raise_error: bool | None = None,
 ) -> Result:  # pragma no cov
     """Azure Batch job execution that will run all job's stages on the Azure
     Batch Node and extract the result file to be returning context result.
@@ -988,7 +968,6 @@ def azure_batch_execute(
     :param run_id:
     :param parent_run_id:
     :param event:
-    :param raise_error:
 
     :rtype: Result
     """
@@ -1009,7 +988,6 @@ def azure_batch_execute(
             },
         )
     print(params)
-    print(raise_error)
     return result.catch(status=SUCCESS)
 
 
@@ -1020,7 +998,6 @@ def docker_execution(
     run_id: str | None = None,
     parent_run_id: str | None = None,
     event: Event | None = None,
-    raise_error: bool | None = None,
 ):
     """Docker job execution.
 
@@ -1046,5 +1023,4 @@ def docker_execution(
             },
         )
     print(params)
-    print(raise_error)
     return result.catch(status=SUCCESS)
