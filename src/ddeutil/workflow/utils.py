@@ -24,7 +24,7 @@ from .__types import DictData, Matrix
 
 T = TypeVar("T")
 UTC: Final[ZoneInfo] = ZoneInfo("UTC")
-NEWLINE: Final[str] = "\n\t...\t"
+NEWLINE: Final[str] = "\n\t| ...\t"
 
 
 def replace_sec(dt: datetime) -> datetime:

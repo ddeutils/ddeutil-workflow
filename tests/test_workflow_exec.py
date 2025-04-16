@@ -196,62 +196,65 @@ def test_workflow_exec_py_with_parallel():
 
 
 def test_workflow_exec_py_raise():
-    workflow = Workflow.from_conf("wf-run-python-raise")
-    rs = workflow.execute(params={}, max_job_parallel=1)
-    assert rs.status == 1
-    assert rs.context == {
-        "params": {},
-        "jobs": {},
-        "errors": {
-            "class": rs.context["errors"]["class"],
-            "name": "WorkflowException",
-            "message": (
-                "Get job execution error first-job: JobException: Stage "
-                "execution error: StageException: PyStage: \n\t"
-                "ValueError: Testing raise error inside PyStage!!!"
-            ),
-        },
-    }
-
-    workflow = Workflow.from_conf(
-        "wf-run-python-raise", extras={"max_job_parallel": 1}
+    rs: Result = Workflow.from_conf("wf-run-python-raise").execute(
+        params={}, max_job_parallel=1
     )
-    rs = workflow.execute(params={})
-    assert rs.status == 1
+    assert rs.status == FAILED
     assert rs.context == {
-        "params": {},
-        "jobs": {},
         "errors": {
             "class": rs.context["errors"]["class"],
             "name": "WorkflowException",
-            "message": (
-                "Get job execution error first-job: JobException: Stage "
-                "execution error: StageException: PyStage: \n\t"
-                "ValueError: Testing raise error inside PyStage!!!"
-            ),
+            "message": "Workflow job, 'first-job', failed without raise error.",
+        },
+        "params": {},
+        "jobs": {
+            "first-job": {
+                "errors": [
+                    {
+                        "class": rs.context["jobs"]["first-job"]["errors"][0][
+                            "class"
+                        ],
+                        "name": "JobException",
+                        "message": (
+                            "Stage raise: StageException: PyStage: \n\t"
+                            "ValueError: Testing raise error inside PyStage!!!"
+                        ),
+                    }
+                ]
+            },
+            "second-job": {"stages": {"1772094681": {"outputs": {}}}},
         },
     }
 
 
 def test_workflow_exec_py_raise_parallel():
-    workflow = Workflow.from_conf("wf-run-python-raise")
-    rs = workflow.execute(params={}, max_job_parallel=2)
-    assert rs.status == 1
+    rs: Result = Workflow.from_conf("wf-run-python-raise").execute(
+        params={}, max_job_parallel=2
+    )
+    assert rs.status == FAILED
     assert rs.context == {
-        "params": {},
-        "jobs": {
-            "second-job": {
-                "stages": {"1772094681": {"outputs": {}}},
-            }
-        },
         "errors": {
             "class": rs.context["errors"]["class"],
             "name": "WorkflowException",
-            "message": (
-                "Get job execution error first-job: JobException: Stage "
-                "execution error: StageException: PyStage: \n\t"
-                "ValueError: Testing raise error inside PyStage!!!"
-            ),
+            "message": "Workflow job, 'first-job', failed without raise error.",
+        },
+        "params": {},
+        "jobs": {
+            "first-job": {
+                "errors": [
+                    {
+                        "class": rs.context["jobs"]["first-job"]["errors"][0][
+                            "class"
+                        ],
+                        "name": "JobException",
+                        "message": (
+                            "Stage raise: StageException: PyStage: \n\t"
+                            "ValueError: Testing raise error inside PyStage!!!"
+                        ),
+                    }
+                ]
+            },
+            "second-job": {"stages": {"1772094681": {"outputs": {}}}},
         },
     }
 
@@ -798,10 +801,10 @@ def test_workflow_exec_raise_param(test_path):
                   echo: "Hello after Raise Error"
         """,
     ):
-        workflow = Workflow.from_conf(name="tmp-wf-exec-raise-param")
-        rs: Result = workflow.execute(
-            params={"stream": "demo-stream"}, max_job_parallel=1
-        )
+        rs: Result = Workflow.from_conf(
+            "tmp-wf-exec-raise-param",
+            extras={"stage_raise_error": False},
+        ).execute(params={"stream": "demo-stream"}, max_job_parallel=1)
         assert rs.status == SUCCESS
         assert rs.context == {
             "params": {"stream": "demo-stream"},
@@ -811,32 +814,27 @@ def test_workflow_exec_raise_param(test_path):
                         "get-param": {
                             "outputs": {},
                             "errors": {
-                                "class": (
-                                    rs.context["jobs"]["start-job"]["stages"][
-                                        "get-param"
-                                    ]["errors"]["class"]
-                                ),
+                                "class": rs.context["jobs"]["start-job"][
+                                    "stages"
+                                ]["get-param"]["errors"]["class"],
                                 "name": "UtilException",
-                                "message": "Params does not set caller: 'params.name'.",
+                                "message": (
+                                    "Params does not set caller: 'params.name'."
+                                ),
                             },
-                        },
+                        }
                     },
                     "errors": {
-                        "class": (
-                            rs.context["jobs"]["start-job"]["errors"]["class"]
-                        ),
+                        "class": rs.context["jobs"]["start-job"]["errors"][
+                            "class"
+                        ],
                         "name": "JobException",
                         "message": (
                             "Job strategy was break because stage, get-param, "
                             "failed without raise error."
                         ),
                     },
-                },
-            },
-            "errors": {
-                "class": rs.context["errors"]["class"],
-                "message": "Workflow job, start-job, failed without raise error.",
-                "name": "WorkflowException",
+                }
             },
         }
 

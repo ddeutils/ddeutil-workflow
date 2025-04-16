@@ -443,7 +443,6 @@ class Job(BaseModel):
         need_exist: dict[str, Any] = {
             need: jobs[need] for need in self.needs if need in jobs
         }
-
         if len(need_exist) != len(self.needs):
             return WAIT
         elif all("skipped" in need_exist[job] for job in need_exist):
@@ -456,6 +455,7 @@ class Job(BaseModel):
                 for k in ("errors", "skipped")
                 for job in need_exist
             )
+            print("All success return", rs)
         elif self.trigger_rule == Rule.ALL_FAILED:
             rs = all("errors" in need_exist[job] for job in need_exist)
         elif self.trigger_rule == Rule.ONE_SUCCESS:
@@ -742,7 +742,7 @@ def local_execute_strategy(
             result.trace.error(f"[JOB]: {e.__class__.__name__}: {e}")
             if raise_error:
                 raise JobException(
-                    f"Stage execution error: {e.__class__.__name__}: {e}"
+                    f"Stage raise: {e.__class__.__name__}: {e}"
                 ) from None
 
             return result.catch(
@@ -820,9 +820,10 @@ def local_execute(
     event: Event = Event() if event is None else event
     fail_fast_flag: bool = job.strategy.fail_fast
     ls: str = "Fail-Fast" if fail_fast_flag else "All-Completed"
+    workers: int = job.strategy.max_parallel
     result.trace.info(
-        f"[JOB]: {ls}-Execute: {job.id} with {job.strategy.max_parallel} "
-        f"workers."
+        f"[JOB]: {ls}-Execute: {job.id} with {workers} "
+        f"worker{'s' if workers > 1 else ''}."
     )
 
     if event and event.is_set():  # pragma: no cov
@@ -837,8 +838,7 @@ def local_execute(
         )
 
     with ThreadPoolExecutor(
-        max_workers=job.strategy.max_parallel,
-        thread_name_prefix="job_strategy_exec_",
+        max_workers=workers, thread_name_prefix="job_strategy_exec_"
     ) as executor:
 
         futures: list[Future] = [

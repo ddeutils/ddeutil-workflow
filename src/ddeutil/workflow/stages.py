@@ -4,7 +4,7 @@
 # license information.
 # ------------------------------------------------------------------------------
 # [x] Use dynamic config
-"""Stage model include all stage model that use be the minimum execution layer
+"""Stages module include all stage model that use be the minimum execution layer
 of this workflow engine. The stage handle the minimize task that run in some
 thread (same thread at its job owner) that mean it is the lowest executor that
 you can track logs.
@@ -216,7 +216,9 @@ class BaseStage(BaseModel, ABC):
             rs: Result = self.execute(params, result=result, event=event)
             return rs
         except Exception as e:
-            result.trace.error(f"[STAGE]: Handler: {e.__class__.__name__}: {e}")
+            result.trace.error(
+                f"[STAGE]: Handler:{NEWLINE}{e.__class__.__name__}: {e}"
+            )
             if dynamic("stage_raise_error", f=raise_error, extras=self.extras):
                 if isinstance(e, StageException):
                     raise

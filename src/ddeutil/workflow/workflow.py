@@ -4,11 +4,11 @@
 # license information.
 # ------------------------------------------------------------------------------
 # [x] Use dynamic config
-"""A Workflow module that is the core module of this package. It keeps Release
-and Workflow Pydantic models.
+"""Workflow module is the core module of this Workflow package. It keeps
+Release, ReleaseQueue, and Workflow Pydantic models.
 
-    I will implement timeout on the workflow execution layer only because the
-main propose of this package in Workflow model.
+    This package implement timeout strategy on the workflow execution layer only
+because the main propose of this package is using Workflow to be orchestrator.
 """
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ from .exceptions import JobException, UtilException, WorkflowException
 from .job import Job
 from .logs import Audit, get_audit
 from .params import Param
-from .result import FAILED, SKIP, SUCCESS, WAIT, Result, Status
+from .result import FAILED, SKIP, SUCCESS, WAIT, Result
 from .reusables import has_template, param2template
 from .utils import (
     gen_id,
@@ -1012,17 +1012,18 @@ class Workflow(BaseModel):
                 run_id=result.run_id,
                 parent_run_id=result.parent_run_id,
                 event=event,
+                raise_error=True,
             )
             job.set_outputs(rs.context, to=params)
         except (JobException, UtilException) as e:
             result.trace.error(f"[WORKFLOW]: {e.__class__.__name__}: {e}")
             raise WorkflowException(
-                f"Get job execution error {job_id}: JobException: {e}"
+                f"Job {job_id!r} raise {e.__class__.__name__}: {e}"
             ) from None
 
         if rs.status == FAILED:
             error_msg: str = (
-                f"Workflow job, {job.id}, failed without raise error."
+                f"Workflow job, {job.id!r}, failed without raise error."
             )
             return result.catch(
                 status=FAILED,
@@ -1081,83 +1082,28 @@ class Workflow(BaseModel):
             id_logic=self.name,
             extras=self.extras,
         )
-
+        context: DictData = self.parameterize(params)
         result.trace.info(f"[WORKFLOW]: Execute: {self.name!r} ...")
         if not self.jobs:
             result.trace.warning(f"[WORKFLOW]: {self.name!r} does not set jobs")
-            return result.catch(status=SUCCESS, context=params)
+            return result.catch(status=SUCCESS, context=context)
 
-        jq: Queue = Queue()
+        job_queue: Queue = Queue()
         for job_id in self.jobs:
-            jq.put(job_id)
+            job_queue.put(job_id)
 
-        context: DictData = self.parameterize(params)
-        status: Status = SUCCESS
-        try:
-            if (
-                dynamic(
-                    "max_job_parallel", f=max_job_parallel, extras=self.extras
-                )
-                == 1
-            ):
-                self.__exec_non_threading(
-                    result=result,
-                    context=context,
-                    ts=ts,
-                    job_queue=jq,
-                    timeout=timeout,
-                    event=event,
-                )
-            else:
-                self.__exec_threading(
-                    result=result,
-                    context=context,
-                    ts=ts,
-                    job_queue=jq,
-                    timeout=timeout,
-                    event=event,
-                )
-        except (WorkflowException, JobException) as e:
-            status: Status = FAILED
-            context.update({"errors": e.to_dict()})
-
-        return result.catch(status=status, context=context)
-
-    def __exec_threading(
-        self,
-        result: Result,
-        context: DictData,
-        ts: float,
-        job_queue: Queue,
-        *,
-        timeout: int = 600,
-        event: Event | None = None,
-    ) -> DictData:
-        """Workflow execution by threading strategy that use multithreading.
-
-            If a job need dependency, it will check dependency job ID from
-        context data before allow it run.
-
-        :param result: (Result) A result model.
-        :param context: A context workflow data that want to downstream passing.
-        :param ts: A start timestamp that use for checking execute time should
-            time out.
-        :param job_queue: (Queue) A job queue object.
-        :param timeout: (int) A second value unit that bounding running time.
-        :param event: (Event) An event manager that pass to the
-            PoolThreadExecutor.
-
-        :rtype: DictData
-        """
         not_timeout_flag: bool = True
         timeout: int = dynamic(
             "max_job_exec_timeout", f=timeout, extras=self.extras
         )
         event: Event = event or Event()
-        result.trace.debug(f"... Run {self.name!r} with threading.")
+        result.trace.debug(f"... Run {self.name!r} with non-threading.")
+        max_job_parallel: int = dynamic(
+            "max_job_parallel", f=max_job_parallel, extras=self.extras
+        )
         with ThreadPoolExecutor(
-            max_workers=dynamic("max_job_parallel", extras=self.extras),
-            thread_name_prefix="wf_exec_threading_",
+            max_workers=max_job_parallel,
+            thread_name_prefix="wf_exec_non_threading_",
         ) as executor:
             futures: list[Future] = []
 
@@ -1173,9 +1119,14 @@ class Workflow(BaseModel):
                     time.sleep(0.15)
                     continue
                 elif check == FAILED:  # pragma: no cov
-                    raise WorkflowException(
-                        f"Validate job trigger rule was failed with "
-                        f"{job.trigger_rule.value!r}."
+                    return result.catch(
+                        status=FAILED,
+                        context={
+                            "errors": WorkflowException(
+                                f"Validate job trigger rule was failed with "
+                                f"{job.trigger_rule.value!r}."
+                            ).to_dict()
+                        },
                     )
                 elif check == SKIP:  # pragma: no cov
                     result.trace.info(f"[JOB]: Skip job: {job_id!r}")
@@ -1183,95 +1134,16 @@ class Workflow(BaseModel):
                     job_queue.task_done()
                     continue
 
-                futures.append(
-                    executor.submit(
-                        self.execute_job,
-                        job_id=job_id,
-                        params=context,
-                        result=result,
-                        event=event,
-                    ),
-                )
-
-                job_queue.task_done()
-
-            if not_timeout_flag:
-                job_queue.join()
-                for future in as_completed(futures):
-                    if e := future.exception():
-                        result.trace.error(f"[WORKFLOW]: {e}")
-                        raise WorkflowException(str(e))
-
-                    future.result()
-
-                return context
-
-            result.trace.error(
-                f"[WORKFLOW]: Execution: {self.name!r} was timeout."
-            )
-            event.set()
-            for future in futures:
-                future.cancel()
-
-        raise WorkflowException(f"Execution: {self.name!r} was timeout.")
-
-    def __exec_non_threading(
-        self,
-        result: Result,
-        context: DictData,
-        ts: float,
-        job_queue: Queue,
-        *,
-        timeout: int = 600,
-        event: Event | None = None,
-    ) -> DictData:
-        """Workflow execution with non-threading strategy that use sequential
-        job running and waiting previous job was run successful.
-
-            If a job need dependency, it will check dependency job ID from
-        context data before allow it run.
-
-        :param result: (Result) A result model.
-        :param context: A context workflow data that want to downstream passing.
-        :param ts: (float) A start timestamp that use for checking execute time
-            should time out.
-        :param timeout: (int) A second value unit that bounding running time.
-        :param event: (Event) An event manager that pass to the
-            PoolThreadExecutor.
-
-        :rtype: DictData
-        """
-        not_timeout_flag: bool = True
-        timeout: int = dynamic(
-            "max_job_exec_timeout", f=timeout, extras=self.extras
-        )
-        event: Event = event or Event()
-        result.trace.debug(f"... Run {self.name!r} with non-threading.")
-        with ThreadPoolExecutor(
-            max_workers=1,
-            thread_name_prefix="wf_exec_non_threading_",
-        ) as executor:
-            futures: list[Future] = []
-
-            while not job_queue.empty() and (
-                not_timeout_flag := ((time.monotonic() - ts) < timeout)
-            ):
-                job_id: str = job_queue.get()
-                job: Job = self.job(name=job_id)
-
-                if (check := job.check_needs(context["jobs"])) == WAIT:
-                    job_queue.task_done()
-                    job_queue.put(job_id)
-                    time.sleep(0.075)
-                    continue
-                elif check == FAILED:
-                    raise WorkflowException(
-                        f"Validate job trigger rule was failed with "
-                        f"{job.trigger_rule.value!r}."
+                if max_job_parallel > 1:
+                    futures.append(
+                        executor.submit(
+                            self.execute_job,
+                            job_id=job_id,
+                            params=context,
+                            result=result,
+                            event=event,
+                        ),
                     )
-                elif check == SKIP:  # pragma: no cov
-                    result.trace.info(f"[JOB]: Skip job: {job_id!r}")
-                    job.set_outputs(output={"skipped": True}, to=context)
                     job_queue.task_done()
                     continue
 
@@ -1307,13 +1179,21 @@ class Workflow(BaseModel):
             if not_timeout_flag:
                 job_queue.join()
                 for future in as_completed(futures):  # pragma: no cov
-                    if e := future.exception():
+                    try:
+                        future.result()
+                    except Exception as e:
                         result.trace.error(f"[WORKFLOW]: {e}")
-                        raise WorkflowException(str(e))
+                        return result.catch(
+                            status=FAILED,
+                            context={
+                                "errors": WorkflowException(str(e)).to_dict()
+                            },
+                        )
 
-                    future.result()
-
-                return context
+                return result.catch(
+                    status=FAILED if "errors" in result.context else SUCCESS,
+                    context=context,
+                )
 
             result.trace.error(
                 f"[WORKFLOW]: Execution: {self.name!r} was timeout."
@@ -1322,7 +1202,14 @@ class Workflow(BaseModel):
             for future in futures:
                 future.cancel()
 
-        raise WorkflowException(f"Execution: {self.name!r} was timeout.")
+        return result.catch(
+            status=FAILED,
+            context={
+                "errors": WorkflowException(
+                    f"Execution: {self.name!r} was timeout."
+                ).to_dict()
+            },
+        )
 
 
 @dataclass(config=ConfigDict(arbitrary_types_allowed=True))
