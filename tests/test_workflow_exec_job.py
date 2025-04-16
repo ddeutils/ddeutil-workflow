@@ -72,7 +72,8 @@ def test_workflow_execute_job_raise_inside():
                             "\n\tNotImplementedError: "
                         ),
                     }
-                ]
-            }
+                ],
+                "stages": {},
+            },
         },
     }

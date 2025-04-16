@@ -1417,8 +1417,18 @@ class ForEachStage(BaseStage):
                 stage.set_outputs(stage.get_outputs(output), to=context)
             except (StageException, UtilException) as e:
                 result.trace.error(f"[STAGE]: {e.__class__.__name__}: {e}")
+                result.catch(
+                    status=FAILED,
+                    foreach={
+                        item: {
+                            "item": item,
+                            "stages": filter_func(output.pop("stages", {})),
+                            "errors": e.to_dict(),
+                        },
+                    },
+                )
                 raise StageException(
-                    f"Sub-Stage execution error: {e.__class__.__name__}: {e}"
+                    f"Sub-Stage raise: {e.__class__.__name__}: {e}"
                 ) from None
 
             if rs.status == FAILED:
@@ -1506,25 +1516,25 @@ class ForEachStage(BaseStage):
             context: DictData = {}
             status: Status = SUCCESS
 
-            done, not_done = wait(
-                futures, timeout=1800, return_when=FIRST_EXCEPTION
-            )
-
+            done, not_done = wait(futures, return_when=FIRST_EXCEPTION)
             if len(done) != len(futures):
                 result.trace.warning(
-                    "[STAGE]: Set the event for stop running stage."
+                    "[STAGE]: Set event for stop pending stage future."
                 )
                 event.set()
                 for future in not_done:
                     future.cancel()
 
+                nd: str = f", item not run: {not_done}" if not_done else ""
+                result.trace.debug(f"... Foreach set Fail-Fast{nd}")
+
             for future in done:
                 try:
                     future.result()
-                except StageException as e:
+                except (StageException, UtilException) as e:
                     status = FAILED
                     result.trace.error(
-                        f"[STAGE]: {e.__class__.__name__}:\n\t{e}"
+                        f"[STAGE]: {e.__class__.__name__}:{NEWLINE}{e}"
                     )
                     context.update({"errors": e.to_dict()})
         return result.catch(status=status, context=context)

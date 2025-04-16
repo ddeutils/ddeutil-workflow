@@ -667,17 +667,39 @@ def test_stage_exec_foreach_with_trigger(test_path):
         assert rs == {
             "stages": {
                 "foreach-raise": {
-                    "outputs": {"items": [1, 2], "foreach": {}},
+                    "outputs": {
+                        "items": [1, 2],
+                        "foreach": {
+                            1: {
+                                "item": 1,
+                                "stages": {},
+                                "errors": {
+                                    "class": rs["stages"]["foreach-raise"][
+                                        "outputs"
+                                    ]["foreach"][1]["errors"]["class"],
+                                    "name": "StageException",
+                                    "message": "Trigger workflow return failed status with:\nWorkflow job, 'first-job', return FAILED status.",
+                                },
+                            },
+                            2: {
+                                "item": 2,
+                                "stages": {},
+                                "errors": {
+                                    "class": rs["stages"]["foreach-raise"][
+                                        "outputs"
+                                    ]["foreach"][2]["errors"]["class"],
+                                    "name": "StageException",
+                                    "message": "Trigger workflow return failed status with:\nWorkflow job was canceled from event that had set before job execution.",
+                                },
+                            },
+                        },
+                    },
                     "errors": {
                         "class": rs["stages"]["foreach-raise"]["errors"][
                             "class"
                         ],
                         "name": "StageException",
-                        "message": (
-                            "Sub-Stage execution error: StageException: "
-                            "Trigger workflow return failed status with:\n"
-                            "Workflow job, 'first-job', return FAILED status."
-                        ),
+                        "message": "Sub-Stage raise: StageException: Trigger workflow return failed status with:\nWorkflow job, 'first-job', return FAILED status.",
                     },
                 }
             }
