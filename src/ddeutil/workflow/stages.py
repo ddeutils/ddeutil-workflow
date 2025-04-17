@@ -1114,10 +1114,10 @@ class TriggerStage(BaseStage):
 
 class ParallelStage(BaseStage):  # pragma: no cov
     """Parallel stage executor that execute branch stages with multithreading.
-    This stage let you set the fix branches for running substage inside it on
+    This stage let you set the fix branches for running child stage inside it on
     multithread pool.
 
-        This stage is not the low-level stage model because it runs muti-stages
+        This stage is not the low-level stage model because it runs multi-stages
     in this stage execution.
 
     Data Validate:
@@ -1333,7 +1333,7 @@ class ForEachStage(BaseStage):
     foreach list.
 
         This stage is not the low-level stage model because it runs
-    muti-stages in this stage execution.
+    multi-stages in this stage execution.
 
     Data Validate:
         >>> stage = {
@@ -1566,6 +1566,9 @@ class ForEachStage(BaseStage):
 class UntilStage(BaseStage):
     """Until stage executor that will run stages in each loop until it valid
     with stop loop condition.
+
+        This stage is not the low-level stage model because it runs
+    multi-stages in this stage execution.
 
     Data Validate:
         >>> stage = {
@@ -2024,7 +2027,7 @@ class CaseStage(BaseStage):
 
 
 class RaiseStage(BaseStage):  # pragma: no cov
-    """Raise error stage execution that raise StageException that use a message
+    """Raise error stage executor that raise `StageException` that use a message
     field for making error message before raise.
 
     Data Validate:

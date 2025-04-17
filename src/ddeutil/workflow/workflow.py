@@ -684,10 +684,10 @@ class Workflow(BaseModel):
         if isinstance(release, datetime):
             release: Release = Release.from_dt(release, extras=self.extras)
 
-        result.trace.debug(
+        result.trace.info(
             f"[RELEASE]: Start {name!r} : {release.date:%Y-%m-%d %H:%M:%S}"
         )
-        self.execute(
+        rs: Result = self.execute(
             params=param2template(
                 params,
                 params={
@@ -706,7 +706,7 @@ class Workflow(BaseModel):
             parent_run_id=result.parent_run_id,
             timeout=timeout,
         )
-        result.trace.debug(
+        result.trace.info(
             f"[RELEASE]: End {name!r} : {release.date:%Y-%m-%d %H:%M:%S}"
         )
 
@@ -732,7 +732,7 @@ class Workflow(BaseModel):
             queue.mark_complete(release)
 
         return result.catch(
-            status=SUCCESS,
+            status=rs.status,
             context={
                 "params": params,
                 "release": {

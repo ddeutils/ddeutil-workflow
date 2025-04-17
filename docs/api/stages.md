@@ -48,34 +48,28 @@ message.
     === "Echo"
 
         ```yaml
-        ...
         stages:
           - name: Echo hello world
             echo: "Hello World"
-        ...
         ```
 
     === "Echo with ID"
 
         ```yaml
-        ...
         stages:
           - name: Echo hello world
             id: echo-stage
             echo: "Hello World"
-        ...
         ```
 
     === "Sleep"
 
         ```yaml
-        ...
         stages:
           - name: Echo hello world
             id: echo-sleep-stage
             echo: "Hello World and Sleep 10 seconds"
             sleep: 10
-        ...
         ```
 
 | field | data type   | default | description                                                                                                      |
@@ -88,114 +82,127 @@ message.
 Bash execution stage that execute bash script on the current OS.
 If your current OS is Windows, it will run on the bash in the WSL.
 
-I get some limitation when I run shell statement with the built-in
-subprocess package. It does not good enough to use multiline statement.
-Thus, I add writing ``.sh`` file before execution process for fix this
-issue.
+!!! warning
+
+    I get some limitation when I run shell statement with the built-in
+    subprocess package. It does not good enough to use multiline statement.
+    Thus, I add writing ``.sh`` file before execution process for fix this
+    issue.
 
 !!! example "YAML"
 
     === "Bash"
 
         ```yaml
-        ...
         stages:
             - name: Call echo
               bash: |
                 echo "Hello Bash Stage";
-        ...
         ```
 
     === "Bash with Env"
 
         ```yaml
-        ...
         stages:
             - name: Call echo with env
               env:
                 FOO: BAR
               bash: |
                 echo "Hello Bash $FOO";
-        ...
         ```
 
-| field   | data type      | default  | description                                                                           |
-|---------|----------------|:--------:|---------------------------------------------------------------------------------------|
-| bash    | str            |          | A bash statement that want to execute.                                                |
-| env     | dict[str, Any] | `dict()` | An environment variable mapping that want to set before execute this shell statement. |
+| field   | data type      | default  | description                                                                                             |
+|---------|----------------|:--------:|---------------------------------------------------------------------------------------------------------|
+| bash    | str            |          | A bash statement that want to execute via Python subprocess.                                            |
+| env     | dict[str, Any] | `dict()` | An environment variables that set before run bash command. It will add on the header of the `.sh` file. |
 
 ## Python Stage
 
-Python executor stage that running the Python statement with receiving
-globals and additional variables.
+Python stage that running the Python statement with the current globals
+and passing an input additional variables via `exec` built-in function.
 
 This stage allow you to use any Python object that exists on the globals
 such as import your installed package.
+
+!!! warning
+
+    The exec build-in function is very dangerous. So, it should use the `re`
+    module to validate exec-string before running or exclude the `os` package
+    from the current globals variable.
 
 !!! example "YAML"
 
     === "Python"
 
         ```yaml
-        ...
         stages:
             - name: Call Python
               run: |
                 import sys
                 print(sys.version_info)
-        ...
         ```
 
-| field | data type      | default  | description                                                 |
-|-------|----------------|:--------:|-------------------------------------------------------------|
-| run   | str            |          | A Python string statement that want to run with exec.       |
-| vars  | dict[str, Any] | `dict()` | A mapping to variable that want to pass to globals in exec. |
+| field | data type      | default  | description                                                                   |
+|-------|----------------|:--------:|-------------------------------------------------------------------------------|
+| run   | str            |          | A Python string statement that want to run with `exec`.                       |
+| vars  | dict[str, Any] | `dict()` | A variable mapping that want to pass to globals parameter in the `exec` func. |
 
 ## Call Stage
 
-Call executor that call the Python function from registry with tag
-decorator function in ``utils`` module and run it with input arguments.
+Call stage executor that call the Python function from registry with tag
+    decorator function in `reusables` module and run it with input arguments.
 
-This stage is different with PyStage because the PyStage is just calling
-a Python statement with the ``eval`` and pass that locale before eval that
-statement. So, you can create your function complexly that you can for your
-objective to invoked by this stage object.
+This stage is different with PyStage because the PyStage is just run
+a Python statement with the `exec` function and pass the current locals and
+globals before exec that statement. This stage will import the caller
+function can call it with an input arguments. So, you can create your
+function complexly that you can for your objective to invoked by this stage
+object.
+
+This stage is the most powerfull stage of this package for run every
+use-case by a custom requirement that you want by creating the Python
+function and adding it to the caller registry value by importer syntax like
+`module.caller.registry` not path style like `module/caller/registry`.
+
+!!! warning
+
+    The caller registry to get a caller function should importable by the
+    current Python execution pointer.
 
 !!! example "YAML"
 
     === "Call"
 
         ```yaml
-        ...
         stages:
             - name: Call call task
               uses: tasks/el-csv-to-parquet@polars
               with:
                 source-path: "./data"
                 target-path: "./warehouse"
-        ...
         ```
 
-| field  | alias | data type           | default  | description                                                  |
-|--------|-------|---------------------|:--------:|--------------------------------------------------------------|
-| uses   |       | str                 |          | A pointer that want to load function from the call registry. |
-| args   | with  | dict[str, Any]      | `dict()` | An arguments that want to pass to the call function.         |
+| field  | alias | data type           | default  | description                                                                                                                                                                 |
+|--------|-------|---------------------|:--------:|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| uses   |       | str                 |          | A caller function with registry importer syntax that use to load function before execute step. The caller registry syntax should be `<import.part>/<func-name>@<tag-name>`. |
+| args   | with  | dict[str, Any]      | `dict()` | An argument parameter that will pass to this caller function.                                                                                                               |
 
 ## Trigger Stage
 
-Trigger Workflow execution stage that execute another workflow. This
-the core stage that allow you to create the reusable workflow object or
-dynamic parameters workflow for common use-case.
+Trigger workflow executor stage that run an input trigger Workflow
+execute method. This is the stage that allow you to create the reusable
+Workflow template with dynamic parameters.
 
 !!! example "YAML"
 
     === "Trigger"
 
         ```yaml
-        ...
         stages:
             - name: Call trigger
-        ...
+              trigger: trigger-workflow-name
+              params:
+                name: foo
         ```
 
 | field     | data type      | default  | description                                                      |
@@ -206,35 +213,60 @@ dynamic parameters workflow for common use-case.
 
 ## Parallel Stage
 
-!!! warning
+Parallel stage executor that execute branch stages with multithreading.
+This stage let you set the fix branches for running child stage inside it on
+multithread pool.
 
-    This stage is nested stage.
+!!! note
+
+    This stage is not the low-level stage model because it runs multi-stages
+    in this stage execution.
+
+| field       | alias       | data type              | default | description                                                                                                                      |
+|-------------|-------------|------------------------|:-------:|----------------------------------------------------------------------------------------------------------------------------------|
+| parallel    |             | dict[str, list[Stage]] |         | A mapping of branch name and its stages.                                                                                         |
+| max_workers | max-workers | int                    |   `2`   | The maximum multi-thread pool worker size for execution parallel. This value should be gather or equal than 1, and less than 20. |
 
 ## ForEach Stage
 
-!!! warning
+For-Each stage executor that execute all stages with each item in the
+foreach list.
 
-    This stage is nested stage.
+!!! note
+
+    This stage is not the low-level stage model because it runs
+    multi-stages in this stage execution.
 
 ## Until Stage
 
-!!! warning
+Until stage executor that will run stages in each loop until it valid
+with stop loop condition.
 
-    This stage is nested stage.
+
+!!! note
+
+    This stage is not the low-level stage model because it runs
+    multi-stages in this stage execution.
 
 ## Case Stage
 
-!!! warning
-
-    This stage is nested stage.
+Case stage executor that execute all stages if the condition was matched.
 
 ## Raise Stage
 
-Raise error stage execution that raise StageException that use a message field
-for making error message before raise.
+Raise error stage executor that raise `StageException` that use a message
+field for making error message before raise.
 
 ## Docker Stage
 
+Docker container stage execution that will pull the specific Docker image
+with custom authentication and run this image by passing environment
+variables and mounting local volume to this Docker container.
+
+The volume path that mount to this Docker container will limit. That is
+this stage does not allow you to mount any path to this container.
+
 ## Virtual Python Stage
 
-Execution Python statement on the new Python virtual environment.
+Virtual Python stage executor that run Python statement on the dependent
+Python virtual environment via the `uv` package.
