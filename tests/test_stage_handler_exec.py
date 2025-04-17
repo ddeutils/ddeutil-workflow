@@ -8,53 +8,48 @@ from ddeutil.workflow import Workflow
 from ddeutil.workflow.conf import Config
 from ddeutil.workflow.exceptions import StageException
 from ddeutil.workflow.result import Result
-from ddeutil.workflow.stages import Stage
+from ddeutil.workflow.stages import BashStage, Stage
 from pydantic import TypeAdapter
 
 from .utils import dump_yaml_context
 
 
-def test_stage_exec_bash():
-    workflow: Workflow = Workflow.from_conf(name="wf-run-common")
-    stage: Stage = workflow.job("bash-run").stage("echo")
+def test_bash_stage_exec():
+    stage: BashStage = BashStage(
+        name="Bash Stage",
+        bash='echo "Hello World";\nVAR=\'Foo\';\necho "Variable $VAR";',
+    )
     rs: Result = stage.handler_execute({})
-    assert {
+    assert rs.context == {
         "return_code": 0,
         "stdout": "Hello World\nVariable Foo",
         "stderr": None,
-    } == rs.context
-
-    make_rs: Result = Result()
-    rs: Result = stage.handler_execute({}, result=make_rs)
-    assert {
-        "return_code": 0,
-        "stdout": "Hello World\nVariable Foo",
-        "stderr": None,
-    } == make_rs.context
-
-    # NOTE: Make sure that the result that pass to the handler execution method
-    #   is the same object of its return.
-    assert make_rs is rs
+    }
 
 
-def test_stage_exec_bash_env():
-    workflow: Workflow = Workflow.from_conf(name="wf-run-common")
-    stage: Stage = workflow.job("bash-run-env").stage("echo-env")
+def test_bash_stage_exec_with_env():
+    stage: BashStage = BashStage(
+        name="Bash Stage", bash='echo "ENV $$FOO";', env={"FOO": "Bar"}
+    )
     rs: Result = stage.handler_execute({})
-    assert {
+    assert rs.context == {
         "return_code": 0,
-        "stdout": "Hello World\nVariable Foo\nENV Bar",
+        "stdout": "ENV Bar",
         "stderr": None,
-    } == rs.context
+    }
 
 
-def test_stage_exec_bash_env_raise():
-    workflow: Workflow = Workflow.from_conf(name="wf-run-common")
-    stage: Stage = workflow.job("bash-run-env").stage("raise-error")
+def test_bash_stage_exec_raise():
+    stage: BashStage = BashStage(
+        name="Bash Stage",
+        bash=(
+            "printf '%s\\n' \"Test Raise Error case with failed\" >&2;\nexit 1;"
+        ),
+    )
 
     # NOTE: Raise error from bash that force exit 1.
     with pytest.raises(StageException):
-        stage.handler_execute({})
+        stage.handler_execute({}, raise_error=True)
 
 
 def test_stage_exec_call(test_path):

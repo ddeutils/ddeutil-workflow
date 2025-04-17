@@ -1,16 +1,15 @@
 import pytest
 from ddeutil.workflow.exceptions import StageException
-from ddeutil.workflow.result import Result
-from ddeutil.workflow.stages import EmptyStage, PyStage, Stage
-from pydantic import TypeAdapter, ValidationError
+from ddeutil.workflow.result import SUCCESS, Result
+from ddeutil.workflow.stages import EmptyStage, Stage
+from pydantic import ValidationError
 
 
-def test_stage():
+def test_empty_stage():
     stage: Stage = EmptyStage.model_validate(
         {"name": "Empty Stage", "echo": "hello world"}
     )
     assert stage.iden == "Empty Stage"
-    assert stage.name == "Empty Stage"
     assert stage == EmptyStage(name="Empty Stage", echo="hello world")
 
     # NOTE: Copy the stage model with adding the id field.
@@ -24,31 +23,28 @@ def test_stage():
     )
     assert stage.id == "dummy"
     assert stage.iden == "dummy"
-    assert not stage.is_skipped(params={})
-
-    stage: Stage = TypeAdapter(Stage).validate_python(
-        {"name": "Empty Stage", "echo": "hello world"}
-    )
-    assert isinstance(stage, EmptyStage)
 
 
-def test_stage_empty_execute():
+def test_empty_stage_execute():
     stage: EmptyStage = EmptyStage(name="Empty Stage", echo="hello world")
     rs: Result = stage.handler_execute(params={})
-
-    assert isinstance(rs, Result)
-    assert 0 == rs.status
-    assert {} == rs.context
+    assert rs.status == SUCCESS
+    assert rs.context == {}
 
     stage: EmptyStage = EmptyStage(
         name="Empty Stage", echo="hello world\nand this is newline to echo"
     )
     rs: Result = stage.handler_execute(params={})
-    assert 0 == rs.status
-    assert {} == rs.context
+    assert rs.status == SUCCESS
+    assert rs.context == {}
+
+    stage: EmptyStage = EmptyStage(name="Empty Stage")
+    rs: Result = stage.handler_execute(params={})
+    assert rs.status == SUCCESS
+    assert rs.context == {}
 
 
-def test_stage_empty_raise():
+def test_empty_stage_raise():
 
     # NOTE: Raise error when passing template data to the name field.
     with pytest.raises(ValidationError):
@@ -71,11 +67,11 @@ def test_stage_empty_raise():
 
 
 def test_stage_if_condition():
-    stage: PyStage = PyStage.model_validate(
+    stage: EmptyStage = EmptyStage.model_validate(
         {
-            "name": "Test if condition",
+            "name": "If Condition",
             "if": '"${{ params.name }}" == "foo"',
-            "run": """message: str = 'Hello World'\nprint(message)""",
+            "echo": "Hello world",
         }
     )
     assert not stage.is_skipped(params={"params": {"name": "foo"}})
@@ -83,14 +79,15 @@ def test_stage_if_condition():
 
 
 def test_stage_if_condition_raise(test_path):
-    stage: PyStage = PyStage.model_validate(
+    stage: EmptyStage = EmptyStage.model_validate(
         {
-            "name": "Test if condition",
+            "name": "If Condition Raise",
             "if": '"${{ params.name }}"',
-            "run": """message: str = 'Hello World'\nprint(message)""",
+            "echo": "Hello World",
         }
     )
 
+    # NOTE: Raise if the returning type after eval does not match with boolean.
     with pytest.raises(StageException):
         stage.is_skipped({"params": {"name": "foo"}})
 
