@@ -2,6 +2,16 @@
 
 ## Latest Changes
 
+## 0.0.55
+
+### :sparkles: Features
+
+- :dart: feat: update api code and restructure api component.
+
+### :broom: Deprecate & Clean
+
+- :recycle: clean: remove useless method on workflow module.
+
 ## 0.0.54
 
 ### :stars: Highlight Features
