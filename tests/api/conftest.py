@@ -3,7 +3,7 @@ from collections.abc import Generator
 import pytest
 from fastapi.testclient import TestClient
 
-from src.ddeutil.workflow.api.api import app
+from src.ddeutil.workflow.api import app
 
 
 @pytest.fixture(scope="session")

@@ -21,7 +21,6 @@ from ...result import Result
 from ...workflow import Workflow
 
 logger = get_logger("uvicorn.error")
-
 workflow_route = APIRouter(
     prefix="/workflows",
     tags=["workflows"],
@@ -55,7 +54,7 @@ async def get_workflow_by_name(name: str) -> DictData:
         ) from None
     return workflow.model_dump(
         by_alias=True,
-        exclude_none=True,
+        exclude_none=False,
         exclude_unset=True,
         exclude_defaults=True,
     )
@@ -98,7 +97,7 @@ async def get_workflow_audits(name: str):
             "audits": [
                 audit.model_dump(
                     by_alias=True,
-                    exclude_none=True,
+                    exclude_none=False,
                     exclude_unset=True,
                     exclude_defaults=True,
                 )
@@ -132,7 +131,7 @@ async def get_workflow_release_audit(name: str, release: str):
         "message": f"Getting workflow {name!r} audit in release {release}",
         "audit": audit.model_dump(
             by_alias=True,
-            exclude_none=True,
+            exclude_none=False,
             exclude_unset=True,
             exclude_defaults=True,
         ),

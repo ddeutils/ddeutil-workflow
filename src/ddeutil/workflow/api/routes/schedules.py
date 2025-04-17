@@ -17,7 +17,6 @@ from ...logs import get_logger
 from ...scheduler import Schedule
 
 logger = get_logger("uvicorn.error")
-
 schedule_route = APIRouter(
     prefix="/schedules",
     tags=["schedules"],
@@ -108,7 +107,6 @@ async def add_deploy_scheduler(request: Request, name: str):
         schedule.tasks(
             start_date_waiting,
             queue=request.state.workflow_queue,
-            extras={},
         ),
     )
     return {
