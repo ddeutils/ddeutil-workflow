@@ -194,9 +194,8 @@ class BaseStage(BaseModel, ABC):
         object from the current stage ID before release the final result.
 
         :param params: (DictData) A parameter data.
-        :param run_id: (str) A running stage ID for this execution.
-        :param parent_run_id: (str) A parent workflow running ID for this
-            execution.
+        :param run_id: (str) A running stage ID.
+        :param parent_run_id: (str) A parent running ID.
         :param result: (Result) A result object for keeping context and status
             data before execution.
         :param event: (Event) An event manager that pass to the stage execution.
@@ -213,19 +212,16 @@ class BaseStage(BaseModel, ABC):
         )
 
         try:
-            rs: Result = self.execute(params, result=result, event=event)
-            return rs
+            return self.execute(params, result=result, event=event)
         except Exception as e:
-            result.trace.error(
-                f"[STAGE]: Handler:{NEWLINE}{e.__class__.__name__}: {e}"
-            )
+            e_name: str = e.__class__.__name__
+            result.trace.error(f"[STAGE]: Handler:{NEWLINE}{e_name}: {e}")
             if dynamic("stage_raise_error", f=raise_error, extras=self.extras):
                 if isinstance(e, StageException):
                     raise
 
                 raise StageException(
-                    f"{self.__class__.__name__}: \n\t"
-                    f"{e.__class__.__name__}: {e}"
+                    f"{self.__class__.__name__}: {NEWLINE}{e_name}: {e}"
                 ) from e
 
             return result.catch(status=FAILED, context={"errors": to_dict(e)})
@@ -251,6 +247,11 @@ class BaseStage(BaseModel, ABC):
                             }
                         }
                     }
+
+            The keys that will set to the received context is `outputs`,
+        `errors`, and `skipped` keys. The `errors` and `skipped` keys will
+        extract from the result context if it exists. If it does not found, it
+        will not set on the received context.
 
         Important:
 
@@ -431,17 +432,14 @@ class BaseAsyncStage(BaseStage):
             rs: Result = await self.axecute(params, result=result, event=event)
             return rs
         except Exception as e:  # pragma: no cov
-            await result.trace.aerror(
-                f"[STAGE]: Handler {e.__class__.__name__}: {e}"
-            )
-
+            e_name: str = e.__class__.__name__
+            await result.trace.aerror(f"[STAGE]: Handler {e_name}: {e}")
             if dynamic("stage_raise_error", f=raise_error, extras=self.extras):
                 if isinstance(e, StageException):
                     raise
 
                 raise StageException(
-                    f"{self.__class__.__name__}: \n\t"
-                    f"{e.__class__.__name__}: {e}"
+                    f"{self.__class__.__name__}: {NEWLINE}{e_name}: {e}"
                 ) from None
 
             return result.catch(status=FAILED, context={"errors": to_dict(e)})
@@ -537,11 +535,10 @@ class EmptyStage(BaseAsyncStage):
 
         :rtype: Result
         """
-        if result is None:
-            result: Result = Result(
-                run_id=gen_id(self.name + (self.id or ""), unique=True),
-                extras=self.extras,
-            )
+        result: Result = result or Result(
+            run_id=gen_id(self.name + (self.id or ""), unique=True),
+            extras=self.extras,
+        )
 
         if not self.echo:
             message: str = "..."
@@ -678,11 +675,10 @@ class BashStage(BaseStage):
 
         :rtype: Result
         """
-        if result is None:  # pragma: no cov
-            result: Result = Result(
-                run_id=gen_id(self.name + (self.id or ""), unique=True),
-                extras=self.extras,
-            )
+        result: Result = result or Result(
+            run_id=gen_id(self.name + (self.id or ""), unique=True),
+            extras=self.extras,
+        )
 
         result.trace.info(f"[STAGE]: Shell-Execute: {self.name}")
 
@@ -811,11 +807,10 @@ class PyStage(BaseStage):
 
         :rtype: Result
         """
-        if result is None:  # pragma: no cov
-            result: Result = Result(
-                run_id=gen_id(self.name + (self.id or ""), unique=True),
-                extras=self.extras,
-            )
+        result: Result = result or Result(
+            run_id=gen_id(self.name + (self.id or ""), unique=True),
+            extras=self.extras,
+        )
 
         lc: DictData = {}
         gb: DictData = (
@@ -927,11 +922,10 @@ class CallStage(BaseStage):
 
         :rtype: Result
         """
-        if result is None:  # pragma: no cov
-            result: Result = Result(
-                run_id=gen_id(self.name + (self.id or ""), unique=True),
-                extras=self.extras,
-            )
+        result: Result = result or Result(
+            run_id=gen_id(self.name + (self.id or ""), unique=True),
+            extras=self.extras,
+        )
 
         call_func: TagFunc = extract_call(
             param2template(self.uses, params, extras=self.extras),
@@ -1087,11 +1081,10 @@ class TriggerStage(BaseStage):
         from .exceptions import WorkflowException
         from .workflow import Workflow
 
-        if result is None:
-            result: Result = Result(
-                run_id=gen_id(self.name + (self.id or ""), unique=True),
-                extras=self.extras,
-            )
+        result: Result = result or Result(
+            run_id=gen_id(self.name + (self.id or ""), unique=True),
+            extras=self.extras,
+        )
 
         _trigger: str = param2template(self.trigger, params, extras=self.extras)
         result.trace.info(f"[STAGE]: Trigger-Execute: {_trigger!r}")
@@ -1170,9 +1163,8 @@ class ParallelStage(BaseStage):  # pragma: no cov
         result: Result,
         *,
         event: Event | None = None,
-    ) -> DictData:
-        """Branch execution method for execute all stages of a specific branch
-        ID.
+    ) -> Result:
+        """Execute all stage with specific branch ID.
 
         :param branch: (str) A branch ID.
         :param params: (DictData) A parameter data.
@@ -1180,7 +1172,7 @@ class ParallelStage(BaseStage):  # pragma: no cov
         :param event: (Event) An Event manager instance that use to cancel this
             execution if it forces stopped by parent execution.
 
-        :rtype: DictData
+        :rtype: Result
         """
         result.trace.debug(f"[STAGE]: Execute Branch: {branch!r}")
         context: DictData = copy.deepcopy(params)
@@ -1192,14 +1184,14 @@ class ParallelStage(BaseStage):  # pragma: no cov
                 stage.extras = self.extras
 
             if stage.is_skipped(params=context):
-                result.trace.info(f"... Skip stage: {stage.iden!r}")
+                result.trace.info(f"[STAGE]: Skip stage: {stage.iden!r}")
                 stage.set_outputs(output={"skipped": True}, to=output)
                 continue
 
             if event and event.is_set():
                 error_msg: str = (
                     "Branch-Stage was canceled from event that had set before "
-                    "stage item execution."
+                    "stage branch execution."
                 )
                 return result.catch(
                     status=CANCEL,
@@ -1223,9 +1215,21 @@ class ParallelStage(BaseStage):  # pragma: no cov
                 stage.set_outputs(rs.context, to=output)
                 stage.set_outputs(stage.get_outputs(output), to=context)
             except (StageException, UtilException) as e:  # pragma: no cov
-                result.trace.error(f"[STAGE]: {e.__class__.__name__}: {e}")
+                result.trace.error(
+                    f"[STAGE]: {e.__class__.__name__}:{NEWLINE}{e}"
+                )
+                result.catch(
+                    status=FAILED,
+                    parallel={
+                        branch: {
+                            "branch": branch,
+                            "stages": filter_func(output.pop("stages", {})),
+                            "errors": e.to_dict(),
+                        },
+                    },
+                )
                 raise StageException(
-                    f"Sub-Stage execution error: {e.__class__.__name__}: {e}"
+                    f"Sub-Stage raise: {e.__class__.__name__}: {e}"
                 ) from None
 
             if rs.status == FAILED:
@@ -1233,7 +1237,7 @@ class ParallelStage(BaseStage):  # pragma: no cov
                     f"Branch-Stage was break because it has a sub stage, "
                     f"{stage.iden}, failed without raise error."
                 )
-                return result.catch(
+                result.catch(
                     status=FAILED,
                     parallel={
                         branch: {
@@ -1243,6 +1247,7 @@ class ParallelStage(BaseStage):  # pragma: no cov
                         },
                     },
                 )
+                raise StageException(error_msg)
 
         return result.catch(
             status=SUCCESS,
@@ -1270,19 +1275,28 @@ class ParallelStage(BaseStage):  # pragma: no cov
 
         :rtype: Result
         """
-        if result is None:  # pragma: no cov
-            result: Result = Result(
-                run_id=gen_id(self.name + (self.id or ""), unique=True),
-                extras=self.extras,
-            )
+        result: Result = result or Result(
+            run_id=gen_id(self.name + (self.id or ""), unique=True),
+            extras=self.extras,
+        )
         event: Event = Event() if event is None else event
         result.trace.info(
             f"[STAGE]: Parallel-Execute: {self.max_workers} workers."
         )
         result.catch(status=WAIT, context={"parallel": {}})
+        if event and event.is_set():  # pragma: no cov
+            return result.catch(
+                status=CANCEL,
+                context={
+                    "errors": StageException(
+                        "Stage was canceled from event that had set "
+                        "before stage parallel execution."
+                    ).to_dict()
+                },
+            )
+
         with ThreadPoolExecutor(
-            max_workers=self.max_workers,
-            thread_name_prefix="parallel_stage_exec_",
+            max_workers=self.max_workers, thread_name_prefix="stage_parallel_"
         ) as executor:
 
             context: DictData = {}
@@ -1299,17 +1313,18 @@ class ParallelStage(BaseStage):  # pragma: no cov
                 for branch in self.parallel
             )
 
-            done = as_completed(futures, timeout=1800)
-            for future in done:
+            for future in as_completed(futures):
                 try:
                     future.result()
                 except StageException as e:
                     status = FAILED
                     result.trace.error(
-                        f"[STAGE]: {e.__class__.__name__}:\n\t{e}"
+                        f"[STAGE]: {e.__class__.__name__}:{NEWLINE}{e}"
                     )
-                    context.update({"errors": e.to_dict()})
-
+                    if "errors" in context:
+                        context["errors"].append(e.to_dict())
+                    else:
+                        context["errors"] = [e.to_dict()]
         return result.catch(status=status, context=context)
 
 
@@ -1363,7 +1378,7 @@ class ForEachStage(BaseStage):
         *,
         event: Event | None = None,
     ) -> Result:
-        """Execute foreach item from list of item.
+        """Execute all stage with specific foreach item.
 
         :param item: (str | int) An item that want to execution.
         :param params: (DictData) A parameter data.
@@ -1385,7 +1400,7 @@ class ForEachStage(BaseStage):
                 stage.extras = self.extras
 
             if stage.is_skipped(params=context):
-                result.trace.info(f"... Skip stage: {stage.iden!r}")
+                result.trace.info(f"[STAGE]: Skip stage: {stage.iden!r}")
                 stage.set_outputs(output={"skipped": True}, to=output)
                 continue
 
@@ -1416,7 +1431,9 @@ class ForEachStage(BaseStage):
                 stage.set_outputs(rs.context, to=output)
                 stage.set_outputs(stage.get_outputs(output), to=context)
             except (StageException, UtilException) as e:
-                result.trace.error(f"[STAGE]: {e.__class__.__name__}: {e}")
+                result.trace.error(
+                    f"[STAGE]: {e.__class__.__name__}:{NEWLINE}{e}"
+                )
                 result.catch(
                     status=FAILED,
                     foreach={
@@ -1436,7 +1453,8 @@ class ForEachStage(BaseStage):
                     f"Item-Stage was break because it has a sub stage, "
                     f"{stage.iden}, failed without raise error."
                 )
-                return result.catch(
+                result.trace.warning(f"[STAGE]: {error_msg}")
+                result.catch(
                     status=FAILED,
                     foreach={
                         item: {
@@ -1446,6 +1464,8 @@ class ForEachStage(BaseStage):
                         },
                     },
                 )
+                raise StageException(error_msg)
+
         return result.catch(
             status=SUCCESS,
             foreach={
@@ -1470,21 +1490,24 @@ class ForEachStage(BaseStage):
         :param event: (Event) An Event manager instance that use to cancel this
             execution if it forces stopped by parent execution.
 
+        :raise TypeError: If the foreach does not match with type list.
+
         :rtype: Result
         """
-        if result is None:  # pragma: no cov
-            result: Result = Result(
-                run_id=gen_id(self.name + (self.id or ""), unique=True),
-                extras=self.extras,
-            )
+        result: Result = result or Result(
+            run_id=gen_id(self.name + (self.id or ""), unique=True),
+            extras=self.extras,
+        )
         event: Event = Event() if event is None else event
         foreach: Union[list[str], list[int]] = (
             param2template(self.foreach, params, extras=self.extras)
             if isinstance(self.foreach, str)
             else self.foreach
         )
+
+        # [VALIDATE]: Type of the foreach should be `list` type.
         if not isinstance(foreach, list):
-            raise StageException(f"Does not support foreach: {foreach!r}")
+            raise TypeError(f"Does not support foreach: {foreach!r}")
 
         result.trace.info(f"[STAGE]: Foreach-Execute: {foreach!r}.")
         result.catch(status=WAIT, context={"items": foreach, "foreach": {}})
@@ -1531,7 +1554,7 @@ class ForEachStage(BaseStage):
             for future in done:
                 try:
                     future.result()
-                except (StageException, UtilException) as e:
+                except StageException as e:
                     status = FAILED
                     result.trace.error(
                         f"[STAGE]: {e.__class__.__name__}:{NEWLINE}{e}"
@@ -1582,7 +1605,7 @@ class UntilStage(BaseStage):
         alias="max-loop",
     )
 
-    def execute_item(
+    def execute_loop(
         self,
         item: T,
         loop: int,
@@ -1590,8 +1613,7 @@ class UntilStage(BaseStage):
         result: Result,
         event: Event | None = None,
     ) -> tuple[Result, T]:
-        """Execute loop item that was set from some stage or set by default loop
-        variable.
+        """Execute all stage with specific loop and item.
 
         :param item: (T) An item that want to execution.
         :param loop: (int) A number of loop.
@@ -1601,6 +1623,7 @@ class UntilStage(BaseStage):
             execution if it forces stopped by parent execution.
 
         :rtype: tuple[Result, T]
+        :return: Return a pair of Result and changed item.
         """
         result.trace.debug(f"... Execute until item: {item!r}")
         context: DictData = copy.deepcopy(params)
@@ -1613,14 +1636,14 @@ class UntilStage(BaseStage):
                 stage.extras = self.extras
 
             if stage.is_skipped(params=context):
-                result.trace.info(f"... Skip stage: {stage.iden!r}")
+                result.trace.info(f"[STAGE]: Skip stage: {stage.iden!r}")
                 stage.set_outputs(output={"skipped": True}, to=output)
                 continue
 
             if event and event.is_set():
                 error_msg: str = (
-                    "Item-Stage was canceled from event that had set before "
-                    "stage item execution."
+                    "Loop-Stage was canceled from event that had set before "
+                    "stage loop execution."
                 )
                 return (
                     result.catch(
@@ -1652,10 +1675,41 @@ class UntilStage(BaseStage):
 
                 stage.set_outputs(_output, to=context)
             except (StageException, UtilException) as e:
-                result.trace.error(f"[STAGE]: {e.__class__.__name__}: {e}")
+                result.trace.error(
+                    f"[STAGE]: {e.__class__.__name__}:{NEWLINE}{e}"
+                )
+                result.catch(
+                    status=FAILED,
+                    until={
+                        loop: {
+                            "loop": loop,
+                            "item": item,
+                            "stages": filter_func(output.pop("stages", {})),
+                            "errors": e.to_dict(),
+                        }
+                    },
+                )
                 raise StageException(
                     f"Sub-Stage execution error: {e.__class__.__name__}: {e}"
                 ) from None
+
+            if rs.status == FAILED:
+                error_msg: str = (
+                    f"Loop-Stage was break because it has a sub stage, "
+                    f"{stage.iden}, failed without raise error."
+                )
+                result.catch(
+                    status=FAILED,
+                    until={
+                        loop: {
+                            "loop": loop,
+                            "item": item,
+                            "stages": filter_func(output.pop("stages", {})),
+                            "errors": StageException(error_msg).to_dict(),
+                        }
+                    },
+                )
+                raise StageException(error_msg)
 
         return (
             result.catch(
@@ -1678,8 +1732,7 @@ class UntilStage(BaseStage):
         result: Result | None = None,
         event: Event | None = None,
     ) -> Result:
-        """Execute the stages that pass item from until condition field and
-        setter step.
+        """Execute until loop with checking until condition.
 
         :param params: (DictData) A parameter data.
         :param result: (Result) A Result instance for return context and status.
@@ -1688,10 +1741,10 @@ class UntilStage(BaseStage):
 
         :rtype: Result
         """
-        if result is None:  # pragma: no cov
-            result: Result = Result(
-                run_id=gen_id(self.name + (self.id or ""), unique=True)
-            )
+        result: Result = result or Result(
+            run_id=gen_id(self.name + (self.id or ""), unique=True),
+            extras=self.extras,
+        )
 
         result.trace.info(f"[STAGE]: Until-Execution: {self.until}")
         item: Union[str, int, bool] = param2template(
@@ -1709,12 +1762,12 @@ class UntilStage(BaseStage):
                     context={
                         "errors": StageException(
                             "Stage was canceled from event that had set "
-                            "before stage until execution."
+                            "before stage loop execution."
                         ).to_dict()
                     },
                 )
 
-            result, item = self.execute_item(
+            result, item = self.execute_loop(
                 item=item,
                 loop=loop,
                 params=params,
@@ -1725,10 +1778,10 @@ class UntilStage(BaseStage):
             loop += 1
             if item is None:
                 result.trace.warning(
-                    "... Does not have set item stage. It will use loop by "
-                    "default."
+                    f"... Loop-Execute not set item. It use loop: {loop} by "
+                    f"default."
                 )
-                item = loop
+                item: int = loop
 
             next_track: bool = eval(
                 param2template(
@@ -1741,8 +1794,8 @@ class UntilStage(BaseStage):
             )
             if not isinstance(next_track, bool):
                 raise StageException(
-                    "Return type of until condition does not be boolean, it"
-                    f"return: {next_track!r}"
+                    "Return type of until condition not be `boolean`, getting"
+                    f": {next_track!r}"
                 )
             track: bool = not next_track
             delay(0.025)
@@ -1830,7 +1883,6 @@ class CaseStage(BaseStage):
         context: DictData = copy.deepcopy(params)
         context.update({"case": case})
         output: DictData = {"case": case, "stages": {}}
-
         for stage in stages:
 
             if self.extras:
@@ -1913,11 +1965,10 @@ class CaseStage(BaseStage):
 
         :rtype: Result
         """
-        if result is None:  # pragma: no cov
-            result: Result = Result(
-                run_id=gen_id(self.name + (self.id or ""), unique=True),
-                extras=self.extras,
-            )
+        result: Result = result or Result(
+            run_id=gen_id(self.name + (self.id or ""), unique=True),
+            extras=self.extras,
+        )
 
         _case: Optional[str] = param2template(
             self.case, params, extras=self.extras
@@ -2005,11 +2056,10 @@ class RaiseStage(BaseStage):  # pragma: no cov
         :param event: (Event) An Event manager instance that use to cancel this
             execution if it forces stopped by parent execution.
         """
-        if result is None:  # pragma: no cov
-            result: Result = Result(
-                run_id=gen_id(self.name + (self.id or ""), unique=True),
-                extras=self.extras,
-            )
+        result: Result = result or Result(
+            run_id=gen_id(self.name + (self.id or ""), unique=True),
+            extras=self.extras,
+        )
         message: str = param2template(self.message, params, extras=self.extras)
         result.trace.info(f"[STAGE]: Raise-Execute: {message!r}.")
         raise StageException(message)
@@ -2163,10 +2213,10 @@ class DockerStage(BaseStage):  # pragma: no cov
 
         :rtype: Result
         """
-        if result is None:  # pragma: no cov
-            result: Result = Result(
-                run_id=gen_id(self.name + (self.id or ""), unique=True)
-            )
+        result: Result = result or Result(
+            run_id=gen_id(self.name + (self.id or ""), unique=True),
+            extras=self.extras,
+        )
 
         result.trace.info(f"[STAGE]: Docker-Execute: {self.image}:{self.tag}")
 
@@ -2258,10 +2308,10 @@ class VirtualPyStage(PyStage):  # pragma: no cov
 
         :rtype: Result
         """
-        if result is None:  # pragma: no cov
-            result: Result = Result(
-                run_id=gen_id(self.name + (self.id or ""), unique=True)
-            )
+        result: Result = result or Result(
+            run_id=gen_id(self.name + (self.id or ""), unique=True),
+            extras=self.extras,
+        )
 
         result.trace.info(f"[STAGE]: Py-Virtual-Execute: {self.name}")
         run: str = param2template(dedent(self.run), params, extras=self.extras)

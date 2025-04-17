@@ -535,9 +535,7 @@ def schedule_task(
         current_release: datetime = current_date.replace(
             second=0, microsecond=0
         )
-        if (
-            first_date := q.first_queue.date
-        ) > current_release:  # pragma: no cov
+        if (first_date := q.queue[0].date) > current_release:  # pragma: no cov
             result.trace.debug(
                 f"[WORKFLOW]: Skip schedule "
                 f"{first_date:%Y-%m-%d %H:%M:%S} for : {task.alias!r}"

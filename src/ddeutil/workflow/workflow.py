@@ -166,6 +166,7 @@ class ReleaseQueue:
     extras: DictData = Field(
         default_factory=dict,
         description="An extra parameters that want to override config values.",
+        repr=False,
     )
 
     @classmethod
@@ -213,15 +214,6 @@ class ReleaseQueue:
         """
         return len(self.queue) > 0
 
-    @property
-    def first_queue(self) -> Release:
-        """Check an input Release object is the first value of the
-        waiting queue.
-
-        :rtype: Release
-        """
-        return self.queue[0]
-
     def check_queue(self, value: Release | datetime) -> bool:
         """Check a Release value already exists in list of tracking
         queues.
@@ -239,16 +231,6 @@ class ReleaseQueue:
             or (value in self.running)
             or (value in self.complete)
         )
-
-    def remove_running(self, value: Release) -> Self:
-        """Remove Release in the running queue if it exists.
-
-        :rtype: Self
-        """
-        if value in self.running:
-            self.running.remove(value)
-
-        return self
 
     def mark_complete(self, value: Release) -> Self:
         """Push Release to the complete queue.
@@ -745,7 +727,8 @@ class Workflow(BaseModel):
         )
 
         if queue:
-            queue.remove_running(release)
+            if release in queue.running:
+                queue.running.remove(release)
             queue.mark_complete(release)
 
         return result.catch(

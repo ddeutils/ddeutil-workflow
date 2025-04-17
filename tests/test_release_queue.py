@@ -30,8 +30,12 @@ def test_release_queue_from_list():
     )
 
     assert queue.is_queued
-    assert release == queue.first_queue
-    assert release == queue.remove_running(release).first_queue
+    assert release == queue.queue[0]
+
+    if release in queue.running:
+        queue.running.remove(release)
+
+    assert release == queue.queue[0]
 
     queue = ReleaseQueue.from_list([release])
 

@@ -131,7 +131,7 @@ def test_workflow_exec_parallel_timeout():
                     "name": "JobException",
                     "message": (
                         "Job strategy was canceled from event that had set "
-                        "before strategy execution."
+                        "before job strategy execution."
                     ),
                 },
             },
@@ -214,7 +214,7 @@ def test_workflow_exec_py_raise():
                         ],
                         "name": "JobException",
                         "message": (
-                            "Stage raise: StageException: PyStage: \n\t"
+                            "Stage raise: StageException: PyStage: \n\t| ...\t"
                             "ValueError: Testing raise error inside PyStage!!!"
                         ),
                     }
@@ -247,7 +247,7 @@ def test_workflow_exec_py_raise_parallel():
                         ],
                         "name": "JobException",
                         "message": (
-                            "Stage raise: StageException: PyStage: \n\t"
+                            "Stage raise: StageException: PyStage: \n\t| ...\t"
                             "ValueError: Testing raise error inside PyStage!!!"
                         ),
                     }
@@ -461,7 +461,7 @@ def test_workflow_exec_call(test_path):
             },
         )
         assert {
-            "1354680202": {
+            "EMPTY": {
                 "matrix": {},
                 "stages": {"extract-load": {"outputs": {"records": 1}}},
             },

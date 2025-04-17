@@ -98,6 +98,7 @@ class Result:
             return cls(
                 run_id=(run_id or gen_id(id_logic or "", unique=True)),
                 parent_run_id=parent_run_id,
+                ts=get_dt_now(dynamic("tz", extras=extras)),
                 extras=(extras or {}),
             )
         elif parent_run_id:

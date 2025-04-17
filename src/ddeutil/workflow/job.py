@@ -540,6 +540,11 @@ class Job(BaseModel):
                         }
                     }
 
+            The keys that will set to the received context is `strategies`,
+        `errors`, and `skipped` keys. The `errors` and `skipped` keys will
+        extract from the result context if it exists. If it does not found, it
+        will not set on the received context.
+
         :raise JobException: If the job's ID does not set and the setting
             default job ID flag does not set.
 
@@ -599,7 +604,7 @@ class Job(BaseModel):
 
         :param params: (DictData) A parameter data.
         :param run_id: (str) A job running ID.
-        :param parent_run_id: (str) A parent workflow running ID.
+        :param parent_run_id: (str) A parent running ID.
         :param event: (Event) An Event manager instance that use to cancel this
             execution if it forces stopped by parent execution.
 
@@ -667,15 +672,15 @@ def local_execute_strategy(
     `set_outputs` method for reconstruct result context data.
 
     :param job: (Job) A job model that want to execute.
-    :param strategy: A strategy metrix value that use on this execution.
-        This value will pass to the `matrix` key for templating.
+    :param strategy: (DictData) A strategy metrix value. This value will pass
+        to the `matrix` key for templating in context data.
     :param params: (DictData) A parameter data.
     :param result: (Result) A Result instance for return context and status.
     :param event: (Event) An Event manager instance that use to cancel this
         execution if it forces stopped by parent execution.
 
-    :raise JobException: If it has any error from `StageException` or
-        `UtilException`.
+    :raise JobException: If stage execution raise any error as `StageException`
+        or `UtilException`.
 
     :rtype: Result
     """
@@ -683,17 +688,16 @@ def local_execute_strategy(
         run_id=gen_id(job.id or "not-set", unique=True),
         extras=job.extras,
     )
-
-    strategy_id: str = gen_id(strategy)
-    context: DictData = copy.deepcopy(params)
-    context.update({"matrix": strategy, "stages": {}})
-
     if strategy:
+        strategy_id: str = gen_id(strategy)
         result.trace.info(f"[JOB]: Start Strategy: {strategy_id!r}")
         result.trace.info(f"[JOB]: ... matrix: {strategy!r}")
     else:
-        result.trace.info("[JOB]: Start Strategy: EMPTY")
+        strategy_id: str = "EMPTY"
+        result.trace.info("[JOB]: Start Strategy: 'EMPTY'")
 
+    context: DictData = copy.deepcopy(params)
+    context.update({"matrix": strategy, "stages": {}})
     for stage in job.stages:
 
         if job.extras:
@@ -707,7 +711,7 @@ def local_execute_strategy(
         if event and event.is_set():
             error_msg: str = (
                 "Job strategy was canceled from event that had set before "
-                "strategy execution."
+                "job strategy execution."
             )
             return result.catch(
                 status=CANCEL,
@@ -820,7 +824,7 @@ def local_execute(
             context={
                 "errors": JobException(
                     "Job was canceled from event that had set before "
-                    "local execution."
+                    "local job execution."
                 ).to_dict()
             },
         )

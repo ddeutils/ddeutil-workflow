@@ -13,7 +13,7 @@ def test_job_exec_py():
     # NOTE: Job params will change schema structure with {"params": { ... }}
     rs: Result = job.execute(params={"params": {"name": "Foo"}})
     assert {
-        "1354680202": {
+        "EMPTY": {
             "matrix": {},
             "stages": {
                 "hello-world": {"outputs": {"x": "New Name"}},
@@ -44,10 +44,10 @@ def test_job_exec_py_raise():
     )
     assert rs.status == FAILED
     assert rs.context == {
-        "1354680202": {
+        "EMPTY": {
             "errors": {
-                "class": rs.context["1354680202"]["errors"]["class"],
-                "message": "PyStage: \n\tValueError: Testing raise error inside PyStage!!!",
+                "class": rs.context["EMPTY"]["errors"]["class"],
+                "message": "PyStage: \n\t| ...\tValueError: Testing raise error inside PyStage!!!",
                 "name": "StageException",
             },
             "matrix": {},
@@ -58,7 +58,7 @@ def test_job_exec_py_raise():
                 "class": rs.context["errors"][0]["class"],
                 "name": "JobException",
                 "message": (
-                    "Stage raise: StageException: PyStage: \n\t"
+                    "Stage raise: StageException: PyStage: \n\t| ...\t"
                     "ValueError: Testing raise error inside PyStage!!!"
                 ),
             },
@@ -72,7 +72,7 @@ def test_job_exec_py_not_set_output():
     )
     job: Job = workflow.job("second-job")
     rs = job.execute(params={})
-    assert {"1354680202": {"matrix": {}, "stages": {}}} == rs.context
+    assert {"EMPTY": {"matrix": {}, "stages": {}}} == rs.context
     assert job.set_outputs(rs.context, to={}) == {
         "jobs": {"second-job": {"stages": {}}}
     }
@@ -113,7 +113,7 @@ def test_job_exec_py_fail_fast_raise_catch():
             "errors": {
                 "class": rs.context["2150810470"]["errors"]["class"],
                 "message": (
-                    "PyStage: \n\tValueError: Testing raise error inside "
+                    "PyStage: \n\t| ...\tValueError: Testing raise error inside "
                     "PyStage with the sleep not equal 4!!!"
                 ),
                 "name": "StageException",
@@ -129,7 +129,7 @@ def test_job_exec_py_fail_fast_raise_catch():
                 "name": "JobException",
                 "message": (
                     "Job strategy was canceled from event that had set before "
-                    "strategy execution."
+                    "job strategy execution."
                 ),
             },
         },
@@ -138,7 +138,7 @@ def test_job_exec_py_fail_fast_raise_catch():
                 "class": rs.context["errors"][0]["class"],
                 "name": "JobException",
                 "message": (
-                    "Stage raise: StageException: PyStage: \n\t"
+                    "Stage raise: StageException: PyStage: \n\t| ...\t"
                     "ValueError: Testing raise error inside PyStage with the "
                     "sleep not equal 4!!!"
                 ),
@@ -232,7 +232,7 @@ def test_job_exec_py_complete_raise():
             "errors": {
                 "class": rs.context["2150810470"]["errors"]["class"],
                 "message": (
-                    "PyStage: \n\tValueError: Testing raise error inside "
+                    "PyStage: \n\t| ...\tValueError: Testing raise error inside "
                     "PyStage!!!"
                 ),
                 "name": "StageException",
@@ -244,7 +244,7 @@ def test_job_exec_py_complete_raise():
             "errors": {
                 "class": rs.context["9112472804"]["errors"]["class"],
                 "message": (
-                    "PyStage: \n\tValueError: Testing raise error inside "
+                    "PyStage: \n\t| ...\tValueError: Testing raise error inside "
                     "PyStage!!!"
                 ),
                 "name": "StageException",
@@ -264,7 +264,7 @@ def test_job_exec_py_complete_raise():
                 "class": rs.context["errors"][0]["class"],
                 "name": "JobException",
                 "message": (
-                    "Stage raise: StageException: PyStage: \n\t"
+                    "Stage raise: StageException: PyStage: \n\t| ...\t"
                     "ValueError: Testing raise error inside PyStage!!!"
                 ),
             },
@@ -272,7 +272,7 @@ def test_job_exec_py_complete_raise():
                 "class": rs.context["errors"][1]["class"],
                 "name": "JobException",
                 "message": (
-                    "Stage raise: StageException: PyStage: \n\t"
+                    "Stage raise: StageException: PyStage: \n\t| ...\t"
                     "ValueError: Testing raise error inside PyStage!!!"
                 ),
             },
