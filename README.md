@@ -76,12 +76,10 @@ flowchart LR
 
 > [!WARNING]
 > _**Disclaimer**_: I inspire the dynamic YAML statement from the [**GitHub Action**](https://github.com/features/actions),
-> and all configs pattern from several data orchestration framework tools from
-> my data engineering experience. :grimacing:
-
-> [!NOTE]
-> Other workflow orchestration tools that I interest and pick them to be inspiration
-> some for this package:
+> and my experience of data framework configs pattern. :grimacing:
+>
+> Other workflow orchestration services that I interest and pick them to be
+> this project inspiration:
 >
 > - [Google **Workflows**](https://cloud.google.com/workflows)
 > - [AWS **Step Functions**](https://aws.amazon.com/step-functions/)
