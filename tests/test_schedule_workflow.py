@@ -12,7 +12,7 @@ from .utils import dump_yaml_context
 
 
 def test_schedule_workflow():
-    schedule_wf = ScheduleWorkflow(name="demo workflow")
+    schedule_wf = ScheduleWorkflow(name="demo_workflow")
 
     assert schedule_wf.name == "demo_workflow"
     assert schedule_wf.alias == "demo_workflow"

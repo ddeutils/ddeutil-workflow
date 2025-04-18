@@ -31,6 +31,7 @@ from concurrent.futures import (
 from datetime import datetime, timedelta
 from functools import wraps
 from heapq import heappop, heappush
+from pathlib import Path
 from textwrap import dedent
 from threading import Thread
 from typing import Any, Callable, Optional, TypedDict, Union
@@ -263,6 +264,7 @@ class Schedule(BaseModel):
     def from_conf(
         cls,
         name: str,
+        path: Optional[Path] = None,
         extras: DictData | None = None,
     ) -> Self:
         """Create Schedule instance from the Loader object that only receive
@@ -270,6 +272,7 @@ class Schedule(BaseModel):
         searching configuration data of this schedule model in conf path.
 
         :param name: (str) A schedule name that want to pass to Loader object.
+        :param path: (Path) An override config path.
         :param extras: An extra parameters that want to pass to Loader
             object.
 
@@ -277,7 +280,7 @@ class Schedule(BaseModel):
 
         :rtype: Self
         """
-        loader: Loader = FileLoad(name, extras=extras)
+        loader: Loader = FileLoad(name, path=path, extras=extras)
 
         # NOTE: Validate the config type match with current connection model
         if loader.type != cls.__name__:

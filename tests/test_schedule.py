@@ -45,7 +45,7 @@ def test_schedule_from_loader_raise(test_path):
         Schedule.from_conf("schedule-raise-wf")
 
     with pytest.raises(ValueError):
-        Schedule.from_path("schedule-raise-wf", path=test_path / "conf")
+        Schedule.from_conf("schedule-raise-wf", path=test_path / "conf")
 
     with test_file.open(mode="w") as f:
         yaml.dump(
@@ -70,7 +70,7 @@ def test_schedule_from_loader_raise(test_path):
         Schedule.from_conf("schedule-raise-wf")
 
     with pytest.raises(TypeError):
-        Schedule.from_path("schedule-raise-wf", path=test_path / "conf")
+        Schedule.from_conf("schedule-raise-wf", path=test_path / "conf")
 
     with test_file.open(mode="w") as f:
         yaml.dump(
@@ -95,7 +95,7 @@ def test_schedule_from_loader_raise(test_path):
         Schedule.from_conf("schedule-raise-wf")
 
     with pytest.raises(ValidationError):
-        Schedule.from_path("schedule-raise-wf", path=test_path / "conf")
+        Schedule.from_conf("schedule-raise-wf", path=test_path / "conf")
 
     test_file.unlink(missing_ok=True)
 
@@ -116,7 +116,7 @@ def test_schedule_default_on(test_path):
         for sch_wf in schedule.workflows:
             assert sch_wf.on == []
 
-        schedule = Schedule.from_path(
+        schedule = Schedule.from_conf(
             "tmp-schedule-default-wf", path=test_path / "conf"
         )
         for sch_wf in schedule.workflows:
