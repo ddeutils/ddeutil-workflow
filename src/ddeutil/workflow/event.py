@@ -3,6 +3,7 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
+"""Event module that store all event object."""
 from __future__ import annotations
 
 from dataclasses import fields
@@ -17,7 +18,7 @@ from typing_extensions import Self
 
 from .__cron import WEEKDAYS, CronJob, CronJobYear, CronRunner, Options
 from .__types import DictData, DictStr
-from .conf import Loader
+from .conf import FileLoad
 
 
 def interval2crontab(
@@ -59,10 +60,11 @@ def interval2crontab(
 
 
 class On(BaseModel):
-    """On Pydantic model (Warped crontab object by model).
+    """On model (Warped crontab object by Pydantic model) to keep crontab value
+    and generate CronRunner object from this crontab value.
 
-    See Also:
-        * `generate()` is the main use-case of this schedule object.
+    Methods:
+        - generate: is the main use-case of this schedule object.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -96,9 +98,10 @@ class On(BaseModel):
     def from_value(cls, value: DictStr, extras: DictData) -> Self:
         """Constructor from values that will generate crontab by function.
 
-        :param value: A mapping value that will generate crontab before create
-            schedule model.
-        :param extras: An extras parameter that will keep in extras.
+        :param value: (DictStr) A mapping value that will generate crontab
+            before create schedule model.
+        :param extras: (DictData) An extra parameter that use to override core
+            config value.
         """
         passing: DictStr = {}
         if "timezone" in value:
@@ -112,18 +115,20 @@ class On(BaseModel):
     def from_conf(
         cls,
         name: str,
+        *,
         extras: DictData | None = None,
     ) -> Self:
-        """Constructor from the name of config that will use loader object for
-        getting the data.
+        """Constructor from the name of config loader that will use loader
+        object for getting the `On` data.
 
-        :param name: A name of config that will get from loader.
-        :param extras: An extra parameter that will keep in extras.
+        :param name: (str) A name of config that will get from loader.
+        :param extras: (DictData) An extra parameter that use to override core
+            config values.
 
         :rtype: Self
         """
         extras: DictData = extras or {}
-        loader: Loader = Loader(name, externals=extras)
+        loader: FileLoad = FileLoad(name, extras=extras)
 
         # NOTE: Validate the config type match with current connection model
         if loader.type != cls.__name__:
@@ -237,6 +242,9 @@ class On(BaseModel):
     def next(self, start: str | datetime) -> CronRunner:
         """Return a next datetime from Cron runner object that start with any
         date that given from input.
+
+        :param start: (str | datetime) A start datetime that use to generate
+            the CronRunner object.
 
         :rtype: CronRunner
         """

@@ -57,6 +57,12 @@ def test_workflow():
     with pytest.raises(ValidationError):
         Workflow(name="manual-workflow-${{ matrix.name }}")
 
+
+def test_workflow_bypass_extras():
+    job: Job = Job(
+        stages=[{"name": "Echo", "id": "echo", "echo": "Hello World"}]
+    )
+
     # NOTE: Test passing extra value from workflow is work.
     workflow: Workflow = Workflow(
         name="manual-workflow",
@@ -72,7 +78,7 @@ def test_workflow():
     assert workflow.job("first-job").stages[0].extras == {}
 
     # NOTE: Bypass extras to stage model.
-    assert workflow.job("first-job").stage("run-stage").extras == {
+    assert workflow.job("first-job").stage("echo").extras == {
         "registries": ["foo", "bar"]
     }
 
@@ -135,7 +141,7 @@ def test_workflow_desc():
     )
 
 
-def test_workflow_from_loader_without_job():
+def test_workflow_from_conf_without_job():
     workflow = Workflow.from_conf(name="wf-without-jobs")
     assert workflow.name == "wf-without-jobs"
 
@@ -143,8 +149,8 @@ def test_workflow_from_loader_without_job():
     assert rs.context == {"params": {}, "jobs": {}}
 
 
-def test_workflow_from_path(test_path):
-    workflow = Workflow.from_path(
+def test_workflow_from_conf_with_path(test_path):
+    workflow = Workflow.from_conf(
         name="wf-without-jobs", path=test_path / "conf"
     )
     assert workflow.name == "wf-without-jobs"
@@ -201,7 +207,7 @@ def test_workflow_from_loader_override(test_path):
     shutil.rmtree(conf_path)
 
 
-def test_workflow_from_loader_raise(test_path):
+def test_workflow_from_conf_raise(test_path):
     test_file = test_path / "conf/demo/01_01_wf_run_raise.yml"
 
     # NOTE: Raise for type of workflow does not valid.
@@ -223,7 +229,7 @@ def test_workflow_from_loader_raise(test_path):
         Workflow.from_conf(name="wf-run-from-loader-raise")
 
     with pytest.raises(ValueError):
-        Workflow.from_path(
+        Workflow.from_conf(
             name="wf-run-from-loader-raise",
             path=test_path / "conf",
         )
@@ -251,7 +257,7 @@ def test_workflow_from_loader_raise(test_path):
         Workflow.from_conf(name="wf-run-from-loader-raise")
 
     with pytest.raises(TypeError):
-        Workflow.from_path(
+        Workflow.from_conf(
             name="wf-run-from-loader-raise",
             path=test_path / "conf",
         )
@@ -278,7 +284,7 @@ def test_workflow_from_loader_raise(test_path):
         Workflow.from_conf(name="wf-run-from-loader-raise")
 
     with pytest.raises(WorkflowException):
-        Workflow.from_path(
+        Workflow.from_conf(
             name="wf-run-from-loader-raise",
             path=test_path / "conf",
         )

@@ -10,21 +10,22 @@ import os
 from collections.abc import Iterator
 from datetime import timedelta
 from functools import cached_property
+from inspect import isclass
 from pathlib import Path
-from typing import Final, Optional, TypeVar
+from typing import Final, Optional, Protocol, TypeVar, Union
 from zoneinfo import ZoneInfo
 
 from ddeutil.core import str2bool
 from ddeutil.io import YamlFlResolve
 from ddeutil.io.paths import glob_files, is_ignored, read_ignore
 
-from .__types import DictData, TupleStr
+from .__types import DictData
 
 T = TypeVar("T")
 PREFIX: Final[str] = "WORKFLOW"
 
 
-def env(var: str, default: str | None = None) -> str | None:  # pragma: no cov
+def env(var: str, default: str | None = None) -> str | None:
     """Get environment variable with uppercase and adding prefix string.
 
     :param var: (str) A env variable name.
@@ -33,17 +34,6 @@ def env(var: str, default: str | None = None) -> str | None:  # pragma: no cov
     :rtype: str | None
     """
     return os.getenv(f"{PREFIX}_{var.upper().replace(' ', '_')}", default)
-
-
-__all__: TupleStr = (
-    "api_config",
-    "env",
-    "Config",
-    "SimLoad",
-    "Loader",
-    "config",
-    "dynamic",
-)
 
 
 class Config:  # pragma: no cov
@@ -188,7 +178,7 @@ class Config:  # pragma: no cov
             return timedelta(**json.loads(stop_boundary_delta_str))
         except Exception as err:
             raise ValueError(
-                "Config ``WORKFLOW_APP_STOP_BOUNDARY_DELTA`` can not parsing to"
+                "Config `WORKFLOW_APP_STOP_BOUNDARY_DELTA` can not parsing to"
                 f"timedelta with {stop_boundary_delta_str}."
             ) from err
 
@@ -209,16 +199,20 @@ class APIConfig:
         return str2bool(env("API_ENABLE_ROUTE_SCHEDULE", "true"))
 
 
-class SimLoad:
-    """Simple Load Object that will search config data by given some identity
-    value like name of workflow or on.
+class FileLoad:
+    """Base Load object that use to search config data by given some identity
+    value like name of `Workflow` or `On` templates.
 
-    :param name: A name of config data that will read by Yaml Loader object.
-    :param conf_path: A config path object.
-    :param externals: An external parameters
+    :param name: (str) A name of key of config data that read with YAML
+        Environment object.
+    :param path: (Path) A config path object.
+    :param externals: (DictData) An external config data that want to add to
+        loaded config data.
+    :param extras: (DictDdata) An extra parameters that use to override core
+        config values.
 
     Noted:
-        The config data should have ``type`` key for modeling validation that
+        The config data should have `type` key for modeling validation that
     make this loader know what is config should to do pass to.
 
         ... <identity-key>:
@@ -230,16 +224,19 @@ class SimLoad:
     def __init__(
         self,
         name: str,
-        conf_path: Path,
+        *,
+        path: Optional[Union[str, Path]] = None,
         externals: DictData | None = None,
+        extras: DictData | None = None,
     ) -> None:
-        self.conf_path: Path = conf_path
+        self.conf_path: Path = Path(dynamic("conf_path", f=path, extras=extras))
         self.externals: DictData = externals or {}
-
+        self.extras: DictData = extras or {}
         self.data: DictData = {}
-        for file in glob_files(conf_path):
 
-            if self.is_ignore(file, conf_path):
+        for file in glob_files(self.conf_path):
+
+            if self.is_ignore(file, self.conf_path):
                 continue
 
             if data := self.filter_yaml(file, name=name):
@@ -258,25 +255,29 @@ class SimLoad:
     def finds(
         cls,
         obj: object,
-        conf_path: Path,
         *,
+        path: Optional[Path] = None,
         included: list[str] | None = None,
         excluded: list[str] | None = None,
+        extras: Optional[DictData] = None,
     ) -> Iterator[tuple[str, DictData]]:
         """Find all data that match with object type in config path. This class
         method can use include and exclude list of identity name for filter and
         adds-on.
 
         :param obj: An object that want to validate matching before return.
-        :param conf_path: A config object.
+        :param path: A config path object.
         :param included: An excluded list of data key that want to reject this
             data if any key exist.
         :param excluded: An included list of data key that want to filter from
             data.
+        :param extras: (DictData) An extra parameter that use to override core
+            config values.
 
         :rtype: Iterator[tuple[str, DictData]]
         """
         exclude: list[str] = excluded or []
+        conf_path: Path = dynamic("conf_path", f=path, extras=extras)
         for file in glob_files(conf_path):
 
             if cls.is_ignore(file, conf_path):
@@ -287,7 +288,10 @@ class SimLoad:
                 if key in exclude:
                     continue
 
-                if data.get("type", "") == obj.__name__:
+                if (
+                    data.get("type", "")
+                    == (obj if isclass(obj) else obj.__class__).__name__
+                ):
                     yield key, (
                         {k: data[k] for k in data if k in included}
                         if included
@@ -307,7 +311,8 @@ class SimLoad:
         :param file: (Path) A file path that want to check.
         :param conf_path: (Path) A config path that want to read the config
             ignore file.
-        :param ignore_filename: (str) An ignore filename.
+        :param ignore_filename: (str) An ignore filename. Default is
+            `.confignore` filename.
 
         :rtype: bool
         """
@@ -369,44 +374,27 @@ def dynamic(
     return rsx if rsx is not None else rs
 
 
-class Loader(SimLoad):
-    """Loader Object that get the config `yaml` file from current path.
+class Loader(Protocol):
+    type: str
+    conf_path: Path
+    data: DictData
 
-    :param name: (str) A name of config data that will read by Yaml Loader object.
-    :param externals: (DictData) An external parameters
-    """
+    def __init__(
+        self,
+        name: str,
+        *,
+        path: Optional[Union[str, Path]] = None,
+        externals: DictData | None = None,
+        extras: DictData | None = None,
+    ) -> None: ...
 
     @classmethod
     def finds(
         cls,
         obj: object,
         *,
-        path: Path | None = None,
+        path: Optional[Path] = None,
         included: list[str] | None = None,
         excluded: list[str] | None = None,
-        **kwargs,
-    ) -> Iterator[tuple[str, DictData]]:
-        """Override the find class method from the Simple Loader object.
-
-        :param obj: An object that want to validate matching before return.
-        :param path: (Path) A override config path.
-        :param included: An excluded list of data key that want to reject this
-            data if any key exist.
-        :param excluded: An included list of data key that want to filter from
-            data.
-
-        :rtype: Iterator[tuple[str, DictData]]
-        """
-        return super().finds(
-            obj=obj,
-            conf_path=(path or config.conf_path),
-            included=included,
-            excluded=excluded,
-        )
-
-    def __init__(self, name: str, externals: DictData) -> None:
-        super().__init__(
-            name,
-            conf_path=dynamic("conf_path", extras=externals),
-            externals=externals,
-        )
+        extras: Optional[DictData] = None,
+    ): ...

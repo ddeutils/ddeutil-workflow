@@ -37,8 +37,8 @@ from typing_extensions import Self
 
 from .__cron import CronJob, CronRunner
 from .__types import DictData, TupleStr
-from .conf import Loader, SimLoad, dynamic
-from .cron import On
+from .conf import FileLoad, Loader, dynamic
+from .event import On
 from .exceptions import JobException, UtilException, WorkflowException
 from .job import Job
 from .logs import Audit, get_audit
@@ -144,7 +144,7 @@ class Release:
         return NotImplemented
 
     def __lt__(self, other: Release | datetime) -> bool:
-        """Override equal property that will compare only the same type or
+        """Override less-than property that will compare only the same type or
         datetime.
 
         :rtype: bool
@@ -355,6 +355,7 @@ class Workflow(BaseModel):
         cls,
         name: str,
         *,
+        path: Optional[Path] = None,
         extras: DictData | None = None,
         loader: type[Loader] = None,
     ) -> Self:
@@ -362,7 +363,8 @@ class Workflow(BaseModel):
         an input workflow name. The loader object will use this workflow name to
         searching configuration data of this workflow model in conf path.
 
-        :param name: A workflow name that want to pass to Loader object.
+        :param name: (str) A workflow name that want to pass to Loader object.
+        :param path: (Path) An override config path.
         :param extras: An extra parameters that want to pass to Loader
             object.
         :param loader: A loader class for override default loader object.
@@ -371,59 +373,23 @@ class Workflow(BaseModel):
 
         :rtype: Self
         """
-        loader: Loader = (loader or Loader)(name, externals=(extras or {}))
+        loader: type[Loader] = loader or FileLoad
+        load: Loader = loader(name, path=path, extras=extras)
 
         # NOTE: Validate the config type match with current connection model
-        if loader.type != cls.__name__:
-            raise ValueError(f"Type {loader.type} does not match with {cls}")
+        if load.type != cls.__name__:
+            raise ValueError(f"Type {load.type} does not match with {cls}")
 
-        loader_data: DictData = copy.deepcopy(loader.data)
-        loader_data["name"] = name.replace(" ", "_")
+        data: DictData = copy.deepcopy(load.data)
+        data["name"] = name.replace(" ", "_")
 
         if extras:
-            loader_data["extras"] = extras
+            data["extras"] = extras
 
-        cls.__bypass_on__(loader_data, path=loader.conf_path, extras=extras)
-        return cls.model_validate(obj=loader_data)
-
-    @classmethod
-    def from_path(
-        cls,
-        name: str,
-        path: Path,
-        *,
-        extras: DictData | None = None,
-        loader: type[Loader] = None,
-    ) -> Self:
-        """Create Workflow instance from the specific path. The loader object
-        will use this workflow name and path to searching configuration data of
-        this workflow model.
-
-        :param name: (str) A workflow name that want to pass to Loader object.
-        :param path: (Path) A config path that want to search.
-        :param extras: (DictData) An extra parameters that want to override core
-            config values.
-        :param loader: A loader class for override default loader object.
-
-        :raise ValueError: If the type does not match with current object.
-
-        :rtype: Self
-        """
-        loader: SimLoad = (loader or SimLoad)(
-            name, conf_path=path, externals=(extras or {})
+        cls.__bypass_on__(
+            data, path=load.conf_path, extras=extras, loader=loader
         )
-        # NOTE: Validate the config type match with current connection model
-        if loader.type != cls.__name__:
-            raise ValueError(f"Type {loader.type} does not match with {cls}")
-
-        loader_data: DictData = copy.deepcopy(loader.data)
-        loader_data["name"] = name.replace(" ", "_")
-
-        if extras:
-            loader_data["extras"] = extras
-
-        cls.__bypass_on__(loader_data, path=path, extras=extras)
-        return cls.model_validate(obj=loader_data)
+        return cls.model_validate(obj=data)
 
     @classmethod
     def __bypass_on__(
@@ -431,6 +397,7 @@ class Workflow(BaseModel):
         data: DictData,
         path: Path,
         extras: DictData | None = None,
+        loader: type[Loader] = None,
     ) -> DictData:
         """Bypass the on data to loaded config data.
 
@@ -451,7 +418,7 @@ class Workflow(BaseModel):
             #   field.
             data["on"] = [
                 (
-                    SimLoad(n, conf_path=path, externals=(extras or {})).data
+                    (loader or FileLoad)(n, path=path, extras=extras).data
                     if isinstance(n, str)
                     else n
                 )

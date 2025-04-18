@@ -2,10 +2,7 @@ from datetime import datetime
 
 import pytest
 import yaml
-from ddeutil.workflow import Workflow
-from ddeutil.workflow.cron import On
-from ddeutil.workflow.scheduler import Schedule
-from ddeutil.workflow.workflow import WorkflowTask
+from ddeutil.workflow import On, Schedule, Workflow, WorkflowTask
 from pydantic import ValidationError
 
 from .utils import dump_yaml_context

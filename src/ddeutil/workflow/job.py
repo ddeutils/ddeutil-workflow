@@ -140,14 +140,19 @@ class Strategy(BaseModel):
 
     fail_fast: bool = Field(
         default=False,
+        description=(
+            "A fail-fast flag that use to cancel strategy execution when it "
+            "has some execution was failed."
+        ),
         alias="fail-fast",
     )
     max_parallel: int = Field(
         default=1,
         gt=0,
+        lt=10,
         description=(
             "The maximum number of executor thread pool that want to run "
-            "parallel"
+            "parallel. This value should gather than 0 and less than 10."
         ),
         alias="max-parallel",
     )

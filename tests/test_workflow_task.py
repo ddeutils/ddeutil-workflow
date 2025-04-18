@@ -2,11 +2,7 @@ from datetime import datetime
 from unittest import mock
 
 import pytest
-from ddeutil.workflow.__cron import CronRunner
-from ddeutil.workflow.conf import Config
-from ddeutil.workflow.cron import On
-from ddeutil.workflow.logs import FileAudit
-from ddeutil.workflow.result import Result
+from ddeutil.workflow import Config, CronRunner, FileAudit, On, Result
 from ddeutil.workflow.workflow import (
     Release,
     ReleaseQueue,

@@ -8,28 +8,19 @@ from zoneinfo import ZoneInfo
 import pytest
 import toml
 import yaml
-from ddeutil.workflow.conf import Config, Loader, SimLoad, config, dynamic
+from ddeutil.workflow.conf import Config, FileLoad, config, dynamic
 from ddeutil.workflow.scheduler import Schedule
 from ddeutil.workflow.workflow import Workflow
 
 
-@pytest.fixture(scope="function")
-def adjust_config():
-    origin_max_job = os.getenv("WORKFLOW_CORE_MAX_JOB_PARALLEL")
+def test_config():
     origin_stop = os.getenv("WORKFLOW_APP_STOP_BOUNDARY_DELTA")
-    os.environ["WORKFLOW_CORE_MAX_JOB_PARALLEL"] = "-1"
     os.environ["WORKFLOW_APP_STOP_BOUNDARY_DELTA"] = "{"
-
-    yield
-
-    os.environ["WORKFLOW_CORE_MAX_JOB_PARALLEL"] = origin_max_job
-    os.environ["WORKFLOW_APP_STOP_BOUNDARY_DELTA"] = origin_stop
-
-
-def test_config(adjust_config):
 
     with pytest.raises(ValueError):
         _ = Config().stop_boundary_delta
+
+    os.environ["WORKFLOW_APP_STOP_BOUNDARY_DELTA"] = origin_stop
 
     conf = Config()
     os.environ["WORKFLOW_CORE_TIMEZONE"] = "Asia/Bangkok"
@@ -56,13 +47,13 @@ def test_simple_load(target_path: Path):
     with mock.patch.object(Config, "conf_path", target_path):
 
         with pytest.raises(ValueError):
-            SimLoad("test_simple_load_raise", config.conf_path)
+            FileLoad("test_simple_load_raise", path=config.conf_path)
 
         with pytest.raises(ValueError):
-            SimLoad("wf-ignore-inside", config.conf_path)
+            FileLoad("wf-ignore-inside", path=config.conf_path)
 
         with pytest.raises(ValueError):
-            SimLoad("wf-ignore", config.conf_path)
+            FileLoad("wf-ignore", path=config.conf_path)
 
 
 def test_simple_load_finds(target_path: Path):
@@ -85,16 +76,20 @@ def test_simple_load_finds(target_path: Path):
                 "test_simple_load_config",
                 {"type": "Config", "foo": "bar"},
             )
-        ] == list(SimLoad.finds(Config, config.conf_path))
+        ] == list(FileLoad.finds(Config, path=config.conf_path))
         assert [
             (
                 "test_simple_load_config",
                 {"type": "Config"},
             )
-        ] == list(SimLoad.finds(Config, config.conf_path, included=["type"]))
+        ] == list(
+            FileLoad.finds(Config, path=config.conf_path, included=["type"])
+        )
         assert [] == list(
-            SimLoad.finds(
-                Config, config.conf_path, excluded=["test_simple_load_config"]
+            FileLoad.finds(
+                Config,
+                path=config.conf_path,
+                excluded=["test_simple_load_config"],
             )
         )
 
@@ -116,14 +111,14 @@ def test_simple_load_finds_raise(target_path: Path):
 
     with mock.patch.object(Config, "conf_path", target_path):
         with pytest.raises(ValueError):
-            _ = SimLoad("test_simple_load_config", config.conf_path).type
+            _ = FileLoad("test_simple_load_config", path=config.conf_path).type
 
 
 def test_loader_find_schedule():
-    for finding in Loader.finds(Schedule, excluded=[]):
+    for finding in FileLoad.finds(Schedule, excluded=[]):
         print(finding)
 
-    for finding in Loader.finds(
+    for finding in FileLoad.finds(
         Schedule,
         excluded=[
             "schedule-common-wf",
@@ -136,7 +131,7 @@ def test_loader_find_schedule():
 
 
 def test_loader_find_workflow():
-    for finding in Loader.finds(Workflow, excluded=[]):
+    for finding in FileLoad.finds(Workflow, excluded=[]):
         print(finding)
 
 
