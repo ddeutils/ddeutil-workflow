@@ -22,7 +22,12 @@ ErrorData = TypedDict(
 
 
 def to_dict(exception: Exception) -> ErrorData:  # pragma: no cov
-    """Create dict data from exception instance."""
+    """Create dict data from exception instance.
+
+    :param exception: An exception object.
+
+    :rtype: ErrorData
+    """
     return {
         "class": exception,
         "name": exception.__class__.__name__,
@@ -33,6 +38,10 @@ def to_dict(exception: Exception) -> ErrorData:  # pragma: no cov
 class BaseWorkflowException(Exception):
 
     def to_dict(self) -> ErrorData:
+        """Return ErrorData data from the current exception object.
+
+        :rtype: ErrorData
+        """
         return to_dict(self)
 
 

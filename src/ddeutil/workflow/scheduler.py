@@ -113,11 +113,8 @@ class ScheduleWorkflow(BaseModel):
     )
 
     @model_validator(mode="before")
-    def __prepare_before__(cls, data: Any) -> DictData:
-        """Prepare incoming values before validating with model fields.
-
-        :rtype: DictData
-        """
+    def __prepare_before__(cls, data: Any) -> Any:
+        """Prepare incoming values before validating with model fields."""
         if isinstance(data, dict):
             # VALIDATE: Add default the alias field with the name.
             if "alias" not in data:
@@ -132,8 +129,10 @@ class ScheduleWorkflow(BaseModel):
     ) -> DictData:
         """Bypass and prepare the on data to loaded config data.
 
-        :param data: A data that want to validate for model initialization.
-        :param extras: An extra parameter that want to override core config.
+        :param data: (DictData) A data that want to validate for the model
+            initialization.
+        :param extras: (DictData) An extra parameter that want to override core
+            config values.
 
         :rtype: DictData
         """
@@ -158,6 +157,10 @@ class ScheduleWorkflow(BaseModel):
     def __on_no_dup__(cls, value: list[On], info: ValidationInfo) -> list[On]:
         """Validate the on fields should not contain duplicate values and if it
         contains every minute value, it should have only one on value.
+
+        :param value: (list[On]) A list of `On` object.
+        :param info: (ValidationInfo) An validation info object for getting an
+            extra parameter.
 
         :rtype: list[On]
         """
@@ -188,23 +191,22 @@ class ScheduleWorkflow(BaseModel):
             This task creation need queue to tracking release date already
         mapped or not.
 
-        :param start_date: A start date that get from the workflow schedule.
-        :param queue: A mapping of name and list of datetime for queue.
+        :param start_date: (datetime) A start datetime that get from the
+            workflow schedule.
+        :param queue: (dict[str, ReleaseQueue]) A mapping of name and list of
+            datetime for queue.
 
         :rtype: list[WorkflowTask]
         :return: Return the list of WorkflowTask object from the specific
             input datetime that mapping with the on field.
         """
-        workflow_tasks: list[WorkflowTask] = []
-
-        # NOTE: Loading workflow model from the name of workflow.
         wf: Workflow = Workflow.from_conf(self.name, extras=self.extras)
         wf_queue: ReleaseQueue = queue[self.alias]
 
         # IMPORTANT: Create the default 'on' value if it does not pass the `on`
         #   field to the Schedule object.
         ons: list[On] = self.on or wf.on.copy()
-
+        workflow_tasks: list[WorkflowTask] = []
         for on in ons:
 
             # NOTE: Create CronRunner instance from the start_date param.
@@ -247,7 +249,7 @@ class Schedule(BaseModel):
     )
     workflows: list[ScheduleWorkflow] = Field(
         default_factory=list,
-        description="A list of ScheduleWorkflow models.",
+        description="A list of ScheduleWorkflow model.",
     )
 
     @field_validator("desc", mode="after")
@@ -264,6 +266,7 @@ class Schedule(BaseModel):
     def from_conf(
         cls,
         name: str,
+        *,
         path: Optional[Path] = None,
         extras: DictData | None = None,
     ) -> Self:

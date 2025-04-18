@@ -264,50 +264,48 @@ def test_workflow_from_conf_raise(test_path):
     test_file.unlink(missing_ok=True)
 
 
-def test_workflow_condition(test_path):
-    with dump_yaml_context(
-        test_path / "conf/demo/01_99_wf_test_wf_condition.yml",
-        data="""
-        tmp-wf-condition:
-          type: Workflow
-          params: {name: str}
-          jobs:
-            condition-job:
-              stages:
-                - name: "Test if condition"
-                  id: condition-stage
-                  if: '"${{ params.name }}" == "foo"'
-                  run: |
-                    message: str = 'Hello World'
-                    print(message)
-                    """,
-    ):
-        workflow = Workflow.from_conf(name="tmp-wf-condition")
-        rs: Result = workflow.execute(params={"name": "bar"})
-        assert {
-            "params": {"name": "bar"},
-            "jobs": {
-                "condition-job": {
-                    "stages": {
-                        "condition-stage": {"outputs": {}, "skipped": True},
-                    },
+def test_workflow_condition():
+    workflow = Workflow(
+        name="tmp-wf-condition",
+        params={"name": "str"},
+        jobs={
+            "condition-job": {
+                "stages": [
+                    {
+                        "name": "Condition Stage",
+                        "id": "condition-stage",
+                        "if": '"${{ params.name }}" == "foo"',
+                        "run": (
+                            "message: str = 'Hello World'\n" "print(message)\n"
+                        ),
+                    }
+                ]
+            }
+        },
+    )
+    rs: Result = workflow.execute(params={"name": "bar"})
+    assert rs.context == {
+        "params": {"name": "bar"},
+        "jobs": {
+            "condition-job": {
+                "stages": {
+                    "condition-stage": {"outputs": {}, "skipped": True},
                 },
             },
-        } == rs.context
+        },
+    }
 
-        rs: Result = workflow.execute(params={"name": "foo"})
-        assert {
-            "params": {"name": "foo"},
-            "jobs": {
-                "condition-job": {
-                    "stages": {
-                        "condition-stage": {
-                            "outputs": {"message": "Hello World"}
-                        }
-                    },
+    rs: Result = workflow.execute(params={"name": "foo"})
+    assert rs.context == {
+        "params": {"name": "foo"},
+        "jobs": {
+            "condition-job": {
+                "stages": {
+                    "condition-stage": {"outputs": {"message": "Hello World"}}
                 },
             },
-        } == rs.context
+        },
+    }
 
 
 def test_workflow_parameterize(test_path):

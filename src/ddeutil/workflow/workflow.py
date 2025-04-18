@@ -427,9 +427,8 @@ class Workflow(BaseModel):
         return data
 
     @model_validator(mode="before")
-    def __prepare_model_before__(cls, data: Any) -> DictData:
+    def __prepare_model_before__(cls, data: Any) -> Any:
         """Prepare the params key in the data model before validating."""
-        # NOTE: Prepare params type if it is passing with only type value.
         if isinstance(data, dict) and (params := data.pop("params", {})):
             data["params"] = {
                 p: (

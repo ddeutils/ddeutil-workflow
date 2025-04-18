@@ -3,7 +3,9 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-"""Event module that store all event object."""
+"""Event module that store all event object. Now, it has only `On` and `OnYear`
+model these are schedule with crontab event.
+"""
 from __future__ import annotations
 
 from dataclasses import fields
@@ -162,7 +164,7 @@ class On(BaseModel):
         )
 
     @model_validator(mode="before")
-    def __prepare_values(cls, data: Any) -> DictData:
+    def __prepare_values(cls, data: Any) -> Any:
         """Extract tz key from value and change name to timezone key.
 
         :param data: (DictData) A data that want to pass for create an On
