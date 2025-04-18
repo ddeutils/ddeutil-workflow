@@ -96,7 +96,7 @@ class On(BaseModel):
             description="A timezone string value",
             alias="timezone",
         ),
-    ] = "Etc/UTC"
+    ] = "UTC"
 
     @classmethod
     def from_value(cls, value: DictStr, extras: DictData) -> Self:

@@ -3,10 +3,12 @@
 !!! important
 
     The config value that you will set on the environment should combine with
-    prefix, component, and name which is `WORKFLOW_{component}_{name}` (With upper
-    case).
+    prefix, component, and name which is `WORKFLOW_{component}_{name}` with upper
+    case.
 
-## Core
+## Environment Variable
+
+### Core
 
 The main configuration that use to dynamic changing with your objective of this
 application. If any configuration values do not set yet, it will use default value
@@ -35,17 +37,18 @@ and do not raise any error to you.
 | **MAX_SCHEDULE_PER_PROCESS** |    App    | `100`                                                                                                                           | A schedule per process that run parallel.                                                                          |
 | **STOP_BOUNDARY_DELTA**      |    App    | `'{"minutes": 5, "seconds": 20}'`                                                                                               | A time delta value that use to stop scheduler app in json string format.                                           |
 
-## API
+### API
 
 | Environment                |  Component  | Default | <div style="width:25em">Description</div>                                          |
 |:---------------------------|:-----------:|---------|------------------------------------------------------------------------------------|
 | **ENABLE_ROUTE_WORKFLOW**  |     API     | `true`  | A flag that enable workflow route to manage execute manually and workflow logging. |
 | **ENABLE_ROUTE_SCHEDULE**  |     API     | `true`  | A flag that enable run scheduler.                                                  |
 
-## Override
+## Execution Override
 
 Some config can override by an extra parameters. For the below example, I override
-the `conf_path` and `stage_default_id` config values at the execution time.
+the `conf_path` and `stage_default_id` config values at the execution time from
+`WORKFLOW_CORE_CONF_PATH` and `WORKFLOW_CORE_STAGE_DEFAULT_ID` environment variables.
 
 That is mean, it does not impact to running workflow that do not override and use
 the current environment config values.

@@ -373,7 +373,7 @@ def dynamic(
     return rsx if rsx is not None else rs
 
 
-class Loader(Protocol):
+class Loader(Protocol):  # pragma: no cov
     type: str
     path: Path
     data: DictData

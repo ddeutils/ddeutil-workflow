@@ -1,4 +1,6 @@
-# Logging
+# Logs
+
+The log from the Workflow can be split with 2 parts: **Trace** and **Audit**.
 
 ## Trace
 

@@ -367,8 +367,8 @@ class Workflow(BaseModel):
 
         :param name: (str) A workflow name that want to pass to Loader object.
         :param path: (Path) An override config path.
-        :param extras: An extra parameters that want to pass to Loader
-            object.
+        :param extras: (DictData) An extra parameters that want to override core
+            config values.
         :param loader: A loader class for override default loader object.
 
         :raise ValueError: If the type does not match with current object.
