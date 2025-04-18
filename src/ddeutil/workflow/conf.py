@@ -229,14 +229,14 @@ class FileLoad:
         externals: DictData | None = None,
         extras: DictData | None = None,
     ) -> None:
-        self.conf_path: Path = Path(dynamic("conf_path", f=path, extras=extras))
+        self.path: Path = Path(dynamic("conf_path", f=path, extras=extras))
         self.externals: DictData = externals or {}
         self.extras: DictData = extras or {}
         self.data: DictData = {}
 
-        for file in glob_files(self.conf_path):
+        for file in glob_files(self.path):
 
-            if self.is_ignore(file, self.conf_path):
+            if self.is_ignore(file, self.path):
                 continue
 
             if data := self.filter_yaml(file, name=name):
@@ -245,8 +245,7 @@ class FileLoad:
         # VALIDATE: check the data that reading should not empty.
         if not self.data:
             raise ValueError(
-                f"Config {name!r} does not found on conf path: "
-                f"{self.conf_path}."
+                f"Config {name!r} does not found on the conf path: {self.path}."
             )
 
         self.data.update(self.externals)
@@ -302,14 +301,14 @@ class FileLoad:
     def is_ignore(
         cls,
         file: Path,
-        conf_path: Path,
+        path: Path,
         *,
         ignore_filename: Optional[str] = None,
     ) -> bool:
         """Check this file was ignored.
 
         :param file: (Path) A file path that want to check.
-        :param conf_path: (Path) A config path that want to read the config
+        :param path: (Path) A config path that want to read the config
             ignore file.
         :param ignore_filename: (str) An ignore filename. Default is
             `.confignore` filename.
@@ -317,7 +316,7 @@ class FileLoad:
         :rtype: bool
         """
         ignore_filename: str = ignore_filename or ".confignore"
-        return is_ignored(file, read_ignore(conf_path / ignore_filename))
+        return is_ignored(file, read_ignore(path / ignore_filename))
 
     @classmethod
     def filter_yaml(cls, file: Path, name: str | None = None) -> DictData:
@@ -376,7 +375,7 @@ def dynamic(
 
 class Loader(Protocol):
     type: str
-    conf_path: Path
+    path: Path
     data: DictData
 
     def __init__(

@@ -57,6 +57,9 @@ docker = [
 Homepage = "https://github.com/ddeutils/ddeutil-workflow/"
 "Source Code" = "https://github.com/ddeutils/ddeutil-workflow/"
 
+[project.scripts]
+workflow-cli = "ddeutil.workflow.__main__:app"
+
 [tool.setuptools.dynamic]
 version = {attr = "ddeutil.workflow.__about__.__version__"}
 

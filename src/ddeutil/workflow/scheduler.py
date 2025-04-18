@@ -33,7 +33,7 @@ from functools import wraps
 from heapq import heappop, heappush
 from textwrap import dedent
 from threading import Thread
-from typing import Callable, Optional, TypedDict, Union
+from typing import Any, Callable, Optional, TypedDict, Union
 
 from pydantic import BaseModel, Field, ValidationInfo
 from pydantic.functional_validators import field_validator, model_validator
@@ -112,21 +112,18 @@ class ScheduleWorkflow(BaseModel):
     )
 
     @model_validator(mode="before")
-    def __prepare_before__(cls, values: DictData) -> DictData:
+    def __prepare_before__(cls, data: Any) -> DictData:
         """Prepare incoming values before validating with model fields.
 
         :rtype: DictData
         """
-        # VALIDATE: Prepare a workflow name that should not include space.
-        if name := values.get("name"):
-            values["name"] = name.replace(" ", "_")
+        if isinstance(data, dict):
+            # VALIDATE: Add default the alias field with the name.
+            if "alias" not in data:
+                data["alias"] = data.get("name")
 
-        # VALIDATE: Add default the alias field with the name.
-        if not values.get("alias"):
-            values["alias"] = values.get("name")
-
-        cls.__bypass_on(values, extras=values.get("extras"))
-        return values
+            cls.__bypass_on(data, extras=data.get("extras"))
+        return data
 
     @classmethod
     def __bypass_on(
@@ -287,9 +284,7 @@ class Schedule(BaseModel):
             raise ValueError(f"Type {loader.type} does not match with {cls}")
 
         loader_data: DictData = copy.deepcopy(loader.data)
-
-        # NOTE: Add name to loader data
-        loader_data["name"] = name.replace(" ", "_")
+        loader_data["name"] = name
 
         if extras:
             loader_data["extras"] = extras

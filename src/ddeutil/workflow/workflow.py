@@ -28,7 +28,7 @@ from pathlib import Path
 from queue import Queue
 from textwrap import dedent
 from threading import Event
-from typing import Optional
+from typing import Any, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo
 from pydantic.dataclasses import dataclass
@@ -172,7 +172,7 @@ class ReleaseQueue:
     @classmethod
     def from_list(
         cls,
-        queue: list[datetime] | list[Release] | None = None,
+        queue: Optional[Union[list[datetime], list[Release]]] = None,
         extras: Optional[DictData] = None,
     ) -> Self:
         """Construct ReleaseQueue object from an input queue value that passing
@@ -190,7 +190,6 @@ class ReleaseQueue:
             return cls()
 
         if isinstance(queue, list):
-
             if all(isinstance(q, datetime) for q in queue):
                 return cls(
                     queue=[
@@ -233,7 +232,11 @@ class ReleaseQueue:
         )
 
     def mark_complete(self, value: Release) -> Self:
-        """Push Release to the complete queue.
+        """Push Release to the complete queue. After push the release, it will
+        delete old release base on the `CORE_MAX_QUEUE_COMPLETE_HIST` value.
+
+        :param value: (Release) A Release value that want to push to the
+            complete field.
 
         :rtype: Self
         """
@@ -262,7 +265,7 @@ class ReleaseQueue:
         force_run: bool = False,
         extras: Optional[DictData] = None,
     ) -> Self:
-        """Generate Release model to queue.
+        """Generate a Release model to the queue field with an input CronRunner.
 
         Steps:
             - Create Release object from the current date that not reach the end
@@ -277,9 +280,10 @@ class ReleaseQueue:
         :param runner: (CronRunner) A CronRunner object.
         :param name: (str) A target name that want to check at pointer of audit.
         :param offset: (float) An offset in second unit for time travel.
-        :param force_run: A flag that allow to release workflow if the audit
-            with that release was pointed.
-        :param extras: An extra parameter that want to override core config.
+        :param force_run: (bool) A flag that allow to release workflow if the
+            audit with that release was pointed. (Default is False).
+        :param extras: (DictDatA) An extra parameter that want to override core
+            config values.
 
         :rtype: ReleaseQueue
 
@@ -287,7 +291,7 @@ class ReleaseQueue:
         if runner.date > end_date:
             return self
 
-        workflow_release = Release(
+        release = Release(
             date=runner.date,
             offset=offset,
             end_date=end_date,
@@ -295,13 +299,11 @@ class ReleaseQueue:
             type=ReleaseType.POKE,
         )
 
-        while self.check_queue(workflow_release) or (
-            audit.is_pointed(
-                name=name, release=workflow_release.date, extras=extras
-            )
+        while self.check_queue(release) or (
+            audit.is_pointed(name=name, release=release.date, extras=extras)
             and not force_run
         ):
-            workflow_release = Release(
+            release = Release(
                 date=runner.next,
                 offset=offset,
                 end_date=end_date,
@@ -312,12 +314,12 @@ class ReleaseQueue:
         if runner.date > end_date:
             return self
 
-        heappush(self.queue, workflow_release)
+        heappush(self.queue, release)
         return self
 
 
 class Workflow(BaseModel):
-    """Workflow Pydantic model.
+    """Workflow model that use to keep the `Job` and `On` models.
 
         This is the main future of this project because it uses to be workflow
     data for running everywhere that you want or using it to scheduler task in
@@ -381,14 +383,12 @@ class Workflow(BaseModel):
             raise ValueError(f"Type {load.type} does not match with {cls}")
 
         data: DictData = copy.deepcopy(load.data)
-        data["name"] = name.replace(" ", "_")
+        data["name"] = name
 
         if extras:
             data["extras"] = extras
 
-        cls.__bypass_on__(
-            data, path=load.conf_path, extras=extras, loader=loader
-        )
+        cls.__bypass_on__(data, path=load.path, extras=extras, loader=loader)
         return cls.model_validate(obj=data)
 
     @classmethod
@@ -427,11 +427,11 @@ class Workflow(BaseModel):
         return data
 
     @model_validator(mode="before")
-    def __prepare_model_before__(cls, values: DictData) -> DictData:
+    def __prepare_model_before__(cls, data: Any) -> DictData:
         """Prepare the params key in the data model before validating."""
         # NOTE: Prepare params type if it is passing with only type value.
-        if params := values.pop("params", {}):
-            values["params"] = {
+        if isinstance(data, dict) and (params := data.pop("params", {})):
+            data["params"] = {
                 p: (
                     {"type": params[p]}
                     if isinstance(params[p], str)
@@ -439,7 +439,7 @@ class Workflow(BaseModel):
                 )
                 for p in params
             }
-        return values
+        return data
 
     @field_validator("desc", mode="after")
     def __dedent_desc__(cls, value: str) -> str:

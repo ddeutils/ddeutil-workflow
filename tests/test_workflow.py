@@ -83,55 +83,31 @@ def test_workflow_bypass_extras():
     }
 
 
-def test_workflow_on(test_path):
+def test_workflow_on():
 
     # NOTE: Raise when the on field receive duplicate values.
-    with dump_yaml_context(
-        test_path / "conf/demo/01_99_wf_test_wf_on_raise.yml",
-        data="""
-        tmp-wf-scheduling-raise:
-          type: Workflow
-          on:
-            - 'every_3_minute_bkk'
-            - 'every_3_minute_bkk'
-          params:
-            name: str
-          jobs:
-            first-job:
-              stages:
-                - name: "Hello stage"
-                  echo: "Hello ${{ params.name | title }}"
-        """,
-    ):
-        with pytest.raises(ValidationError):
-            Workflow.from_conf(name="tmp-wf-scheduling-raise")
+    with pytest.raises(ValidationError):
+        Workflow(
+            name="tmp-wf-scheduling-raise",
+            on=[
+                "every_3_minute_bkk",
+                "every_3_minute_bkk",
+            ],
+        )
 
     # NOTE: Raise if values on the on field reach the maximum value.
-    with dump_yaml_context(
-        test_path / "conf/demo/01_99_wf_test_wf_on_reach_max_values.yml",
-        data="""
-        tmp-wf-on-reach-max-value:
-          type: Workflow
-          on:
-            - cronjob: '2 * * * *'
-            - cronjob: '3 * * * *'
-            - cronjob: '4 * * * *'
-            - cronjob: '5 * * * *'
-            - cronjob: '6 * * * *'
-            - cronjob: '7 * * * *'
-          jobs:
-            condition-job:
-              stages:
-                - name: "Test if condition"
-                  id: condition-stage
-                  if: '"${{ params.name }}" == "foo"'
-                  run: |
-                    message: str = 'Hello World'
-                    print(message)
-        """,
-    ):
-        with pytest.raises(ValidationError):
-            Workflow.from_conf(name="tmp-wf-on-reach-max-value")
+    with pytest.raises(ValidationError):
+        Workflow(
+            name="tmp-wf-on-reach-max-value",
+            on=[
+                {"cronjob": "2 * * * *"},
+                {"cronjob": "3 * * * *"},
+                {"cronjob": "4 * * * *"},
+                {"cronjob": "5 * * * *"},
+                {"cronjob": "6 * * * *"},
+                {"cronjob": "7 * * * *"},
+            ],
+        )
 
 
 def test_workflow_desc():
@@ -225,14 +201,9 @@ def test_workflow_from_conf_raise(test_path):
         },
     )
 
+    # Note: Raise because the type of config data does not match with model.
     with pytest.raises(ValueError):
         Workflow.from_conf(name="wf-run-from-loader-raise")
-
-    with pytest.raises(ValueError):
-        Workflow.from_conf(
-            name="wf-run-from-loader-raise",
-            path=test_path / "conf",
-        )
 
     # NOTE: Raise if type of the on field does not valid with str or dict.
     dump_yaml(

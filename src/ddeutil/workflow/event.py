@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import fields
 from datetime import datetime
-from typing import Annotated, Literal, Union
+from typing import Annotated, Any, Literal, Union
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo
@@ -20,9 +20,11 @@ from .__cron import WEEKDAYS, CronJob, CronJobYear, CronRunner, Options
 from .__types import DictData, DictStr
 from .conf import FileLoad
 
+Interval = Literal["daily", "weekly", "monthly"]
+
 
 def interval2crontab(
-    interval: Literal["daily", "weekly", "monthly"],
+    interval: Interval,
     *,
     day: str | None = None,
     time: str = "00:00",
@@ -160,17 +162,17 @@ class On(BaseModel):
         )
 
     @model_validator(mode="before")
-    def __prepare_values(cls, values: DictData) -> DictData:
+    def __prepare_values(cls, data: Any) -> DictData:
         """Extract tz key from value and change name to timezone key.
 
-        :param values: (DictData) A data that want to pass for create an On
+        :param data: (DictData) A data that want to pass for create an On
             model.
 
         :rtype: DictData
         """
-        if tz := values.pop("tz", None):
-            values["timezone"] = tz
-        return values
+        if isinstance(data, dict) and (tz := data.pop("tz", None)):
+            data["timezone"] = tz
+        return data
 
     @field_validator("tz")
     def __validate_tz(cls, value: str) -> str:
