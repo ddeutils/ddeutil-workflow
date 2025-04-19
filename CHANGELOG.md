@@ -2,6 +2,30 @@
 
 ## Latest Changes
 
+## 0.0.56
+
+### :stars: Highlight Features
+
+- :star: hl: support multiple config path on fileload object.
+
+### :bug: Bug fixes
+
+- :gear: fixed: add type check on model validate before mode.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: revise some testcase that not use.
+- :test_tube: tests: update event testcase.
+- :test_tube: tests: update get tz key on from_value construct func.
+- :test_tube: tests: fixed testcase for removing from_path classmethod.
+- :art: styled: change cron module to event.
+- :test_tube: tests: improve stage exec testcase.
+
+### :broom: Deprecate & Clean
+
+- :recycle: clean: remove simload object and use fileload instead.
+- :recycle: clean: remove from_path on workflow model.
+
 ## 0.0.55
 
 ### :sparkles: Features
