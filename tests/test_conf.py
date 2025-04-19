@@ -77,14 +77,6 @@ def test_load_file_finds(target_path: Path):
                 {"type": "Config", "foo": "bar"},
             )
         ] == list(FileLoad.finds(Config, path=config.conf_path))
-        assert [
-            (
-                "test_load_file_config",
-                {"type": "Config"},
-            )
-        ] == list(
-            FileLoad.finds(Config, path=config.conf_path, included=["type"])
-        )
         assert [] == list(
             FileLoad.finds(
                 Config,
@@ -115,7 +107,7 @@ def test_load_file_finds_raise(target_path: Path):
 
 
 def test_loader_find_schedule():
-    for finding in FileLoad.finds(Schedule, excluded=[]):
+    for finding in FileLoad.finds(Schedule):
         print(finding)
 
     for finding in FileLoad.finds(
@@ -131,7 +123,7 @@ def test_loader_find_schedule():
 
 
 def test_loader_find_workflow():
-    for finding in FileLoad.finds(Workflow, excluded=[]):
+    for finding in FileLoad.finds(Workflow):
         print(finding)
 
 

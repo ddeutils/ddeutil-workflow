@@ -236,6 +236,9 @@ class FileLoad(BaseLoad):
         ...     type: <importable-object>
         ...     <key-data-1>: <value-data-1>
         ...     <key-data-2>: <value-data-2>
+
+        This object support multiple config paths if you pass the `conf_paths`
+    key to the `extras` parameter.
     """
 
     def __init__(
@@ -249,7 +252,12 @@ class FileLoad(BaseLoad):
         self.path: Path = Path(dynamic("conf_path", f=path, extras=extras))
         self.externals: DictData = externals or {}
         self.extras: DictData = extras or {}
-        self.data: DictData = self.find(name, path=path, extras=extras)
+        self.data: DictData = self.find(
+            name,
+            path=path,
+            paths=self.extras.get("conf_paths"),
+            extras=extras,
+        )
 
         # VALIDATE: check the data that reading should not empty.
         if not self.data:
@@ -265,6 +273,7 @@ class FileLoad(BaseLoad):
         name: str,
         *,
         path: Optional[Path] = None,
+        paths: Optional[list[Path]] = None,
         extras: Optional[DictData] = None,
     ) -> DictData:
         """Find data with specific key and return the latest modify date data if
@@ -272,20 +281,31 @@ class FileLoad(BaseLoad):
 
         :param name: (str) A name of data that want to find.
         :param path: (Path) A config path object.
+        :param paths: (list[Path]) A list of config path object.
         :param extras: (DictData)  An extra parameter that use to override core
             config values.
 
         :rtype: DictData
         """
         path: Path = dynamic("conf_path", f=path, extras=extras)
+        if not paths:
+            paths: list[Path] = [path]
+        elif not isinstance(paths, list):
+            raise TypeError(
+                f"Multi-config paths does not support for type: {type(paths)}"
+            )
+        else:
+            paths.append(path)
+
         all_data: list[tuple[float, DictData]] = []
-        for file in glob_files(path):
+        for path in paths:
+            for file in glob_files(path):
 
-            if cls.is_ignore(file, path):
-                continue
+                if cls.is_ignore(file, path):
+                    continue
 
-            if data := cls.filter_yaml(file, name=name):
-                all_data.append((file.lstat().st_mtime, data))
+                if data := cls.filter_yaml(file, name=name):
+                    all_data.append((file.lstat().st_mtime, data))
 
         return {} if not all_data else max(all_data, key=lambda x: x[0])[1]
 
@@ -295,6 +315,7 @@ class FileLoad(BaseLoad):
         obj: object,
         *,
         path: Optional[Path] = None,
+        paths: Optional[list[Path]] = None,
         excluded: list[str] | None = None,
         extras: Optional[DictData] = None,
     ) -> Iterator[tuple[str, DictData]]:
@@ -304,6 +325,7 @@ class FileLoad(BaseLoad):
 
         :param obj: An object that want to validate matching before return.
         :param path: A config path object.
+        :param paths: (list[Path]) A list of config path object.
         :param excluded: An included list of data key that want to filter from
             data.
         :param extras: (DictData) An extra parameter that use to override core
@@ -313,29 +335,35 @@ class FileLoad(BaseLoad):
         """
         excluded: list[str] = excluded or []
         path: Path = dynamic("conf_path", f=path, extras=extras)
+        if not paths:
+            paths: list[Path] = [path]
+        else:
+            paths.append(path)
+
         all_data: dict[str, list[tuple[float, DictData]]] = {}
-        for file in glob_files(path):
+        for path in paths:
+            for file in glob_files(path):
 
-            if cls.is_ignore(file, path):
-                continue
-
-            for key, data in cls.filter_yaml(file).items():
-
-                if key in excluded:
+                if cls.is_ignore(file, path):
                     continue
 
-                if (
-                    data.get("type", "")
-                    == (obj if isclass(obj) else obj.__class__).__name__
-                ):
-                    marking: tuple[float, DictData] = (
-                        file.lstat().st_mtime,
-                        data,
-                    )
-                    if key in all_data:
-                        all_data[key].append(marking)
-                    else:
-                        all_data[key] = [marking]
+                for key, data in cls.filter_yaml(file).items():
+
+                    if key in excluded:
+                        continue
+
+                    if (
+                        data.get("type", "")
+                        == (obj if isclass(obj) else obj.__class__).__name__
+                    ):
+                        marking: tuple[float, DictData] = (
+                            file.lstat().st_mtime,
+                            data,
+                        )
+                        if key in all_data:
+                            all_data[key].append(marking)
+                        else:
+                            all_data[key] = [marking]
 
         for key in all_data:
             yield key, max(all_data[key], key=lambda x: x[0])[1]
