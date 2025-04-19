@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from typing import TypedDict
 
+from .utils import NEWLINE
+
 ErrorData = TypedDict(
     "ErrorData",
     {
@@ -43,6 +45,13 @@ class BaseWorkflowException(Exception):
         :rtype: ErrorData
         """
         return to_dict(self)
+
+    def make_message(self, newline: bool = False) -> str:
+        """Make this exception message for tracing log.
+
+        :rtype: str
+        """
+        return f"{self.__class__.__name__}:{NEWLINE if newline else ' '}{self}"
 
 
 class UtilException(BaseWorkflowException): ...

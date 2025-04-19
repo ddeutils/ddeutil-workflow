@@ -201,6 +201,9 @@ class BaseStage(BaseModel, ABC):
         :param event: (Event) An event manager that pass to the stage execution.
         :param raise_error: (bool) A flag that all this method raise error
 
+        :raise StageException: If the raise_error was set and the execution
+            raise any error.
+
         :rtype: Result
         """
         result: Result = Result.construct_with_rs_or_id(
@@ -510,7 +513,7 @@ class EmptyStage(BaseAsyncStage):
                 message: str = NEWLINE + message.replace("\n", NEWLINE)
 
         result.trace.info(
-            f"[STAGE]: Empty-Execute: {self.name!r}: ( {message} )"
+            f"[STAGE]: Execute Empty-Stage: {self.name!r}: ( {message} )"
         )
         if self.sleep > 0:
             if self.sleep > 5:
@@ -549,9 +552,7 @@ class EmptyStage(BaseAsyncStage):
             if "\n" in message:
                 message: str = NEWLINE + message.replace("\n", NEWLINE)
 
-        result.trace.info(
-            f"[STAGE]: Empty-Execute: {self.name!r}: ( {message} )"
-        )
+        result.trace.info(f"[STAGE]: Empty-Stage: {self.name!r}: ( {message} )")
         if self.sleep > 0:
             if self.sleep > 5:
                 await result.trace.ainfo(
@@ -680,7 +681,7 @@ class BashStage(BaseStage):
             extras=self.extras,
         )
 
-        result.trace.info(f"[STAGE]: Shell-Execute: {self.name}")
+        result.trace.info(f"[STAGE]: Execute Shell-Stage: {self.name}")
 
         bash: str = param2template(
             dedent(self.bash.strip("\n")), params, extras=self.extras
@@ -819,7 +820,7 @@ class PyStage(BaseStage):
             | {"result": result}
         )
 
-        result.trace.info(f"[STAGE]: Py-Execute: {self.name}")
+        result.trace.info(f"[STAGE]: Execute Py-Stage: {self.name}")
 
         # WARNING: The exec build-in function is very dangerous. So, it
         #   should use the re module to validate exec-string before running.
@@ -933,7 +934,7 @@ class CallStage(BaseStage):
         )()
 
         result.trace.info(
-            f"[STAGE]: Call-Execute: {call_func.name}@{call_func.tag}"
+            f"[STAGE]: Execute Call-Stage: {call_func.name}@{call_func.tag}"
         )
 
         # VALIDATE: check input task caller parameters that exists before
@@ -1087,7 +1088,7 @@ class TriggerStage(BaseStage):
         )
 
         _trigger: str = param2template(self.trigger, params, extras=self.extras)
-        result.trace.info(f"[STAGE]: Trigger-Execute: {_trigger!r}")
+        result.trace.info(f"[STAGE]: Execute Trigger-Stage: {_trigger!r}")
         try:
             rs: Result = Workflow.from_conf(
                 name=_trigger,
@@ -1281,7 +1282,7 @@ class ParallelStage(BaseStage):  # pragma: no cov
         )
         event: Event = Event() if event is None else event
         result.trace.info(
-            f"[STAGE]: Parallel-Execute: {self.max_workers} workers."
+            f"[STAGE]: Execute Parallel-Stage: {self.max_workers} workers."
         )
         result.catch(status=WAIT, context={"parallel": {}})
         if event and event.is_set():  # pragma: no cov
@@ -1509,7 +1510,7 @@ class ForEachStage(BaseStage):
         if not isinstance(foreach, list):
             raise TypeError(f"Does not support foreach: {foreach!r}")
 
-        result.trace.info(f"[STAGE]: Foreach-Execute: {foreach!r}.")
+        result.trace.info(f"[STAGE]: Execute Foreach-Stage: {foreach!r}.")
         result.catch(status=WAIT, context={"items": foreach, "foreach": {}})
         if event and event.is_set():  # pragma: no cov
             return result.catch(
@@ -1749,7 +1750,7 @@ class UntilStage(BaseStage):
             extras=self.extras,
         )
 
-        result.trace.info(f"[STAGE]: Until-Execution: {self.until}")
+        result.trace.info(f"[STAGE]: Execute Until-Stage: {self.until}")
         item: Union[str, int, bool] = param2template(
             self.item, params, extras=self.extras
         )
@@ -1977,7 +1978,7 @@ class CaseStage(BaseStage):
             self.case, params, extras=self.extras
         )
 
-        result.trace.info(f"[STAGE]: Case-Execute: {_case!r}.")
+        result.trace.info(f"[STAGE]: Execute Case-Stage: {_case!r}.")
         _else: Optional[Match] = None
         stages: Optional[list[Stage]] = None
         for match in self.match:
@@ -2064,7 +2065,7 @@ class RaiseStage(BaseStage):  # pragma: no cov
             extras=self.extras,
         )
         message: str = param2template(self.message, params, extras=self.extras)
-        result.trace.info(f"[STAGE]: Raise-Execute: {message!r}.")
+        result.trace.info(f"[STAGE]: Execute Raise-Stage: {message!r}.")
         raise StageException(message)
 
 
@@ -2221,8 +2222,9 @@ class DockerStage(BaseStage):  # pragma: no cov
             extras=self.extras,
         )
 
-        result.trace.info(f"[STAGE]: Docker-Execute: {self.image}:{self.tag}")
-
+        result.trace.info(
+            f"[STAGE]: Execute Docker-Stage: {self.image}:{self.tag}"
+        )
         raise NotImplementedError("Docker Stage does not implement yet.")
 
 
@@ -2316,7 +2318,7 @@ class VirtualPyStage(PyStage):  # pragma: no cov
             extras=self.extras,
         )
 
-        result.trace.info(f"[STAGE]: Py-Virtual-Execute: {self.name}")
+        result.trace.info(f"[STAGE]: Execute VirtualPy-Stage: {self.name}")
         run: str = param2template(dedent(self.run), params, extras=self.extras)
         with self.create_py_file(
             py=run,

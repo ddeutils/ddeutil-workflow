@@ -39,7 +39,7 @@ from .__cron import CronJob, CronRunner
 from .__types import DictData, TupleStr
 from .conf import FileLoad, Loader, dynamic
 from .event import On
-from .exceptions import JobException, UtilException, WorkflowException
+from .exceptions import JobException, WorkflowException
 from .job import Job
 from .logs import Audit, get_audit
 from .params import Param
@@ -964,7 +964,7 @@ class Workflow(BaseModel):
                 event=event,
             )
             job.set_outputs(rs.context, to=params)
-        except (JobException, UtilException) as e:
+        except JobException as e:
             result.trace.error(f"[WORKFLOW]: {e.__class__.__name__}: {e}")
             raise WorkflowException(
                 f"Job {job_id!r} raise {e.__class__.__name__}: {e}"
@@ -972,7 +972,6 @@ class Workflow(BaseModel):
 
         if rs.status == FAILED:
             error_msg: str = f"Workflow job, {job.id!r}, return FAILED status."
-            result.trace.warning(f"[WORKFLOW]: {error_msg}")
             return result.catch(
                 status=FAILED,
                 context={

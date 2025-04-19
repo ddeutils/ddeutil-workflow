@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from ddeutil.workflow.utils import (
+    NEWLINE,
     UTC,
     batch,
     cut_id,
@@ -15,6 +16,7 @@ from ddeutil.workflow.utils import (
     get_dt_now,
     make_exec,
     reach_next_minute,
+    replace_newline,
 )
 from freezegun import freeze_time
 
@@ -123,3 +125,20 @@ def test_reach_next_minute():
     # NOTE: Raise because this datetime gather than the current time.
     with pytest.raises(ValueError):
         reach_next_minute(datetime(2024, 1, 1, 1, 12, 55, tzinfo=UTC))
+
+
+def test_replace_newline():
+    message: str = (
+        f"[JOB]: JobException:{NEWLINE}This is error message from job "
+        f"execution."
+    )
+    print(replace_newline(message))
+    assert replace_newline(message) == (
+        f"{NEWLINE}[JOB]: JobException:{NEWLINE}| ...\tThis is error message "
+        f"from job execution."
+    )
+    print(replace_newline(replace_newline(message)))
+    assert replace_newline(replace_newline(message)) == (
+        f"{NEWLINE}{NEWLINE}| ...\t[JOB]: JobException:{NEWLINE}| ...\t| ...\t"
+        f"This is error message from job execution."
+    )

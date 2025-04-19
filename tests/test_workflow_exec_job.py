@@ -68,8 +68,8 @@ def test_workflow_execute_job_raise_inside():
                         ],
                         "name": "JobException",
                         "message": (
-                            "Stage raise: StageException: PyStage: "
-                            "\n\t| ...\tNotImplementedError: "
+                            "Stage raise: StageException:\n\t| ...\tPyStage: "
+                            "\n\t| ...\t| ...\tNotImplementedError: "
                         ),
                     }
                 ],

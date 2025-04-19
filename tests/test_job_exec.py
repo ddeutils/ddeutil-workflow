@@ -1,8 +1,5 @@
-from unittest import mock
-
 import pytest
 from ddeutil.workflow import Job, Workflow
-from ddeutil.workflow.conf import Config
 from ddeutil.workflow.result import FAILED, Result
 
 
@@ -58,7 +55,8 @@ def test_job_exec_py_raise():
                 "class": rs.context["errors"][0]["class"],
                 "name": "JobException",
                 "message": (
-                    "Stage raise: StageException: PyStage: \n\t| ...\t"
+                    "Stage raise: StageException:\n\t| ...\tPyStage: "
+                    "\n\t| ...\t| ...\t"
                     "ValueError: Testing raise error inside PyStage!!!"
                 ),
             },
@@ -78,9 +76,11 @@ def test_job_exec_py_not_set_output():
     }
 
 
-@mock.patch.object(Config, "stage_raise_error", True)
 def test_job_exec_py_fail_fast():
-    workflow: Workflow = Workflow.from_conf(name="wf-run-python-raise-for-job")
+    workflow: Workflow = Workflow.from_conf(
+        name="wf-run-python-raise-for-job",
+        extras={"stage_raise_error": True},
+    )
     job: Job = workflow.job("job-fail-fast")
     rs: Result = job.execute({})
     assert rs.context == {
@@ -138,18 +138,20 @@ def test_job_exec_py_fail_fast_raise_catch():
                 "class": rs.context["errors"][0]["class"],
                 "name": "JobException",
                 "message": (
-                    "Stage raise: StageException: PyStage: \n\t| ...\t"
-                    "ValueError: Testing raise error inside PyStage with the "
-                    "sleep not equal 4!!!"
+                    "Stage raise: StageException:\n\t| ...\tPyStage: "
+                    "\n\t| ...\t| ...\tValueError: Testing raise error inside "
+                    "PyStage with the sleep not equal 4!!!"
                 ),
             },
         ],
     }
 
 
-@mock.patch.object(Config, "stage_raise_error", True)
 def test_job_exec_py_complete():
-    workflow: Workflow = Workflow.from_conf(name="wf-run-python-raise-for-job")
+    workflow: Workflow = Workflow.from_conf(
+        name="wf-run-python-raise-for-job",
+        extras={"stage_raise_error": True},
+    )
     job: Job = workflow.job("job-complete")
     rs: Result = job.execute({})
     assert rs.context == {
@@ -168,9 +170,11 @@ def test_job_exec_py_complete():
     }
 
 
-@mock.patch.object(Config, "stage_raise_error", True)
 def test_job_exec_py_complete_not_parallel():
-    workflow: Workflow = Workflow.from_conf(name="wf-run-python-raise-for-job")
+    workflow: Workflow = Workflow.from_conf(
+        name="wf-run-python-raise-for-job",
+        extras={"stage_raise_error": True},
+    )
     job: Job = workflow.job("job-complete-not-parallel")
     rs: Result = job.execute({})
     assert rs.context == {
@@ -264,7 +268,8 @@ def test_job_exec_py_complete_raise():
                 "class": rs.context["errors"][0]["class"],
                 "name": "JobException",
                 "message": (
-                    "Stage raise: StageException: PyStage: \n\t| ...\t"
+                    "Stage raise: StageException:\n\t| ...\tPyStage: "
+                    "\n\t| ...\t| ...\t"
                     "ValueError: Testing raise error inside PyStage!!!"
                 ),
             },
@@ -272,7 +277,8 @@ def test_job_exec_py_complete_raise():
                 "class": rs.context["errors"][1]["class"],
                 "name": "JobException",
                 "message": (
-                    "Stage raise: StageException: PyStage: \n\t| ...\t"
+                    "Stage raise: StageException:\n\t| ...\tPyStage: "
+                    "\n\t| ...\t| ...\t"
                     "ValueError: Testing raise error inside PyStage!!!"
                 ),
             },

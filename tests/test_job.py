@@ -31,8 +31,9 @@ def test_run_ons():
 
 def test_job():
     job = Job()
-    assert "all_success" == job.trigger_rule
-    assert Rule.ALL_SUCCESS == job.trigger_rule
+    assert job.id is None
+    assert job.trigger_rule == "all_success"
+    assert job.trigger_rule == Rule.ALL_SUCCESS
 
     job = Job(desc="\t# Desc\n\tThis is a demo job.")
     assert job.desc == "# Desc\nThis is a demo job."
@@ -41,8 +42,12 @@ def test_job():
     assert job.id == "final-job"
 
     # NOTE: Validate the `check_needs` method
-    assert job.check_needs({"job-before": "foo"}) == SUCCESS
-    assert job.check_needs({"job-after": "foo"}) == WAIT
+    assert job.check_needs({"job-before": {"stages": "foo"}}) == SUCCESS
+    assert job.check_needs({"job-before": {}}) == SUCCESS
+    assert job.check_needs({"job-after": {"stages": "foo"}}) == WAIT
+    assert job.check_needs({"job-before": {"errors": {}}}) == FAILED
+    assert job.check_needs({"job-before": {"skipped": True}}) == SKIP
+    assert job.check_needs({"job-before": {"skipped": False}}) == SUCCESS
 
     job = Job.model_validate({"runs-on": {"type": "docker"}})
     assert isinstance(job.runs_on, OnDocker)
@@ -79,17 +84,19 @@ def test_job_raise():
 
 
 def test_job_set_outputs():
-    assert Job(id="final-job").set_outputs({}, {}) == {
-        "jobs": {"final-job": {}}
+    job = Job(id="final-job")
+    assert job.set_outputs({}, {}) == {"jobs": {"final-job": {}}}
+    assert job.set_outputs({}, {"jobs": {}}) == {"jobs": {"final-job": {}}}
+    assert job.set_outputs({"skipped": False}, {"jobs": {}}) == {
+        "jobs": {"final-job": {"skipped": False}}
     }
-
-    assert Job(id="final-job").set_outputs({}, {"jobs": {}}) == {
-        "jobs": {"final-job": {}}
+    assert job.set_outputs({"errors": {}}, {"jobs": {}}) == {
+        "jobs": {"final-job": {"errors": {}}}
     }
 
     # NOTE: Raise because job ID does not set.
     with pytest.raises(JobException):
-        Job().set_outputs({}, {}, job_id=None)
+        Job().set_outputs({}, {})
 
     assert Job().set_outputs({}, {"jobs": {}}, job_id="1") == {
         "jobs": {"1": {}}
@@ -107,16 +114,8 @@ def test_job_if_condition():
     assert not job.is_skipped(params={"params": {"name": "foo"}})
     assert job.is_skipped(params={"params": {"name": "bar"}})
 
-
-def test_job_if_condition_raise():
     job = Job.model_validate({"if": '"${{ params.name }}"'})
+
+    # NOTE: Raise because return type of condition does not match with boolean.
     with pytest.raises(JobException):
         job.is_skipped({"params": {"name": "foo"}})
-
-
-def test_job_check_needs():
-    job = Job(id="foo", needs=["deps"])
-    assert job.check_needs({}) == WAIT
-    assert job.check_needs({"deps": {}}) == SUCCESS
-    assert job.check_needs({"deps": {"errors": {}}}) == FAILED
-    assert job.check_needs({"deps": {"skipped": True}}) == SKIP

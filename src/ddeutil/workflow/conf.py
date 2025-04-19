@@ -201,6 +201,9 @@ class APIConfig:
 
 
 class BaseLoad(ABC):
+    """Base Load object is the abstraction object for any Load object that
+    should to inherit from this base class.
+    """
 
     @classmethod
     @abstractmethod

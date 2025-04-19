@@ -40,13 +40,12 @@ from .__types import DictData, DictStr, Matrix
 from .exceptions import (
     JobException,
     StageException,
-    UtilException,
     to_dict,
 )
 from .result import CANCEL, FAILED, SKIP, SUCCESS, WAIT, Result, Status
 from .reusables import has_template, param2template
 from .stages import Stage
-from .utils import NEWLINE, cross_product, filter_func, gen_id
+from .utils import NEWLINE, cross_product, filter_func, gen_id, replace_newline
 
 MatrixFilter = list[dict[str, Union[str, int]]]
 
@@ -429,11 +428,14 @@ class Job(BaseModel):
                 return stage
         raise ValueError(f"Stage {stage_id!r} does not exists in this job.")
 
-    def check_needs(self, jobs: dict[str, Any]) -> Status:  # pragma: no cov
+    def check_needs(
+        self, jobs: dict[str, DictData]
+    ) -> Status:  # pragma: no cov
         """Return trigger status from checking job's need trigger rule logic was
         valid. The return status should be SUCCESS, FAILED, WAIT, or SKIP.
 
-        :param jobs: A mapping of job ID and its context data.
+        :param jobs: (dict[str, DictData]) A mapping of job ID and its context
+            data that return from execution process.
 
         :raise NotImplementedError: If the job trigger rule out of scope.
 
@@ -450,28 +452,34 @@ class Job(BaseModel):
         }
         if len(need_exist) != len(self.needs):
             return WAIT
-        elif all("skipped" in need_exist[job] for job in need_exist):
+        elif all(need_exist[job].get("skipped", False) for job in need_exist):
             return SKIP
         elif self.trigger_rule == Rule.ALL_DONE:
             return SUCCESS
         elif self.trigger_rule == Rule.ALL_SUCCESS:
             rs = all(
-                k not in need_exist[job]
-                for k in ("errors", "skipped")
+                (
+                    "errors" not in need_exist[job]
+                    and not need_exist[job].get("skipped", False)
+                )
                 for job in need_exist
             )
         elif self.trigger_rule == Rule.ALL_FAILED:
             rs = all("errors" in need_exist[job] for job in need_exist)
         elif self.trigger_rule == Rule.ONE_SUCCESS:
             rs = sum(
-                k not in need_exist[job]
-                for k in ("errors", "skipped")
+                (
+                    "errors" not in need_exist[job]
+                    and not need_exist[job].get("skipped", False)
+                )
                 for job in need_exist
             ) + 1 == len(self.needs)
         elif self.trigger_rule == Rule.ONE_FAILED:
             rs = sum("errors" in need_exist[job] for job in need_exist) == 1
         elif self.trigger_rule == Rule.NONE_SKIPPED:
-            rs = all("skipped" not in need_exist[job] for job in need_exist)
+            rs = all(
+                not need_exist[job].get("skipped", False) for job in need_exist
+            )
         elif self.trigger_rule == Rule.NONE_FAILED:
             rs = all("errors" not in need_exist[job] for job in need_exist)
         else:  # pragma: no cov
@@ -684,8 +692,7 @@ def local_execute_strategy(
     :param event: (Event) An Event manager instance that use to cancel this
         execution if it forces stopped by parent execution.
 
-    :raise JobException: If stage execution raise any error as `StageException`
-        or `UtilException`.
+    :raise JobException: If stage execution raise any error as `StageException`.
 
     :rtype: Result
     """
@@ -699,7 +706,6 @@ def local_execute_strategy(
         result.trace.info(f"[JOB]: ... matrix: {strategy!r}")
     else:
         strategy_id: str = "EMPTY"
-        result.trace.info("[JOB]: Start Strategy: 'EMPTY'")
 
     context: DictData = copy.deepcopy(params)
     context.update({"matrix": strategy, "stages": {}})
@@ -738,8 +744,8 @@ def local_execute_strategy(
                 event=event,
             )
             stage.set_outputs(rs.context, to=context)
-        except (StageException, UtilException) as e:
-            result.trace.error(f"[JOB]: {e.__class__.__name__}: {e}")
+        except StageException as e:
+            result.trace.error(f"[JOB]: {e.make_message()}")
             result.catch(
                 status=FAILED,
                 context={
@@ -751,7 +757,7 @@ def local_execute_strategy(
                 },
             )
             raise JobException(
-                f"Stage raise: {e.__class__.__name__}: {e}"
+                f"Stage raise: {e.__class__.__name__}:{replace_newline(str(e))}"
             ) from e
 
         if rs.status == FAILED:
@@ -759,7 +765,6 @@ def local_execute_strategy(
                 f"Strategy break because stage, {stage.iden!r}, return FAILED "
                 f"status."
             )
-            result.trace.warning(f"[JOB]: {error_msg}")
             result.catch(
                 status=FAILED,
                 context={
@@ -795,8 +800,16 @@ def local_execute(
     execution or itself execution. It will generate matrix values at the first
     step and run multithread on this metrics to the `stages` field of this job.
 
-        This method does not raise any `JobException` if it runs with
-    multi-threading strategy.
+    Important:
+        This method does not raise any `JobException` because it allows run
+    parallel mode. If it raises error from strategy execution, it will catch
+    that error and store it in the `errors` key with list of error.
+
+        {
+            "errors": [
+                {"class": Exception(), "name": "...", "message": "..."},
+            ]
+        }
 
     :param job: (Job) A job model.
     :param params: (DictData) A parameter data.

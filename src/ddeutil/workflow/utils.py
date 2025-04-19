@@ -27,6 +27,11 @@ UTC: Final[ZoneInfo] = ZoneInfo("UTC")
 NEWLINE: Final[str] = "\n\t| ...\t"
 
 
+def replace_newline(message: str) -> str:
+    """Duplicate newline if it already set on an input message."""
+    return NEWLINE + message.replace(NEWLINE, NEWLINE + "| ...\t")
+
+
 def replace_sec(dt: datetime) -> datetime:
     return dt.replace(second=0, microsecond=0)
 

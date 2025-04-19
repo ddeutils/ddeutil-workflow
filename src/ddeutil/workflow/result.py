@@ -37,6 +37,14 @@ class Status(IntEnum):
     SKIP: int = 3
     CANCEL: int = 4
 
+    @property
+    def emoji(self) -> str:
+        """Return the emoji value of this status.
+
+        :rtype: str
+        """
+        return {0: "✅", 1: "❌", 2: "🟡", 3: "⏩", 4: "🚫"}[self.value]
+
 
 SUCCESS = Status.SUCCESS
 FAILED = Status.FAILED
@@ -46,10 +54,7 @@ CANCEL = Status.CANCEL
 
 
 @dataclass(
-    config=ConfigDict(
-        arbitrary_types_allowed=True,
-        use_enum_values=True,
-    ),
+    config=ConfigDict(arbitrary_types_allowed=True, use_enum_values=True),
 )
 class Result:
     """Result Pydantic Model for passing and receiving data context from any
