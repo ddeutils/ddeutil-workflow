@@ -1,16 +1,11 @@
 from __future__ import annotations
 
-import asyncio
-import inspect
 import shutil
-import typing
-from dataclasses import is_dataclass
 from pathlib import Path
 from textwrap import dedent
 
 import pytest
 from ddeutil.workflow.reusables import Registry, extract_call, make_registry
-from pydantic import BaseModel
 
 
 @pytest.fixture(scope="module")
@@ -124,129 +119,3 @@ def test_extract_call():
     call_func = func()
     assert call_func.name == "el-csv-to-parquet"
     assert call_func.tag == "polars-dir"
-
-
-def test_extract_call_args_type():
-    func = extract_call("tasks/gen-type@demo")
-    call_func = func()
-
-    get_types = typing.get_type_hints(call_func)
-    for p in get_types:
-        t = get_types[p]
-        print(t)
-        if is_dataclass(t) and t.__name__ == "Result":
-            print("[x] found result", p, t)
-        if issubclass(t, BaseModel):
-            print("[x]", p, "with type:", t)
-
-
-@pytest.mark.skip("Skip because it uses for local test only.")
-def test_inspec_func():
-
-    def demo_func(
-        args_1: str, args_2: Path, *args, kwargs_1: str | None = None, **kwargs
-    ):  # pragma: no cov
-        _ = args_1
-        _ = args_2
-        _ = args
-        _ = kwargs_1
-        _ = kwargs
-        pass
-
-    assert inspect.isfunction(demo_func)
-
-    ips = inspect.signature(demo_func)
-    for k, v in ips.parameters.items():
-        print(k)
-        print(ips.parameters[k].default)
-        print(v)
-        print(v.name)
-        print(v.annotation, "type:", type(v.annotation))
-        print(v.default)
-        print(v.kind, " (", type(v.kind), ")")
-        print("-----")
-
-    async def ademo_func(
-        args_1: str, args_2: Path, *args, kwargs_1: str | None = None, **kwargs
-    ):  # pragma: no cov
-        await asyncio.sleep(0.1)
-        _ = args_1
-        _ = args_2
-        _ = args
-        _ = kwargs_1
-        _ = kwargs
-        pass
-
-    print(inspect.isfunction(ademo_func))
-    print(inspect.isasyncgenfunction(ademo_func))
-    print(inspect.isasyncgen(ademo_func))
-    print(inspect.iscoroutinefunction(ademo_func))
-
-    # ips = inspect.signature(demo_func)
-    # for k, v in ips.parameters.items():
-    #     print(k)
-    #     print(ips.parameters[k].default)
-    #     print(v)
-    #     print(v.name)
-    #     print(v.annotation, "type:", type(v.annotation))
-    #     print(v.default)
-    #     print(v.kind, " (", type(v.kind), ")")
-    #     print("-----")
-
-
-class MockModel(BaseModel):  # pragma: no cov
-    name: str
-
-
-def outside_func(args: MockModel) -> MockModel:  # pragma: no cov
-    _ = args
-    pass
-
-
-@pytest.mark.skip("Skip because it uses for local test only.")
-def test_inspec_with_pydantic_model_args():
-    from pydantic import BaseModel
-
-    class MockModelLocal(BaseModel):
-        name: str
-
-    def demo_func(
-        args_1: MockModel,
-        args_2: MockModelLocal,
-        *args,
-        kwargs_1: str = None,
-        **kwargs,
-    ) -> MockModel:  # pragma: no cov
-        _ = args_1
-        _ = args_2
-        _ = args
-        _ = kwargs_1
-        _ = kwargs
-        pass
-
-    # ips = inspect.signature(demo_func)
-    # for k, v in ips.parameters.items():
-    #     print(k)
-    #     print(ips.parameters[k].default)
-    #     print(v)
-    #     print(v.name)
-    #     print(v.annotation, "type:", type(v.annotation))
-    #     print(v.default)
-    #     print(v.kind, " (", type(v.kind), ")")
-    #     print("-----")
-    #
-    # print(ips.return_annotation, "type:", type(ips.return_annotation))
-    # print(ips.return_annotation is MockModel)
-    # print(ips.return_annotation.__parameter__)
-
-    import typing
-
-    rs = typing.get_type_hints(demo_func, localns=locals(), globalns=globals())
-    print(rs)
-
-    print(demo_func.__annotations__)
-    print(globals()["MockModel"])
-    print(locals()["MockModelLocal"])
-
-    rs = typing.get_type_hints(outside_func)
-    print(rs)

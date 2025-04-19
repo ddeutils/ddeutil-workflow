@@ -166,26 +166,27 @@ def test_on_aws():
         name="aws_every_5_minute_bkk",
         extras={},
     )
-    assert "Asia/Bangkok" == schedule.tz
+    assert schedule.tz == "Asia/Bangkok"
+    assert str(schedule.cronjob) == "*/5 * * * * 2024"
 
 
 def test_on_every_minute():
-    schedule = On.from_conf(
-        name="every_minute_bkk",
-        extras={},
-    )
+    schedule = On.from_conf(name="every_minute_bkk", extras={})
     current: datetime = datetime(2024, 8, 1, 12, 5, 45)
     adjust: datetime = current.replace(second=0, microsecond=0).astimezone(
         tz=ZoneInfo(schedule.tz)
     )
     gen = schedule.generate(adjust)
-    print(f"{gen.next:%Y-%m-%d %H:%M:%S}")
+    assert f"{gen.date:%Y-%m-%d %H:%M:%S}" == "2024-08-01 12:05:00"
+    assert f"{gen.next:%Y-%m-%d %H:%M:%S}" == "2024-08-01 12:05:00"
+    assert f"{gen.next:%Y-%m-%d %H:%M:%S}" == "2024-08-01 12:06:00"
 
 
 def test_on_every_minute_with_second():
     schedule = On.from_conf(name="every_minute_bkk")
-    gen = schedule.next(datetime(2024, 1, 1, 0, 0, 1))
-    print(gen.date)
+    gen = schedule.next(datetime(2024, 1, 1, 0, 0, 12))
+    assert f"{gen.date:%Y-%m-%d %H:%M:%S}" == "2024-01-01 00:01:00"
+    assert f"{gen.next:%Y-%m-%d %H:%M:%S}" == "2024-01-01 00:02:00"
 
 
 def test_on_every_5_minute_bkk():
@@ -201,8 +202,18 @@ def test_on_every_5_minute_bkk():
 
 
 def test_on_serialize():
-    schedule = On.from_conf(
-        name="every_minute_bkk",
-        extras={},
-    )
-    print(schedule.model_dump())
+    schedule = On(cronjob="* * * * *", tz="Asia/Bangkok")
+    assert schedule.model_dump(by_alias=False, exclude_unset=True) == {
+        "cronjob": "* * * * *",
+        "tz": "Asia/Bangkok",
+    }
+    assert schedule.model_dump(by_alias=True, exclude_unset=True) == {
+        "cronjob": "* * * * *",
+        "timezone": "Asia/Bangkok",
+    }
+
+    assert schedule.model_dump(by_alias=True, exclude_unset=False) == {
+        "cronjob": "* * * * *",
+        "timezone": "Asia/Bangkok",
+        "extras": {},
+    }

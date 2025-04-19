@@ -160,12 +160,6 @@ def test_cron_next_previous():
     assert sch.next == str2dt("2024-01-23 00:00:00")
     assert sch.next == str2dt("2024-01-23 00:30:00")
 
-    # sch = cron.CronJob("0 0 23 1 ?").schedule(
-    #     date=datetime(2024, 1, 1, 12, tzinfo=ZoneInfo("Asia/Bangkok")),
-    # )
-    # assert sch.next == str2dt("2025-01-23 00:00:00")
-    # assert sch.next == str2dt("2026-01-23 00:00:00")
-
 
 def test_cron_cronjob_year():
     cr = cron.CronJobYear("*/5 * * * * */8,1999")

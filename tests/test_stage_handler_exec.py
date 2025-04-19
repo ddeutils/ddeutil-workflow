@@ -80,9 +80,6 @@ def test_call_stage_exec(test_path):
           jobs:
             first-job:
               stages:
-                - name: "Return type not valid"
-                  id: valid-type
-                  uses: tasks/return-type-not-valid@raise
                 - name: "Necessary argument do not pass"
                   id: args-necessary
                   uses: tasks/mssql-proc@odbc
@@ -122,7 +119,9 @@ def test_call_stage_exec(test_path):
 
         # NOTE: Raise because invalid return type.
         with pytest.raises(StageException):
-            stage: Stage = workflow.job("first-job").stage("valid-type")
+            stage: Stage = CallStage(
+                name="Type not valid", uses="tasks/return-type-not-valid@raise"
+            )
             stage.handler_execute({})
 
         # NOTE: Raise because necessary args do not pass.
