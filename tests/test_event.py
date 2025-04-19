@@ -66,7 +66,7 @@ def test_on_from_value():
         },
         extras={},
     )
-    assert "Etc/UTC" == schedule.tz
+    assert "UTC" == schedule.tz
     assert "12 0 1 * 1" == str(schedule.cronjob)
 
     schedule = On.from_value(
@@ -78,8 +78,8 @@ def test_on_from_value():
         },
         extras={},
     )
-    assert "Etc/UTC" == schedule.tz
-    assert "12 0 1 * 1" == str(schedule.cronjob)
+    assert schedule.tz == "Etc/UTC"
+    assert str(schedule.cronjob) == "12 0 1 * 1"
 
     schedule = On.from_value(
         value={
@@ -90,8 +90,8 @@ def test_on_from_value():
         },
         extras={},
     )
-    assert "Etc/UTC" == schedule.tz
-    assert "12 0 1 * 1" == str(schedule.cronjob)
+    assert schedule.tz == "Etc/UTC"
+    assert str(schedule.cronjob) == "12 0 1 * 1"
 
 
 def test_on_from_loader():

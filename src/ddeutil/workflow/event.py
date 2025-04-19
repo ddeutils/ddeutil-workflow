@@ -108,8 +108,12 @@ class On(BaseModel):
             config value.
         """
         passing: DictStr = {}
+
         if "timezone" in value:
             passing["tz"] = value.pop("timezone")
+        elif "tz" in value:
+            passing["tz"] = value.pop("tz")
+
         passing["cronjob"] = interval2crontab(
             **{v: value[v] for v in value if v in ("interval", "day", "time")}
         )
