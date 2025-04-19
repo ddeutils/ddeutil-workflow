@@ -94,7 +94,7 @@ def test_on_from_value():
     assert str(schedule.cronjob) == "12 0 1 * 1"
 
 
-def test_on_from_loader():
+def test_on_from_conf():
     schedule = On.from_conf(
         name="every_day_noon",
         extras={},
@@ -103,7 +103,7 @@ def test_on_from_loader():
     assert "12 0 1 * 1" == str(schedule.cronjob)
 
 
-def test_on_from_loader_raise(test_path):
+def test_on_from_conf_raise(test_path):
     test_file = test_path / "conf/demo/02_on_raise.yml"
     with test_file.open(mode="w") as f:
         yaml.dump(

@@ -25,7 +25,7 @@ def test_schedule():
     )
 
 
-def test_schedule_from_loader_raise(test_path):
+def test_schedule_from_conf_raise(test_path):
     test_file = test_path / "conf/demo/03_schedule_raise.yml"
 
     with test_file.open(mode="w") as f:

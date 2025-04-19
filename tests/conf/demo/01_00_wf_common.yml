@@ -325,11 +325,6 @@ wf-run-depends-condition:
           echo: "This job do not wait the first jon finish"
           sleep: 1
 
-
-wf-without-jobs:
-  type: Workflow
-
-
 wf-trigger:
   type: Workflow
   on: 'every_5_minute_bkk'

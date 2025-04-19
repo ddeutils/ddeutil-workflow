@@ -2,10 +2,8 @@ import shutil
 from pathlib import Path
 
 import pytest
-from ddeutil.workflow import Workflow
+from ddeutil.workflow import SUCCESS, Job, Result, Workflow
 from ddeutil.workflow.exceptions import WorkflowException
-from ddeutil.workflow.job import Job
-from ddeutil.workflow.result import Result
 from pydantic import ValidationError
 
 from .utils import dump_yaml, dump_yaml_context
@@ -118,24 +116,13 @@ def test_workflow_desc():
 
 
 def test_workflow_from_conf_without_job():
-    workflow = Workflow.from_conf(name="wf-without-jobs")
-    assert workflow.name == "wf-without-jobs"
-
-    rs = workflow.execute({})
+    workflow = Workflow(name="wf-without-jobs")
+    rs: Result = workflow.execute({})
+    assert rs.status == SUCCESS
     assert rs.context == {"params": {}, "jobs": {}}
 
 
-def test_workflow_from_conf_with_path(test_path):
-    workflow = Workflow.from_conf(
-        name="wf-without-jobs", path=test_path / "conf"
-    )
-    assert workflow.name == "wf-without-jobs"
-
-    rs = workflow.execute({})
-    assert rs.context == {"params": {}, "jobs": {}}
-
-
-def test_workflow_from_loader_override(test_path):
+def test_workflow_from_conf_override(test_path):
     conf_path: Path = test_path / "mock_conf"
     conf_path.mkdir(exist_ok=True)
     (conf_path / "demo").mkdir(exist_ok=True)
@@ -169,7 +156,11 @@ def test_workflow_from_loader_override(test_path):
             name="tmp-wf-override-conf", extras={"conf_path": conf_path}
         )
         rs: Result = workflow.execute(params={"name": "foo"})
-        print(rs.context)
+        assert rs.status == SUCCESS
+        assert rs.context == {
+            "params": {"name": "foo"},
+            "jobs": {"first-job": {"stages": {"1926515049": {"outputs": {}}}}},
+        }
 
         workflow = Workflow.from_conf(
             name="tmp-wf-override-conf-trigger", extras={"conf_path": conf_path}
@@ -178,7 +169,28 @@ def test_workflow_from_loader_override(test_path):
         assert stage.extras == {"conf_path": conf_path}
 
         rs: Result = workflow.execute(params={"name": "bar"})
-        print(rs.context)
+        assert rs.status == SUCCESS
+        assert rs.context == {
+            "params": {"name": "bar"},
+            "jobs": {
+                "trigger-job": {
+                    "stages": {
+                        "trigger-stage": {
+                            "outputs": {
+                                "params": {"name": "bar"},
+                                "jobs": {
+                                    "first-job": {
+                                        "stages": {
+                                            "1926515049": {"outputs": {}}
+                                        }
+                                    }
+                                },
+                            }
+                        }
+                    }
+                }
+            },
+        }
 
     shutil.rmtree(conf_path)
 

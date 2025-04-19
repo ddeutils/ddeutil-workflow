@@ -78,12 +78,11 @@ def test_filter_func():
             "echo": _extract_func,
         },
     }
-    rs = filter_func(raw_rs)
-    assert {
+    assert filter_func(raw_rs) == {
         "echo": "echo",
         "list": ["1", 2, "echo"],
         "dict": {"foo": open, "echo": "echo"},
-    } == rs
+    }
 
 
 def test_batch():
