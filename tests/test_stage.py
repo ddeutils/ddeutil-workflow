@@ -77,8 +77,6 @@ def test_stage_if_condition():
     assert not stage.is_skipped(params={"params": {"name": "foo"}})
     assert stage.is_skipped(params={"params": {"name": "bar"}})
 
-
-def test_stage_if_condition_raise(test_path):
     stage: EmptyStage = EmptyStage.model_validate(
         {
             "name": "If Condition Raise",

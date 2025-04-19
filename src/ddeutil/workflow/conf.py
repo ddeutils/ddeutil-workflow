@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from datetime import timedelta
 from functools import cached_property
@@ -199,7 +200,20 @@ class APIConfig:
         return str2bool(env("API_ENABLE_ROUTE_SCHEDULE", "true"))
 
 
-class FileLoad:
+class BaseLoad(ABC):
+
+    @classmethod
+    @abstractmethod
+    def find(cls, name: str, *args, **kwargs) -> DictData: ...
+
+    @classmethod
+    @abstractmethod
+    def finds(
+        cls, obj: object, *args, **kwargs
+    ) -> Iterator[tuple[str, DictData]]: ...
+
+
+class FileLoad(BaseLoad):
     """Base Load object that use to search config data by given some identity
     value like name of `Workflow` or `On` templates.
 
@@ -210,6 +224,9 @@ class FileLoad:
         loaded config data.
     :param extras: (DictDdata) An extra parameters that use to override core
         config values.
+
+    :raise ValueError: If the data does not find on the config path with the
+        name parameter.
 
     Noted:
         The config data should have `type` key for modeling validation that
@@ -232,15 +249,7 @@ class FileLoad:
         self.path: Path = Path(dynamic("conf_path", f=path, extras=extras))
         self.externals: DictData = externals or {}
         self.extras: DictData = extras or {}
-        self.data: DictData = {}
-
-        for file in glob_files(self.path):
-
-            if self.is_ignore(file, self.path):
-                continue
-
-            if data := self.filter_yaml(file, name=name):
-                self.data = data
+        self.data: DictData = self.find(name, path=path, extras=extras)
 
         # VALIDATE: check the data that reading should not empty.
         if not self.data:
@@ -251,12 +260,41 @@ class FileLoad:
         self.data.update(self.externals)
 
     @classmethod
+    def find(
+        cls,
+        name: str,
+        *,
+        path: Optional[Path] = None,
+        extras: Optional[DictData] = None,
+    ) -> DictData:
+        """Find data with specific key and return the latest modify date data if
+        this key exists multiple files.
+
+        :param name: (str) A name of data that want to find.
+        :param path: (Path) A config path object.
+        :param extras: (DictData)  An extra parameter that use to override core
+            config values.
+
+        :rtype: DictData
+        """
+        path: Path = dynamic("conf_path", f=path, extras=extras)
+        all_data: list[tuple[float, DictData]] = []
+        for file in glob_files(path):
+
+            if cls.is_ignore(file, path):
+                continue
+
+            if data := cls.filter_yaml(file, name=name):
+                all_data.append((file.lstat().st_mtime, data))
+
+        return {} if not all_data else max(all_data, key=lambda x: x[0])[1]
+
+    @classmethod
     def finds(
         cls,
         obj: object,
         *,
         path: Optional[Path] = None,
-        included: list[str] | None = None,
         excluded: list[str] | None = None,
         extras: Optional[DictData] = None,
     ) -> Iterator[tuple[str, DictData]]:
@@ -266,8 +304,6 @@ class FileLoad:
 
         :param obj: An object that want to validate matching before return.
         :param path: A config path object.
-        :param included: An excluded list of data key that want to reject this
-            data if any key exist.
         :param excluded: An included list of data key that want to filter from
             data.
         :param extras: (DictData) An extra parameter that use to override core
@@ -275,27 +311,34 @@ class FileLoad:
 
         :rtype: Iterator[tuple[str, DictData]]
         """
-        exclude: list[str] = excluded or []
-        conf_path: Path = dynamic("conf_path", f=path, extras=extras)
-        for file in glob_files(conf_path):
+        excluded: list[str] = excluded or []
+        path: Path = dynamic("conf_path", f=path, extras=extras)
+        all_data: dict[str, list[tuple[float, DictData]]] = {}
+        for file in glob_files(path):
 
-            if cls.is_ignore(file, conf_path):
+            if cls.is_ignore(file, path):
                 continue
 
             for key, data in cls.filter_yaml(file).items():
 
-                if key in exclude:
+                if key in excluded:
                     continue
 
                 if (
                     data.get("type", "")
                     == (obj if isclass(obj) else obj.__class__).__name__
                 ):
-                    yield key, (
-                        {k: data[k] for k in data if k in included}
-                        if included
-                        else data
+                    marking: tuple[float, DictData] = (
+                        file.lstat().st_mtime,
+                        data,
                     )
+                    if key in all_data:
+                        all_data[key].append(marking)
+                    else:
+                        all_data[key] = [marking]
+
+        for key in all_data:
+            yield key, max(all_data[key], key=lambda x: x[0])[1]
 
     @classmethod
     def is_ignore(
@@ -377,23 +420,15 @@ class Loader(Protocol):  # pragma: no cov
     type: str
     path: Path
     data: DictData
+    extras: DictData
+    externals: DictData
 
-    def __init__(
-        self,
-        name: str,
-        *,
-        path: Optional[Union[str, Path]] = None,
-        externals: DictData | None = None,
-        extras: DictData | None = None,
-    ) -> None: ...
+    def __init__(self, *args, **kwargs) -> None: ...
+
+    @classmethod
+    def find(cls, name: str, *args, **kwargs) -> DictData: ...
 
     @classmethod
     def finds(
-        cls,
-        obj: object,
-        *,
-        path: Optional[Path] = None,
-        included: list[str] | None = None,
-        excluded: list[str] | None = None,
-        extras: Optional[DictData] = None,
-    ): ...
+        cls, obj: object, *args, **kwargs
+    ) -> Iterator[tuple[str, DictData]]: ...

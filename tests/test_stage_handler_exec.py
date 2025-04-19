@@ -4,11 +4,14 @@ from unittest import mock
 
 import pytest
 from ddeutil.core import getdot
-from ddeutil.workflow import Workflow
+from ddeutil.workflow import FAILED, SUCCESS, Result, Workflow
 from ddeutil.workflow.conf import Config
 from ddeutil.workflow.exceptions import StageException
-from ddeutil.workflow.result import Result
-from ddeutil.workflow.stages import BashStage, Stage
+from ddeutil.workflow.stages import (
+    BashStage,
+    CallStage,
+    Stage,
+)
 from pydantic import TypeAdapter
 
 from .utils import dump_yaml_context
@@ -43,7 +46,8 @@ def test_bash_stage_exec_raise():
     stage: BashStage = BashStage(
         name="Bash Stage",
         bash=(
-            "printf '%s\\n' \"Test Raise Error case with failed\" >&2;\nexit 1;"
+            "printf '%s\\n' \"Test Raise Error case with failed\" >&2;\n"
+            "exit 1;"
         ),
     )
 
@@ -51,8 +55,23 @@ def test_bash_stage_exec_raise():
     with pytest.raises(StageException):
         stage.handler_execute({}, raise_error=True)
 
+    rs: Result = stage.handler_execute({}, raise_error=False)
+    assert rs.status == FAILED
+    assert rs.context == {
+        "errors": {
+            "class": rs.context["errors"]["class"],
+            "name": "StageException",
+            "message": (
+                "Subprocess: Test Raise Error case with failed\n"
+                "---( statement )---\n"
+                "```bash\nprintf '%s\\n"
+                '\' "Test Raise Error case with failed" >&2;\nexit 1;\n```'
+            ),
+        }
+    }
 
-def test_stage_exec_call(test_path):
+
+def test_call_stage_exec(test_path):
     with dump_yaml_context(
         test_path / "conf/demo/01_99_wf_test_wf_call_return_type.yml",
         data="""
@@ -73,12 +92,6 @@ def test_stage_exec_call(test_path):
                       run_date: 2024-08-01
                       source: src
                       target: tgt
-                - name: "Call value not valid"
-                  id: call-not-valid
-                  uses: tasks-foo-bar
-                - name: "Call does not register"
-                  id: call-not-register
-                  uses: tasks/abc@foo
             second-job:
               stages:
                 - name: "Extract & Load Local System"
@@ -93,16 +106,6 @@ def test_stage_exec_call(test_path):
                   with:
                     source: src
                     sink: sink
-                - name: "Return with Pydantic Model"
-                  id: return-model
-                  uses: tasks/gen-type@demo
-                  with:
-                    args1: foo
-                    args2: conf/path
-                    args3:
-                      name: test
-                      data:
-                        input: hello
         """,
     ):
         workflow = Workflow.from_conf(name="tmp-wf-call-return-type")
@@ -129,17 +132,28 @@ def test_stage_exec_call(test_path):
 
         # NOTE: Raise because call does not valid.
         with pytest.raises(StageException):
-            stage: Stage = workflow.job("first-job").stage("call-not-valid")
+            stage: Stage = CallStage(name="Not valid", uses="tasks-foo-bar")
             stage.handler_execute({})
 
         # NOTE: Raise because call does not register.
         with pytest.raises(StageException):
-            stage: Stage = workflow.job("first-job").stage("call-not-register")
+            stage: Stage = CallStage(name="Not register", uses="tasks/abc@foo")
             stage.handler_execute({})
 
-        stage: Stage = workflow.job("second-job").stage("return-model")
+        stage: Stage = CallStage.model_validate(
+            {
+                "name": "Return with Pydantic Model",
+                "id": "return-model",
+                "uses": "tasks/gen-type@demo",
+                "with": {
+                    "args1": "foo",
+                    "args2": "conf/path",
+                    "args3": {"name": "test", "data": {"input": "hello"}},
+                },
+            }
+        )
         rs: Result = stage.handler_execute({})
-        assert rs.status == 0
+        assert rs.status == SUCCESS
         assert rs.context == {"name": "foo", "data": {"key": "value"}}
 
 
@@ -157,16 +171,7 @@ def test_stage_exec_py_not_raise():
     stage: Stage = workflow.job("raise-run").stage(stage_id="raise-error")
 
     rs = stage.handler_execute(params={"x": "Foo"})
-
-    assert rs.status == 1
-
-    # NOTE:
-    #   Context that return from error will be:
-    #   {
-    #       'error': ValueError("Testing ... PyStage!!!"),
-    #       'error_message': "ValueError: Testing ... PyStage!!!",
-    #   }
-    assert isinstance(rs.context["errors"]["class"], ValueError)
+    assert rs.status == FAILED
     assert rs.context == {
         "errors": {
             "class": rs.context["errors"]["class"],
@@ -175,13 +180,13 @@ def test_stage_exec_py_not_raise():
         }
     }
 
-    rs_out = stage.set_outputs(rs.context, {})
-    assert rs_out == {
+    output = stage.set_outputs(rs.context, {})
+    assert output == {
         "stages": {
             "raise-error": {
                 "outputs": {},
                 "errors": {
-                    "class": getdot("stages.raise-error.errors.class", rs_out),
+                    "class": getdot("stages.raise-error.errors.class", output),
                     "name": "ValueError",
                     "message": "Testing raise error inside PyStage!!!",
                 },
