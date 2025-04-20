@@ -99,7 +99,7 @@ def reach_next_minute(dt: datetime, offset: float = 0.0) -> bool:
     )
 
 
-def wait_to_next_minute(
+def wait_until_next_minute(
     dt: datetime, second: float = 0
 ) -> None:  # pragma: no cov
     """Wait with sleep to the next minute with an offset second value."""

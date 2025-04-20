@@ -434,17 +434,21 @@ def dynamic(
     """Dynamic get config if extra value was passed at run-time.
 
     :param key: (str) A config key that get from Config object.
-    :param f: An inner config function scope.
+    :param f: (T) An inner config function scope.
     :param extras: An extra values that pass at run-time.
+
+    :rtype: T
     """
-    rsx: Optional[T] = extras[key] if extras and key in extras else None
-    rs: Optional[T] = getattr(config, key, None) if f is None else f
-    if rsx is not None and not isinstance(rsx, type(rs)):
+    extra: Optional[T] = (extras or {}).get(key, None)
+    conf: Optional[T] = getattr(config, key, None) if f is None else f
+    if extra is None:
+        return conf
+    if not isinstance(extra, type(conf)):
         raise TypeError(
-            f"Type of config {key!r} from extras: {rsx!r} does not valid "
-            f"as config {type(rs)}."
+            f"Type of config {key!r} from extras: {extra!r} does not valid "
+            f"as config {type(conf)}."
         )
-    return rsx if rsx is not None else rs
+    return extra
 
 
 class Loader(Protocol):  # pragma: no cov

@@ -28,6 +28,7 @@ from queue import Queue
 from textwrap import dedent
 from threading import Event
 from typing import Any, Optional, Union
+from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo
 from pydantic.dataclasses import dataclass
@@ -50,7 +51,7 @@ from .utils import (
     get_dt_now,
     reach_next_minute,
     replace_sec,
-    wait_to_next_minute,
+    wait_until_next_minute,
 )
 
 __all__: TupleStr = (
@@ -80,10 +81,24 @@ class Release:
     that use with the `workflow.release` method.
     """
 
-    date: datetime
-    offset: float
-    end_date: datetime
-    runner: CronRunner
+    date: datetime = Field(
+        description=(
+            "A release date that should has second and millisecond equal 0."
+        )
+    )
+    offset: float = Field(
+        ge=0,
+        description=(
+            "An offset value that keep second time that different with the "
+            "current process datetime."
+        ),
+    )
+    end_date: datetime = Field(
+        description="An end datetime for stop generate release datetime."
+    )
+    runner: CronRunner = Field(
+        description="A CronRunner object for generate the next release date."
+    )
     type: ReleaseType = Field(
         default=ReleaseType.DEFAULT,
         description="A type of release that create before start execution.",
@@ -609,9 +624,10 @@ class Workflow(BaseModel):
         result: Optional[Result] = None,
         timeout: int = 600,
     ) -> Result:
-        """Release the workflow execution with overriding parameter with the
-        release templating that include logical date (release date), execution
-        date, or running id to the params.
+        """Release the workflow which is executes workflow with writing audit
+        log tracking. The method is overriding parameter with the release
+        templating that include logical date (release date), execution date,
+        or running id to the params.
 
             This method allow workflow use audit object to save the execution
         result to audit destination like file audit to the local `./logs` path.
@@ -664,21 +680,21 @@ class Workflow(BaseModel):
         result.trace.info(
             f"[RELEASE]: Start {name!r} : {release.date:%Y-%m-%d %H:%M:%S}"
         )
+        tz: ZoneInfo = dynamic("tz", extras=self.extras)
+        values: DictData = param2template(
+            params,
+            params={
+                "release": {
+                    "logical_date": release.date,
+                    "execute_date": datetime.now(tz=tz),
+                    "run_id": result.run_id,
+                    "timezone": tz,
+                }
+            },
+            extras=self.extras,
+        )
         rs: Result = self.execute(
-            params=param2template(
-                params,
-                params={
-                    "release": {
-                        "logical_date": release.date,
-                        "execute_date": datetime.now(
-                            tz=dynamic("tz", extras=self.extras)
-                        ),
-                        "run_id": result.run_id,
-                        "timezone": dynamic("tz", extras=self.extras),
-                    }
-                },
-                extras=self.extras,
-            ),
+            params=values,
             result=result,
             parent_run_id=result.parent_run_id,
             timeout=timeout,
@@ -686,9 +702,6 @@ class Workflow(BaseModel):
         result.trace.info(
             f"[RELEASE]: End {name!r} : {release.date:%Y-%m-%d %H:%M:%S}"
         )
-
-        # NOTE: Saving execution result to destination of the input audit
-        #   object.
         result.trace.debug(f"[LOG]: Writing audit: {name!r}.")
         (
             audit(
@@ -712,6 +725,7 @@ class Workflow(BaseModel):
             status=rs.status,
             context={
                 "params": params,
+                "values": values,
                 "release": {
                     "type": release.type,
                     "logical_date": release.date,
@@ -771,7 +785,7 @@ class Workflow(BaseModel):
         timeout: int = 1800,
         max_poking_pool_worker: int = 4,
     ) -> Result:
-        """Poke function with a start datetime value that will pass to its
+        """Poke workflow with a start datetime value that will pass to its
         `on` field on the threading executor pool for execute the `release`
         method (It run all schedules that was set on the `on` values).
 
@@ -798,6 +812,7 @@ class Workflow(BaseModel):
         :return: A list of all results that return from `self.release` method.
         """
         audit: type[Audit] = audit or get_audit(extras=self.extras)
+        tz: ZoneInfo = dynamic("tz", extras=self.extras)
         result: Result = Result(
             run_id=(run_id or gen_id(self.name, unique=True))
         )
@@ -816,21 +831,21 @@ class Workflow(BaseModel):
             return result.catch(status=SUCCESS, context={"outputs": []})
 
         # NOTE: Create the current date that change microsecond to 0
-        current_date: datetime = datetime.now(
-            tz=dynamic("tz", extras=self.extras)
-        ).replace(microsecond=0)
+        current_date: datetime = datetime.now(tz=tz).replace(microsecond=0)
 
-        # NOTE: Create start_date and offset variables.
-        if start_date and start_date <= current_date:
-            start_date = start_date.replace(
-                tzinfo=dynamic("tz", extras=self.extras)
-            ).replace(microsecond=0)
-            offset: float = (current_date - start_date).total_seconds()
-        else:
+        if start_date is None:
             # NOTE: Force change start date if it gathers than the current date,
             #   or it does not pass to this method.
             start_date: datetime = current_date
             offset: float = 0
+        elif start_date <= current_date:
+            start_date = start_date.replace(tzinfo=tz).replace(microsecond=0)
+            offset: float = (current_date - start_date).total_seconds()
+        else:
+            raise WorkflowException(
+                f"The start datetime should less than or equal the current "
+                f"datetime, {current_date:%Y-%m-%d %H:%M:%S}."
+            )
 
         # NOTE: The end date is using to stop generate queue with an input
         #   periods value.
@@ -883,11 +898,7 @@ class Workflow(BaseModel):
                         f"{release.date:%Y-%m-%d %H:%M:%S}"
                     )
                     heappush(q.queue, release)
-                    wait_to_next_minute(
-                        get_dt_now(
-                            tz=dynamic("tz", extras=self.extras), offset=offset
-                        )
-                    )
+                    wait_until_next_minute(get_dt_now(tz=tz, offset=offset))
 
                     # WARNING: I already call queue poking again because issue
                     #   about the every minute crontab.
