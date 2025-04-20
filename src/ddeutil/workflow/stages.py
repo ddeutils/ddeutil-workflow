@@ -211,20 +211,20 @@ class BaseStage(BaseModel, ABC):
             id_logic=self.iden,
             extras=self.extras,
         )
-
         try:
             return self.execute(params, result=result, event=event)
         except Exception as e:
             e_name: str = e.__class__.__name__
-            result.trace.error(f"[STAGE]: Handler:{NEWLINE}{e_name}: {e}")
+            e_msg: str = str(e).replace("\n", NEWLINE)
+            result.trace.error(
+                f"[STAGE]: Error Handler:{NEWLINE}{e_name}: {e_msg}"
+            )
             if dynamic("stage_raise_error", f=raise_error, extras=self.extras):
                 if isinstance(e, StageException):
                     raise
-
                 raise StageException(
-                    f"{self.__class__.__name__}: {NEWLINE}{e_name}: {e}"
+                    f"{self.__class__.__name__}: {e_name}: {e}"
                 ) from e
-
             return result.catch(status=FAILED, context={"errors": to_dict(e)})
 
     def set_outputs(self, output: DictData, to: DictData) -> DictData:

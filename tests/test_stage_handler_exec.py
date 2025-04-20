@@ -8,6 +8,7 @@ from ddeutil.workflow.exceptions import StageException
 from ddeutil.workflow.stages import (
     BashStage,
     CallStage,
+    RaiseStage,
     Stage,
 )
 from pydantic import TypeAdapter
@@ -1131,3 +1132,29 @@ def test_stage_py_virtual(test_path):
             print(rs)
         except StageException as e:
             print(e)
+
+
+def test_raise_stage_exec():
+    stage: RaiseStage = RaiseStage.model_validate(
+        obj={
+            "name": "Raise Stage",
+            "raise": (
+                "Demo raise error from the raise stage\nThis is the new "
+                "line from error message."
+            ),
+        },
+    )
+    rs: Result = stage.handler_execute(params={}, raise_error=False)
+    assert rs.status == FAILED
+    assert rs.context == {
+        "errors": {
+            "name": "StageException",
+            "message": (
+                "Demo raise error from the raise stage\n"
+                "This is the new line from error message."
+            ),
+        }
+    }
+
+    with pytest.raises(StageException):
+        stage.handler_execute(params={}, raise_error=True)
