@@ -3,9 +3,8 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-# [x] Use dynamic config
-"""Workflow module is the core module of this Workflow package. It keeps
-Release, ReleaseQueue, and Workflow Pydantic models.
+"""Workflow module is the core module of this package. It keeps Release,
+ReleaseQueue, and Workflow models.
 
     This package implement timeout strategy on the workflow execution layer only
 because the main propose of this package is using Workflow to be orchestrator.
@@ -50,6 +49,7 @@ from .utils import (
     gen_id,
     get_dt_now,
     reach_next_minute,
+    replace_sec,
     wait_to_next_minute,
 )
 
@@ -66,8 +66,9 @@ class ReleaseType(str, Enum):
     """Release Type Enum support the type field on the Release dataclass."""
 
     DEFAULT: str = "manual"
-    TASK: str = "task"
-    POKE: str = "poking"
+    SCHEDULE: str = "schedule"
+    POKING: str = "poking"
+    FORCE: str = "force"
 
 
 @total_ordering
@@ -83,14 +84,20 @@ class Release:
     offset: float
     end_date: datetime
     runner: CronRunner
-    type: ReleaseType = field(default=ReleaseType.DEFAULT)
+    type: ReleaseType = Field(
+        default=ReleaseType.DEFAULT,
+        description="A type of release that create before start execution.",
+    )
 
     def __repr__(self) -> str:
-        """Represent string"""
+        """Override __repr__ method for represent value of `date` field.
+
+        :rtype: str
+        """
         return repr(f"{self.date:%Y-%m-%d %H:%M:%S}")
 
     def __str__(self) -> str:
-        """Override string value of this release object with the date field.
+        """Override string value of this release object with the `date` field.
 
         :rtype: str
         """
@@ -98,9 +105,13 @@ class Release:
 
     @classmethod
     def from_dt(
-        cls, dt: datetime | str, *, extras: Optional[DictData] = None
+        cls,
+        dt: datetime | str,
+        *,
+        extras: Optional[DictData] = None,
     ) -> Self:
-        """Construct Release via datetime object only.
+        """Construct Release object from datetime or str object. This method
+        will replace second and millisecond value to 0 before create Release.
 
         :param dt: (datetime | str) A datetime object or string that want to
             construct to the Release object.
@@ -116,17 +127,17 @@ class Release:
             dt: datetime = datetime.fromisoformat(dt)
         elif not isinstance(dt, datetime):
             raise TypeError(
-                "The `from_dt` need the `dt` argument type be str or datetime "
-                "only."
+                f"The `from_dt` need the `dt` parameter type be `str` or "
+                f"`datetime` only, not {type(dt)}."
             )
 
         return cls(
-            date=dt,
+            date=replace_sec(dt),
             offset=0,
             end_date=dt + timedelta(days=1),
             runner=(
                 CronJob("* * * * *").schedule(
-                    dt.replace(tzinfo=dynamic("tz", extras=extras))
+                    replace_sec(dt).replace(tzinfo=dynamic("tz", extras=extras))
                 )
             ),
         )
@@ -296,7 +307,7 @@ class ReleaseQueue:
             offset=offset,
             end_date=end_date,
             runner=runner,
-            type=ReleaseType.POKE,
+            type=(ReleaseType.FORCE if force_run else ReleaseType.POKING),
         )
 
         while self.check_queue(release) or (
@@ -308,7 +319,7 @@ class ReleaseQueue:
                 offset=offset,
                 end_date=end_date,
                 runner=runner,
-                type=ReleaseType.POKE,
+                type=(ReleaseType.FORCE if force_run else ReleaseType.POKING),
             )
 
         if runner.date > end_date:
@@ -750,8 +761,8 @@ class Workflow(BaseModel):
 
     def poke(
         self,
-        start_date: datetime | None = None,
         params: DictData | None = None,
+        start_date: datetime | None = None,
         *,
         run_id: str | None = None,
         periods: int = 1,
@@ -770,8 +781,8 @@ class Workflow(BaseModel):
             The limitation of this method is not allow run a date that less
         than the current date.
 
-        :param start_date: A start datetime object.
         :param params: A parameters that want to pass to the release method.
+        :param start_date: A start datetime object.
         :param run_id: A workflow running ID for this poke.
         :param periods: A periods in minutes value that use to run this poking.
         :param audit: An audit object that want to use on this poking process.
@@ -780,6 +791,8 @@ class Workflow(BaseModel):
         :param timeout: A second value for timeout while waiting all futures
             run completely.
         :param max_poking_pool_worker: The maximum poking pool worker.
+
+        :raise WorkflowException: If the periods parameter less or equal than 0.
 
         :rtype: Result
         :return: A list of all results that return from `self.release` method.
@@ -792,12 +805,13 @@ class Workflow(BaseModel):
         # VALIDATE: Check the periods value should gather than 0.
         if periods <= 0:
             raise WorkflowException(
-                "The period of poking should be int and grater or equal than 1."
+                "The period of poking should be `int` and grater or equal "
+                "than 1."
             )
 
         if len(self.on) == 0:
-            result.trace.info(
-                f"[POKING]: {self.name!r} does not have any schedule to run."
+            result.trace.warning(
+                f"[POKING]: {self.name!r} not have any schedule!!!"
             )
             return result.catch(status=SUCCESS, context={"outputs": []})
 
@@ -823,14 +837,12 @@ class Workflow(BaseModel):
         end_date: datetime = start_date + timedelta(minutes=periods)
 
         result.trace.info(
-            f"[POKING]: Start Poking: {self.name!r} from "
-            f"{start_date:%Y-%m-%d %H:%M:%S} to {end_date:%Y-%m-%d %H:%M:%S}"
+            f"[POKING]: Execute Poking: {self.name!r} ("
+            f"{start_date:%Y-%m-%d %H:%M:%S} ==> {end_date:%Y-%m-%d %H:%M:%S})"
         )
 
         params: DictData = {} if params is None else params
         context: list[Result] = []
-
-        # NOTE: Create empty ReleaseQueue object.
         q: ReleaseQueue = ReleaseQueue()
 
         # NOTE: Create reusable partial function and add Release to the release
@@ -842,8 +854,8 @@ class Workflow(BaseModel):
 
         # NOTE: Return the empty result if it does not have any Release.
         if not q.is_queued:
-            result.trace.info(
-                f"[POKING]: {self.name!r} does not have any queue."
+            result.trace.warning(
+                f"[POKING]: Skip {self.name!r}, not have any queue!!!"
             )
             return result.catch(status=SUCCESS, context={"outputs": []})
 
@@ -867,9 +879,8 @@ class Workflow(BaseModel):
 
                 if reach_next_minute(release.date, offset=offset):
                     result.trace.debug(
-                        f"[POKING]: Latest Release, "
-                        f"{release.date:%Y-%m-%d %H:%M:%S}, can not run on "
-                        f"this time"
+                        f"[POKING]: Skip Release: "
+                        f"{release.date:%Y-%m-%d %H:%M:%S}"
                     )
                     heappush(q.queue, release)
                     wait_to_next_minute(

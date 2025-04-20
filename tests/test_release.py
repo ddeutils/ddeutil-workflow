@@ -24,7 +24,7 @@ def test_release():
         runner=CronJob("* * * * *").schedule(dt.replace(tzinfo=config.tz)),
         type="poking",
     )
-    assert release.type == ReleaseType.POKE
+    assert release.type == ReleaseType.POKING
 
 
 def test_release_from_dt():
@@ -54,8 +54,8 @@ def test_release_from_dt():
 
     release = Release.from_dt(dt="2024-01-01 01:02:03")
 
-    assert str(release) == "2024-01-01 01:02:03"
-    assert release == datetime.fromisoformat("2024-01-01 01:02:03")
+    assert str(release) == "2024-01-01 01:02:00"
+    assert release == datetime.fromisoformat("2024-01-01 01:02:00")
 
     # NOTE: Raise because type not valid.
     with pytest.raises(TypeError):

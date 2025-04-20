@@ -15,7 +15,7 @@ def test_release_queue():
 
 def test_release_queue_from_list():
     queue = ReleaseQueue.from_list()
-    release = Release.from_dt(datetime(2024, 1, 1, 1))
+    release = Release.from_dt(datetime(2024, 1, 1, 1, 0, 15))
 
     assert not queue.is_queued
     assert queue.queue == []

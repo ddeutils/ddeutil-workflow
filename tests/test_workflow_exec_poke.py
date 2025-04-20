@@ -2,10 +2,8 @@ from datetime import datetime
 from unittest import mock
 
 import pytest
-from ddeutil.workflow import Workflow
-from ddeutil.workflow.conf import Config, config
+from ddeutil.workflow import SUCCESS, Config, Result, Workflow, config
 from ddeutil.workflow.exceptions import WorkflowException
-from ddeutil.workflow.result import Result
 
 from .utils import dump_yaml_context
 
@@ -47,7 +45,6 @@ def test_workflow_poke(test_path):
             "params": {"asat-dt": datetime(2024, 1, 1)},
             "release": {
                 "type": "poking",
-                # NOTE: This value return with the current datetime.
                 "logical_date": result.context["outputs"][0].context["release"][
                     "logical_date"
                 ],
@@ -94,19 +91,18 @@ def test_workflow_poke_no_queue(test_path):
         workflow = Workflow.from_conf(name="tmp-wf-scheduling-daily")
 
         # NOTE: Poking with the current datetime.
-        results: Result = workflow.poke(
-            params={"asat-dt": datetime(2024, 1, 1)}
-        )
-        assert results.context == {"outputs": []}
+        rs: Result = workflow.poke(params={"asat-dt": datetime(2024, 1, 1)})
+        assert rs.status == SUCCESS
+        assert rs.context == {"outputs": []}
 
 
 @pytest.mark.poke
 def test_workflow_poke_raise():
-    workflow = Workflow.from_conf(name="wf-scheduling-common")
+    workflow = Workflow(name="wf-scheduling-common")
 
     # Raise: If a period value is lower than 0.
     with pytest.raises(WorkflowException):
-        workflow.poke(periods=-1)
+        workflow.poke(periods=0)
 
     # Raise: If a period value is lower than 0.
     with pytest.raises(WorkflowException):
