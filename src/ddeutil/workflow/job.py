@@ -379,7 +379,7 @@ class Job(BaseModel):
 
         :rtype: str
         """
-        return dedent(value)
+        return dedent(value.lstrip("\n"))
 
     @field_validator("stages", mode="after")
     def __validate_stage_id__(cls, value: list[Stage]) -> list[Stage]:

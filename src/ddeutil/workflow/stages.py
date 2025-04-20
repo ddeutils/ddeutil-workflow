@@ -3,7 +3,6 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-# [x] Use dynamic config
 """Stages module include all stage model that use be the minimum execution layer
 of this workflow engine. The stage handle the minimize task that run in some
 thread (same thread at its job owner) that mean it is the lowest executor that
@@ -58,9 +57,9 @@ from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
-from .__types import DictData, DictStr, TupleStr
+from .__types import DictData, DictStr, StrOrInt, TupleStr
 from .conf import dynamic
-from .exceptions import StageException, UtilException, to_dict
+from .exceptions import StageException, to_dict
 from .result import CANCEL, FAILED, SUCCESS, WAIT, Result, Status
 from .reusables import TagFunc, extract_call, not_in_template, param2template
 from .utils import (
@@ -72,7 +71,6 @@ from .utils import (
 )
 
 T = TypeVar("T")
-StrOrInt = Union[str, int]
 
 
 class BaseStage(BaseModel, ABC):
@@ -1215,10 +1213,7 @@ class ParallelStage(BaseStage):  # pragma: no cov
                 )
                 stage.set_outputs(rs.context, to=output)
                 stage.set_outputs(stage.get_outputs(output), to=context)
-            except (StageException, UtilException) as e:  # pragma: no cov
-                result.trace.error(
-                    f"[STAGE]: {e.__class__.__name__}:{NEWLINE}{e}"
-                )
+            except StageException as e:  # pragma: no cov
                 result.catch(
                     status=FAILED,
                     parallel={
@@ -1229,9 +1224,7 @@ class ParallelStage(BaseStage):  # pragma: no cov
                         },
                     },
                 )
-                raise StageException(
-                    f"Sub-Stage raise: {e.__class__.__name__}: {e}"
-                ) from None
+                raise
 
             if rs.status == FAILED:
                 error_msg: str = (
@@ -1431,10 +1424,7 @@ class ForEachStage(BaseStage):
                 )
                 stage.set_outputs(rs.context, to=output)
                 stage.set_outputs(stage.get_outputs(output), to=context)
-            except (StageException, UtilException) as e:
-                result.trace.error(
-                    f"[STAGE]: {e.__class__.__name__}:{NEWLINE}{e}"
-                )
+            except StageException as e:
                 result.catch(
                     status=FAILED,
                     foreach={
@@ -1445,9 +1435,7 @@ class ForEachStage(BaseStage):
                         },
                     },
                 )
-                raise StageException(
-                    f"Sub-Stage raise: {e.__class__.__name__}: {e}"
-                ) from None
+                raise
 
             if rs.status == FAILED:
                 error_msg: str = (
@@ -1678,10 +1666,7 @@ class UntilStage(BaseStage):
                     next_item = _output["item"]
 
                 stage.set_outputs(_output, to=context)
-            except (StageException, UtilException) as e:
-                result.trace.error(
-                    f"[STAGE]: {e.__class__.__name__}:{NEWLINE}{e}"
-                )
+            except StageException as e:
                 result.catch(
                     status=FAILED,
                     until={
@@ -1693,9 +1678,7 @@ class UntilStage(BaseStage):
                         }
                     },
                 )
-                raise StageException(
-                    f"Sub-Stage execution error: {e.__class__.__name__}: {e}"
-                ) from None
+                raise
 
             if rs.status == FAILED:
                 error_msg: str = (
@@ -1921,8 +1904,7 @@ class CaseStage(BaseStage):
                 )
                 stage.set_outputs(rs.context, to=output)
                 stage.set_outputs(stage.get_outputs(output), to=context)
-            except (StageException, UtilException) as e:  # pragma: no cov
-                result.trace.error(f"[STAGE]: {e.__class__.__name__}: {e}")
+            except StageException as e:  # pragma: no cov
                 return result.catch(
                     status=FAILED,
                     context={

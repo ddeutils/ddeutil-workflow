@@ -3,8 +3,7 @@ from inspect import isfunction
 from unittest import mock
 
 import pytest
-from ddeutil.workflow import FAILED, SUCCESS, Result, Workflow
-from ddeutil.workflow.conf import Config
+from ddeutil.workflow import FAILED, SUCCESS, Config, Result, Workflow
 from ddeutil.workflow.exceptions import StageException
 from ddeutil.workflow.stages import (
     BashStage,
@@ -660,7 +659,10 @@ def test_stage_exec_foreach_with_trigger(test_path):
                                 "stages": {},
                                 "errors": {
                                     "name": "StageException",
-                                    "message": "Trigger workflow return failed status with:\nWorkflow job, 'first-job', return FAILED status.",
+                                    "message": (
+                                        "Trigger workflow return failed status with:\n"
+                                        "Workflow job, 'first-job', return FAILED status."
+                                    ),
                                 },
                             },
                             2: {
@@ -668,14 +670,20 @@ def test_stage_exec_foreach_with_trigger(test_path):
                                 "stages": {},
                                 "errors": {
                                     "name": "StageException",
-                                    "message": "Trigger workflow return failed status with:\nWorkflow job was canceled from event that had set before job execution.",
+                                    "message": (
+                                        "Trigger workflow return failed status with:\n"
+                                        "Workflow job was canceled from event that had set before job execution."
+                                    ),
                                 },
                             },
                         },
                     },
                     "errors": {
                         "name": "StageException",
-                        "message": "Sub-Stage raise: StageException: Trigger workflow return failed status with:\nWorkflow job, 'first-job', return FAILED status.",
+                        "message": (
+                            "Trigger workflow return failed status with:\n"
+                            "Workflow job, 'first-job', return FAILED status."
+                        ),
                     },
                 }
             }

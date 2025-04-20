@@ -458,7 +458,7 @@ class Workflow(BaseModel):
         :param value: A description string value that want to dedent.
         :rtype: str
         """
-        return dedent(value)
+        return dedent(value.lstrip("\n"))
 
     @field_validator("on", mode="after")
     def __on_no_dup_and_reach_limit__(

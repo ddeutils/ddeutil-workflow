@@ -35,7 +35,7 @@ def test_job():
     assert job.trigger_rule == "all_success"
     assert job.trigger_rule == Rule.ALL_SUCCESS
 
-    job = Job(desc="\t# Desc\n\tThis is a demo job.")
+    job = Job(desc="\n\t# Desc\n\tThis is a demo job.")
     assert job.desc == "# Desc\nThis is a demo job."
 
     job = Job(id="final-job", needs=["job-before"])

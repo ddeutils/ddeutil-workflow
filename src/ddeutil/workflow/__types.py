@@ -20,6 +20,7 @@ from typing import Any, Optional, TypedDict, Union
 
 from typing_extensions import Self
 
+StrOrInt = Union[str, int]
 TupleStr = tuple[str, ...]
 DictData = dict[str, Any]
 DictStr = dict[str, str]
