@@ -13,14 +13,10 @@ from typing import TypedDict
 
 from .utils import NEWLINE
 
-ErrorData = TypedDict(
-    "ErrorData",
-    {
-        "class": Exception,
-        "name": str,
-        "message": str,
-    },
-)
+
+class ErrorData(TypedDict):
+    name: str
+    message: str
 
 
 def to_dict(exception: Exception) -> ErrorData:  # pragma: no cov
@@ -31,7 +27,6 @@ def to_dict(exception: Exception) -> ErrorData:  # pragma: no cov
     :rtype: ErrorData
     """
     return {
-        "class": exception,
         "name": exception.__class__.__name__,
         "message": str(exception),
     }

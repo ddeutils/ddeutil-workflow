@@ -52,7 +52,6 @@ For the fist context values that passing to the workflow execution method:
     "<job-name-02>": {}
   },
   "errors": {
-    "class": "",
     "name": "",
     "message": ""
   }
@@ -118,7 +117,6 @@ With error;
 ```json
 {
   "errors": {
-    "class": "ExceptionClass",
     "name": "class-name",
     "message": "error-message"
   }
@@ -146,7 +144,6 @@ it will return result be;
     "<stage-id>": {
       "outputs": {"result": "100"},
       "errors": {
-        "class": "ExceptionClass",
         "name": "class-name",
         "message": "error-message"
       }

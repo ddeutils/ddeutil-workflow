@@ -55,7 +55,6 @@ def test_workflow_execute_job_raise_inside():
     assert rs.status == FAILED
     assert rs.context == {
         "errors": {
-            "class": rs.context["errors"]["class"],
             "name": "WorkflowException",
             "message": "Workflow job, 'demo-run', return FAILED status.",
         },
@@ -63,9 +62,6 @@ def test_workflow_execute_job_raise_inside():
             "demo-run": {
                 "errors": [
                     {
-                        "class": rs.context["jobs"]["demo-run"]["errors"][0][
-                            "class"
-                        ],
                         "name": "JobException",
                         "message": (
                             "Stage raise: StageException:\n\t| ...\tPyStage: "

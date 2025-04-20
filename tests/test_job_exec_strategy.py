@@ -2,7 +2,6 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from threading import Event
 
 import pytest
-from ddeutil.core import getdot
 from ddeutil.workflow.exceptions import JobException
 from ddeutil.workflow.job import Job, local_execute_strategy
 from ddeutil.workflow.result import CANCEL, FAILED, SUCCESS, Result
@@ -59,17 +58,12 @@ def test_job_exec_strategy_catch_stage_error():
                 "raise-error": {
                     "outputs": {},
                     "errors": {
-                        "class": getdot(
-                            "5027535057.stages.raise-error.errors.class",
-                            rs.context,
-                        ),
                         "name": "ValueError",
                         "message": "Testing raise error inside PyStage!!!",
                     },
                 },
             },
             "errors": {
-                "class": getdot("5027535057.errors.class", rs.context),
                 "name": "JobException",
                 "message": (
                     "Strategy break because stage, 'raise-error', return "
@@ -95,7 +89,6 @@ def test_job_exec_strategy_catch_job_error():
             "matrix": {"name": "foo"},
             "stages": {"1772094681": {"outputs": {}}},
             "errors": {
-                "class": rs.context["5027535057"]["errors"]["class"],
                 "name": "StageException",
                 "message": (
                     "PyStage: \n\t| ...\tValueError: Testing raise error "
@@ -120,7 +113,6 @@ def test_job_exec_strategy_event_set():
     rs: Result = future.result()
     assert rs.status == CANCEL
     assert rs.context["EMPTY"]["errors"] == {
-        "class": rs.context["EMPTY"]["errors"]["class"],
         "name": "JobException",
         "message": (
             "Job strategy was canceled from event that had set before "
@@ -143,7 +135,6 @@ def test_job_exec_strategy_raise():
             "matrix": {},
             "stages": {},
             "errors": {
-                "class": rs.context["EMPTY"]["errors"]["class"],
                 "name": "StageException",
                 "message": (
                     "PyStage: \n\t| ...\tValueError: Testing raise error inside "

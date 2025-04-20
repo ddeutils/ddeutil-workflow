@@ -807,7 +807,7 @@ def local_execute(
 
         {
             "errors": [
-                {"class": Exception(), "name": "...", "message": "..."},
+                {"name": "...", "message": "..."}, ...
             ]
         }
 

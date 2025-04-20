@@ -127,7 +127,6 @@ def test_workflow_exec_parallel_timeout():
             "sleep-run": {
                 "stages": {"7972360640": {"outputs": {}}},
                 "errors": {
-                    "class": rs.context["jobs"]["sleep-run"]["errors"]["class"],
                     "name": "JobException",
                     "message": (
                         "Job strategy was canceled from event that had set "
@@ -137,7 +136,6 @@ def test_workflow_exec_parallel_timeout():
             },
         },
         "errors": {
-            "class": rs.context["errors"]["class"],
             "name": "WorkflowException",
             "message": "'demo-workflow' was timeout.",
         },
@@ -200,7 +198,6 @@ def test_workflow_exec_py_raise():
     assert rs.status == FAILED
     assert rs.context == {
         "errors": {
-            "class": rs.context["errors"]["class"],
             "name": "WorkflowException",
             "message": "Workflow job, 'first-job', return FAILED status.",
         },
@@ -209,9 +206,6 @@ def test_workflow_exec_py_raise():
             "first-job": {
                 "errors": [
                     {
-                        "class": rs.context["jobs"]["first-job"]["errors"][0][
-                            "class"
-                        ],
                         "name": "JobException",
                         "message": (
                             "Stage raise: StageException:\n\t| ...\tPyStage: "
@@ -234,7 +228,6 @@ def test_workflow_exec_py_raise_parallel():
     assert rs.status == FAILED
     assert rs.context == {
         "errors": {
-            "class": rs.context["errors"]["class"],
             "name": "WorkflowException",
             "message": "Workflow job, 'first-job', return FAILED status.",
         },
@@ -243,9 +236,6 @@ def test_workflow_exec_py_raise_parallel():
             "first-job": {
                 "errors": [
                     {
-                        "class": rs.context["jobs"]["first-job"]["errors"][0][
-                            "class"
-                        ],
                         "name": "JobException",
                         "message": (
                             "Stage raise: StageException:\n\t| ...\tPyStage: "
@@ -816,9 +806,6 @@ def test_workflow_exec_raise_param(test_path):
                         "get-param": {
                             "outputs": {},
                             "errors": {
-                                "class": rs.context["jobs"]["start-job"][
-                                    "stages"
-                                ]["get-param"]["errors"]["class"],
                                 "name": "UtilException",
                                 "message": (
                                     "Params does not set caller: 'params.name'."
@@ -828,9 +815,6 @@ def test_workflow_exec_raise_param(test_path):
                     },
                     "errors": [
                         {
-                            "class": rs.context["jobs"]["start-job"]["errors"][
-                                0
-                            ]["class"],
                             "name": "JobException",
                             "message": (
                                 "Strategy break because stage, 'get-param', "
@@ -841,7 +825,6 @@ def test_workflow_exec_raise_param(test_path):
                 }
             },
             "errors": {
-                "class": rs.context["errors"]["class"],
                 "message": "Workflow job, 'start-job', return FAILED status.",
                 "name": "WorkflowException",
             },
@@ -887,11 +870,6 @@ def test_workflow_exec_raise_job_trigger(test_path):
                         "get-param": {
                             "outputs": {},
                             "errors": {
-                                "class": (
-                                    rs.context["jobs"]["start-job"]["stages"][
-                                        "get-param"
-                                    ]["errors"]["class"]
-                                ),
                                 "name": "UtilException",
                                 "message": (
                                     "Params does not set caller: 'params.name'."
@@ -901,11 +879,6 @@ def test_workflow_exec_raise_job_trigger(test_path):
                     },
                     "errors": [
                         {
-                            "class": (
-                                rs.context["jobs"]["start-job"]["errors"][0][
-                                    "class"
-                                ]
-                            ),
                             "name": "JobException",
                             "message": (
                                 "Strategy break because stage, 'get-param', "
@@ -916,7 +889,6 @@ def test_workflow_exec_raise_job_trigger(test_path):
                 },
             },
             "errors": {
-                "class": rs.context["errors"]["class"],
                 "name": "WorkflowException",
                 "message": (
                     "Validate job trigger rule was failed with 'all_success'."

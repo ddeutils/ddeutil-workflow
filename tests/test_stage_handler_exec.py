@@ -3,7 +3,6 @@ from inspect import isfunction
 from unittest import mock
 
 import pytest
-from ddeutil.core import getdot
 from ddeutil.workflow import FAILED, SUCCESS, Result, Workflow
 from ddeutil.workflow.conf import Config
 from ddeutil.workflow.exceptions import StageException
@@ -59,7 +58,6 @@ def test_bash_stage_exec_raise():
     assert rs.status == FAILED
     assert rs.context == {
         "errors": {
-            "class": rs.context["errors"]["class"],
             "name": "StageException",
             "message": (
                 "Subprocess: Test Raise Error case with failed\n"
@@ -173,7 +171,6 @@ def test_stage_exec_py_not_raise():
     assert rs.status == FAILED
     assert rs.context == {
         "errors": {
-            "class": rs.context["errors"]["class"],
             "name": "ValueError",
             "message": "Testing raise error inside PyStage!!!",
         }
@@ -185,7 +182,6 @@ def test_stage_exec_py_not_raise():
             "raise-error": {
                 "outputs": {},
                 "errors": {
-                    "class": getdot("stages.raise-error.errors.class", output),
                     "name": "ValueError",
                     "message": "Testing raise error inside PyStage!!!",
                 },
@@ -263,7 +259,6 @@ def test_stage_exec_py_result(test_path):
                 "py-raise": {
                     "outputs": {},
                     "errors": {
-                        "class": rs["stages"]["py-raise"]["errors"]["class"],
                         "name": "ValueError",
                         "message": "test raise error",
                     },
@@ -514,9 +509,6 @@ def test_stage_exec_foreach_concurrent_with_raise(test_path):
         #                             }
         #                         },
         #                         "errors": {
-        #                             "class": rs["stages"]["foreach-stage"][
-        #                                 "outputs"
-        #                             ]["foreach"][3]["errors"]["class"],
         #                             "name": "StageException",
         #                             "message": (
         #                                 "Item-Stage was canceled from event "
@@ -535,9 +527,6 @@ def test_stage_exec_foreach_concurrent_with_raise(test_path):
         #                             "2709471980": {"outputs": {}},
         #                         },
         #                         "errors": {
-        #                             "class": rs["stages"]["foreach-stage"][
-        #                                 "outputs"
-        #                             ]["foreach"][1]["errors"]["class"],
         #                             "name": "StageException",
         #                             "message": (
         #                                 "Item-Stage was canceled from event "
@@ -549,9 +538,6 @@ def test_stage_exec_foreach_concurrent_with_raise(test_path):
         #                 },
         #             },
         #             "errors": {
-        #                 "class": rs["stages"]["foreach-stage"]["errors"][
-        #                     "class"
-        #                 ],
         #                 "name": "StageException",
         #                 "message": "Sub-Stage execution error: StageException: Raise error when item match 2",
         #             },
@@ -673,9 +659,6 @@ def test_stage_exec_foreach_with_trigger(test_path):
                                 "item": 1,
                                 "stages": {},
                                 "errors": {
-                                    "class": rs["stages"]["foreach-raise"][
-                                        "outputs"
-                                    ]["foreach"][1]["errors"]["class"],
                                     "name": "StageException",
                                     "message": "Trigger workflow return failed status with:\nWorkflow job, 'first-job', return FAILED status.",
                                 },
@@ -684,9 +667,6 @@ def test_stage_exec_foreach_with_trigger(test_path):
                                 "item": 2,
                                 "stages": {},
                                 "errors": {
-                                    "class": rs["stages"]["foreach-raise"][
-                                        "outputs"
-                                    ]["foreach"][2]["errors"]["class"],
                                     "name": "StageException",
                                     "message": "Trigger workflow return failed status with:\nWorkflow job was canceled from event that had set before job execution.",
                                 },
@@ -694,9 +674,6 @@ def test_stage_exec_foreach_with_trigger(test_path):
                         },
                     },
                     "errors": {
-                        "class": rs["stages"]["foreach-raise"]["errors"][
-                            "class"
-                        ],
                         "name": "StageException",
                         "message": "Sub-Stage raise: StageException: Trigger workflow return failed status with:\nWorkflow job, 'first-job', return FAILED status.",
                     },
@@ -1107,7 +1084,6 @@ def test_stage_exec_case_match(test_path):
                 "not-else": {
                     "outputs": {},
                     "errors": {
-                        "class": rs["stages"]["not-else"]["errors"]["class"],
                         "name": "StageException",
                         "message": (
                             "Case-Stage was canceled because it does not match "
