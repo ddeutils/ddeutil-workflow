@@ -45,7 +45,7 @@ from .exceptions import (
 from .result import CANCEL, FAILED, SKIP, SUCCESS, WAIT, Result, Status
 from .reusables import has_template, param2template
 from .stages import Stage
-from .utils import NEWLINE, cross_product, filter_func, gen_id, replace_newline
+from .utils import cross_product, filter_func, gen_id
 
 MatrixFilter = list[dict[str, Union[str, int]]]
 
@@ -634,7 +634,9 @@ class Job(BaseModel):
         )
 
         result.trace.info(
-            f"[JOB]: Execute: {self.id!r} on {self.runs_on.type.value!r}"
+            f"[JOB]: Execute "
+            f"{''.join(self.runs_on.type.value.split('_')).title()}: "
+            f"{self.id!r}"
         )
         if self.runs_on.type == RunsOn.LOCAL:
             return local_execute(
@@ -745,7 +747,6 @@ def local_execute_strategy(
             )
             stage.set_outputs(rs.context, to=context)
         except StageException as e:
-            result.trace.error(f"[JOB]: {e.make_message()}")
             result.catch(
                 status=FAILED,
                 context={
@@ -757,7 +758,7 @@ def local_execute_strategy(
                 },
             )
             raise JobException(
-                f"Stage raise: {e.__class__.__name__}:{replace_newline(str(e))}"
+                f"Stage raise: {e.__class__.__name__}: {e}"
             ) from e
 
         if rs.status == FAILED:
@@ -879,7 +880,7 @@ def local_execute(
                     future.cancel()
 
             nd: str = f", strategies not run: {not_done}" if not_done else ""
-            result.trace.debug(f"... Strategy set Fail-Fast{nd}")
+            result.trace.debug(f"[JOB]: ... Strategy set Fail-Fast{nd}")
 
         for future in done:
             try:
@@ -887,7 +888,7 @@ def local_execute(
             except JobException as e:
                 status = FAILED
                 result.trace.error(
-                    f"[JOB]: {ls}: {e.__class__.__name__}:{NEWLINE}{e}"
+                    f"[JOB]: {ls} Error Handler:||{e.__class__.__name__}:||{e}"
                 )
                 if "errors" in context:
                     context["errors"].append(e.to_dict())

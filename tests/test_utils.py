@@ -5,7 +5,6 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from ddeutil.workflow.utils import (
-    NEWLINE,
     UTC,
     batch,
     cut_id,
@@ -15,8 +14,8 @@ from ddeutil.workflow.utils import (
     get_diff_sec,
     get_dt_now,
     make_exec,
+    prepare_newline,
     reach_next_minute,
-    replace_newline,
 )
 from freezegun import freeze_time
 
@@ -127,18 +126,24 @@ def test_reach_next_minute():
         reach_next_minute(datetime(2024, 1, 1, 1, 12, 55, tzinfo=UTC))
 
 
-def test_replace_newline():
-    message: str = (
-        f"[JOB]: JobException:{NEWLINE}This is error message from job "
-        f"execution."
+def test_trace_meta_prepare_msg():
+    print()
+    rs = prepare_newline(
+        "[STAGE]: StageException: PyStage:\nRaise error from python code."
     )
-    print(replace_newline(message))
-    assert replace_newline(message) == (
-        f"{NEWLINE}[JOB]: JobException:{NEWLINE}| ...\tThis is error message "
-        f"from job execution."
+    print(rs)
+
+    rs = prepare_newline(
+        "[STAGE]: StageException: PyStage:\nRaise error from python code\n"
+        "with newline statement (this is the last line for this message)."
     )
-    print(replace_newline(replace_newline(message)))
-    assert replace_newline(replace_newline(message)) == (
-        f"{NEWLINE}{NEWLINE}| ...\t[JOB]: JobException:{NEWLINE}| ...\t| ...\t"
-        f"This is error message from job execution."
-    )
+    print(rs)
+
+    rs = prepare_newline("hello world\nand this is newline to echo")
+    print(rs)
+
+    rs = prepare_newline("\nhello world")
+    assert rs == "hello world"
+
+    rs = prepare_newline("\nhello world\n")
+    assert rs == "hello world"

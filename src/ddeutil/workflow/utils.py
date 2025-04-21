@@ -24,15 +24,40 @@ from .__types import DictData, Matrix
 
 T = TypeVar("T")
 UTC: Final[ZoneInfo] = ZoneInfo("UTC")
-NEWLINE: Final[str] = "\n\t| ...\t"
+MARK_NL: Final[str] = "||"
 
 
-def replace_newline(message: str) -> str:
-    """Duplicate newline if it already set on an input message."""
-    return NEWLINE + message.replace(NEWLINE, NEWLINE + "| ...\t")
+def prepare_newline(msg: str) -> str:
+    """Prepare message that has multiple newline char.
+
+    :param msg: (str) A message that want to prepare.
+
+    :rtype: str
+    """
+    msg: str = msg.strip("\n").replace("\n", MARK_NL)
+    if MARK_NL not in msg:
+        return msg
+
+    msg_lines: list[str] = msg.split(MARK_NL)
+    if len(msg_lines) == 1:
+        return msg_lines[0]
+
+    msg_last: str = msg_lines[-1]
+    msg_body: str = (
+        "\n" + "\n".join(f" ... |  \t{s}" for s in msg_lines[1:-1])
+        if len(msg_lines) > 2
+        else ""
+    )
+    return msg_lines[0] + msg_body + f"\n ... ╰─ \t{msg_last}"
 
 
 def replace_sec(dt: datetime) -> datetime:
+    """Replace second and microsecond values to 0.
+
+    :param dt: A datetime object that want to replace.
+
+    :rtype: datetime
+    """
     return dt.replace(second=0, microsecond=0)
 
 

@@ -49,7 +49,6 @@ from .params import Param
 from .result import FAILED, SKIP, SUCCESS, WAIT, Result
 from .reusables import has_template, param2template
 from .utils import (
-    NEWLINE,
     gen_id,
     get_dt_now,
     reach_next_minute,
@@ -1032,7 +1031,7 @@ class Workflow(BaseModel):
             extras=self.extras,
         )
         context: DictData = self.parameterize(params)
-        result.trace.info(f"[WORKFLOW]: Execute: {self.name!r} ...")
+        result.trace.info(f"[WORKFLOW]: Execute: {self.name!r}")
         if not self.jobs:
             result.trace.warning(f"[WORKFLOW]: {self.name!r} does not set jobs")
             return result.catch(status=SUCCESS, context=context)
@@ -1046,7 +1045,9 @@ class Workflow(BaseModel):
             "max_job_exec_timeout", f=timeout, extras=self.extras
         )
         event: Event = event or Event()
-        result.trace.debug(f"... Run {self.name!r} with non-threading.")
+        result.trace.debug(
+            f"[WORKFLOW]: ... Run {self.name!r} with non-threading."
+        )
         max_job_parallel: int = dynamic(
             "max_job_parallel", f=max_job_parallel, extras=self.extras
         )
@@ -1118,8 +1119,10 @@ class Workflow(BaseModel):
                 else:  # pragma: no cov
                     job_queue.put(job_id)
                     futures.insert(0, future)
+                    time.sleep(0.025)
                     result.trace.warning(
-                        f"... Execution non-threading not handle: {future}."
+                        f"[WORKFLOW]: ... Execution non-threading not "
+                        f"handle: {future}."
                     )
 
                 job_queue.task_done()
@@ -1130,7 +1133,7 @@ class Workflow(BaseModel):
                     try:
                         future.result()
                     except WorkflowException as e:
-                        result.trace.error(f"[WORKFLOW]: Handler:{NEWLINE}{e}")
+                        result.trace.error(f"[WORKFLOW]: Error Handler: {e}")
                         return result.catch(
                             status=FAILED,
                             context={

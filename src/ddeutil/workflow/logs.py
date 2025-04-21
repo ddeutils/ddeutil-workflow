@@ -29,7 +29,7 @@ from typing_extensions import Self
 
 from .__types import DictData, DictStr
 from .conf import config, dynamic
-from .utils import cut_id, get_dt_now
+from .utils import cut_id, get_dt_now, prepare_newline
 
 
 @lru_cache
@@ -71,7 +71,9 @@ def get_dt_tznow() -> datetime:  # pragma: no cov
 
 
 class TraceMeta(BaseModel):  # pragma: no cov
-    """Trace Meta model."""
+    """Trace Metadata model for making the current metadata of this CPU, Memory
+    process, and thread data.
+    """
 
     mode: Literal["stdout", "stderr"]
     datetime: str
@@ -90,6 +92,11 @@ class TraceMeta(BaseModel):  # pragma: no cov
         extras: Optional[DictData] = None,
     ) -> Self:
         """Make the current TraceMeta instance that catching local state.
+
+        :param mode: A metadata mode.
+        :param message: A message.
+        :param extras: (DictData) An extra parameter that want to override core
+            config values.
 
         :rtype: Self
         """
@@ -232,7 +239,7 @@ class BaseTrace(ABC):  # pragma: no cov
 
         :param message: (str) A message that want to log.
         """
-        msg: str = self.make_message(message)
+        msg: str = prepare_newline(self.make_message(message))
 
         if mode != "debug" or (
             mode == "debug" and dynamic("debug", extras=self.extras)
@@ -445,6 +452,7 @@ class FileTrace(BaseTrace):  # pragma: no cov
     async def awriter(
         self, message: str, is_err: bool = False
     ) -> None:  # pragma: no cov
+        """Write with async mode."""
         if not dynamic("enable_write_log", extras=self.extras):
             return
 

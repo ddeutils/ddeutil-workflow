@@ -63,7 +63,6 @@ from .exceptions import StageException, to_dict
 from .result import CANCEL, FAILED, SUCCESS, WAIT, Result, Status
 from .reusables import TagFunc, extract_call, not_in_template, param2template
 from .utils import (
-    NEWLINE,
     delay,
     filter_func,
     gen_id,
@@ -215,10 +214,7 @@ class BaseStage(BaseModel, ABC):
             return self.execute(params, result=result, event=event)
         except Exception as e:
             e_name: str = e.__class__.__name__
-            e_msg: str = str(e).replace("\n", NEWLINE)
-            result.trace.error(
-                f"[STAGE]: Error Handler:{NEWLINE}{e_name}: {e_msg}"
-            )
+            result.trace.error(f"[STAGE]: Error Handler:||{e_name}:||{e}")
             if dynamic("stage_raise_error", f=raise_error, extras=self.extras):
                 if isinstance(e, StageException):
                     raise
@@ -440,7 +436,7 @@ class BaseAsyncStage(BaseStage):
                     raise
 
                 raise StageException(
-                    f"{self.__class__.__name__}: {NEWLINE}{e_name}: {e}"
+                    f"{self.__class__.__name__}: {e_name}: {e}"
                 ) from None
 
             return result.catch(status=FAILED, context={"errors": to_dict(e)})
@@ -507,8 +503,6 @@ class EmptyStage(BaseAsyncStage):
             message: str = param2template(
                 dedent(self.echo.strip("\n")), params, extras=self.extras
             )
-            if "\n" in message:
-                message: str = NEWLINE + message.replace("\n", NEWLINE)
 
         result.trace.info(
             f"[STAGE]: Execute Empty-Stage: {self.name!r}: ( {message} )"
@@ -547,8 +541,6 @@ class EmptyStage(BaseAsyncStage):
             message: str = param2template(
                 dedent(self.echo.strip("\n")), params, extras=self.extras
             )
-            if "\n" in message:
-                message: str = NEWLINE + message.replace("\n", NEWLINE)
 
         result.trace.info(f"[STAGE]: Empty-Stage: {self.name!r}: ( {message} )")
         if self.sleep > 0:
@@ -690,7 +682,7 @@ class BashStage(BaseStage):
             env=param2template(self.env, params, extras=self.extras),
             run_id=result.run_id,
         ) as sh:
-            result.trace.debug(f"... Create `{sh[1]}` file.")
+            result.trace.debug(f"[STAGE] ... Create `{sh[1]}` file.")
             rs: CompletedProcess = subprocess.run(
                 sh, shell=False, capture_output=True, text=True
             )
@@ -1312,9 +1304,7 @@ class ParallelStage(BaseStage):  # pragma: no cov
                     future.result()
                 except StageException as e:
                     status = FAILED
-                    result.trace.error(
-                        f"[STAGE]: {e.__class__.__name__}:{NEWLINE}{e}"
-                    )
+                    result.trace.error(f"[STAGE]: {e.__class__.__name__}: {e}")
                     if "errors" in context:
                         context["errors"].append(e.to_dict())
                     else:
@@ -1538,16 +1528,14 @@ class ForEachStage(BaseStage):
                     future.cancel()
 
                 nd: str = f", item not run: {not_done}" if not_done else ""
-                result.trace.debug(f"... Foreach set Fail-Fast{nd}")
+                result.trace.debug(f"[STAGE]: ... Foreach set Fail-Fast{nd}")
 
             for future in done:
                 try:
                     future.result()
                 except StageException as e:
                     status = FAILED
-                    result.trace.error(
-                        f"[STAGE]: {e.__class__.__name__}:{NEWLINE}{e}"
-                    )
+                    result.trace.error(f"[STAGE]: {e.__class__.__name__}: {e}")
                     context.update({"errors": e.to_dict()})
         return result.catch(status=status, context=context)
 
@@ -1617,7 +1605,7 @@ class UntilStage(BaseStage):
         :rtype: tuple[Result, T]
         :return: Return a pair of Result and changed item.
         """
-        result.trace.debug(f"... Execute until item: {item!r}")
+        result.trace.debug(f"[STAGE]: ... Execute until item: {item!r}")
         context: DictData = copy.deepcopy(params)
         context.update({"item": item})
         output: DictData = {"loop": loop, "item": item, "stages": {}}
@@ -1765,7 +1753,7 @@ class UntilStage(BaseStage):
             loop += 1
             if item is None:
                 result.trace.warning(
-                    f"... Loop-Execute not set item. It use loop: {loop} by "
+                    f"[STAGE]: ... Loop-Execute not set item. It use loop: {loop} by "
                     f"default."
                 )
                 item: int = loop
@@ -1876,7 +1864,7 @@ class CaseStage(BaseStage):
                 stage.extras = self.extras
 
             if stage.is_skipped(params=context):
-                result.trace.info(f"... Skip stage: {stage.iden!r}")
+                result.trace.info(f"[STAGE]: ... Skip stage: {stage.iden!r}")
                 stage.set_outputs(output={"skipped": True}, to=output)
                 continue
 
@@ -1980,7 +1968,7 @@ class CaseStage(BaseStage):
                         "any case."
                     )
                 result.trace.info(
-                    "... Skip this stage because it does not match."
+                    "[STAGE]: ... Skip this stage because it does not match."
                 )
                 error_msg: str = (
                     "Case-Stage was canceled because it does not match any "
@@ -2125,7 +2113,7 @@ class DockerStage(BaseStage):  # pragma: no cov
             decode=True,
         )
         for line in resp:
-            result.trace.info(f"... {line}")
+            result.trace.info(f"[STAGE]: ... {line}")
 
         if event and event.is_set():
             error_msg: str = (
@@ -2161,7 +2149,7 @@ class DockerStage(BaseStage):  # pragma: no cov
         )
 
         for line in container.logs(stream=True, timestamps=True):
-            result.trace.info(f"... {line.strip().decode()}")
+            result.trace.info(f"[STAGE]: ... {line.strip().decode()}")
 
         # NOTE: This code copy from the docker package.
         exit_status: int = container.wait()["StatusCode"]
@@ -2308,7 +2296,7 @@ class VirtualPyStage(PyStage):  # pragma: no cov
             deps=param2template(self.deps, params, extras=self.extras),
             run_id=result.run_id,
         ) as py:
-            result.trace.debug(f"... Create `{py}` file.")
+            result.trace.debug(f"[STAGE]: ... Create `{py}` file.")
             rs: CompletedProcess = subprocess.run(
                 ["uv", "run", py, "--no-cache"],
                 # ["uv", "run", "--python", "3.9", py],

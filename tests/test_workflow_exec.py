@@ -208,8 +208,7 @@ def test_workflow_exec_py_raise():
                     {
                         "name": "JobException",
                         "message": (
-                            "Stage raise: StageException:\n\t| ...\tPyStage: "
-                            "\n\t| ...\t| ...\t"
+                            "Stage raise: StageException: PyStage: "
                             "ValueError: Testing raise error inside PyStage!!!"
                         ),
                     }
@@ -238,8 +237,7 @@ def test_workflow_exec_py_raise_parallel():
                     {
                         "name": "JobException",
                         "message": (
-                            "Stage raise: StageException:\n\t| ...\tPyStage: "
-                            "\n\t| ...\t| ...\t"
+                            "Stage raise: StageException: PyStage: "
                             "ValueError: Testing raise error inside PyStage!!!"
                         ),
                     }
