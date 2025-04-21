@@ -8,6 +8,9 @@ ReleaseQueue, and Workflow models.
 
     This package implement timeout strategy on the workflow execution layer only
 because the main propose of this package is using Workflow to be orchestrator.
+
+    ReleaseQueue is the memory storage of Release for tracking this release
+already run or pending in the current session.
 """
 from __future__ import annotations
 

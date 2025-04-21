@@ -3,7 +3,6 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-# [x] Use dynamic config
 """The main schedule running is `schedule_runner` function that trigger the
 multiprocess of `schedule_control` function for listing schedules on the
 config by `Loader.finds(Schedule)`.
@@ -17,6 +16,11 @@ functions; `workflow_task`, and `workflow_monitor`.
     The `schedule_task` will run `task.release` method in threading object
 for multithreading strategy. This `release` method will run only one crontab
 value with the on field.
+
+Steps:
+    - Extract all schedule config on the conf path.
+    - Slice schedules to multiprocess
+    - Start running task.
 """
 from __future__ import annotations
 
