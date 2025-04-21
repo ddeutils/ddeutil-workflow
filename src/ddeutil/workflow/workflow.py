@@ -38,7 +38,7 @@ from pydantic.dataclasses import dataclass
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
-from .__cron import CronJob, CronRunner
+from .__cron import CronRunner
 from .__types import DictData, TupleStr
 from .conf import FileLoad, Loader, dynamic
 from .event import On
@@ -80,27 +80,12 @@ class ReleaseType(str, Enum):
     config=ConfigDict(arbitrary_types_allowed=True, use_enum_values=True)
 )
 class Release:
-    """Release Pydantic dataclass object that use for represent the release data
-    that use with the `workflow.release` method.
-    """
+    """Release object that use for represent the release datetime."""
 
     date: datetime = Field(
         description=(
             "A release date that should has second and millisecond equal 0."
         )
-    )
-    offset: float = Field(
-        ge=0,
-        description=(
-            "An offset value that keep second time that different with the "
-            "current process datetime."
-        ),
-    )
-    end_date: datetime = Field(
-        description="An end datetime for stop generate release datetime."
-    )
-    runner: CronRunner = Field(
-        description="A CronRunner object for generate the next release date."
     )
     type: ReleaseType = Field(
         default=ReleaseType.DEFAULT,
@@ -141,6 +126,7 @@ class Release:
 
         :rtype: Release
         """
+        tz: ZoneInfo = dynamic("tz", extras=extras)
         if isinstance(dt, str):
             dt: datetime = datetime.fromisoformat(dt)
         elif not isinstance(dt, datetime):
@@ -148,17 +134,8 @@ class Release:
                 f"The `from_dt` need the `dt` parameter type be `str` or "
                 f"`datetime` only, not {type(dt)}."
             )
-
-        return cls(
-            date=replace_sec(dt),
-            offset=0,
-            end_date=dt + timedelta(days=1),
-            runner=(
-                CronJob("* * * * *").schedule(
-                    replace_sec(dt).replace(tzinfo=dynamic("tz", extras=extras))
-                )
-            ),
-        )
+        dt: datetime = dt.replace(tzinfo=tz)
+        return cls(date=replace_sec(dt))
 
     def __eq__(self, other: Release | datetime) -> bool:
         """Override equal property that will compare only the same type or
@@ -187,7 +164,9 @@ class Release:
 
 @dataclass
 class ReleaseQueue:
-    """Workflow Queue object that is management of Release objects."""
+    """ReleaseQueue object that is storage management of Release objects on
+    the memory with list object.
+    """
 
     queue: list[Release] = field(default_factory=list)
     running: list[Release] = field(default_factory=list)
@@ -290,7 +269,6 @@ class ReleaseQueue:
         runner: CronRunner,
         name: str,
         *,
-        offset: float = 0,
         force_run: bool = False,
         extras: Optional[DictData] = None,
     ) -> Self:
@@ -306,9 +284,8 @@ class ReleaseQueue:
         :param end_date: (datetime) An end datetime object.
         :param audit: (type[Audit]) An audit class that want to make audit
             instance.
-        :param runner: (CronRunner) A CronRunner object.
+        :param runner: (CronRunner) A `CronRunner` object.
         :param name: (str) A target name that want to check at pointer of audit.
-        :param offset: (float) An offset in second unit for time travel.
         :param force_run: (bool) A flag that allow to release workflow if the
             audit with that release was pointed. (Default is False).
         :param extras: (DictDatA) An extra parameter that want to override core
@@ -322,9 +299,6 @@ class ReleaseQueue:
 
         release = Release(
             date=runner.date,
-            offset=offset,
-            end_date=end_date,
-            runner=runner,
             type=(ReleaseType.FORCE if force_run else ReleaseType.POKING),
         )
 
@@ -334,9 +308,6 @@ class ReleaseQueue:
         ):
             release = Release(
                 date=runner.next,
-                offset=offset,
-                end_date=end_date,
-                runner=runner,
                 type=(ReleaseType.FORCE if force_run else ReleaseType.POKING),
             )
 
@@ -691,7 +662,7 @@ class Workflow(BaseModel):
                     "logical_date": release.date,
                     "execute_date": datetime.now(tz=tz),
                     "run_id": result.run_id,
-                    "timezone": tz,
+                    "timezone": str(tz),
                 }
             },
             extras=self.extras,
@@ -728,7 +699,6 @@ class Workflow(BaseModel):
             status=rs.status,
             context={
                 "params": params,
-                "values": values,
                 "release": {
                     "type": release.type,
                     "logical_date": release.date,
@@ -770,7 +740,6 @@ class Workflow(BaseModel):
                     ).replace(microsecond=0)
                 ),
                 self.name,
-                offset=offset,
                 force_run=force_run,
             )
 

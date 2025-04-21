@@ -2,7 +2,7 @@ from datetime import datetime
 from unittest import mock
 
 import pytest
-from ddeutil.workflow.conf import Config
+from ddeutil.workflow.conf import Config, config
 from ddeutil.workflow.result import SUCCESS, Result
 from ddeutil.workflow.workflow import (
     Release,
@@ -109,7 +109,7 @@ def test_workflow_exec_release_with_start_date():
         "params": {"asat-dt": datetime(2024, 10, 1, 0, 0)},
         "release": {
             "type": ReleaseType.DEFAULT,
-            "logical_date": start_date,
+            "logical_date": start_date.replace(tzinfo=config.tz),
             "release": Release.from_dt(start_date),
         },
         "outputs": {
