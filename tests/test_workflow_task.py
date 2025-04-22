@@ -15,7 +15,27 @@ from .utils import dump_yaml_context
 
 
 def test_workflow_task():
-    workflow: Workflow = Workflow.from_conf(name="wf-scheduling-common")
+    workflow: Workflow = Workflow.model_validate(
+        obj={
+            "name": "wf-scheduling-common",
+            "params": {"asat-dt": "datetime"},
+            "on": [
+                {"cronjob": "*/3 * * * *", "timezone": "Asia/Bangkok"},
+            ],
+            "jobs": {
+                "condition-job": {
+                    "stages": [
+                        {"name": "Empty Stage"},
+                        {
+                            "name": "Call Out",
+                            "id": "call-out",
+                            "echo": "Hello ${{ params.asat-dt | fmt('%Y-%m-%d') }}",
+                        },
+                    ]
+                }
+            },
+        }
+    )
     runner = workflow.on[0].generate(datetime(2024, 1, 1, 1))
 
     task: WorkflowTask = WorkflowTask(

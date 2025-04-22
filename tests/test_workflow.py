@@ -107,6 +107,16 @@ def test_workflow_on():
             ],
         )
 
+    # NOTE: Raise if values on the on field have multiple timezone.
+    with pytest.raises(ValidationError):
+        Workflow(
+            name="tmp-wf-on-multiple-tz",
+            on=[
+                {"cronjob": "2 * * * *", "timezone": "UTC"},
+                {"cronjob": "3 * * * *", "timezone": "Asia/Bangkok"},
+            ],
+        )
+
 
 def test_workflow_desc():
     workflow = Workflow.from_conf(name="wf-run-common")

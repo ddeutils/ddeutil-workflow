@@ -481,6 +481,12 @@ class Workflow(BaseModel):
         #         "If it has every minute cronjob on value, it should have "
         #         "only one value in the on field."
         #     )
+        set_tz: set[str] = {on.tz for on in value}
+        if len(set_tz) > 1:
+            raise ValueError(
+                f"The on fields should not contain multiple timezone, "
+                f"{list[set_tz]}."
+            )
 
         extras: Optional[DictData] = info.data.get("extras")
         if len(set_ons) > (

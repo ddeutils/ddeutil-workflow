@@ -93,7 +93,7 @@ def test_workflow_poke_no_queue(test_path):
 
 @pytest.mark.poke
 def test_workflow_poke_raise():
-    workflow = Workflow(name="wf-scheduling-common")
+    workflow = Workflow(name="tmp-wf-scheduling-common")
 
     # Raise: If a period value is lower than 0.
     with pytest.raises(WorkflowException):
@@ -105,7 +105,6 @@ def test_workflow_poke_raise():
 
 
 @pytest.mark.poke
-@mock.patch.object(Config, "enable_write_audit", False)
 def test_workflow_poke_with_start_date_and_period(test_path):
     with dump_yaml_context(
         test_path / "conf/demo/01_99_wf_test_wf_poke_with_start_date.yml",
@@ -122,7 +121,10 @@ def test_workflow_poke_with_start_date_and_period(test_path):
                   echo: "Hello ${{ params.name | title }}"
         """,
     ):
-        workflow = Workflow.from_conf(name="tmp-wf-scheduling-with-name")
+        workflow = Workflow.from_conf(
+            name="tmp-wf-scheduling-with-name",
+            extras={"enable_write_audit": False},
+        )
 
         # NOTE: Poking with specific start datetime.
         result: Result = workflow.poke(
