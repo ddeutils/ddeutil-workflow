@@ -567,7 +567,32 @@ def test_workflow_exec_call_with_prefix(test_path):
                 "target_name": "tgt",
             },
         )
-        print(rs)
+        assert rs.status == SUCCESS
+        assert rs.context == {
+            "params": {
+                "run_date": datetime(2024, 1, 1),
+                "sp_name": "proc-name",
+                "source_name": "src",
+                "target_name": "tgt",
+            },
+            "jobs": {
+                "transform": {
+                    "stages": {
+                        "transform": {
+                            "outputs": {
+                                "exec": "proc-name",
+                                "params": {
+                                    "run_mode": "T",
+                                    "run_date": datetime(2024, 1, 1),
+                                    "source": "src",
+                                    "target": "tgt",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        }
 
 
 def test_workflow_exec_trigger():

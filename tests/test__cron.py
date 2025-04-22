@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from functools import partial
 from zoneinfo import ZoneInfo
 
@@ -6,20 +6,6 @@ import ddeutil.workflow.__cron as cron
 import pytest
 
 from tests.utils import str2dt
-
-
-def test_timezone():
-    jan1_in_utc = datetime.fromisoformat("2024-01-01T08:00").replace(
-        tzinfo=ZoneInfo("UTC")
-    )
-
-    assert timedelta(0) == ZoneInfo("UTC").utcoffset(jan1_in_utc)
-
-    jan1_in_utc = datetime.fromisoformat("2024-01-01T08:00").replace(
-        tzinfo=timezone.utc
-    )
-
-    assert timedelta(0) == timezone.utc.utcoffset(jan1_in_utc)
 
 
 def test_cron_cron_part():

@@ -104,26 +104,21 @@ class Release:
         return f"{self.date:%Y-%m-%d %H:%M:%S}"
 
     @classmethod
-    def from_dt(
-        cls,
-        dt: datetime | str,
-        *,
-        extras: Optional[DictData] = None,
-    ) -> Self:
-        """Construct Release object from datetime or str object. This method
-        will replace second and millisecond value to 0 before create Release.
+    def from_dt(cls, dt: datetime | str) -> Self:
+        """Construct Release object from `datetime` or `str` objects.
+
+            This method will replace second and millisecond value to 0 and
+        replace timezone to the `tz` config setting or extras overriding before
+        create Release object.
 
         :param dt: (datetime | str) A datetime object or string that want to
             construct to the Release object.
-        :param extras: (DictData) An extra parameters that want to pass to
-            override config values.
 
         :raise TypeError: If the type of the dt argument does not valid with
             datetime or str object.
 
         :rtype: Release
         """
-        tz: ZoneInfo = dynamic("tz", extras=extras)
         if isinstance(dt, str):
             dt: datetime = datetime.fromisoformat(dt)
         elif not isinstance(dt, datetime):
@@ -131,8 +126,7 @@ class Release:
                 f"The `from_dt` need the `dt` parameter type be `str` or "
                 f"`datetime` only, not {type(dt)}."
             )
-        dt: datetime = dt.replace(tzinfo=tz)
-        return cls(date=replace_sec(dt))
+        return cls(date=replace_sec(dt.replace(tzinfo=None)))
 
     def __eq__(self, other: Release | datetime) -> bool:
         """Override equal property that will compare only the same type or
@@ -181,14 +175,11 @@ class ReleaseQueue:
     def from_list(
         cls,
         queue: Optional[Union[list[datetime], list[Release]]] = None,
-        extras: Optional[DictData] = None,
     ) -> Self:
         """Construct ReleaseQueue object from an input queue value that passing
         with list of datetime or list of Release.
 
-        :param queue:
-        :param extras: An extra parameter that want to override core config
-            values.
+        :param queue: A queue object for create ReleaseQueue instance.
 
         :raise TypeError: If the type of input queue does not valid.
 
@@ -199,11 +190,7 @@ class ReleaseQueue:
 
         if isinstance(queue, list):
             if all(isinstance(q, datetime) for q in queue):
-                return cls(
-                    queue=[
-                        Release.from_dt(q, extras=(extras or {})) for q in queue
-                    ]
-                )
+                return cls(queue=[Release.from_dt(q) for q in queue])
 
             if all(isinstance(q, Release) for q in queue):
                 return cls(queue=queue)
@@ -231,7 +218,7 @@ class ReleaseQueue:
         :rtype: bool
         """
         if isinstance(value, datetime):
-            value = Release.from_dt(value, extras=self.extras)
+            value = Release.from_dt(value)
 
         with self.lock:
             return (
@@ -300,7 +287,7 @@ class ReleaseQueue:
             return self
 
         release = Release(
-            date=runner.date,
+            date=runner.date.replace(tzinfo=None),
             type=(ReleaseType.FORCE if force_run else ReleaseType.POKING),
         )
 
@@ -309,7 +296,7 @@ class ReleaseQueue:
             and not force_run
         ):
             release = Release(
-                date=runner.next,
+                date=runner.next.replace(tzinfo=None),
                 type=(ReleaseType.FORCE if force_run else ReleaseType.POKING),
             )
 
@@ -659,7 +646,7 @@ class Workflow(BaseModel):
 
         # VALIDATE: Change release value to Release object.
         if isinstance(release, datetime):
-            release: Release = Release.from_dt(release, extras=self.extras)
+            release: Release = Release.from_dt(release)
 
         result.trace.info(
             f"[RELEASE]: Start {name!r} : {release.date:%Y-%m-%d %H:%M:%S}"
@@ -776,22 +763,26 @@ class Workflow(BaseModel):
         `on` field on the threading executor pool for execute the `release`
         method (It run all schedules that was set on the `on` values).
 
-            This method will observe its schedule that nearing to run with the
+            This method will observe its `on` field that nearing to run with the
         `self.release()` method.
 
-            The limitation of this method is not allow run a date that less
+            The limitation of this method is not allow run a date that gather
         than the current date.
 
-        :param params: A parameters that want to pass to the release method.
-        :param start_date: A start datetime object.
-        :param run_id: A workflow running ID for this poke.
-        :param periods: A periods in minutes value that use to run this poking.
-        :param audit: An audit object that want to use on this poking process.
-        :param force_run: A flag that allow to release workflow if the audit with
-            that release was pointed.
-        :param timeout: A second value for timeout while waiting all futures
-            run completely.
-        :param max_poking_pool_worker: The maximum poking pool worker.
+        :param params: (DictData) A parameters that want to pass to the release
+            method.
+        :param start_date: (datetime) A start datetime object.
+        :param run_id: (str) A workflow running ID for this poke.
+        :param periods: (int) A periods in minutes value that use to run this
+            poking. (Default is 1)
+        :param audit: (Audit) An audit object that want to use on this poking
+            process.
+        :param force_run: (bool) A flag that allow to release workflow if the
+            audit with that release was pointed. (Default is False)
+        :param timeout: (int) A second value for timeout while waiting all
+            futures run completely.
+        :param max_poking_pool_worker: (int) The maximum poking pool worker.
+            (Default is 4 workers)
 
         :raise WorkflowException: If the periods parameter less or equal than 0.
 

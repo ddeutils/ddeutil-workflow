@@ -75,7 +75,7 @@ def test_workflow_release_with_datetime():
         "params": {"asat-dt": datetime(2024, 10, 1, 0, 0)},
         "release": {
             "type": ReleaseType.DEFAULT,
-            "logical_date": dt,
+            "logical_date": dt.replace(tzinfo=None),
             "release": Release.from_dt(dt),
         },
         "jobs": {

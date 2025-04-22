@@ -1,10 +1,33 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import pytest
 import yaml
 from ddeutil.workflow import On, YearOn, interval2crontab
 from pydantic import ValidationError
+
+
+def test_localize_timezone():
+    one_dt = datetime(2024, 1, 1, 17)
+    second_dt = datetime(2024, 1, 1, 12)
+    assert one_dt > second_dt
+
+    one_dt = one_dt.replace(tzinfo=ZoneInfo("Asia/Bangkok"))
+    assert one_dt > second_dt.replace(tzinfo=ZoneInfo("Asia/Bangkok"))
+    assert one_dt.astimezone(timezone.utc).replace(tzinfo=None) == datetime(
+        2024, 1, 1, 10
+    )
+    assert one_dt.astimezone(ZoneInfo("UTC")).replace(tzinfo=None) == datetime(
+        2024, 1, 1, 10
+    )
+    assert one_dt.astimezone(timezone.utc).replace(tzinfo=None) < second_dt
+    assert one_dt.astimezone(ZoneInfo("UTC")).replace(tzinfo=None) < second_dt
+
+    bkk = ZoneInfo("Asia/Bangkok")
+    dt = datetime(2024, 1, 1, 12, tzinfo=ZoneInfo("UTC"))
+    assert dt.replace(tzinfo=None) == datetime(2024, 1, 1, 12)
+    bkk_dt = dt.astimezone(bkk)
+    assert bkk_dt.replace(tzinfo=None) == datetime(2024, 1, 1, 19)
 
 
 def test_interval2crontab():
@@ -202,7 +225,7 @@ def test_on_every_5_minute_bkk():
 
 
 def test_on_serialize():
-    schedule = On(cronjob="* * * * *", tz="Asia/Bangkok")
+    schedule = On.model_validate({"cronjob": "* * * * *", "tz": "Asia/Bangkok"})
     assert schedule.model_dump(by_alias=False, exclude_unset=True) == {
         "cronjob": "* * * * *",
         "tz": "Asia/Bangkok",
