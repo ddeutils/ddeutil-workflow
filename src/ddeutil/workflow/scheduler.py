@@ -703,7 +703,7 @@ def schedule_control(
     :rtype: Result
     """
     audit: type[Audit] = audit or get_audit(extras=extras)
-    result: Result = Result().set_parent_run_id(parent_run_id)
+    result: Result = Result.construct_with_rs_or_id(parent_run_id=parent_run_id)
 
     # NOTE: Create the start and stop datetime.
     start_date: datetime = datetime.now(tz=dynamic("tz", extras=extras))

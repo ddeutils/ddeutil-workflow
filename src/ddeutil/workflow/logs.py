@@ -752,7 +752,7 @@ class FileAudit(BaseAudit):
 
         # NOTE: Check environ variable was set for real writing.
         if not dynamic("enable_write_audit", extras=self.extras):
-            trace.debug("[LOG]: Skip writing log cause config was set")
+            trace.debug("[AUDIT]: Skip writing log cause config was set")
             return self
 
         log_file: Path = (
@@ -821,7 +821,7 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
 
         # NOTE: Check environ variable was set for real writing.
         if not dynamic("enable_write_audit", extras=self.extras):
-            trace.debug("[LOG]: Skip writing log cause config was set")
+            trace.debug("[AUDIT]: Skip writing log cause config was set")
             return self
 
         raise NotImplementedError("SQLiteAudit does not implement yet.")

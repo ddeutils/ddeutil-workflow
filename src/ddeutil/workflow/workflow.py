@@ -29,7 +29,7 @@ from heapq import heappop, heappush
 from pathlib import Path
 from queue import Queue
 from textwrap import dedent
-from threading import Event
+from threading import Event, Lock
 from typing import Any, Optional, Union
 from zoneinfo import ZoneInfo
 
@@ -75,9 +75,7 @@ class ReleaseType(str, Enum):
 
 
 @total_ordering
-@dataclass(
-    config=ConfigDict(arbitrary_types_allowed=True, use_enum_values=True)
-)
+@dataclass(config=ConfigDict(use_enum_values=True))
 class Release:
     """Release object that use for represent the release datetime."""
 
@@ -161,20 +159,23 @@ class Release:
         return NotImplemented
 
 
-@dataclass
 class ReleaseQueue:
     """ReleaseQueue object that is storage management of Release objects on
     the memory with list object.
     """
 
-    queue: list[Release] = field(default_factory=list)
-    running: list[Release] = field(default_factory=list)
-    complete: list[Release] = field(default_factory=list)
-    extras: DictData = Field(
-        default_factory=dict,
-        description="An extra parameters that want to override config values.",
-        repr=False,
-    )
+    def __init__(
+        self,
+        queue: Optional[list[Release]] = None,
+        running: Optional[list[Release]] = None,
+        complete: Optional[list[Release]] = None,
+        extras: Optional[DictData] = None,
+    ):
+        self.queue: list[Release] = queue or []
+        self.running: list[Release] = running or []
+        self.complete: list[Release] = complete or []
+        self.extras: DictData = extras or {}
+        self.lock: Lock = Lock()
 
     @classmethod
     def from_list(
@@ -232,11 +233,12 @@ class ReleaseQueue:
         if isinstance(value, datetime):
             value = Release.from_dt(value, extras=self.extras)
 
-        return (
-            (value in self.queue)
-            or (value in self.running)
-            or (value in self.complete)
-        )
+        with self.lock:
+            return (
+                (value in self.queue)
+                or (value in self.running)
+                or (value in self.complete)
+            )
 
     def mark_complete(self, value: Release) -> Self:
         """Push Release to the complete queue. After push the release, it will
@@ -247,17 +249,18 @@ class ReleaseQueue:
 
         :rtype: Self
         """
-        heappush(self.complete, value)
+        with self.lock:
+            heappush(self.complete, value)
 
-        # NOTE: Remove complete queue on workflow that keep more than the
-        #   maximum config value.
-        num_complete_delete: int = len(self.complete) - dynamic(
-            "max_queue_complete_hist", extras=self.extras
-        )
+            # NOTE: Remove complete queue on workflow that keep more than the
+            #   maximum config value.
+            num_complete_delete: int = len(self.complete) - dynamic(
+                "max_queue_complete_hist", extras=self.extras
+            )
 
-        if num_complete_delete > 0:
-            for _ in range(num_complete_delete):
-                heappop(self.complete)
+            if num_complete_delete > 0:
+                for _ in range(num_complete_delete):
+                    heappop(self.complete)
 
         return self
 
@@ -313,7 +316,9 @@ class ReleaseQueue:
         if runner.date > end_date:
             return self
 
-        heappush(self.queue, release)
+        with self.lock:
+            heappush(self.queue, release)
+
         return self
 
 
@@ -641,7 +646,7 @@ class Workflow(BaseModel):
         )
 
         # VALIDATE: check type of queue that valid with ReleaseQueue.
-        if queue and not isinstance(queue, ReleaseQueue):
+        if queue is not None and not isinstance(queue, ReleaseQueue):
             raise TypeError(
                 "The queue argument should be ReleaseQueue object only."
             )
@@ -675,7 +680,7 @@ class Workflow(BaseModel):
         result.trace.info(
             f"[RELEASE]: End {name!r} : {release.date:%Y-%m-%d %H:%M:%S}"
         )
-        result.trace.debug(f"[LOG]: Writing audit: {name!r}.")
+        result.trace.debug(f"[RELEASE]: Writing audit: {name!r}.")
         (
             audit(
                 name=name,
@@ -703,7 +708,12 @@ class Workflow(BaseModel):
                     "logical_date": release.date,
                     "release": release,
                 },
-                "outputs": {"jobs": result.context.pop("jobs", {})},
+                **{"jobs": result.context.pop("jobs", {})},
+                **(
+                    result.context["errors"]
+                    if "errors" in result.context
+                    else {}
+                ),
             },
         )
 
@@ -837,16 +847,12 @@ class Workflow(BaseModel):
             self.queue, offset, end_date, audit=audit, force_run=force_run
         )
         partial_queue(q)
-
-        # NOTE: Return the empty result if it does not have any Release.
         if not q.is_queued:
             result.trace.warning(
                 f"[POKING]: Skip {self.name!r}, not have any queue!!!"
             )
             return result.catch(status=SUCCESS, context={"outputs": []})
 
-        # NOTE: Start create the thread pool executor for running this poke
-        #   process.
         with ThreadPoolExecutor(
             max_workers=dynamic(
                 "max_poking_pool_worker",
