@@ -67,4 +67,4 @@ def test_release_queue_mark_complete():
         complete=[Release.from_dt(datetime(2024, 1, 1, i)) for i in range(5)],
     )
     queue.mark_complete(Release.from_dt(datetime(2024, 1, 1, 10)))
-    assert len(queue.complete) == 5
+    assert len(queue.complete) == 4

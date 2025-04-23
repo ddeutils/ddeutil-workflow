@@ -39,9 +39,6 @@ def prepare_newline(msg: str) -> str:
         return msg
 
     msg_lines: list[str] = msg.split(MARK_NL)
-    if len(msg_lines) == 1:
-        return msg_lines[0]
-
     msg_last: str = msg_lines[-1]
     msg_body: str = (
         "\n" + "\n".join(f" ... |  \t{s}" for s in msg_lines[1:-1])

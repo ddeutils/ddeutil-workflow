@@ -1,6 +1,5 @@
 from datetime import date, datetime
 from decimal import Decimal
-from zoneinfo import ZoneInfo
 
 import pytest
 from ddeutil.workflow.exceptions import ParamValueException
@@ -78,9 +77,7 @@ def test_param_datetime():
 
 @freeze_time("2024-01-01 00:00:00")
 def test_param_datetime_default():
-    assert DatetimeParam().receive() == datetime(
-        2024, 1, 1, tzinfo=ZoneInfo("UTC")
-    )
+    assert DatetimeParam().receive() == datetime(2024, 1, 1)
 
 
 def test_param_int():

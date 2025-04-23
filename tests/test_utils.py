@@ -33,10 +33,13 @@ def adjust_config_gen_id():
 @freeze_time("2024-01-01 01:13:30")
 def test_get_dt_now():
     rs = get_dt_now()
+    assert rs == datetime(2024, 1, 1, 1, 13, 30)
+
+    rs = get_dt_now(tz=ZoneInfo("UTC"))
     assert rs == datetime(2024, 1, 1, 1, 13, 30, tzinfo=ZoneInfo("UTC"))
 
     rs = get_dt_now(offset=30)
-    assert rs == datetime(2024, 1, 1, 1, 13, 00, tzinfo=ZoneInfo("UTC"))
+    assert rs == datetime(2024, 1, 1, 1, 13, 00)
 
     rs = get_d_now()
     assert rs == date(2024, 1, 1)

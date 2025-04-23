@@ -287,7 +287,7 @@ class ReleaseQueue:
         :rtype: ReleaseQueue
 
         """
-        if clear_tz(runner.date) > end_date:
+        if clear_tz(runner.date) > clear_tz(end_date):
             return self
 
         release = Release(
@@ -304,7 +304,7 @@ class ReleaseQueue:
                 type=(ReleaseType.FORCE if force_run else ReleaseType.POKING),
             )
 
-        if clear_tz(runner.date) > end_date:
+        if clear_tz(runner.date) > clear_tz(end_date):
             return self
 
         with self.lock:
@@ -820,12 +820,12 @@ class Workflow(BaseModel):
             )
 
         # NOTE: The end date is using to stop generate queue with an input
-        #   periods value. It will change to MM:00:00.
+        #   periods value. It will change to MM:59.
         #   For example:
         #       (input)  start_date = 12:04:12, offset = 2
-        #       (output) end_date = 12:07:00
+        #       (output) end_date = 12:06:59
         end_date: datetime = start_date.replace(second=0) + timedelta(
-            minutes=periods + 1
+            minutes=periods + 1, seconds=-1
         )
 
         result.trace.info(
@@ -1111,8 +1111,13 @@ class Workflow(BaseModel):
                     time.sleep(0.025)
                 elif (future := futures.pop(0)).done() or future.cancelled():
                     if e := future.exception():
-                        result.trace.error(f"[WORKFLOW]: {e}")
-                        raise WorkflowException(str(e))
+                        result.trace.error(f"[WORKFLOW]: Error Handler: {e}")
+                        return result.catch(
+                            status=FAILED,
+                            context={
+                                "errors": WorkflowException(str(e)).to_dict()
+                            },
+                        )
                     job_queue.put(job_id)
                 elif future.running() or "state=pending" in str(future):
                     time.sleep(0.075)

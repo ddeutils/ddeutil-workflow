@@ -10,7 +10,6 @@ import toml
 import yaml
 from ddeutil.workflow.conf import Config, FileLoad, config, dynamic
 from ddeutil.workflow.scheduler import Schedule
-from ddeutil.workflow.workflow import Workflow
 
 
 def test_config():
@@ -54,6 +53,23 @@ def test_load_file(target_path: Path):
 
         with pytest.raises(ValueError):
             FileLoad("wf-ignore", path=config.conf_path)
+
+    with (target_path / "test_simple_file_raise.yaml").open(mode="w") as f:
+        yaml.dump(
+            {
+                "test_load_file": {
+                    "type": "Workflow",
+                    "desc": "Test multi config path",
+                }
+            },
+            f,
+        )
+
+    load = FileLoad("test_load_file", extras={"conf_paths": [target_path]})
+    assert load.data == {"desc": "Test multi config path", "type": "Workflow"}
+
+    with pytest.raises(TypeError):
+        FileLoad("test_load_file", extras={"conf_paths": target_path})
 
 
 def test_load_file_finds(target_path: Path):
@@ -106,9 +122,29 @@ def test_load_file_finds_raise(target_path: Path):
             _ = FileLoad("test_load_file_config", path=config.conf_path).type
 
 
-def test_loader_find_schedule():
-    for finding in FileLoad.finds(Schedule):
-        print(finding)
+@pytest.fixture(scope="module")
+def schedule_path(test_path):
+    target_p = test_path / "test_schedule_conf"
+    target_p.mkdir(exist_ok=True)
+
+    with (target_p / "test_schedule_conf.yaml").open(mode="w") as f:
+        yaml.dump(
+            {
+                "schedule-wf": {
+                    "type": "Schedule",
+                    "desc": "Test multi config path",
+                }
+            },
+            f,
+        )
+
+    yield target_p
+
+    shutil.rmtree(target_p)
+
+
+def test_loader_find_schedule(schedule_path):
+    assert len(list(FileLoad.finds(Schedule))) == 5
 
     for finding in FileLoad.finds(
         Schedule,
@@ -119,12 +155,47 @@ def test_loader_find_schedule():
             "schedule-every-minute-wf-parallel",
         ],
     ):
-        print(finding[0])
+        assert finding[0] == "schedule-wf"
 
+    for finding in FileLoad.finds(
+        Schedule,
+        excluded=[
+            "schedule-common-wf",
+            "schedule-multi-on-wf",
+            "schedule-every-minute-wf",
+            "schedule-every-minute-wf-parallel",
+        ],
+        paths=[schedule_path],
+    ):
+        assert finding[0] == "schedule-wf"
+        assert finding[1] == {
+            "desc": "Test multi config path",
+            "type": "Schedule",
+        }
 
-def test_loader_find_workflow():
-    for finding in FileLoad.finds(Workflow):
-        print(finding)
+    for finding in FileLoad.finds(
+        Schedule,
+        excluded=[
+            "schedule-common-wf",
+            "schedule-multi-on-wf",
+            "schedule-every-minute-wf",
+            "schedule-every-minute-wf-parallel",
+        ],
+        extras={"conf_paths": [schedule_path]},
+    ):
+        assert finding[0] == "schedule-wf"
+        assert finding[1] == {
+            "desc": "Test multi config path",
+            "type": "Schedule",
+        }
+
+    with pytest.raises(TypeError):
+        list(
+            FileLoad.finds(
+                Schedule,
+                extras={"conf_paths": schedule_path},
+            )
+        )
 
 
 def test_dynamic():

@@ -37,7 +37,6 @@ def test_workflow_release():
         "release": {
             "type": ReleaseType.DEFAULT,
             "logical_date": release.date,
-            "release": release,
         },
         "jobs": {
             "first-job": {
@@ -76,7 +75,6 @@ def test_workflow_release_with_datetime():
         "release": {
             "type": ReleaseType.DEFAULT,
             "logical_date": dt.replace(tzinfo=None),
-            "release": Release.from_dt(dt),
         },
         "jobs": {
             "first-job": {
@@ -120,7 +118,6 @@ def test_workflow_release_with_queue():
         "release": {
             "type": ReleaseType.DEFAULT,
             "logical_date": release.date,
-            "release": release,
         },
         "jobs": {
             "first-job": {

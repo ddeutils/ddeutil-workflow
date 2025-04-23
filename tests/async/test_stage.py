@@ -1,9 +1,14 @@
 import pytest
-from ddeutil.workflow import SUCCESS, EmptyStage, Result
+from ddeutil.workflow import SUCCESS, BashStage, EmptyStage, Result
 
 
 @pytest.mark.asyncio
-async def test_stage_empty_axecute():
+async def test_empty_stage_axec():
+    stage: EmptyStage = EmptyStage(name="Empty Stage")
+    rs: Result = await stage.handler_axecute(params={})
+    assert rs.status == SUCCESS
+    assert rs.context == {}
+
     stage: EmptyStage = EmptyStage(name="Empty Stage", echo="hello world")
     rs: Result = await stage.handler_axecute(params={})
     assert rs.status == SUCCESS
@@ -27,3 +32,9 @@ async def test_stage_empty_axecute():
     rs: Result = await stage.handler_axecute(params={})
     assert rs.status == SUCCESS
     assert rs.context == {}
+
+
+@pytest.mark.asyncio
+async def test_bash_stage_axec():
+    stage: BashStage = BashStage(name="Bash Stage", bash='echo "Hello World"')
+    _ = stage

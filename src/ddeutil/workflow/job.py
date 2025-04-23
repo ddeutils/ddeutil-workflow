@@ -969,7 +969,7 @@ def azure_batch_execute(
     run_id: str | None = None,
     parent_run_id: str | None = None,
     event: Event | None = None,
-) -> Result:  # pragma no cov
+) -> Result:  # pragma: no cov
     """Azure Batch job execution that will run all job's stages on the Azure
     Batch Node and extract the result file to be returning context result.
 
@@ -1023,7 +1023,7 @@ def docker_execution(
     run_id: str | None = None,
     parent_run_id: str | None = None,
     event: Event | None = None,
-):
+):  # pragma: no cov
     """Docker job execution.
 
     Steps:

@@ -82,8 +82,9 @@ source = ["src.ddeutil.workflow"]
 omit = [
     "src/ddeutil/workflow/__about__.py",
     "src/ddeutil/workflow/__cron.py",
+    "src/ddeutil/workflow/__main__.py",
     "src/ddeutil/workflow/api/__init__.py",
-    "src/ddeutil/workflow/api/log.py",
+    "src/ddeutil/workflow/api/logs.py",
     "src/ddeutil/workflow/api/utils.py",
     "src/ddeutil/workflow/api/routes/__init__.py",
     "src/ddeutil/workflow/api/routes/job.py",

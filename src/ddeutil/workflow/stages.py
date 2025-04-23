@@ -588,7 +588,7 @@ class BashStage(BaseStage):
     @contextlib.asynccontextmanager
     async def acreate_sh_file(
         self, bash: str, env: DictStr, run_id: str | None = None
-    ) -> AsyncIterator:  # pragma no cov
+    ) -> AsyncIterator:  # pragma: no cov
         import aiofiles
 
         f_name: str = f"{run_id or uuid.uuid4()}.sh"

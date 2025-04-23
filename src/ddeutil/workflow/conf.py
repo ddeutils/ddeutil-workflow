@@ -200,7 +200,7 @@ class APIConfig:
         return str2bool(env("API_ENABLE_ROUTE_SCHEDULE", "true"))
 
 
-class BaseLoad(ABC):
+class BaseLoad(ABC):  # pragma: no cov
     """Base Load object is the abstraction object for any Load object that
     should to inherit from this base class.
     """
@@ -338,8 +338,13 @@ class FileLoad(BaseLoad):
         """
         excluded: list[str] = excluded or []
         path: Path = dynamic("conf_path", f=path, extras=extras)
+        paths: Optional[list[Path]] = paths or (extras or {}).get("conf_paths")
         if not paths:
             paths: list[Path] = [path]
+        elif not isinstance(paths, list):
+            raise TypeError(
+                f"Multi-config paths does not support for type: {type(paths)}"
+            )
         else:
             paths.append(path)
 
