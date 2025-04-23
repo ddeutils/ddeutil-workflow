@@ -49,6 +49,7 @@ from .params import Param
 from .result import FAILED, SKIP, SUCCESS, WAIT, Result
 from .reusables import has_template, param2template
 from .utils import (
+    clear_tz,
     gen_id,
     get_dt_now,
     reach_next_minute,
@@ -236,17 +237,17 @@ class ReleaseQueue:
 
         :rtype: Self
         """
-        # NOTE: Remove complete queue on workflow that keep more than the
-        #   maximum config value.
-        num_complete_delete: int = len(self.complete) - dynamic(
-            "max_queue_complete_hist", extras=self.extras
-        )
-
         with self.lock:
             if value in self.running:
                 self.running.remove(value)
 
             heappush(self.complete, value)
+
+            # NOTE: Remove complete queue on workflow that keep more than the
+            #   maximum config value.
+            num_complete_delete: int = len(self.complete) - dynamic(
+                "max_queue_complete_hist", extras=self.extras
+            )
 
             if num_complete_delete > 0:
                 for _ in range(num_complete_delete):
@@ -286,11 +287,11 @@ class ReleaseQueue:
         :rtype: ReleaseQueue
 
         """
-        if runner.date > end_date:
+        if clear_tz(runner.date) > end_date:
             return self
 
         release = Release(
-            date=runner.date.replace(tzinfo=None),
+            date=clear_tz(runner.date),
             type=(ReleaseType.FORCE if force_run else ReleaseType.POKING),
         )
 
@@ -299,11 +300,11 @@ class ReleaseQueue:
             and not force_run
         ):
             release = Release(
-                date=runner.next.replace(tzinfo=None),
+                date=clear_tz(runner.next),
                 type=(ReleaseType.FORCE if force_run else ReleaseType.POKING),
             )
 
-        if runner.date > end_date:
+        if clear_tz(runner.date) > end_date:
             return self
 
         with self.lock:
@@ -735,11 +736,7 @@ class Workflow(BaseModel):
             queue.gen(
                 end_date,
                 audit,
-                on.next(
-                    get_dt_now(
-                        tz=dynamic("tz", extras=self.extras), offset=offset
-                    ).replace(microsecond=0)
-                ),
+                on.next(get_dt_now(offset=offset).replace(microsecond=0)),
                 self.name,
                 force_run=force_run,
             )
@@ -756,7 +753,7 @@ class Workflow(BaseModel):
         audit: Audit | None = None,
         force_run: bool = False,
         timeout: int = 1800,
-        max_poking_pool_worker: int = 4,
+        max_poking_pool_worker: int = 2,
     ) -> Result:
         """Poke workflow with a start datetime value that will pass to its
         `on` field on the threading executor pool for execute the `release`
@@ -768,8 +765,7 @@ class Workflow(BaseModel):
             The limitation of this method is not allow run a date that gather
         than the current date.
 
-        :param params: (DictData) A parameters that want to pass to the release
-            method.
+        :param params: (DictData) A parameter data.
         :param start_date: (datetime) A start datetime object.
         :param run_id: (str) A workflow running ID for this poke.
         :param periods: (int) A periods in minutes value that use to run this
@@ -781,7 +777,7 @@ class Workflow(BaseModel):
         :param timeout: (int) A second value for timeout while waiting all
             futures run completely.
         :param max_poking_pool_worker: (int) The maximum poking pool worker.
-            (Default is 4 workers)
+            (Default is 2 workers)
 
         :raise WorkflowException: If the periods parameter less or equal than 0.
 
@@ -789,7 +785,6 @@ class Workflow(BaseModel):
         :return: A list of all results that return from `self.release` method.
         """
         audit: type[Audit] = audit or get_audit(extras=self.extras)
-        tz: ZoneInfo = dynamic("tz", extras=self.extras)
         result: Result = Result(
             run_id=(run_id or gen_id(self.name, unique=True))
         )
@@ -808,7 +803,7 @@ class Workflow(BaseModel):
             return result.catch(status=SUCCESS, context={"outputs": []})
 
         # NOTE: Create the current date that change microsecond to 0
-        current_date: datetime = datetime.now(tz=tz).replace(microsecond=0)
+        current_date: datetime = datetime.now().replace(microsecond=0)
 
         if start_date is None:
             # NOTE: Force change start date if it gathers than the current date,
@@ -816,7 +811,7 @@ class Workflow(BaseModel):
             start_date: datetime = current_date
             offset: float = 0
         elif start_date <= current_date:
-            start_date = start_date.replace(tzinfo=tz).replace(microsecond=0)
+            start_date = start_date.replace(microsecond=0)
             offset: float = (current_date - start_date).total_seconds()
         else:
             raise WorkflowException(
@@ -825,8 +820,13 @@ class Workflow(BaseModel):
             )
 
         # NOTE: The end date is using to stop generate queue with an input
-        #   periods value.
-        end_date: datetime = start_date + timedelta(minutes=periods)
+        #   periods value. It will change to MM:00:00.
+        #   For example:
+        #       (input)  start_date = 12:04:12, offset = 2
+        #       (output) end_date = 12:07:00
+        end_date: datetime = start_date.replace(second=0) + timedelta(
+            minutes=periods + 1
+        )
 
         result.trace.info(
             f"[POKING]: Execute Poking: {self.name!r} ("
@@ -871,7 +871,7 @@ class Workflow(BaseModel):
                         f"{release.date:%Y-%m-%d %H:%M:%S}"
                     )
                     heappush(q.queue, release)
-                    wait_until_next_minute(get_dt_now(tz=tz, offset=offset))
+                    wait_until_next_minute(get_dt_now(offset=offset))
 
                     # WARNING: I already call queue poking again because issue
                     #   about the every minute crontab.

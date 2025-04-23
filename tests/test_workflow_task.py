@@ -4,7 +4,6 @@ from unittest import mock
 import pytest
 from ddeutil.workflow import Config, CronRunner, FileAudit, On, Result
 from ddeutil.workflow.workflow import (
-    Release,
     ReleaseQueue,
     ReleaseType,
     Workflow,
@@ -151,16 +150,11 @@ def test_workflow_task_release(test_path):
             "params": {"name": "foo"},
             "release": {
                 "type": ReleaseType.DEFAULT,
-                "release": Release.from_dt(
-                    datetime(2024, 1, 1, 1, tzinfo=runner.tz)
-                ),
-                "logical_date": datetime(2024, 1, 1, 1, tzinfo=runner.tz),
+                "logical_date": datetime(2024, 1, 1, 1),
             },
-            "outputs": {
-                "jobs": {
-                    "first-job": {
-                        "stages": {"9818133124": {"outputs": {}}},
-                    },
+            "jobs": {
+                "first-job": {
+                    "stages": {"9818133124": {"outputs": {}}},
                 },
             },
         }

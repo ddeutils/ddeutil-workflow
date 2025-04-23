@@ -61,6 +61,11 @@ def replace_sec(dt: datetime) -> datetime:
     return dt.replace(second=0, microsecond=0)
 
 
+def clear_tz(dt: datetime) -> datetime:
+    """Replace timezone info on an input datetime object to None."""
+    return dt.replace(tzinfo=None)
+
+
 def get_dt_now(tz: ZoneInfo | None = None, offset: float = 0.0) -> datetime:
     """Return the current datetime object.
 
@@ -70,7 +75,7 @@ def get_dt_now(tz: ZoneInfo | None = None, offset: float = 0.0) -> datetime:
     :rtype: datetime
     :return: The current datetime object that use an input timezone or UTC.
     """
-    return datetime.now(tz=(tz or UTC)) - timedelta(seconds=offset)
+    return datetime.now(tz=tz) - timedelta(seconds=offset)
 
 
 def get_d_now(
@@ -84,7 +89,7 @@ def get_d_now(
     :rtype: date
     :return: The current date object that use an input timezone or UTC.
     """
-    return (datetime.now(tz=(tz or UTC)) - timedelta(seconds=offset)).date()
+    return (datetime.now(tz=tz) - timedelta(seconds=offset)).date()
 
 
 def get_diff_sec(dt: datetime, offset: float = 0.0) -> int:
@@ -111,13 +116,12 @@ def reach_next_minute(dt: datetime, offset: float = 0.0) -> bool:
     :param offset: (float) An offset second value.
     """
     diff: float = (
-        replace_sec(dt) - replace_sec(get_dt_now(tz=dt.tzinfo, offset=offset))
+        replace_sec(clear_tz(dt)) - replace_sec(get_dt_now(offset=offset))
     ).total_seconds()
     if diff >= 60:
         return True
     elif diff >= 0:
         return False
-
     raise ValueError(
         "Check reach the next minute function should check a datetime that not "
         "less than the current date"

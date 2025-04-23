@@ -2,7 +2,7 @@ from datetime import datetime
 from unittest import mock
 
 import pytest
-from ddeutil.workflow import SUCCESS, Config, Result, Workflow, config
+from ddeutil.workflow import SUCCESS, Config, Result, Workflow
 from ddeutil.workflow.exceptions import WorkflowException
 
 from .utils import dump_yaml_context
@@ -15,14 +15,14 @@ def test_workflow_poke(test_path):
             "extras": {"enable_write_audit": False, "enable_write_log": True},
             "name": "tmp-wf-scheduling-minute",
             "on": [{"cronjob": "* * * * *", "timezone": "Asia/Bangkok"}],
-            "params": {"asat-dt": "datetime"},
+            "params": {"run-dt": "datetime"},
             "jobs": {
                 "first-job": {
                     "stages": [
                         {"name": "Empty stage"},
                         {
                             "name": "Hello stage",
-                            "echo": "Hello ${{ params.asat-dt | fmt('%Y-%m-%d') }}",
+                            "echo": "Hello ${{ params.run-dt | fmt('%Y-%m-%d') }}",
                         },
                     ]
                 }
@@ -30,7 +30,7 @@ def test_workflow_poke(test_path):
         }
     )
     result: Result = workflow.poke(
-        params={"asat-dt": datetime(2024, 1, 1)},
+        params={"run-dt": datetime(2024, 1, 1)},
     )
 
     # FIXME: The result that return from this test is random between 1 and 2
@@ -39,14 +39,11 @@ def test_workflow_poke(test_path):
     assert isinstance(result.context["outputs"][0], Result)
     assert result.context["outputs"][0].status == 0
     assert result.context["outputs"][0].context == {
-        "params": {"asat-dt": datetime(2024, 1, 1)},
+        "params": {"run-dt": datetime(2024, 1, 1)},
         "release": {
             "type": "poking",
             "logical_date": result.context["outputs"][0].context["release"][
                 "logical_date"
-            ],
-            "release": result.context["outputs"][0].context["release"][
-                "release"
             ],
         },
         "jobs": {
@@ -128,7 +125,7 @@ def test_workflow_poke_with_start_date_and_period(test_path):
 
         # NOTE: Poking with specific start datetime.
         result: Result = workflow.poke(
-            start_date=datetime(2024, 1, 1, 0, 0, 15, tzinfo=config.tz),
+            start_date=datetime(2024, 1, 1, 0, 0, 15),
             periods=2,
             params={"name": "FOO"},
         )
@@ -136,10 +133,10 @@ def test_workflow_poke_with_start_date_and_period(test_path):
         outputs: list[Result] = result.context["outputs"]
         assert outputs[0].parent_run_id == outputs[1].parent_run_id
         assert outputs[0].context["release"]["logical_date"] == datetime(
-            2024, 1, 1, 0, 1, tzinfo=config.tz
+            2024, 1, 1, 0, 1
         )
         assert outputs[1].context["release"]["logical_date"] == datetime(
-            2024, 1, 1, 0, 2, tzinfo=config.tz
+            2024, 1, 1, 0, 2
         )
 
 
