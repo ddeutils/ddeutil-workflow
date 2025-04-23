@@ -244,6 +244,10 @@ result: Result = workflow.execute(
 > )
 > ```
 
+> [!WARNING]
+> The scheduler feature is the expensive feature of this project. You should
+> avoid to use it and find a scheduler tool instead.
+
 ## :cookie: Configuration
 
 The main configuration that use to dynamic changing this workflow engine for your
