@@ -21,7 +21,6 @@ from typing_extensions import Self
 from .__cron import WEEKDAYS, CronJob, CronJobYear, CronRunner, Options
 from .__types import DictData, DictStr
 from .conf import FileLoad
-from .utils import UTC
 
 Interval = Literal["daily", "weekly", "monthly"]
 
@@ -97,7 +96,7 @@ class On(BaseModel):
             description="A timezone string value",
             alias="timezone",
         ),
-    ] = UTC
+    ] = "UTC"
 
     @classmethod
     def from_value(cls, value: DictStr, extras: DictData) -> Self:
@@ -118,6 +117,7 @@ class On(BaseModel):
         passing["cronjob"] = interval2crontab(
             **{v: value[v] for v in value if v in ("interval", "day", "time")}
         )
+        print(passing)
         return cls(extras=extras | passing.pop("extras", {}), **passing)
 
     @classmethod

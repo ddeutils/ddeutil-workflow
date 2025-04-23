@@ -118,7 +118,7 @@ def test_cron_option():
     assert str(cr) == "*/5 9-17/2 * JAN-MAR,MAY MON-FRI"
 
 
-def test_cron_next_previous():
+def test_cron_runner_next_previous():
     sch = cron.CronJob("*/30 */12 23 */3 *").schedule(
         date=datetime(2024, 1, 1, 12, tzinfo=ZoneInfo("Asia/Bangkok")),
     )
@@ -145,6 +145,32 @@ def test_cron_next_previous():
 
     assert sch.next == str2dt("2024-01-23 00:00:00")
     assert sch.next == str2dt("2024-01-23 00:30:00")
+
+
+def test_cron_runner_tz():
+    with pytest.raises(TypeError):
+        cron.CronJob("*/5 * * * *").schedule(tz=1)
+
+    with pytest.raises(ValueError):
+        cron.CronJob("*/5 * * * *").schedule(tz="UUID")
+
+    sch = cron.CronJob("*/5 * * * *").schedule(
+        date=datetime(2024, 1, 1, 12, tzinfo=ZoneInfo("Asia/Bangkok")),
+        tz="UTC",
+    )
+    assert sch.date == str2dt("2024-01-01 12:00:00", "UTC")
+    assert sch.next == str2dt("2024-01-01 12:00:00", "UTC")
+    assert sch.next == str2dt("2024-01-01 12:05:00", "UTC")
+
+    sch.reset()
+
+    assert sch.prev == str2dt("2024-01-01 11:55:00", "UTC")
+    assert sch.prev == str2dt("2024-01-01 11:50:00", "UTC")
+
+    sch = cron.CronJob("*/5 * * * *").schedule(date=datetime(2024, 1, 1, 12))
+    assert sch.date == datetime(2024, 1, 1, 12)
+    assert sch.next == datetime(2024, 1, 1, 12)
+    assert sch.next == datetime(2024, 1, 1, 12, 5)
 
 
 def test_cron_cronjob_year():

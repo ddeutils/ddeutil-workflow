@@ -54,14 +54,17 @@ def dotenv_setting() -> None:
     load_dotenv(env_path)
 
 
-def str2dt(value: str) -> datetime:  # pragma: no cov
+def str2dt(value: str, tz: str | None = None) -> datetime:  # pragma: no cov
     """Convert string value to datetime object with ``fromisoformat`` method.
 
     :param value: (str): A string value that want to convert to datetime object.
+    :param tz: (str)
 
     :rtype: datetime
     """
-    return datetime.fromisoformat(value).astimezone(ZoneInfo("Asia/Bangkok"))
+    return datetime.fromisoformat(value).astimezone(
+        ZoneInfo(tz or "Asia/Bangkok")
+    )
 
 
 def dump_yaml(

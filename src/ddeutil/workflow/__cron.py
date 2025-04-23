@@ -502,10 +502,10 @@ class CronPart:
             except IndexError:
                 next_value: int = -1
             if value != (next_value - 1):
-                # NOTE: ``next_value`` is not the subsequent number
+                # NOTE: `next_value` is not the subsequent number
                 if start_number is None:
                     # NOTE:
-                    #   The last number of the list ``self.values`` is not in a
+                    #   The last number of the list `self.values` is not in a
                     #   range.
                     multi_dim_values.append(value)
                 else:
@@ -703,11 +703,14 @@ class CronJob:
         *,
         tz: str | None = None,
     ) -> CronRunner:
-        """Returns the schedule datetime runner with this cronjob. It would run
-        ``next``, ``prev``, or ``reset`` to generate running date that you want.
+        """Returns CronRunner instance that be datetime runner with this
+        cronjob. It can use `next`, `prev`, or `reset` methods to generate
+        running date.
 
-        :param date: An initial date that want to mark as the start point.
-        :param tz: A string timezone that want to change on runner.
+        :param date: (datetime) An initial date that want to mark as the start
+            point. (Default is use the current datetime)
+        :param tz: (str) A string timezone that want to change on runner.
+            (Default is None)
 
         :rtype: CronRunner
         """
@@ -743,6 +746,10 @@ class CronJobYear(CronJob):
 class CronRunner:
     """Create an instance of Date Runner object for datetime generate with
     cron schedule object value.
+
+    :param cron: (CronJob | CronJobYear)
+    :param date: (datetime)
+    :param tz: (str)
     """
 
     shift_limit: ClassVar[int] = 25
@@ -761,11 +768,17 @@ class CronRunner:
         cron: CronJob | CronJobYear,
         date: datetime | None = None,
         *,
-        tz: str | None = None,
+        tz: str | ZoneInfo | None = None,
     ) -> None:
-        # NOTE: Prepare timezone if this value does not set, it will use UTC.
-        self.tz: ZoneInfo = ZoneInfo("UTC")
+        self.tz: ZoneInfo | None = None
         if tz:
+            if isinstance(tz, ZoneInfo):
+                self.tz = tz
+            elif not isinstance(tz, str):
+                raise TypeError(
+                    "Invalid type of `tz` parameter, it should be str or "
+                    "ZoneInfo instance."
+                )
             try:
                 self.tz = ZoneInfo(tz)
             except ZoneInfoNotFoundError as err:
@@ -777,9 +790,10 @@ class CronRunner:
                 raise ValueError(
                     "Input schedule start time is not a valid datetime object."
                 )
-            if tz is None:
-                self.tz = date.tzinfo
-            self.date: datetime = date.astimezone(self.tz)
+            if tz is not None:
+                self.date: datetime = date.astimezone(self.tz)
+            else:
+                self.date: datetime = date
         else:
             self.date: datetime = datetime.now(tz=self.tz)
 
