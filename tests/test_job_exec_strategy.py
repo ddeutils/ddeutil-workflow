@@ -91,8 +91,7 @@ def test_job_exec_strategy_catch_job_error():
             "errors": {
                 "name": "StageException",
                 "message": (
-                    "PyStage: \n\t| ...\tValueError: Testing raise error "
-                    "inside PyStage!!!"
+                    "PyStage: ValueError: Testing raise error inside PyStage!!!"
                 ),
             },
         },
@@ -137,8 +136,7 @@ def test_job_exec_strategy_raise():
             "errors": {
                 "name": "StageException",
                 "message": (
-                    "PyStage: \n\t| ...\tValueError: Testing raise error inside "
-                    "PyStage!!!"
+                    "PyStage: ValueError: Testing raise error inside PyStage!!!"
                 ),
             },
         },

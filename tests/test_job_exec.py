@@ -43,7 +43,7 @@ def test_job_exec_py_raise():
     assert rs.context == {
         "EMPTY": {
             "errors": {
-                "message": "PyStage: \n\t| ...\tValueError: Testing raise error inside PyStage!!!",
+                "message": "PyStage: ValueError: Testing raise error inside PyStage!!!",
                 "name": "StageException",
             },
             "matrix": {},
@@ -53,8 +53,7 @@ def test_job_exec_py_raise():
             {
                 "name": "JobException",
                 "message": (
-                    "Stage raise: StageException:\n\t| ...\tPyStage: "
-                    "\n\t| ...\t| ...\t"
+                    "Stage raise: StageException: PyStage: "
                     "ValueError: Testing raise error inside PyStage!!!"
                 ),
             },
@@ -110,7 +109,7 @@ def test_job_exec_py_fail_fast_raise_catch():
         "2150810470": {
             "errors": {
                 "message": (
-                    "PyStage: \n\t| ...\tValueError: Testing raise error inside "
+                    "PyStage: ValueError: Testing raise error inside "
                     "PyStage with the sleep not equal 4!!!"
                 ),
                 "name": "StageException",
@@ -133,8 +132,8 @@ def test_job_exec_py_fail_fast_raise_catch():
             {
                 "name": "JobException",
                 "message": (
-                    "Stage raise: StageException:\n\t| ...\tPyStage: "
-                    "\n\t| ...\t| ...\tValueError: Testing raise error inside "
+                    "Stage raise: StageException: PyStage: "
+                    "ValueError: Testing raise error inside "
                     "PyStage with the sleep not equal 4!!!"
                 ),
             },
@@ -230,7 +229,7 @@ def test_job_exec_py_complete_raise():
         "2150810470": {
             "errors": {
                 "message": (
-                    "PyStage: \n\t| ...\tValueError: Testing raise error inside "
+                    "PyStage: ValueError: Testing raise error inside "
                     "PyStage!!!"
                 ),
                 "name": "StageException",
@@ -241,7 +240,7 @@ def test_job_exec_py_complete_raise():
         "9112472804": {
             "errors": {
                 "message": (
-                    "PyStage: \n\t| ...\tValueError: Testing raise error inside "
+                    "PyStage: ValueError: Testing raise error inside "
                     "PyStage!!!"
                 ),
                 "name": "StageException",
@@ -260,16 +259,14 @@ def test_job_exec_py_complete_raise():
             {
                 "name": "JobException",
                 "message": (
-                    "Stage raise: StageException:\n\t| ...\tPyStage: "
-                    "\n\t| ...\t| ...\t"
+                    "Stage raise: StageException: PyStage: "
                     "ValueError: Testing raise error inside PyStage!!!"
                 ),
             },
             {
                 "name": "JobException",
                 "message": (
-                    "Stage raise: StageException:\n\t| ...\tPyStage: "
-                    "\n\t| ...\t| ...\t"
+                    "Stage raise: StageException: PyStage: "
                     "ValueError: Testing raise error inside PyStage!!!"
                 ),
             },

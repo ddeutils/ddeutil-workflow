@@ -659,10 +659,12 @@ class Job(BaseModel):
 
         # pragma: no cov
         result.trace.error(
-            f"[JOB]: Execute not support runs-on: {self.runs_on.type!r} yet."
+            f"[JOB]: Execute not support runs-on: {self.runs_on.type.value!r} "
+            f"yet."
         )
         raise NotImplementedError(
-            f"Execute runs-on type: {self.runs_on.type} does not support yet."
+            f"Execute runs-on type: {self.runs_on.type.value!r} does not "
+            f"support yet."
         )
 
 
