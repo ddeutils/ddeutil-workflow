@@ -2,7 +2,7 @@ from datetime import datetime
 from unittest import mock
 
 import pytest
-from ddeutil.workflow import Config, CronRunner, FileAudit, On, Result
+from ddeutil.workflow import SUCCESS, Config, CronRunner, FileAudit, On, Result
 from ddeutil.workflow.workflow import (
     ReleaseQueue,
     ReleaseType,
@@ -145,7 +145,7 @@ def test_workflow_task_release(test_path):
         )
 
         rs: Result = task.release(queue=queue["demo"])
-        assert rs.status == 0
+        assert rs.status == SUCCESS
         assert rs.context == {
             "params": {"name": "foo"},
             "release": {
@@ -158,6 +158,7 @@ def test_workflow_task_release(test_path):
                 },
             },
         }
+        assert len(queue["demo"].complete) == 1
 
         with pytest.raises(ValueError):
             task.release()
@@ -166,6 +167,12 @@ def test_workflow_task_release(test_path):
             task.release(
                 queue=list[datetime(2024, 1, 1, 1, 0, tzinfo=runner.tz)],
             )
+
+        rs: Result = task.release(
+            release=datetime(2024, 1, 1, 1, 1), queue=queue["demo"]
+        )
+        assert rs.status == SUCCESS
+        assert len(queue["demo"].complete) == 2
 
 
 @mock.patch.object(Config, "enable_write_audit", False)

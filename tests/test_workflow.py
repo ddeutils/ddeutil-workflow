@@ -88,8 +88,8 @@ def test_workflow_on():
         Workflow(
             name="tmp-wf-scheduling-raise",
             on=[
-                "every_3_minute_bkk",
-                "every_3_minute_bkk",
+                {"cronjob": "2 * * * *"},
+                {"cronjob": "2 * * * *"},
             ],
         )
 

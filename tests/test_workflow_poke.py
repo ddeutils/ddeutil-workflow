@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from unittest import mock
 
 import pytest
@@ -61,6 +61,10 @@ def test_workflow_poke(test_path):
         result.context["outputs"][0].run_id
         != result.context["outputs"][0].parent_run_id
     )
+
+    # NOTE: Raise because start date gather than the current date.
+    with pytest.raises(WorkflowException):
+        workflow.poke(start_date=datetime.now() + timedelta(days=1))
 
 
 @pytest.mark.poke

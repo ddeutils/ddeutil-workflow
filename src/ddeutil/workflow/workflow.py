@@ -42,11 +42,11 @@ from .__cron import CronRunner
 from .__types import DictData, TupleStr
 from .conf import FileLoad, Loader, dynamic
 from .event import On
-from .exceptions import JobException, WorkflowException
+from .exceptions import WorkflowException
 from .job import Job
 from .logs import Audit, get_audit
 from .params import Param
-from .result import FAILED, SKIP, SUCCESS, WAIT, Result
+from .result import CANCEL, FAILED, SKIP, SUCCESS, WAIT, Result
 from .reusables import has_template, param2template
 from .utils import (
     clear_tz,
@@ -928,8 +928,7 @@ class Workflow(BaseModel):
 
         :rtype: Result
         """
-        if result is None:  # pragma: no cov
-            result: Result = Result(run_id=gen_id(self.name, unique=True))
+        result: Result = result or Result(run_id=gen_id(self.name, unique=True))
 
         # VALIDATE: check a job ID that exists in this workflow or not.
         if job_id not in self.jobs:
@@ -944,27 +943,25 @@ class Workflow(BaseModel):
             job.set_outputs(output={"skipped": True}, to=params)
             return result.catch(status=SKIP, context=params)
 
-        if event and event.is_set():  # pragma: no cov
-            raise WorkflowException(
-                "Workflow job was canceled from event that had set before "
-                "job execution."
+        if event and event.is_set():
+            return result.catch(
+                status=CANCEL,
+                context={
+                    "errors": WorkflowException(
+                        "Workflow job was canceled from event that had set "
+                        "before job execution."
+                    ).to_dict(),
+                },
             )
 
-        try:
-            result.trace.info(f"[WORKFLOW]: Execute Job: {job_id!r}")
-            rs: Result = job.execute(
-                params=params,
-                run_id=result.run_id,
-                parent_run_id=result.parent_run_id,
-                event=event,
-            )
-            job.set_outputs(rs.context, to=params)
-        except JobException as e:
-            result.trace.error(f"[WORKFLOW]: {e.__class__.__name__}: {e}")
-            raise WorkflowException(
-                f"Job {job_id!r} raise {e.__class__.__name__}: {e}"
-            ) from None
-
+        result.trace.info(f"[WORKFLOW]: Execute Job: {job_id!r}")
+        rs: Result = job.execute(
+            params=params,
+            run_id=result.run_id,
+            parent_run_id=result.parent_run_id,
+            event=event,
+        )
+        job.set_outputs(rs.context, to=params)
         if rs.status == FAILED:
             error_msg: str = f"Workflow job, {job.id!r}, return FAILED status."
             return result.catch(
@@ -1110,14 +1107,6 @@ class Workflow(BaseModel):
                     )
                     time.sleep(0.025)
                 elif (future := futures.pop(0)).done() or future.cancelled():
-                    if e := future.exception():
-                        result.trace.error(f"[WORKFLOW]: Error Handler: {e}")
-                        return result.catch(
-                            status=FAILED,
-                            context={
-                                "errors": WorkflowException(str(e)).to_dict()
-                            },
-                        )
                     job_queue.put(job_id)
                 elif future.running() or "state=pending" in str(future):
                     time.sleep(0.075)
@@ -1137,16 +1126,7 @@ class Workflow(BaseModel):
             if not_timeout_flag:
                 job_queue.join()
                 for future in as_completed(futures):
-                    try:
-                        future.result()
-                    except WorkflowException as e:
-                        result.trace.error(f"[WORKFLOW]: Error Handler: {e}")
-                        return result.catch(
-                            status=FAILED,
-                            context={
-                                "errors": WorkflowException(str(e)).to_dict()
-                            },
-                        )
+                    future.result()
                 return result.catch(
                     status=FAILED if "errors" in result.context else SUCCESS,
                     context=context,

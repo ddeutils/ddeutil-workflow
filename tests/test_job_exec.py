@@ -1,4 +1,3 @@
-import pytest
 from ddeutil.workflow import Job, Workflow
 from ddeutil.workflow.result import FAILED, Result
 
@@ -279,6 +278,11 @@ def test_job_exec_runs_on_not_implement():
         "wf-run-python-raise-for-job",
         extras={"stage_raise_error": True},
     ).job("job-fail-runs-on")
-
-    with pytest.raises(NotImplementedError):
-        job.execute({})
+    rs: Result = job.execute({})
+    assert rs.status == FAILED
+    assert rs.context == {
+        "errors": {
+            "message": "Execute runs-on type: 'self_hosted' does not support yet.",
+            "name": "JobException",
+        }
+    }

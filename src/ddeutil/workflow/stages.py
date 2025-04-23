@@ -1069,7 +1069,6 @@ class TriggerStage(BaseStage):
 
         :rtype: Result
         """
-        from .exceptions import WorkflowException
         from .workflow import Workflow
 
         result: Result = result or Result(
@@ -1079,18 +1078,14 @@ class TriggerStage(BaseStage):
 
         _trigger: str = param2template(self.trigger, params, extras=self.extras)
         result.trace.info(f"[STAGE]: Execute Trigger-Stage: {_trigger!r}")
-        try:
-            rs: Result = Workflow.from_conf(
-                name=_trigger,
-                extras=self.extras | {"stage_raise_error": True},
-            ).execute(
-                params=param2template(self.params, params, extras=self.extras),
-                parent_run_id=result.run_id,
-                event=event,
-            )
-        except WorkflowException as e:
-            raise StageException("Trigger workflow stage was failed") from e
-
+        rs: Result = Workflow.from_conf(
+            name=_trigger,
+            extras=self.extras | {"stage_raise_error": True},
+        ).execute(
+            params=param2template(self.params, params, extras=self.extras),
+            parent_run_id=result.run_id,
+            event=event,
+        )
         if rs.status == FAILED:
             err_msg: str | None = (
                 f" with:\n{msg}"

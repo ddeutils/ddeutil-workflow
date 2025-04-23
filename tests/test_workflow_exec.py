@@ -1,6 +1,8 @@
 import shutil
+from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime
 from textwrap import dedent
+from threading import Event
 from unittest import mock
 
 from ddeutil.core import getdot
@@ -46,6 +48,40 @@ def test_workflow_exec_raise_timeout():
     rs: Result = workflow.execute(params={}, timeout=1, max_job_parallel=1)
     assert rs.status == FAILED
     assert rs.context["errors"]["message"] == "'demo-workflow' was timeout."
+
+
+def test_workflow_exec_raise_event_set():
+    job: Job = Job(
+        stages=[{"name": "Echo Last Stage", "echo": "the last stage"}],
+    )
+    workflow: Workflow = Workflow(
+        name="demo-workflow",
+        jobs={"sleep-run": job, "sleep-again-run": job},
+    )
+    event = Event()
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future: Future = executor.submit(
+            workflow.execute,
+            params={},
+            timeout=1,
+            event=event,
+            max_job_parallel=1,
+        )
+        event.set()
+
+    rs: Result = future.result()
+    assert rs.status == FAILED
+    assert rs.context == {
+        "errors": {
+            "name": "WorkflowException",
+            "message": (
+                "Workflow job was canceled from event that had set before job "
+                "execution."
+            ),
+        },
+        "jobs": {},
+        "params": {},
+    }
 
 
 def test_workflow_exec_py():

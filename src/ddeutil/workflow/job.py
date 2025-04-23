@@ -621,9 +621,6 @@ class Job(BaseModel):
         :param event: (Event) An Event manager instance that use to cancel this
             execution if it forces stopped by parent execution.
 
-        :raise NotImplementedError: If the `runs-on` value does not implement on
-            this execution.
-
         :rtype: Result
         """
         result: Result = Result.construct_with_rs_or_id(
@@ -657,14 +654,18 @@ class Job(BaseModel):
                 event=event,
             )
 
-        # pragma: no cov
         result.trace.error(
             f"[JOB]: Execute not support runs-on: {self.runs_on.type.value!r} "
             f"yet."
         )
-        raise NotImplementedError(
-            f"Execute runs-on type: {self.runs_on.type.value!r} does not "
-            f"support yet."
+        return result.catch(
+            status=FAILED,
+            context={
+                "errors": JobException(
+                    f"Execute runs-on type: {self.runs_on.type.value!r} does "
+                    f"not support yet."
+                ).to_dict(),
+            },
         )
 
 

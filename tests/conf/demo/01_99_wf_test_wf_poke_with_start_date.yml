@@ -1,0 +1,10 @@
+tmp-wf-scheduling-with-name:
+  type: Workflow
+  on:
+    - 'every_minute_bkk'
+  params: {name: str}
+  jobs:
+    first-job:
+      stages:
+        - name: "Hello stage"
+          echo: "Hello ${{ params.name | title }}"
