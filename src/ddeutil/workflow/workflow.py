@@ -236,14 +236,17 @@ class ReleaseQueue:
 
         :rtype: Self
         """
-        with self.lock:
-            heappush(self.complete, value)
+        # NOTE: Remove complete queue on workflow that keep more than the
+        #   maximum config value.
+        num_complete_delete: int = len(self.complete) - dynamic(
+            "max_queue_complete_hist", extras=self.extras
+        )
 
-            # NOTE: Remove complete queue on workflow that keep more than the
-            #   maximum config value.
-            num_complete_delete: int = len(self.complete) - dynamic(
-                "max_queue_complete_hist", extras=self.extras
-            )
+        with self.lock:
+            if value in self.running:
+                self.running.remove(value)
+
+            heappush(self.complete, value)
 
             if num_complete_delete > 0:
                 for _ in range(num_complete_delete):
@@ -659,7 +662,6 @@ class Workflow(BaseModel):
                     "logical_date": release.date,
                     "execute_date": datetime.now(tz=tz),
                     "run_id": result.run_id,
-                    "timezone": str(tz),
                 }
             },
             extras=self.extras,
@@ -688,8 +690,6 @@ class Workflow(BaseModel):
         )
 
         if queue:
-            if release in queue.running:
-                queue.running.remove(release)
             queue.mark_complete(release)
 
         return result.catch(
@@ -699,7 +699,6 @@ class Workflow(BaseModel):
                 "release": {
                     "type": release.type,
                     "logical_date": release.date,
-                    "release": release,
                 },
                 **{"jobs": result.context.pop("jobs", {})},
                 **(
