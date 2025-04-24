@@ -36,6 +36,93 @@ Stage       --> {
                 }
 ```
 
+## Stage
+
+A stage context is the minimum standard context for this package. I will explain
+context execution that return from `execute` and `handler_execute`
+methods can be any custom output with its stage.
+
+### Input Template Params
+
+The template parameter that want to use on stage will can be
+
+- `${{ stages.<stage-id>.outputs.<result> }}`
+- `${{ stages.<stage-id>.errors?.name }}`
+
+Job reference if it has any job running finish before.
+
+- `${{ jobs.<job-id>.stages.<stage-id>.outputs.<result> }}`
+- `${{ jobs.<job-id>.strategies.<strategy-id>.stages.<stage-id>.errors?.name }}`
+
+### Execution Output
+
+The result from execution method should be.
+
+=== "SUCCESS"
+
+    ```python
+    {
+      "result": 100
+    }
+    ```
+
+=== "FAILED/CANCEL"
+
+    ```python
+    {
+      "errors": {
+        "name": "error-class-name",
+        "message": "error-message"
+      }
+    }
+    ```
+
+For nested stage, it can return `SKIP` status.
+
+```python
+{
+  "skipped": True
+}
+```
+
+!!! note
+
+    This step can raise any error by custom excution. It does not raise only
+    `StageExcepton`.
+
+### Set Output
+
+A context that return from `set_outputs` method.
+
+if a `to` argument that pass to this method be;
+
+```json
+{
+  "params": {"key":  "value"}
+}
+```
+
+it will return result be;
+
+```json
+{
+  "params": {"key": "value"},
+  "stages": {
+    "<stage-id>": {
+      "outputs": {"result": "100"},
+      "errors": {
+        "name": "class-name",
+        "message": "error-message"
+      }
+    }
+  }
+}
+```
+
+!!! note
+
+    The main key from stage setting output method are `outputs` and `errors`.
+
 ## Workflow
 
 A workflow execution context that return from the `execute` method.
@@ -99,69 +186,3 @@ If the job does not set strategy matrix;
   }
 }
 ```
-
-
-## Stage
-
-A stage context execution that return from `execute` and `handler_execute`
-methods can be any custom output with its stage.
-
-```json
-{
-  "result": 100
-}
-```
-
-With error;
-
-```json
-{
-  "errors": {
-    "name": "class-name",
-    "message": "error-message"
-  }
-}
-```
-
-### Set Output
-
-A context that return from `set_outputs` method.
-
-if a `to` argument that pass to this method be;
-
-```json
-{
-  "params": {"key":  "value"}
-}
-```
-
-it will return result be;
-
-```json
-{
-  "params": {"key": "value"},
-  "stages": {
-    "<stage-id>": {
-      "outputs": {"result": "100"},
-      "errors": {
-        "name": "class-name",
-        "message": "error-message"
-      }
-    }
-  }
-}
-```
-
-!!! note
-
-    The main key from stage setting output method are `outputs` and `errors`.
-
-The template parameter that want to use on stage will can be
-
-- `${{ stages.<stage-id>.outputs.<result> }}`
-- `${{ stages.<stage-id>.errors?.name }}`
-
-Job reference if it has any job running finish before.
-
-- `${{ jobs.<job-id>.stages.<stage-id>.outputs.<result> }}`
-- `${{ jobs.<job-id>.strategies.<strategy-id>.stages.<stage-id>.errors?.name }}`
