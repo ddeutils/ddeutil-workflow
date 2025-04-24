@@ -649,46 +649,48 @@ def test_stage_exec_foreach_with_trigger(test_path):
 
         stage: Stage = workflow.job("first-job").stage("foreach-raise")
         rs = stage.set_outputs(stage.handler_execute({}).context, to={})
-        assert rs == {
-            "stages": {
-                "foreach-raise": {
-                    "outputs": {
-                        "items": [1, 2],
-                        "foreach": {
-                            1: {
-                                "item": 1,
-                                "stages": {},
-                                "errors": {
-                                    "name": "StageException",
-                                    "message": (
-                                        "Trigger workflow return failed status with:\n"
-                                        "Workflow job, 'first-job', return FAILED status."
-                                    ),
-                                },
-                            },
-                            2: {
-                                "item": 2,
-                                "stages": {},
-                                "errors": {
-                                    "name": "StageException",
-                                    "message": (
-                                        "Trigger workflow return failed status with:\n"
-                                        "Workflow job was canceled from event that had set before job execution."
-                                    ),
-                                },
-                            },
-                        },
-                    },
+        assert rs["stages"]["foreach-raise"]["outputs"] == {
+            "items": [1, 2],
+            "foreach": {
+                1: {
+                    "item": 1,
+                    "stages": {},
                     "errors": {
                         "name": "StageException",
                         "message": (
                             "Trigger workflow return failed status with:\n"
-                            "Workflow job, 'first-job', return FAILED status."
+                            "Job, 'first-job', return `FAILED` status."
                         ),
                     },
-                }
-            }
+                },
+                2: {
+                    "item": 2,
+                    "stages": {},
+                    "errors": {
+                        "name": "StageException",
+                        "message": (
+                            "Trigger workflow return failed status with:\n"
+                            "Workflow job was canceled because event was set."
+                        ),
+                    },
+                },
+            },
         }
+        assert len(rs["stages"]["foreach-raise"]["errors"]) == 2
+        assert {
+            "name": "StageException",
+            "message": (
+                "Trigger workflow return failed status with:\n"
+                "Workflow job was canceled because event was set."
+            ),
+        } in rs["stages"]["foreach-raise"]["errors"]
+        assert {
+            "name": "StageException",
+            "message": (
+                "Trigger workflow return failed status with:\n"
+                "Job, 'first-job', return `FAILED` status."
+            ),
+        } in rs["stages"]["foreach-raise"]["errors"]
 
 
 def test_stage_exec_multi_foreach_nested_with_trigger(test_path):

@@ -40,6 +40,7 @@ from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Iterator
 from concurrent.futures import (
     FIRST_EXCEPTION,
+    CancelledError,
     Future,
     ThreadPoolExecutor,
     as_completed,
@@ -1456,10 +1457,9 @@ class ForEachStage(BaseStage):
 
             if event and event.is_set():  # pragma: no cov
                 error_msg: str = (
-                    "Item-Stage was canceled from event that had set before "
-                    "stage item execution."
+                    "Item-Stage was canceled because event was set."
                 )
-                return result.catch(
+                result.catch(
                     status=CANCEL,
                     foreach={
                         item: {
@@ -1469,6 +1469,7 @@ class ForEachStage(BaseStage):
                         }
                     },
                 )
+                raise StageException(error_msg)
 
             try:
                 rs: Result = stage.handler_execute(
@@ -1587,22 +1588,33 @@ class ForEachStage(BaseStage):
             done, not_done = wait(futures, return_when=FIRST_EXCEPTION)
             if len(done) != len(futures):
                 result.trace.warning(
-                    "[STAGE]: Set event for stop pending stage future."
+                    "[STAGE]: Set event for stop pending for-each stage."
                 )
                 event.set()
                 for future in not_done:
                     future.cancel()
+                time.sleep(0.075)
 
                 nd: str = f", item not run: {not_done}" if not_done else ""
-                result.trace.debug(f"[STAGE]: ... Foreach set Fail-Fast{nd}")
+                result.trace.debug(
+                    f"[STAGE]: ... Foreach-Stage set failed event{nd}"
+                )
+                done: list[Future] = as_completed(futures)
 
             for future in done:
                 try:
                     future.result()
                 except StageException as e:
                     status = FAILED
-                    result.trace.error(f"[STAGE]: {e.__class__.__name__}: {e}")
-                    context.update({"errors": e.to_dict()})
+                    result.trace.error(
+                        f"[STAGE]: Error Handler:||{e.__class__.__name__}:||{e}"
+                    )
+                    if "errors" in context:
+                        context["errors"].append(e.to_dict())
+                    else:
+                        context["errors"] = [e.to_dict()]
+                except CancelledError:
+                    pass
         return result.catch(status=status, context=context)
 
 

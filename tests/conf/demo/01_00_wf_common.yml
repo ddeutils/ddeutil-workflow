@@ -260,7 +260,7 @@ wf-run-python-raise-for-job:
         fail-fast: True
         max-parallel: 2
         matrix:
-          sleep: [ '1', '4' ]
+          sleep: [ '1', '4', '2', '3', '5']
       stages:
         - name: Python Sleep
           run: |

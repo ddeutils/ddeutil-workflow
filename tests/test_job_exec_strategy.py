@@ -67,7 +67,7 @@ def test_job_exec_strategy_catch_stage_error():
                 "name": "JobException",
                 "message": (
                     "Strategy break because stage, 'raise-error', return "
-                    "FAILED status."
+                    "`FAILED` status."
                 ),
             },
         },
@@ -103,20 +103,20 @@ def test_job_exec_strategy_event_set():
         "second-job"
     )
     event = Event()
+    rs = Result()
     with ThreadPoolExecutor(max_workers=1) as executor:
         future: Future = executor.submit(
-            local_execute_strategy, job, {}, {}, event=event
+            local_execute_strategy, job, {}, {}, result=rs, event=event
         )
         event.set()
 
-    rs: Result = future.result()
+    with pytest.raises(JobException):
+        future.result()
+
     assert rs.status == CANCEL
     assert rs.context["EMPTY"]["errors"] == {
         "name": "JobException",
-        "message": (
-            "Job strategy was canceled from event that had set before "
-            "job strategy execution."
-        ),
+        "message": "Job strategy was canceled because event was set.",
     }
 
 

@@ -1,6 +1,4 @@
-import pytest
 from ddeutil.workflow import Workflow
-from ddeutil.workflow.exceptions import WorkflowException
 from ddeutil.workflow.job import Job
 from ddeutil.workflow.result import FAILED, Result
 
@@ -20,7 +18,7 @@ def test_workflow_execute_job():
         ],
     )
     workflow: Workflow = Workflow(name="workflow", jobs={"demo-run": job})
-    rs: Result = workflow.execute_job(job_id="demo-run", params={})
+    rs: Result = workflow.execute_job(job=workflow.job("demo-run"), params={})
     assert rs.context == {
         "jobs": {
             "demo-run": {
@@ -41,35 +39,25 @@ def test_workflow_execute_job_raise_inside():
     )
     workflow: Workflow = Workflow(name="workflow", jobs={"demo-run": job})
 
-    # NOTE: Raise if execute not exist job's ID.
-    with pytest.raises(WorkflowException):
-        workflow.execute_job(
-            job_id="not-found-job",
-            params={
-                "author-run": "Local Workflow",
-                "run-date": "2024-01-01",
-            },
-        )
-
-    rs: Result = workflow.execute_job(job_id="demo-run", params={})
+    rs: Result = workflow.execute_job(job=workflow.job("demo-run"), params={})
     assert rs.status == FAILED
     assert rs.context == {
         "errors": {
             "name": "WorkflowException",
-            "message": "Workflow job, 'demo-run', return FAILED status.",
+            "message": "Job, 'demo-run', return `FAILED` status.",
         },
         "jobs": {
             "demo-run": {
+                "stages": {},
                 "errors": [
                     {
                         "name": "JobException",
                         "message": (
-                            "Stage raise: StageException: PyStage: "
+                            "Handler Error: StageException: PyStage: "
                             "NotImplementedError: "
                         ),
                     }
                 ],
-                "stages": {},
             },
         },
     }

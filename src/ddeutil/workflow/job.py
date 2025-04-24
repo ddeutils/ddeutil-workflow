@@ -18,8 +18,10 @@ method.
 from __future__ import annotations
 
 import copy
+import time
 from concurrent.futures import (
     FIRST_EXCEPTION,
+    CancelledError,
     Future,
     ThreadPoolExecutor,
     as_completed,
@@ -697,6 +699,7 @@ def local_execute_strategy(
     :param event: (Event) An Event manager instance that use to cancel this
         execution if it forces stopped by parent execution.
 
+    :raise JobException: If event was set.
     :raise JobException: If stage execution raise any error as `StageException`.
     :raise JobException: If the result from execution has status equal `FAILED`.
 
@@ -727,7 +730,7 @@ def local_execute_strategy(
 
         if event and event.is_set():
             error_msg: str = "Job strategy was canceled because event was set."
-            return result.catch(
+            result.catch(
                 status=CANCEL,
                 context={
                     strategy_id: {
@@ -737,6 +740,7 @@ def local_execute_strategy(
                     },
                 },
             )
+            raise JobException(error_msg)
 
         try:
             result.trace.info(f"[JOB]: Execute Stage: {stage.iden!r}")
@@ -874,14 +878,16 @@ def local_execute(
             done, not_done = wait(futures, return_when=FIRST_EXCEPTION)
             if len(done) != len(futures):
                 result.trace.warning(
-                    "[JOB]: Get first exception and set event."
+                    "[JOB]: Handler Fail-Fast: Got exception and set event."
                 )
                 event.set()
                 for future in not_done:
                     future.cancel()
+                time.sleep(0.075)
 
             nd: str = f", strategies not run: {not_done}" if not_done else ""
             result.trace.debug(f"[JOB]: ... Job was set Fail-Fast{nd}")
+            done: list[Future] = as_completed(futures)
 
         for future in done:
             try:
@@ -895,6 +901,8 @@ def local_execute(
                     context["errors"].append(e.to_dict())
                 else:
                     context["errors"] = [e.to_dict()]
+            except CancelledError:
+                pass
     return result.catch(status=status, context=context)
 
 

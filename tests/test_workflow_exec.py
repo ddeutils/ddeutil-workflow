@@ -74,10 +74,7 @@ def test_workflow_exec_raise_event_set():
     assert rs.context == {
         "errors": {
             "name": "WorkflowException",
-            "message": (
-                "Workflow job was canceled from event that had set before job "
-                "execution."
-            ),
+            "message": "Workflow job was canceled because event was set.",
         },
         "jobs": {},
         "params": {},
@@ -162,13 +159,12 @@ def test_workflow_exec_parallel_timeout():
         "jobs": {
             "sleep-run": {
                 "stages": {"7972360640": {"outputs": {}}},
-                "errors": {
-                    "name": "JobException",
-                    "message": (
-                        "Job strategy was canceled from event that had set "
-                        "before job strategy execution."
-                    ),
-                },
+                "errors": [
+                    {
+                        "name": "JobException",
+                        "message": "Job strategy was canceled because event was set.",
+                    },
+                ],
             },
         },
         "errors": {
@@ -235,7 +231,7 @@ def test_workflow_exec_py_raise():
     assert rs.context == {
         "errors": {
             "name": "WorkflowException",
-            "message": "Workflow job, 'first-job', return FAILED status.",
+            "message": "Job, 'first-job', return `FAILED` status.",
         },
         "params": {},
         "jobs": {
@@ -244,7 +240,7 @@ def test_workflow_exec_py_raise():
                     {
                         "name": "JobException",
                         "message": (
-                            "Stage raise: StageException: PyStage: "
+                            "Handler Error: StageException: PyStage: "
                             "ValueError: Testing raise error inside PyStage!!!"
                         ),
                     }
@@ -264,7 +260,7 @@ def test_workflow_exec_py_raise_parallel():
     assert rs.context == {
         "errors": {
             "name": "WorkflowException",
-            "message": "Workflow job, 'first-job', return FAILED status.",
+            "message": "Job, 'first-job', return `FAILED` status.",
         },
         "params": {},
         "jobs": {
@@ -273,7 +269,7 @@ def test_workflow_exec_py_raise_parallel():
                     {
                         "name": "JobException",
                         "message": (
-                            "Stage raise: StageException: PyStage: "
+                            "Handler Error: StageException: PyStage: "
                             "ValueError: Testing raise error inside PyStage!!!"
                         ),
                     }
@@ -877,14 +873,14 @@ def test_workflow_exec_raise_param(test_path):
                             "name": "JobException",
                             "message": (
                                 "Strategy break because stage, 'get-param', "
-                                "return FAILED status."
+                                "return `FAILED` status."
                             ),
                         },
                     ],
                 }
             },
             "errors": {
-                "message": "Workflow job, 'start-job', return FAILED status.",
+                "message": "Job, 'start-job', return `FAILED` status.",
                 "name": "WorkflowException",
             },
         }
@@ -941,7 +937,7 @@ def test_workflow_exec_raise_job_trigger(test_path):
                             "name": "JobException",
                             "message": (
                                 "Strategy break because stage, 'get-param', "
-                                "return FAILED status."
+                                "return `FAILED` status."
                             ),
                         },
                     ],

@@ -904,7 +904,7 @@ class Workflow(BaseModel):
 
     def execute_job(
         self,
-        job_id: str,
+        job: Job,
         params: DictData,
         *,
         result: Result | None = None,
@@ -917,10 +917,9 @@ class Workflow(BaseModel):
         model. It different with `self.execute` because this method run only
         one job and return with context of this job data.
 
-        :raise WorkflowException: If execute with not exist job's ID.
         :raise WorkflowException: If the job execution raise JobException.
 
-        :param job_id: A job ID.
+        :param job: (Job) A job model that want to execute.
         :param params: (DictData) A parameter data.
         :param result: (Result) A Result instance for return context and status.
         :param event: (Event) An Event manager instance that use to cancel this
@@ -930,16 +929,8 @@ class Workflow(BaseModel):
         """
         result: Result = result or Result(run_id=gen_id(self.name, unique=True))
 
-        # VALIDATE: check a job ID that exists in this workflow or not.
-        if job_id not in self.jobs:
-            raise WorkflowException(
-                f"The job: {job_id!r} does not exists in {self.name!r} "
-                f"workflow."
-            )
-
-        job: Job = self.job(name=job_id)
         if job.is_skipped(params=params):
-            result.trace.info(f"[WORKFLOW]: Skip job: {job_id!r}")
+            result.trace.info(f"[WORKFLOW]: Skip Job: {job.id!r}")
             job.set_outputs(output={"skipped": True}, to=params)
             return result.catch(status=SKIP, context=params)
 
@@ -948,13 +939,12 @@ class Workflow(BaseModel):
                 status=CANCEL,
                 context={
                     "errors": WorkflowException(
-                        "Workflow job was canceled from event that had set "
-                        "before job execution."
+                        "Workflow job was canceled because event was set."
                     ).to_dict(),
                 },
             )
 
-        result.trace.info(f"[WORKFLOW]: Execute Job: {job_id!r}")
+        result.trace.info(f"[WORKFLOW]: Execute Job: {job.id!r}")
         rs: Result = job.execute(
             params=params,
             run_id=result.run_id,
@@ -962,10 +952,12 @@ class Workflow(BaseModel):
             event=event,
         )
         job.set_outputs(rs.context, to=params)
-        if rs.status == FAILED:
-            error_msg: str = f"Workflow job, {job.id!r}, return FAILED status."
+        if rs.status in (FAILED, CANCEL):
+            error_msg: str = (
+                f"Job, {job.id!r}, return `{rs.status.name}` status."
+            )
             return result.catch(
-                status=FAILED,
+                status=rs.status,
                 context={
                     "errors": WorkflowException(error_msg).to_dict(),
                     **params,
@@ -1086,7 +1078,7 @@ class Workflow(BaseModel):
                     futures.append(
                         executor.submit(
                             self.execute_job,
-                            job_id=job_id,
+                            job=job,
                             params=context,
                             result=result,
                             event=event,
@@ -1099,7 +1091,7 @@ class Workflow(BaseModel):
                     futures.append(
                         executor.submit(
                             self.execute_job,
-                            job_id=job_id,
+                            job=job,
                             params=context,
                             result=result,
                             event=event,
