@@ -37,4 +37,5 @@ async def test_empty_stage_axec():
 @pytest.mark.asyncio
 async def test_bash_stage_axec():
     stage: BashStage = BashStage(name="Bash Stage", bash='echo "Hello World"')
-    _ = stage
+    rs: Result = await stage.handler_axecute(params={})
+    assert rs.status == SUCCESS

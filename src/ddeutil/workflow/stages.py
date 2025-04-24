@@ -15,11 +15,11 @@ have a lot of use-case, and it should does not worry about it error output.
     So, I will create `handler_execute` for any exception class that raise from
 the stage execution method.
 
-    Execution   --> Ok      ---( handler )--> Result with `SUCCESS` or `CANCEL`
-
-                --> Error   ┬--( handler )-> Result with `FAILED` (Set `raise_error` flag)
+    Execution   --> Ok      ┬--( handler )--> Result with `SUCCESS` or `CANCEL`
                             |
-                            ╰--( handler )-> Raise StageException(...)
+                            ╰--( handler )--> Result with `FAILED` (Set `raise_error` flag)
+
+                --> Error   ---( handler )--> Raise StageException(...)
 
     On the context I/O that pass to a stage object at execute process. The
 execute method receives a `params={"params": {...}}` value for passing template
@@ -171,17 +171,23 @@ class BaseStage(BaseModel, ABC):
 
             This stage exception handler still use ok-error concept, but it
         allows you force catching an output result with error message by
-        specific environment variable,`WORKFLOW_CORE_STAGE_RAISE_ERROR`.
+        specific environment variable,`WORKFLOW_CORE_STAGE_RAISE_ERROR` or set
+        `raise_error` parameter to True.
 
             Execution   --> Ok      --> Result
                                         |-status: SUCCESS
                                         ╰-context:
                                             ╰-outputs: ...
 
-                        --> Error   --> Result (if `raise_error` was set)
+                        --> Ok      --> Result
+                                        |-status: CANCEL
+                                        ╰-errors:
+                                            |-name: ...
+                                            ╰-message: ...
+
+                        --> Ok      --> Result (if `raise_error` was set)
                                         |-status: FAILED
                                         ╰-errors:
-                                            |-class: ...
                                             |-name: ...
                                             ╰-message: ...
 
@@ -552,7 +558,7 @@ class EmptyStage(BaseAsyncStage):
         return result.catch(status=SUCCESS)
 
 
-class BashStage(BaseStage):
+class BashStage(BaseAsyncStage):
     """Bash stage executor that execute bash script on the current OS.
     If your current OS is Windows, it will run on the bash from the current WSL.
     It will use `bash` for Windows OS and use `sh` for Linux OS.
@@ -588,7 +594,16 @@ class BashStage(BaseStage):
     @contextlib.asynccontextmanager
     async def acreate_sh_file(
         self, bash: str, env: DictStr, run_id: str | None = None
-    ) -> AsyncIterator:  # pragma: no cov
+    ) -> AsyncIterator[TupleStr]:
+        """Async create and write `.sh` file with the `aiofiles` package.
+
+        :param bash: (str) A bash statement.
+        :param env: (DictStr) An environment variable that set before run bash.
+        :param run_id: (str | None) A running stage ID that use for writing sh
+            file instead generate by UUID4.
+
+        :rtype: AsyncIterator[TupleStr]
+        """
         import aiofiles
 
         f_name: str = f"{run_id or uuid.uuid4()}.sh"
@@ -607,7 +622,7 @@ class BashStage(BaseStage):
         # NOTE: Make this .sh file able to executable.
         make_exec(f"./{f_name}")
 
-        yield [f_shebang, f_name]
+        yield f_shebang, f_name
 
         # Note: Remove .sh file that use to run bash.
         Path(f"./{f_name}").unlink()
@@ -616,9 +631,8 @@ class BashStage(BaseStage):
     def create_sh_file(
         self, bash: str, env: DictStr, run_id: str | None = None
     ) -> Iterator[TupleStr]:
-        """Return context of prepared bash statement that want to execute. This
-        step will write the `.sh` file before giving this file name to context.
-        After that, it will auto delete this file automatic.
+        """Create and write the `.sh` file before giving this file name to
+        context. After that, it will auto delete this file automatic.
 
         :param bash: (str) A bash statement.
         :param env: (DictStr) An environment variable that set before run bash.
@@ -626,6 +640,7 @@ class BashStage(BaseStage):
             file instead generate by UUID4.
 
         :rtype: Iterator[TupleStr]
+        :return: Return context of prepared bash statement that want to execute.
         """
         f_name: str = f"{run_id or uuid.uuid4()}.sh"
         f_shebang: str = "bash" if sys.platform.startswith("win") else "sh"
@@ -643,7 +658,7 @@ class BashStage(BaseStage):
         # NOTE: Make this .sh file able to executable.
         make_exec(f"./{f_name}")
 
-        yield [f_shebang, f_name]
+        yield f_shebang, f_name
 
         # Note: Remove .sh file that use to run bash.
         Path(f"./{f_name}").unlink()
@@ -683,6 +698,62 @@ class BashStage(BaseStage):
             run_id=result.run_id,
         ) as sh:
             result.trace.debug(f"[STAGE] ... Create `{sh[1]}` file.")
+            rs: CompletedProcess = subprocess.run(
+                sh, shell=False, capture_output=True, text=True
+            )
+
+        if rs.returncode > 0:
+            # NOTE: Prepare stderr message that returning from subprocess.
+            e: str = (
+                rs.stderr.encode("utf-8").decode("utf-16")
+                if "\\x00" in rs.stderr
+                else rs.stderr
+            ).removesuffix("\n")
+            raise StageException(
+                f"Subprocess: {e}\n---( statement )---\n"
+                f"```bash\n{bash}\n```"
+            )
+        return result.catch(
+            status=SUCCESS,
+            context={
+                "return_code": rs.returncode,
+                "stdout": None if (out := rs.stdout.strip("\n")) == "" else out,
+                "stderr": None if (out := rs.stderr.strip("\n")) == "" else out,
+            },
+        )
+
+    async def axecute(
+        self,
+        params: DictData,
+        *,
+        result: Result | None = None,
+        event: Event | None = None,
+    ) -> Result:
+        """Async execution method for this Bash stage that only logging out to
+        stdout.
+
+        :param params: (DictData) A parameter data.
+        :param result: (Result) A Result instance for return context and status.
+        :param event: (Event) An Event manager instance that use to cancel this
+            execution if it forces stopped by parent execution.
+
+        :rtype: Result
+        """
+        result: Result = result or Result(
+            run_id=gen_id(self.name + (self.id or ""), unique=True),
+            extras=self.extras,
+        )
+        await result.trace.ainfo(f"[STAGE]: Execute Shell-Stage: {self.name}")
+        bash: str = param2template(
+            dedent(self.bash.strip("\n")), params, extras=self.extras
+        )
+
+        async with self.acreate_sh_file(
+            bash=bash,
+            env=param2template(self.env, params, extras=self.extras),
+            run_id=result.run_id,
+        ) as sh:
+            await result.trace.adebug(f"[STAGE] ... Create `{sh[1]}` file.")
             rs: CompletedProcess = subprocess.run(
                 sh, shell=False, capture_output=True, text=True
             )

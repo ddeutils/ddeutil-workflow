@@ -77,11 +77,16 @@ The result from execution method should be.
     }
     ```
 
-For nested stage, it can return `SKIP` status.
+For nested stage, it can return skipped output with `SUCCESS` status,
+but it will keep in nested-stage ID instead parent output.
 
 ```python
 {
-  "skipped": True
+    "stages": {
+        "<stage-ID>": {
+            "skipped": True,
+        }
+    }
 }
 ```
 
