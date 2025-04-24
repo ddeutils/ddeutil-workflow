@@ -626,7 +626,7 @@ class Job(BaseModel):
         result: Result = Result.construct_with_rs_or_id(
             run_id=run_id,
             parent_run_id=parent_run_id,
-            id_logic=(self.id or "not-set"),
+            id_logic=(self.id or "EMPTY"),
             extras=self.extras,
         )
 
@@ -677,10 +677,10 @@ def local_execute_strategy(
     result: Result | None = None,
     event: Event | None = None,
 ) -> Result:
-    """Local job strategy execution with passing dynamic parameters from the
-    workflow execution to strategy matrix.
+    """Local strategy execution with passing dynamic parameters from the
+    job execution and strategy matrix.
 
-        This execution is the minimum level of execution of this job model.
+        This execution is the minimum level of job execution.
     It different with `self.execute` because this method run only one
     strategy and return with context of this strategy data.
 
@@ -698,16 +698,17 @@ def local_execute_strategy(
         execution if it forces stopped by parent execution.
 
     :raise JobException: If stage execution raise any error as `StageException`.
+    :raise JobException: If the result from execution has status equal `FAILED`.
 
     :rtype: Result
     """
     result: Result = result or Result(
-        run_id=gen_id(job.id or "not-set", unique=True),
+        run_id=gen_id(job.id or "EMPTY", unique=True),
         extras=job.extras,
     )
     if strategy:
         strategy_id: str = gen_id(strategy)
-        result.trace.info(f"[JOB]: Start Strategy: {strategy_id!r}")
+        result.trace.info(f"[JOB]: Execute Strategy: {strategy_id!r}")
         result.trace.info(f"[JOB]: ... matrix: {strategy!r}")
     else:
         strategy_id: str = "EMPTY"
@@ -725,10 +726,7 @@ def local_execute_strategy(
             continue
 
         if event and event.is_set():
-            error_msg: str = (
-                "Job strategy was canceled from event that had set before "
-                "job strategy execution."
-            )
+            error_msg: str = "Job strategy was canceled because event was set."
             return result.catch(
                 status=CANCEL,
                 context={
@@ -761,13 +759,13 @@ def local_execute_strategy(
                 },
             )
             raise JobException(
-                f"Stage raise: {e.__class__.__name__}: {e}"
+                f"Handler Error: {e.__class__.__name__}: {e}"
             ) from e
 
         if rs.status == FAILED:
             error_msg: str = (
-                f"Strategy break because stage, {stage.iden!r}, return FAILED "
-                f"status."
+                f"Strategy break because stage, {stage.iden!r}, return "
+                f"`FAILED` status."
             )
             result.catch(
                 status=FAILED,
@@ -801,7 +799,7 @@ def local_execute(
     event: Event | None = None,
 ) -> Result:
     """Local job execution with passing dynamic parameters from the workflow
-    execution or itself execution. It will generate matrix values at the first
+    execution or directly. It will generate matrix values at the first
     step and run multithread on this metrics to the `stages` field of this job.
 
     Important:
@@ -827,20 +825,20 @@ def local_execute(
     result: Result = Result.construct_with_rs_or_id(
         run_id=run_id,
         parent_run_id=parent_run_id,
-        id_logic=(job.id or "not-set"),
+        id_logic=(job.id or "EMPTY"),
         extras=job.extras,
     )
 
-    event: Event = Event() if event is None else event
+    event: Event = event or Event()
     fail_fast_flag: bool = job.strategy.fail_fast
     ls: str = "Fail-Fast" if fail_fast_flag else "All-Completed"
     workers: int = job.strategy.max_parallel
     result.trace.info(
-        f"[JOB]: {ls}-Execute: {job.id} with {workers} "
+        f"[JOB]: Execute {ls}: {job.id} with {workers} "
         f"worker{'s' if workers > 1 else ''}."
     )
 
-    if event and event.is_set():  # pragma: no cov
+    if event and event.is_set():
         return result.catch(
             status=CANCEL,
             context={
@@ -876,14 +874,14 @@ def local_execute(
             done, not_done = wait(futures, return_when=FIRST_EXCEPTION)
             if len(done) != len(futures):
                 result.trace.warning(
-                    "[JOB]: Set event for stop pending stage future."
+                    "[JOB]: Get first exception and set event."
                 )
                 event.set()
                 for future in not_done:
                     future.cancel()
 
             nd: str = f", strategies not run: {not_done}" if not_done else ""
-            result.trace.debug(f"[JOB]: ... Strategy set Fail-Fast{nd}")
+            result.trace.debug(f"[JOB]: ... Job was set Fail-Fast{nd}")
 
         for future in done:
             try:
@@ -924,7 +922,7 @@ def self_hosted_execute(
     result: Result = Result.construct_with_rs_or_id(
         run_id=run_id,
         parent_run_id=parent_run_id,
-        id_logic=(job.id or "not-set"),
+        id_logic=(job.id or "EMPTY"),
         extras=job.extras,
     )
 
@@ -1000,7 +998,7 @@ def azure_batch_execute(
     result: Result = Result.construct_with_rs_or_id(
         run_id=run_id,
         parent_run_id=parent_run_id,
-        id_logic=(job.id or "not-set"),
+        id_logic=(job.id or "EMPTY"),
         extras=job.extras,
     )
     if event and event.is_set():
@@ -1035,7 +1033,7 @@ def docker_execution(
     result: Result = Result.construct_with_rs_or_id(
         run_id=run_id,
         parent_run_id=parent_run_id,
-        id_logic=(job.id or "not-set"),
+        id_logic=(job.id or "EMPTY"),
         extras=job.extras,
     )
     if event and event.is_set():
