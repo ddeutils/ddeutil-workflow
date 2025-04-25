@@ -6,7 +6,7 @@ from unittest import mock
 from zoneinfo import ZoneInfo
 
 import pytest
-import toml
+import rtoml
 import yaml
 from ddeutil.workflow.conf import Config, FileLoad, config, dynamic
 from ddeutil.workflow.scheduler import Schedule
@@ -35,7 +35,7 @@ def target_path(test_path):
         json.dump({"foo": "bar"}, f)
 
     with (target_p / "test_simple_file.toml").open(mode="w") as f:
-        toml.dump({"foo": "bar"}, f)
+        rtoml.dump({"foo": "bar"}, f)
 
     yield target_p
 
