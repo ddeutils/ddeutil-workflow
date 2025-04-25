@@ -23,13 +23,15 @@ def dummy_task_polars_dir(
     conversion: Optional[dict[str, Any]] = None,
 ) -> dict[str, int]:
     result.trace.info("[CALLER]: el-csv-to-parquet@polars-dir")
-    result.trace.debug("... Start EL for CSV to Parquet with Polars Engine")
-    result.trace.debug(f"... Reading data from {source}")
+    result.trace.debug(
+        "[CALLER]: ... Start EL for CSV to Parquet with Polars Engine"
+    )
+    result.trace.debug(f"[CALLER]: ... Reading data from {source}")
 
     conversion: dict[str, Any] = conversion or {}
     if conversion:
-        result.trace.debug("... Start Schema Conversion ...")
-    result.trace.debug(f"... Writing data to {sink}")
+        result.trace.debug("[CALLER]: ... Start Schema Conversion ...")
+    result.trace.debug(f"[CALLER]: ... Writing data to {sink}")
     return {"records": 1}
 
 
@@ -41,14 +43,16 @@ async def dummy_async_task_polars_dir(
     conversion: dict[str, Any] | None = None,
 ) -> dict[str, int]:
     result.trace.info("[CALLER]: async-el-csv-to-parquet@polars-dir")
-    result.trace.debug("... Start EL for CSV to Parquet with Polars Engine")
-    result.trace.debug(f"... Reading data from {source}")
+    result.trace.debug(
+        "[CALLER]: ... Start EL for CSV to Parquet with Polars Engine"
+    )
+    result.trace.debug(f"[CALLER]: ... Reading data from {source}")
 
     await asyncio.sleep(0.1)
     conversion: dict[str, Any] = conversion or {}
     if conversion:
-        result.trace.debug("... Start Schema Conversion ...")
-    result.trace.debug(f"... Writing data to {sink}")
+        result.trace.debug("[CALLER]: ... Start Schema Conversion ...")
+    result.trace.debug(f"[CALLER]: ... Writing data to {sink}")
     return {"records": 1}
 
 
@@ -60,14 +64,16 @@ def dummy_task_polars_dir_scan(
     conversion: Optional[dict[str, Any]] | None = None,
 ) -> dict[str, int]:
     result.trace.info("[CALLER]: el-csv-to-parquet@polars-dir-scan")
-    result.trace.debug("... Start EL for CSV to Parquet with Polars Engine")
-    result.trace.debug("... ---")
-    result.trace.debug(f"... Reading data from {source}")
+    result.trace.debug(
+        "[CALLER]: ... Start EL for CSV to Parquet with Polars Engine"
+    )
+    result.trace.debug("[CALLER]: ... ---")
+    result.trace.debug(f"[CALLER]: ... Reading data from {source}")
 
     conversion: dict[str, Any] = conversion or {}
     if conversion:
-        result.trace.debug("... Start Schema Conversion ...")
-    result.trace.debug(f"... Writing data to {sink}")
+        result.trace.debug("[CALLER]: ... Start Schema Conversion ...")
+    result.trace.debug(f"[CALLER]: ... Writing data to {sink}")
     return {"records": 1}
 
 
@@ -112,5 +118,5 @@ def get_types(
     _ = kwargs2
     result = kwargs["result"]
     result.trace.info("[CALLER]: Test task type.")
-    result.trace.info(f"... {type(args3)}: {args3}")
+    result.trace.info(f"[CALLER]: ... {type(args3)}: {args3}")
     return MockModel(name="foo", data={"key": "value"})

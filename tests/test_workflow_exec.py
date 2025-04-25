@@ -6,11 +6,15 @@ from threading import Event
 from unittest import mock
 
 from ddeutil.core import getdot
-from ddeutil.workflow import SUCCESS, Workflow, extract_call
-from ddeutil.workflow.conf import Config
-from ddeutil.workflow.job import Job
-from ddeutil.workflow.result import FAILED, Result
-from ddeutil.workflow.stages import CallStage
+from ddeutil.workflow import (
+    FAILED,
+    SUCCESS,
+    Config,
+    Job,
+    Result,
+    Workflow,
+    extract_call,
+)
 
 from .utils import dump_yaml_context
 
@@ -34,7 +38,7 @@ def test_workflow_exec():
     }
 
 
-def test_workflow_exec_raise_timeout():
+def test_workflow_exec_timeout():
     job: Job = Job(
         stages=[
             {"name": "Sleep", "run": "import time\ntime.sleep(2)"},
@@ -45,9 +49,24 @@ def test_workflow_exec_raise_timeout():
         name="demo-workflow",
         jobs={"sleep-run": job, "sleep-again-run": job},
     )
-    rs: Result = workflow.execute(params={}, timeout=1, max_job_parallel=1)
+    rs: Result = workflow.execute(params={}, timeout=1.25, max_job_parallel=1)
     assert rs.status == FAILED
-    assert rs.context["errors"]["message"] == "'demo-workflow' was timeout."
+    assert rs.context == {
+        "errors": {
+            "name": "WorkflowException",
+            "message": "'demo-workflow' was timeout.",
+        },
+        "params": {},
+        "jobs": {
+            "sleep-again-run": {
+                "stages": {"7972360640": {"outputs": {}}},
+                "errors": {
+                    "name": "JobException",
+                    "message": "Job strategy was canceled because event was set.",
+                },
+            },
+        },
+    }
 
 
 def test_workflow_exec_raise_event_set():
@@ -89,8 +108,8 @@ def test_workflow_exec_py():
             "run-date": "2024-01-01",
         },
     )
-    assert rs.status == 0
-    assert {
+    assert rs.status == SUCCESS
+    assert rs.context == {
         "params": {
             "author-run": "Local Workflow",
             "run-date": datetime(2024, 1, 1, 0, 0),
@@ -126,7 +145,7 @@ def test_workflow_exec_py():
                 },
             },
         },
-    } == rs.context
+    }
 
 
 def test_workflow_exec_parallel():
@@ -136,7 +155,14 @@ def test_workflow_exec_parallel():
     workflow: Workflow = Workflow(
         name="demo-workflow", jobs={"sleep-run": job, "sleep-again-run": job}
     )
-    workflow.execute(params={}, max_job_parallel=2)
+    rs: Result = workflow.execute(params={}, max_job_parallel=2)
+    assert rs.status == SUCCESS
+    assert rs.context == {
+        "params": {},
+        "jobs": {
+            "sleep-again-run": {"stages": {"7972360640": {"outputs": {}}}},
+        },
+    }
 
 
 def test_workflow_exec_parallel_timeout():
@@ -152,13 +178,15 @@ def test_workflow_exec_parallel_timeout():
             "sleep-run": job,
             "sleep-again-run": job.model_copy(update={"needs": ["sleep-run"]}),
         },
+        extras={"stage_default_id": False},
     )
-    rs = workflow.execute(params={}, timeout=0.5, max_job_parallel=2)
+    rs: Result = workflow.execute(params={}, timeout=1.25, max_job_parallel=2)
+    assert rs.status == FAILED
     assert rs.context == {
         "params": {},
         "jobs": {
             "sleep-run": {
-                "stages": {"7972360640": {"outputs": {}}},
+                "stages": {},
                 "errors": {
                     "name": "JobException",
                     "message": "Job strategy was canceled because event was set.",
@@ -181,8 +209,8 @@ def test_workflow_exec_py_with_parallel():
         },
         max_job_parallel=3,
     )
-    assert 0 == rs.status
-    assert {
+    assert rs.status == SUCCESS
+    assert rs.context == {
         "params": {
             "author-run": "Local Workflow",
             "run-date": datetime(2024, 1, 1, 0, 0),
@@ -218,7 +246,7 @@ def test_workflow_exec_py_with_parallel():
                 },
             },
         },
-    } == rs.context
+    }
 
 
 def test_workflow_exec_py_raise():
@@ -278,7 +306,8 @@ def test_workflow_exec_py_raise_parallel():
 def test_workflow_exec_with_matrix():
     workflow: Workflow = Workflow.from_conf(name="wf-run-matrix")
     rs: Result = workflow.execute(params={"source": "src", "target": "tgt"})
-    assert {
+    assert rs.status == SUCCESS
+    assert rs.context == {
         "params": {"source": "src", "target": "tgt"},
         "jobs": {
             "multiple-system": {
@@ -341,13 +370,14 @@ def test_workflow_exec_with_matrix():
                 },
             },
         },
-    } == rs.context
+    }
 
 
 def test_workflow_exec_needs():
     workflow = Workflow.from_conf(name="wf-run-depends")
     rs: Result = workflow.execute(params={"name": "bar"})
-    assert {
+    assert rs.status == SUCCESS
+    assert rs.context == {
         "params": {"name": "bar"},
         "jobs": {
             "final-job": {
@@ -372,7 +402,7 @@ def test_workflow_exec_needs():
                 },
             },
         },
-    } == rs.context
+    }
 
 
 def test_workflow_exec_needs_condition():
@@ -446,52 +476,16 @@ def test_workflow_exec_call(test_path):
                     sink: ${{ params.sink }}
         """,
     ):
-        workflow = Workflow.from_conf(
-            name="tmp-wf-call-csv-to-parquet",
-            extras={},
-        )
-
-        # NOTE: execute from the call stage model
-        stage: CallStage = workflow.job("extract-load").stage("extract-load")
-        rs = stage.handler_execute(
-            params={
-                "params": {
-                    "run-date": datetime(2024, 1, 1),
-                    "source": "ds_csv_local_file",
-                    "sink": "ds_parquet_local_file_dir",
-                },
-            }
-        )
-        assert 0 == rs.status
-        assert {"records": 1} == rs.context
-
-        # NOTE: execute from the job model
-        job: Job = workflow.job("extract-load")
-        rs = job.execute(
-            params={
-                "params": {
-                    "run-date": datetime(2024, 1, 1),
-                    "source": "ds_csv_local_file",
-                    "sink": "ds_parquet_local_file_dir",
-                },
-            },
-        )
-        assert {
-            "EMPTY": {
-                "matrix": {},
-                "stages": {"extract-load": {"outputs": {"records": 1}}},
-            },
-        } == rs.context
-
-        rs = workflow.execute(
+        workflow = Workflow.from_conf(name="tmp-wf-call-csv-to-parquet")
+        rs: Result = workflow.execute(
             params={
                 "run-date": datetime(2024, 1, 1),
                 "source": "ds_csv_local_file",
                 "sink": "ds_parquet_local_file_dir",
             },
         )
-        assert 0 == rs.status
-        assert {
+        assert rs.status == SUCCESS
+        assert rs.context == {
             "params": {
                 "run-date": datetime(2024, 1, 1),
                 "source": "ds_csv_local_file",
@@ -506,7 +500,7 @@ def test_workflow_exec_call(test_path):
                     },
                 },
             },
-        } == rs.context
+        }
 
 
 def test_workflow_exec_call_override_registry(test_path):
@@ -525,7 +519,6 @@ def test_workflow_exec_call_override_registry(test_path):
             def get_info(result: Result):
                 result.trace.info("... [CALLER]: Info from mock tasks")
                 return {"get-info": "success"}
-
             """.strip(
                     "\n"
                 )
@@ -551,9 +544,18 @@ def test_workflow_exec_call_override_registry(test_path):
             name="tmp-wf-exec-call-override",
             extras={"registry_caller": ["mock_tests"]},
         )
-        rs = workflow.execute(params={})
+        rs: Result = workflow.execute(params={})
         assert rs.status == SUCCESS
-        print(rs.context)
+        assert rs.context == {
+            "params": {},
+            "jobs": {
+                "first-job": {
+                    "stages": {
+                        "4030788970": {"outputs": {"get-info": "success"}}
+                    },
+                },
+            },
+        }
 
     shutil.rmtree(task_path)
 

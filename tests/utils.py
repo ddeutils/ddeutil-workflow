@@ -37,13 +37,10 @@ def dotenv_setting() -> None:
             WORKFLOW_CORE_DEBUG_MODE=true
             WORKFLOW_CORE_STAGE_DEFAULT_ID=true
             WORKFLOW_CORE_STAGE_RAISE_ERROR=true
-            WORKFLOW_CORE_MAX_CRON_PER_WORKFLOW=5
-            WORKFLOW_CORE_MAX_QUEUE_COMPLETE_HIST=16
             WORKFLOW_CORE_GENERATE_ID_SIMPLE_MODE=true
             WORKFLOW_LOG_TRACE_ENABLE_WRITE=false
             WORKFLOW_LOG_AUDIT_ENABLE_WRITE=true
             WORKFLOW_APP_MAX_PROCESS=2
-            WORKFLOW_APP_MAX_SCHEDULE_PER_PROCESS=100
             WORKFLOW_APP_STOP_BOUNDARY_DELTA='{{"minutes": 5, "seconds": 20}}'
             WORKFLOW_API_ENABLE_ROUTE_WORKFLOW=true
             WORKFLOW_API_ENABLE_ROUTE_SCHEDULE=true
@@ -102,3 +99,15 @@ def dump_yaml_context(
 
     # NOTE: Remove the testing file.
     test_file.unlink(missing_ok=True)
+
+
+class MockEvent:  # pragma: no cov
+    def __init__(self, n: int = 1):
+        self.n: int = n
+        self.counter: int = 0
+
+    def is_set(self):
+        if self.counter == self.n:
+            return True
+        self.counter += 1
+        return False

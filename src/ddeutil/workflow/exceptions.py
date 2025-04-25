@@ -9,7 +9,7 @@ annotate for handle error only.
 """
 from __future__ import annotations
 
-from typing import TypedDict, overload
+from typing import Literal, TypedDict, overload
 
 
 class ErrorData(TypedDict):
@@ -44,10 +44,14 @@ class BaseWorkflowException(Exception):
         self.refs: str | None = refs
 
     @overload
-    def to_dict(self, with_refs: bool = True) -> dict[str, ErrorData]: ...
+    def to_dict(
+        self, with_refs: Literal[True] = ...
+    ) -> dict[str, ErrorData]: ...  # pragma: no cov
 
     @overload
-    def to_dict(self, with_refs: bool = False) -> ErrorData: ...
+    def to_dict(
+        self, with_refs: Literal[False] = ...
+    ) -> ErrorData: ...  # pragma: no cov
 
     def to_dict(
         self, with_refs: bool = False

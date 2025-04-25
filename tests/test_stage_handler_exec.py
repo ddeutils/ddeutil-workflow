@@ -1,19 +1,20 @@
 from datetime import datetime
 from inspect import isfunction
-from unittest import mock
+from threading import Event
 
 import pytest
-from ddeutil.workflow import FAILED, SUCCESS, Config, Result, Workflow
+from ddeutil.workflow import CANCEL, FAILED, SUCCESS, Result, Workflow
 from ddeutil.workflow.exceptions import StageException
 from ddeutil.workflow.stages import (
     BashStage,
     CallStage,
+    PyStage,
     RaiseStage,
     Stage,
 )
 from pydantic import TypeAdapter
 
-from .utils import dump_yaml_context
+from .utils import MockEvent, dump_yaml_context
 
 
 def test_bash_stage_exec():
@@ -44,10 +45,7 @@ def test_bash_stage_exec_with_env():
 def test_bash_stage_exec_raise():
     stage: BashStage = BashStage(
         name="Bash Stage",
-        bash=(
-            "printf '%s\\n' \"Test Raise Error case with failed\" >&2;\n"
-            "exit 1;"
-        ),
+        bash='echo "Test Raise Error case with failed" >&2;\n' "exit 1;",
     )
 
     # NOTE: Raise error from bash that force exit 1.
@@ -62,8 +60,9 @@ def test_bash_stage_exec_raise():
             "message": (
                 "Subprocess: Test Raise Error case with failed\n"
                 "---( statement )---\n"
-                "```bash\nprintf '%s\\n"
-                '\' "Test Raise Error case with failed" >&2;\nexit 1;\n```'
+                '```bash\necho "Test Raise Error case with failed" >&2;\n'
+                "exit 1;\n"
+                "```"
             ),
         }
     }
@@ -107,12 +106,12 @@ def test_call_stage_exec(test_path):
 
         stage: Stage = workflow.job("second-job").stage("extract-load")
         rs: Result = stage.handler_execute({})
-        assert 0 == rs.status
+        assert rs.status == SUCCESS
         assert {"records": 1} == rs.context
 
         stage: Stage = workflow.job("second-job").stage("async-extract-load")
         rs: Result = stage.handler_execute({})
-        assert rs.status == 0
+        assert rs.status == SUCCESS
         assert rs.context == {"records": 1}
 
         # NOTE: Raise because invalid return type.
@@ -154,20 +153,17 @@ def test_call_stage_exec(test_path):
         assert rs.context == {"name": "foo", "data": {"key": "value"}}
 
 
-@mock.patch.object(Config, "stage_raise_error", True)
-def test_stage_exec_py_raise():
-    workflow: Workflow = Workflow.from_conf(name="wf-run-common")
-    stage: Stage = workflow.job("raise-run").stage(stage_id="raise-error")
+def test_py_stage_exec_raise():
+    stage: PyStage = PyStage(
+        name="Raise Error Inside",
+        id="raise-error",
+        run="raise ValueError('Testing raise error inside PyStage!!!')",
+    )
+
     with pytest.raises(StageException):
-        stage.handler_execute(params={"x": "Foo"})
+        stage.handler_execute(params={"x": "Foo"}, raise_error=True)
 
-
-@mock.patch.object(Config, "stage_raise_error", False)
-def test_stage_exec_py_not_raise():
-    workflow: Workflow = Workflow.from_conf(name="wf-run-common")
-    stage: Stage = workflow.job("raise-run").stage(stage_id="raise-error")
-
-    rs = stage.handler_execute(params={"x": "Foo"})
+    rs = stage.handler_execute(params={"x": "Foo"}, raise_error=False)
     assert rs.status == FAILED
     assert rs.context == {
         "errors": {
@@ -190,84 +186,59 @@ def test_stage_exec_py_not_raise():
     }
 
 
-def test_stage_exec_py_with_vars():
-    workflow: Workflow = Workflow.from_conf(name="wf-run-common")
-    stage: Stage = workflow.job("demo-run").stage(stage_id="run-var")
-    assert stage.id == "run-var"
-
-    params = {
-        "params": {"name": "Author"},
-        "stages": {"hello-world": {"outputs": {"x": "Foo"}}},
-    }
-    rs_out = stage.set_outputs(
-        stage.handler_execute(params=params).context, to=params
+def test_py_stage_exec():
+    stage: PyStage = PyStage(
+        name="Run Sequence and use var from Above",
+        id="run-var",
+        vars={"x": "${{ stages.hello-world.outputs.x }}"},
+        run=(
+            "print(f'Receive x from above with {x}')\n\n"
+            "# Change x value\nx: int = 1\n"
+            'result.trace.info("Log from result object inside PyStage!!!")'
+        ),
     )
-    assert {
-        "params": {"name": "Author"},
-        "stages": {
-            "hello-world": {"outputs": {"x": "Foo"}},
-            "run-var": {"outputs": {"x": 1}},
-        },
-    } == rs_out
-
-
-def test_stage_exec_py_func():
-    workflow: Workflow = Workflow.from_conf(name="wf-run-python")
-    stage: Stage = workflow.job("second-job").stage(stage_id="create-func")
-    rs = stage.set_outputs(stage.handler_execute(params={}).context, to={})
-    assert ("var_inside", "echo") == tuple(
-        rs["stages"]["create-func"]["outputs"].keys()
-    )
-    assert isfunction(rs["stages"]["create-func"]["outputs"]["echo"])
-
-
-@mock.patch.object(Config, "stage_raise_error", False)
-def test_stage_exec_py_result(test_path):
-    with dump_yaml_context(
-        test_path / "conf/demo/01_99_wf_test_wf_py_result.yml",
-        data="""
-        tmp-wf-py-result:
-          type: Workflow
-          jobs:
-            first-job:
-              stages:
-                - name: "Start run python with result argument"
-                  id: py-result-stage
-                  run: |
-                    result.trace.info("Log from result object inside PyStage!!!")
-                - name: "Raise error"
-                  id: py-raise
-                  run: |
-                    raise ValueError("test raise error")
-        """,
-    ):
-        workflow: Workflow = Workflow.from_conf(name="tmp-wf-py-result")
-        stage: Stage = workflow.job("first-job").stage(
-            stage_id="py-result-stage"
-        )
-        rs: dict = stage.set_outputs(
-            stage.handler_execute(params={}).context, to={}
-        )
-        assert rs == {"stages": {"py-result-stage": {"outputs": {}}}}
-
-        stage: Stage = workflow.job("first-job").stage(stage_id="py-raise")
-        rs: dict = stage.set_outputs(
-            stage.handler_execute(params={}).context, to={}
-        )
-        assert rs == {
-            "stages": {
-                "py-raise": {
-                    "outputs": {},
-                    "errors": {
-                        "name": "ValueError",
-                        "message": "test raise error",
-                    },
-                },
-            },
+    rs: Result = stage.handler_execute(
+        params={
+            "params": {"name": "Author"},
+            "stages": {"hello-world": {"outputs": {"x": "Foo"}}},
         }
+    )
+    assert rs.status == SUCCESS
+
+    rs = stage.set_outputs(
+        stage.handler_execute(
+            params={
+                "params": {"name": "Author"},
+                "stages": {"hello-world": {"outputs": {"x": "Foo"}}},
+            }
+        ).context,
+        to={},
+    )
+    assert rs == {"stages": {"run-var": {"outputs": {"x": 1}}}}
 
 
-def test_stage_exec_py_create_object():
+def test_py_stage_exec_create_func():
+    stage: PyStage = PyStage(
+        name="Set variable and function",
+        id="create-func",
+        run=(
+            "var_inside: str = 'Create Function Inside'\n"
+            'def echo(var: str) -> None:\n\tprint(f"Echo {var}")\n'
+            "echo(var_inside)"
+        ),
+    )
+    rs: Result = stage.handler_execute(params={})
+    assert rs.status == SUCCESS
+
+    rs: dict = stage.set_outputs(rs.context, {})
+    assert isfunction(rs["stages"]["create-func"]["outputs"]["echo"])
+    assert (
+        rs["stages"]["create-func"]["outputs"]["var_inside"]
+        == "Create Function Inside"
+    )
+
+
+def test_py_stage_exec_create_object():
     workflow: Workflow = Workflow.from_conf(name="wf-run-python-filter")
     stage: Stage = workflow.job("create-job").stage(stage_id="create-stage")
     rs = stage.set_outputs(stage.handler_execute(params={}).context, to={})
@@ -871,14 +842,18 @@ def test_stage_exec_parallel(test_path):
                         echo: |
                           Start run with branch 1
                         sleep: 1
+                      - name: "Skip Stage"
+                        if: ${{ branch | rstr }} == "branch02"
+                        id: skip-stage
                     branch02:
                       - name: "Echo branch02 stage"
                         echo: |
                           Start run with branch 2
         """,
     ):
-        workflow = Workflow.from_conf(name="tmp-wf-parallel")
-
+        workflow = Workflow.from_conf(
+            name="tmp-wf-parallel", extras={"stage_raise_error": False}
+        )
         stage: Stage = workflow.job("first-job").stage("parallel-stage")
         rs = stage.set_outputs(stage.handler_execute({}).context, to={})
         assert rs == {
@@ -892,10 +867,60 @@ def test_stage_exec_parallel(test_path):
                             },
                             "branch01": {
                                 "branch": "branch01",
-                                "stages": {"0573477600": {"outputs": {}}},
+                                "stages": {
+                                    "0573477600": {"outputs": {}},
+                                    "skip-stage": {
+                                        "outputs": {},
+                                        "skipped": True,
+                                    },
+                                },
                             },
                         },
                     },
+                },
+            },
+        }
+
+        event = Event()
+        event.set()
+        rs: Result = stage.handler_execute({}, event=event)
+        assert rs.status == CANCEL
+        assert rs.context == {
+            "parallel": {},
+            "errors": {
+                "name": "StageException",
+                "message": (
+                    "Stage was canceled from event that had set before stage "
+                    "parallel execution."
+                ),
+            },
+        }
+
+        event = MockEvent(n=2)
+        rs: Result = stage.handler_execute({}, event=event)
+        assert rs.status == FAILED
+        assert rs.context == {
+            "parallel": {
+                "branch02": {
+                    "branch": "branch02",
+                    "stages": {},
+                    "errors": {
+                        "name": "StageException",
+                        "message": "Branch-Stage was canceled from event that had set before stage branch execution.",
+                    },
+                },
+                "branch01": {
+                    "branch": "branch01",
+                    "stages": {
+                        "0573477600": {"outputs": {}},
+                        "skip-stage": {"outputs": {}, "skipped": True},
+                    },
+                },
+            },
+            "errors": {
+                "branch02": {
+                    "name": "StageException",
+                    "message": "Branch-Stage was canceled from event that had set before stage branch execution.",
                 },
             },
         }

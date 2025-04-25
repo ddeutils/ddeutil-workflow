@@ -440,13 +440,12 @@ class BaseAsyncStage(BaseStage):
         try:
             rs: Result = await self.axecute(params, result=result, event=event)
             return rs
-        except Exception as e:  # pragma: no cov
+        except Exception as e:
             e_name: str = e.__class__.__name__
             await result.trace.aerror(f"[STAGE]: Handler {e_name}: {e}")
             if dynamic("stage_raise_error", f=raise_error, extras=self.extras):
                 if isinstance(e, StageException):
                     raise
-
                 raise StageException(
                     f"{self.__class__.__name__}: {e_name}: {e}"
                 ) from None
@@ -703,21 +702,19 @@ class BashStage(BaseAsyncStage):
             env=param2template(self.env, params, extras=self.extras),
             run_id=result.run_id,
         ) as sh:
-            result.trace.debug(f"[STAGE] ... Create `{sh[1]}` file.")
+            result.trace.debug(f"[STAGE]: ... Create `{sh[1]}` file.")
             rs: CompletedProcess = subprocess.run(
-                sh, shell=False, capture_output=True, text=True
+                sh,
+                shell=False,
+                check=False,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
             )
-
         if rs.returncode > 0:
-            # NOTE: Prepare stderr message that returning from subprocess.
-            e: str = (
-                rs.stderr.encode("utf-8").decode("utf-16")
-                if "\\x00" in rs.stderr
-                else rs.stderr
-            ).removesuffix("\n")
+            e: str = rs.stderr.removesuffix("\n")
             raise StageException(
-                f"Subprocess: {e}\n---( statement )---\n"
-                f"```bash\n{bash}\n```"
+                f"Subprocess: {e}\n---( statement )---\n```bash\n{bash}\n```"
             )
         return result.catch(
             status=SUCCESS,
@@ -759,21 +756,20 @@ class BashStage(BaseAsyncStage):
             env=param2template(self.env, params, extras=self.extras),
             run_id=result.run_id,
         ) as sh:
-            await result.trace.adebug(f"[STAGE] ... Create `{sh[1]}` file.")
+            await result.trace.adebug(f"[STAGE]: ... Create `{sh[1]}` file.")
             rs: CompletedProcess = subprocess.run(
-                sh, shell=False, capture_output=True, text=True
+                sh,
+                shell=False,
+                check=False,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
             )
 
         if rs.returncode > 0:
-            # NOTE: Prepare stderr message that returning from subprocess.
-            e: str = (
-                rs.stderr.encode("utf-8").decode("utf-16")
-                if "\\x00" in rs.stderr
-                else rs.stderr
-            ).removesuffix("\n")
+            e: str = rs.stderr.removesuffix("\n")
             raise StageException(
-                f"Subprocess: {e}\n---( statement )---\n"
-                f"```bash\n{bash}\n```"
+                f"Subprocess: {e}\n---( statement )---\n```bash\n{bash}\n```"
             )
         return result.catch(
             status=SUCCESS,
@@ -785,7 +781,7 @@ class BashStage(BaseAsyncStage):
         )
 
 
-class PyStage(BaseStage):
+class PyStage(BaseAsyncStage):
     """Python stage that running the Python statement with the current globals
     and passing an input additional variables via `exec` built-in function.
 
@@ -917,15 +913,63 @@ class PyStage(BaseStage):
 
     async def axecute(
         self,
-    ):
-        """Async execution method.
+        params: DictData,
+        *,
+        result: Result | None = None,
+        event: Event | None = None,
+    ) -> Result:
+        """Async execution method for this Bash stage that only logging out to
+        stdout.
+
+        :param params: (DictData) A parameter data.
+        :param result: (Result) A Result instance for return context and status.
+        :param event: (Event) An Event manager instance that use to cancel this
+            execution if it forces stopped by parent execution.
 
         References:
             - https://stackoverflow.com/questions/44859165/async-exec-in-python
+
+        :rtype: Result
         """
+        result: Result = result or Result(
+            run_id=gen_id(self.name + (self.id or ""), unique=True),
+            extras=self.extras,
+        )
+        lc: DictData = {}
+        gb: DictData = (
+            globals()
+            | param2template(self.vars, params, extras=self.extras)
+            | {"result": result}
+        )
+        await result.trace.ainfo(f"[STAGE]: Execute Py-Stage: {self.name}")
+
+        # WARNING: The exec build-in function is very dangerous. So, it
+        #   should use the re module to validate exec-string before running.
+        exec(
+            param2template(dedent(self.run), params, extras=self.extras),
+            gb,
+            lc,
+        )
+        return result.catch(
+            status=SUCCESS,
+            context={
+                "locals": {k: lc[k] for k in self.filter_locals(lc)},
+                "globals": {
+                    k: gb[k]
+                    for k in gb
+                    if (
+                        not k.startswith("__")
+                        and k != "annotations"
+                        and not ismodule(gb[k])
+                        and not isclass(gb[k])
+                        and not isfunction(gb[k])
+                    )
+                },
+            },
+        )
 
 
-class CallStage(BaseStage):
+class CallStage(BaseAsyncStage):
     """Call stage executor that call the Python function from registry with tag
     decorator function in `reusables` module and run it with input arguments.
 
@@ -1053,8 +1097,97 @@ class CallStage(BaseStage):
             rs: DictData = rs.model_dump(by_alias=True)
         elif not isinstance(rs, dict):
             raise TypeError(
-                f"Return type: '{call_func.name}@{call_func.tag}' does not "
-                f"serialize to result model, you change return type to `dict`."
+                f"Return type: '{call_func.name}@{call_func.tag}' can not "
+                f"serialize, you must set return be `dict` or Pydantic "
+                f"model."
+            )
+        return result.catch(status=SUCCESS, context=rs)
+
+    async def axecute(
+        self,
+        params: DictData,
+        *,
+        result: Result | None = None,
+        event: Event | None = None,
+    ) -> Result:
+        """Async execution method for this Bash stage that only logging out to
+        stdout.
+
+        :param params: (DictData) A parameter data.
+        :param result: (Result) A Result instance for return context and status.
+        :param event: (Event) An Event manager instance that use to cancel this
+            execution if it forces stopped by parent execution.
+
+        References:
+            - https://stackoverflow.com/questions/44859165/async-exec-in-python
+
+        :rtype: Result
+        """
+        result: Result = result or Result(
+            run_id=gen_id(self.name + (self.id or ""), unique=True),
+            extras=self.extras,
+        )
+
+        call_func: TagFunc = extract_call(
+            param2template(self.uses, params, extras=self.extras),
+            registries=self.extras.get("registry_caller"),
+        )()
+
+        await result.trace.ainfo(
+            f"[STAGE]: Execute Call-Stage: {call_func.name}@{call_func.tag}"
+        )
+
+        # VALIDATE: check input task caller parameters that exists before
+        #   calling.
+        args: DictData = {"result": result} | param2template(
+            self.args, params, extras=self.extras
+        )
+        ips = inspect.signature(call_func)
+        necessary_params: list[str] = []
+        has_keyword: bool = False
+        for k in ips.parameters:
+            if (
+                v := ips.parameters[k]
+            ).default == Parameter.empty and v.kind not in (
+                Parameter.VAR_KEYWORD,
+                Parameter.VAR_POSITIONAL,
+            ):
+                necessary_params.append(k)
+            elif v.kind == Parameter.VAR_KEYWORD:
+                has_keyword = True
+
+        if any(
+            (k.removeprefix("_") not in args and k not in args)
+            for k in necessary_params
+        ):
+            raise ValueError(
+                f"Necessary params, ({', '.join(necessary_params)}, ), "
+                f"does not set to args, {list(args.keys())}."
+            )
+
+        if "result" not in ips.parameters and not has_keyword:
+            args.pop("result")
+
+        args = self.parse_model_args(call_func, args, result)
+
+        if inspect.iscoroutinefunction(call_func):
+            rs: DictData = await call_func(
+                **param2template(args, params, extras=self.extras)
+            )
+        else:
+            rs: DictData = call_func(
+                **param2template(args, params, extras=self.extras)
+            )
+
+        # VALIDATE:
+        #   Check the result type from call function, it should be dict.
+        if isinstance(rs, BaseModel):
+            rs: DictData = rs.model_dump(by_alias=True)
+        elif not isinstance(rs, dict):
+            raise TypeError(
+                f"Return type: '{call_func.name}@{call_func.tag}' can not "
+                f"serialize, you must set return be `dict` or Pydantic "
+                f"model."
             )
         return result.catch(status=SUCCESS, context=rs)
 
@@ -1175,7 +1308,7 @@ class TriggerStage(BaseStage):
         return rs
 
 
-class ParallelStage(BaseStage):  # pragma: no cov
+class ParallelStage(BaseStage):
     """Parallel stage executor that execute branch stages with multithreading.
     This stage let you set the fix branches for running child stage inside it on
     multithread pool.
@@ -1278,7 +1411,7 @@ class ParallelStage(BaseStage):  # pragma: no cov
                 )
                 stage.set_outputs(rs.context, to=output)
                 stage.set_outputs(stage.get_outputs(output), to=context)
-            except StageException as e:  # pragma: no cov
+            except StageException as e:
                 result.catch(
                     status=FAILED,
                     parallel={
@@ -1343,7 +1476,7 @@ class ParallelStage(BaseStage):  # pragma: no cov
             f"[STAGE]: Execute Parallel-Stage: {self.max_workers} workers."
         )
         result.catch(status=WAIT, context={"parallel": {}})
-        if event and event.is_set():  # pragma: no cov
+        if event and event.is_set():
             return result.catch(
                 status=CANCEL,
                 context={
@@ -1468,7 +1601,7 @@ class ForEachStage(BaseStage):
                 stage.set_outputs(output={"skipped": True}, to=output)
                 continue
 
-            if event and event.is_set():  # pragma: no cov
+            if event and event.is_set():
                 error_msg: str = (
                     "Item-Stage was canceled because event was set."
                 )
@@ -1570,7 +1703,7 @@ class ForEachStage(BaseStage):
 
         result.trace.info(f"[STAGE]: Execute Foreach-Stage: {foreach!r}.")
         result.catch(status=WAIT, context={"items": foreach, "foreach": {}})
-        if event and event.is_set():  # pragma: no cov
+        if event and event.is_set():
             return result.catch(
                 status=CANCEL,
                 context={
@@ -1959,7 +2092,7 @@ class CaseStage(BaseStage):
                 stage.set_outputs(output={"skipped": True}, to=output)
                 continue
 
-            if event and event.is_set():  # pragma: no cov
+            if event and event.is_set():
                 error_msg: str = (
                     "Case-Stage was canceled from event that had set before "
                     "stage case execution."
@@ -1983,7 +2116,7 @@ class CaseStage(BaseStage):
                 )
                 stage.set_outputs(rs.context, to=output)
                 stage.set_outputs(stage.get_outputs(output), to=context)
-            except StageException as e:  # pragma: no cov
+            except StageException as e:
                 return result.catch(
                     status=FAILED,
                     context={
@@ -2072,7 +2205,7 @@ class CaseStage(BaseStage):
             _case: str = "_"
             stages: list[Stage] = _else.stages
 
-        if event and event.is_set():  # pragma: no cov
+        if event and event.is_set():
             return result.catch(
                 status=CANCEL,
                 context={
@@ -2088,7 +2221,7 @@ class CaseStage(BaseStage):
         )
 
 
-class RaiseStage(BaseAsyncStage):  # pragma: no cov
+class RaiseStage(BaseAsyncStage):
     """Raise error stage executor that raise `StageException` that use a message
     field for making error message before raise.
 
@@ -2465,4 +2598,4 @@ Stage = Annotated[
         EmptyStage,
     ],
     Field(union_mode="smart"),
-]
+]  # pragma: no cov

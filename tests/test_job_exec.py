@@ -1,14 +1,14 @@
+from threading import Event
+
 from ddeutil.workflow import Job, Workflow
-from ddeutil.workflow.result import FAILED, SUCCESS, Result
+from ddeutil.workflow.result import CANCEL, FAILED, SUCCESS, Result
 
 
 def test_job_exec_py():
-    workflow: Workflow = Workflow.from_conf(name="wf-run-common")
-    job: Job = workflow.job("demo-run")
-
-    # NOTE: Job params will change schema structure with {"params": { ... }}
+    job: Job = Workflow.from_conf(name="wf-run-common").job("demo-run")
     rs: Result = job.execute(params={"params": {"name": "Foo"}})
-    assert {
+    assert rs.status == SUCCESS
+    assert rs.context == {
         "EMPTY": {
             "matrix": {},
             "stages": {
@@ -16,10 +16,9 @@ def test_job_exec_py():
                 "run-var": {"outputs": {"x": 1}},
             },
         },
-    } == rs.context
+    }
 
-    output = {}
-    job.set_outputs(rs.context, to=output)
+    output = job.set_outputs(rs.context, to={})
     assert output == {
         "jobs": {
             "demo-run": {
@@ -29,6 +28,17 @@ def test_job_exec_py():
                 },
             },
         },
+    }
+
+    event = Event()
+    event.set()
+    rs: Result = job.execute(params={"params": {"name": "Foo"}}, event=event)
+    assert rs.status == CANCEL
+    assert rs.context == {
+        "errors": {
+            "name": "JobException",
+            "message": "Job was canceled from event that had set before local job execution.",
+        }
     }
 
 
