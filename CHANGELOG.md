@@ -2,6 +2,59 @@
 
 ## Latest Changes
 
+## 0.0.57
+
+### :stars: Highlight Features
+
+- :star: hl: revise error context from multi-parallel execution.
+- :star: hl: add tz validate if pass different timezone in the same workflow.
+- :star: hl: remove class key on errors context.
+
+### :sparkles: Features
+
+- :dart: feat: add cancel error handler error on job exec.
+- :dart: feat: update async function on the bash stage.
+- :dart: feat: change code not handler error on workflow exec method.
+- :dart: feat: add remove queue in running on mark complete method.
+- :dart: feat: revise poking and release method.
+
+### :bug: Bug fixes
+
+- :gear: fixed: testcase that run base on cpu bound.
+- :gear: fixed: remove util exception class that not raise from stage exec.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: update testcase for make coverage.
+- :art: format: change log stetement.
+- :test_tube: tests: create testcase for make coverage.
+- :test_tube: tests: fix test case that change error statement.
+- :test_tube: tests: add testcase for cron runner object.
+- :art: format: revise poking method.
+- :test_tube: tests: add testcase for change datetime with timezone.
+- :test_tube: tests: update poking function on workflow module.
+- :lipstick: styled: change trace log message style.
+- :construction: format: change code format on poke method.
+- :test_tube: tests: add testcase for raise stage exec.
+- :art: styled: improve logging statement of stages module.
+
+### :broom: Deprecate & Clean
+
+- :recycle: clean: remove unuse field on release object.
+
+### :package: Build & Workflow
+
+- :toolbox: build: update clishelf version from 0.2.19 to 0.2.22.
+
+### :postbox: Dependencies
+
+- :pushpin: deps: update ddeutil package base version.
+
+### :book: Documentations
+
+- :page_facing_up: docs: update context docs.
+- :page_facing_up: docs: update readme file for warning scheduler feature.
+
 ## 0.0.56
 
 ### :stars: Highlight Features
