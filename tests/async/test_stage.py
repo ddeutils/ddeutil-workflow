@@ -1,5 +1,13 @@
 import pytest
-from ddeutil.workflow import SUCCESS, BashStage, EmptyStage, Result
+from ddeutil.workflow import (
+    FAILED,
+    SUCCESS,
+    BashStage,
+    EmptyStage,
+    RaiseStage,
+    Result,
+    StageException,
+)
 
 
 @pytest.mark.asyncio
@@ -39,3 +47,21 @@ async def test_bash_stage_axec():
     stage: BashStage = BashStage(name="Bash Stage", bash='echo "Hello World"')
     rs: Result = await stage.handler_axecute(params={})
     assert rs.status == SUCCESS
+
+
+@pytest.mark.asyncio
+async def test_raise_stage_exec():
+    stage: RaiseStage = RaiseStage.model_validate(
+        {"name": "Raise Stage", "raise": "This is test message error"}
+    )
+    rs: Result = await stage.handler_axecute(params={}, raise_error=False)
+    assert rs.status == FAILED
+    assert rs.context == {
+        "errors": {
+            "name": "StageException",
+            "message": "This is test message error",
+        },
+    }
+
+    with pytest.raises(StageException):
+        await stage.handler_axecute(params={}, raise_error=True)

@@ -277,13 +277,6 @@ class BaseStage(BaseModel, ABC):
         ):
             return to
 
-        _id: str = (
-            param2template(self.id, params=to, extras=self.extras)
-            if self.id
-            else gen_id(
-                param2template(self.name, params=to, extras=self.extras)
-            )
-        )
         output: DictData = output.copy()
         errors: DictData = (
             {"errors": output.pop("errors", {})} if "errors" in output else {}
@@ -293,7 +286,7 @@ class BaseStage(BaseModel, ABC):
             if "skipped" in output
             else {}
         )
-        to["stages"][_id] = {
+        to["stages"][self.gen_id(params=to)] = {
             "outputs": copy.deepcopy(output),
             **skipping,
             **errors,
@@ -313,15 +306,11 @@ class BaseStage(BaseModel, ABC):
             "stage_default_id", extras=self.extras
         ):
             return {}
-
-        _id: str = (
-            param2template(self.id, params=output, extras=self.extras)
-            if self.id
-            else gen_id(
-                param2template(self.name, params=output, extras=self.extras)
-            )
+        return (
+            output.get("stages", {})
+            .get(self.gen_id(params=output), {})
+            .get("outputs", {})
         )
-        return output.get("stages", {}).get(_id, {}).get("outputs", {})
 
     def is_skipped(self, params: DictData) -> bool:
         """Return true if condition of this stage do not correct. This process
@@ -354,6 +343,22 @@ class BaseStage(BaseModel, ABC):
             return not rs
         except Exception as e:
             raise StageException(f"{e.__class__.__name__}: {e}") from e
+
+    def gen_id(self, params: DictData) -> str:
+        """Generate stage ID that dynamic use stage's name if it ID does not
+        set.
+
+        :param params: A parameter data.
+
+        :rtype: str
+        """
+        return (
+            param2template(self.id, params=params, extras=self.extras)
+            if self.id
+            else gen_id(
+                param2template(self.name, params=params, extras=self.extras)
+            )
+        )
 
 
 class BaseAsyncStage(BaseStage):
@@ -1251,7 +1256,7 @@ class ParallelStage(BaseStage):  # pragma: no cov
                     "Branch-Stage was canceled from event that had set before "
                     "stage branch execution."
                 )
-                return result.catch(
+                result.catch(
                     status=CANCEL,
                     parallel={
                         branch: {
@@ -1261,6 +1266,7 @@ class ParallelStage(BaseStage):  # pragma: no cov
                         }
                     },
                 )
+                raise StageException(error_msg, refs=branch)
 
             try:
                 rs: Result = stage.handler_execute(
@@ -1283,7 +1289,7 @@ class ParallelStage(BaseStage):  # pragma: no cov
                         },
                     },
                 )
-                raise
+                raise StageException(str(e), refs=branch) from e
 
             if rs.status == FAILED:
                 error_msg: str = (
@@ -1300,7 +1306,7 @@ class ParallelStage(BaseStage):  # pragma: no cov
                         },
                     },
                 )
-                raise StageException(error_msg)
+                raise StageException(error_msg, refs=branch)
 
         return result.catch(
             status=SUCCESS,
@@ -1332,7 +1338,7 @@ class ParallelStage(BaseStage):  # pragma: no cov
             run_id=gen_id(self.name + (self.id or ""), unique=True),
             extras=self.extras,
         )
-        event: Event = Event() if event is None else event
+        event: Event = event or Event()
         result.trace.info(
             f"[STAGE]: Execute Parallel-Stage: {self.max_workers} workers."
         )
@@ -1371,11 +1377,15 @@ class ParallelStage(BaseStage):  # pragma: no cov
                     future.result()
                 except StageException as e:
                     status = FAILED
-                    result.trace.error(f"[STAGE]: {e.__class__.__name__}: {e}")
+                    result.trace.error(
+                        f"[STAGE]: Error Handler:||{e.__class__.__name__}:||{e}"
+                    )
                     if "errors" in context:
-                        context["errors"].append(e.to_dict())
+                        context["errors"][e.refs] = e.to_dict()
                     else:
-                        context["errors"] = [e.to_dict()]
+                        context["errors"] = e.to_dict(with_refs=True)
+                except CancelledError:
+                    pass
         return result.catch(status=status, context=context)
 
 
@@ -1429,7 +1439,8 @@ class ForEachStage(BaseStage):
         *,
         event: Event | None = None,
     ) -> Result:
-        """Execute all stage with specific foreach item.
+        """Execute all nested stage that set on this stage with specific foreach
+        item parameter.
 
         :param item: (str | int) An item that want to execution.
         :param params: (DictData) A parameter data.
@@ -1437,7 +1448,9 @@ class ForEachStage(BaseStage):
         :param event: (Event) An Event manager instance that use to cancel this
             execution if it forces stopped by parent execution.
 
-        :raise StageException: If the stage execution raise errors.
+        :raise StageException: If event was set.
+        :raise StageException: If the stage execution raise any Exception error.
+        :raise StageException: If the result from execution has `FAILED` status.
 
         :rtype: Result
         """
@@ -1469,7 +1482,7 @@ class ForEachStage(BaseStage):
                         }
                     },
                 )
-                raise StageException(error_msg)
+                raise StageException(error_msg, refs=item)
 
             try:
                 rs: Result = stage.handler_execute(
@@ -1492,7 +1505,7 @@ class ForEachStage(BaseStage):
                         },
                     },
                 )
-                raise
+                raise StageException(str(e), refs=item) from e
 
             if rs.status == FAILED:
                 error_msg: str = (
@@ -1510,7 +1523,7 @@ class ForEachStage(BaseStage):
                         },
                     },
                 )
-                raise StageException(error_msg)
+                raise StageException(error_msg, refs=item)
 
         return result.catch(
             status=SUCCESS,
@@ -1544,7 +1557,7 @@ class ForEachStage(BaseStage):
             run_id=gen_id(self.name + (self.id or ""), unique=True),
             extras=self.extras,
         )
-        event: Event = Event() if event is None else event
+        event: Event = event or Event()
         foreach: Union[list[str], list[int]] = (
             param2template(self.foreach, params, extras=self.extras)
             if isinstance(self.foreach, str)
@@ -1610,9 +1623,9 @@ class ForEachStage(BaseStage):
                         f"[STAGE]: Error Handler:||{e.__class__.__name__}:||{e}"
                     )
                     if "errors" in context:
-                        context["errors"].append(e.to_dict())
+                        context["errors"][e.refs] = e.to_dict()
                     else:
-                        context["errors"] = [e.to_dict()]
+                        context["errors"] = e.to_dict(with_refs=True)
                 except CancelledError:
                     pass
         return result.catch(status=status, context=context)
@@ -2075,7 +2088,7 @@ class CaseStage(BaseStage):
         )
 
 
-class RaiseStage(BaseStage):  # pragma: no cov
+class RaiseStage(BaseAsyncStage):  # pragma: no cov
     """Raise error stage executor that raise `StageException` that use a message
     field for making error message before raise.
 
@@ -2114,6 +2127,33 @@ class RaiseStage(BaseStage):  # pragma: no cov
         )
         message: str = param2template(self.message, params, extras=self.extras)
         result.trace.info(f"[STAGE]: Execute Raise-Stage: {message!r}.")
+        raise StageException(message)
+
+    async def axecute(
+        self,
+        params: DictData,
+        *,
+        result: Result | None = None,
+        event: Event | None = None,
+    ) -> Result:
+        """Async execution method for this Empty stage that only logging out to
+        stdout.
+
+        :param params: (DictData) A context data that want to add output result.
+            But this stage does not pass any output.
+        :param result: (Result) A result object for keeping context and status
+            data.
+        :param event: (Event) An event manager that use to track parent execute
+            was not force stopped.
+
+        :rtype: Result
+        """
+        result: Result = result or Result(
+            run_id=gen_id(self.name + (self.id or ""), unique=True),
+            extras=self.extras,
+        )
+        message: str = param2template(self.message, params, extras=self.extras)
+        await result.trace.ainfo(f"[STAGE]: Execute Raise-Stage: {message!r}.")
         raise StageException(message)
 
 

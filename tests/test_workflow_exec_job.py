@@ -49,15 +49,13 @@ def test_workflow_execute_job_raise_inside():
         "jobs": {
             "demo-run": {
                 "stages": {},
-                "errors": [
-                    {
-                        "name": "JobException",
-                        "message": (
-                            "Handler Error: StageException: PyStage: "
-                            "NotImplementedError: "
-                        ),
-                    }
-                ],
+                "errors": {
+                    "name": "JobException",
+                    "message": (
+                        "Handler Error: StageException: PyStage: "
+                        "NotImplementedError: "
+                    ),
+                },
             },
         },
     }

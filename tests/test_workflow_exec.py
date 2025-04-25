@@ -159,12 +159,10 @@ def test_workflow_exec_parallel_timeout():
         "jobs": {
             "sleep-run": {
                 "stages": {"7972360640": {"outputs": {}}},
-                "errors": [
-                    {
-                        "name": "JobException",
-                        "message": "Job strategy was canceled because event was set.",
-                    },
-                ],
+                "errors": {
+                    "name": "JobException",
+                    "message": "Job strategy was canceled because event was set.",
+                },
             },
         },
         "errors": {
@@ -236,15 +234,13 @@ def test_workflow_exec_py_raise():
         "params": {},
         "jobs": {
             "first-job": {
-                "errors": [
-                    {
-                        "name": "JobException",
-                        "message": (
-                            "Handler Error: StageException: PyStage: "
-                            "ValueError: Testing raise error inside PyStage!!!"
-                        ),
-                    }
-                ],
+                "errors": {
+                    "name": "JobException",
+                    "message": (
+                        "Handler Error: StageException: PyStage: "
+                        "ValueError: Testing raise error inside PyStage!!!"
+                    ),
+                },
                 "stages": {},
             },
             "second-job": {"stages": {"1772094681": {"outputs": {}}}},
@@ -265,15 +261,13 @@ def test_workflow_exec_py_raise_parallel():
         "params": {},
         "jobs": {
             "first-job": {
-                "errors": [
-                    {
-                        "name": "JobException",
-                        "message": (
-                            "Handler Error: StageException: PyStage: "
-                            "ValueError: Testing raise error inside PyStage!!!"
-                        ),
-                    }
-                ],
+                "errors": {
+                    "name": "JobException",
+                    "message": (
+                        "Handler Error: StageException: PyStage: "
+                        "ValueError: Testing raise error inside PyStage!!!"
+                    ),
+                },
                 "stages": {},
             },
             "second-job": {"stages": {"1772094681": {"outputs": {}}}},
@@ -868,15 +862,13 @@ def test_workflow_exec_raise_param(test_path):
                             },
                         }
                     },
-                    "errors": [
-                        {
-                            "name": "JobException",
-                            "message": (
-                                "Strategy break because stage, 'get-param', "
-                                "return `FAILED` status."
-                            ),
-                        },
-                    ],
+                    "errors": {
+                        "name": "JobException",
+                        "message": (
+                            "Strategy break because stage, 'get-param', "
+                            "return `FAILED` status."
+                        ),
+                    },
                 }
             },
             "errors": {
@@ -932,15 +924,13 @@ def test_workflow_exec_raise_job_trigger(test_path):
                             },
                         },
                     },
-                    "errors": [
-                        {
-                            "name": "JobException",
-                            "message": (
-                                "Strategy break because stage, 'get-param', "
-                                "return `FAILED` status."
-                            ),
-                        },
-                    ],
+                    "errors": {
+                        "name": "JobException",
+                        "message": (
+                            "Strategy break because stage, 'get-param', "
+                            "return `FAILED` status."
+                        ),
+                    },
                 },
             },
             "errors": {

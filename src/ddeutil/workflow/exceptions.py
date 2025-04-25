@@ -9,10 +9,14 @@ annotate for handle error only.
 """
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import TypedDict, overload
 
 
 class ErrorData(TypedDict):
+    """Error data type dict for typing necessary keys of return of to_dict func
+    and method.
+    """
+
     name: str
     message: str
 
@@ -31,13 +35,31 @@ def to_dict(exception: Exception) -> ErrorData:  # pragma: no cov
 
 
 class BaseWorkflowException(Exception):
+    """Base Workflow exception class will implement the `refs` argument for
+    making an error context to the result context.
+    """
 
-    def to_dict(self) -> ErrorData:
+    def __init__(self, message: str, *, refs: str | None = None):
+        super().__init__(message)
+        self.refs: str | None = refs
+
+    @overload
+    def to_dict(self, with_refs: bool = True) -> dict[str, ErrorData]: ...
+
+    @overload
+    def to_dict(self, with_refs: bool = False) -> ErrorData: ...
+
+    def to_dict(
+        self, with_refs: bool = False
+    ) -> ErrorData | dict[str, ErrorData]:
         """Return ErrorData data from the current exception object.
 
         :rtype: ErrorData
         """
-        return to_dict(self)
+        data: ErrorData = to_dict(self)
+        if with_refs and (self.refs is not None and self.refs != "EMPTY"):
+            return {self.refs: data}
+        return data
 
 
 class UtilException(BaseWorkflowException): ...

@@ -701,7 +701,7 @@ def local_execute_strategy(
 
     :raise JobException: If event was set.
     :raise JobException: If stage execution raise any error as `StageException`.
-    :raise JobException: If the result from execution has status equal `FAILED`.
+    :raise JobException: If the result from execution has `FAILED` status.
 
     :rtype: Result
     """
@@ -740,7 +740,7 @@ def local_execute_strategy(
                     },
                 },
             )
-            raise JobException(error_msg)
+            raise JobException(error_msg, refs=strategy_id)
 
         try:
             result.trace.info(f"[JOB]: Execute Stage: {stage.iden!r}")
@@ -763,7 +763,8 @@ def local_execute_strategy(
                 },
             )
             raise JobException(
-                f"Handler Error: {e.__class__.__name__}: {e}"
+                message=f"Handler Error: {e.__class__.__name__}: {e}",
+                refs=strategy_id,
             ) from e
 
         if rs.status == FAILED:
@@ -781,7 +782,7 @@ def local_execute_strategy(
                     },
                 },
             )
-            raise JobException(error_msg)
+            raise JobException(error_msg, refs=strategy_id)
 
     return result.catch(
         status=SUCCESS,
@@ -898,9 +899,9 @@ def local_execute(
                     f"[JOB]: {ls} Error Handler:||{e.__class__.__name__}:||{e}"
                 )
                 if "errors" in context:
-                    context["errors"].append(e.to_dict())
+                    context["errors"][e.refs] = e.to_dict()
                 else:
-                    context["errors"] = [e.to_dict()]
+                    context["errors"] = e.to_dict(with_refs=True)
             except CancelledError:
                 pass
     return result.catch(status=status, context=context)

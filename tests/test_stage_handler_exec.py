@@ -490,60 +490,64 @@ def test_stage_exec_foreach_concurrent_with_raise(test_path):
                       echo: "Final stage of item: ${{ item }}"
         """,
     ):
-        workflow = Workflow.from_conf(name="tmp-wf-foreach-concurrent-raise")
-        stage: Stage = workflow.job("first-job").stage("foreach-stage")
+        stage: Stage = (
+            Workflow.from_conf(
+                name="tmp-wf-foreach-concurrent-raise",
+                extras={"stage_default_id": False},
+            )
+            .job("first-job")
+            .stage("foreach-stage")
+        )
         rs = stage.set_outputs(stage.handler_execute({}).context, to={})
-        print(rs)
-        # assert rs == {
-        #     "stages": {
-        #         "foreach-stage": {
-        #             "outputs": {
-        #                 "items": [1, 2, 3, 4],
-        #                 "foreach": {
-        #                     3: {
-        #                         "item": 3,
-        #                         "stages": {
-        #                             "2495665187": {
-        #                                 "outputs": {},
-        #                                 "skipped": True,
-        #                             }
-        #                         },
-        #                         "errors": {
-        #                             "name": "StageException",
-        #                             "message": (
-        #                                 "Item-Stage was canceled from event "
-        #                                 "that had set before stage item "
-        #                                 "execution."
-        #                             ),
-        #                         },
-        #                     },
-        #                     1: {
-        #                         "item": 1,
-        #                         "stages": {
-        #                             "2495665187": {
-        #                                 "outputs": {},
-        #                                 "skipped": True,
-        #                             },
-        #                             "2709471980": {"outputs": {}},
-        #                         },
-        #                         "errors": {
-        #                             "name": "StageException",
-        #                             "message": (
-        #                                 "Item-Stage was canceled from event "
-        #                                 "that had set before stage item "
-        #                                 "execution."
-        #                             ),
-        #                         },
-        #                     },
-        #                 },
-        #             },
-        #             "errors": {
-        #                 "name": "StageException",
-        #                 "message": "Sub-Stage execution error: StageException: Raise error when item match 2",
-        #             },
-        #         }
-        #     }
-        # }
+        assert rs == {
+            "stages": {
+                "foreach-stage": {
+                    "outputs": {
+                        "items": [1, 2, 3, 4],
+                        "foreach": {
+                            2: {
+                                "item": 2,
+                                "stages": {},
+                                "errors": {
+                                    "name": "StageException",
+                                    "message": "Raise error when item match 2",
+                                },
+                            },
+                            3: {
+                                "item": 3,
+                                "stages": {},
+                                "errors": {
+                                    "name": "StageException",
+                                    "message": "Item-Stage was canceled because event was set.",
+                                },
+                            },
+                            1: {
+                                "item": 1,
+                                "stages": {},
+                                "errors": {
+                                    "name": "StageException",
+                                    "message": "Item-Stage was canceled because event was set.",
+                                },
+                            },
+                        },
+                    },
+                    "errors": {
+                        2: {
+                            "name": "StageException",
+                            "message": "Raise error when item match 2",
+                        },
+                        3: {
+                            "name": "StageException",
+                            "message": "Item-Stage was canceled because event was set.",
+                        },
+                        1: {
+                            "name": "StageException",
+                            "message": "Item-Stage was canceled because event was set.",
+                        },
+                    },
+                }
+            }
+        }
 
 
 def test_stage_exec_foreach_with_trigger(test_path):
@@ -649,48 +653,43 @@ def test_stage_exec_foreach_with_trigger(test_path):
 
         stage: Stage = workflow.job("first-job").stage("foreach-raise")
         rs = stage.set_outputs(stage.handler_execute({}).context, to={})
-        assert rs["stages"]["foreach-raise"]["outputs"] == {
-            "items": [1, 2],
-            "foreach": {
-                1: {
-                    "item": 1,
-                    "stages": {},
-                    "errors": {
-                        "name": "StageException",
-                        "message": (
-                            "Trigger workflow return failed status with:\n"
-                            "Job, 'first-job', return `FAILED` status."
-                        ),
+        assert rs == {
+            "stages": {
+                "foreach-raise": {
+                    "outputs": {
+                        "items": [1, 2],
+                        "foreach": {
+                            1: {
+                                "item": 1,
+                                "stages": {},
+                                "errors": {
+                                    "name": "StageException",
+                                    "message": "Trigger workflow return failed status with:\nJob, 'first-job', return `FAILED` status.",
+                                },
+                            },
+                            2: {
+                                "item": 2,
+                                "stages": {},
+                                "errors": {
+                                    "name": "StageException",
+                                    "message": "Trigger workflow return failed status with:\nWorkflow job was canceled because event was set.",
+                                },
+                            },
+                        },
                     },
-                },
-                2: {
-                    "item": 2,
-                    "stages": {},
                     "errors": {
-                        "name": "StageException",
-                        "message": (
-                            "Trigger workflow return failed status with:\n"
-                            "Workflow job was canceled because event was set."
-                        ),
+                        1: {
+                            "name": "StageException",
+                            "message": "Trigger workflow return failed status with:\nJob, 'first-job', return `FAILED` status.",
+                        },
+                        2: {
+                            "name": "StageException",
+                            "message": "Trigger workflow return failed status with:\nWorkflow job was canceled because event was set.",
+                        },
                     },
-                },
-            },
+                }
+            }
         }
-        assert len(rs["stages"]["foreach-raise"]["errors"]) == 2
-        assert {
-            "name": "StageException",
-            "message": (
-                "Trigger workflow return failed status with:\n"
-                "Workflow job was canceled because event was set."
-            ),
-        } in rs["stages"]["foreach-raise"]["errors"]
-        assert {
-            "name": "StageException",
-            "message": (
-                "Trigger workflow return failed status with:\n"
-                "Job, 'first-job', return `FAILED` status."
-            ),
-        } in rs["stages"]["foreach-raise"]["errors"]
 
 
 def test_stage_exec_multi_foreach_nested_with_trigger(test_path):
