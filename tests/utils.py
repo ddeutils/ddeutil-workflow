@@ -111,3 +111,5 @@ class MockEvent:  # pragma: no cov
             return True
         self.counter += 1
         return False
+
+    def set(self): ...

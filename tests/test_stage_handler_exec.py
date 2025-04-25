@@ -456,9 +456,7 @@ def test_stage_exec_foreach_concurrent_with_raise(test_path):
                     - name: "Echo stage"
                       echo: |
                         Start run with item: ${{ item }}
-                      sleep: 3
-                    - name: "Final"
-                      echo: "Final stage of item: ${{ item }}"
+                      sleep: 4
         """,
     ):
         stage: Stage = (
@@ -469,7 +467,10 @@ def test_stage_exec_foreach_concurrent_with_raise(test_path):
             .job("first-job")
             .stage("foreach-stage")
         )
-        rs = stage.set_outputs(stage.handler_execute({}).context, to={})
+        event = MockEvent(n=2)
+        rs: Result = stage.set_outputs(
+            stage.handler_execute({}, event=event).context, to={}
+        )
         assert rs == {
             "stages": {
                 "foreach-stage": {
