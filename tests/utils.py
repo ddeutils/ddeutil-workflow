@@ -10,6 +10,7 @@ from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from textwrap import dedent
+from threading import Lock
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -105,11 +106,15 @@ class MockEvent:  # pragma: no cov
     def __init__(self, n: int = 1):
         self.n: int = n
         self.counter: int = 0
+        self.lock: Lock = Lock()
 
     def is_set(self) -> bool:
-        if self.counter == self.n:
-            return True
-        self.counter += 1
-        return False
+        with self.lock:
+            if self.counter == self.n:
+                return True
+            self.counter += 1
+            return False
 
-    def set(self) -> None: ...
+    def set(self) -> None:
+        with self.lock:
+            self.counter = self.n

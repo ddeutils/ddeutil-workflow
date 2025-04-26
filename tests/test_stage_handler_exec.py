@@ -427,66 +427,55 @@ def test_foreach_stage_exec_concurrent(test_path):
         }
 
 
-def test_foreach_stage_exec_concurrent_with_raise(test_path):
-    with dump_yaml_context(
-        test_path / "conf/demo/01_99_wf_test_wf_foreach_concurrent_raise.yml",
-        data="""
-        tmp-wf-foreach-concurrent-raise:
-          type: Workflow
-          jobs:
-            first-job:
-              stages:
-                - name: "Start run for-each stage"
-                  id: foreach-stage
-                  foreach: [1, 2, 3, 4, 5]
-                  concurrent: 2
-                  stages:
-                    - name: "Raise with PyStage"
-                      run: |
-                        import time
-
-                        if ${{ item }} == 2:
-                            raise ValueError("Raise error for item equal 2")
-                        else:
-                            time.sleep(2)
-        """,
-    ):
-        stage: Stage = (
-            Workflow.from_conf(
-                name="tmp-wf-foreach-concurrent-raise",
-                extras={"stage_default_id": False},
-            )
-            .job("first-job")
-            .stage("foreach-stage")
-        )
-        rs: Result = stage.set_outputs(stage.handler_execute({}).context, to={})
-        assert rs == {
-            "stages": {
-                "foreach-stage": {
-                    "outputs": {
-                        "items": [1, 2, 3, 4, 5],
-                        "foreach": {
-                            2: {
-                                "item": 2,
-                                "stages": {},
-                                "errors": {
-                                    "name": "StageException",
-                                    "message": "PyStage: ValueError: Raise error for item equal 2",
-                                },
-                            },
-                            3: {"item": 3, "stages": {}},
-                            1: {"item": 1, "stages": {}},
-                        },
-                    },
-                    "errors": {
+def test_foreach_stage_exec_concurrent_with_raise():
+    stage: ForEachStage = ForEachStage(
+        id="foreach-stage",
+        name="Start run for-each stage",
+        foreach=[1, 2, 3, 4, 5],
+        concurrent=2,
+        stages=[
+            {
+                "name": "Raise with PyStage",
+                "run": (
+                    "import time\n\nif ${{ item }} == 2:\n\t"
+                    'raise ValueError("Raise error for item equal 2")\n'
+                    "else:\n\ttime.sleep(3)"
+                ),
+            },
+        ],
+        extras={"stage_default_id": False},
+    )
+    event = MockEvent(n=4)
+    rs: Result = stage.set_outputs(
+        stage.handler_execute({}, event=event).context, to={}
+    )
+    assert rs == {
+        "stages": {
+            "foreach-stage": {
+                "outputs": {
+                    "items": [1, 2, 3, 4, 5],
+                    "foreach": {
                         2: {
-                            "name": "StageException",
-                            "message": "PyStage: ValueError: Raise error for item equal 2",
+                            "item": 2,
+                            "stages": {},
+                            "errors": {
+                                "name": "StageException",
+                                "message": "PyStage: ValueError: Raise error for item equal 2",
+                            },
                         },
+                        3: {"item": 3, "stages": {}},
+                        1: {"item": 1, "stages": {}},
                     },
-                }
+                },
+                "errors": {
+                    2: {
+                        "name": "StageException",
+                        "message": "PyStage: ValueError: Raise error for item equal 2",
+                    },
+                },
             }
         }
+    }
 
 
 def test_foreach_stage_exec_with_trigger(test_path):
@@ -631,7 +620,7 @@ def test_foreach_stage_exec_with_trigger(test_path):
         }
 
 
-def test_stage_exec_multi_foreach_nested_with_trigger(test_path):
+def test_foreach_stage_exec_nested_foreach_and_trigger(test_path):
     with dump_yaml_context(
         test_path / "conf/demo/01_99_wf_test_wf_foreach_with_trigger.yml",
         data="""

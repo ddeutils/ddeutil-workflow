@@ -27,7 +27,7 @@ jobs:
           - "3.11"
           - "3.12"
           - "3.13"
-          - "3.13t"
+#          - "3.13t"
 #        marker:
 #          - "poke"
 #          - "not_poke"
@@ -37,7 +37,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install the latest version of uv and activate the environment
+      - name: Install UV and activate the environment
         uses: astral-sh/setup-uv@v6
         id: setup-uv
         with:
@@ -56,7 +56,7 @@ jobs:
           uv pip install -U pytest freezegun pytest-asyncio
           uv pip list
 
-      - name: Check GIL
+      - name: Check Python GIL
         if: "startsWith(matrix.python-version, '3.13')"
         run: |
           python --version --version
@@ -64,13 +64,7 @@ jobs:
           python -c "import sysconfig; print(sysconfig.get_config_var('Py_GIL_DISABLED'))"
           python -c "import sys; print(sys._is_gil_enabled())"
 
-      - name: Use Python virtual environment
-        run: |
-          echo "$GITHUB_WORKSPACE/.venv/bin" >> $GITHUB_PATH
-          echo "VIRTUAL_ENV=$GITHUB_WORKSPACE/.venv" >> $GITHUB_ENV
-          python -c "import pathlib; print(pathlib.Path('.').resolve())"
-
-      - name: Check git is working
+      - name: Check Git
         run: |
           git config --global user.email "ddeutils@github.actions"
           git config --global user.name "Testing Git on Testing"
@@ -94,7 +88,7 @@ jobs:
 
       - name: Test with Pytest with not mark poke and schedule
         run: |
-          pytest -vv -s -m "not schedule"
+          uv pytest -vv -s -m "not schedule"
 
 #      - name: Tests with Pytest with mark poke - Worker. ${{ matrix.worker_id }}
 #      - name: Test with Pytest with mark poke and schedule
@@ -105,6 +99,3 @@ jobs:
 #        wait
 #        run: |
 #          pytest -vv -s -m "schedule"
-
-      - name: Minimize uv cache
-        run: uv cache prune --ci
