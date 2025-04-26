@@ -37,15 +37,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
       - name: Install UV and activate the environment
         uses: astral-sh/setup-uv@v6
         id: setup-uv
         with:
-          python-version: ${{ matrix.python-version }}
-          activate-environment: true
           enable-cache: true
-          prune-cache: false
-          ignore-nothing-to-cache: true
           cache-dependency-glob: "**/pyproject.toml"
 
       - name: Install Python Dependencies
@@ -88,7 +89,7 @@ jobs:
 
       - name: Test with Pytest with not mark poke and schedule
         run: |
-          uv pytest -vv -s -m "not schedule"
+          pytest -vv -s -m "not schedule"
 
 #      - name: Tests with Pytest with mark poke - Worker. ${{ matrix.worker_id }}
 #      - name: Test with Pytest with mark poke and schedule
