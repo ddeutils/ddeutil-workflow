@@ -8,6 +8,7 @@ from ddeutil.workflow.exceptions import StageException
 from ddeutil.workflow.stages import (
     BashStage,
     CallStage,
+    ForEachStage,
     PyStage,
     RaiseStage,
     Stage,
@@ -268,99 +269,89 @@ def test_stage_exec_trigger_raise():
         stage.handler_execute(params={})
 
 
-def test_stage_exec_foreach(test_path):
-    with dump_yaml_context(
-        test_path / "conf/demo/01_99_wf_test_wf_foreach.yml",
-        data="""
-        tmp-wf-foreach:
-          type: Workflow
-          jobs:
-            first-job:
-              stages:
-                - name: "Start run for-each stage"
-                  id: foreach-stage
-                  foreach: [1, 2, 3, 4]
-                  stages:
-                    - name: "Echo stage"
-                      echo: |
-                        Start run with item ${{ item }}
-                    - name: "Final Echo"
-                      if: ${{ item }} == 4
-                      echo: |
-                        Final run
-                - name: "Foreach values type not valid"
-                  id: foreach-raise
-                  foreach: ${{ values.items }}
-                  stages:
-                    - name: "Echo stage"
-                      echo: |
-                        Start run with item ${{ item }}
-                    - name: "Final Echo"
-                      if: ${{ item }} == 4
-                      echo: |
-                        Final run
-        """,
-    ):
-        workflow = Workflow.from_conf(name="tmp-wf-foreach")
-        stage: Stage = workflow.job("first-job").stage("foreach-stage")
-        rs = stage.set_outputs(stage.handler_execute({}).context, to={})
-        print(rs)
-        assert rs == {
-            "stages": {
-                "foreach-stage": {
-                    "outputs": {
-                        "items": [1, 2, 3, 4],
-                        "foreach": {
-                            1: {
-                                "item": 1,
-                                "stages": {
-                                    "2709471980": {"outputs": {}},
-                                    "9263488742": {
-                                        "outputs": {},
-                                        "skipped": True,
-                                    },
+def test_foreach_stage_exec():
+    stage: Stage = ForEachStage(
+        name="Start run for-each stage",
+        id="foreach-stage",
+        foreach=[1, 2, 3, 4],
+        stages=[
+            {"name": "Echo stage", "echo": "Start run with item ${{ item }}"},
+            {
+                "name": "Final Echo",
+                "if": "${{ item }} == 4",
+                "echo": "Final stage",
+            },
+        ],
+    )
+    rs = stage.set_outputs(stage.handler_execute({}).context, to={})
+    assert rs == {
+        "stages": {
+            "foreach-stage": {
+                "outputs": {
+                    "items": [1, 2, 3, 4],
+                    "foreach": {
+                        1: {
+                            "item": 1,
+                            "stages": {
+                                "2709471980": {"outputs": {}},
+                                "9263488742": {
+                                    "outputs": {},
+                                    "skipped": True,
                                 },
                             },
-                            2: {
-                                "item": 2,
-                                "stages": {
-                                    "2709471980": {"outputs": {}},
-                                    "9263488742": {
-                                        "outputs": {},
-                                        "skipped": True,
-                                    },
+                        },
+                        2: {
+                            "item": 2,
+                            "stages": {
+                                "2709471980": {"outputs": {}},
+                                "9263488742": {
+                                    "outputs": {},
+                                    "skipped": True,
                                 },
                             },
-                            3: {
-                                "item": 3,
-                                "stages": {
-                                    "2709471980": {"outputs": {}},
-                                    "9263488742": {
-                                        "outputs": {},
-                                        "skipped": True,
-                                    },
+                        },
+                        3: {
+                            "item": 3,
+                            "stages": {
+                                "2709471980": {"outputs": {}},
+                                "9263488742": {
+                                    "outputs": {},
+                                    "skipped": True,
                                 },
                             },
-                            4: {
-                                "item": 4,
-                                "stages": {
-                                    "2709471980": {"outputs": {}},
-                                    "9263488742": {"outputs": {}},
-                                },
+                        },
+                        4: {
+                            "item": 4,
+                            "stages": {
+                                "2709471980": {"outputs": {}},
+                                "9263488742": {"outputs": {}},
                             },
                         },
                     },
                 },
             },
-        }
+        },
+    }
 
-        # NOTE: Raise because type of foreach does not match with list of item.
-        stage: Stage = workflow.job("first-job").stage("foreach-raise")
-        with pytest.raises(StageException):
-            stage.handler_execute({"values": {"items": "test"}})
+    # NOTE: Raise because type of foreach does not match with list of item.
+    stage: ForEachStage = ForEachStage(
+        name="Foreach values type not valid",
+        id="foreach-raise",
+        foreach="${{values.items}}",
+    )
+    with pytest.raises(StageException):
+        stage.handler_execute({"values": {"items": "test"}})
+
+    # NOTE: Raise because foreach item was duplicated.
+    stage: ForEachStage = ForEachStage(
+        name="Foreach item was duplicated",
+        foreach=[1, 1, 2, 3],
+    )
+    with pytest.raises(StageException):
+        stage.handler_execute({})
 
 
-def test_stage_exec_foreach_concurrent(test_path):
+def test_foreach_stage_exec_concurrent(test_path):
     with dump_yaml_context(
         test_path / "conf/demo/01_99_wf_test_wf_foreach_concurrent.yml",
         data="""
@@ -436,7 +427,7 @@ def test_stage_exec_foreach_concurrent(test_path):
         }
 
 
-def test_stage_exec_foreach_concurrent_with_raise(test_path):
+def test_foreach_stage_exec_concurrent_with_raise(test_path):
     with dump_yaml_context(
         test_path / "conf/demo/01_99_wf_test_wf_foreach_concurrent_raise.yml",
         data="""
@@ -447,16 +438,17 @@ def test_stage_exec_foreach_concurrent_with_raise(test_path):
               stages:
                 - name: "Start run for-each stage"
                   id: foreach-stage
-                  foreach: [1, 2, 3, 4]
+                  foreach: [1, 2, 3, 4, 5]
                   concurrent: 2
                   stages:
-                    - name: "Raise"
-                      if: ${{ item }} == 2
-                      raise: "Raise error when item match ${{ item }}"
-                    - name: "Echo stage"
-                      echo: |
-                        Start run with item: ${{ item }}
-                      sleep: 4
+                    - name: "Raise with PyStage"
+                      run: |
+                        import time
+
+                        if ${{ item }} == 2:
+                            raise ValueError("Raise error for item equal 2")
+                        else:
+                            time.sleep(2)
         """,
     ):
         stage: Stage = (
@@ -467,54 +459,29 @@ def test_stage_exec_foreach_concurrent_with_raise(test_path):
             .job("first-job")
             .stage("foreach-stage")
         )
-        event = MockEvent(n=2)
-        rs: Result = stage.set_outputs(
-            stage.handler_execute({}, event=event).context, to={}
-        )
+        rs: Result = stage.set_outputs(stage.handler_execute({}).context, to={})
         assert rs == {
             "stages": {
                 "foreach-stage": {
                     "outputs": {
-                        "items": [1, 2, 3, 4],
+                        "items": [1, 2, 3, 4, 5],
                         "foreach": {
                             2: {
                                 "item": 2,
                                 "stages": {},
                                 "errors": {
                                     "name": "StageException",
-                                    "message": "Raise error when item match 2",
+                                    "message": "PyStage: ValueError: Raise error for item equal 2",
                                 },
                             },
-                            3: {
-                                "item": 3,
-                                "stages": {},
-                                "errors": {
-                                    "name": "StageException",
-                                    "message": "Item-Stage was canceled because event was set.",
-                                },
-                            },
-                            1: {
-                                "item": 1,
-                                "stages": {},
-                                "errors": {
-                                    "name": "StageException",
-                                    "message": "Item-Stage was canceled because event was set.",
-                                },
-                            },
+                            3: {"item": 3, "stages": {}},
+                            1: {"item": 1, "stages": {}},
                         },
                     },
                     "errors": {
                         2: {
                             "name": "StageException",
-                            "message": "Raise error when item match 2",
-                        },
-                        3: {
-                            "name": "StageException",
-                            "message": "Item-Stage was canceled because event was set.",
-                        },
-                        1: {
-                            "name": "StageException",
-                            "message": "Item-Stage was canceled because event was set.",
+                            "message": "PyStage: ValueError: Raise error for item equal 2",
                         },
                     },
                 }
@@ -522,7 +489,7 @@ def test_stage_exec_foreach_concurrent_with_raise(test_path):
         }
 
 
-def test_stage_exec_foreach_with_trigger(test_path):
+def test_foreach_stage_exec_with_trigger(test_path):
     with dump_yaml_context(
         test_path / "conf/demo/01_99_wf_test_wf_foreach_with_trigger.yml",
         data="""
@@ -826,7 +793,7 @@ def test_stage_exec_multi_foreach_nested_with_trigger(test_path):
         }
 
 
-def test_stage_exec_parallel(test_path):
+def test_parallel_stage_exec(test_path):
     with dump_yaml_context(
         test_path / "conf/demo/01_99_wf_test_wf_parallel.yml",
         data="""
@@ -853,7 +820,8 @@ def test_stage_exec_parallel(test_path):
         """,
     ):
         workflow = Workflow.from_conf(
-            name="tmp-wf-parallel", extras={"stage_raise_error": False}
+            name="tmp-wf-parallel",
+            extras={"stage_raise_error": False},
         )
         stage: Stage = workflow.job("first-job").stage("parallel-stage")
         rs = stage.set_outputs(stage.handler_execute({}).context, to={})

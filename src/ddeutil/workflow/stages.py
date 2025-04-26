@@ -508,12 +508,13 @@ class EmptyStage(BaseAsyncStage):
             extras=self.extras,
         )
 
-        if not self.echo:
-            message: str = "..."
-        else:
-            message: str = param2template(
+        message: str = (
+            param2template(
                 dedent(self.echo.strip("\n")), params, extras=self.extras
             )
+            if self.echo
+            else "..."
+        )
 
         result.trace.info(
             f"[STAGE]: Execute Empty-Stage: {self.name!r}: ( {message} )"
@@ -546,12 +547,13 @@ class EmptyStage(BaseAsyncStage):
             extras=self.extras,
         )
 
-        if not self.echo:
-            message: str = "..."
-        else:
-            message: str = param2template(
+        message: str = (
+            param2template(
                 dedent(self.echo.strip("\n")), params, extras=self.extras
             )
+            if self.echo
+            else "..."
+        )
 
         result.trace.info(f"[STAGE]: Empty-Stage: {self.name!r}: ( {message} )")
         if self.sleep > 0:
@@ -1700,6 +1702,8 @@ class ForEachStage(BaseStage):
         # [VALIDATE]: Type of the foreach should be `list` type.
         if not isinstance(foreach, list):
             raise TypeError(f"Does not support foreach: {foreach!r}")
+        elif len(set(foreach)) != len(foreach):
+            raise ValueError("Foreach item should not duplicate.")
 
         result.trace.info(f"[STAGE]: Execute Foreach-Stage: {foreach!r}.")
         result.catch(status=WAIT, context={"items": foreach, "foreach": {}})

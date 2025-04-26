@@ -106,10 +106,10 @@ class MockEvent:  # pragma: no cov
         self.n: int = n
         self.counter: int = 0
 
-    def is_set(self):
+    def is_set(self) -> bool:
         if self.counter == self.n:
             return True
         self.counter += 1
         return False
 
-    def set(self): ...
+    def set(self) -> None: ...
