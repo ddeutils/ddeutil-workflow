@@ -3,7 +3,14 @@ from inspect import isfunction
 from threading import Event
 
 import pytest
-from ddeutil.workflow import CANCEL, FAILED, SUCCESS, Result, Workflow
+from ddeutil.workflow import (
+    CANCEL,
+    FAILED,
+    SUCCESS,
+    ParallelStage,
+    Result,
+    Workflow,
+)
 from ddeutil.workflow.exceptions import StageException
 from ddeutil.workflow.stages import (
     BashStage,
@@ -350,6 +357,91 @@ def test_foreach_stage_exec():
     with pytest.raises(StageException):
         stage.handler_execute({})
 
+    stage: ForEachStage = ForEachStage(
+        name="Foreach item was duplicated",
+        foreach=[1, 1, 2, 3],
+        stages=[{"name": "Echo stage", "echo": "Start item ${{ item }}"}],
+        use_index_as_key=True,
+    )
+    rs: Result = stage.handler_execute({})
+    assert rs.status == SUCCESS
+    assert rs.context == {
+        "items": [1, 1, 2, 3],
+        "foreach": {
+            0: {"item": 1, "stages": {"2709471980": {"outputs": {}}}},
+            1: {"item": 1, "stages": {"2709471980": {"outputs": {}}}},
+            2: {"item": 2, "stages": {"2709471980": {"outputs": {}}}},
+            3: {"item": 3, "stages": {"2709471980": {"outputs": {}}}},
+        },
+    }
+
+
+def test_foreach_stage_exec_raise(test_path):
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_foreach_raise.yml",
+        data="""
+        tmp-wf-foreach-raise:
+          type: Workflow
+          jobs:
+            first-job:
+              stages:
+                - name: "Start run for-each stage"
+                  id: foreach-stage
+                  foreach: [1, 2]
+                  concurrent: 2
+                  stages:
+                    - name: "Echo stage"
+                      echo: |
+                        Start run with item ${{ item }}
+                    - name: "Final Echo"
+                      if: ${{ item }} == 2
+                      raise: Raise for item equal 2
+                    - name: "Sleep stage"
+                      sleep: 4
+                    - name: "Echo Final"
+                      echo: "This stage should not echo because event was set"
+        """,
+    ):
+        workflow = Workflow.from_conf(name="tmp-wf-foreach-raise")
+        stage: Stage = workflow.job("first-job").stage("foreach-stage")
+        rs: Result = stage.handler_execute({})
+        assert rs.status == FAILED
+        assert rs.context == {
+            "items": [1, 2],
+            "foreach": {
+                2: {
+                    "item": 2,
+                    "stages": {"2709471980": {"outputs": {}}},
+                    "errors": {
+                        "name": "StageException",
+                        "message": "Raise for item equal 2",
+                    },
+                },
+                1: {
+                    "item": 1,
+                    "stages": {
+                        "2709471980": {"outputs": {}},
+                        "9263488742": {"outputs": {}, "skipped": True},
+                        "2238460182": {"outputs": {}},
+                    },
+                    "errors": {
+                        "name": "StageException",
+                        "message": "Item-Stage was canceled because event was set.",
+                    },
+                },
+            },
+            "errors": {
+                2: {
+                    "name": "StageException",
+                    "message": "Raise for item equal 2",
+                },
+                1: {
+                    "name": "StageException",
+                    "message": "Item-Stage was canceled because event was set.",
+                },
+            },
+        }
+
 
 def test_foreach_stage_exec_concurrent(test_path):
     with dump_yaml_context(
@@ -578,6 +670,40 @@ def test_parallel_stage_exec(test_path):
                 },
             },
         }
+
+
+def test_parallel_stage_exec_raise():
+    stage = ParallelStage(
+        name="Parallel Stage Raise",
+        parallel={
+            "branch01": [
+                {
+                    "name": "Raise Stage",
+                    "raise": "Raise error inside parallel stage.",
+                }
+            ]
+        },
+    )
+    rs: Result = stage.handler_execute({})
+    assert rs.status == FAILED
+    assert rs.context == {
+        "parallel": {
+            "branch01": {
+                "branch": "branch01",
+                "stages": {},
+                "errors": {
+                    "name": "StageException",
+                    "message": "Raise error inside parallel stage.",
+                },
+            }
+        },
+        "errors": {
+            "branch01": {
+                "name": "StageException",
+                "message": "Raise error inside parallel stage.",
+            },
+        },
+    }
 
 
 def test_stage_exec_until(test_path):

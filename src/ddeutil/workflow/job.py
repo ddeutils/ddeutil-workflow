@@ -839,7 +839,7 @@ def local_execute(
     ls: str = "Fail-Fast" if fail_fast_flag else "All-Completed"
     workers: int = job.strategy.max_parallel
     result.trace.info(
-        f"[JOB]: Execute {ls}: {job.id} with {workers} "
+        f"[JOB]: Execute {ls}: {job.id!r} with {workers} "
         f"worker{'s' if workers > 1 else ''}."
     )
 
@@ -886,7 +886,14 @@ def local_execute(
                     future.cancel()
                 time.sleep(0.075)
 
-            nd: str = f", strategies not run: {not_done}" if not_done else ""
+            nd: str = (
+                (
+                    f", {len(not_done)} strateg"
+                    f"{'ies' if len(not_done) > 1 else 'y'} not run!!!"
+                )
+                if not_done
+                else ""
+            )
             result.trace.debug(f"[JOB]: ... Job was set Fail-Fast{nd}")
             done: list[Future] = as_completed(futures)
 

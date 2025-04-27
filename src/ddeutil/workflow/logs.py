@@ -85,13 +85,13 @@ class TraceMeta(BaseModel):  # pragma: no cov
     process, and thread data.
     """
 
-    mode: Literal["stdout", "stderr"]
-    datetime: str
-    process: int
-    thread: int
-    message: str
-    filename: str
-    lineno: int
+    mode: Literal["stdout", "stderr"] = Field(description="A meta mode.")
+    datetime: str = Field(description="A datetime in string format.")
+    process: int = Field(description="A process ID.")
+    thread: int = Field(description="A thread ID.")
+    message: str = Field(description="A message log.")
+    filename: str = Field(description="A filename of this log.")
+    lineno: int = Field(description="A line number of this log.")
 
     @classmethod
     def make(
@@ -152,11 +152,9 @@ class TraceData(BaseModel):  # pragma: no cov
         """
         data: DictStr = {"stdout": "", "stderr": "", "meta": []}
 
-        if (file / "stdout.txt").exists():
-            data["stdout"] = (file / "stdout.txt").read_text(encoding="utf-8")
-
-        if (file / "stderr.txt").exists():
-            data["stderr"] = (file / "stderr.txt").read_text(encoding="utf-8")
+        for mode in ("stdout", "stderr"):
+            if (file / f"{mode}.txt").exists():
+                data[mode] = (file / f"{mode}.txt").read_text(encoding="utf-8")
 
         if (file / "metadata.json").exists():
             data["meta"] = [
@@ -298,16 +296,30 @@ class BaseTrace(ABC):  # pragma: no cov
         """
         self.__logging(message, mode="exception", is_err=True)
 
+    async def __alogging(
+        self, message: str, mode: str, *, is_err: bool = False
+    ) -> None:
+        """Write trace log with append mode and logging this message with any
+        logging level.
+
+        :param message: (str) A message that want to log.
+        """
+        msg: str = prepare_newline(self.make_message(message))
+
+        if mode != "debug" or (
+            mode == "debug" and dynamic("debug", extras=self.extras)
+        ):
+            await self.awriter(msg, is_err=is_err)
+
+        getattr(logger, mode)(msg, stacklevel=3)
+
     async def adebug(self, message: str) -> None:  # pragma: no cov
         """Async write trace log with append mode and logging this message with
         the DEBUG level.
 
         :param message: (str) A message that want to log.
         """
-        msg: str = self.make_message(message)
-        if dynamic("debug", extras=self.extras):
-            await self.awriter(msg)
-        logger.info(msg, stacklevel=2)
+        await self.__alogging(message, mode="debug")
 
     async def ainfo(self, message: str) -> None:  # pragma: no cov
         """Async write trace log with append mode and logging this message with
@@ -315,9 +327,7 @@ class BaseTrace(ABC):  # pragma: no cov
 
         :param message: (str) A message that want to log.
         """
-        msg: str = self.make_message(message)
-        await self.awriter(msg)
-        logger.info(msg, stacklevel=2)
+        await self.__alogging(message, mode="info")
 
     async def awarning(self, message: str) -> None:  # pragma: no cov
         """Async write trace log with append mode and logging this message with
@@ -325,9 +335,7 @@ class BaseTrace(ABC):  # pragma: no cov
 
         :param message: (str) A message that want to log.
         """
-        msg: str = self.make_message(message)
-        await self.awriter(msg)
-        logger.warning(msg, stacklevel=2)
+        await self.__alogging(message, mode="warning")
 
     async def aerror(self, message: str) -> None:  # pragma: no cov
         """Async write trace log with append mode and logging this message with
@@ -335,9 +343,7 @@ class BaseTrace(ABC):  # pragma: no cov
 
         :param message: (str) A message that want to log.
         """
-        msg: str = self.make_message(message)
-        await self.awriter(msg, is_err=True)
-        logger.error(msg, stacklevel=2)
+        await self.__alogging(message, mode="error", is_err=True)
 
     async def aexception(self, message: str) -> None:  # pragma: no cov
         """Async write trace log with append mode and logging this message with
@@ -345,9 +351,7 @@ class BaseTrace(ABC):  # pragma: no cov
 
         :param message: (str) A message that want to log.
         """
-        msg: str = self.make_message(message)
-        await self.awriter(msg, is_err=True)
-        logger.exception(msg, stacklevel=2)
+        await self.__alogging(message, mode="exception", is_err=True)
 
 
 class FileTrace(BaseTrace):  # pragma: no cov
@@ -361,7 +365,7 @@ class FileTrace(BaseTrace):  # pragma: no cov
     ) -> Iterator[TraceData]:  # pragma: no cov
         """Find trace logs.
 
-        :param path: (Path)
+        :param path: (Path) A trace path that want to find.
         :param extras: An extra parameter that want to override core config.
         """
         for file in sorted(
@@ -374,16 +378,16 @@ class FileTrace(BaseTrace):  # pragma: no cov
     def find_trace_with_id(
         cls,
         run_id: str,
-        force_raise: bool = True,
         *,
+        force_raise: bool = True,
         path: Path | None = None,
         extras: Optional[DictData] = None,
     ) -> TraceData:
         """Find trace log with an input specific run ID.
 
         :param run_id: A running ID of trace log.
-        :param force_raise:
-        :param path:
+        :param force_raise: (bool)
+        :param path: (Path)
         :param extras: An extra parameter that want to override core config.
         """
         base_path: Path = path or dynamic("trace_path", extras=extras)

@@ -1304,13 +1304,15 @@ class TriggerStage(BaseStage):
                 else "."
             )
             raise StageException(
-                f"Trigger workflow return failed status{err_msg}"
+                f"Trigger workflow return `FAILED` status{err_msg}"
             )
         return rs
 
 
 class BaseNestedStage(BaseStage):
-    """Base Nested Stage model."""
+    """Base Nested Stage model. This model is use for checking the child stage
+    is the nested stage or not.
+    """
 
     @abstractmethod
     def execute(
@@ -1540,15 +1542,10 @@ class ParallelStage(BaseNestedStage):
                     future.result()
                 except StageException as e:
                     status = FAILED
-                    result.trace.error(
-                        f"[STAGE]: Error Handler:||{e.__class__.__name__}:||{e}"
-                    )
                     if "errors" in context:
                         context["errors"][e.refs] = e.to_dict()
                     else:
                         context["errors"] = e.to_dict(with_refs=True)
-                except CancelledError:
-                    pass
         return result.catch(status=status, context=context)
 
 
@@ -1593,9 +1590,17 @@ class ForEachStage(BaseNestedStage):
             "will be sequential mode if this value equal 1."
         ),
     )
+    use_index_as_key: bool = Field(
+        default=False,
+        description=(
+            "A flag for using the loop index as a key instead item value. "
+            "This flag allow to skip checking duplicate item step."
+        ),
+    )
 
     def execute_item(
         self,
+        index: int,
         item: StrOrInt,
         params: DictData,
         result: Result,
@@ -1605,6 +1610,7 @@ class ForEachStage(BaseNestedStage):
         """Execute all nested stage that set on this stage with specific foreach
         item parameter.
 
+        :param index: (int) An index value of foreach loop.
         :param item: (str | int) An item that want to execution.
         :param params: (DictData) A parameter data.
         :param result: (Result) A Result instance for return context and status.
@@ -1618,8 +1624,9 @@ class ForEachStage(BaseNestedStage):
         :rtype: Result
         """
         result.trace.debug(f"[STAGE]: Execute Item: {item!r}")
+        key: StrOrInt = index if self.use_index_as_key else item
         context: DictData = copy.deepcopy(params)
-        context.update({"item": item})
+        context.update({"item": item, "loop": index})
         output: DictData = {"item": item, "stages": {}}
         for stage in self.stages:
 
@@ -1638,14 +1645,14 @@ class ForEachStage(BaseNestedStage):
                 result.catch(
                     status=CANCEL,
                     foreach={
-                        item: {
+                        key: {
                             "item": item,
                             "stages": filter_func(output.pop("stages", {})),
                             "errors": StageException(error_msg).to_dict(),
                         }
                     },
                 )
-                raise StageException(error_msg, refs=item)
+                raise StageException(error_msg, refs=key)
 
             try:
                 rs: Result = stage.handler_execute(
@@ -1661,14 +1668,14 @@ class ForEachStage(BaseNestedStage):
                 result.catch(
                     status=FAILED,
                     foreach={
-                        item: {
+                        key: {
                             "item": item,
                             "stages": filter_func(output.pop("stages", {})),
                             "errors": e.to_dict(),
                         },
                     },
                 )
-                raise StageException(str(e), refs=item) from e
+                raise StageException(str(e), refs=key) from e
 
             if rs.status == FAILED:
                 error_msg: str = (
@@ -1679,19 +1686,19 @@ class ForEachStage(BaseNestedStage):
                 result.catch(
                     status=FAILED,
                     foreach={
-                        item: {
+                        key: {
                             "item": item,
                             "stages": filter_func(output.pop("stages", {})),
                             "errors": StageException(error_msg).to_dict(),
                         },
                     },
                 )
-                raise StageException(error_msg, refs=item)
+                raise StageException(error_msg, refs=key)
 
         return result.catch(
             status=SUCCESS,
             foreach={
-                item: {
+                key: {
                     "item": item,
                     "stages": filter_func(output.pop("stages", {})),
                 },
@@ -1730,8 +1737,11 @@ class ForEachStage(BaseNestedStage):
         # [VALIDATE]: Type of the foreach should be `list` type.
         if not isinstance(foreach, list):
             raise TypeError(f"Does not support foreach: {foreach!r}")
-        elif len(set(foreach)) != len(foreach):
-            raise ValueError("Foreach item should not duplicate.")
+        elif len(set(foreach)) != len(foreach) and not self.use_index_as_key:
+            raise ValueError(
+                "Foreach item should not duplicate. If this stage must to pass "
+                "duplicate item, it should set `use_index_as_key: true`."
+            )
 
         result.trace.info(f"[STAGE]: Execute Foreach-Stage: {foreach!r}.")
         result.catch(status=WAIT, context={"items": foreach, "foreach": {}})
@@ -1753,12 +1763,13 @@ class ForEachStage(BaseNestedStage):
             futures: list[Future] = [
                 executor.submit(
                     self.execute_item,
+                    index=i,
                     item=item,
                     params=params,
                     result=result,
                     event=event,
                 )
-                for item in foreach
+                for i, item in enumerate(foreach, start=0)
             ]
             context: DictData = {}
             status: Status = SUCCESS
@@ -1773,7 +1784,14 @@ class ForEachStage(BaseNestedStage):
                     future.cancel()
                 time.sleep(0.075)
 
-                nd: str = f", item not run: {not_done}" if not_done else ""
+                nd: str = (
+                    (
+                        f", {len(not_done)} item"
+                        f"{'s' if len(not_done) > 1 else ''} not run!!!"
+                    )
+                    if not_done
+                    else ""
+                )
                 result.trace.debug(
                     f"[STAGE]: ... Foreach-Stage set failed event{nd}"
                 )
@@ -1784,9 +1802,6 @@ class ForEachStage(BaseNestedStage):
                     future.result()
                 except StageException as e:
                     status = FAILED
-                    result.trace.error(
-                        f"[STAGE]: Error Handler:||{e.__class__.__name__}:||{e}"
-                    )
                     if "errors" in context:
                         context["errors"][e.refs] = e.to_dict()
                     else:
@@ -2291,7 +2306,7 @@ class RaiseStage(BaseAsyncStage):
             extras=self.extras,
         )
         message: str = param2template(self.message, params, extras=self.extras)
-        result.trace.info(f"[STAGE]: Execute Raise-Stage: {message!r}.")
+        result.trace.info(f"[STAGE]: Execute Raise-Stage: ( {message} )")
         raise StageException(message)
 
     async def axecute(
@@ -2318,7 +2333,7 @@ class RaiseStage(BaseAsyncStage):
             extras=self.extras,
         )
         message: str = param2template(self.message, params, extras=self.extras)
-        await result.trace.ainfo(f"[STAGE]: Execute Raise-Stage: {message!r}.")
+        await result.trace.ainfo(f"[STAGE]: Execute Raise-Stage: ( {message} )")
         raise StageException(message)
 
 

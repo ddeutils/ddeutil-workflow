@@ -17,18 +17,6 @@ def test_foreach_stage_exec_with_trigger(test_path):
                 - name: "Echo"
                   id: hello
                   echo: "Run trigger with item: ${{ params.item }}"
-
-        tmp-wf-foreach-trigger-task-raise:
-          type: Workflow
-          params:
-            item: int
-          jobs:
-            first-job:
-              stages:
-                - name: "Echo"
-                  id: raise-stage
-                  raise: "Raise trigger with item: ${{ params.item }}"
-
         tmp-wf-foreach-trigger:
           type: Workflow
           jobs:
@@ -42,20 +30,9 @@ def test_foreach_stage_exec_with_trigger(test_path):
                       trigger: tmp-wf-foreach-trigger-task
                       params:
                         item: ${{ item }}
-                - name: "Raise run for-each stage"
-                  id: foreach-raise
-                  foreach: [1, 2]
-                  stages:
-                    - name: "Stage trigger for raise"
-                      trigger: tmp-wf-foreach-trigger-task-raise
-                      params:
-                        item: ${{ item }}
         """,
     ):
-        workflow = Workflow.from_conf(
-            name="tmp-wf-foreach-trigger",
-            extras={"test": "demo"},
-        )
+        workflow = Workflow.from_conf(name="tmp-wf-foreach-trigger")
         stage: Stage = workflow.job("first-job").stage("foreach-stage")
         rs = stage.set_outputs(stage.handler_execute({}).context, to={})
         assert rs == {
@@ -104,6 +81,38 @@ def test_foreach_stage_exec_with_trigger(test_path):
             },
         }
 
+
+def test_foreach_stage_exec_with_trigger_raise(test_path):
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_foreach_with_trigger_raise.yml",
+        data="""
+        tmp-wf-foreach-trigger-task-raise:
+          type: Workflow
+          params:
+            item: int
+          jobs:
+            first-job:
+              stages:
+                - name: "Echo"
+                  id: raise-stage
+                  raise: "Raise trigger with item: ${{ params.item }}"
+
+        tmp-wf-foreach-trigger-raise:
+          type: Workflow
+          jobs:
+            first-job:
+              stages:
+                - name: "Raise run for-each stage"
+                  id: foreach-raise
+                  foreach: [1, 2]
+                  stages:
+                    - name: "Stage trigger for raise"
+                      trigger: tmp-wf-foreach-trigger-task-raise
+                      params:
+                        item: ${{ item }}
+        """,
+    ):
+        workflow = Workflow.from_conf(name="tmp-wf-foreach-trigger-raise")
         stage: Stage = workflow.job("first-job").stage("foreach-raise")
         rs = stage.set_outputs(stage.handler_execute({}).context, to={})
         assert rs == {
@@ -117,7 +126,7 @@ def test_foreach_stage_exec_with_trigger(test_path):
                                 "stages": {},
                                 "errors": {
                                     "name": "StageException",
-                                    "message": "Trigger workflow return failed status with:\nJob, 'first-job', return `FAILED` status.",
+                                    "message": "Trigger workflow return `FAILED` status with:\nJob, 'first-job', return `FAILED` status.",
                                 },
                             },
                             2: {
@@ -125,7 +134,7 @@ def test_foreach_stage_exec_with_trigger(test_path):
                                 "stages": {},
                                 "errors": {
                                     "name": "StageException",
-                                    "message": "Trigger workflow return failed status with:\nWorkflow job was canceled because event was set.",
+                                    "message": "Trigger workflow return `FAILED` status with:\nWorkflow job was canceled because event was set.",
                                 },
                             },
                         },
@@ -133,11 +142,11 @@ def test_foreach_stage_exec_with_trigger(test_path):
                     "errors": {
                         1: {
                             "name": "StageException",
-                            "message": "Trigger workflow return failed status with:\nJob, 'first-job', return `FAILED` status.",
+                            "message": "Trigger workflow return `FAILED` status with:\nJob, 'first-job', return `FAILED` status.",
                         },
                         2: {
                             "name": "StageException",
-                            "message": "Trigger workflow return failed status with:\nWorkflow job was canceled because event was set.",
+                            "message": "Trigger workflow return `FAILED` status with:\nWorkflow job was canceled because event was set.",
                         },
                     },
                 }
@@ -158,7 +167,7 @@ def test_foreach_stage_exec_nested_foreach_and_trigger(test_path):
               stages:
                 - name: "Echo"
                   id: hello
-                  echo: "Run trigger with item: ${{ params.item }}"
+                  echo: "Trigger Item: ${{ params.item }}"
 
         tmp-wf-foreach-nested-trigger:
           type: Workflow
