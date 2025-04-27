@@ -27,7 +27,7 @@ jobs:
           - "3.11"
           - "3.12"
           - "3.13"
-          - "3.13-dev"
+#          - "3.13t"
 #        marker:
 #          - "poke"
 #          - "not_poke"
@@ -39,17 +39,10 @@ jobs:
 
       - name: Set up Python
         uses: actions/setup-python@v5
-        if: "!endsWith(matrix.python-version, '-dev')"
+        id: setup_python
         with:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
-
-      - name: Set up Pre-release Python with no GIL
-        uses: deadsnakes/action@v3.2.0
-        if: "endsWith(matrix.python-version, '-dev')"
-        with:
-          python-version: ${{ matrix.python-version }}
-          nogil: true
 
       - name: Install UV and activate the environment
         uses: astral-sh/setup-uv@v6
@@ -58,7 +51,7 @@ jobs:
         id: cache
         with:
           path: .venv
-          key: ${{ runner.os }}-python-${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}-test-02
+          key: ${{ runner.os }}-python-${{ steps.setup_python.outputs.python-version }}-${{ hashFiles('pyproject.toml') }}-test-02
 
       - name: Install Python Dependencies
         if: steps.cache.outputs.cache-hit != 'true'
