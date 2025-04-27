@@ -70,6 +70,16 @@ def get_dt_tznow() -> datetime:  # pragma: no cov
     return get_dt_now(tz=config.tz)
 
 
+PREFIX_LOGS: dict[str, dict] = {
+    "CALLER": {"emoji": ""},
+    "STAGE": {"emoji": ""},
+    "JOB": {"emoji": ""},
+    "WORKFLOW": {"emoji": "🏃"},
+    "RELEASE": {"emoji": ""},
+    "POKE": {"emoji": ""},
+}  # pragma: no cov
+
+
 class TraceMeta(BaseModel):  # pragma: no cov
     """Trace Metadata model for making the current metadata of this CPU, Memory
     process, and thread data.

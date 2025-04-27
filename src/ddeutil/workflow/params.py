@@ -190,10 +190,13 @@ class IntParam(DefaultParam):
 
 
 class FloatParam(DefaultParam):  # pragma: no cov
+    """Float parameter."""
+
     type: Literal["float"] = "float"
     precision: int = 6
 
     def rounding(self, value: float) -> float:
+        """Rounding float value with the specific precision field."""
         round_str: str = f"{{0:.{self.precision}f}}"
         return float(round_str.format(round(value, self.precision)))
 
@@ -224,6 +227,7 @@ class DecimalParam(DefaultParam):  # pragma: no cov
     precision: int = 6
 
     def rounding(self, value: Decimal) -> Decimal:
+        """Rounding float value with the specific precision field."""
         return value.quantize(Decimal(10) ** -self.precision)
 
     def receive(self, value: float | Decimal | None = None) -> Decimal:

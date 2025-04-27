@@ -507,7 +507,6 @@ class EmptyStage(BaseAsyncStage):
             run_id=gen_id(self.name + (self.id or ""), unique=True),
             extras=self.extras,
         )
-
         message: str = (
             param2template(
                 dedent(self.echo.strip("\n")), params, extras=self.extras

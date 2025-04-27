@@ -49,14 +49,23 @@ jobs:
           enable-cache: true
           cache-dependency-glob: "**/pyproject.toml"
 
+      - name: Install Python virtual environment
+        run: |
+          uv venv
+
       - name: Install Python Dependencies
         if: steps.setup-uv.outputs.cache-hit != 'true'
         run: |
-          uv venv
           uv pip install -U pip
           uv pip install -U -e .[all]
           uv pip install -U pytest freezegun pytest-asyncio
           uv pip list
+
+      - name: Use Python virtual environment
+        run: |
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> $GITHUB_PATH
+          echo "VIRTUAL_ENV=$GITHUB_WORKSPACE/.venv" >> $GITHUB_ENV
+          python -c "import pathlib; print(pathlib.Path('.').resolve())"
 
       - name: Check Python GIL
         if: "startsWith(matrix.python-version, '3.13')"
@@ -90,7 +99,7 @@ jobs:
 
       - name: Test with Pytest with not mark poke and schedule
         run: |
-          pytest -vv -s -m "not schedule"
+          uv run pytest -vv -s -m "not schedule"
 
 #      - name: Tests with Pytest with mark poke - Worker. ${{ matrix.worker_id }}
 #      - name: Test with Pytest with mark poke and schedule

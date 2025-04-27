@@ -1,4 +1,4 @@
-from ddeutil.workflow import Stage, Workflow
+from ddeutil.workflow import SUCCESS, Result, Stage, Workflow
 
 from ..utils import dump_yaml_context
 
@@ -147,7 +147,7 @@ def test_foreach_stage_exec_with_trigger(test_path):
 
 def test_foreach_stage_exec_nested_foreach_and_trigger(test_path):
     with dump_yaml_context(
-        test_path / "conf/demo/01_99_wf_test_wf_foreach_with_trigger.yml",
+        test_path / "conf/demo/01_99_wf_test_foreach_with_trigger.yml",
         data="""
         tmp-wf-foreach-nested-trigger-task:
           type: Workflow
@@ -177,6 +177,7 @@ def test_foreach_stage_exec_nested_foreach_and_trigger(test_path):
                         - name: "Check params"
 
                         - name: "Stage trigger"
+                          id: trigger-stage
                           trigger: tmp-wf-foreach-nested-trigger-task
                           params:
                             item: ${{ item }}
@@ -184,126 +185,113 @@ def test_foreach_stage_exec_nested_foreach_and_trigger(test_path):
     ):
         workflow = Workflow.from_conf(
             name="tmp-wf-foreach-nested-trigger",
-            extras={"test": "demo"},
+            extras={"stage_default_id": False},
         )
         stage: Stage = workflow.job("first-job").stage("foreach-stage")
-        rs = stage.set_outputs(stage.handler_execute({}).context, to={})
-        assert rs == {
-            "stages": {
-                "foreach-stage": {
-                    "outputs": {
-                        "items": [1, 2],
-                        "foreach": {
-                            1: {
-                                "item": 1,
-                                "stages": {
-                                    "foreach-nested": {
-                                        "outputs": {
-                                            "items": [3, 4],
-                                            "foreach": {
-                                                3: {
-                                                    "item": 3,
-                                                    "stages": {
-                                                        "8713259197": {
-                                                            "outputs": {
-                                                                "params": {
-                                                                    "item": 3
-                                                                },
-                                                                "jobs": {
-                                                                    "first-job": {
-                                                                        "stages": {
-                                                                            "hello": {
-                                                                                "outputs": {}
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                },
+        rs: Result = stage.handler_execute({})
+        assert rs.status == SUCCESS
+        assert rs.context == {
+            "items": [1, 2],
+            "foreach": {
+                1: {
+                    "item": 1,
+                    "stages": {
+                        "foreach-nested": {
+                            "outputs": {
+                                "items": [3, 4],
+                                "foreach": {
+                                    3: {
+                                        "item": 3,
+                                        "stages": {
+                                            "trigger-stage": {
+                                                "outputs": {
+                                                    "params": {"item": 3},
+                                                    "jobs": {
+                                                        "first-job": {
+                                                            "stages": {
+                                                                "hello": {
+                                                                    "outputs": {}
+                                                                }
                                                             }
                                                         }
                                                     },
-                                                },
-                                                4: {
-                                                    "item": 4,
-                                                    "stages": {
-                                                        "8713259197": {
-                                                            "outputs": {
-                                                                "params": {
-                                                                    "item": 4
-                                                                },
-                                                                "jobs": {
-                                                                    "first-job": {
-                                                                        "stages": {
-                                                                            "hello": {
-                                                                                "outputs": {}
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                },
+                                                }
+                                            }
+                                        },
+                                    },
+                                    4: {
+                                        "item": 4,
+                                        "stages": {
+                                            "trigger-stage": {
+                                                "outputs": {
+                                                    "params": {"item": 4},
+                                                    "jobs": {
+                                                        "first-job": {
+                                                            "stages": {
+                                                                "hello": {
+                                                                    "outputs": {}
+                                                                }
                                                             }
                                                         }
                                                     },
-                                                },
-                                            },
-                                        }
-                                    }
+                                                }
+                                            }
+                                        },
+                                    },
                                 },
-                            },
-                            2: {
-                                "item": 2,
-                                "stages": {
-                                    "foreach-nested": {
-                                        "outputs": {
-                                            "items": [3, 4],
-                                            "foreach": {
-                                                3: {
-                                                    "item": 3,
-                                                    "stages": {
-                                                        "8713259197": {
-                                                            "outputs": {
-                                                                "params": {
-                                                                    "item": 3
-                                                                },
-                                                                "jobs": {
-                                                                    "first-job": {
-                                                                        "stages": {
-                                                                            "hello": {
-                                                                                "outputs": {}
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                },
+                            }
+                        }
+                    },
+                },
+                2: {
+                    "item": 2,
+                    "stages": {
+                        "foreach-nested": {
+                            "outputs": {
+                                "items": [3, 4],
+                                "foreach": {
+                                    3: {
+                                        "item": 3,
+                                        "stages": {
+                                            "trigger-stage": {
+                                                "outputs": {
+                                                    "params": {"item": 3},
+                                                    "jobs": {
+                                                        "first-job": {
+                                                            "stages": {
+                                                                "hello": {
+                                                                    "outputs": {}
+                                                                }
                                                             }
                                                         }
                                                     },
-                                                },
-                                                4: {
-                                                    "item": 4,
-                                                    "stages": {
-                                                        "8713259197": {
-                                                            "outputs": {
-                                                                "params": {
-                                                                    "item": 4
-                                                                },
-                                                                "jobs": {
-                                                                    "first-job": {
-                                                                        "stages": {
-                                                                            "hello": {
-                                                                                "outputs": {}
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                },
+                                                }
+                                            }
+                                        },
+                                    },
+                                    4: {
+                                        "item": 4,
+                                        "stages": {
+                                            "trigger-stage": {
+                                                "outputs": {
+                                                    "params": {"item": 4},
+                                                    "jobs": {
+                                                        "first-job": {
+                                                            "stages": {
+                                                                "hello": {
+                                                                    "outputs": {}
+                                                                }
                                                             }
                                                         }
                                                     },
-                                                },
-                                            },
-                                        }
-                                    }
+                                                }
+                                            }
+                                        },
+                                    },
                                 },
-                            },
-                        },
-                    }
-                }
-            }
+                            }
+                        }
+                    },
+                },
+            },
         }
