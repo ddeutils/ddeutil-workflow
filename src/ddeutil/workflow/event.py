@@ -3,8 +3,8 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-"""Event module that store all event object. Now, it has only `On` and `OnYear`
-model these are schedule with crontab event.
+"""Event module that store all event object. Now, it has only `Crontab` and
+`CrontabYear` model these are schedule with crontab event.
 """
 from __future__ import annotations
 
@@ -63,9 +63,9 @@ def interval2crontab(
     return f"{h} {m} {'1' if interval == 'monthly' else '*'} * {d}"
 
 
-class On(BaseModel):
-    """On model (Warped crontab object by Pydantic model) to keep crontab value
-    and generate CronRunner object from this crontab value.
+class Crontab(BaseModel):
+    """Cron event model (Warped the CronJob object by Pydantic model) to keep
+    crontab value and generate CronRunner object from this crontab value.
 
     Methods:
         - generate: is the main use-case of this schedule object.
@@ -128,7 +128,7 @@ class On(BaseModel):
         extras: DictData | None = None,
     ) -> Self:
         """Constructor from the name of config loader that will use loader
-        object for getting the `On` data.
+        object for getting the `Crontab` data.
 
         :param name: (str) A name of config that will get from loader.
         :param extras: (DictData) An extra parameter that use to override core
@@ -172,7 +172,7 @@ class On(BaseModel):
     def __prepare_values(cls, data: Any) -> Any:
         """Extract tz key from value and change name to timezone key.
 
-        :param data: (DictData) A data that want to pass for create an On
+        :param data: (DictData) A data that want to pass for create an Crontab
             model.
 
         :rtype: DictData
@@ -265,9 +265,9 @@ class On(BaseModel):
         return runner
 
 
-class YearOn(On):
-    """On with enhance Year Pydantic model for limit year matrix that use by
-    some data schedule tools like AWS Glue.
+class CrontabYear(Crontab):
+    """Cron event with enhance Year Pydantic model for limit year matrix that
+    use by some data schedule tools like AWS Glue.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)

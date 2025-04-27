@@ -13,7 +13,7 @@ model.
 |--------|--------|----------------|:--------:|-----------------------------------------------------------------------------------|
 | alias  |        | str \| None    |  `None`  | An alias name of workflow that use for schedule model.                            |
 | name   |        | str            |          | A workflow name.                                                                  |
-| on     |        | list[On]       | `list()` | An override the list of On object values.                                         |
+| on     |        | list[Crontab]       | `list()` | An override the list of Crontab object values.                                         |
 | values | params | dict[str, Any] | `dict()` | A value that want to pass to the workflow parameters when calling release method. |
 
 ## Schedule

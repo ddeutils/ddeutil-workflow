@@ -41,7 +41,7 @@ from typing_extensions import Self
 from .__cron import CronRunner
 from .__types import DictData, TupleStr
 from .conf import FileLoad, Loader, dynamic
-from .event import On
+from .event import Crontab
 from .exceptions import WorkflowException
 from .job import Job
 from .logs import Audit, get_audit
@@ -314,7 +314,7 @@ class ReleaseQueue:
 
 
 class Workflow(BaseModel):
-    """Workflow model that use to keep the `Job` and `On` models.
+    """Workflow model that use to keep the `Job` and `Crontab` models.
 
         This is the main future of this project because it uses to be workflow
     data for running everywhere that you want or using it to scheduler task in
@@ -338,9 +338,9 @@ class Workflow(BaseModel):
         default_factory=dict,
         description="A parameters that need to use on this workflow.",
     )
-    on: list[On] = Field(
+    on: list[Crontab] = Field(
         default_factory=list,
-        description="A list of On instance for this workflow schedule.",
+        description="A list of Crontab instance for this workflow schedule.",
     )
     jobs: dict[str, Job] = Field(
         default_factory=dict,
@@ -447,9 +447,9 @@ class Workflow(BaseModel):
     @field_validator("on", mode="after")
     def __on_no_dup_and_reach_limit__(
         cls,
-        value: list[On],
+        value: list[Crontab],
         info: ValidationInfo,
-    ) -> list[On]:
+    ) -> list[Crontab]:
         """Validate the on fields should not contain duplicate values and if it
         contains the every minute value more than one value, it will remove to
         only one value.
@@ -458,7 +458,7 @@ class Workflow(BaseModel):
 
         :param value: A list of on object.
 
-        :rtype: list[On]
+        :rtype: list[Crontab]
         """
         set_ons: set[str] = {str(on.cronjob) for on in value}
         if len(set_ons) != len(value):

@@ -1,8 +1,8 @@
 # Event
 
-## On
+## Crontab
 
-The **On** is schedule object that receive crontab value and able to generate
+The **Crontab** is schedule object that receive crontab value and able to generate
 datetime value with next or previous with any start point of an input datetime.
 
 !!! example "YAML"
@@ -11,7 +11,7 @@ datetime value with next or previous with any start point of an input datetime.
 
         ```yaml
         on_every_5_min:
-          type: On
+          type: Crontab
           cron: "*/5 * * * *"
         ```
 
@@ -21,10 +21,10 @@ datetime value with next or previous with any start point of an input datetime.
 !!! note "Usage"
 
     ```python
-    from ddeutil.workflow.cron import On
+    from ddeutil.workflow.cron import Crontab
 
     # NOTE: Start load the on data from `.yaml` template file with this key.
-    schedule = On.from_conf(name='on_every_5_min', extras={})
+    schedule = Crontab.from_conf(name='on_every_5_min', extras={})
 
     assert '*/5 * * * *' == str(schedule.cronjob)
 
@@ -35,6 +35,6 @@ datetime value with next or previous with any start point of an input datetime.
     assert "2022-01-01 00:15:00" f"{cron_iter.next:%Y-%m-%d %H:%M:%S}"
     ```
 
-## YearOn
+## CrontabYear
 
-The `On` model that add year layer.
+The `Crontab` model that add Year unit.

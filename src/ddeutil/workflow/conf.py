@@ -218,7 +218,7 @@ class BaseLoad(ABC):  # pragma: no cov
 
 class FileLoad(BaseLoad):
     """Base Load object that use to search config data by given some identity
-    value like name of `Workflow` or `On` templates.
+    value like name of `Workflow` or `Crontab` templates.
 
     :param name: (str) A name of key of config data that read with YAML
         Environment object.

@@ -37,39 +37,39 @@ def create_cron_yaml(conf_path: Path):
         conf_path / "demo/02_cron.yml",
         data="""
         every_5_minute_bkk:
-          type: On
+          type: Crontab
           cronjob: "*/5 * * * *"
           timezone: "Asia/Bangkok"
 
         every_minute_bkk:
-          type: On
+          type: Crontab
           cronjob: "* * * * *"
           timezone: "Asia/Bangkok"
 
         every_2_minute_bkk:
-          type: On
+          type: Crontab
           cronjob: "*/2 * * * *"
           timezone: "Asia/Bangkok"
 
         every_3_minute_bkk:
-          type: On
+          type: Crontab
           cronjob: "*/3 * * * *"
           timezone: "Asia/Bangkok"
 
         every_hour_bkk:
-          type: On
+          type: Crontab
           cronjob: "0 * * * *"
           timezone: "Asia/Bangkok"
 
         every_day_noon:
-          type: On
+          type: Crontab
           interval: "monthly"
           day: "monday"
           time: "12:00"
           timezone: "Etc/UTC"
 
         aws_every_5_minute_bkk:
-          type: YearOn
+          type: CrontabYear
           cronjob: "*/5 * * * * 2024"
           timezone: "Asia/Bangkok"
         """,

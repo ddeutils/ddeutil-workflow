@@ -39,31 +39,30 @@ jobs:
 
       - name: Set up Python
         uses: actions/setup-python@v5
+        id: setup_python
         with:
           python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
 
       - name: Install UV and activate the environment
         uses: astral-sh/setup-uv@v6
-        id: setup-uv
-        with:
-          enable-cache: true
-          cache-dependency-glob: "**/pyproject.toml"
 
-      - name: Install Python virtual environment
-        run: |
-          uv venv
-          uv pip list
+      - uses: actions/cache@v4
+        id: cache
+        with:
+          path: .venv
+          key: ${{ runner.os }}-python-${{ steps.setup_python.outputs.python-version }}-${{ hashFiles('pyproject.toml') }}-test-02
 
       - name: Install Python Dependencies
-        if: steps.setup-uv.outputs.cache-hit != 'true'
+        if: steps.cache.outputs.cache-hit != 'true'
+        env:
+          UV_SYSTEM_PYTHON: 1
         run: |
+          uv venv
           uv pip install -U pip
           uv pip install -U -e .[all]
-          uv pip list
-
-      - name: Install Pytest
-        run: |
           uv pip install -U pytest freezegun pytest-asyncio
+          uv pip list
 
       - name: Use Python virtual environment
         run: |

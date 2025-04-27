@@ -2,7 +2,14 @@ from datetime import datetime
 from unittest import mock
 
 import pytest
-from ddeutil.workflow import SUCCESS, Config, CronRunner, FileAudit, On, Result
+from ddeutil.workflow import (
+    SUCCESS,
+    Config,
+    CronRunner,
+    Crontab,
+    FileAudit,
+    Result,
+)
 from ddeutil.workflow.workflow import (
     ReleaseQueue,
     ReleaseType,
@@ -86,7 +93,7 @@ def test_workflow_task_queue(test_path):
         """,
     ):
         workflow = Workflow.from_conf(name="tmp-wf-task-data-release")
-        runner: CronRunner = On.from_conf("every_minute_bkk").generate(
+        runner: CronRunner = Crontab.from_conf("every_minute_bkk").generate(
             datetime(2024, 1, 1, 1)
         )
         queue = {
@@ -132,7 +139,7 @@ def test_workflow_task_release(test_path):
         """,
     ):
         workflow = Workflow.from_conf(name="tmp-wf-task-data-release")
-        runner: CronRunner = On.from_conf("every_minute_bkk").generate(
+        runner: CronRunner = Crontab.from_conf("every_minute_bkk").generate(
             datetime(2024, 1, 1, 1)
         )
         queue = {"demo": ReleaseQueue()}
@@ -192,7 +199,7 @@ def test_workflow_task_release_long_running(test_path):
         """,
     ):
         workflow = Workflow.from_conf(name="tmp-wf-task-data-release-long-run")
-        runner: CronRunner = On.from_conf("every_minute_bkk").generate(
+        runner: CronRunner = Crontab.from_conf("every_minute_bkk").generate(
             datetime(2024, 1, 1, 1)
         )
         queue = {
