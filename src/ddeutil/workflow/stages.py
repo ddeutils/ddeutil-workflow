@@ -1310,7 +1310,36 @@ class TriggerStage(BaseStage):
         return rs
 
 
-class ParallelStage(BaseStage):
+class BaseNestedStage(BaseStage):
+    """Base Nested Stage model."""
+
+    @abstractmethod
+    def execute(
+        self,
+        params: DictData,
+        *,
+        result: Result | None = None,
+        event: Event | None = None,
+    ) -> Result:
+        """Execute abstraction method that action something by sub-model class.
+        This is important method that make this class is able to be the nested
+        stage.
+
+        :param params: (DictData) A parameter data that want to use in this
+            execution.
+        :param result: (Result) A result object for keeping context and status
+            data.
+        :param event: (Event) An event manager that use to track parent execute
+            was not force stopped.
+
+        :rtype: Result
+        """
+        raise NotImplementedError(
+            "Nested-Stage should implement `execute` method."
+        )
+
+
+class ParallelStage(BaseNestedStage):
     """Parallel stage executor that execute branch stages with multithreading.
     This stage let you set the fix branches for running child stage inside it on
     multithread pool.
@@ -1524,7 +1553,7 @@ class ParallelStage(BaseStage):
         return result.catch(status=status, context=context)
 
 
-class ForEachStage(BaseStage):
+class ForEachStage(BaseNestedStage):
     """For-Each stage executor that execute all stages with each item in the
     foreach list.
 
@@ -1768,7 +1797,7 @@ class ForEachStage(BaseStage):
         return result.catch(status=status, context=context)
 
 
-class UntilStage(BaseStage):
+class UntilStage(BaseNestedStage):
     """Until stage executor that will run stages in each loop until it valid
     with stop loop condition.
 
@@ -2019,7 +2048,7 @@ class Match(BaseModel):
     )
 
 
-class CaseStage(BaseStage):
+class CaseStage(BaseNestedStage):
     """Case stage executor that execute all stages if the condition was matched.
 
     Data Validate:

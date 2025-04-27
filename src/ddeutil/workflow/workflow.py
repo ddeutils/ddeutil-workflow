@@ -1022,7 +1022,14 @@ class Workflow(BaseModel):
             extras=self.extras,
         )
         context: DictData = self.parameterize(params)
-        result.trace.info(f"[WORKFLOW]: Execute: {self.name!r}")
+        event: Event = event or Event()
+        max_job_parallel: int = dynamic(
+            "max_job_parallel", f=max_job_parallel, extras=self.extras
+        )
+        result.trace.info(
+            f"[WORKFLOW]: Execute: {self.name!r} ("
+            f"{'parallel' if max_job_parallel > 1 else 'sequential'} jobs)"
+        )
         if not self.jobs:
             result.trace.warning(f"[WORKFLOW]: {self.name!r} does not set jobs")
             return result.catch(status=SUCCESS, context=context)
@@ -1035,16 +1042,9 @@ class Workflow(BaseModel):
         timeout: int = dynamic(
             "max_job_exec_timeout", f=timeout, extras=self.extras
         )
-        event: Event = event or Event()
-        result.trace.debug(
-            f"[WORKFLOW]: ... Run {self.name!r} with non-threading."
-        )
-        max_job_parallel: int = dynamic(
-            "max_job_parallel", f=max_job_parallel, extras=self.extras
-        )
+
         with ThreadPoolExecutor(
-            max_workers=max_job_parallel,
-            thread_name_prefix="wf_exec_non_threading_",
+            max_workers=max_job_parallel, thread_name_prefix="wf_exec_"
         ) as executor:
             futures: list[Future] = []
 
