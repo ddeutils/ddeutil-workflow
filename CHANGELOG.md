@@ -2,6 +2,30 @@
 
 ## Latest Changes
 
+## 0.0.58
+
+### :sparkles: Features
+
+- :dart: feat: revise tests gh workflow (#37)
+- :dart: feat: add use_index_as_key support foreach on duplicate key.
+
+### :bug: Bug fixes
+
+- :gear: fixed: add debug on uv venv step.
+- :gear: fixed: always install pytest.
+- :gear: fixed: uv run pytest not spawn module.
+- :gear: fixed: remove python version 3.13t from tests action.
+
+### :black_nib: Code Changes
+
+- :lipstick: styled: draft emoji for logging prefix.
+- :test_tube: tests: split complex stage testcase to example.
+
+### :package: Build & Workflow
+
+- :toolbox: build: reformat test workflow.
+- :toolbox: build: update test with uv.
+
 ## 0.0.57
 
 ### :stars: Highlight Features
