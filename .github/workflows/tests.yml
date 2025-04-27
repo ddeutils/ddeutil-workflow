@@ -99,7 +99,7 @@ jobs:
 
       - name: Test with Pytest with not mark poke and schedule
         run: |
-          uv run pytest -vv -s -m "not schedule"
+          pytest -vv -s -m "not schedule"
 
 #      - name: Tests with Pytest with mark poke - Worker. ${{ matrix.worker_id }}
 #      - name: Test with Pytest with mark poke and schedule
