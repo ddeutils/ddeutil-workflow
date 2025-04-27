@@ -7,6 +7,7 @@
 """Reusables module that keep any templating functions."""
 from __future__ import annotations
 
+import copy
 import inspect
 import logging
 from ast import Call, Constant, Expr, Module, Name, parse
@@ -450,11 +451,10 @@ def make_registry(
     :rtype: dict[str, Registry]
     """
     rs: dict[str, Registry] = {}
-    regis_calls: list[str] = dynamic(
-        "registry_caller", f=registries
-    )  # pragma: no cov
+    regis_calls: list[str] = copy.deepcopy(
+        dynamic("registry_caller", f=registries)
+    )
     regis_calls.extend(["ddeutil.vendors"])
-
     for module in regis_calls:
         # NOTE: try to sequential import task functions
         try:

@@ -5,6 +5,7 @@
 # ------------------------------------------------------------------------------
 from __future__ import annotations
 
+import copy
 import json
 import os
 from abc import ABC, abstractmethod
@@ -298,6 +299,7 @@ class FileLoad(BaseLoad):
                 f"Multi-config paths does not support for type: {type(paths)}"
             )
         else:
+            paths: list[Path] = copy.deepcopy(paths)
             paths.append(path)
 
         all_data: list[tuple[float, DictData]] = []
