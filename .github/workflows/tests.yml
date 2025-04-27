@@ -27,7 +27,7 @@ jobs:
           - "3.11"
           - "3.12"
           - "3.13"
-#          - "3.13t"
+          - "3.13-dev"
 #        marker:
 #          - "poke"
 #          - "not_poke"
@@ -39,9 +39,17 @@ jobs:
 
       - name: Set up Python
         uses: actions/setup-python@v5
+        if: "!endsWith(matrix.python-version, '-dev')"
         with:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
+
+      - name: Set up Pre-release Python with no GIL
+        uses: deadsnakes/action@v3.2.0
+        if: "endsWith(matrix.python-version, '-dev')"
+        with:
+          python-version: ${{ matrix.python-version }}
+          nogil: true
 
       - name: Install UV and activate the environment
         uses: astral-sh/setup-uv@v6
@@ -69,13 +77,13 @@ jobs:
           echo "VIRTUAL_ENV=${GITHUB_WORKSPACE}/.venv" >> $GITHUB_ENV
           python -c "import pathlib; print(pathlib.Path('.').resolve())"
 
-      # - name: Check Python GIL
-      #   if: "startsWith(matrix.python-version, '3.13')"
-      #   run: |
-      #     python --version --version
-      #     which python
-      #     python -c "import sysconfig; print(sysconfig.get_config_var('Py_GIL_DISABLED'))"
-      #     python -c "import sys; print(sys._is_gil_enabled())"
+      - name: Check Python GIL
+        if: "startsWith(matrix.python-version, '3.13')"
+        run: |
+          python --version --version
+          which python
+          python -c "import sysconfig; print(sysconfig.get_config_var('Py_GIL_DISABLED'))"
+          python -c "import sys; print(sys._is_gil_enabled())"
 
       - name: Check Git
         run: |
