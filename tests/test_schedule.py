@@ -2,7 +2,7 @@ from datetime import datetime
 
 import pytest
 import yaml
-from ddeutil.workflow import On, Schedule, Workflow, WorkflowTask
+from ddeutil.workflow import Crontab, Schedule, Workflow, WorkflowTask
 from pydantic import ValidationError
 
 from .utils import dump_yaml_context
@@ -32,7 +32,7 @@ def test_schedule_from_conf_raise(test_path):
         yaml.dump(
             {
                 "schedule-raise-wf": {
-                    "type": "On",
+                    "type": "Crontab",
                     "workflows": [
                         {"name": "wf-scheduling"},
                     ],
@@ -166,7 +166,7 @@ def test_schedule_remove_workflow_task():
     remover = WorkflowTask(
         alias=wf.name,
         workflow=wf,
-        runner=On.from_conf(name="every_minute_bkk").generate(start_date),
+        runner=Crontab.from_conf(name="every_minute_bkk").generate(start_date),
         values={"asat-dt": "${{ release.logical_date }}"},
     )
     pipeline_tasks.remove(remover)

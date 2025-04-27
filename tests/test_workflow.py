@@ -213,7 +213,7 @@ def test_workflow_from_conf_raise(test_path):
         test_file,
         data={
             "wf-run-from-loader-raise": {
-                "type": "On",
+                "type": "Crontab",
                 "jobs": {
                     "first-job": {
                         "stages": [{"name": "Echo next", "echo": "Hello World"}]

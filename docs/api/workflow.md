@@ -54,7 +54,7 @@
 | name     | str              |          |             |
 | desc     | str \| None      |  `None`  |             |
 | params   | dict[str, Param] | `dict()` |             |
-| on       | list[On]         | `list()` |             |
+| on       | list[Crontab]         | `list()` |             |
 | jobs     | dict[str, Job]   | `dict()` |             |
 
 ## WorkflowTask

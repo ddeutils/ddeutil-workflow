@@ -3,7 +3,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 import yaml
-from ddeutil.workflow import On, YearOn, interval2crontab
+from ddeutil.workflow import Crontab, CrontabYear, interval2crontab
 from pydantic import ValidationError
 
 
@@ -43,8 +43,8 @@ def test_interval2crontab():
     )
 
 
-def test_on():
-    schedule = On(
+def test_event_crontab():
+    schedule = Crontab(
         cronjob="*/5,3,6 9-17/2 * 1-3 1-5",
         extras={"output_hashes": True, "other_key": "not_use_value"},
     )
@@ -53,7 +53,7 @@ def test_on():
         == "0,3,5-6,10,15,20,25,30,35,40,45,50,55 H(9-17)/2 H 1-3 1-5"
     )
 
-    schedule = On.from_conf(name="every_5_minute_bkk", extras={})
+    schedule = Crontab.from_conf(name="every_5_minute_bkk", extras={})
     assert "Asia/Bangkok" == schedule.tz
     assert "*/5 * * * *" == str(schedule.cronjob)
 
@@ -80,8 +80,8 @@ def test_on():
     assert cron_runner.prev == start_date_bkk - timedelta(minutes=5)
 
 
-def test_on_from_value():
-    schedule = On.from_value(
+def test_event_crontab_from_value():
+    schedule = Crontab.from_value(
         value={
             "interval": "monthly",
             "day": "monday",
@@ -92,7 +92,7 @@ def test_on_from_value():
     assert "UTC" == schedule.tz
     assert "12 0 1 * 1" == str(schedule.cronjob)
 
-    schedule = On.from_value(
+    schedule = Crontab.from_value(
         value={
             "interval": "monthly",
             "day": "monday",
@@ -104,7 +104,7 @@ def test_on_from_value():
     assert schedule.tz == "Etc/UTC"
     assert str(schedule.cronjob) == "12 0 1 * 1"
 
-    schedule = On.from_value(
+    schedule = Crontab.from_value(
         value={
             "interval": "monthly",
             "day": "monday",
@@ -117,8 +117,8 @@ def test_on_from_value():
     assert str(schedule.cronjob) == "12 0 1 * 1"
 
 
-def test_on_from_conf():
-    schedule = On.from_conf(
+def test_event_crontab_from_conf():
+    schedule = Crontab.from_conf(
         name="every_day_noon",
         extras={},
     )
@@ -126,7 +126,7 @@ def test_on_from_conf():
     assert "12 0 1 * 1" == str(schedule.cronjob)
 
 
-def test_on_from_conf_raise(test_path):
+def test_event_crontab_from_conf_raise(test_path):
     test_file = test_path / "conf/demo/02_on_raise.yml"
     with test_file.open(mode="w") as f:
         yaml.dump(
@@ -142,7 +142,7 @@ def test_on_from_conf_raise(test_path):
         )
 
     with pytest.raises(ValueError):
-        On.from_conf(
+        Crontab.from_conf(
             name="every_day_no_cron_raise",
             extras={},
         )
@@ -151,14 +151,14 @@ def test_on_from_conf_raise(test_path):
         yaml.dump(
             {
                 "every_day_no_cron_raise": {
-                    "type": "On",
+                    "type": "Crontab",
                 }
             },
             f,
         )
 
     with pytest.raises(ValueError):
-        On.from_conf(
+        Crontab.from_conf(
             name="every_day_no_cron_raise",
             extras={},
         )
@@ -167,7 +167,7 @@ def test_on_from_conf_raise(test_path):
         yaml.dump(
             {
                 "every_day_no_cron_raise": {
-                    "type": "On",
+                    "type": "Crontab",
                     "cronjob": "* * * * *",
                     "timezone": "NotExists",
                 }
@@ -176,7 +176,7 @@ def test_on_from_conf_raise(test_path):
         )
 
     with pytest.raises(ValidationError):
-        On.from_conf(
+        Crontab.from_conf(
             name="every_day_no_cron_raise",
             extras={},
         )
@@ -184,8 +184,8 @@ def test_on_from_conf_raise(test_path):
     test_file.unlink()
 
 
-def test_on_aws():
-    schedule = YearOn.from_conf(
+def test_event_crontab_aws():
+    schedule = CrontabYear.from_conf(
         name="aws_every_5_minute_bkk",
         extras={},
     )
@@ -193,8 +193,8 @@ def test_on_aws():
     assert str(schedule.cronjob) == "*/5 * * * * 2024"
 
 
-def test_on_every_minute():
-    schedule = On.from_conf(name="every_minute_bkk", extras={})
+def test_event_crontab_every_minute():
+    schedule = Crontab.from_conf(name="every_minute_bkk", extras={})
     current: datetime = datetime(2024, 8, 1, 12, 5, 45)
     adjust: datetime = current.replace(second=0, microsecond=0).astimezone(
         tz=ZoneInfo(schedule.tz)
@@ -205,15 +205,15 @@ def test_on_every_minute():
     assert f"{gen.next:%Y-%m-%d %H:%M:%S}" == "2024-08-01 12:06:00"
 
 
-def test_on_every_minute_with_second():
-    schedule = On.from_conf(name="every_minute_bkk")
+def test_event_crontab_every_minute_with_second():
+    schedule = Crontab.from_conf(name="every_minute_bkk")
     gen = schedule.next(datetime(2024, 1, 1, 0, 0, 12))
     assert f"{gen.date:%Y-%m-%d %H:%M:%S}" == "2024-01-01 00:01:00"
     assert f"{gen.next:%Y-%m-%d %H:%M:%S}" == "2024-01-01 00:02:00"
 
 
-def test_on_every_5_minute_bkk():
-    schedule = On.from_conf(name="every_5_minute_bkk")
+def test_event_crontab_every_5_minute_bkk():
+    schedule = Crontab.from_conf(name="every_5_minute_bkk")
     schedule.generate("2024-01-01 01:12:00")
     schedule.next("2024-01-01 01:12:00")
 
@@ -224,8 +224,10 @@ def test_on_every_5_minute_bkk():
         schedule.next(20240101001200)
 
 
-def test_on_serialize():
-    schedule = On.model_validate({"cronjob": "* * * * *", "tz": "Asia/Bangkok"})
+def test_event_crontab_serialize():
+    schedule = Crontab.model_validate(
+        {"cronjob": "* * * * *", "tz": "Asia/Bangkok"}
+    )
     assert schedule.model_dump(by_alias=False, exclude_unset=True) == {
         "cronjob": "* * * * *",
         "tz": "Asia/Bangkok",

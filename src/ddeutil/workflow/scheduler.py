@@ -57,7 +57,7 @@ except ImportError:  # pragma: no cov
 from .__cron import CronRunner
 from .__types import DictData, TupleStr
 from .conf import FileLoad, Loader, dynamic
-from .event import On
+from .event import Crontab
 from .exceptions import ScheduleException, WorkflowException
 from .logs import Audit, get_audit
 from .result import SUCCESS, Result
@@ -103,9 +103,9 @@ class ScheduleWorkflow(BaseModel):
         description="An alias name of workflow that use for schedule model.",
     )
     name: str = Field(description="A workflow name.")
-    on: list[On] = Field(
+    on: list[Crontab] = Field(
         default_factory=list,
-        description="An override the list of On object values.",
+        description="An override the list of Crontab object values.",
     )
     values: DictData = Field(
         default_factory=dict,
@@ -158,15 +158,17 @@ class ScheduleWorkflow(BaseModel):
         return data
 
     @field_validator("on", mode="after")
-    def __on_no_dup__(cls, value: list[On], info: ValidationInfo) -> list[On]:
+    def __on_no_dup__(
+        cls, value: list[Crontab], info: ValidationInfo
+    ) -> list[Crontab]:
         """Validate the on fields should not contain duplicate values and if it
         contains every minute value, it should have only one on value.
 
-        :param value: (list[On]) A list of `On` object.
+        :param value: (list[Crontab]) A list of `Crontab` object.
         :param info: (ValidationInfo) An validation info object for getting an
             extra parameter.
 
-        :rtype: list[On]
+        :rtype: list[Crontab]
         """
         set_ons: set[str] = {str(on.cronjob) for on in value}
         if len(set_ons) != len(value):
@@ -209,7 +211,7 @@ class ScheduleWorkflow(BaseModel):
 
         # IMPORTANT: Create the default 'on' value if it does not pass the `on`
         #   field to the Schedule object.
-        ons: list[On] = self.on or wf.on.copy()
+        ons: list[Crontab] = self.on or wf.on.copy()
         workflow_tasks: list[WorkflowTask] = []
         for on in ons:
 
