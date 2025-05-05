@@ -3,7 +3,6 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-# [x] Use dynamic config
 # [x] Use fix config for `get_logger`, and Model initialize step.
 """A Logs module contain Trace dataclass and Audit Pydantic model.
 """
@@ -84,6 +83,7 @@ class TraceMeta(BaseModel):  # pragma: no cov
     """
 
     mode: Literal["stdout", "stderr"] = Field(description="A meta mode.")
+    level: str = Field(description="A log level.")
     datetime: str = Field(description="A datetime in string format.")
     process: int = Field(description="A process ID.")
     thread: int = Field(description="A thread ID.")
@@ -96,13 +96,15 @@ class TraceMeta(BaseModel):  # pragma: no cov
         cls,
         mode: Literal["stdout", "stderr"],
         message: str,
+        level: str,
         *,
         extras: Optional[DictData] = None,
     ) -> Self:
         """Make the current TraceMeta instance that catching local state.
 
-        :param mode: A metadata mode.
-        :param message: A message.
+        :param mode: (Literal["stdout", "stderr"]) A metadata mode.
+        :param message: (str) A message.
+        :param level: (str) A log level.
         :param extras: (DictData) An extra parameter that want to override core
             config values.
 
@@ -114,6 +116,7 @@ class TraceMeta(BaseModel):  # pragma: no cov
         extras: DictData = extras or {}
         return cls(
             mode=mode,
+            level=level,
             datetime=(
                 get_dt_now(tz=dynamic("tz", extras=extras)).strftime(
                     dynamic("log_datetime_format", extras=extras)
@@ -211,24 +214,30 @@ class BaseTrace(BaseModel, ABC):  # pragma: no cov
         )
 
     @abstractmethod
-    def writer(self, message: str, is_err: bool = False) -> None:
+    def writer(self, message: str, level: str, is_err: bool = False) -> None:
         """Write a trace message after making to target pointer object. The
         target can be anything be inherited this class and overwrite this method
         such as file, console, or database.
 
-        :param message: A message after making.
-        :param is_err: A flag for writing with an error trace or not.
+        :param message: (str) A message after making.
+        :param level: (str) A log level.
+        :param is_err: (bool) A flag for writing with an error trace or not.
+            (Default be False)
         """
         raise NotImplementedError(
             "Create writer logic for this trace object before using."
         )
 
     @abstractmethod
-    async def awriter(self, message: str, is_err: bool = False) -> None:
+    async def awriter(
+        self, message: str, level: str, is_err: bool = False
+    ) -> None:
         """Async Write a trace message after making to target pointer object.
 
-        :param message:
-        :param is_err:
+        :param message: (str) A message after making.
+        :param level: (str) A log level.
+        :param is_err: (bool) A flag for writing with an error trace or not.
+            (Default be False)
         """
         raise NotImplementedError(
             "Create async writer logic for this trace object before using."
@@ -259,7 +268,7 @@ class BaseTrace(BaseModel, ABC):  # pragma: no cov
         if mode != "debug" or (
             mode == "debug" and dynamic("debug", extras=self.extras)
         ):
-            self.writer(msg, is_err=is_err)
+            self.writer(msg, level=mode, is_err=is_err)
 
         getattr(logger, mode)(msg, stacklevel=3)
 
@@ -316,7 +325,7 @@ class BaseTrace(BaseModel, ABC):  # pragma: no cov
         if mode != "debug" or (
             mode == "debug" and dynamic("debug", extras=self.extras)
         ):
-            await self.awriter(msg, is_err=is_err)
+            await self.awriter(msg, level=mode, is_err=is_err)
 
         getattr(logger, mode)(msg, stacklevel=3)
 
@@ -440,7 +449,7 @@ class FileTrace(BaseTrace):  # pragma: no cov
         """
         return f"({self.cut_id}) {message}"
 
-    def writer(self, message: str, is_err: bool = False) -> None:
+    def writer(self, message: str, level: str, is_err: bool = False) -> None:
         """Write a trace message after making to target file and write metadata
         in the same path of standard files.
 
@@ -450,14 +459,17 @@ class FileTrace(BaseTrace):  # pragma: no cov
             ... ./logs/run_id=<run-id>/stdout.txt
             ... ./logs/run_id=<run-id>/stderr.txt
 
-        :param message: A message after making.
+        :param message: (str) A message after making.
+        :param level: (str) A log level.
         :param is_err: A flag for writing with an error trace or not.
         """
         if not dynamic("enable_write_log", extras=self.extras):
             return
 
         mode: Literal["stdout", "stderr"] = "stderr" if is_err else "stdout"
-        trace_meta: TraceMeta = TraceMeta.make(mode=mode, message=message)
+        trace_meta: TraceMeta = TraceMeta.make(
+            mode=mode, level=level, message=message
+        )
 
         with (self.pointer / f"{mode}.txt").open(
             mode="at", encoding="utf-8"
@@ -471,7 +483,7 @@ class FileTrace(BaseTrace):  # pragma: no cov
             f.write(trace_meta.model_dump_json() + "\n")
 
     async def awriter(
-        self, message: str, is_err: bool = False
+        self, message: str, level: str, is_err: bool = False
     ) -> None:  # pragma: no cov
         """Write with async mode."""
         if not dynamic("enable_write_log", extras=self.extras):
@@ -483,7 +495,9 @@ class FileTrace(BaseTrace):  # pragma: no cov
             raise ImportError("Async mode need aiofiles package") from e
 
         mode: Literal["stdout", "stderr"] = "stderr" if is_err else "stdout"
-        trace_meta: TraceMeta = TraceMeta.make(mode=mode, message=message)
+        trace_meta: TraceMeta = TraceMeta.make(
+            mode=mode, level=level, message=message
+        )
 
         async with aiofiles.open(
             self.pointer / f"{mode}.txt", mode="at", encoding="utf-8"
@@ -530,9 +544,13 @@ class SQLiteTrace(BaseTrace):  # pragma: no cov
 
     def make_message(self, message: str) -> str: ...
 
-    def writer(self, message: str, is_err: bool = False) -> None: ...
+    def writer(
+        self, message: str, level: str, is_err: bool = False
+    ) -> None: ...
 
-    def awriter(self, message: str, is_err: bool = False) -> None: ...
+    def awriter(
+        self, message: str, level: str, is_err: bool = False
+    ) -> None: ...
 
 
 Trace = TypeVar("Trace", bound=BaseTrace)
