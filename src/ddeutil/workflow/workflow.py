@@ -69,10 +69,10 @@ __all__: TupleStr = (
 class ReleaseType(str, Enum):
     """Release Type Enum support the type field on the Release dataclass."""
 
-    DEFAULT: str = "manual"
-    SCHEDULE: str = "schedule"
-    POKING: str = "poking"
-    FORCE: str = "force"
+    DEFAULT = "manual"
+    SCHEDULE = "schedule"
+    POKING = "poking"
+    FORCE = "force"
 
 
 @total_ordering
@@ -105,14 +105,14 @@ class Release:
         return f"{self.date:%Y-%m-%d %H:%M:%S}"
 
     @classmethod
-    def from_dt(cls, dt: datetime | str) -> Self:
+    def from_dt(cls, dt: Union[datetime, str]) -> Self:
         """Construct Release object from `datetime` or `str` objects.
 
             This method will replace second and millisecond value to 0 and
         replace timezone to the `tz` config setting or extras overriding before
         create Release object.
 
-        :param dt: (datetime | str) A datetime object or string that want to
+        :param dt: (Union[datetime, str]) A datetime object or string that want to
             construct to the Release object.
 
         :raise TypeError: If the type of the dt argument does not valid with
@@ -129,7 +129,7 @@ class Release:
             )
         return cls(date=replace_sec(dt.replace(tzinfo=None)))
 
-    def __eq__(self, other: Release | datetime) -> bool:
+    def __eq__(self, other: Union[Release, datetime]) -> bool:
         """Override equal property that will compare only the same type or
         datetime.
 
@@ -141,7 +141,7 @@ class Release:
             return self.date == other
         return NotImplemented
 
-    def __lt__(self, other: Release | datetime) -> bool:
+    def __lt__(self, other: Union[Release, datetime]) -> bool:
         """Override less-than property that will compare only the same type or
         datetime.
 
@@ -209,7 +209,7 @@ class ReleaseQueue:
         """
         return len(self.queue) > 0
 
-    def check_queue(self, value: Release | datetime) -> bool:
+    def check_queue(self, value: Union[Release, datetime]) -> bool:
         """Check a Release value already exists in list of tracking
         queues.
 
@@ -476,7 +476,7 @@ class Workflow(BaseModel):
         if len(set_tz) > 1:
             raise ValueError(
                 f"The on fields should not contain multiple timezone, "
-                f"{list[set_tz]}."
+                f"{list(set_tz)}."
             )
 
         extras: Optional[DictData] = info.data.get("extras")
@@ -563,11 +563,11 @@ class Workflow(BaseModel):
             adding jobs key to this parameter.
         """
         # VALIDATE: Incoming params should have keys that set on this workflow.
-        if check_key := tuple(
+        if check_key := [
             f"{k!r}"
             for k in self.params
             if (k not in params and self.params[k].required)
-        ):
+        ]:
             raise WorkflowException(
                 f"Required Param on this workflow setting does not set: "
                 f"{', '.join(check_key)}."
@@ -588,14 +588,14 @@ class Workflow(BaseModel):
 
     def release(
         self,
-        release: datetime | Release,
+        release: Union[Release, datetime],
         params: DictData,
         *,
-        run_id: str | None = None,
-        parent_run_id: str | None = None,
+        run_id: Optional[str] = None,
+        parent_run_id: Optional[str] = None,
         audit: type[Audit] = None,
         queue: Optional[ReleaseQueue] = None,
-        override_log_name: str | None = None,
+        override_log_name: Optional[str] = None,
         result: Optional[Result] = None,
         timeout: int = 600,
     ) -> Result:
@@ -745,12 +745,12 @@ class Workflow(BaseModel):
 
     def poke(
         self,
-        params: DictData | None = None,
-        start_date: datetime | None = None,
+        params: Optional[DictData] = None,
+        start_date: Optional[datetime] = None,
         *,
-        run_id: str | None = None,
+        run_id: Optional[str] = None,
         periods: int = 1,
-        audit: Audit | None = None,
+        audit: Optional[Audit] = None,
         force_run: bool = False,
         timeout: int = 1800,
         max_poking_pool_worker: int = 2,
@@ -907,8 +907,8 @@ class Workflow(BaseModel):
         job: Job,
         params: DictData,
         *,
-        result: Result | None = None,
-        event: Event | None = None,
+        result: Optional[Result] = None,
+        event: Optional[Event] = None,
     ) -> Result:
         """Job execution with passing dynamic parameters from the main workflow
         execution to the target job object via job's ID.
@@ -969,10 +969,10 @@ class Workflow(BaseModel):
         self,
         params: DictData,
         *,
-        run_id: str | None = None,
-        parent_run_id: str | None = None,
-        result: Result | None = None,
-        event: Event | None = None,
+        run_id: Optional[str] = None,
+        parent_run_id: Optional[str] = None,
+        result: Optional[Result] = None,
+        event: Optional[Event] = None,
         timeout: int = 3600,
         max_job_parallel: int = 2,
     ) -> Result:
@@ -999,8 +999,8 @@ class Workflow(BaseModel):
         at the result context.
 
         :param params: A parameter data that will parameterize before execution.
-        :param run_id: (str | None) A workflow running ID.
-        :param parent_run_id: (str | None) A parent workflow running ID.
+        :param run_id: (Optional[str]) A workflow running ID.
+        :param parent_run_id: (Optional[str]) A parent workflow running ID.
         :param result: (Result) A Result instance for return context and status.
         :param event: (Event) An Event manager instance that use to cancel this
             execution if it forces stopped by parent execution.
@@ -1165,10 +1165,10 @@ class WorkflowTask:
 
     def release(
         self,
-        release: datetime | Release | None = None,
-        run_id: str | None = None,
+        release: Optional[Union[Release, datetime]] = None,
+        run_id: Optional[str] = None,
         audit: type[Audit] = None,
-        queue: ReleaseQueue | None = None,
+        queue: Optional[ReleaseQueue] = None,
     ) -> Result:
         """Release the workflow task that passing an override parameter to
         the parent release method with the `values` field.

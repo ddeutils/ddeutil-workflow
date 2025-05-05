@@ -141,8 +141,8 @@ class BaseStage(BaseModel, ABC):
         self,
         params: DictData,
         *,
-        result: Result | None = None,
-        event: Event | None = None,
+        result: Optional[Result] = None,
+        event: Optional[Event] = None,
     ) -> Result:
         """Execute abstraction method that action something by sub-model class.
         This is important method that make this class is able to be the stage.
@@ -162,12 +162,12 @@ class BaseStage(BaseModel, ABC):
         self,
         params: DictData,
         *,
-        run_id: str | None = None,
-        parent_run_id: str | None = None,
-        result: Result | None = None,
-        event: Event | None = None,
-        raise_error: bool | None = None,
-    ) -> Result | DictData:
+        run_id: Optional[str] = None,
+        parent_run_id: Optional[str] = None,
+        result: Optional[Result] = None,
+        event: Optional[Event] = None,
+        raise_error: Optional[bool] = None,
+    ) -> Union[Result, DictData]:
         """Handler stage execution result from the stage `execute` method.
 
             This stage exception handler still use ok-error concept, but it
@@ -376,8 +376,8 @@ class BaseAsyncStage(BaseStage):
         self,
         params: DictData,
         *,
-        result: Result | None = None,
-        event: Event | None = None,
+        result: Optional[Result] = None,
+        event: Optional[Event] = None,
     ) -> Result:
         raise NotImplementedError(
             "Async Stage should implement `execute` method."
@@ -388,8 +388,8 @@ class BaseAsyncStage(BaseStage):
         self,
         params: DictData,
         *,
-        result: Result | None = None,
-        event: Event | None = None,
+        result: Optional[Result] = None,
+        event: Optional[Event] = None,
     ) -> Result:
         """Async execution method for this Empty stage that only logging out to
         stdout.
@@ -411,11 +411,11 @@ class BaseAsyncStage(BaseStage):
         self,
         params: DictData,
         *,
-        run_id: str | None = None,
-        parent_run_id: str | None = None,
-        result: Result | None = None,
-        event: Event | None = None,
-        raise_error: bool | None = None,
+        run_id: Optional[str] = None,
+        parent_run_id: Optional[str] = None,
+        result: Optional[Result] = None,
+        event: Optional[Event] = None,
+        raise_error: Optional[bool] = None,
     ) -> Result:
         """Async Handler stage execution result from the stage `execute` method.
 
@@ -487,8 +487,8 @@ class EmptyStage(BaseAsyncStage):
         self,
         params: DictData,
         *,
-        result: Result | None = None,
-        event: Event | None = None,
+        result: Optional[Result] = None,
+        event: Optional[Event] = None,
     ) -> Result:
         """Execution method for the Empty stage that do only logging out to
         stdout.
@@ -528,8 +528,8 @@ class EmptyStage(BaseAsyncStage):
         self,
         params: DictData,
         *,
-        result: Result | None = None,
-        event: Event | None = None,
+        result: Optional[Result] = None,
+        event: Optional[Event] = None,
     ) -> Result:
         """Async execution method for this Empty stage that only logging out to
         stdout.
@@ -599,13 +599,13 @@ class BashStage(BaseAsyncStage):
 
     @contextlib.asynccontextmanager
     async def acreate_sh_file(
-        self, bash: str, env: DictStr, run_id: str | None = None
+        self, bash: str, env: DictStr, run_id: Optional[str] = None
     ) -> AsyncIterator[TupleStr]:
         """Async create and write `.sh` file with the `aiofiles` package.
 
         :param bash: (str) A bash statement.
         :param env: (DictStr) An environment variable that set before run bash.
-        :param run_id: (str | None) A running stage ID that use for writing sh
+        :param run_id: (Optional[str]) A running stage ID that use for writing sh
             file instead generate by UUID4.
 
         :rtype: AsyncIterator[TupleStr]
@@ -635,14 +635,14 @@ class BashStage(BaseAsyncStage):
 
     @contextlib.contextmanager
     def create_sh_file(
-        self, bash: str, env: DictStr, run_id: str | None = None
+        self, bash: str, env: DictStr, run_id: Optional[str] = None
     ) -> Iterator[TupleStr]:
         """Create and write the `.sh` file before giving this file name to
         context. After that, it will auto delete this file automatic.
 
         :param bash: (str) A bash statement.
         :param env: (DictStr) An environment variable that set before run bash.
-        :param run_id: (str | None) A running stage ID that use for writing sh
+        :param run_id: (Optional[str]) A running stage ID that use for writing sh
             file instead generate by UUID4.
 
         :rtype: Iterator[TupleStr]
@@ -673,8 +673,8 @@ class BashStage(BaseAsyncStage):
         self,
         params: DictData,
         *,
-        result: Result | None = None,
-        event: Event | None = None,
+        result: Optional[Result] = None,
+        event: Optional[Event] = None,
     ) -> Result:
         """Execute bash statement with the Python build-in `subprocess` package.
         It will catch result from the `subprocess.run` returning output like
@@ -730,8 +730,8 @@ class BashStage(BaseAsyncStage):
         self,
         params: DictData,
         *,
-        result: Result | None = None,
-        event: Event | None = None,
+        result: Optional[Result] = None,
+        event: Optional[Event] = None,
     ) -> Result:
         """Async execution method for this Bash stage that only logging out to
         stdout.
@@ -858,8 +858,8 @@ class PyStage(BaseAsyncStage):
         self,
         params: DictData,
         *,
-        result: Result | None = None,
-        event: Event | None = None,
+        result: Optional[Result] = None,
+        event: Optional[Event] = None,
     ) -> Result:
         """Execute the Python statement that pass all globals and input params
         to globals argument on `exec` build-in function.
@@ -916,8 +916,8 @@ class PyStage(BaseAsyncStage):
         self,
         params: DictData,
         *,
-        result: Result | None = None,
-        event: Event | None = None,
+        result: Optional[Result] = None,
+        event: Optional[Event] = None,
     ) -> Result:
         """Async execution method for this Bash stage that only logging out to
         stdout.
@@ -1018,8 +1018,8 @@ class CallStage(BaseAsyncStage):
         self,
         params: DictData,
         *,
-        result: Result | None = None,
-        event: Event | None = None,
+        result: Optional[Result] = None,
+        event: Optional[Event] = None,
     ) -> Result:
         """Execute this caller function with its argument parameter.
 
@@ -1108,8 +1108,8 @@ class CallStage(BaseAsyncStage):
         self,
         params: DictData,
         *,
-        result: Result | None = None,
-        event: Event | None = None,
+        result: Optional[Result] = None,
+        event: Optional[Event] = None,
     ) -> Result:
         """Async execution method for this Bash stage that only logging out to
         stdout.
@@ -1266,8 +1266,8 @@ class TriggerStage(BaseStage):
         self,
         params: DictData,
         *,
-        result: Result | None = None,
-        event: Event | None = None,
+        result: Optional[Result] = None,
+        event: Optional[Event] = None,
     ) -> Result:
         """Trigger another workflow execution. It will wait the trigger
         workflow running complete before catching its result.
@@ -1298,7 +1298,7 @@ class TriggerStage(BaseStage):
             event=event,
         )
         if rs.status == FAILED:
-            err_msg: str | None = (
+            err_msg: Optional[str] = (
                 f" with:\n{msg}"
                 if (msg := rs.context.get("errors", {}).get("message"))
                 else "."
@@ -1319,8 +1319,8 @@ class BaseNestedStage(BaseStage):
         self,
         params: DictData,
         *,
-        result: Result | None = None,
-        event: Event | None = None,
+        result: Optional[Result] = None,
+        event: Optional[Event] = None,
     ) -> Result:
         """Execute abstraction method that action something by sub-model class.
         This is important method that make this class is able to be the nested
@@ -1390,7 +1390,7 @@ class ParallelStage(BaseNestedStage):
         params: DictData,
         result: Result,
         *,
-        event: Event | None = None,
+        event: Optional[Event] = None,
     ) -> Result:
         """Execute all stage with specific branch ID.
 
@@ -1487,8 +1487,8 @@ class ParallelStage(BaseNestedStage):
         self,
         params: DictData,
         *,
-        result: Result | None = None,
-        event: Event | None = None,
+        result: Optional[Result] = None,
+        event: Optional[Event] = None,
     ) -> Result:
         """Execute parallel each branch via multi-threading pool.
 
@@ -1526,7 +1526,7 @@ class ParallelStage(BaseNestedStage):
             context: DictData = {}
             status: Status = SUCCESS
 
-            futures: list[Future] = (
+            futures: list[Future] = [
                 executor.submit(
                     self.execute_branch,
                     branch=branch,
@@ -1535,7 +1535,7 @@ class ParallelStage(BaseNestedStage):
                     event=event,
                 )
                 for branch in self.parallel
-            )
+            ]
 
             for future in as_completed(futures):
                 try:
@@ -1605,7 +1605,7 @@ class ForEachStage(BaseNestedStage):
         params: DictData,
         result: Result,
         *,
-        event: Event | None = None,
+        event: Optional[Event] = None,
     ) -> Result:
         """Execute all nested stage that set on this stage with specific foreach
         item parameter.
@@ -1709,8 +1709,8 @@ class ForEachStage(BaseNestedStage):
         self,
         params: DictData,
         *,
-        result: Result | None = None,
-        event: Event | None = None,
+        result: Optional[Result] = None,
+        event: Optional[Event] = None,
     ) -> Result:
         """Execute the stages that pass each item form the foreach field.
 
@@ -1775,7 +1775,7 @@ class ForEachStage(BaseNestedStage):
             status: Status = SUCCESS
 
             done, not_done = wait(futures, return_when=FIRST_EXCEPTION)
-            if len(done) != len(futures):
+            if len(list(done)) != len(futures):
                 result.trace.warning(
                     "[STAGE]: Set event for stop pending for-each stage."
                 )
@@ -1795,7 +1795,7 @@ class ForEachStage(BaseNestedStage):
                 result.trace.debug(
                     f"[STAGE]: ... Foreach-Stage set failed event{nd}"
                 )
-                done: list[Future] = as_completed(futures)
+                done: Iterator[Future] = as_completed(futures)
 
             for future in done:
                 try:
@@ -1862,7 +1862,7 @@ class UntilStage(BaseNestedStage):
         loop: int,
         params: DictData,
         result: Result,
-        event: Event | None = None,
+        event: Optional[Event] = None,
     ) -> tuple[Result, T]:
         """Execute all stage with specific loop and item.
 
@@ -1975,8 +1975,8 @@ class UntilStage(BaseNestedStage):
         self,
         params: DictData,
         *,
-        result: Result | None = None,
-        event: Event | None = None,
+        result: Optional[Result] = None,
+        event: Optional[Event] = None,
     ) -> Result:
         """Execute until loop with checking until condition.
 
@@ -2113,7 +2113,7 @@ class CaseStage(BaseNestedStage):
         params: DictData,
         result: Result,
         *,
-        event: Event | None = None,
+        event: Optional[Event] = None,
     ) -> Result:
         """Execute case.
 
@@ -2198,8 +2198,8 @@ class CaseStage(BaseNestedStage):
         self,
         params: DictData,
         *,
-        result: Result | None = None,
-        event: Event | None = None,
+        result: Optional[Result] = None,
+        event: Optional[Event] = None,
     ) -> Result:
         """Execute case-match condition that pass to the case field.
 
@@ -2291,8 +2291,8 @@ class RaiseStage(BaseAsyncStage):
         self,
         params: DictData,
         *,
-        result: Result | None = None,
-        event: Event | None = None,
+        result: Optional[Result] = None,
+        event: Optional[Event] = None,
     ) -> Result:
         """Raise the StageException object with the message field execution.
 
@@ -2313,8 +2313,8 @@ class RaiseStage(BaseAsyncStage):
         self,
         params: DictData,
         *,
-        result: Result | None = None,
-        event: Event | None = None,
+        result: Optional[Result] = None,
+        event: Optional[Event] = None,
     ) -> Result:
         """Async execution method for this Empty stage that only logging out to
         stdout.
@@ -2367,7 +2367,7 @@ class DockerStage(BaseStage):  # pragma: no cov
     env: DictData = Field(
         default_factory=dict,
         description=(
-            "An environment variable that want pass to Docker container.",
+            "An environment variable that want pass to Docker container."
         ),
     )
     volume: DictData = Field(
@@ -2385,7 +2385,7 @@ class DockerStage(BaseStage):  # pragma: no cov
         self,
         params: DictData,
         result: Result,
-        event: Event | None = None,
+        event: Optional[Event] = None,
     ) -> Result:
         """Execute Docker container task.
 
@@ -2473,8 +2473,8 @@ class DockerStage(BaseStage):  # pragma: no cov
         self,
         params: DictData,
         *,
-        result: Result | None = None,
-        event: Event | None = None,
+        result: Optional[Result] = None,
+        event: Optional[Event] = None,
     ) -> Result:
         """Execute the Docker image via Python API.
 
@@ -2518,7 +2518,7 @@ class VirtualPyStage(PyStage):  # pragma: no cov
         py: str,
         values: DictData,
         deps: list[str],
-        run_id: str | None = None,
+        run_id: Optional[str] = None,
     ) -> Iterator[str]:
         """Create the .py file with an input Python string statement.
 
@@ -2526,7 +2526,7 @@ class VirtualPyStage(PyStage):  # pragma: no cov
         :param values: A variable that want to set before running this
         :param deps: An additional Python dependencies that want install before
             run this python stage.
-        :param run_id: (str | None) A running ID of this stage execution.
+        :param run_id: (Optional[str]) A running ID of this stage execution.
         """
         run_id: str = run_id or uuid.uuid4()
         f_name: str = f"{run_id}.py"
@@ -2565,8 +2565,8 @@ class VirtualPyStage(PyStage):  # pragma: no cov
         self,
         params: DictData,
         *,
-        result: Result | None = None,
-        event: Event | None = None,
+        result: Optional[Result] = None,
+        event: Optional[Event] = None,
     ) -> Result:
         """Execute the Python statement via Python virtual environment.
 

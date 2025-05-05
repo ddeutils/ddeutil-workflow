@@ -699,9 +699,9 @@ class CronJob:
 
     def schedule(
         self,
-        date: datetime | None = None,
+        date: Optional[datetime] = None,
         *,
-        tz: str | None = None,
+        tz: Optional[str] = None,
     ) -> CronRunner:
         """Returns CronRunner instance that be datetime runner with this
         cronjob. It can use `next`, `prev`, or `reset` methods to generate
@@ -766,7 +766,7 @@ class CronRunner:
     def __init__(
         self,
         cron: CronJob | CronJobYear,
-        date: datetime | None = None,
+        date: Optional[datetime] = None,
         *,
         tz: str | ZoneInfo | None = None,
     ) -> None:

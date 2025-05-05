@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import fields
 from datetime import datetime
-from typing import Annotated, Any, Literal, Union
+from typing import Annotated, Any, Literal, Optional, Union
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo
@@ -28,7 +28,7 @@ Interval = Literal["daily", "weekly", "monthly"]
 def interval2crontab(
     interval: Interval,
     *,
-    day: str | None = None,
+    day: Optional[str] = None,
     time: str = "00:00",
 ) -> str:
     """Return the crontab string that was generated from specific values.

@@ -14,7 +14,6 @@ import logging
 import os
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from dataclasses import field
 from datetime import datetime
 from functools import lru_cache
 from inspect import Traceback, currentframe, getframeinfo
@@ -22,12 +21,11 @@ from pathlib import Path
 from threading import get_ident
 from typing import ClassVar, Literal, Optional, TypeVar, Union
 
-from pydantic import BaseModel, Field
-from pydantic.dataclasses import dataclass
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
-from .__types import DictData, DictStr
+from .__types import DictData
 from .conf import config, dynamic
 from .utils import cut_id, get_dt_now, prepare_newline
 
@@ -150,7 +148,7 @@ class TraceData(BaseModel):  # pragma: no cov
 
         :rtype: Self
         """
-        data: DictStr = {"stdout": "", "stderr": "", "meta": []}
+        data: DictData = {"stdout": "", "stderr": "", "meta": []}
 
         for mode in ("stdout", "stderr"):
             if (file / f"{mode}.txt").exists():
@@ -169,19 +167,28 @@ class TraceData(BaseModel):  # pragma: no cov
         return cls.model_validate(data)
 
 
-@dataclass(frozen=True)
-class BaseTrace(ABC):  # pragma: no cov
-    """Base Trace dataclass with abstraction class property."""
+class BaseTrace(BaseModel, ABC):  # pragma: no cov
+    """Base Trace model with abstraction class property."""
 
-    run_id: str
-    parent_run_id: Optional[str] = field(default=None)
-    extras: DictData = field(default_factory=dict, compare=False, repr=False)
+    model_config = ConfigDict(frozen=True)
+
+    run_id: str = Field(default="A running ID")
+    parent_run_id: Optional[str] = Field(
+        default=None, description="A parent running ID"
+    )
+    extras: DictData = Field(
+        default_factory=dict,
+        description=(
+            "An extra parameter that want to override on the core config "
+            "values."
+        ),
+    )
 
     @classmethod
     @abstractmethod
     def find_traces(
         cls,
-        path: Path | None = None,
+        path: Optional[Path] = None,
         extras: Optional[DictData] = None,
     ) -> Iterator[TraceData]:  # pragma: no cov
         raise NotImplementedError(
@@ -195,7 +202,7 @@ class BaseTrace(ABC):  # pragma: no cov
         run_id: str,
         force_raise: bool = True,
         *,
-        path: Path | None = None,
+        path: Optional[Path] = None,
         extras: Optional[DictData] = None,
     ) -> TraceData:
         raise NotImplementedError(
@@ -360,7 +367,7 @@ class FileTrace(BaseTrace):  # pragma: no cov
     @classmethod
     def find_traces(
         cls,
-        path: Path | None = None,
+        path: Optional[Path] = None,
         extras: Optional[DictData] = None,
     ) -> Iterator[TraceData]:  # pragma: no cov
         """Find trace logs.
@@ -380,7 +387,7 @@ class FileTrace(BaseTrace):  # pragma: no cov
         run_id: str,
         *,
         force_raise: bool = True,
-        path: Path | None = None,
+        path: Optional[Path] = None,
         extras: Optional[DictData] = None,
     ) -> TraceData:
         """Find trace log with an input specific run ID.
@@ -399,7 +406,7 @@ class FileTrace(BaseTrace):  # pragma: no cov
                 f"Trace log on path {base_path}, does not found trace "
                 f"'run_id={run_id}'."
             )
-        return {}
+        return TraceData(stdout="", stderr="")
 
     @property
     def pointer(self) -> Path:
@@ -449,10 +456,10 @@ class FileTrace(BaseTrace):  # pragma: no cov
         if not dynamic("enable_write_log", extras=self.extras):
             return
 
-        write_file: str = "stderr" if is_err else "stdout"
-        trace_meta: TraceMeta = TraceMeta.make(mode=write_file, message=message)
+        mode: Literal["stdout", "stderr"] = "stderr" if is_err else "stdout"
+        trace_meta: TraceMeta = TraceMeta.make(mode=mode, message=message)
 
-        with (self.pointer / f"{write_file}.txt").open(
+        with (self.pointer / f"{mode}.txt").open(
             mode="at", encoding="utf-8"
         ) as f:
             fmt: str = dynamic("log_format_file", extras=self.extras)
@@ -475,11 +482,11 @@ class FileTrace(BaseTrace):  # pragma: no cov
         except ImportError as e:
             raise ImportError("Async mode need aiofiles package") from e
 
-        write_file: str = "stderr" if is_err else "stdout"
-        trace_meta: TraceMeta = TraceMeta.make(mode=write_file, message=message)
+        mode: Literal["stdout", "stderr"] = "stderr" if is_err else "stdout"
+        trace_meta: TraceMeta = TraceMeta.make(mode=mode, message=message)
 
         async with aiofiles.open(
-            self.pointer / f"{write_file}.txt", mode="at", encoding="utf-8"
+            self.pointer / f"{mode}.txt", mode="at", encoding="utf-8"
         ) as f:
             fmt: str = dynamic("log_format_file", extras=self.extras)
             await f.write(f"{fmt}\n".format(**trace_meta.model_dump()))
@@ -507,7 +514,7 @@ class SQLiteTrace(BaseTrace):  # pragma: no cov
     @classmethod
     def find_traces(
         cls,
-        path: Path | None = None,
+        path: Optional[Path] = None,
         extras: Optional[DictData] = None,
     ) -> Iterator[TraceData]: ...
 
@@ -517,7 +524,7 @@ class SQLiteTrace(BaseTrace):  # pragma: no cov
         run_id: str,
         force_raise: bool = True,
         *,
-        path: Path | None = None,
+        path: Optional[Path] = None,
         extras: Optional[DictData] = None,
     ) -> TraceData: ...
 
@@ -538,7 +545,7 @@ TraceModel = Union[
 def get_trace(
     run_id: str,
     *,
-    parent_run_id: str | None = None,
+    parent_run_id: Optional[str] = None,
     extras: Optional[DictData] = None,
 ) -> TraceModel:  # pragma: no cov
     """Get dynamic Trace instance from the core config (it can override by an
@@ -619,7 +626,7 @@ class BaseAudit(BaseModel, ABC):
     def find_audit_with_release(
         cls,
         name: str,
-        release: datetime | None = None,
+        release: Optional[datetime] = None,
         *,
         extras: Optional[DictData] = None,
     ) -> Self:
@@ -631,7 +638,7 @@ class BaseAudit(BaseModel, ABC):
         """To something before end up of initial log model."""
 
     @abstractmethod
-    def save(self, excluded: list[str] | None) -> None:  # pragma: no cov
+    def save(self, excluded: Optional[list[str]]) -> None:  # pragma: no cov
         """Save this model logging to target logging store."""
         raise NotImplementedError("Audit should implement ``save`` method.")
 
@@ -676,7 +683,7 @@ class FileAudit(BaseAudit):
     def find_audit_with_release(
         cls,
         name: str,
-        release: datetime | None = None,
+        release: Optional[datetime] = None,
         *,
         extras: Optional[DictData] = None,
     ) -> Self:
@@ -749,7 +756,7 @@ class FileAudit(BaseAudit):
             "audit_path", extras=self.extras
         ) / self.filename_fmt.format(name=self.name, release=self.release)
 
-    def save(self, excluded: list[str] | None) -> Self:
+    def save(self, excluded: Optional[list[str]]) -> Self:
         """Save logging data that receive a context data from a workflow
         execution result.
 
@@ -818,7 +825,7 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
     def find_audit_with_release(
         cls,
         name: str,
-        release: datetime | None = None,
+        release: Optional[datetime] = None,
         *,
         extras: Optional[DictData] = None,
     ) -> Self: ...

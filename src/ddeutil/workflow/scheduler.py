@@ -335,9 +335,9 @@ class Schedule(BaseModel):
     def pending(
         self,
         *,
-        stop: datetime | None = None,
+        stop: Optional[datetime] = None,
         audit: type[Audit] | None = None,
-        parent_run_id: str | None = None,
+        parent_run_id: Optional[str] = None,
     ) -> Result:  # pragma: no cov
         """Pending this schedule tasks with the schedule package.
 
@@ -384,7 +384,7 @@ DecoratorCancelJob = Callable[[ReturnResultOrCancel], ReturnResultOrCancel]
 
 def catch_exceptions(
     cancel_on_failure: bool = False,
-    parent_run_id: str | None = None,
+    parent_run_id: Optional[str] = None,
 ) -> DecoratorCancelJob:
     """Catch exception error from scheduler job that running with schedule
     package and return CancelJob if this function raise an error.
@@ -440,7 +440,7 @@ def schedule_task(
     threads: ReleaseThreads,
     audit: type[Audit],
     *,
-    parent_run_id: str | None = None,
+    parent_run_id: Optional[str] = None,
     extras: Optional[DictData] = None,
 ) -> ResultOrCancel:
     """Schedule task function that generate thread of workflow task release
@@ -558,7 +558,7 @@ def schedule_task(
 
 def monitor(
     threads: ReleaseThreads,
-    parent_run_id: str | None = None,
+    parent_run_id: Optional[str] = None,
 ) -> None:  # pragma: no cov
     """Monitoring function that running every five minute for track long-running
     thread instance from the schedule_control function that run every minute.
@@ -685,11 +685,11 @@ def scheduler_pending(
 
 def schedule_control(
     schedules: list[str],
-    stop: datetime | None = None,
+    stop: Optional[datetime] = None,
     *,
     extras: DictData | None = None,
     audit: type[Audit] | None = None,
-    parent_run_id: str | None = None,
+    parent_run_id: Optional[str] = None,
 ) -> Result:  # pragma: no cov
     """Scheduler control function that run the chuck of schedules every minute
     and this function release monitoring thread for tracking undead thread in
@@ -744,7 +744,7 @@ def schedule_control(
 
 
 def schedule_runner(
-    stop: datetime | None = None,
+    stop: Optional[datetime] = None,
     *,
     max_process: int | None = None,
     extras: DictData | None = None,

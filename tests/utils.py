@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from textwrap import dedent
 from threading import Lock
-from typing import Any
+from typing import Any, Optional
 from zoneinfo import ZoneInfo
 
 import yaml
@@ -52,7 +52,7 @@ def dotenv_setting() -> None:
     load_dotenv(env_path)
 
 
-def str2dt(value: str, tz: str | None = None) -> datetime:  # pragma: no cov
+def str2dt(value: str, tz: Optional[str] = None) -> datetime:  # pragma: no cov
     """Convert string value to datetime object with ``fromisoformat`` method.
 
     :param value: (str): A string value that want to convert to datetime object.

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import copy
 import time
+from collections.abc import Iterator
 from concurrent.futures import (
     FIRST_EXCEPTION,
     CancelledError,
@@ -67,8 +68,8 @@ def make(
 
     :param matrix: (Matrix) A matrix values that want to cross product to
         possible parallelism values.
-    :param include: (A list of additional matrix that want to adds-in.
-    :param exclude: (A list of exclude matrix that want to filter-out.
+    :param include: A list of additional matrix that want to adds-in.
+    :param exclude: A list of exclude matrix that want to filter-out.
 
     :rtype: list[DictStr]
     """
@@ -191,22 +192,22 @@ class Strategy(BaseModel):
 class Rule(str, Enum):
     """Rule enum object for assign trigger option."""
 
-    ALL_SUCCESS: str = "all_success"
-    ALL_FAILED: str = "all_failed"
-    ALL_DONE: str = "all_done"
-    ONE_FAILED: str = "one_failed"
-    ONE_SUCCESS: str = "one_success"
-    NONE_FAILED: str = "none_failed"
-    NONE_SKIPPED: str = "none_skipped"
+    ALL_SUCCESS = "all_success"
+    ALL_FAILED = "all_failed"
+    ALL_DONE = "all_done"
+    ONE_FAILED = "one_failed"
+    ONE_SUCCESS = "one_success"
+    NONE_FAILED = "none_failed"
+    NONE_SKIPPED = "none_skipped"
 
 
 class RunsOn(str, Enum):
     """Runs-On enum object."""
 
-    LOCAL: str = "local"
-    SELF_HOSTED: str = "self_hosted"
-    AZ_BATCH: str = "azure_batch"
-    DOCKER: str = "docker"
+    LOCAL = "local"
+    SELF_HOSTED = "self_hosted"
+    AZ_BATCH = "azure_batch"
+    DOCKER = "docker"
 
 
 class BaseRunsOn(BaseModel):  # pragma: no cov
@@ -566,7 +567,7 @@ class Job(BaseModel):
         :param output: (DictData) A result data context that want to extract
             and transfer to the `strategies` key in receive context.
         :param to: (DictData) A received context data.
-        :param job_id: (str | None) A job ID if the `id` field does not set.
+        :param job_id: (Optional[str]) A job ID if the `id` field does not set.
 
         :rtype: DictData
         """
@@ -606,9 +607,9 @@ class Job(BaseModel):
         self,
         params: DictData,
         *,
-        run_id: str | None = None,
-        parent_run_id: str | None = None,
-        event: Event | None = None,
+        run_id: Optional[str] = None,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
     ) -> Result:
         """Job execution with passing dynamic parameters from the workflow
         execution. It will generate matrix values at the first step and run
@@ -676,8 +677,8 @@ def local_execute_strategy(
     strategy: DictData,
     params: DictData,
     *,
-    result: Result | None = None,
-    event: Event | None = None,
+    result: Optional[Result] = None,
+    event: Optional[Event] = None,
 ) -> Result:
     """Local strategy execution with passing dynamic parameters from the
     job execution and strategy matrix.
@@ -799,9 +800,9 @@ def local_execute(
     job: Job,
     params: DictData,
     *,
-    run_id: str | None = None,
-    parent_run_id: str | None = None,
-    event: Event | None = None,
+    run_id: Optional[str] = None,
+    parent_run_id: Optional[str] = None,
+    event: Optional[Event] = None,
 ) -> Result:
     """Local job execution with passing dynamic parameters from the workflow
     execution or directly. It will generate matrix values at the first
@@ -874,10 +875,10 @@ def local_execute(
         status: Status = SUCCESS
 
         if not fail_fast_flag:
-            done: list[Future] = as_completed(futures)
+            done: Iterator[Future] = as_completed(futures)
         else:
             done, not_done = wait(futures, return_when=FIRST_EXCEPTION)
-            if len(done) != len(futures):
+            if len(list(done)) != len(futures):
                 result.trace.warning(
                     "[JOB]: Handler Fail-Fast: Got exception and set event."
                 )
@@ -895,7 +896,7 @@ def local_execute(
                 else ""
             )
             result.trace.debug(f"[JOB]: ... Job was set Fail-Fast{nd}")
-            done: list[Future] = as_completed(futures)
+            done: Iterator[Future] = as_completed(futures)
 
         for future in done:
             try:
@@ -918,9 +919,9 @@ def self_hosted_execute(
     job: Job,
     params: DictData,
     *,
-    run_id: str | None = None,
-    parent_run_id: str | None = None,
-    event: Event | None = None,
+    run_id: Optional[str] = None,
+    parent_run_id: Optional[str] = None,
+    event: Optional[Event] = None,
 ) -> Result:  # pragma: no cov
     """Self-Hosted job execution with passing dynamic parameters from the
     workflow execution or itself execution. It will make request to the
@@ -981,9 +982,9 @@ def azure_batch_execute(
     job: Job,
     params: DictData,
     *,
-    run_id: str | None = None,
-    parent_run_id: str | None = None,
-    event: Event | None = None,
+    run_id: Optional[str] = None,
+    parent_run_id: Optional[str] = None,
+    event: Optional[Event] = None,
 ) -> Result:  # pragma: no cov
     """Azure Batch job execution that will run all job's stages on the Azure
     Batch Node and extract the result file to be returning context result.
@@ -1035,9 +1036,9 @@ def docker_execution(
     job: Job,
     params: DictData,
     *,
-    run_id: str | None = None,
-    parent_run_id: str | None = None,
-    event: Event | None = None,
+    run_id: Optional[str] = None,
+    parent_run_id: Optional[str] = None,
+    event: Optional[Event] = None,
 ):  # pragma: no cov
     """Docker job execution.
 

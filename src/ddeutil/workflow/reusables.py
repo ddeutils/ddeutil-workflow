@@ -36,7 +36,7 @@ logger = logging.getLogger("ddeutil.workflow")
 logging.getLogger("asyncio").setLevel(logging.INFO)
 
 
-FILTERS: dict[str, callable] = {  # pragma: no cov
+FILTERS: dict[str, Callable] = {  # pragma: no cov
     "abs": abs,
     "str": str,
     "int": int,
@@ -259,9 +259,9 @@ def str2template(
     value: str,
     params: DictData,
     *,
-    filters: dict[str, FilterRegistry] | None = None,
+    filters: Optional[dict[str, FilterRegistry]] = None,
     registers: Optional[list[str]] = None,
-) -> str:
+) -> Optional[str]:
     """(Sub-function) Pass param to template string that can search by
     ``RE_CALLER`` regular expression.
 
@@ -327,7 +327,7 @@ def str2template(
 def param2template(
     value: T,
     params: DictData,
-    filters: dict[str, FilterRegistry] | None = None,
+    filters: Optional[dict[str, FilterRegistry]] = None,
     *,
     extras: Optional[DictData] = None,
 ) -> T:
@@ -382,7 +382,7 @@ def datetime_format(value: datetime, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
 
 
 @custom_filter("coalesce")  # pragma: no cov
-def coalesce(value: T | None, default: Any) -> T:
+def coalesce(value: Optional[T], default: Any) -> T:
     """Coalesce with default value if the main value is None."""
     return default if value is None else value
 

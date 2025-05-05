@@ -15,7 +15,7 @@ from inspect import isfunction
 from itertools import chain, islice, product
 from pathlib import Path
 from random import randrange
-from typing import Any, Final, TypeVar
+from typing import Any, Final, Optional, TypeVar, Union
 from zoneinfo import ZoneInfo
 
 from ddeutil.core import hash_str
@@ -63,7 +63,7 @@ def clear_tz(dt: datetime) -> datetime:
     return dt.replace(tzinfo=None)
 
 
-def get_dt_now(tz: ZoneInfo | None = None, offset: float = 0.0) -> datetime:
+def get_dt_now(tz: Optional[ZoneInfo] = None, offset: float = 0.0) -> datetime:
     """Return the current datetime object.
 
     :param tz: A ZoneInfo object for replace timezone of return datetime object.
@@ -76,7 +76,7 @@ def get_dt_now(tz: ZoneInfo | None = None, offset: float = 0.0) -> datetime:
 
 
 def get_d_now(
-    tz: ZoneInfo | None = None, offset: float = 0.0
+    tz: Optional[ZoneInfo] = None, offset: float = 0.0
 ) -> date:  # pragma: no cov
     """Return the current date object.
 
@@ -147,7 +147,7 @@ def gen_id(
     *,
     sensitive: bool = True,
     unique: bool = False,
-    simple_mode: bool | None = None,
+    simple_mode: Optional[bool] = None,
     extras: DictData | None = None,
 ) -> str:
     """Generate running ID for able to tracking. This generates process use
@@ -197,7 +197,7 @@ def default_gen_id() -> str:
     return gen_id("manual", unique=True)
 
 
-def make_exec(path: str | Path) -> None:
+def make_exec(path: Union[Path, str]) -> None:
     """Change mode of file to be executable file.
 
     :param path: A file path that want to make executable permission.
@@ -244,7 +244,7 @@ def cross_product(matrix: Matrix) -> Iterator[DictData]:
     )
 
 
-def batch(iterable: Iterator[Any] | range, n: int) -> Iterator[Any]:
+def batch(iterable: Union[Iterator[Any], range], n: int) -> Iterator[Any]:
     """Batch data into iterators of length n. The last batch may be shorter.
 
     Example:

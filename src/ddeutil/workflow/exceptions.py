@@ -9,7 +9,7 @@ annotate for handle error only.
 """
 from __future__ import annotations
 
-from typing import Literal, TypedDict, overload
+from typing import Literal, Optional, TypedDict, overload
 
 
 class ErrorData(TypedDict):
@@ -39,9 +39,9 @@ class BaseWorkflowException(Exception):
     making an error context to the result context.
     """
 
-    def __init__(self, message: str, *, refs: str | None = None):
+    def __init__(self, message: str, *, refs: Optional[str] = None):
         super().__init__(message)
-        self.refs: str | None = refs
+        self.refs: Optional[str] = refs
 
     @overload
     def to_dict(

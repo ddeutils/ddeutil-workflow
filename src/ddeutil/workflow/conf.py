@@ -27,13 +27,13 @@ T = TypeVar("T")
 PREFIX: Final[str] = "WORKFLOW"
 
 
-def env(var: str, default: str | None = None) -> str | None:
+def env(var: str, default: Optional[str] = None) -> Optional[str]:
     """Get environment variable with uppercase and adding prefix string.
 
     :param var: (str) A env variable name.
-    :param default: (str | None) A default value if an env var does not set.
+    :param default: (Optional[str]) A default value if an env var does not set.
 
-    :rtype: str | None
+    :rtype: Optional[str]
     """
     return os.getenv(f"{PREFIX}_{var.upper().replace(' ', '_')}", default)
 
@@ -400,7 +400,7 @@ class FileLoad(BaseLoad):
         return is_ignored(file, read_ignore(path / ignore_filename))
 
     @classmethod
-    def filter_yaml(cls, file: Path, name: str | None = None) -> DictData:
+    def filter_yaml(cls, file: Path, name: Optional[str] = None) -> DictData:
         """Read a YAML file context from an input file path and specific name.
 
         :param file: (Path) A file path that want to extract YAML context.

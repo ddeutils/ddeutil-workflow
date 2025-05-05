@@ -81,10 +81,10 @@ class Result:
     @classmethod
     def construct_with_rs_or_id(
         cls,
-        result: Result | None = None,
-        run_id: str | None = None,
-        parent_run_id: str | None = None,
-        id_logic: str | None = None,
+        result: Optional[Result] = None,
+        run_id: Optional[str] = None,
+        parent_run_id: Optional[str] = None,
+        id_logic: Optional[str] = None,
         *,
         extras: DictData | None = None,
     ) -> Self:

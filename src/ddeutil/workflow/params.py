@@ -155,11 +155,11 @@ class StrParam(DefaultParam):
 
     type: Literal["str"] = "str"
 
-    def receive(self, value: str | None = None) -> str | None:
+    def receive(self, value: Optional[str] = None) -> Optional[str]:
         """Receive value that match with str.
 
         :param value: A value that want to validate with string parameter type.
-        :rtype: str | None
+        :rtype: Optional[str]
         """
         if value is None:
             return self.default
