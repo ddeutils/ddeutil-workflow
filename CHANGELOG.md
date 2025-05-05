@@ -2,6 +2,33 @@
 
 ## Latest Changes
 
+## 0.0.59
+
+### :sparkles: Features
+
+- :dart: feat: add log level on the trace data.
+
+### :bug: Bug fixes
+
+- :gear: fixed: init audit log model pass position arg.
+- :gear: fixed: add deepcopy on value and extend or append.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: revise example testcase for parallel stage.
+- :art: format: change type annotation for py39.
+
+### :package: Build & Workflow
+
+- :toolbox: build: revert add uv install on tests workflow.
+- :toolbox: build: update pre-commit hook to v5.0.0.
+- :package: build: bump pydantic from 2.11.1 to 2.11.4 (#38)
+
+### :postbox: Dependencies
+
+- :pushpin: deps: add uvicorn package on all tag.
+- :pushpin: deps: update ddeutil-io to 0.2.13.
+
 ## 0.0.58
 
 ### :sparkles: Features
