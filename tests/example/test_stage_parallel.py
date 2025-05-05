@@ -165,10 +165,49 @@ def test_parallel_stage_exec_with_trigger_raise_bug(test_path):
                           branch: ${{ branch }}
         """,
     ):
-        workflow = Workflow.from_conf("tmp-wf-parallel-trigger-raise-task")
-        print(workflow)
-
         workflow = Workflow.from_conf("tmp-wf-parallel-trigger-raise")
         stage: Stage = workflow.job("first-job").stage("parallel-stage")
         rs: Result = stage.handler_execute({})
-        print(rs)
+        assert rs.status == FAILED
+        assert rs.context == {
+            "parallel": {
+                "branch02": {
+                    "branch": "branch02",
+                    "stages": {},
+                    "errors": {
+                        "name": "StageException",
+                        "message": (
+                            "Trigger workflow return `FAILED` status with:\n"
+                            "Job, 'first-job', return `FAILED` status."
+                        ),
+                    },
+                },
+                "branch01": {
+                    "branch": "branch01",
+                    "stages": {},
+                    "errors": {
+                        "name": "StageException",
+                        "message": (
+                            "Trigger workflow return `FAILED` status with:\n"
+                            "Job, 'first-job', return `FAILED` status."
+                        ),
+                    },
+                },
+            },
+            "errors": {
+                "branch02": {
+                    "name": "StageException",
+                    "message": (
+                        "Trigger workflow return `FAILED` status with:\n"
+                        "Job, 'first-job', return `FAILED` status."
+                    ),
+                },
+                "branch01": {
+                    "name": "StageException",
+                    "message": (
+                        "Trigger workflow return `FAILED` status with:\n"
+                        "Job, 'first-job', return `FAILED` status."
+                    ),
+                },
+            },
+        }
