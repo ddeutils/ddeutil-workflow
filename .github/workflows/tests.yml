@@ -44,20 +44,16 @@ jobs:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
 
-      - name: Install UV and activate the environment
-        uses: astral-sh/setup-uv@v6
-
       - uses: actions/cache@v4
         id: cache
         with:
           path: .venv
-          key: ${{ runner.os }}-python-${{ steps.setup_python.outputs.python-version }}-${{ hashFiles('pyproject.toml') }}-test-02
+          key: ${{ runner.os }}-python-${{ steps.setup_python.outputs.python-version }}-${{ hashFiles('pyproject.toml') }}-test-uv
 
       - name: Install Python Dependencies
         if: steps.cache.outputs.cache-hit != 'true'
-        env:
-          UV_SYSTEM_PYTHON: 1
         run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
           uv venv
           uv pip install -U pip
           uv pip install -U -e .[all]
