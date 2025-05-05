@@ -560,9 +560,11 @@ def get_trace(
     """
     if dynamic("trace_path", extras=extras).is_file():
         return SQLiteTrace(
-            run_id, parent_run_id=parent_run_id, extras=(extras or {})
+            run_id=run_id, parent_run_id=parent_run_id, extras=(extras or {})
         )
-    return FileTrace(run_id, parent_run_id=parent_run_id, extras=(extras or {}))
+    return FileTrace(
+        run_id=run_id, parent_run_id=parent_run_id, extras=(extras or {})
+    )
 
 
 class BaseAudit(BaseModel, ABC):
@@ -765,7 +767,7 @@ class FileAudit(BaseAudit):
 
         :rtype: Self
         """
-        trace: Trace = get_trace(
+        trace: TraceModel = get_trace(
             self.run_id,
             parent_run_id=self.parent_run_id,
             extras=self.extras,
@@ -830,11 +832,11 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
         extras: Optional[DictData] = None,
     ) -> Self: ...
 
-    def save(self, excluded: list[str] | None) -> SQLiteAudit:
+    def save(self, excluded: Optional[list[str]]) -> SQLiteAudit:
         """Save logging data that receive a context data from a workflow
         execution result.
         """
-        trace: Trace = get_trace(
+        trace: TraceModel = get_trace(
             self.run_id,
             parent_run_id=self.parent_run_id,
             extras=self.extras,

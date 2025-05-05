@@ -3,16 +3,16 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-# [x] Use dynamic config
-"""Result module. It is the data context transfer objects that use by all object
-in this package. This module provide Status enum object and Result dataclass.
+"""A Result module. It is the data context transfer objects that use by all
+object in this package. This module provide Status enum object and Result
+dataclass.
 """
 from __future__ import annotations
 
 from dataclasses import field
 from datetime import datetime
 from enum import IntEnum
-from typing import Optional
+from typing import Optional, Union
 
 from pydantic import ConfigDict
 from pydantic.dataclasses import dataclass
@@ -22,7 +22,7 @@ from typing_extensions import Self
 from .__types import DictData
 from .conf import dynamic
 from .exceptions import ResultException
-from .logs import Trace, get_dt_tznow, get_trace
+from .logs import TraceModel, get_dt_tznow, get_trace
 from .utils import default_gen_id, gen_id, get_dt_now
 
 
@@ -31,11 +31,11 @@ class Status(IntEnum):
     Result dataclass object.
     """
 
-    SUCCESS: int = 0
-    FAILED: int = 1
-    WAIT: int = 2
-    SKIP: int = 3
-    CANCEL: int = 4
+    SUCCESS = 0
+    FAILED = 1
+    WAIT = 2
+    SKIP = 3
+    CANCEL = 4
 
     @property
     def emoji(self) -> str:
@@ -75,7 +75,7 @@ class Result:
     parent_run_id: Optional[str] = field(default=None, compare=False)
     ts: datetime = field(default_factory=get_dt_tznow, compare=False)
 
-    trace: Optional[Trace] = field(default=None, compare=False, repr=False)
+    trace: Optional[TraceModel] = field(default=None, compare=False, repr=False)
     extras: DictData = field(default_factory=dict, compare=False, repr=False)
 
     @classmethod
@@ -121,7 +121,7 @@ class Result:
         :rtype: Self
         """
         if self.trace is None:  # pragma: no cov
-            self.trace: Trace = get_trace(
+            self.trace: TraceModel = get_trace(
                 self.run_id,
                 parent_run_id=self.parent_run_id,
                 extras=self.extras,
@@ -136,14 +136,14 @@ class Result:
         :rtype: Self
         """
         self.parent_run_id: str = running_id
-        self.trace: Trace = get_trace(
+        self.trace: TraceModel = get_trace(
             self.run_id, parent_run_id=running_id, extras=self.extras
         )
         return self
 
     def catch(
         self,
-        status: int | Status,
+        status: Union[int, Status],
         context: DictData | None = None,
         **kwargs,
     ) -> Self:

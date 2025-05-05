@@ -82,7 +82,9 @@ class DateParam(DefaultParam):  # pragma: no cov
         description="A default date that make from the current date func.",
     )
 
-    def receive(self, value: Optional[str | datetime | date] = None) -> date:
+    def receive(
+        self, value: Optional[Union[str, datetime, date]] = None
+    ) -> date:
         """Receive value that match with date. If an input value pass with
         None, it will use default value instead.
 
@@ -121,7 +123,9 @@ class DatetimeParam(DefaultParam):
         ),
     )
 
-    def receive(self, value: str | datetime | date | None = None) -> datetime:
+    def receive(
+        self, value: Optional[Union[str, datetime, date]] = None
+    ) -> datetime:
         """Receive value that match with datetime. If an input value pass with
         None, it will use default value instead.
 
@@ -171,7 +175,7 @@ class IntParam(DefaultParam):
 
     type: Literal["int"] = "int"
 
-    def receive(self, value: int | None = None) -> int | None:
+    def receive(self, value: Optional[int] = None) -> Optional[int]:
         """Receive value that match with int.
 
         :param value: A value that want to validate with integer parameter type.
