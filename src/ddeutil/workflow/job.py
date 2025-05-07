@@ -39,7 +39,7 @@ from pydantic import BaseModel, Discriminator, Field, SecretStr, Tag
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
-from .__types import DictData, DictStr, Matrix
+from .__types import DictData, DictStr, Matrix, StrOrNone
 from .exceptions import (
     JobException,
     StageException,
@@ -329,14 +329,14 @@ class Job(BaseModel):
         ... }
     """
 
-    id: Optional[str] = Field(
+    id: StrOrNone = Field(
         default=None,
         description=(
             "A job ID that was set from Workflow model after initialize step. "
             "If this model create standalone, it will be None."
         ),
     )
-    desc: Optional[str] = Field(
+    desc: StrOrNone = Field(
         default=None,
         description="A job description that can be markdown syntax.",
     )
@@ -345,7 +345,7 @@ class Job(BaseModel):
         description="A target node for this job to use for execution.",
         alias="runs-on",
     )
-    condition: Optional[str] = Field(
+    condition: StrOrNone = Field(
         default=None,
         description="A job condition statement to allow job executable.",
         alias="if",
@@ -526,7 +526,7 @@ class Job(BaseModel):
         output: DictData,
         to: DictData,
         *,
-        job_id: Optional[str] = None,
+        job_id: StrOrNone = None,
     ) -> DictData:
         """Set an outputs from execution result context to the received context
         with a `to` input parameter. The result context from job strategy
@@ -567,7 +567,7 @@ class Job(BaseModel):
         :param output: (DictData) A result data context that want to extract
             and transfer to the `strategies` key in receive context.
         :param to: (DictData) A received context data.
-        :param job_id: (Optional[str]) A job ID if the `id` field does not set.
+        :param job_id: (StrOrNone) A job ID if the `id` field does not set.
 
         :rtype: DictData
         """
@@ -607,8 +607,8 @@ class Job(BaseModel):
         self,
         params: DictData,
         *,
-        run_id: Optional[str] = None,
-        parent_run_id: Optional[str] = None,
+        run_id: StrOrNone = None,
+        parent_run_id: StrOrNone = None,
         event: Optional[Event] = None,
     ) -> Result:
         """Job execution with passing dynamic parameters from the workflow
@@ -800,8 +800,8 @@ def local_execute(
     job: Job,
     params: DictData,
     *,
-    run_id: Optional[str] = None,
-    parent_run_id: Optional[str] = None,
+    run_id: StrOrNone = None,
+    parent_run_id: StrOrNone = None,
     event: Optional[Event] = None,
 ) -> Result:
     """Local job execution with passing dynamic parameters from the workflow
@@ -919,8 +919,8 @@ def self_hosted_execute(
     job: Job,
     params: DictData,
     *,
-    run_id: Optional[str] = None,
-    parent_run_id: Optional[str] = None,
+    run_id: StrOrNone = None,
+    parent_run_id: StrOrNone = None,
     event: Optional[Event] = None,
 ) -> Result:  # pragma: no cov
     """Self-Hosted job execution with passing dynamic parameters from the
@@ -982,8 +982,8 @@ def azure_batch_execute(
     job: Job,
     params: DictData,
     *,
-    run_id: Optional[str] = None,
-    parent_run_id: Optional[str] = None,
+    run_id: StrOrNone = None,
+    parent_run_id: StrOrNone = None,
     event: Optional[Event] = None,
 ) -> Result:  # pragma: no cov
     """Azure Batch job execution that will run all job's stages on the Azure
@@ -1036,8 +1036,8 @@ def docker_execution(
     job: Job,
     params: DictData,
     *,
-    run_id: Optional[str] = None,
-    parent_run_id: Optional[str] = None,
+    run_id: StrOrNone = None,
+    parent_run_id: StrOrNone = None,
     event: Optional[Event] = None,
 ):  # pragma: no cov
     """Docker job execution.

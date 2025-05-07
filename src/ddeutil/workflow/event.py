@@ -3,8 +3,9 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-"""Event module that store all event object. Now, it has only `Crontab` and
-`CrontabYear` model these are schedule with crontab event.
+"""Event module include all event object for trigger the Workflow to release.
+Now, it has only `Crontab` and `CrontabYear` event models on this module because
+I think it is the core event for workflow orchestration.
 """
 from __future__ import annotations
 
@@ -86,7 +87,7 @@ class Crontab(BaseModel):
         CronJob,
         Field(
             description=(
-                "A Cronjob object that use for validate and generate datetime.",
+                "A Cronjob object that use for validate and generate datetime."
             ),
         ),
     ]
@@ -170,9 +171,10 @@ class Crontab(BaseModel):
 
     @model_validator(mode="before")
     def __prepare_values(cls, data: Any) -> Any:
-        """Extract tz key from value and change name to timezone key.
+        """Extract a `tz` key from data and change the key name from `tz` to
+        `timezone`.
 
-        :param data: (DictData) A data that want to pass for create an Crontab
+        :param data: (DictData) A data that want to pass for create a Crontab
             model.
 
         :rtype: DictData
@@ -198,7 +200,7 @@ class Crontab(BaseModel):
         "cronjob", mode="before", json_schema_input_type=Union[CronJob, str]
     )
     def __prepare_cronjob(
-        cls, value: str | CronJob, info: ValidationInfo
+        cls, value: Union[str, CronJob], info: ValidationInfo
     ) -> CronJob:
         """Prepare crontab value that able to receive with string type.
         This step will get options kwargs from extras field and pass to the
@@ -234,7 +236,7 @@ class Crontab(BaseModel):
         """
         return str(value)
 
-    def generate(self, start: str | datetime) -> CronRunner:
+    def generate(self, start: Union[str, datetime]) -> CronRunner:
         """Return CronRunner object from an initial datetime.
 
         :param start: (str | datetime) A string or datetime for generate the
@@ -248,7 +250,7 @@ class Crontab(BaseModel):
             raise TypeError("start value should be str or datetime type.")
         return self.cronjob.schedule(date=start, tz=self.tz)
 
-    def next(self, start: str | datetime) -> CronRunner:
+    def next(self, start: Union[str, datetime]) -> CronRunner:
         """Return a next datetime from Cron runner object that start with any
         date that given from input.
 
@@ -277,16 +279,18 @@ class CrontabYear(Crontab):
         CronJobYear,
         Field(
             description=(
-                "A Cronjob object that use for validate and generate datetime.",
+                "A Cronjob object that use for validate and generate datetime."
             ),
         ),
     ]
 
     @field_validator(
-        "cronjob", mode="before", json_schema_input_type=Union[CronJobYear, str]
+        "cronjob",
+        mode="before",
+        json_schema_input_type=Union[CronJobYear, str],
     )
     def __prepare_cronjob(
-        cls, value: str | CronJobYear, info: ValidationInfo
+        cls, value: Union[CronJobYear, str], info: ValidationInfo
     ) -> CronJobYear:
         """Prepare crontab value that able to receive with string type.
         This step will get options kwargs from extras field and pass to the

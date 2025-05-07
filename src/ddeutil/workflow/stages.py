@@ -58,7 +58,7 @@ from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
-from .__types import DictData, DictStr, StrOrInt, TupleStr
+from .__types import DictData, DictStr, StrOrInt, StrOrNone, TupleStr
 from .conf import dynamic
 from .exceptions import StageException, to_dict
 from .result import CANCEL, FAILED, SUCCESS, WAIT, Result, Status
@@ -87,7 +87,7 @@ class BaseStage(BaseModel, ABC):
         default_factory=dict,
         description="An extra parameter that override core config values.",
     )
-    id: Optional[str] = Field(
+    id: StrOrNone = Field(
         default=None,
         description=(
             "A stage ID that use to keep execution output or getting by job "
@@ -97,7 +97,7 @@ class BaseStage(BaseModel, ABC):
     name: str = Field(
         description="A stage name that want to logging when start execution.",
     )
-    condition: Optional[str] = Field(
+    condition: StrOrNone = Field(
         default=None,
         description=(
             "A stage condition statement to allow stage executable. This field "
@@ -162,8 +162,8 @@ class BaseStage(BaseModel, ABC):
         self,
         params: DictData,
         *,
-        run_id: Optional[str] = None,
-        parent_run_id: Optional[str] = None,
+        run_id: StrOrNone = None,
+        parent_run_id: StrOrNone = None,
         result: Optional[Result] = None,
         event: Optional[Event] = None,
         raise_error: Optional[bool] = None,
@@ -411,8 +411,8 @@ class BaseAsyncStage(BaseStage):
         self,
         params: DictData,
         *,
-        run_id: Optional[str] = None,
-        parent_run_id: Optional[str] = None,
+        run_id: StrOrNone = None,
+        parent_run_id: StrOrNone = None,
         result: Optional[Result] = None,
         event: Optional[Event] = None,
         raise_error: Optional[bool] = None,
@@ -469,7 +469,7 @@ class EmptyStage(BaseAsyncStage):
         ... }
     """
 
-    echo: Optional[str] = Field(
+    echo: StrOrNone = Field(
         default=None,
         description="A message that want to show on the stdout.",
     )
@@ -599,13 +599,13 @@ class BashStage(BaseAsyncStage):
 
     @contextlib.asynccontextmanager
     async def async_create_sh_file(
-        self, bash: str, env: DictStr, run_id: Optional[str] = None
+        self, bash: str, env: DictStr, run_id: StrOrNone = None
     ) -> AsyncIterator[TupleStr]:
         """Async create and write `.sh` file with the `aiofiles` package.
 
         :param bash: (str) A bash statement.
         :param env: (DictStr) An environment variable that set before run bash.
-        :param run_id: (Optional[str]) A running stage ID that use for writing sh
+        :param run_id: (StrOrNone) A running stage ID that use for writing sh
             file instead generate by UUID4.
 
         :rtype: AsyncIterator[TupleStr]
@@ -635,14 +635,14 @@ class BashStage(BaseAsyncStage):
 
     @contextlib.contextmanager
     def create_sh_file(
-        self, bash: str, env: DictStr, run_id: Optional[str] = None
+        self, bash: str, env: DictStr, run_id: StrOrNone = None
     ) -> Iterator[TupleStr]:
         """Create and write the `.sh` file before giving this file name to
         context. After that, it will auto delete this file automatic.
 
         :param bash: (str) A bash statement.
         :param env: (DictStr) An environment variable that set before run bash.
-        :param run_id: (Optional[str]) A running stage ID that use for writing sh
+        :param run_id: (StrOrNone) A running stage ID that use for writing sh
             file instead generate by UUID4.
 
         :rtype: Iterator[TupleStr]
@@ -1298,7 +1298,7 @@ class TriggerStage(BaseStage):
             event=event,
         )
         if rs.status == FAILED:
-            err_msg: Optional[str] = (
+            err_msg: StrOrNone = (
                 f" with:\n{msg}"
                 if (msg := rs.context.get("errors", {}).get("message"))
                 else "."
@@ -2218,9 +2218,7 @@ class CaseStage(BaseNestedStage):
             extras=self.extras,
         )
 
-        _case: Optional[str] = param2template(
-            self.case, params, extras=self.extras
-        )
+        _case: StrOrNone = param2template(self.case, params, extras=self.extras)
 
         result.trace.info(f"[STAGE]: Execute Case-Stage: {_case!r}.")
         _else: Optional[Match] = None
@@ -2468,7 +2466,7 @@ class DockerStage(BaseStage):  # pragma: no cov
                 exit_status,
                 None,
                 f"{self.image}:{self.tag}",
-                out,
+                out.decode("utf-8"),
             )
         output_file: Path = Path(f".docker.{result.run_id}.logs/outputs.json")
         if not output_file.exists():
@@ -2527,7 +2525,7 @@ class VirtualPyStage(PyStage):  # pragma: no cov
         py: str,
         values: DictData,
         deps: list[str],
-        run_id: Optional[str] = None,
+        run_id: StrOrNone = None,
     ) -> Iterator[str]:
         """Create the .py file with an input Python string statement.
 
@@ -2535,7 +2533,7 @@ class VirtualPyStage(PyStage):  # pragma: no cov
         :param values: A variable that want to set before running this
         :param deps: An additional Python dependencies that want install before
             run this python stage.
-        :param run_id: (Optional[str]) A running ID of this stage execution.
+        :param run_id: (StrOrNone) A running ID of this stage execution.
         """
         run_id: str = run_id or uuid.uuid4()
         f_name: str = f"{run_id}.py"
@@ -2653,5 +2651,8 @@ Stage = Annotated[
         RaiseStage,
         EmptyStage,
     ],
-    Field(union_mode="smart"),
+    Field(
+        union_mode="smart",
+        description="A stage models that already implemented on this package.",
+    ),
 ]  # pragma: no cov
