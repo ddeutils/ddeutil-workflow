@@ -18,6 +18,7 @@ from functools import lru_cache
 from inspect import Traceback, currentframe, getframeinfo
 from pathlib import Path
 from threading import get_ident
+from types import FrameType
 from typing import ClassVar, Literal, Optional, TypeVar, Union
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -92,23 +93,25 @@ class TraceMeta(BaseModel):  # pragma: no cov
     lineno: int = Field(description="A line number of this log.")
 
     @classmethod
-    def dynamic_frame(cls, extras: Optional[DictData] = None) -> Traceback:
+    def dynamic_frame(
+        cls, frame: FrameType, *, extras: Optional[DictData] = None
+    ) -> Traceback:
         """Dynamic Frame information base on the `logs_trace_frame_layer` config
         value that was set from the extra parameter.
 
+        :param frame: (FrameType) The current frame that want to dynamic.
         :param extras: (DictData) An extra parameter that want to get the
             `logs_trace_frame_layer` config value.
         """
         extras: DictData = extras or {}
-        layer: int = extras.get("logs_trace_frame_layer", 3)
-        frame = currentframe()
+        layer: int = extras.get("logs_trace_frame_layer", 4)
         for _ in range(layer):
-            _frame = frame.f_back
-            if _frame is None and ((_ + 1) != layer):
+            _frame: Optional[FrameType] = frame.f_back
+            if _frame is None:
                 raise ValueError(
                     f"Layer value does not valid, the maximum frame is: {_ + 1}"
                 )
-            frame = _frame
+            frame: FrameType = _frame
         return getframeinfo(frame)
 
     @classmethod
@@ -120,7 +123,8 @@ class TraceMeta(BaseModel):  # pragma: no cov
         *,
         extras: Optional[DictData] = None,
     ) -> Self:
-        """Make the current TraceMeta instance that catching local state.
+        """Make the current metric for contract this TraceMeta model instance
+        that will catch local states like PID, thread identity.
 
         :param mode: (Literal["stdout", "stderr"]) A metadata mode.
         :param message: (str) A message.
@@ -130,7 +134,8 @@ class TraceMeta(BaseModel):  # pragma: no cov
 
         :rtype: Self
         """
-        frame_info: Traceback = cls.dynamic_frame(extras)
+        frame: FrameType = currentframe()
+        frame_info: Traceback = cls.dynamic_frame(frame, extras=extras)
         extras: DictData = extras or {}
         return cls(
             mode=mode,
@@ -486,7 +491,7 @@ class FileTrace(BaseTrace):  # pragma: no cov
 
         mode: Literal["stdout", "stderr"] = "stderr" if is_err else "stdout"
         trace_meta: TraceMeta = TraceMeta.make(
-            mode=mode, level=level, message=message
+            mode=mode, level=level, message=message, extras=self.extras
         )
 
         with (self.pointer / f"{mode}.txt").open(
@@ -514,7 +519,7 @@ class FileTrace(BaseTrace):  # pragma: no cov
 
         mode: Literal["stdout", "stderr"] = "stderr" if is_err else "stdout"
         trace_meta: TraceMeta = TraceMeta.make(
-            mode=mode, level=level, message=message
+            mode=mode, level=level, message=message, extras=self.extras
         )
 
         async with aiofiles.open(

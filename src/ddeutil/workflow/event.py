@@ -118,7 +118,6 @@ class Crontab(BaseModel):
         passing["cronjob"] = interval2crontab(
             **{v: value[v] for v in value if v in ("interval", "day", "time")}
         )
-        print(passing)
         return cls(extras=extras | passing.pop("extras", {}), **passing)
 
     @classmethod
