@@ -598,7 +598,7 @@ class BashStage(BaseAsyncStage):
     )
 
     @contextlib.asynccontextmanager
-    async def acreate_sh_file(
+    async def async_create_sh_file(
         self, bash: str, env: DictStr, run_id: Optional[str] = None
     ) -> AsyncIterator[TupleStr]:
         """Async create and write `.sh` file with the `aiofiles` package.
@@ -752,7 +752,7 @@ class BashStage(BaseAsyncStage):
             dedent(self.bash.strip("\n")), params, extras=self.extras
         )
 
-        async with self.acreate_sh_file(
+        async with self.async_create_sh_file(
             bash=bash,
             env=param2template(self.env, params, extras=self.extras),
             run_id=result.run_id,
@@ -1826,7 +1826,10 @@ class UntilStage(BaseNestedStage):
         ...     "stages": [
         ...         {
         ...             "name": "Start increase item value.",
-        ...             "run": "item = ${{ item }}\\nitem += 1\\n"
+        ...             "run": (
+        ...                 "item = ${{ item }}\\n"
+        ...                 "item += 1\\n"
+        ...             )
         ...         },
         ...     ],
         ... }
@@ -2396,8 +2399,14 @@ class DockerStage(BaseStage):  # pragma: no cov
 
         :rtype: Result
         """
-        from docker import DockerClient
-        from docker.errors import ContainerError
+        try:
+            from docker import DockerClient
+            from docker.errors import ContainerError
+        except ImportError:
+            raise ImportError(
+                "Docker stage need the docker package, you should install it "
+                "by `pip install docker` first."
+            ) from None
 
         client = DockerClient(
             base_url="unix://var/run/docker.sock", version="auto"

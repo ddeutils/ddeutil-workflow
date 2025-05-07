@@ -38,7 +38,7 @@ class Status(IntEnum):
     CANCEL = 4
 
     @property
-    def emoji(self) -> str:
+    def emoji(self) -> str:  # pragma: no cov
         """Return the emoji value of this status.
 
         :rtype: str

@@ -563,11 +563,12 @@ class Workflow(BaseModel):
             adding jobs key to this parameter.
         """
         # VALIDATE: Incoming params should have keys that set on this workflow.
-        if check_key := [
+        check_key: list[str] = [
             f"{k!r}"
             for k in self.params
             if (k not in params and self.params[k].required)
-        ]:
+        ]
+        if check_key:
             raise WorkflowException(
                 f"Required Param on this workflow setting does not set: "
                 f"{', '.join(check_key)}."
