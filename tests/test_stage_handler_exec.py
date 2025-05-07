@@ -529,7 +529,7 @@ def test_foreach_stage_exec_concurrent_with_raise():
             {
                 "name": "Raise with PyStage",
                 "run": (
-                    "import time\n\nif ${{ item }} == 2:\n\t"
+                    "import time\n\nif ${{ item }} == 2:\n\ttime.sleep(0.8)\n\t"
                     'raise ValueError("Raise error for item equal 2")\n'
                     "else:\n\ttime.sleep(3)"
                 ),
@@ -538,7 +538,7 @@ def test_foreach_stage_exec_concurrent_with_raise():
         extras={"stage_default_id": False},
     )
     event = MockEvent(n=4)
-    rs: Result = stage.set_outputs(
+    rs: dict = stage.set_outputs(
         stage.handler_execute({}, event=event).context, to={}
     )
     assert rs == {

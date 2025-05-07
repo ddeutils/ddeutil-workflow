@@ -6,12 +6,13 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from textwrap import dedent
-from threading import Lock
-from typing import Any, Optional
+from threading import Event, Lock
+from typing import Any, Optional, Union
 from zoneinfo import ZoneInfo
 
 import yaml
@@ -66,7 +67,7 @@ def str2dt(value: str, tz: Optional[str] = None) -> datetime:  # pragma: no cov
 
 
 def dump_yaml(
-    filename: str | Path, data: dict[str, Any] | str
+    filename: Union[str, Path], data: Union[dict[str, Any], str]
 ) -> None:  # pragma: no cov
     """Dump the context data to the target yaml file.
 
@@ -82,8 +83,8 @@ def dump_yaml(
 
 @contextmanager
 def dump_yaml_context(
-    filename: str | Path, data: dict[str, Any] | str
-) -> None:  # pragma: no cov
+    filename: Union[str, Path], data: Union[dict[str, Any], str]
+) -> Iterator[Path]:  # pragma: no cov
     """Dump the context data to the target yaml file.
 
     :param filename: (str | Path) A file path or filename of a YAML config.
@@ -102,7 +103,7 @@ def dump_yaml_context(
     test_file.unlink(missing_ok=True)
 
 
-class MockEvent:  # pragma: no cov
+class MockEvent(Event):  # pragma: no cov
     def __init__(self, n: int = 1):
         self.n: int = n
         self.counter: int = 0
@@ -118,3 +119,11 @@ class MockEvent:  # pragma: no cov
     def set(self) -> None:
         with self.lock:
             self.counter = self.n
+
+    def clear(self):
+        self.counter = 0
+
+    def wait(self, timeout=None):
+        raise NotImplementedError(
+            "MockEvent object does not override the `wait` method."
+        )
