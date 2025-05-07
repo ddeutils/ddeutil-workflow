@@ -20,6 +20,7 @@ from typing import Any, Optional, TypedDict, Union
 
 from typing_extensions import Self
 
+StrOrNone = Optional[str]
 StrOrInt = Union[str, int]
 TupleStr = tuple[str, ...]
 DictData = dict[str, Any]
@@ -42,13 +43,16 @@ class CallerRe:
 
     full: str
     caller: str
-    caller_prefix: Optional[str]
+    caller_prefix: StrOrNone
     caller_last: str
     post_filters: str
 
     @classmethod
     def from_regex(cls, match: Match[str]) -> Self:
         """Class construct from matching result.
+
+        :param match: A match string object for contract this Caller regex data
+            class.
 
         :rtype: Self
         """
@@ -121,9 +125,12 @@ class Re:
     )
 
     @classmethod
-    def finditer_caller(cls, value) -> Iterator[CallerRe]:
+    def finditer_caller(cls, value: str) -> Iterator[CallerRe]:
         """Generate CallerRe object that create from matching object that
         extract with re.finditer function.
+
+        :param value: (str) A string value that want to finditer with the caller
+            regular expression.
 
         :rtype: Iterator[CallerRe]
         """

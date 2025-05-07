@@ -9,7 +9,7 @@ annotate for handle error only.
 """
 from __future__ import annotations
 
-from typing import Literal, Optional, TypedDict, overload
+from typing import Literal, Optional, TypedDict, Union, overload
 
 
 class ErrorData(TypedDict):
@@ -55,8 +55,9 @@ class BaseWorkflowException(Exception):
 
     def to_dict(
         self, with_refs: bool = False
-    ) -> ErrorData | dict[str, ErrorData]:
-        """Return ErrorData data from the current exception object.
+    ) -> Union[ErrorData, dict[str, ErrorData]]:
+        """Return ErrorData data from the current exception object. If with_refs
+        flag was set, it will return mapping of refs and itself data.
 
         :rtype: ErrorData
         """
