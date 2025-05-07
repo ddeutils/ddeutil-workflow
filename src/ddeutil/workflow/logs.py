@@ -33,7 +33,7 @@ from .utils import cut_id, get_dt_now, prepare_newline
 def get_logger(name: str):
     """Return logger object with an input module name.
 
-    :param name: A module name that want to log.
+    :param name: (str) A module name that want to log.
     """
     lg = logging.getLogger(name)
 
@@ -92,6 +92,26 @@ class TraceMeta(BaseModel):  # pragma: no cov
     lineno: int = Field(description="A line number of this log.")
 
     @classmethod
+    def dynamic_frame(cls, extras: Optional[DictData] = None) -> Traceback:
+        """Dynamic Frame information base on the `logs_trace_frame_layer` config
+        value that was set from the extra parameter.
+
+        :param extras: (DictData) An extra parameter that want to get the
+            `logs_trace_frame_layer` config value.
+        """
+        extras: DictData = extras or {}
+        layer: int = extras.get("logs_trace_frame_layer", 3)
+        frame = currentframe()
+        for _ in range(layer):
+            _frame = frame.f_back
+            if _frame is None and ((_ + 1) != layer):
+                raise ValueError(
+                    f"Layer value does not valid, the maximum frame is: {_ + 1}"
+                )
+            frame = _frame
+        return getframeinfo(frame)
+
+    @classmethod
     def make(
         cls,
         mode: Literal["stdout", "stderr"],
@@ -110,9 +130,7 @@ class TraceMeta(BaseModel):  # pragma: no cov
 
         :rtype: Self
         """
-        frame_info: Traceback = getframeinfo(
-            currentframe().f_back.f_back.f_back
-        )
+        frame_info: Traceback = cls.dynamic_frame(extras)
         extras: DictData = extras or {}
         return cls(
             mode=mode,

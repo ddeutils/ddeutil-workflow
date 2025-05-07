@@ -104,6 +104,10 @@ def dump_yaml_context(
 
 
 class MockEvent(Event):  # pragma: no cov
+    """Mock Event object that override the core methods of Event for force set
+    from parent thread of its function lineage.
+    """
+
     def __init__(self, n: int = 1):
         self.n: int = n
         self.counter: int = 0
