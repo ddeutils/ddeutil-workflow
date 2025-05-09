@@ -1294,6 +1294,7 @@ class TriggerStage(BaseStage):
             extras=self.extras | {"stage_raise_error": True},
         ).execute(
             params=param2template(self.params, params, extras=self.extras),
+            run_id=result.run_id,
             parent_run_id=result.run_id,
             event=event,
         )
