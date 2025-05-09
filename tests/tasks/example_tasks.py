@@ -26,7 +26,7 @@ def get_stream_info(name: str, result: Result) -> DictData:
 
     :rtype: DictData
     """
-    result.trace.info(f"[CALLER]: Start getting stream: {name!r} info.")
+    result.trace.info(f"Start getting stream: {name!r} info.")
     return {
         "name": name,
         "freq": {"mode": "daily"},
@@ -48,9 +48,9 @@ def start_stream(
     :param data_freq: (dict[str, str]) A logical date frequency.
     :param result: (Result) A result dataclass for make logging.
     """
-    result.trace.info(f"[CALLER]: Start running stream: {name!r}.")
-    result.trace.info(f"[CALLER]: ... freq: {freq}")
-    result.trace.info(f"[CALLER]: ... data_freq: {data_freq}")
+    result.trace.info(f"Start running stream: {name!r}.")
+    result.trace.info(f"... freq: {freq}")
+    result.trace.info(f"... data_freq: {data_freq}")
     return {
         "audit-date": datetime(2025, 4, 1, 1),
         "logical-date": datetime(2025, 4, 1, 1),
@@ -68,13 +68,13 @@ def get_groups_from_priority(
     :param result: (Result)
     """
     result.trace.info(
-        f"[CALLER]: Get groups from priority: {priority} and stream: {stream!r}"
+        f"Get groups from priority: {priority} and stream: {stream!r}"
     )
     priority_group = {
         1: ["group-01"],
         2: ["group-02", "group-12"],
     }
-    result.trace.info(f"[CALLER]: ... Return groups from {priority}")
+    result.trace.info(f"... Return groups from {priority}")
     return {"groups": priority_group.get(priority)}
 
 
@@ -83,7 +83,7 @@ def get_processes_from_group(
     group: str, stream: str, result: Result
 ) -> DictData:
     result.trace.info(
-        f"[CALLER]: Get processes from group: {group!r} and stream: {stream!r}"
+        f"Get processes from group: {group!r} and stream: {stream!r}"
     )
     processes = {
         "group-01": ["process-01"],
@@ -96,7 +96,7 @@ def get_processes_from_group(
 @tag_v1(alias="start-process")
 def start_process(name: str, result: Result) -> DictData:
     """Start process with an input process name."""
-    result.trace.info(f"[CALLER]: Start process: {name!r}")
+    result.trace.info(f"Start process: {name!r}")
     routes = {
         "process-01": 1,
         "process-02": 2,
@@ -125,12 +125,10 @@ def routing_ingest_file(
     :param audit_date: (datetime)
     :param result: (Result)
     """
-    result.trace.info(f"[CALLER]: Routing: 01 with process: {process!r}")
-    result.trace.info(
-        "[CALLER]: ... This routing is ingest data with file type."
-    )
-    result.trace.info(f"[CALLER]: ... Audit date: {audit_date}")
-    time.sleep(5)
+    result.trace.info(f"Routing: 01 with process: {process!r}")
+    result.trace.info("... This routing is ingest data with file type.")
+    result.trace.info(f"... Audit date: {audit_date}")
+    time.sleep(2)
     return {
         "records": 1000,
     }
@@ -148,12 +146,10 @@ def routing_ingest_db(
     :param audit_date: (datetime)
     :param result: (Result)
     """
-    result.trace.info(f"[CALLER]: Routing: 02 with process: {process!r}")
-    result.trace.info(
-        "[CALLER]: ... This routing is ingest data with database type."
-    )
-    result.trace.info(f"[CALLER]: ... Audit date: {audit_date}")
-    time.sleep(5)
+    result.trace.info(f"Routing: 02 with process: {process!r}")
+    result.trace.info("... This routing is ingest data with database type.")
+    result.trace.info(f"... Audit date: {audit_date}")
+    time.sleep(2)
     return {
         "records": 2000,
     }
