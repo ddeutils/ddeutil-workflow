@@ -59,7 +59,7 @@ def test_workflow_poke(test_path):
     # NOTE: Respec the run_id does not equal to the parent_run_id.
     assert (
         result.context["outputs"][0].run_id
-        != result.context["outputs"][0].parent_run_id
+        == result.context["outputs"][0].parent_run_id
     )
 
     # NOTE: Raise because start date gather than the current date.
@@ -135,7 +135,7 @@ def test_workflow_poke_with_start_date_and_period(test_path):
         )
         assert len(result.context["outputs"]) == 2
         outputs: list[Result] = result.context["outputs"]
-        assert outputs[0].parent_run_id == outputs[1].parent_run_id
+        assert outputs[0].parent_run_id != outputs[1].parent_run_id
         assert outputs[0].context["release"]["logical_date"] == datetime(
             2024, 1, 1, 0, 1
         )

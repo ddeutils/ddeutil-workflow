@@ -83,7 +83,7 @@ PREFIX_LOGS: dict[str, dict] = {
     "JOB": {"emoji": "⛓️", "desc": "logs from job module."},
     "WORKFLOW": {"emoji": "🏃", "desc": "logs from workflow module."},
     "RELEASE": {"emoji": "📅", "desc": "logs from release workflow method."},
-    "POKE": {"emoji": "⏰", "desc": "logs from poke workflow method."},
+    "POKING": {"emoji": "⏰", "desc": "logs from poke workflow method."},
 }  # pragma: no cov
 PREFIX_DEFAULT: str = "CALLER"
 PREFIX_LOGS_REGEX: re.Pattern[str] = re.compile(
