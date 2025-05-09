@@ -671,7 +671,7 @@ class Workflow(BaseModel):
         rs: Result = self.execute(
             params=values,
             result=result,
-            parent_run_id=result.parent_run_id,
+            parent_run_id=result.run_id,
             timeout=timeout,
         )
         result.trace.info(
