@@ -29,6 +29,8 @@ from .__types import DictData
 from .conf import config, dynamic
 from .utils import cut_id, get_dt_now, prepare_newline
 
+METADATA: str = "metadata.json"
+
 
 @lru_cache
 def get_logger(name: str):
@@ -180,13 +182,11 @@ class TraceData(BaseModel):  # pragma: no cov
             if (file / f"{mode}.txt").exists():
                 data[mode] = (file / f"{mode}.txt").read_text(encoding="utf-8")
 
-        if (file / "metadata.json").exists():
+        if (file / METADATA).exists():
             data["meta"] = [
                 json.loads(line)
                 for line in (
-                    (file / "metadata.json")
-                    .read_text(encoding="utf-8")
-                    .splitlines()
+                    (file / METADATA).read_text(encoding="utf-8").splitlines()
                 )
             ]
 
@@ -500,9 +500,7 @@ class FileTrace(BaseTrace):  # pragma: no cov
             fmt: str = dynamic("log_format_file", extras=self.extras)
             f.write(f"{fmt}\n".format(**trace_meta.model_dump()))
 
-        with (self.pointer / "metadata.json").open(
-            mode="at", encoding="utf-8"
-        ) as f:
+        with (self.pointer / METADATA).open(mode="at", encoding="utf-8") as f:
             f.write(trace_meta.model_dump_json() + "\n")
 
     async def awriter(
@@ -529,7 +527,7 @@ class FileTrace(BaseTrace):  # pragma: no cov
             await f.write(f"{fmt}\n".format(**trace_meta.model_dump()))
 
         async with aiofiles.open(
-            self.pointer / "metadata.json", mode="at", encoding="utf-8"
+            self.pointer / METADATA, mode="at", encoding="utf-8"
         ) as f:
             await f.write(trace_meta.model_dump_json() + "\n")
 

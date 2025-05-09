@@ -1,0 +1,29 @@
+process-workflow:
+  type: Workflow
+  params:
+    name: str
+    audit-date: datetime
+  jobs:
+    start-process:
+      stages:
+        - name: "Start run Process"
+          id: start-process
+          uses: tasks/start-process@v1
+          with:
+            name: ${{ params.name }}
+
+        - name: Switch routing
+          trigger: routing-${{ stages.start-process.outputs.routing }}-workflow
+          params:
+            name: ${{ params.name }}
+            audit-date: ${{ params.audit-date }}
+
+        - name: "Making Data Quality"
+          echo: Start run data quality
+
+        - name: "Clear log"
+          echo: Clear logging and close process
+
+        - name: "End process"
+          echo: |
+            End run process: ${{ params.name }}

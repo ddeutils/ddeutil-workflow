@@ -4,3 +4,4 @@
 # license information.
 # ------------------------------------------------------------------------------
 from .dummy_tasks import *
+from .example_tasks import *
