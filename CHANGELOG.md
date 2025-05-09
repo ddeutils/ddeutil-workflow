@@ -2,6 +2,34 @@
 
 ## Latest Changes
 
+## 0.0.60
+
+### :sparkles: Features
+
+- :dart: feat: add emoji to trace log with log prefix.
+- :dart: feat: add extract message prefix log.
+
+### :bug: Bug fixes
+
+- :gear: fixed: testcase from feature change does not valid.
+- :gear: fixed: running id that use on trigger stage not valid.
+- :gear: fixed: pass run id to trigger stage exec for merge trace log together.
+- :gear: fixed: move current frame from dynamic method to make method.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: add testcase for create full example workflow usecase.
+- :test_tube: tests: update traces testcase.
+- :test_tube: tests: fixed testcase and change typed-hint on utils mod.
+
+### :postbox: Dependencies
+
+- :pushpin: deps: update deps for self-hosted job.
+
+### :book: Documentations
+
+- :page_facing_up: docs: update docs-string and field desc.
+
 ## 0.0.59
 
 ### :sparkles: Features
