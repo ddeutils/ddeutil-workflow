@@ -1,0 +1,32 @@
+group-workflow:
+  type: Workflow
+  params:
+    name: str
+    stream: str
+    audit-date: datetime
+  jobs:
+    start-group:
+      stages:
+        - name: "Get Process from Group"
+          id: get-processes
+          uses: tasks/get-processes-from-group@v1
+          with:
+            group: ${{ params.name }}
+            stream: ${{ params.stream }}
+
+        - name: "For-each process"
+          id: processes
+          foreach: ${{ stages.get-processes.outputs.processes }}
+          concurrency: 1
+          stages:
+            - name: Run Process
+              id: trigger-process-workflow
+              trigger: process-workflow
+              params:
+                name: ${{ item }}
+                stream: ${{ params.stream }}
+                audit-date: ${{ params.audit-date }}
+
+            - name: End trigger Process
+              id: end-trigger-process
+              echo: "End trigger Process: ${{ item }}"
