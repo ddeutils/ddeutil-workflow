@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from datetime import datetime
@@ -71,13 +72,44 @@ def get_dt_tznow() -> datetime:  # pragma: no cov
 
 
 PREFIX_LOGS: dict[str, dict] = {
-    "CALLER": {"emoji": ""},
+    "CALLER": {
+        "emoji": "",
+        "desc": "logs from any usage from custom caller function",
+    },
     "STAGE": {"emoji": ""},
     "JOB": {"emoji": ""},
     "WORKFLOW": {"emoji": "🏃"},
     "RELEASE": {"emoji": ""},
     "POKE": {"emoji": ""},
 }  # pragma: no cov
+PREFIX_LOGS_REGEX: re.Pattern[str] = re.compile(
+    rf"""
+    (^\[(?P<name>{'|'.join(p for p in PREFIX_LOGS)})]:\s?)?
+    (?P<message>.*)
+    """,
+    re.MULTILINE | re.DOTALL | re.ASCII | re.VERBOSE,
+)  # pragma: no cov
+
+
+class PrefixMsg(BaseModel):
+    """Prefix Message model for receive grouping dict from searching prefix data
+    from logging message.
+    """
+
+    name: Optional[str] = Field(default=None)
+    message: Optional[str] = Field(default=None)
+
+
+def extract_msg_prefix(msg: str) -> PrefixMsg:
+    """Extract message prefix from an input message.
+
+    :param msg: A message that want to extract.
+
+    :rtype: PrefixMsg
+    """
+    return PrefixMsg.model_validate(
+        obj=PREFIX_LOGS_REGEX.search(msg).groupdict()
+    )
 
 
 class TraceMeta(BaseModel):  # pragma: no cov
@@ -286,6 +318,9 @@ class BaseTrace(BaseModel, ABC):  # pragma: no cov
 
         :param message: (str) A message that want to log.
         """
+        if not extract_msg_prefix(message).name:
+            message: str = f"[CALLER]: {message.lstrip()}"
+
         msg: str = prepare_newline(self.make_message(message))
 
         if mode != "debug" or (

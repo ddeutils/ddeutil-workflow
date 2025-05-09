@@ -24,7 +24,7 @@ from .__types import DictData, Matrix
 
 T = TypeVar("T")
 UTC: Final[ZoneInfo] = ZoneInfo("UTC")
-MARK_NL: Final[str] = "||"
+MARK_NEWLINE: Final[str] = "||"
 
 
 def prepare_newline(msg: str) -> str:
@@ -34,11 +34,12 @@ def prepare_newline(msg: str) -> str:
 
     :rtype: str
     """
-    msg: str = msg.strip("\n").replace("\n", MARK_NL)
-    if MARK_NL not in msg:
+    # NOTE: Remove ending with "\n" and replace "\n" with the "||" value.
+    msg: str = msg.strip("\n").replace("\n", MARK_NEWLINE)
+    if MARK_NEWLINE not in msg:
         return msg
 
-    msg_lines: list[str] = msg.split(MARK_NL)
+    msg_lines: list[str] = msg.split(MARK_NEWLINE)
     msg_last: str = msg_lines[-1]
     msg_body: str = (
         "\n" + "\n".join(f" ... |  \t{s}" for s in msg_lines[1:-1])
