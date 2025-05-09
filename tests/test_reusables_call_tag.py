@@ -94,11 +94,18 @@ def test_make_registry_from_env():
     rs: dict[str, Registry] = make_registry("tasks")
     assert set(rs.keys()) == {
         "async-el-csv-to-parquet",
-        "get-items",
-        "gen-type",
-        "mssql-proc",
         "el-csv-to-parquet",
+        "gen-type",
+        "get-groups-from-priority",
+        "get-items",
+        "get-processes-from-group",
+        "get-stream-info",
+        "mssql-proc",
         "return-type-not-valid",
+        "routing-01",
+        "routing-02",
+        "start-process",
+        "start-stream",
     }
 
 
