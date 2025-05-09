@@ -4,7 +4,10 @@
 # license information.
 # ------------------------------------------------------------------------------
 # [x] Use fix config for `get_logger`, and Model initialize step.
-"""A Logs module contain Trace dataclass and Audit Pydantic model.
+"""A Logs module contain Trace and Audit Pydantic models for process log from
+the core workflow engine. I separate part of log to 2 types:
+  - Trace: A stdout and stderr log
+  - Audit: An audit release log for tracking incremental running workflow.
 """
 from __future__ import annotations
 
@@ -73,20 +76,18 @@ def get_dt_tznow() -> datetime:  # pragma: no cov
 
 PREFIX_LOGS: dict[str, dict] = {
     "CALLER": {
-        "emoji": "",
-        "desc": "logs from any usage from custom caller function",
+        "emoji": "📍",
+        "desc": "logs from any usage from custom caller function.",
     },
-    "STAGE": {"emoji": ""},
-    "JOB": {"emoji": ""},
-    "WORKFLOW": {"emoji": "🏃"},
-    "RELEASE": {"emoji": ""},
-    "POKE": {"emoji": ""},
+    "STAGE": {"emoji": "⚙️", "desc": "logs from stages module."},
+    "JOB": {"emoji": "⛓️", "desc": "logs from job module."},
+    "WORKFLOW": {"emoji": "🏃", "desc": "logs from workflow module."},
+    "RELEASE": {"emoji": "📅", "desc": "logs from release workflow method."},
+    "POKE": {"emoji": "⏰", "desc": "logs from poke workflow method."},
 }  # pragma: no cov
+PREFIX_DEFAULT: str = "CALLER"
 PREFIX_LOGS_REGEX: re.Pattern[str] = re.compile(
-    rf"""
-    (^\[(?P<name>{'|'.join(p for p in PREFIX_LOGS)})]:\s?)?
-    (?P<message>.*)
-    """,
+    rf"(^\[(?P<name>{'|'.join(PREFIX_LOGS)})]:\s?)?(?P<message>.*)",
     re.MULTILINE | re.DOTALL | re.ASCII | re.VERBOSE,
 )  # pragma: no cov
 
@@ -98,6 +99,19 @@ class PrefixMsg(BaseModel):
 
     name: Optional[str] = Field(default=None)
     message: Optional[str] = Field(default=None)
+
+    def prepare(self, extras: Optional[DictData] = None) -> str:
+        """Prepare message with force add prefix before writing trace log.
+
+        :rtype: str
+        """
+        name: str = self.name or PREFIX_DEFAULT
+        emoji: str = (
+            f"{PREFIX_LOGS[name]['emoji']} "
+            if (extras or {}).get("log_add_emoji", True)
+            else ""
+        )
+        return f"{emoji}[{name}]: {self.message}"
 
 
 def extract_msg_prefix(msg: str) -> PrefixMsg:
@@ -318,10 +332,9 @@ class BaseTrace(BaseModel, ABC):  # pragma: no cov
 
         :param message: (str) A message that want to log.
         """
-        if not extract_msg_prefix(message).name:
-            message: str = f"[CALLER]: {message.lstrip()}"
-
-        msg: str = prepare_newline(self.make_message(message))
+        msg: str = prepare_newline(
+            self.make_message(extract_msg_prefix(message).prepare(self.extras))
+        )
 
         if mode != "debug" or (
             mode == "debug" and dynamic("debug", extras=self.extras)
@@ -378,7 +391,9 @@ class BaseTrace(BaseModel, ABC):  # pragma: no cov
 
         :param message: (str) A message that want to log.
         """
-        msg: str = prepare_newline(self.make_message(message))
+        msg: str = prepare_newline(
+            self.make_message(extract_msg_prefix(message).prepare(self.extras))
+        )
 
         if mode != "debug" or (
             mode == "debug" and dynamic("debug", extras=self.extras)

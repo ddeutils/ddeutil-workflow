@@ -46,6 +46,14 @@ def test_trace_regex_message():
         "Execute Empty-Stage:\n'End trigger Priority Group':\n"
         "( End trigger Priority Group: 2 )"
     )
+    assert prefix.prepare() == (
+        "🏃 [WORKFLOW]: Execute Empty-Stage:\n'End trigger Priority Group':\n"
+        "( End trigger Priority Group: 2 )"
+    )
+    assert prefix.prepare(extras={"log_add_emoji": False}) == (
+        "[WORKFLOW]: Execute Empty-Stage:\n'End trigger Priority Group':\n"
+        "( End trigger Priority Group: 2 )"
+    )
 
 
 def test_trace_meta():
