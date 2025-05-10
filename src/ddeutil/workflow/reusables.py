@@ -40,12 +40,14 @@ FILTERS: dict[str, Callable] = {  # pragma: no cov
     "abs": abs,
     "str": str,
     "int": int,
+    "list": list,
+    "dict": dict,
     "title": lambda x: x.title(),
     "upper": lambda x: x.upper(),
     "lower": lambda x: x.lower(),
     "rstr": [str, repr],
-    "keys": lambda x: list(x.keys()),
-    "values": lambda x: list(x.values()),
+    "keys": lambda x: x.keys(),
+    "values": lambda x: x.values(),
 }
 
 
@@ -303,7 +305,7 @@ def str2template(
             getter: Any = getdot(caller, params)
         except ValueError as err:
             raise UtilException(
-                f"Params does not set caller: {caller!r}."
+                f"Parameters does not get dot with caller: {caller!r}."
             ) from err
 
         # NOTE:
@@ -332,7 +334,7 @@ def param2template(
     filters: Optional[dict[str, FilterRegistry]] = None,
     *,
     extras: Optional[DictData] = None,
-) -> T:
+) -> Any:
     """Pass param to template string that can search by ``RE_CALLER`` regular
     expression.
 
@@ -342,7 +344,7 @@ def param2template(
     :param filters: A filter mapping for mapping with `map_post_filter` func.
     :param extras: (Optional[list[str]]) An Override extras.
 
-    :rtype: T
+    :rtype: Any
     :returns: An any getter value from the params input.
     """
     registers: Optional[list[str]] = (
@@ -369,6 +371,11 @@ def param2template(
 def datetime_format(value: datetime, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
     """Format datetime object to string with the format.
 
+    Examples:
+
+        > ${{ start-date | fmt('%Y%m%d') }}
+        > ${{ start-date | fmt }}
+
     :param value: (datetime) A datetime value that want to format to string
         value.
     :param fmt: (str) A format string pattern that passing to the `dt.strftime`
@@ -385,8 +392,46 @@ def datetime_format(value: datetime, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
 
 @custom_filter("coalesce")  # pragma: no cov
 def coalesce(value: Optional[T], default: Any) -> T:
-    """Coalesce with default value if the main value is None."""
+    """Coalesce with default value if the main value is None.
+
+    Examples:
+
+        > ${{ value | coalesce("foo") }}
+
+    :param value: A value that want to check nullable.
+    :param default: A default value that use to returned value if an input
+        value was null.
+    """
     return default if value is None else value
+
+
+@custom_filter("getitem")  # pragma: no cov
+def get_item(
+    value: DictData, key: Union[str, int], default: Optional[Any] = None
+) -> Any:
+    """Get a value with an input specific key."""
+    if not isinstance(value, dict):
+        raise UtilException(
+            f"The value that pass to `getitem` filter should be `dict` not "
+            f"`{type(value)}`."
+        )
+    return value.get(key, default)
+
+
+@custom_filter("getindex")  # pragma: no cov
+def get_index(value: list[Any], index: int):
+    if not isinstance(value, list):
+        raise UtilException(
+            f"The value that pass to `getindex` filter should be `list` not "
+            f"`{type(value)}`."
+        )
+    try:
+        return value[index]
+    except IndexError as e:
+        raise UtilException(
+            f"Index: {index} is out of range of value (The maximum range is "
+            f"{len(value)})."
+        ) from e
 
 
 class TagFunc(Protocol):

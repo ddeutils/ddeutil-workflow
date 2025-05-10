@@ -80,9 +80,11 @@ def test_map_post_filter():
     assert "'bar'" == map_post_filter("bar", ["rstr"], registry)
     assert 1 == map_post_filter("1", ["int"], registry)
     assert ["foo", "bar"] == map_post_filter(
-        {"foo": 1, "bar": 2}, ["keys"], registry
+        {"foo": 1, "bar": 2}, ["keys", "list"], registry
     )
-    assert [1, 2] == map_post_filter({"foo": 1, "bar": 2}, ["values"], registry)
+    assert [1, 2] == map_post_filter(
+        {"foo": 1, "bar": 2}, ["values", "list"], registry
+    )
 
     with pytest.raises(UtilException):
         map_post_filter("demo", ['rstr(fmt="foo")'], registry)

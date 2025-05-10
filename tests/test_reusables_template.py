@@ -76,6 +76,70 @@ def test_param2template_with_filter():
     )
     assert 5 == value
 
+    assert (
+        param2template(
+            value="${{ params.start-dt | fmt('%Y%m%d') }}",
+            params={"params": {"start-dt": datetime(2024, 6, 12)}},
+        )
+        == "20240612"
+    )
+
+    assert (
+        param2template(
+            value="${{ params.start-dt | fmt }}",
+            params={"params": {"start-dt": datetime(2024, 6, 12)}},
+        )
+        == "2024-06-12 00:00:00"
+    )
+
+    assert (
+        param2template(
+            value="${{ params.value | coalesce('foo') }}",
+            params={"params": {"value": None}},
+        )
+        == "foo"
+    )
+
+    assert (
+        param2template(
+            value="${{ params.value | coalesce('foo') }}",
+            params={"params": {"value": "bar"}},
+        )
+        == "bar"
+    )
+
+    assert (
+        param2template(
+            value="${{ params.data | getitem('key') }}",
+            params={"params": {"data": {"key": "value"}}},
+        )
+        == "value"
+    )
+
+    assert (
+        param2template(
+            value="${{ params.data | getitem('foo', 'bar') }}",
+            params={"params": {"data": {"key": "value"}}},
+        )
+        == "bar"
+    )
+
+    assert (
+        param2template(
+            value="${{ params.data | getitem(1, 'bar') }}",
+            params={"params": {"data": {1: "value"}}},
+        )
+        == "value"
+    )
+
+    assert (
+        param2template(
+            value="${{ params.range | getindex(0) }}",
+            params={"params": {"range": [1, 2, 3]}},
+        )
+        == 1
+    )
+
     with pytest.raises(UtilException):
         param2template(
             value="${{ params.value | abs12 }}",
@@ -94,6 +158,18 @@ def test_param2template_with_filter():
             params={
                 "params": {"asat-dt": datetime(2024, 8, 1)},
             },
+        )
+
+    with pytest.raises(UtilException):
+        param2template(
+            value="${{ params.data | getitem(1, 'bar') }}",
+            params={"params": {"data": 1}},
+        )
+
+    with pytest.raises(UtilException):
+        param2template(
+            value="${{ params.range | getindex(4) }}",
+            params={"params": {"range": [1, 2, 3]}},
         )
 
 
