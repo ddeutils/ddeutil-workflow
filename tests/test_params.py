@@ -102,8 +102,14 @@ def test_param_choice():
 
 def test_param_array():
     assert [7, 8] == ArrayParam(default=[1]).receive([7, 8])
+    assert [7, 8] == ArrayParam(default=[1]).receive((7, 8))
+
+    # NOTE: If receive set type it does not guarantee ordering.
+    assert {7, 8} == set(ArrayParam(default=[1]).receive({7, 8}))
+
     assert [1, 2, 3] == ArrayParam(default=[1]).receive("[1, 2, 3]")
     assert [1] == ArrayParam(default=[1]).receive()
+    assert [] == ArrayParam().receive()
 
     with pytest.raises(ParamValueException):
         ArrayParam().receive('{"foo": 1}')
@@ -120,6 +126,7 @@ def test_param_map():
         '{"foo": "bar"}'
     )
     assert {"key": "value"} == MapParam(default={"key": "value"}).receive()
+    assert {} == MapParam().receive()
 
     with pytest.raises(ParamValueException):
         MapParam().receive('["foo", 1]')
@@ -132,6 +139,8 @@ def test_param_decimal():
     assert not (rs > respect)
     assert not (rs < respect)
     assert not (rs == 1.015)
+
+    assert Decimal(1) == DecimalParam().receive(1)
 
     with pytest.raises(TypeError):
         DecimalParam().receive(value=[1.2])

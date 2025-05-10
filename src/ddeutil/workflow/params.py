@@ -160,10 +160,11 @@ class StrParam(DefaultParam):
 
     type: Literal["str"] = "str"
 
-    def receive(self, value: Optional[str] = None) -> Optional[str]:
+    def receive(self, value: Optional[Any] = None) -> Optional[str]:
         """Receive value that match with str.
 
-        :param value: A value that want to validate with string parameter type.
+        :param value: (Any) A value that want to validate with string parameter
+            type.
         :rtype: Optional[str]
         """
         if value is None:
@@ -176,7 +177,7 @@ class IntParam(DefaultParam):
 
     type: Literal["int"] = "int"
 
-    def receive(self, value: Optional[int] = None) -> Optional[int]:
+    def receive(self, value: Optional[StrOrInt] = None) -> Optional[int]:
         """Receive value that match with int.
 
         :param value: A value that want to validate with integer parameter type.
@@ -248,7 +249,9 @@ class DecimalParam(DefaultParam):  # pragma: no cov
         """
         return value.quantize(Decimal(10) ** -self.precision)
 
-    def receive(self, value: Optional[Union[float, Decimal]] = None) -> Decimal:
+    def receive(
+        self, value: Optional[Union[float, int, str, Decimal]] = None
+    ) -> Decimal:
         """Receive value that match with decimal.
 
         :param value: (float | Decimal) A value that want to validate with
@@ -258,7 +261,7 @@ class DecimalParam(DefaultParam):  # pragma: no cov
         if value is None:
             return self.default
 
-        if isinstance(value, float):
+        if isinstance(value, (float, int)):
             return self.rounding(Decimal(value))
         elif isinstance(value, Decimal):
             return self.rounding(value)
@@ -302,7 +305,7 @@ class ChoiceParam(BaseParam):
         return value
 
 
-class MapParam(DefaultParam):  # pragma: no cov
+class MapParam(DefaultParam):
     """Map parameter."""
 
     type: Literal["map"] = "map"
@@ -340,7 +343,7 @@ class MapParam(DefaultParam):  # pragma: no cov
         return value
 
 
-class ArrayParam(DefaultParam):  # pragma: no cov
+class ArrayParam(DefaultParam):
     """Array parameter."""
 
     type: Literal["array"] = "array"
@@ -350,7 +353,7 @@ class ArrayParam(DefaultParam):  # pragma: no cov
     )
 
     def receive(
-        self, value: Optional[Union[list[T], tuple[T, ...], str]] = None
+        self, value: Optional[Union[list[T], tuple[T, ...], set[T], str]] = None
     ) -> list[T]:
         """Receive value that match with array type.
 
