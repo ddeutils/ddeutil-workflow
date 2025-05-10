@@ -332,9 +332,7 @@ class BaseTrace(BaseModel, ABC):  # pragma: no cov
 
         :param message: (str) A message that want to log.
         """
-        msg: str = prepare_newline(
-            self.make_message(extract_msg_prefix(message).prepare(self.extras))
-        )
+        msg: str = self.make_message(message)
 
         if mode != "debug" or (
             mode == "debug" and dynamic("debug", extras=self.extras)
@@ -391,9 +389,7 @@ class BaseTrace(BaseModel, ABC):  # pragma: no cov
 
         :param message: (str) A message that want to log.
         """
-        msg: str = prepare_newline(
-            self.make_message(extract_msg_prefix(message).prepare(self.extras))
-        )
+        msg: str = self.make_message(message)
 
         if mode != "debug" or (
             mode == "debug" and dynamic("debug", extras=self.extras)
@@ -514,13 +510,15 @@ class FileTrace(BaseTrace):  # pragma: no cov
         return f"{cut_parent_run_id} -> {cut_run_id}"
 
     def make_message(self, message: str) -> str:
-        """Prepare and Make a message before write and log processes.
+        """Prepare and Make a message before write and log steps.
 
         :param message: (str) A message that want to prepare and make before.
 
         :rtype: str
         """
-        return f"({self.cut_id}) {message}"
+        return prepare_newline(
+            f"({self.cut_id}) {extract_msg_prefix(message).prepare(self.extras)}"
+        )
 
     def writer(self, message: str, level: str, is_err: bool = False) -> None:
         """Write a trace message after making to target file and write metadata
