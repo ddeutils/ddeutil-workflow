@@ -922,20 +922,33 @@ def test_stage_py_virtual(test_path):
                 - name: "Start run Python on the new Virtual"
                   id: py-virtual
                   deps:
-                    - pandas
+                    - numpy
                   run: |
-                    import pandas as pd
-                    print(pd)
+                    import numpy as np
+
+                    arr = np.array([1, 2, 3, 4, 5])
+                    print(arr)
+                    print(type(arr))
         """,
     ):
         workflow = Workflow.from_conf(name="tmp-wf-py-virtual")
         stage: Stage = workflow.job("first-job").stage("py-virtual")
         # TODO: This testcase raise error for uv does not exist on GH action.
         try:
-            rs = stage.set_outputs(
+            rs: dict = stage.set_outputs(
                 stage.handler_execute({"params": {}}).context, to={}
             )
-            print(rs)
+            assert rs == {
+                "stages": {
+                    "py-virtual": {
+                        "outputs": {
+                            "return_code": 0,
+                            "stdout": "[1 2 3 4 5]\n<class 'numpy.ndarray'>",
+                            "stderr": "Installed 1 package in 25ms",
+                        },
+                    },
+                },
+            }
         except StageException as e:
             print(e)
 

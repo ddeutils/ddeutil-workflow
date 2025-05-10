@@ -2532,7 +2532,11 @@ class VirtualPyStage(PyStage):  # pragma: no cov
         deps: list[str],
         run_id: StrOrNone = None,
     ) -> Iterator[str]:
-        """Create the .py file with an input Python string statement.
+        """Create the `.py` file and write an input Python statement and its
+        Python dependency on the header of this file.
+
+            The format of Python dependency was followed by the `uv`
+        recommended.
 
         :param py: A Python string statement.
         :param values: A variable that want to set before running this
@@ -2548,7 +2552,7 @@ class VirtualPyStage(PyStage):  # pragma: no cov
                 f"{var} = {value!r}" for var, value in values.items()
             )
 
-            # NOTE: uv supports PEP 723 — inline TOML metadata.
+            # NOTE: `uv` supports PEP 723 — inline TOML metadata.
             f.write(
                 dedent(
                     f"""
@@ -2607,6 +2611,16 @@ class VirtualPyStage(PyStage):  # pragma: no cov
             run_id=result.run_id,
         ) as py:
             result.trace.debug(f"[STAGE]: ... Create `{py}` file.")
+            try:
+                import uv
+
+                _ = uv
+            except ImportError:
+                raise ImportError(
+                    "The VirtualPyStage need you to install `uv` before"
+                    "execution."
+                ) from None
+
             rs: CompletedProcess = subprocess.run(
                 ["uv", "run", py, "--no-cache"],
                 # ["uv", "run", "--python", "3.9", py],
