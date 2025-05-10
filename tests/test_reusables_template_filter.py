@@ -75,34 +75,24 @@ def test_get_args_const():
     ],
 )
 def test_map_post_filter():
-    assert "bar" == map_post_filter("demo", ["foo"], make_filter_registry())
-    assert "'bar'" == map_post_filter("bar", ["rstr"], make_filter_registry())
+    registry = make_filter_registry()
+    assert "bar" == map_post_filter("demo", ["foo"], registry)
+    assert "'bar'" == map_post_filter("bar", ["rstr"], registry)
+    assert 1 == map_post_filter("1", ["int"], registry)
+    assert ["foo", "bar"] == map_post_filter(
+        {"foo": 1, "bar": 2}, ["keys"], registry
+    )
+    assert [1, 2] == map_post_filter({"foo": 1, "bar": 2}, ["values"], registry)
 
     with pytest.raises(UtilException):
-        map_post_filter(
-            "demo",
-            ['rstr(fmt="foo")'],
-            make_filter_registry(),
-        )
+        map_post_filter("demo", ['rstr(fmt="foo")'], registry)
 
     with pytest.raises(UtilException):
-        map_post_filter(
-            "demo",
-            ["raise_err"],
-            make_filter_registry(),
-        )
+        map_post_filter("demo", ["raise_err"], registry)
 
     with pytest.raises(UtilException):
-        map_post_filter(
-            "2024",
-            ["fmt"],
-            make_filter_registry(),
-        )
+        map_post_filter("2024", ["fmt"], registry)
 
     # NOTE: Raise util exception inside filter function
     with pytest.raises(UtilException):
-        map_post_filter(
-            "foo",
-            ["raise_util_exception"],
-            make_filter_registry(),
-        )
+        map_post_filter("foo", ["raise_util_exception"], registry)

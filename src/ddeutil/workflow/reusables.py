@@ -44,6 +44,8 @@ FILTERS: dict[str, Callable] = {  # pragma: no cov
     "upper": lambda x: x.upper(),
     "lower": lambda x: x.lower(),
     "rstr": [str, repr],
+    "keys": lambda x: list(x.keys()),
+    "values": lambda x: list(x.values()),
 }
 
 
