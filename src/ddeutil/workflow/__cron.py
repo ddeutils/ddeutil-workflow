@@ -18,7 +18,7 @@ from ddeutil.core import (
     isinstance_check,
     must_split,
 )
-from ddeutil.core.dtutils import next_date, replace_date
+from ddeutil.core.dtutils import DatetimeMode, next_date, replace_date
 
 WEEKDAYS: dict[str, int] = {
     "Sun": 0,
@@ -178,7 +178,7 @@ class CronPart:
     def __init__(
         self,
         unit: Unit,
-        values: str | list[int],
+        values: Union[str, list[int]],
         options: Options,
     ) -> None:
         self.unit: Unit = unit
@@ -229,19 +229,21 @@ class CronPart:
             f"(unit={self.unit}, values={self.__str__()!r})"
         )
 
-    def __lt__(self, other) -> bool:
+    def __lt__(self, other: Union[CronPart, list]) -> bool:
         """Override __lt__ method."""
         if isinstance(other, CronPart):
             return self.values < other.values
         elif isinstance(other, list):
             return self.values < other
+        return NotImplemented
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: Union[CronPart, list]) -> bool:
         """Override __eq__ method."""
         if isinstance(other, CronPart):
             return self.values == other.values
         elif isinstance(other, list):
             return self.values == other
+        return NotImplemented
 
     @property
     def min(self) -> int:
@@ -271,6 +273,7 @@ class CronPart:
             and (step := self.values[1] - self.values[0]) > 1
         ):
             return step
+        return None
 
     @property
     def is_full(self) -> bool:
@@ -355,6 +358,8 @@ class CronPart:
                     f"Invalid interval step value {value_step!r} for "
                     f"{self.unit.name!r}"
                 )
+            elif value_step:
+                value_step: int = int(value_step)
 
             # NOTE: Generate interval that has step
             interval_list.append(self._interval(value_range_list, value_step))
@@ -375,7 +380,9 @@ class CronPart:
                 value: str = value.replace(alt, str(self.unit.min + i))
         return value
 
-    def replace_weekday(self, values: list[int] | Iterator[int]) -> list[int]:
+    def replace_weekday(
+        self, values: Union[list[int], Iterator[int]]
+    ) -> list[int]:
         """Replaces all 7 with 0 as Sunday can be represented by both.
 
         :param values: list or iter of int that want to mode by 7
@@ -433,12 +440,12 @@ class CronPart:
     def _interval(
         self,
         values: list[int],
-        step: int | None = None,
+        step: Optional[int] = None,
     ) -> list[int]:
         """Applies an interval step to a collection of values.
 
         :param values:
-        :param step:
+        :param step: (int) A step
 
         :rtype: list[int]
         """
@@ -515,7 +522,7 @@ class CronPart:
                 start_number: Optional[int] = value
         return multi_dim_values
 
-    def filler(self, value: int) -> int | str:
+    def filler(self, value: int) -> Union[int, str]:
         """Formats weekday and month names as string when the relevant options
         are set.
 
@@ -765,12 +772,12 @@ class CronRunner:
 
     def __init__(
         self,
-        cron: CronJob | CronJobYear,
+        cron: Union[CronJob, CronJobYear],
         date: Optional[datetime] = None,
         *,
-        tz: str | ZoneInfo | None = None,
+        tz: Optional[Union[str, ZoneInfo]] = None,
     ) -> None:
-        self.tz: ZoneInfo | None = None
+        self.tz: Optional[ZoneInfo] = None
         if tz:
             if isinstance(tz, ZoneInfo):
                 self.tz = tz
@@ -810,7 +817,7 @@ class CronRunner:
             )
 
         self.__start_date: datetime = self.date
-        self.cron: CronJob | CronJobYear = cron
+        self.cron: Union[CronJob, CronJobYear] = cron
         self.is_year: bool = isinstance(cron, CronJobYear)
         self.reset_flag: bool = True
 
@@ -863,7 +870,7 @@ class CronRunner:
 
         raise RecursionError("Unable to find execution time for schedule")
 
-    def __shift_date(self, mode: str, reverse: bool = False) -> bool:
+    def __shift_date(self, mode: DatetimeMode, reverse: bool = False) -> bool:
         """Increments the mode of date value ("month", "day", "hour", "minute")
         until matches with the schedule.
 
@@ -917,12 +924,3 @@ class CronRunner:
 
         # NOTE: Return False if the date that match with condition.
         return False
-
-
-__all__ = (
-    "CronJob",
-    "CronJobYear",
-    "CronRunner",
-    "Options",
-    "WEEKDAYS",
-)

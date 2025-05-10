@@ -316,6 +316,17 @@ class CrontabYear(Crontab):
         )
 
 
+class ReleaseEvent(BaseModel):  # pragma: no cov
+    """Release trigger event."""
+
+    release: list[str] = Field(
+        description=(
+            "A list of workflow name that want to receive event from release"
+            "trigger."
+        )
+    )
+
+
 Event = Annotated[
     Union[
         CronJobYear,
