@@ -2,6 +2,24 @@
 
 ## Latest Changes
 
+## 0.0.61
+
+### :stars: Highlight Features
+
+- :star: hl: add traceback logging on trace log when stage got raise error.
+
+### :sparkles: Features
+
+- :dart: feat: add keys and values template filter for extract dict value.
+- :dart: feat: add dump_all model result recursive on caller stage result.
+
+### :black_nib: Code Changes
+
+- :art: format: add typed-hint on params module.
+- :construction: refactored: seperate queue and poke methods from workflow model to workflow poke model.
+- :test_tube: tests: update pyvirtual stage testcase.
+- :art: format: move prepare message log to `make_message` method.
+
 ## 0.0.60
 
 ### :sparkles: Features
