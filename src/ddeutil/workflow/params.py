@@ -389,5 +389,11 @@ Param = Annotated[
         IntParam,
         StrParam,
     ],
-    Field(discriminator="type"),
+    Field(
+        discriminator="type",
+        description=(
+            "A parameter models that use for validate and receive on the "
+            "workflow execution."
+        ),
+    ),
 ]

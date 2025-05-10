@@ -314,3 +314,15 @@ class CrontabYear(Crontab):
             if isinstance(value, str)
             else value
         )
+
+
+Event = Annotated[
+    Union[
+        CronJobYear,
+        CronJob,
+    ],
+    Field(
+        union_mode="smart",
+        description="An event models.",
+    ),
+]  # pragma: no cov

@@ -39,7 +39,7 @@ from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
 from .__cron import CronRunner
-from .__types import DictData, TupleStr
+from .__types import DictData
 from .conf import FileLoad, Loader, dynamic
 from .event import Crontab
 from .exceptions import WorkflowException
@@ -55,14 +55,6 @@ from .utils import (
     reach_next_minute,
     replace_sec,
     wait_until_next_minute,
-)
-
-__all__: TupleStr = (
-    "Release",
-    "ReleaseQueue",
-    "ReleaseType",
-    "Workflow",
-    "WorkflowTask",
 )
 
 
@@ -711,198 +703,6 @@ class Workflow(BaseModel):
             },
         )
 
-    def queue(
-        self,
-        offset: float,
-        end_date: datetime,
-        queue: ReleaseQueue,
-        audit: type[Audit],
-        *,
-        force_run: bool = False,
-    ) -> ReleaseQueue:
-        """Generate Release from all on values from the on field and store them
-        to the ReleaseQueue object.
-
-        :param offset: An offset in second unit for time travel.
-        :param end_date: An end datetime object.
-        :param queue: A workflow queue object.
-        :param audit: An audit class that want to make audit object.
-        :param force_run: A flag that allow to release workflow if the audit
-            with that release was pointed.
-
-        :rtype: ReleaseQueue
-        """
-        for on in self.on:
-
-            queue.gen(
-                end_date,
-                audit,
-                on.next(get_dt_now(offset=offset).replace(microsecond=0)),
-                self.name,
-                force_run=force_run,
-            )
-
-        return queue
-
-    def poke(
-        self,
-        params: Optional[DictData] = None,
-        start_date: Optional[datetime] = None,
-        *,
-        run_id: Optional[str] = None,
-        periods: int = 1,
-        audit: Optional[Audit] = None,
-        force_run: bool = False,
-        timeout: int = 1800,
-        max_poking_pool_worker: int = 2,
-    ) -> Result:
-        """Poke workflow with a start datetime value that will pass to its
-        `on` field on the threading executor pool for execute the `release`
-        method (It run all schedules that was set on the `on` values).
-
-            This method will observe its `on` field that nearing to run with the
-        `self.release()` method.
-
-            The limitation of this method is not allow run a date that gather
-        than the current date.
-
-        :param params: (DictData) A parameter data.
-        :param start_date: (datetime) A start datetime object.
-        :param run_id: (str) A workflow running ID for this poke.
-        :param periods: (int) A periods in minutes value that use to run this
-            poking. (Default is 1)
-        :param audit: (Audit) An audit object that want to use on this poking
-            process.
-        :param force_run: (bool) A flag that allow to release workflow if the
-            audit with that release was pointed. (Default is False)
-        :param timeout: (int) A second value for timeout while waiting all
-            futures run completely.
-        :param max_poking_pool_worker: (int) The maximum poking pool worker.
-            (Default is 2 workers)
-
-        :raise WorkflowException: If the periods parameter less or equal than 0.
-
-        :rtype: Result
-        :return: A list of all results that return from `self.release` method.
-        """
-        audit: type[Audit] = audit or get_audit(extras=self.extras)
-        result: Result = Result(
-            run_id=(run_id or gen_id(self.name, unique=True))
-        )
-
-        # VALIDATE: Check the periods value should gather than 0.
-        if periods <= 0:
-            raise WorkflowException(
-                "The period of poking should be `int` and grater or equal "
-                "than 1."
-            )
-
-        if len(self.on) == 0:
-            result.trace.warning(
-                f"[POKING]: {self.name!r} not have any schedule!!!"
-            )
-            return result.catch(status=SUCCESS, context={"outputs": []})
-
-        # NOTE: Create the current date that change microsecond to 0
-        current_date: datetime = datetime.now().replace(microsecond=0)
-
-        if start_date is None:
-            # NOTE: Force change start date if it gathers than the current date,
-            #   or it does not pass to this method.
-            start_date: datetime = current_date
-            offset: float = 0
-        elif start_date <= current_date:
-            start_date = start_date.replace(microsecond=0)
-            offset: float = (current_date - start_date).total_seconds()
-        else:
-            raise WorkflowException(
-                f"The start datetime should less than or equal the current "
-                f"datetime, {current_date:%Y-%m-%d %H:%M:%S}."
-            )
-
-        # NOTE: The end date is using to stop generate queue with an input
-        #   periods value. It will change to MM:59.
-        #   For example:
-        #       (input)  start_date = 12:04:12, offset = 2
-        #       (output) end_date = 12:06:59
-        end_date: datetime = start_date.replace(second=0) + timedelta(
-            minutes=periods + 1, seconds=-1
-        )
-
-        result.trace.info(
-            f"[POKING]: Execute Poking: {self.name!r} ("
-            f"{start_date:%Y-%m-%d %H:%M:%S} ==> {end_date:%Y-%m-%d %H:%M:%S})"
-        )
-
-        params: DictData = {} if params is None else params
-        context: list[Result] = []
-        q: ReleaseQueue = ReleaseQueue()
-
-        # NOTE: Create reusable partial function and add Release to the release
-        #   queue object.
-        partial_queue = partial(
-            self.queue, offset, end_date, audit=audit, force_run=force_run
-        )
-        partial_queue(q)
-        if not q.is_queued:
-            result.trace.warning(
-                f"[POKING]: Skip {self.name!r}, not have any queue!!!"
-            )
-            return result.catch(status=SUCCESS, context={"outputs": []})
-
-        with ThreadPoolExecutor(
-            max_workers=dynamic(
-                "max_poking_pool_worker",
-                f=max_poking_pool_worker,
-                extras=self.extras,
-            ),
-            thread_name_prefix="wf_poking_",
-        ) as executor:
-
-            futures: list[Future] = []
-
-            while q.is_queued:
-
-                # NOTE: Pop the latest Release object from the release queue.
-                release: Release = heappop(q.queue)
-
-                if reach_next_minute(release.date, offset=offset):
-                    result.trace.debug(
-                        f"[POKING]: Skip Release: "
-                        f"{release.date:%Y-%m-%d %H:%M:%S}"
-                    )
-                    heappush(q.queue, release)
-                    wait_until_next_minute(get_dt_now(offset=offset))
-
-                    # WARNING: I already call queue poking again because issue
-                    #   about the every minute crontab.
-                    partial_queue(q)
-                    continue
-
-                heappush(q.running, release)
-                futures.append(
-                    executor.submit(
-                        self.release,
-                        release=release,
-                        params=params,
-                        audit=audit,
-                        queue=q,
-                        parent_run_id=result.run_id,
-                    )
-                )
-
-                partial_queue(q)
-
-            # WARNING: This poking method does not allow to use fail-fast
-            #   logic to catching parallel execution result.
-            for future in as_completed(futures, timeout=timeout):
-                context.append(future.result())
-
-        return result.catch(
-            status=SUCCESS,
-            context={"outputs": context},
-        )
-
     def execute_job(
         self,
         job: Job,
@@ -1137,6 +937,202 @@ class Workflow(BaseModel):
                     f"{self.name!r} was timeout."
                 ).to_dict()
             },
+        )
+
+
+class WorkflowPoke(Workflow):
+    """Workflow Poke model that was implemented the poke method."""
+
+    def queue(
+        self,
+        offset: float,
+        end_date: datetime,
+        queue: ReleaseQueue,
+        audit: type[Audit],
+        *,
+        force_run: bool = False,
+    ) -> ReleaseQueue:
+        """Generate Release from all on values from the on field and store them
+        to the ReleaseQueue object.
+
+        :param offset: An offset in second unit for time travel.
+        :param end_date: An end datetime object.
+        :param queue: A workflow queue object.
+        :param audit: An audit class that want to make audit object.
+        :param force_run: A flag that allow to release workflow if the audit
+            with that release was pointed.
+
+        :rtype: ReleaseQueue
+        """
+        for on in self.on:
+
+            queue.gen(
+                end_date,
+                audit,
+                on.next(get_dt_now(offset=offset).replace(microsecond=0)),
+                self.name,
+                force_run=force_run,
+            )
+
+        return queue
+
+    def poke(
+        self,
+        params: Optional[DictData] = None,
+        start_date: Optional[datetime] = None,
+        *,
+        run_id: Optional[str] = None,
+        periods: int = 1,
+        audit: Optional[Audit] = None,
+        force_run: bool = False,
+        timeout: int = 1800,
+        max_poking_pool_worker: int = 2,
+    ) -> Result:
+        """Poke workflow with a start datetime value that will pass to its
+        `on` field on the threading executor pool for execute the `release`
+        method (It run all schedules that was set on the `on` values).
+
+            This method will observe its `on` field that nearing to run with the
+        `self.release()` method.
+
+            The limitation of this method is not allow run a date that gather
+        than the current date.
+
+        :param params: (DictData) A parameter data.
+        :param start_date: (datetime) A start datetime object.
+        :param run_id: (str) A workflow running ID for this poke.
+        :param periods: (int) A periods in minutes value that use to run this
+            poking. (Default is 1)
+        :param audit: (Audit) An audit object that want to use on this poking
+            process.
+        :param force_run: (bool) A flag that allow to release workflow if the
+            audit with that release was pointed. (Default is False)
+        :param timeout: (int) A second value for timeout while waiting all
+            futures run completely.
+        :param max_poking_pool_worker: (int) The maximum poking pool worker.
+            (Default is 2 workers)
+
+        :raise WorkflowException: If the periods parameter less or equal than 0.
+
+        :rtype: Result
+        :return: A list of all results that return from `self.release` method.
+        """
+        audit: type[Audit] = audit or get_audit(extras=self.extras)
+        result: Result = Result(
+            run_id=(run_id or gen_id(self.name, unique=True))
+        )
+
+        # VALIDATE: Check the periods value should gather than 0.
+        if periods <= 0:
+            raise WorkflowException(
+                "The period of poking should be `int` and grater or equal "
+                "than 1."
+            )
+
+        if len(self.on) == 0:
+            result.trace.warning(
+                f"[POKING]: {self.name!r} not have any schedule!!!"
+            )
+            return result.catch(status=SUCCESS, context={"outputs": []})
+
+        # NOTE: Create the current date that change microsecond to 0
+        current_date: datetime = datetime.now().replace(microsecond=0)
+
+        if start_date is None:
+            # NOTE: Force change start date if it gathers than the current date,
+            #   or it does not pass to this method.
+            start_date: datetime = current_date
+            offset: float = 0
+        elif start_date <= current_date:
+            start_date = start_date.replace(microsecond=0)
+            offset: float = (current_date - start_date).total_seconds()
+        else:
+            raise WorkflowException(
+                f"The start datetime should less than or equal the current "
+                f"datetime, {current_date:%Y-%m-%d %H:%M:%S}."
+            )
+
+        # NOTE: The end date is using to stop generate queue with an input
+        #   periods value. It will change to MM:59.
+        #   For example:
+        #       (input)  start_date = 12:04:12, offset = 2
+        #       (output) end_date = 12:06:59
+        end_date: datetime = start_date.replace(second=0) + timedelta(
+            minutes=periods + 1, seconds=-1
+        )
+
+        result.trace.info(
+            f"[POKING]: Execute Poking: {self.name!r} "
+            f"({start_date:%Y-%m-%d %H:%M:%S} ==> {end_date:%Y-%m-%d %H:%M:%S})"
+        )
+
+        params: DictData = {} if params is None else params
+        context: list[Result] = []
+        q: ReleaseQueue = ReleaseQueue()
+
+        # NOTE: Create reusable partial function and add Release to the release
+        #   queue object.
+        partial_queue = partial(
+            self.queue, offset, end_date, audit=audit, force_run=force_run
+        )
+        partial_queue(q)
+        if not q.is_queued:
+            result.trace.warning(
+                f"[POKING]: Skip {self.name!r}, not have any queue!!!"
+            )
+            return result.catch(status=SUCCESS, context={"outputs": []})
+
+        with ThreadPoolExecutor(
+            max_workers=dynamic(
+                "max_poking_pool_worker",
+                f=max_poking_pool_worker,
+                extras=self.extras,
+            ),
+            thread_name_prefix="wf_poking_",
+        ) as executor:
+
+            futures: list[Future] = []
+
+            while q.is_queued:
+
+                # NOTE: Pop the latest Release object from the release queue.
+                release: Release = heappop(q.queue)
+
+                if reach_next_minute(release.date, offset=offset):
+                    result.trace.debug(
+                        f"[POKING]: Skip Release: "
+                        f"{release.date:%Y-%m-%d %H:%M:%S}"
+                    )
+                    heappush(q.queue, release)
+                    wait_until_next_minute(get_dt_now(offset=offset))
+
+                    # WARNING: I already call queue poking again because issue
+                    #   about the every minute crontab.
+                    partial_queue(q)
+                    continue
+
+                heappush(q.running, release)
+                futures.append(
+                    executor.submit(
+                        self.release,
+                        release=release,
+                        params=params,
+                        audit=audit,
+                        queue=q,
+                        parent_run_id=result.run_id,
+                    )
+                )
+
+                partial_queue(q)
+
+            # WARNING: This poking method does not allow to use fail-fast
+            #   logic to catching parallel execution result.
+            for future in as_completed(futures, timeout=timeout):
+                context.append(future.result())
+
+        return result.catch(
+            status=SUCCESS,
+            context={"outputs": context},
         )
 
 

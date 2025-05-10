@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from unittest import mock
 
 import pytest
-from ddeutil.workflow import SUCCESS, Config, Result, Workflow
+from ddeutil.workflow import SUCCESS, Config, Result, WorkflowPoke
 from ddeutil.workflow.exceptions import WorkflowException
 
 from .utils import dump_yaml_context
@@ -10,7 +10,7 @@ from .utils import dump_yaml_context
 
 @pytest.mark.poke
 def test_workflow_poke(test_path):
-    workflow = Workflow.model_validate(
+    workflow = WorkflowPoke.model_validate(
         obj={
             "extras": {"enable_write_audit": False, "enable_write_log": True},
             "name": "tmp-wf-scheduling-minute",
@@ -74,7 +74,7 @@ def test_workflow_poke_no_queue(test_path):
         test_path / "conf/demo/01_99_wf_test_wf_poke_no_schedule.yml",
         data="""
         tmp-wf-scheduling-daily:
-          type: Workflow
+          type: WorkflowPoke
           on:
             - cronjob: "30 3 * * *"
               timezone: "Asia/Bangkok"
@@ -84,7 +84,7 @@ def test_workflow_poke_no_queue(test_path):
                 - name: "Empty stage"
         """,
     ):
-        workflow = Workflow.from_conf(name="tmp-wf-scheduling-daily")
+        workflow = WorkflowPoke.from_conf(name="tmp-wf-scheduling-daily")
 
         # NOTE: Poking with the current datetime.
         rs: Result = workflow.poke(params={"asat-dt": datetime(2024, 1, 1)})
@@ -94,7 +94,7 @@ def test_workflow_poke_no_queue(test_path):
 
 @pytest.mark.poke
 def test_workflow_poke_raise():
-    workflow = Workflow(name="tmp-wf-scheduling-common")
+    workflow = WorkflowPoke(name="tmp-wf-scheduling-common")
 
     # Raise: If a period value is lower than 0.
     with pytest.raises(WorkflowException):
@@ -111,7 +111,7 @@ def test_workflow_poke_with_start_date_and_period(test_path):
         test_path / "conf/demo/01_99_wf_test_wf_poke_with_start_date.yml",
         data="""
         tmp-wf-scheduling-with-name:
-          type: Workflow
+          type: WorkflowPoke
           on:
             - 'every_minute_bkk'
           params: {name: str}
@@ -122,7 +122,7 @@ def test_workflow_poke_with_start_date_and_period(test_path):
                   echo: "Hello ${{ params.name | title }}"
         """,
     ):
-        workflow = Workflow.from_conf(
+        workflow = WorkflowPoke.from_conf(
             name="tmp-wf-scheduling-with-name",
             extras={"enable_write_audit": False},
         )
@@ -145,8 +145,8 @@ def test_workflow_poke_with_start_date_and_period(test_path):
 
 
 @pytest.mark.poke
-def test_workflow_poke_no_on():
-    workflow = Workflow.model_validate(
+def test_workflow_poke_no_event():
+    workflow = WorkflowPoke.model_validate(
         {
             "name": "tmp-wf-poke-no-on",
             "params": {"name": "str"},
