@@ -23,7 +23,7 @@ from inspect import Traceback, currentframe, getframeinfo
 from pathlib import Path
 from threading import get_ident
 from types import FrameType
-from typing import ClassVar, Literal, Optional, TypeVar, Union
+from typing import ClassVar, Final, Literal, Optional, TypeVar, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.functional_validators import model_validator
@@ -74,7 +74,7 @@ def get_dt_tznow() -> datetime:  # pragma: no cov
     return get_dt_now(tz=config.tz)
 
 
-PREFIX_LOGS: dict[str, dict] = {
+PREFIX_LOGS: Final[dict[str, dict]] = {
     "CALLER": {
         "emoji": "📍",
         "desc": "logs from any usage from custom caller function.",
@@ -85,7 +85,7 @@ PREFIX_LOGS: dict[str, dict] = {
     "RELEASE": {"emoji": "📅", "desc": "logs from release workflow method."},
     "POKING": {"emoji": "⏰", "desc": "logs from poke workflow method."},
 }  # pragma: no cov
-PREFIX_DEFAULT: str = "CALLER"
+PREFIX_DEFAULT: Final[str] = "CALLER"
 PREFIX_LOGS_REGEX: re.Pattern[str] = re.compile(
     rf"(^\[(?P<name>{'|'.join(PREFIX_LOGS)})]:\s?)?(?P<message>.*)",
     re.MULTILINE | re.DOTALL | re.ASCII | re.VERBOSE,
@@ -102,6 +102,9 @@ class PrefixMsg(BaseModel):
 
     def prepare(self, extras: Optional[DictData] = None) -> str:
         """Prepare message with force add prefix before writing trace log.
+
+        :param extras: (DictData) An extra parameter that want to get the
+            `log_add_emoji` flag.
 
         :rtype: str
         """

@@ -1,3 +1,5 @@
+import traceback
+
 import pytest
 from ddeutil.workflow import Result
 from ddeutil.workflow.logs import (
@@ -6,6 +8,17 @@ from ddeutil.workflow.logs import (
     TraceMeta,
     extract_msg_prefix,
 )
+
+
+def test_print_trace_exception():
+
+    def nested_func():  # pragma: no cov
+        return 1 / 0
+
+    try:
+        nested_func()
+    except ZeroDivisionError:
+        print(traceback.format_exc())
 
 
 def test_trace_regex_message():

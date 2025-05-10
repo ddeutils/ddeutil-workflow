@@ -20,6 +20,7 @@ from typing import Annotated, Any, Literal, Optional, TypeVar, Union
 from ddeutil.core import str2dict, str2list
 from pydantic import BaseModel, Field
 
+from .__types import StrOrInt
 from .exceptions import ParamValueException
 from .utils import get_d_now, get_dt_now
 
@@ -200,13 +201,24 @@ class FloatParam(DefaultParam):  # pragma: no cov
     precision: int = 6
 
     def rounding(self, value: float) -> float:
-        """Rounding float value with the specific precision field."""
+        """Rounding float value with the specific precision field.
+
+        :param value: A float value that want to round with the precision value.
+
+        :rtype: float
+        """
         round_str: str = f"{{0:.{self.precision}f}}"
         return float(round_str.format(round(value, self.precision)))
 
-    def receive(self, value: Optional[Union[float, int, str]] = None) -> float:
+    def receive(
+        self, value: Optional[Union[float, int, str]] = None
+    ) -> Optional[float]:
+        """Receive value that match with float.
 
-        if value in None:
+        :param value: A value that want to validate with float parameter type.
+        :rtype: float | None
+        """
+        if value is None:
             return self.default
 
         if isinstance(value, float):
@@ -217,11 +229,7 @@ class FloatParam(DefaultParam):  # pragma: no cov
             raise TypeError(
                 "Received value type does not math with str, float, or int."
             )
-
-        try:
-            return self.rounding(float(value))
-        except Exception:
-            raise
+        return self.rounding(float(value))
 
 
 class DecimalParam(DefaultParam):  # pragma: no cov
@@ -231,10 +239,24 @@ class DecimalParam(DefaultParam):  # pragma: no cov
     precision: int = 6
 
     def rounding(self, value: Decimal) -> Decimal:
-        """Rounding float value with the specific precision field."""
+        """Rounding float value with the specific precision field.
+
+        :param value: (Decimal) A Decimal value that want to round with the
+            precision value.
+
+        :rtype: Decimal
+        """
         return value.quantize(Decimal(10) ** -self.precision)
 
-    def receive(self, value: float | Decimal | None = None) -> Decimal:
+    def receive(self, value: Optional[Union[float, Decimal]] = None) -> Decimal:
+        """Receive value that match with decimal.
+
+        :param value: (float | Decimal) A value that want to validate with
+            decimal parameter type.
+        :rtype: Decimal | None
+        """
+        if value is None:
+            return self.default
 
         if isinstance(value, float):
             return self.rounding(Decimal(value))
@@ -261,11 +283,12 @@ class ChoiceParam(BaseParam):
         description="A list of choice parameters that able be str or int.",
     )
 
-    def receive(self, value: Union[str, int] | None = None) -> Union[str, int]:
+    def receive(self, value: Optional[StrOrInt] = None) -> StrOrInt:
         """Receive value that match with options.
 
-        :param value: A value that want to select from the options field.
-        :rtype: str
+        :param value: (str | int) A value that want to select from the options
+            field.
+        :rtype: str | int
         """
         # NOTE:
         #   Return the first value in options if it does not pass any input
@@ -295,6 +318,7 @@ class MapParam(DefaultParam):  # pragma: no cov
         """Receive value that match with map type.
 
         :param value: A value that want to validate with map parameter type.
+
         :rtype: dict[Any, Any]
         """
         if value is None:
