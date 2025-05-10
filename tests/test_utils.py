@@ -8,6 +8,7 @@ from ddeutil.workflow.utils import (
     UTC,
     batch,
     cut_id,
+    dump_all,
     filter_func,
     gen_id,
     get_d_now,
@@ -18,6 +19,7 @@ from ddeutil.workflow.utils import (
     reach_next_minute,
 )
 from freezegun import freeze_time
+from pydantic import BaseModel, Field
 
 
 @pytest.fixture(scope="function")
@@ -150,3 +152,49 @@ def test_trace_meta_prepare_msg():
 
     rs = prepare_newline("\nhello world\n")
     assert rs == "hello world"
+
+
+class DumpField(BaseModel):  # pragma: no cov
+    name: str = Field(default="foo", alias="field")
+    age: int = 10
+
+
+class DumpModel(BaseModel):  # pragma: no cov
+    name: str
+    info: DumpField
+
+
+def test_dump_all():
+    assert dump_all({"test": {"foo": "bar"}}) == {"test": {"foo": "bar"}}
+    assert dump_all("demo") == "demo"
+    assert dump_all(1) == 1
+
+    assert dump_all(DumpModel(name="model", info=DumpField())) == {
+        "name": "model",
+        "info": {"name": "foo", "age": 10},
+    }
+
+    assert dump_all({"key": DumpModel(name="model", info=DumpField())}) == {
+        "key": {"name": "model", "info": {"name": "foo", "age": 10}}
+    }
+
+    assert dump_all(
+        [
+            DumpModel(name="first", info=DumpField()),
+            DumpModel(name="second", info=DumpField()),
+        ]
+    ) == [
+        {"name": "first", "info": {"name": "foo", "age": 10}},
+        {"name": "second", "info": {"name": "foo", "age": 10}},
+    ]
+
+    assert dump_all(
+        [
+            DumpModel(name="first", info=DumpField()),
+            DumpModel(name="second", info=DumpField()),
+        ],
+        by_alias=True,
+    ) == [
+        {"name": "first", "info": {"field": "foo", "age": 10}},
+        {"name": "second", "info": {"field": "foo", "age": 10}},
+    ]

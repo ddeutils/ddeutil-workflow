@@ -15,10 +15,11 @@ from inspect import isfunction
 from itertools import chain, islice, product
 from pathlib import Path
 from random import randrange
-from typing import Any, Final, Optional, TypeVar, Union
+from typing import Any, Final, Optional, TypeVar, Union, overload
 from zoneinfo import ZoneInfo
 
 from ddeutil.core import hash_str
+from pydantic import BaseModel
 
 from .__types import DictData, Matrix
 
@@ -289,3 +290,24 @@ def cut_id(run_id: str, *, num: int = 6) -> str:
         dt, simple = run_id.split("T", maxsplit=1)
         return dt[:12] + simple[-num:]
     return run_id[:12] + run_id[-num:]
+
+
+@overload
+def dump_all(value: BaseModel, by_alias: bool = False) -> DictData: ...
+
+
+@overload
+def dump_all(value: T, by_alias: bool = False) -> T: ...
+
+
+def dump_all(
+    value: Union[T, BaseModel], by_alias: bool = False
+) -> Union[T, DictData]:
+    """Dump all BaseModel object to dict."""
+    if isinstance(value, dict):
+        return {k: dump_all(value[k], by_alias=by_alias) for k in value}
+    elif isinstance(value, (list, tuple, set)):
+        return type(value)([dump_all(i, by_alias=by_alias) for i in value])
+    elif isinstance(value, BaseModel):
+        return value.model_dump(by_alias=by_alias)
+    return value

@@ -66,12 +66,14 @@ from .result import CANCEL, FAILED, SUCCESS, WAIT, Result, Status
 from .reusables import TagFunc, extract_call, not_in_template, param2template
 from .utils import (
     delay,
+    dump_all,
     filter_func,
     gen_id,
     make_exec,
 )
 
 T = TypeVar("T")
+DictOrModel = Union[DictData, BaseModel]
 
 
 class BaseStage(BaseModel, ABC):
@@ -1174,13 +1176,12 @@ class CallStage(BaseAsyncStage):
             args.pop("result")
 
         args = self.parse_model_args(call_func, args, result)
-
         if inspect.iscoroutinefunction(call_func):
-            rs: DictData = await call_func(
+            rs: DictOrModel = await call_func(
                 **param2template(args, params, extras=self.extras)
             )
         else:
-            rs: DictData = call_func(
+            rs: DictOrModel = call_func(
                 **param2template(args, params, extras=self.extras)
             )
 
@@ -1194,7 +1195,7 @@ class CallStage(BaseAsyncStage):
                 f"serialize, you must set return be `dict` or Pydantic "
                 f"model."
             )
-        return result.catch(status=SUCCESS, context=rs)
+        return result.catch(status=SUCCESS, context=dump_all(rs, by_alias=True))
 
     @staticmethod
     def parse_model_args(
