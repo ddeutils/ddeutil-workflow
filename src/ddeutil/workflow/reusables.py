@@ -4,7 +4,7 @@
 # license information.
 # ------------------------------------------------------------------------------
 # [x] Use dynamic config
-"""Reusables module that keep any templating functions."""
+"""Reusables module that keep any template and template filter functions."""
 from __future__ import annotations
 
 import copy

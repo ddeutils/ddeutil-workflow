@@ -31,7 +31,8 @@ WEEKDAYS: dict[str, int] = {
 }
 
 
-class CronYearLimit(Exception): ...
+class YearReachLimit(Exception):
+    """"""
 
 
 def str2cron(value: str) -> str:  # pragma: no cov
@@ -904,8 +905,8 @@ class CronRunner:
                 getattr(self.date, mode)
                 > (max_year := max(self.cron.year.values))
             ):
-                raise CronYearLimit(
-                    f"The year is out of limit with this crontab value: "
+                raise YearReachLimit(
+                    f"The year is reach the limit with this crontab setting: "
                     f"{max_year}."
                 )
 

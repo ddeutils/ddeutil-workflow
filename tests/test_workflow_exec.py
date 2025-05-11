@@ -859,7 +859,8 @@ def test_workflow_exec_raise_param(test_path):
                             "errors": {
                                 "name": "UtilException",
                                 "message": (
-                                    "Params does not set caller: 'params.name'."
+                                    "Parameters does not get dot with caller: "
+                                    "'params.name'."
                                 ),
                             },
                         }
@@ -921,7 +922,8 @@ def test_workflow_exec_raise_job_trigger(test_path):
                             "errors": {
                                 "name": "UtilException",
                                 "message": (
-                                    "Params does not set caller: 'params.name'."
+                                    "Parameters does not get dot with caller: "
+                                    "'params.name'."
                                 ),
                             },
                         },

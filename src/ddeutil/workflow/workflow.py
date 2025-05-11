@@ -774,7 +774,7 @@ class Workflow(BaseModel):
         parent_run_id: Optional[str] = None,
         result: Optional[Result] = None,
         event: Optional[Event] = None,
-        timeout: int = 3600,
+        timeout: float = 3600,
         max_job_parallel: int = 2,
     ) -> Result:
         """Execute workflow with passing a dynamic parameters to all jobs that
@@ -805,10 +805,10 @@ class Workflow(BaseModel):
         :param result: (Result) A Result instance for return context and status.
         :param event: (Event) An Event manager instance that use to cancel this
             execution if it forces stopped by parent execution.
-        :param timeout: (int) A workflow execution time out in second unit that
-            use for limit time of execution and waiting job dependency. This
-            value does not force stop the task that still running more than this
-            limit time. (Default: 60 * 60 seconds)
+        :param timeout: (float) A workflow execution time out in second unit
+            that use for limit time of execution and waiting job dependency.
+            This value does not force stop the task that still running more than
+            this limit time. (Default: 60 * 60 seconds)
         :param max_job_parallel: (int) The maximum workers that use for job
             execution in `PoolThreadExecutor` object. (Default: 2 workers)
 
@@ -840,7 +840,7 @@ class Workflow(BaseModel):
             job_queue.put(job_id)
 
         not_timeout_flag: bool = True
-        timeout: int = dynamic(
+        timeout: float = dynamic(
             "max_job_exec_timeout", f=timeout, extras=self.extras
         )
 
