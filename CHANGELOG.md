@@ -2,6 +2,19 @@
 
 ## Latest Changes
 
+## 0.0.62
+
+### :sparkles: Features
+
+- :dart: feat: add mark argument on templating and template filtering functions.
+- :dart: feat: add more filter build-in functions.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: update testcase of __cron.
+- :test_tube: tests: fixed testcase that not valid with feature changed.
+- :art: format: change typed-hint on __cron module.
+
 ## 0.0.61
 
 ### :stars: Highlight Features
