@@ -121,8 +121,9 @@ def test_make_registry_raise(call_function_dup):
         make_registry("new_tasks_dup")
 
 
-def test_extract_call():
+def test_extract_caller():
     func = extract_call("tasks/el-csv-to-parquet@polars-dir")
     call_func = func()
     assert call_func.name == "el-csv-to-parquet"
     assert call_func.tag == "polars-dir"
+    assert call_func.mark == "tag"

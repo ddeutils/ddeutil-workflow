@@ -40,6 +40,10 @@ def test_make_registry_raise():
     assert isfunction(make_filter_registry()["foo"])
     assert "bar" == make_filter_registry()["foo"]("")
 
+    filter_func = make_filter_registry()["foo"]
+    assert filter_func.filter == "foo"
+    assert filter_func.mark == "filter"
+
 
 def test_get_args_const():
     name, args, kwargs = get_args_const('fmt(fmt="str")')

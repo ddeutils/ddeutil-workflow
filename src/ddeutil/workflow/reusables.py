@@ -14,7 +14,7 @@ from ast import Call, Constant, Expr, Module, Name, parse
 from datetime import datetime
 from functools import wraps
 from importlib import import_module
-from typing import Any, Callable, Optional, Protocol, TypeVar, Union
+from typing import Any, Callable, Literal, Optional, Protocol, TypeVar, Union
 
 try:
     from typing import ParamSpec
@@ -32,7 +32,7 @@ from .exceptions import UtilException
 T = TypeVar("T")
 P = ParamSpec("P")
 
-logger = logging.getLogger("ddeutil.workflow")
+# NOTE: Adjust logging level of the `asyncio` to INFO level.
 logging.getLogger("asyncio").setLevel(logging.INFO)
 
 
@@ -57,6 +57,7 @@ class FilterFunc(Protocol):
     """
 
     filter: str
+    mark: Literal["filter"] = "filter"
 
     def __call__(self, *args, **kwargs): ...  # pragma: no cov
 
@@ -75,6 +76,7 @@ def custom_filter(name: str) -> Callable[P, FilterFunc]:
 
     def func_internal(func: Callable[[...], Any]) -> FilterFunc:
         func.filter = name
+        func.mark = "filter"
 
         @wraps(func)
         def wrapped(*args, **kwargs):
@@ -106,7 +108,10 @@ def make_filter_registry(
         for fstr, func in inspect.getmembers(importer, inspect.isfunction):
             # NOTE: check function attribute that already set tag by
             #   ``utils.tag`` decorator.
-            if not hasattr(func, "filter"):
+            if not (
+                hasattr(func, "filter")
+                and str(getattr(func, "mark", "NOT SET")) == "filter"
+            ):
                 continue
 
             func: FilterFunc
@@ -211,11 +216,9 @@ def map_post_filter(
                     value: T = func(value)
             else:
                 value: T = f_func(value, *args, **kwargs)
-        except UtilException as err:
-            logger.warning(str(err))
+        except UtilException:
             raise
-        except Exception as err:
-            logger.warning(str(err))
+        except Exception:
             raise UtilException(
                 f"The post-filter: {func_name!r} does not fit with {value!r} "
                 f"(type: {type(value).__name__})."
@@ -439,6 +442,7 @@ class TagFunc(Protocol):
 
     name: str
     tag: str
+    mark: Literal["tag"] = "tag"
 
     def __call__(self, *args, **kwargs): ...  # pragma: no cov
 
@@ -466,6 +470,7 @@ def tag(
     def func_internal(func: Callable[[...], Any]) -> ReturnTagFunc:
         func.tag = name or "latest"
         func.name = alias or func.__name__.replace("_", "-")
+        func.mark = "tag"
 
         @wraps(func)
         def wrapped(*args: P.args, **kwargs: P.kwargs) -> TagFunc:
@@ -513,7 +518,9 @@ def make_registry(
             # NOTE: check function attribute that already set tag by
             #   ``utils.tag`` decorator.
             if not (
-                hasattr(func, "tag") and hasattr(func, "name")
+                hasattr(func, "tag")
+                and hasattr(func, "name")
+                and str(getattr(func, "mark", "NOT SET")) == "tag"
             ):  # pragma: no cov
                 continue
 
