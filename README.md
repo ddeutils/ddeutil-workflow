@@ -165,6 +165,10 @@ registry-caller/
 This function will store as module that will import from `WORKFLOW_CORE_REGISTRY_CALLER`
 value (This config can override by extra parameters with `registry_caller` key).
 
+> [!NOTE]
+> You can use Pydantic Model as argument of your caller function. The core workflow
+> engine will auto use the `model_validate` method before run your caller function.
+
 ```python
 from ddeutil.workflow import Result, tag
 from ddeutil.workflow.exceptions import StageException
