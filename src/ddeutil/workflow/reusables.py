@@ -304,12 +304,14 @@ def str2template(
         ]
 
         # NOTE: from validate step, it guarantees that caller exists in params.
+        #   I recommend to avoid logging params context on this case because it
+        #   can include secret value.
         try:
             getter: Any = getdot(caller, params)
-        except ValueError as err:
+        except ValueError:
             raise UtilException(
                 f"Parameters does not get dot with caller: {caller!r}."
-            ) from err
+            ) from None
 
         # NOTE:
         #   If type of getter caller is not string type, and it does not use to
@@ -368,6 +370,26 @@ def param2template(
     elif not isinstance(value, str):
         return value
     return str2template(value, params, filters=filters, registers=registers)
+
+
+def validate_secret_key(key: str) -> bool:  # pragma: no cov
+    if key.startswith("secret"):
+        return True
+    elif key.endswith("key"):
+        return True
+    return False
+
+
+def mark_secret(value: T, *, mark: bool = False) -> T:  # pragma: no cov
+    if isinstance(value, dict):
+        return {
+            k: mark_secret(value[k], mark=validate_secret_key(k)) for k in value
+        }
+    elif isinstance(value, (list, tuple, set)):
+        return type(value)([mark_secret(i, mark=False) for i in value])
+    elif not isinstance(value, str):
+        return value
+    return "*" * len(value) if mark else value
 
 
 @custom_filter("fmt")  # pragma: no cov
