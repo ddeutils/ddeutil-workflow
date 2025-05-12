@@ -636,9 +636,13 @@ def extract_call(
 
 
 def create_model_from_caller(func: Callable) -> BaseModel:  # pragma: no cov
-    """Create model from the caller function.
+    """Create model from the caller function. This function will use for
+    validate the caller function argument typed-hint that valid with the args
+    field.
 
     :param func: A caller function.
+
+    :rtype: BaseModel
     """
     sig: inspect.Signature = inspect.signature(func)
     type_hints: dict[str, Any] = get_type_hints(func)
