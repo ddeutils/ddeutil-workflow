@@ -28,6 +28,7 @@ dependencies = [
     "ddeutil[checksum]>=0.4.8",
     "ddeutil-io[yaml,toml]>=0.2.13",
     "pydantic==2.11.4",
+    "pydantic-extra-types==2.10.4",
     "python-dotenv==1.1.0",
     "schedule==1.2.2,<2.0.0",
 ]

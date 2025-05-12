@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo
 from pydantic.functional_serializers import field_serializer
 from pydantic.functional_validators import field_validator, model_validator
+from pydantic_extra_types.timezone_name import TimeZoneName
 from typing_extensions import Self
 
 from .__cron import WEEKDAYS, CronJob, CronJobYear, CronRunner, Options
@@ -92,7 +93,7 @@ class Crontab(BaseModel):
         ),
     ]
     tz: Annotated[
-        str,
+        TimeZoneName,
         Field(
             description="A timezone string value",
             alias="timezone",
