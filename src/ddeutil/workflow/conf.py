@@ -20,7 +20,7 @@ from zoneinfo import ZoneInfo
 from ddeutil.core import str2bool
 from ddeutil.io import YamlFlResolve, search_env_replace
 from ddeutil.io.paths import glob_files, is_ignored, read_ignore
-from pydantic import SecretStr
+from pydantic import SecretStr, TypeAdapter
 
 from .__types import DictData
 
@@ -496,7 +496,7 @@ def pass_env(value: T) -> T:  # pragma: no cov
     return None if rs == "null" else rs
 
 
-class WorkflowSecret(SecretStr):  # pragma: no cov
+class CallerSecret(SecretStr):  # pragma: no cov
     """Workflow Secret String model."""
 
     def get_secret_value(self) -> str:
@@ -506,3 +506,6 @@ class WorkflowSecret(SecretStr):  # pragma: no cov
         :rtype: str
         """
         return pass_env(super().get_secret_value())
+
+
+CallerSecretType = TypeAdapter(CallerSecret)

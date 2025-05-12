@@ -55,7 +55,7 @@ from textwrap import dedent
 from threading import Event
 from typing import Annotated, Any, Optional, TypeVar, Union, get_type_hints
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, TypeAdapter
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
@@ -1241,6 +1241,8 @@ class CallStage(BaseAsyncStage):
 
             if issubclass(t, BaseModel) and arg in args:
                 args[arg] = t.model_validate(obj=args[arg])
+            elif isinstance(t, TypeAdapter) and arg in args:
+                args[arg] = t.validate_python(args[arg])
 
         return args
 

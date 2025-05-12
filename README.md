@@ -170,18 +170,18 @@ value (This config can override by extra parameters with `registry_caller` key).
 > engine will auto use the `model_validate` method before run your caller function.
 
 ```python
-from ddeutil.workflow import Result, WorkflowSecret, tag
+from ddeutil.workflow import Result, CallerSecret, tag
 from ddeutil.workflow.exceptions import StageException
 from pydantic import BaseModel
 
 class AwsCredential(BaseModel):
     path: str
     access_client_id: str
-    access_client_secret: WorkflowSecret
+    access_client_secret: CallerSecret
 
 class RestAuth(BaseModel):
     type: str
-    keys: WorkflowSecret
+    keys: CallerSecret
 
 @tag("requests", alias="get-api-with-oauth-to-s3")
 def get_api_with_oauth_to_s3(
