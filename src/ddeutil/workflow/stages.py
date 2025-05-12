@@ -60,7 +60,7 @@ from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
 from .__types import DictData, DictStr, StrOrInt, StrOrNone, TupleStr
-from .conf import dynamic
+from .conf import dynamic, pass_env
 from .exceptions import StageException, to_dict
 from .result import CANCEL, FAILED, SUCCESS, WAIT, Result, Status
 from .reusables import TagFunc, extract_call, not_in_template, param2template
@@ -626,10 +626,10 @@ class BashStage(BaseAsyncStage):
             await f.write(f"#!/bin/{f_shebang}\n\n")
 
             # NOTE: add setting environment variable before bash skip statement.
-            await f.writelines([f"{k}='{env[k]}';\n" for k in env])
+            await f.writelines(pass_env([f"{k}='{env[k]}';\n" for k in env]))
 
             # NOTE: make sure that shell script file does not have `\r` char.
-            await f.write("\n" + bash.replace("\r\n", "\n"))
+            await f.write("\n" + pass_env(bash.replace("\r\n", "\n")))
 
         # NOTE: Make this .sh file able to executable.
         make_exec(f"./{f_name}")
@@ -662,10 +662,10 @@ class BashStage(BaseAsyncStage):
             f.write(f"#!/bin/{f_shebang}\n\n")
 
             # NOTE: add setting environment variable before bash skip statement.
-            f.writelines([f"{k}='{env[k]}';\n" for k in env])
+            f.writelines(pass_env([f"{k}='{env[k]}';\n" for k in env]))
 
             # NOTE: make sure that shell script file does not have `\r` char.
-            f.write("\n" + bash.replace("\r\n", "\n"))
+            f.write("\n" + pass_env(bash.replace("\r\n", "\n")))
 
         # NOTE: Make this .sh file able to executable.
         make_exec(f"./{f_name}")
@@ -895,7 +895,9 @@ class PyStage(BaseAsyncStage):
         # WARNING: The exec build-in function is very dangerous. So, it
         #   should use the re module to validate exec-string before running.
         exec(
-            param2template(dedent(self.run), params, extras=self.extras),
+            pass_env(
+                param2template(dedent(self.run), params, extras=self.extras)
+            ),
             gb,
             lc,
         )
@@ -1295,7 +1297,7 @@ class TriggerStage(BaseStage):
         _trigger: str = param2template(self.trigger, params, extras=self.extras)
         result.trace.info(f"[STAGE]: Execute Trigger-Stage: {_trigger!r}")
         rs: Result = Workflow.from_conf(
-            name=_trigger,
+            name=pass_env(_trigger),
             extras=self.extras | {"stage_raise_error": True},
         ).execute(
             params=param2template(self.params, params, extras=self.extras),
@@ -2417,9 +2419,11 @@ class DockerStage(BaseStage):  # pragma: no cov
         )
 
         resp = client.api.pull(
-            repository=f"{self.image}",
-            tag=self.tag,
-            auth_config=param2template(self.auth, params, extras=self.extras),
+            repository=pass_env(self.image),
+            tag=pass_env(self.tag),
+            auth_config=pass_env(
+                param2template(self.auth, params, extras=self.extras)
+            ),
             stream=True,
             decode=True,
         )
@@ -2438,10 +2442,10 @@ class DockerStage(BaseStage):  # pragma: no cov
 
         unique_image_name: str = f"{self.image}_{datetime.now():%Y%m%d%H%M%S%f}"
         container = client.containers.run(
-            image=f"{self.image}:{self.tag}",
+            image=pass_env(f"{self.image}:{self.tag}"),
             name=unique_image_name,
-            environment=self.env,
-            volumes=(
+            environment=pass_env(self.env),
+            volumes=pass_env(
                 {
                     Path.cwd()
                     / f".docker.{result.run_id}.logs": {
@@ -2549,8 +2553,10 @@ class VirtualPyStage(PyStage):  # pragma: no cov
         f_name: str = f"{run_id}.py"
         with open(f"./{f_name}", mode="w", newline="\n") as f:
             # NOTE: Create variable mapping that write before running statement.
-            vars_str: str = "\n ".join(
-                f"{var} = {value!r}" for var, value in values.items()
+            vars_str: str = pass_env(
+                "\n ".join(
+                    f"{var} = {value!r}" for var, value in values.items()
+                )
             )
 
             # NOTE: `uv` supports PEP 723 — inline TOML metadata.
@@ -2568,7 +2574,7 @@ class VirtualPyStage(PyStage):  # pragma: no cov
             )
 
             # NOTE: make sure that py script file does not have `\r` char.
-            f.write("\n" + py.replace("\r\n", "\n"))
+            f.write("\n" + pass_env(py.replace("\r\n", "\n")))
 
         # NOTE: Make this .py file able to executable.
         make_exec(f"./{f_name}")
