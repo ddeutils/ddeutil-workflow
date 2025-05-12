@@ -8,7 +8,12 @@ from typing import get_type_hints
 
 import pytest
 from ddeutil.workflow import Result
-from ddeutil.workflow.reusables import Registry, extract_call, make_registry
+from ddeutil.workflow.reusables import (
+    Registry,
+    create_model_from_caller,
+    extract_call,
+    make_registry,
+)
 from pydantic import ValidationError, create_model
 from typing_extensions import TypedDict
 
@@ -182,3 +187,17 @@ def test_make_model_from_argument():
             f"\t> kind: {param.kind}\n"
             f"\t> annotation: {param.annotation} ({type(param.annotation)})"
         )
+
+
+def test_create_model_from_caller():
+    model = create_model_from_caller(dummy_func)
+    arg_instance = model.model_validate(
+        {
+            "source": "some-source",
+            "limit": 10,
+            "result": Result(),
+            "outer-key": "should not pass to model",
+        }
+    )
+    print(arg_instance)
+    print("test")
