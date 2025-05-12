@@ -479,7 +479,12 @@ class Loader(Protocol):  # pragma: no cov
 
 
 def pass_env(value: T) -> T:  # pragma: no cov
-    """Passing environment variable to an input value."""
+    """Passing environment variable to an input value.
+
+    :param value: (Any) A value that want to pass env var searching.
+
+    :rtype: Any
+    """
     if isinstance(value, dict):
         return {k: pass_env(value[k]) for k in value}
     elif isinstance(value, (list, tuple, set)):
@@ -495,4 +500,9 @@ class WorkflowSecret(SecretStr):  # pragma: no cov
     """Workflow Secret String model."""
 
     def get_secret_value(self) -> str:
+        """Override get_secret_value by adding pass_env before return the
+        real-value.
+
+        :rtype: str
+        """
         return pass_env(super().get_secret_value())
