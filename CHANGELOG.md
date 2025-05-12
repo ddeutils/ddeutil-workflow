@@ -2,6 +2,31 @@
 
 ## Latest Changes
 
+## 0.0.63
+
+### :stars: Highlight Features
+
+- :star: hl: create WorkflowSecret for pass env var before get secret value and binding when export to json.
+
+### :sparkles: Features
+
+- :dart: feat: add pass_env before start stage execution (#44)
+- :dart: feat: draft create model from caller func.
+- :dart: feat: draft mark secret value on result context.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: add testcase for draft create model for function args.
+
+### :postbox: Dependencies
+
+- :pushpin: deps: add pydantic-extra-types for extra timezone type validation.
+
+### :book: Documentations
+
+- :page_facing_up: docs: update docs-string.
+- :page_facing_up: docs: update readme file.
+
 ## 0.0.62
 
 ### :sparkles: Features
