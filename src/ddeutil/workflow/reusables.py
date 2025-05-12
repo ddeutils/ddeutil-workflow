@@ -14,7 +14,16 @@ from ast import Call, Constant, Expr, Module, Name, parse
 from datetime import datetime
 from functools import wraps
 from importlib import import_module
-from typing import Any, Callable, Literal, Optional, Protocol, TypeVar, Union
+from typing import (
+    Any,
+    Callable,
+    Literal,
+    Optional,
+    Protocol,
+    TypeVar,
+    Union,
+    get_type_hints,
+)
 
 try:
     from typing import ParamSpec
@@ -23,6 +32,7 @@ except ImportError:
 
 from ddeutil.core import getdot, import_string, lazy
 from ddeutil.io import search_env_replace
+from pydantic import BaseModel, create_model
 from pydantic.dataclasses import dataclass
 
 from .__types import DictData, Re
@@ -623,3 +633,28 @@ def extract_call(
             f"`REGISTER.{call.path}.registries.{call.func}`"
         )
     return rgt[call.func][call.tag]
+
+
+def create_model_from_caller(func: Callable) -> BaseModel:  # pragma: no cov
+    """Create model from the caller function.
+
+    :param func: A caller function.
+    """
+    sig: inspect.Signature = inspect.signature(func)
+    type_hints: dict[str, Any] = get_type_hints(func)
+    fields: dict[str, Any] = {}
+    for name in sig.parameters:
+        param: inspect.Parameter = sig.parameters[name]
+        if param.kind in (
+            inspect.Parameter.VAR_KEYWORD,
+            inspect.Parameter.VAR_POSITIONAL,
+        ):
+            continue
+        if param.default != inspect.Parameter.empty:
+            fields[name] = (type_hints[name], param.default)
+        else:
+            fields[name] = (type_hints[name], ...)
+
+    return create_model(
+        "".join(i.title() for i in func.__name__.split("_")), **fields
+    )
