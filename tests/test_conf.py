@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 import pytest
 import rtoml
 import yaml
-from ddeutil.workflow.conf import Config, FileLoad, config, dynamic
+from ddeutil.workflow.conf import Config, FileLoad, config, dynamic, pass_env
 from ddeutil.workflow.scheduler import Schedule
 
 
@@ -35,7 +35,7 @@ def target_path(test_path):
         json.dump({"foo": "bar"}, f)
 
     with (target_p / "test_simple_file.toml").open(mode="w") as f:
-        rtoml.dump({"foo": "bar"}, f)
+        rtoml.dump({"foo": "bar", "env": "${ WORKFLOW_CORE_TIMEZONE }"}, f)
 
     yield target_p
 
@@ -60,14 +60,26 @@ def test_load_file(target_path: Path):
                 "test_load_file": {
                     "type": "Workflow",
                     "desc": "Test multi config path",
+                    "env": "${WORKFLOW_CORE_TIMEZONE}",
                 }
             },
             f,
         )
 
     load = FileLoad("test_load_file", extras={"conf_paths": [target_path]})
-    assert load.data == {"desc": "Test multi config path", "type": "Workflow"}
+    assert load.data == {
+        "type": "Workflow",
+        "desc": "Test multi config path",
+        "env": "${WORKFLOW_CORE_TIMEZONE}",
+    }
+    assert pass_env(load.data["env"]) == "Asia/Bangkok"
+    assert pass_env(load.data) == {
+        "type": "Workflow",
+        "desc": "Test multi config path",
+        "env": "Asia/Bangkok",
+    }
 
+    # NOTE: Raise because passing `conf_paths` invalid type.
     with pytest.raises(TypeError):
         FileLoad("test_load_file", extras={"conf_paths": target_path})
 
