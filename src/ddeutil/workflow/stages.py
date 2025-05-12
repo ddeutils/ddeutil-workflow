@@ -1060,12 +1060,12 @@ class CallStage(BaseAsyncStage):
         args: DictData = {"result": result} | param2template(
             self.args, params, extras=self.extras
         )
-        ips = inspect.signature(call_func)
+        sig = inspect.signature(call_func)
         necessary_params: list[str] = []
         has_keyword: bool = False
-        for k in ips.parameters:
+        for k in sig.parameters:
             if (
-                v := ips.parameters[k]
+                v := sig.parameters[k]
             ).default == Parameter.empty and v.kind not in (
                 Parameter.VAR_KEYWORD,
                 Parameter.VAR_POSITIONAL,
@@ -1083,7 +1083,7 @@ class CallStage(BaseAsyncStage):
                 f"does not set to args, {list(args.keys())}."
             )
 
-        if "result" not in ips.parameters and not has_keyword:
+        if "result" not in sig.parameters and not has_keyword:
             args.pop("result")
 
         args = self.parse_model_args(call_func, args, result)
@@ -1149,12 +1149,12 @@ class CallStage(BaseAsyncStage):
         args: DictData = {"result": result} | param2template(
             self.args, params, extras=self.extras
         )
-        ips = inspect.signature(call_func)
+        sig = inspect.signature(call_func)
         necessary_params: list[str] = []
         has_keyword: bool = False
-        for k in ips.parameters:
+        for k in sig.parameters:
             if (
-                v := ips.parameters[k]
+                v := sig.parameters[k]
             ).default == Parameter.empty and v.kind not in (
                 Parameter.VAR_KEYWORD,
                 Parameter.VAR_POSITIONAL,
@@ -1172,7 +1172,7 @@ class CallStage(BaseAsyncStage):
                 f"does not set to args, {list(args.keys())}."
             )
 
-        if "result" not in ips.parameters and not has_keyword:
+        if "result" not in sig.parameters and not has_keyword:
             args.pop("result")
 
         args = self.parse_model_args(call_func, args, result)
