@@ -18,8 +18,9 @@ from typing import Final, Optional, Protocol, TypeVar, Union
 from zoneinfo import ZoneInfo
 
 from ddeutil.core import str2bool
-from ddeutil.io import YamlFlResolve
+from ddeutil.io import YamlFlResolve, search_env_replace
 from ddeutil.io.paths import glob_files, is_ignored, read_ignore
+from pydantic import SecretStr
 
 from .__types import DictData
 
@@ -321,15 +322,16 @@ class FileLoad(BaseLoad):
         *,
         path: Optional[Path] = None,
         paths: Optional[list[Path]] = None,
-        excluded: list[str] | None = None,
+        excluded: Optional[list[str]] = None,
         extras: Optional[DictData] = None,
     ) -> Iterator[tuple[str, DictData]]:
         """Find all data that match with object type in config path. This class
         method can use include and exclude list of identity name for filter and
         adds-on.
 
-        :param obj: An object that want to validate matching before return.
-        :param path: A config path object.
+        :param obj: (object) An object that want to validate matching before
+            return.
+        :param path: (Path) A config path object.
         :param paths: (list[Path]) A list of config path object.
         :param excluded: An included list of data key that want to filter from
             data.
@@ -474,3 +476,23 @@ class Loader(Protocol):  # pragma: no cov
     def finds(
         cls, obj: object, *args, **kwargs
     ) -> Iterator[tuple[str, DictData]]: ...
+
+
+def pass_env(value: T) -> T:  # pragma: no cov
+    """Passing environment variable to an input value."""
+    if isinstance(value, dict):
+        return {k: pass_env(value[k]) for k in value}
+    elif isinstance(value, (list, tuple, set)):
+        return type(value)([pass_env(i) for i in value])
+    if not isinstance(value, str):
+        return value
+
+    rs: str = search_env_replace(value)
+    return None if rs == "null" else rs
+
+
+class WorkflowSecret(SecretStr):  # pragma: no cov
+    """Workflow Secret String model."""
+
+    def get_secret_value(self) -> str:
+        return pass_env(super().get_secret_value())

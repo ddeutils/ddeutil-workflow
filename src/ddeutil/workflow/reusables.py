@@ -231,6 +231,7 @@ def not_in_template(value: Any, *, not_in: str = "matrix.") -> bool:
 
     :param value: A value that want to find parameter template prefix.
     :param not_in: The not-in string that use in the `.startswith` function.
+        (Default is `matrix.`)
 
     :rtype: bool
     """
@@ -279,7 +280,7 @@ def str2template(
     :param value: (str) A string value that want to map with params.
     :param params: (DictData) A parameter value that getting with matched
         regular expression.
-    :param filters: A mapping of filter registry.
+    :param filters: (dict[str, FilterRegistry]) A mapping of filter registry.
     :param registers: (Optional[list[str]]) Override list of register.
 
     :rtype: str
@@ -343,10 +344,11 @@ def param2template(
     """Pass param to template string that can search by ``RE_CALLER`` regular
     expression.
 
-    :param value: A value that want to map with params
-    :param params: A parameter value that getting with matched regular
-        expression.
-    :param filters: A filter mapping for mapping with `map_post_filter` func.
+    :param value: (Any) A value that want to map with params.
+    :param params: (DictData) A parameter value that getting with matched
+        regular expression.
+    :param filters: (dict[str, FilterRegistry]) A filter mapping for mapping
+        with `map_post_filter` func.
     :param extras: (Optional[list[str]]) An Override extras.
 
     :rtype: Any
@@ -372,34 +374,14 @@ def param2template(
     return str2template(value, params, filters=filters, registers=registers)
 
 
-def validate_secret_key(key: str) -> bool:  # pragma: no cov
-    if key.startswith("secret"):
-        return True
-    elif key.endswith("key"):
-        return True
-    return False
-
-
-def mark_secret(value: T, *, mark: bool = False) -> T:  # pragma: no cov
-    if isinstance(value, dict):
-        return {
-            k: mark_secret(value[k], mark=validate_secret_key(k)) for k in value
-        }
-    elif isinstance(value, (list, tuple, set)):
-        return type(value)([mark_secret(i, mark=False) for i in value])
-    elif not isinstance(value, str):
-        return value
-    return "*" * len(value) if mark else value
-
-
 @custom_filter("fmt")  # pragma: no cov
 def datetime_format(value: datetime, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
     """Format datetime object to string with the format.
 
     Examples:
 
-        > ${{ start-date | fmt('%Y%m%d') }}
-        > ${{ start-date | fmt }}
+        >>> "${{ start-date | fmt('%Y%m%d') }}"
+        >>> "${{ start-date | fmt }}"
 
     :param value: (datetime) A datetime value that want to format to string
         value.
@@ -421,7 +403,7 @@ def coalesce(value: Optional[T], default: Any) -> T:
 
     Examples:
 
-        > ${{ value | coalesce("foo") }}
+        >>> "${{ value | coalesce('foo') }}"
 
     :param value: A value that want to check nullable.
     :param default: A default value that use to returned value if an input
@@ -434,7 +416,14 @@ def coalesce(value: Optional[T], default: Any) -> T:
 def get_item(
     value: DictData, key: Union[str, int], default: Optional[Any] = None
 ) -> Any:
-    """Get a value with an input specific key."""
+    """Get a value with an input specific key.
+
+    Examples:
+
+        >>> "${{ value | getitem('key') }}"
+        >>> "${{ value | getitem('key', 'default') }}"
+
+    """
     if not isinstance(value, dict):
         raise UtilException(
             f"The value that pass to `getitem` filter should be `dict` not "
@@ -444,7 +433,14 @@ def get_item(
 
 
 @custom_filter("getindex")  # pragma: no cov
-def get_index(value: list[Any], index: int):
+def get_index(value: list[Any], index: int) -> Any:
+    """Get a value with an input specific index.
+
+    Examples:
+
+        >>> "${{ value | getindex(1) }}"
+
+    """
     if not isinstance(value, list):
         raise UtilException(
             f"The value that pass to `getindex` filter should be `list` not "
