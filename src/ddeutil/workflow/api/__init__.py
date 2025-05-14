@@ -7,8 +7,6 @@ from __future__ import annotations
 
 import contextlib
 from collections.abc import AsyncIterator
-from datetime import datetime, timedelta
-from typing import TypedDict
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
@@ -20,10 +18,8 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import UJSONResponse
 
 from ..__about__ import __version__
-from ..conf import api_config, config
+from ..conf import api_config
 from ..logs import get_logger
-from ..scheduler import ReleaseThread, ReleaseThreads
-from ..workflow import ReleaseQueue, WorkflowTask
 from .routes import job, log
 from .utils import repeat_at
 
@@ -31,38 +27,10 @@ load_dotenv()
 logger = get_logger("uvicorn.error")
 
 
-class State(TypedDict):
-    """TypeDict for State of FastAPI application."""
-
-    scheduler: list[str]
-    workflow_threads: ReleaseThreads
-    workflow_tasks: list[WorkflowTask]
-    workflow_queue: dict[str, ReleaseQueue]
-
-
 @contextlib.asynccontextmanager
-async def lifespan(a: FastAPI) -> AsyncIterator[State]:
+async def lifespan(_: FastAPI) -> AsyncIterator[dict[str, list]]:
     """Lifespan function for the FastAPI application."""
-    a.state.scheduler = []
-    a.state.workflow_threads = {}
-    a.state.workflow_tasks = []
-    a.state.workflow_queue = {}
-
-    yield {
-        # NOTE: Scheduler value should be contained a key of workflow and
-        #   list of datetime of queue and running.
-        #
-        #   ... {
-        #   ...     '<workflow-name>': (
-        #   ...         [<running-datetime>, ...], [<queue-datetime>, ...]
-        #   ...     )
-        #   ... }
-        #
-        "scheduler": a.state.scheduler,
-        "workflow_queue": a.state.workflow_queue,
-        "workflow_threads": a.state.workflow_threads,
-        "workflow_tasks": a.state.workflow_tasks,
-    }
+    yield {}
 
 
 app = FastAPI(
@@ -109,43 +77,43 @@ if api_config.enable_route_workflow:
 
 
 # NOTE: Enable the schedules route.
-if api_config.enable_route_schedule:
-    from ..logs import get_audit
-    from ..scheduler import schedule_task
-    from .routes import schedule
-
-    app.include_router(schedule, prefix=api_config.prefix_path)
-
-    @schedule.on_event("startup")
-    @repeat_at(cron="* * * * *", delay=2)
-    def scheduler_listener():
-        """Schedule broker every minute at 02 second."""
-        logger.debug(
-            f"[SCHEDULER]: Start listening schedule from queue "
-            f"{app.state.scheduler}"
-        )
-        if app.state.workflow_tasks:
-            schedule_task(
-                app.state.workflow_tasks,
-                stop=datetime.now(config.tz) + timedelta(minutes=1),
-                queue=app.state.workflow_queue,
-                threads=app.state.workflow_threads,
-                audit=get_audit(),
-            )
-
-    @schedule.on_event("startup")
-    @repeat_at(cron="*/5 * * * *", delay=10)
-    def monitoring():
-        """Monitoring workflow thread that running in the background."""
-        logger.debug("[MONITOR]: Start monitoring threading.")
-        snapshot_threads: list[str] = list(app.state.workflow_threads.keys())
-        for t_name in snapshot_threads:
-
-            thread_release: ReleaseThread = app.state.workflow_threads[t_name]
-
-            # NOTE: remove the thread that running success.
-            if not thread_release["thread"].is_alive():
-                app.state.workflow_threads.pop(t_name)
+# if api_config.enable_route_schedule:
+#     from ..logs import get_audit
+#     from ..scheduler import schedule_task
+#     from .routes import schedule
+#
+#     app.include_router(schedule, prefix=api_config.prefix_path)
+#
+#     @schedule.on_event("startup")
+#     @repeat_at(cron="* * * * *", delay=2)
+#     def scheduler_listener():
+#         """Schedule broker every minute at 02 second."""
+#         logger.debug(
+#             f"[SCHEDULER]: Start listening schedule from queue "
+#             f"{app.state.scheduler}"
+#         )
+#         if app.state.workflow_tasks:
+#             schedule_task(
+#                 app.state.workflow_tasks,
+#                 stop=datetime.now(config.tz) + timedelta(minutes=1),
+#                 queue=app.state.workflow_queue,
+#                 threads=app.state.workflow_threads,
+#                 audit=get_audit(),
+#             )
+#
+#     @schedule.on_event("startup")
+#     @repeat_at(cron="*/5 * * * *", delay=10)
+#     def monitoring():
+#         """Monitoring workflow thread that running in the background."""
+#         logger.debug("[MONITOR]: Start monitoring threading.")
+#         snapshot_threads: list[str] = list(app.state.workflow_threads.keys())
+#         for t_name in snapshot_threads:
+#
+#             thread_release: ReleaseThread = app.state.workflow_threads[t_name]
+#
+#             # NOTE: remove the thread that running success.
+#             if not thread_release["thread"].is_alive():
+#                 app.state.workflow_threads.pop(t_name)
 
 
 @app.exception_handler(RequestValidationError)
