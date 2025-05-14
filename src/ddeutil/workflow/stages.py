@@ -55,7 +55,7 @@ from textwrap import dedent
 from threading import Event
 from typing import Annotated, Any, Optional, TypeVar, Union, get_type_hints
 
-from pydantic import BaseModel, Field, TypeAdapter
+from pydantic import BaseModel, Field, ValidationError
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
@@ -63,7 +63,13 @@ from .__types import DictData, DictStr, StrOrInt, StrOrNone, TupleStr
 from .conf import dynamic, pass_env
 from .exceptions import StageException, to_dict
 from .result import CANCEL, FAILED, SUCCESS, WAIT, Result, Status
-from .reusables import TagFunc, extract_call, not_in_template, param2template
+from .reusables import (
+    TagFunc,
+    create_model_from_caller,
+    extract_call,
+    not_in_template,
+    param2template,
+)
 from .utils import (
     delay,
     dump_all,
@@ -1088,8 +1094,7 @@ class CallStage(BaseAsyncStage):
         if "result" not in sig.parameters and not has_keyword:
             args.pop("result")
 
-        args = self.parse_model_args(call_func, args, result)
-
+        args = self.validate_model_args(call_func, args, result)
         if inspect.iscoroutinefunction(call_func):
             loop = asyncio.get_event_loop()
             rs: DictData = loop.run_until_complete(
@@ -1177,7 +1182,7 @@ class CallStage(BaseAsyncStage):
         if "result" not in sig.parameters and not has_keyword:
             args.pop("result")
 
-        args = self.parse_model_args(call_func, args, result)
+        args = self.validate_model_args(call_func, args, result)
         if inspect.iscoroutinefunction(call_func):
             rs: DictOrModel = await call_func(
                 **param2template(args, params, extras=self.extras)
@@ -1200,13 +1205,12 @@ class CallStage(BaseAsyncStage):
         return result.catch(status=SUCCESS, context=dump_all(rs, by_alias=True))
 
     @staticmethod
-    def parse_model_args(
+    def validate_model_args(
         func: TagFunc,
         args: DictData,
         result: Result,
     ) -> DictData:
-        """Parse Pydantic model from any dict data before parsing to target
-        caller function.
+        """Validate an input arguments before passing to the caller function.
 
         :param func: A tag function that want to get typing.
         :param args: An arguments before passing to this tag function.
@@ -1216,35 +1220,31 @@ class CallStage(BaseAsyncStage):
         :rtype: DictData
         """
         try:
+            model_instance = create_model_from_caller(func).model_validate(args)
+            override = dict(model_instance)
+            args.update(override)
+
             type_hints: dict[str, Any] = get_type_hints(func)
+
+            for arg in type_hints:
+
+                if arg == "return":
+                    continue
+
+                if arg.removeprefix("_") in args:
+                    args[arg] = args.pop(arg.removeprefix("_"))
+
+            return args
+        except ValidationError as e:
+            raise StageException(
+                "Validate argument from the caller function raise invalid type."
+            ) from e
         except TypeError as e:
             result.trace.warning(
                 f"[STAGE]: Get type hint raise TypeError: {e}, so, it skip "
                 f"parsing model args process."
             )
             return args
-
-        for arg in type_hints:
-
-            if arg == "return":
-                continue
-
-            if arg.removeprefix("_") in args:
-                args[arg] = args.pop(arg.removeprefix("_"))
-
-            t: Any = type_hints[arg]
-
-            # NOTE: Check Result argument was passed to this caller function.
-            #
-            # if is_dataclass(t) and t.__name__ == "Result" and arg not in args:
-            #     args[arg] = result
-
-            if issubclass(t, BaseModel) and arg in args:
-                args[arg] = t.model_validate(obj=args[arg])
-            elif isinstance(t, TypeAdapter) and arg in args:
-                args[arg] = t.validate_python(args[arg])
-
-        return args
 
 
 class TriggerStage(BaseStage):

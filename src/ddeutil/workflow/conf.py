@@ -508,4 +508,5 @@ class CallerSecret(SecretStr):  # pragma: no cov
         return pass_env(super().get_secret_value())
 
 
+# NOTE: Define the caller secret type for use it directly in the caller func.
 CallerSecretType = TypeAdapter(CallerSecret)

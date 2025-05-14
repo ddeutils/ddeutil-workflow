@@ -15,6 +15,7 @@ from datetime import datetime
 from functools import wraps
 from importlib import import_module
 from typing import (
+    Annotated,
     Any,
     Callable,
     Literal,
@@ -32,7 +33,8 @@ except ImportError:
 
 from ddeutil.core import getdot, import_string, lazy
 from ddeutil.io import search_env_replace
-from pydantic import BaseModel, create_model
+from pydantic import BaseModel, ConfigDict, Field, create_model
+from pydantic.alias_generators import to_pascal
 from pydantic.dataclasses import dataclass
 
 from .__types import DictData, Re
@@ -635,12 +637,25 @@ def extract_call(
     return rgt[call.func][call.tag]
 
 
+class BaseCallerArgs(BaseModel):  # pragma: no cov
+    """Base Caller Args model."""
+
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        use_enum_values=True,
+    )
+
+
 def create_model_from_caller(func: Callable) -> BaseModel:  # pragma: no cov
     """Create model from the caller function. This function will use for
     validate the caller function argument typed-hint that valid with the args
     field.
 
-    :param func: A caller function.
+    Reference:
+        - https://github.com/lmmx/pydantic-function-models
+        - https://docs.pydantic.dev/1.10/usage/models/#dynamic-model-creation
+
+    :param func: (Callable) A caller function.
 
     :rtype: BaseModel
     """
@@ -649,16 +664,34 @@ def create_model_from_caller(func: Callable) -> BaseModel:  # pragma: no cov
     fields: dict[str, Any] = {}
     for name in sig.parameters:
         param: inspect.Parameter = sig.parameters[name]
+
+        # NOTE: Skip all `*args` and `**kwargs` parameters.
         if param.kind in (
             inspect.Parameter.VAR_KEYWORD,
             inspect.Parameter.VAR_POSITIONAL,
         ):
             continue
-        if param.default != inspect.Parameter.empty:
-            fields[name] = (type_hints[name], param.default)
+
+        if name.startswith("_"):
+            kwargs = {"serialization_alias": name}
+            rename: str = name.removeprefix("_")
         else:
-            fields[name] = (type_hints[name], ...)
+            kwargs = {}
+            rename: str = name
+
+        if param.default != inspect.Parameter.empty:
+            fields[rename] = Annotated[
+                type_hints[name],
+                Field(default=param.default, **kwargs),
+            ]
+        else:
+            fields[rename] = Annotated[
+                type_hints[name],
+                Field(..., **kwargs),
+            ]
 
     return create_model(
-        "".join(i.title() for i in func.__name__.split("_")), **fields
+        to_pascal(func.__name__),
+        __base__=BaseCallerArgs,
+        **fields,
     )

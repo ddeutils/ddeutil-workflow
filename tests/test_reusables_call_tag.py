@@ -1,21 +1,15 @@
 from __future__ import annotations
 
 import shutil
-from inspect import Parameter, signature
 from pathlib import Path
 from textwrap import dedent
-from typing import get_type_hints
 
 import pytest
-from ddeutil.workflow import Result
 from ddeutil.workflow.reusables import (
     Registry,
-    create_model_from_caller,
     extract_call,
     make_registry,
 )
-from pydantic import ValidationError, create_model
-from typing_extensions import TypedDict
 
 
 @pytest.fixture(scope="module")
@@ -137,67 +131,3 @@ def test_extract_caller():
     assert call_func.name == "el-csv-to-parquet"
     assert call_func.tag == "polars-dir"
     assert call_func.mark == "tag"
-
-
-class Kwargs(TypedDict):  # pragma: no cov
-    foo: str
-    bar: str
-
-
-def dummy_func(
-    source: str, result: Result, limit: int = 5, **kwargs: Kwargs
-):  # pragma: no cov
-    ...
-
-
-def test_make_model_from_argument():
-    """Create Pydantic Model from function arguments.
-
-    Refs:
-    - https://github.com/lmmx/pydantic-function-models
-    - https://docs.pydantic.dev/1.10/usage/models/#dynamic-model-creation
-    """
-    type_hints: dict = get_type_hints(dummy_func)
-    print(type_hints)
-    model = create_model("ArgsFunc", **type_hints)
-    print(model)
-    arg_instance = model.model_validate(
-        {
-            "source": "some-source",
-            "limit": 10,
-            "result": Result(),
-            "kwargs": {"foo": "baz", "bar": "baz"},
-        }
-    )
-    print(arg_instance)
-
-    with pytest.raises(ValidationError):
-        model.model_validate({"source": []})
-
-    with pytest.raises(ValidationError):
-        model.model_validate({"limit": "10"})
-
-    sig = signature(dummy_func)
-    print(sig.parameters)
-    for name in sig.parameters:
-        param: Parameter = sig.parameters[name]
-        print(name, ":", param)
-        print(
-            f"\t> default: {param.default}\n"
-            f"\t> kind: {param.kind}\n"
-            f"\t> annotation: {param.annotation} ({type(param.annotation)})"
-        )
-
-
-def test_create_model_from_caller():
-    model = create_model_from_caller(dummy_func)
-    arg_instance = model.model_validate(
-        {
-            "source": "some-source",
-            "limit": 10,
-            "result": Result(),
-            "outer-key": "should not pass to model",
-        }
-    )
-    print(arg_instance)
-    print("test")

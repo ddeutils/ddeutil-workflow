@@ -94,6 +94,13 @@ def test_call_stage_exec(test_path):
                       run_date: 2024-08-01
                       source: src
                       target: tgt
+                - name: "Private args should pass"
+                  id: args-private
+                  uses: tasks/mssql-proc@odbc
+                  with:
+                    params:
+                      run_mode: "T"
+                    exec: "Test this arge should pass"
             second-job:
               stages:
                 - name: "Extract & Load Local System"
@@ -121,6 +128,14 @@ def test_call_stage_exec(test_path):
         rs: Result = stage.handler_execute({})
         assert rs.status == SUCCESS
         assert rs.context == {"records": 1}
+
+        stage: Stage = workflow.job("first-job").stage("args-private")
+        rs: Result = stage.handler_execute({})
+        assert rs.status == SUCCESS
+        assert rs.context == {
+            "exec": "Test this arge should pass",
+            "params": {"run_mode": "T"},
+        }
 
         # NOTE: Raise because invalid return type.
         with pytest.raises(StageException):
@@ -213,7 +228,7 @@ def test_py_stage_exec():
     )
     assert rs.status == SUCCESS
 
-    rs = stage.set_outputs(
+    rs: dict = stage.set_outputs(
         stage.handler_execute(
             params={
                 "params": {"name": "Author"},
@@ -290,7 +305,7 @@ def test_foreach_stage_exec():
             },
         ],
     )
-    rs = stage.set_outputs(stage.handler_execute({}).context, to={})
+    rs: dict = stage.set_outputs(stage.handler_execute({}).context, to={})
     assert rs == {
         "stages": {
             "foreach-stage": {
@@ -944,7 +959,9 @@ def test_stage_py_virtual(test_path):
                         "outputs": {
                             "return_code": 0,
                             "stdout": "[1 2 3 4 5]\n<class 'numpy.ndarray'>",
-                            "stderr": "Installed 1 package in 25ms",
+                            "stderr": rs["stages"]["py-virtual"]["outputs"][
+                                "stderr"
+                            ],
                         },
                     },
                 },

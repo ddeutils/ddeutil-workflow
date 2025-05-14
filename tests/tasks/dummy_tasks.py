@@ -67,8 +67,7 @@ def dummy_task_polars_dir_scan(
     result.trace.debug(
         "[CALLER]: ... Start EL for CSV to Parquet with Polars Engine"
     )
-    result.trace.debug("[CALLER]: ... ---")
-    result.trace.debug(f"[CALLER]: ... Reading data from {source}")
+    result.trace.debug("... ---||... Reading data from {source}")
 
     conversion: dict[str, Any] = conversion or {}
     if conversion:
@@ -78,7 +77,11 @@ def dummy_task_polars_dir_scan(
 
 
 @tag("odbc", alias="mssql-proc")
-def dummy_task_odbc_mssql_procedure(_exec: str, params: dict):
+def dummy_task_odbc_mssql_procedure(_exec: str, params: dict, result: Result):
+    result.trace.info(
+        f"Private args: `_exec` receive from `exec` params||"
+        f"with value: {_exec!r}"
+    )
     return {"exec": _exec, "params": params}
 
 

@@ -1,7 +1,7 @@
 import shutil
 from datetime import datetime
 
-from ddeutil.workflow import Result, Workflow
+from ddeutil.workflow import SUCCESS, Result, Workflow
 
 
 def test_example_stage_exec_nested_trigger(test_path):
@@ -24,4 +24,5 @@ def test_example_stage_exec_nested_trigger(test_path):
             "name": "starter-stream-name",
         },
     )
+    assert rs.status == SUCCESS
     print(rs)
