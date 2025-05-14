@@ -293,11 +293,13 @@ def cut_id(run_id: str, *, num: int = 6) -> str:
 
 
 @overload
-def dump_all(value: BaseModel, by_alias: bool = False) -> DictData: ...
+def dump_all(
+    value: BaseModel, by_alias: bool = False
+) -> DictData: ...  # pragma: no cov
 
 
 @overload
-def dump_all(value: T, by_alias: bool = False) -> T: ...
+def dump_all(value: T, by_alias: bool = False) -> T: ...  # pragma: no cov
 
 
 def dump_all(

@@ -204,39 +204,6 @@ result: Result = workflow.execute(
 )
 ```
 
-So, this package provide the `Schedule` template for this action, and you can dynamic
-pass the parameters for changing align with that running time by the `release` prefix.
-
-```yaml
-schedule-run-local-wf:
-
-   # Validate model that use to parsing exists for template file
-   type: Schedule
-   workflows:
-
-      # Map existing workflow that want to deploy with scheduler application.
-      # It allows you to pass release parameter that dynamic change depend on the
-      # current context of this scheduler application releasing that time.
-      - name: run-py-local
-        params:
-          source-extract: "USD-THB"
-          asat-dt: "${{ release.logical_date }}"
-```
-
-The main method of the `Schedule` model that use to running is `pending`. If you
-do not pass the `stop` date on this method, it will use config with `WORKFLOW_APP_STOP_BOUNDARY_DELTA`
-key for generate this stop date.
-
-```python
-from ddeutil.workflow import Schedule
-
-(
-   Schedule
-   .from_conf("schedule-run-local-wf")
-   .pending(stop=None)
-)
-```
-
 !!! example
 
     For more examples, this workflow can use with these scenarios:
