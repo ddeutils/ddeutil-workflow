@@ -2,6 +2,30 @@
 
 ## Latest Changes
 
+## 0.0.64
+
+### :stars: Highlight Features
+
+- :star: hl: change validation of caller function args to dynamic model validation.
+- :star: hl: support type adapter on caller function argument.
+
+### :bug: Bug fixes
+
+- :gear: fixed: remove not use args on model dump.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: fix invalid testcase.
+- :construction: refactored: remove schedule module.
+
+### :broom: Deprecate & Clean
+
+- :recycle: clean: remove schedule route marking.
+
+### :book: Documentations
+
+- :page_facing_up: docs: remove scheduler docs.
+
 ## 0.0.63
 
 ### :stars: Highlight Features
