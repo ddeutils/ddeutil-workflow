@@ -214,45 +214,6 @@ result: Result = workflow.execute(
 )
 ```
 
-> [!NOTE]
-> So, this package provide the `Schedule` template for this action, and you can
-> pass the parameters dynamically for changing align with that running time by
-> the `release` prefix.
->
-> ```yaml
-> schedule-run-local-wf:
->
->    # Validate model that use to parsing exists for template file
->    type: Schedule
->    workflows:
->
->       # Map existing workflow that want to deploy with scheduler application.
->       # It allows you to pass release parameter that dynamic change depend on the
->       # current context of this scheduler application releasing that time.
->       - name: run-py-local
->         params:
->           source-extract: "USD-THB"
->           run-date: "${{ release.logical_date }}"
-> ```
->
-> The main method of the `Schedule` model that use to running is `pending`. If you
-> do not pass the `stop` date on this method, it will use config with
-> `WORKFLOW_APP_STOP_BOUNDARY_DELTA` key for generate this stop date.
->
-> ```python
-> from ddeutil.workflow import Schedule
->
-> (
->    Schedule
->    .from_conf("schedule-run-local-wf")
->    .pending(stop=None)
-> )
-> ```
-
-> [!WARNING]
-> The scheduler feature is the expensive feature of this project. You should
-> avoid to use it and find a scheduler tool instead.
-
 ## :cookie: Configuration
 
 The main configuration that use to dynamic changing this workflow engine for your
@@ -282,9 +243,6 @@ it will use default value and do not raise any error to you.
 | **TRACE_ENABLE_WRITE**       |    Log    | `false`                                                                                                                         |                                                                                                                    |
 | **AUDIT_PATH**               |    Log    | `./audits`                                                                                                                      |                                                                                                                    |
 | **AUDIT_ENABLE_WRITE**       |    Log    | `true`                                                                                                                          | A flag that enable logging object saving log to its destination.                                                   |
-| **MAX_PROCESS**              |    App    | `2`                                                                                                                             | The maximum process worker number that run in scheduler app module.                                                |
-| **MAX_SCHEDULE_PER_PROCESS** |    App    | `100`                                                                                                                           | A schedule per process that run parallel.                                                                          |
-| **STOP_BOUNDARY_DELTA**      |    App    | `'{"minutes": 5, "seconds": 20}'`                                                                                               | A time delta value that use to stop scheduler app in json string format.                                           |
 
 **API Application**:
 
@@ -294,7 +252,6 @@ only.
 | Environment                |  Component  | Default | Description                                                                        |
 |:---------------------------|:-----------:|---------|------------------------------------------------------------------------------------|
 | **ENABLE_ROUTE_WORKFLOW**  |     API     | `true`  | A flag that enable workflow route to manage execute manually and workflow logging. |
-| **ENABLE_ROUTE_SCHEDULE**  |     API     | `true`  | A flag that enable run scheduler.                                                  |
 
 ## :rocket: Deployment
 

@@ -123,7 +123,7 @@ def make_filter_registry(
             if not (
                 hasattr(func, "filter")
                 and str(getattr(func, "mark", "NOT SET")) == "filter"
-            ):
+            ):  # pragma: no cov
                 continue
 
             func: FilterFunc

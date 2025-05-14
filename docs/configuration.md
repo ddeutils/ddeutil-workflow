@@ -33,16 +33,12 @@ and do not raise any error to you.
 | **TRACE_ENABLE_WRITE**       |    Log    | `false`                                                                                                                         |                                                                                                                    |
 | **AUDIT_PATH**               |    Log    | `./audits`                                                                                                                      |                                                                                                                    |
 | **AUDIT_ENABLE_WRITE**       |    Log    | `true`                                                                                                                          | A flag that enable logging object saving log to its destination.                                                   |
-| **MAX_PROCESS**              |    App    | `2`                                                                                                                             | The maximum process worker number that run in scheduler app module.                                                |
-| **MAX_SCHEDULE_PER_PROCESS** |    App    | `100`                                                                                                                           | A schedule per process that run parallel.                                                                          |
-| **STOP_BOUNDARY_DELTA**      |    App    | `'{"minutes": 5, "seconds": 20}'`                                                                                               | A time delta value that use to stop scheduler app in json string format.                                           |
 
 ### API
 
 | Environment                |  Component  | Default | <div style="width:25em">Description</div>                                          |
 |:---------------------------|:-----------:|---------|------------------------------------------------------------------------------------|
 | **ENABLE_ROUTE_WORKFLOW**  |     API     | `true`  | A flag that enable workflow route to manage execute manually and workflow logging. |
-| **ENABLE_ROUTE_SCHEDULE**  |     API     | `true`  | A flag that enable run scheduler.                                                  |
 
 ## Execution Override
 
