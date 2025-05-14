@@ -43,6 +43,11 @@ def test_empty_stage_execute():
     assert rs.status == SUCCESS
     assert rs.context == {}
 
+    stage: EmptyStage = EmptyStage(name="Empty Stage", sleep=5.1)
+    rs: Result = stage.handler_execute(params={})
+    assert rs.status == SUCCESS
+    assert rs.context == {}
+
 
 def test_empty_stage_raise():
 

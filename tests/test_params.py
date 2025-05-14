@@ -117,6 +117,9 @@ def test_param_array():
     with pytest.raises(ParamValueException):
         ArrayParam().receive("foo")
 
+    with pytest.raises(ParamValueException):
+        ArrayParam().receive(100)
+
 
 def test_param_map():
     assert {1: "test"} == MapParam(default={"key": "value"}).receive(
@@ -130,6 +133,9 @@ def test_param_map():
 
     with pytest.raises(ParamValueException):
         MapParam().receive('["foo", 1]')
+
+    with pytest.raises(ParamValueException):
+        MapParam().receive(100)
 
 
 def test_param_decimal():
