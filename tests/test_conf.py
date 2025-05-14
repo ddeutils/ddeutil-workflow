@@ -19,14 +19,6 @@ from ddeutil.workflow.conf import (
 
 
 def test_config():
-    origin_stop = os.getenv("WORKFLOW_APP_STOP_BOUNDARY_DELTA")
-    os.environ["WORKFLOW_APP_STOP_BOUNDARY_DELTA"] = "{"
-
-    with pytest.raises(ValueError):
-        _ = Config().stop_boundary_delta
-
-    os.environ["WORKFLOW_APP_STOP_BOUNDARY_DELTA"] = origin_stop
-
     conf = Config()
     os.environ["WORKFLOW_CORE_TIMEZONE"] = "Asia/Bangkok"
     assert conf.tz == ZoneInfo("Asia/Bangkok")

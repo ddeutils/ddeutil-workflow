@@ -20,8 +20,7 @@ from fastapi.responses import UJSONResponse
 from ..__about__ import __version__
 from ..conf import api_config
 from ..logs import get_logger
-from .routes import job, log
-from .utils import repeat_at
+from .routes import job, log, workflow
 
 load_dotenv()
 logger = get_logger("uvicorn.error")
@@ -67,53 +66,7 @@ async def health():
 # NOTE Add the jobs and logs routes by default.
 app.include_router(job, prefix=api_config.prefix_path)
 app.include_router(log, prefix=api_config.prefix_path)
-
-
-# NOTE: Enable the workflows route.
-if api_config.enable_route_workflow:
-    from .routes import workflow
-
-    app.include_router(workflow, prefix=api_config.prefix_path)
-
-
-# NOTE: Enable the schedules route.
-# if api_config.enable_route_schedule:
-#     from ..logs import get_audit
-#     from ..scheduler import schedule_task
-#     from .routes import schedule
-#
-#     app.include_router(schedule, prefix=api_config.prefix_path)
-#
-#     @schedule.on_event("startup")
-#     @repeat_at(cron="* * * * *", delay=2)
-#     def scheduler_listener():
-#         """Schedule broker every minute at 02 second."""
-#         logger.debug(
-#             f"[SCHEDULER]: Start listening schedule from queue "
-#             f"{app.state.scheduler}"
-#         )
-#         if app.state.workflow_tasks:
-#             schedule_task(
-#                 app.state.workflow_tasks,
-#                 stop=datetime.now(config.tz) + timedelta(minutes=1),
-#                 queue=app.state.workflow_queue,
-#                 threads=app.state.workflow_threads,
-#                 audit=get_audit(),
-#             )
-#
-#     @schedule.on_event("startup")
-#     @repeat_at(cron="*/5 * * * *", delay=10)
-#     def monitoring():
-#         """Monitoring workflow thread that running in the background."""
-#         logger.debug("[MONITOR]: Start monitoring threading.")
-#         snapshot_threads: list[str] = list(app.state.workflow_threads.keys())
-#         for t_name in snapshot_threads:
-#
-#             thread_release: ReleaseThread = app.state.workflow_threads[t_name]
-#
-#             # NOTE: remove the thread that running success.
-#             if not thread_release["thread"].is_alive():
-#                 app.state.workflow_threads.pop(t_name)
+app.include_router(workflow, prefix=api_config.prefix_path)
 
 
 @app.exception_handler(RequestValidationError)

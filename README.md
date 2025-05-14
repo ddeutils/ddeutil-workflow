@@ -244,15 +244,6 @@ it will use default value and do not raise any error to you.
 | **AUDIT_PATH**               |    Log    | `./audits`                                                                                                                      |                                                                                                                    |
 | **AUDIT_ENABLE_WRITE**       |    Log    | `true`                                                                                                                          | A flag that enable logging object saving log to its destination.                                                   |
 
-**API Application**:
-
-This config part use for the workflow application that build from the FastAPI
-only.
-
-| Environment                |  Component  | Default | Description                                                                        |
-|:---------------------------|:-----------:|---------|------------------------------------------------------------------------------------|
-| **ENABLE_ROUTE_WORKFLOW**  |     API     | `true`  | A flag that enable workflow route to manage execute manually and workflow logging. |
-
 ## :rocket: Deployment
 
 This package able to run as an application service for receive manual trigger

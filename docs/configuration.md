@@ -34,12 +34,6 @@ and do not raise any error to you.
 | **AUDIT_PATH**               |    Log    | `./audits`                                                                                                                      |                                                                                                                    |
 | **AUDIT_ENABLE_WRITE**       |    Log    | `true`                                                                                                                          | A flag that enable logging object saving log to its destination.                                                   |
 
-### API
-
-| Environment                |  Component  | Default | <div style="width:25em">Description</div>                                          |
-|:---------------------------|:-----------:|---------|------------------------------------------------------------------------------------|
-| **ENABLE_ROUTE_WORKFLOW**  |     API     | `true`  | A flag that enable workflow route to manage execute manually and workflow logging. |
-
 ## Execution Override
 
 Some config can override by an extra parameters. For the below example, I override

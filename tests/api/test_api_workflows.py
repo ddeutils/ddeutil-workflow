@@ -7,7 +7,7 @@ def test_workflows_get_by_name(client):
     assert response.json() == {
         "name": "wf-run-common",
         "desc": "## Run Python Workflow\n\nThis is a running python workflow\n",
-        "params": {"name": {}},
+        "params": {"name": {"type": "str"}},
         "on": [{"cronjob": "*/5 * * * *", "timezone": "Asia/Bangkok"}],
         "jobs": {
             "demo-run": {

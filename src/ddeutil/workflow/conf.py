@@ -6,11 +6,9 @@
 from __future__ import annotations
 
 import copy
-import json
 import os
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from datetime import timedelta
 from functools import cached_property
 from inspect import isclass
 from pathlib import Path
@@ -163,28 +161,6 @@ class Config:  # pragma: no cov
     def max_queue_complete_hist(self) -> int:
         return int(env("CORE_MAX_QUEUE_COMPLETE_HIST", "16"))
 
-    # NOTE: App
-    @property
-    def max_schedule_process(self) -> int:
-        return int(env("APP_MAX_PROCESS", "2"))
-
-    @property
-    def max_schedule_per_process(self) -> int:
-        return int(env("APP_MAX_SCHEDULE_PER_PROCESS", "100"))
-
-    @property
-    def stop_boundary_delta(self) -> timedelta:
-        stop_boundary_delta_str: str = env(
-            "APP_STOP_BOUNDARY_DELTA", '{"minutes": 5, "seconds": 20}'
-        )
-        try:
-            return timedelta(**json.loads(stop_boundary_delta_str))
-        except Exception as err:
-            raise ValueError(
-                "Config `WORKFLOW_APP_STOP_BOUNDARY_DELTA` can not parsing to"
-                f"timedelta with {stop_boundary_delta_str}."
-            ) from err
-
 
 class APIConfig:
     """API Config object."""
@@ -192,14 +168,6 @@ class APIConfig:
     @property
     def prefix_path(self) -> str:
         return env("API_PREFIX_PATH", "/api/v1")
-
-    @property
-    def enable_route_workflow(self) -> bool:
-        return str2bool(env("API_ENABLE_ROUTE_WORKFLOW", "true"))
-
-    @property
-    def enable_route_schedule(self) -> bool:
-        return str2bool(env("API_ENABLE_ROUTE_SCHEDULE", "true"))
 
 
 class BaseLoad(ABC):  # pragma: no cov
