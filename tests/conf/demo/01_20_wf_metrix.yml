@@ -27,12 +27,8 @@ wf-run-matrix:
           uses: tasks/el-${{ matrix.system }}-to-parquet@polars-dir
           id: ${{ matrix.table }}-${{ matrix.partition }}
           with:
-            source:
-              conn: ${{ params.source }}
-              table: ${{ matrix.table }}
-            sink:
-              conn: ${{ params.target }}
-              endpoint: /raw/${{ matrix.table }}_${{ matrix.system }}
+            source: ${{ params.source }}/${{ matrix.table }}
+            sink: ${{ params.target }}/raw/${{ matrix.table }}_${{ matrix.system }}
 
         - name: End Stage
           id: end-stage

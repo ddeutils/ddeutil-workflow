@@ -578,7 +578,7 @@ def test_workflow_exec_call_with_prefix(test_path):
                   id: transform
                   uses: tasks/mssql-proc@odbc
                   with:
-                    _exec: ${{ params.sp_name }}
+                    exec: ${{ params.sp_name }}
                     params:
                       run_mode: "T"
                       run_date: ${{ params.run_date }}

@@ -5,5 +5,4 @@
 # ------------------------------------------------------------------------------
 from .job import job_route as job
 from .logs import log_route as log
-from .schedules import schedule_route as schedule
 from .workflows import workflow_route as workflow
