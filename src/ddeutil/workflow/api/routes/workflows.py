@@ -56,7 +56,6 @@ async def get_workflow_by_name(name: str) -> DictData:
         by_alias=True,
         exclude_none=False,
         exclude_unset=True,
-        exclude_defaults=True,
     )
 
 
@@ -99,7 +98,6 @@ async def get_workflow_audits(name: str):
                     by_alias=True,
                     exclude_none=False,
                     exclude_unset=True,
-                    exclude_defaults=True,
                 )
                 for audit in get_audit().find_audits(name=name)
             ],
@@ -133,6 +131,5 @@ async def get_workflow_release_audit(name: str, release: str):
             by_alias=True,
             exclude_none=False,
             exclude_unset=True,
-            exclude_defaults=True,
         ),
     }

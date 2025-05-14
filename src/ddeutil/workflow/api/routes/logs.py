@@ -44,7 +44,6 @@ async def get_traces(
                 by_alias=True,
                 exclude_none=True,
                 exclude_unset=True,
-                exclude_defaults=True,
             )
             for trace in result.trace.find_traces()
         ],
@@ -73,7 +72,6 @@ async def get_trace_with_id(run_id: str):
                 by_alias=True,
                 exclude_none=True,
                 exclude_unset=True,
-                exclude_defaults=True,
             )
         ),
     }
