@@ -1225,7 +1225,6 @@ class CallStage(BaseAsyncStage):
             args.update(override)
 
             type_hints: dict[str, Any] = get_type_hints(func)
-
             for arg in type_hints:
 
                 if arg == "return":
@@ -1233,6 +1232,7 @@ class CallStage(BaseAsyncStage):
 
                 if arg.removeprefix("_") in args:
                     args[arg] = args.pop(arg.removeprefix("_"))
+                    continue
 
             return args
         except ValidationError as e:
@@ -1466,7 +1466,7 @@ class ParallelStage(BaseNestedStage):
                 )
                 raise StageException(str(e), refs=branch) from e
 
-            if rs.status == FAILED:
+            if rs.status == FAILED:  # pragma: no cov
                 error_msg: str = (
                     f"Branch-Stage was break because it has a sub stage, "
                     f"{stage.iden}, failed without raise error."
@@ -1687,7 +1687,7 @@ class ForEachStage(BaseNestedStage):
                 )
                 raise StageException(str(e), refs=key) from e
 
-            if rs.status == FAILED:
+            if rs.status == FAILED:  # pragma: no cov
                 error_msg: str = (
                     f"Item-Stage was break because it has a sub stage, "
                     f"{stage.iden}, failed without raise error."

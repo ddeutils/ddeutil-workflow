@@ -115,6 +115,12 @@ def test_call_stage_exec(test_path):
                   with:
                     source: src
                     sink: sink
+                - name: "Extract & Load Local System"
+                  id: extract-load-raise-type
+                  uses: tasks/el-csv-to-parquet@polars-dir
+                  with:
+                    source: 1
+                    sink: sink
         """,
     ):
         workflow = Workflow.from_conf(name="tmp-wf-call-return-type")
@@ -157,6 +163,13 @@ def test_call_stage_exec(test_path):
         # NOTE: Raise because call does not register.
         with pytest.raises(StageException):
             stage: Stage = CallStage(name="Not register", uses="tasks/abc@foo")
+            stage.handler_execute({})
+
+        # NOTE: Raise because type of args not valid.
+        with pytest.raises(StageException):
+            stage: Stage = workflow.job("second-job").stage(
+                "extract-load-raise-type"
+            )
             stage.handler_execute({})
 
         stage: Stage = CallStage.model_validate(
