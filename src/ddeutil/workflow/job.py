@@ -578,17 +578,23 @@ class Job(BaseModel):
         _id: str = self.id or job_id
         output: DictData = copy.deepcopy(output)
         errors: DictData = (
-            {"errors": output.pop("errors", {})} if "errors" in output else {}
+            {"errors": output.pop("errors")} if "errors" in output else {}
         )
         skipping: dict[str, bool] = (
-            {"skipped": output.pop("skipped", False)}
-            if "skipped" in output
-            else {}
+            {"skipped": output.pop("skipped")} if "skipped" in output else {}
         )
-
+        status: dict[str, Status] = (
+            {"status": output.pop("status")} if "status" in output else {}
+        )
         if self.strategy.is_set():
-            to["jobs"][_id] = {"strategies": output, **skipping, **errors}
+            to["jobs"][_id] = {
+                "strategies": output,
+                **skipping,
+                **errors,
+                **status,
+            }
         elif len(k := output.keys()) > 1:  # pragma: no cov
+            print(output)
             raise JobError(
                 "Strategy output from execution return more than one ID while "
                 "this job does not set strategy."
@@ -596,7 +602,7 @@ class Job(BaseModel):
         else:
             _output: DictData = {} if len(k) == 0 else output[list(k)[0]]
             _output.pop("matrix", {})
-            to["jobs"][_id] = {**_output, **skipping, **errors}
+            to["jobs"][_id] = {**_output, **skipping, **errors, **status}
         return to
 
     def get_outputs(
@@ -850,10 +856,7 @@ def local_execute(
             },
         )
 
-    with ThreadPoolExecutor(
-        max_workers=workers, thread_name_prefix="job_strategy_exec_"
-    ) as executor:
-
+    with ThreadPoolExecutor(workers, "jb_stg") as executor:
         futures: list[Future] = [
             executor.submit(
                 local_execute_strategy,

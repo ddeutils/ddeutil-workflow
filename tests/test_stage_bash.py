@@ -1,3 +1,4 @@
+import pytest
 from ddeutil.workflow import FAILED, SUCCESS, Result
 from ddeutil.workflow.stages import BashStage
 
@@ -53,4 +54,35 @@ def test_bash_stage_exec_raise():
                 "```"
             ),
         },
+    }
+
+
+@pytest.mark.asyncio
+async def test_bash_stage_axec():
+    stage: BashStage = BashStage(name="Bash Stage", bash='echo "Hello World"')
+    rs: Result = await stage.handler_axecute(params={})
+    assert rs.status == SUCCESS
+
+
+@pytest.mark.asyncio
+async def test_bash_stage_axec_raise():
+    stage: BashStage = BashStage(
+        name="Bash Stage",
+        bash='echo "Test Raise Error case with failed" >&2;\n' "exit 1;",
+    )
+
+    # NOTE: Raise error from bash that force exit 1.
+    rs: Result = await stage.handler_axecute({})
+    assert rs.status == FAILED
+    assert rs.context == {
+        "errors": {
+            "name": "StageError",
+            "message": (
+                "Subprocess: Test Raise Error case with failed\n"
+                "---( statement )---\n"
+                '```bash\necho "Test Raise Error case with failed" >&2;\n'
+                "exit 1;\n"
+                "```"
+            ),
+        }
     }

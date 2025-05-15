@@ -264,19 +264,19 @@ class BaseStage(BaseModel, ABC):
             return self.execute(params, result=result, event=event)
         except StageSkipError as e:  # pragma: no cov
             result.trace.info(
-                f"[STAGE]: Skip Handler:||StageSkipError:{e}||"
+                f"[STAGE]: Skip Handler:||StageSkipError: {e}||"
                 f"{traceback.format_exc()}"
             )
             return result.catch(status=SKIP, context={"skipped": True})
         except StageError as e:
             result.trace.error(
-                f"[STAGE]: Error Handler:||StageError:||{e}||"
+                f"[STAGE]: Error Handler:||StageError: {e}||"
                 f"{traceback.format_exc()}"
             )
             return result.catch(status=FAILED, context={"errors": e.to_dict()})
         except Exception as e:
             result.trace.error(
-                f"[STAGE]: Error Handler:||{e.__class__.__name__}:||{e}||"
+                f"[STAGE]: Error Handler:||{e.__class__.__name__}: {e}||"
                 f"{traceback.format_exc()}"
             )
             return result.catch(status=FAILED, context={"errors": to_dict(e)})
@@ -501,19 +501,19 @@ class BaseAsyncStage(BaseStage):
             return await self.axecute(params, result=result, event=event)
         except StageSkipError as e:  # pragma: no cov
             await result.trace.ainfo(
-                f"[STAGE]: Skip Handler:||StageSkipError:{e}||"
+                f"[STAGE]: Skip Handler:||StageSkipError: {e}||"
                 f"{traceback.format_exc()}"
             )
             return result.catch(status=SKIP, context={"skipped": True})
         except StageError as e:
             await result.trace.aerror(
-                f"[STAGE]: Error Handler:||StageError:||{e}||"
+                f"[STAGE]: Error Handler:||StageError: {e}||"
                 f"{traceback.format_exc()}"
             )
             return result.catch(status=FAILED, context={"errors": e.to_dict()})
         except Exception as e:
             await result.trace.aerror(
-                f"[STAGE]: Error Handler:||{e.__class__.__name__}:||{e}||"
+                f"[STAGE]: Error Handler:||{e.__class__.__name__}: {e}||"
                 f"{traceback.format_exc()}"
             )
             return result.catch(status=FAILED, context={"errors": to_dict(e)})
@@ -1671,18 +1671,14 @@ class ForEachStage(BaseNestedStage):
         """
         result.trace.debug(f"[STAGE]: Execute Item: {item!r}")
         key: StrOrInt = index if self.use_index_as_key else item
+
         context: DictData = copy.deepcopy(params)
         context.update({"item": item, "loop": index})
-        output: DictData = {"item": item, "stages": {}}
+        nestet_context: DictData = {"item": item, "stages": {}}
         for stage in self.stages:
 
             if self.extras:
                 stage.extras = self.extras
-
-            if stage.is_skipped(params=context):
-                result.trace.info(f"[STAGE]: Skip stage: {stage.iden!r}")
-                stage.set_outputs(output={"skipped": True}, to=output)
-                continue
 
             if event and event.is_set():
                 error_msg: str = (
@@ -1693,7 +1689,9 @@ class ForEachStage(BaseNestedStage):
                     foreach={
                         key: {
                             "item": item,
-                            "stages": filter_func(output.pop("stages", {})),
+                            "stages": filter_func(
+                                nestet_context.pop("stages", {})
+                            ),
                             "errors": StageError(error_msg).to_dict(),
                         }
                     },
@@ -1706,27 +1704,30 @@ class ForEachStage(BaseNestedStage):
                 parent_run_id=result.parent_run_id,
                 event=event,
             )
-            stage.set_outputs(rs.context, to=output)
-            stage.set_outputs(stage.get_outputs(output), to=context)
+            stage.set_outputs(rs.context, to=nestet_context)
+            stage.set_outputs(stage.get_outputs(nestet_context), to=context)
 
-            if rs.status in (FAILED, SKIP):  # pragma: no cov
+            if rs.status == SKIP:
+                continue
+
+            if rs.status == FAILED:  # pragma: no cov
                 error_msg: str = (
-                    f"Item-Stage was break because it has a sub stage, "
-                    f"{stage.iden}, failed or skipped."
+                    f"Item-Stage was break because it has a nested-stage, "
+                    f"{stage.iden!r}, failed."
                 )
                 result.trace.warning(f"[STAGE]: {error_msg}")
                 result.catch(
-                    status=rs.status,
+                    status=FAILED,
                     foreach={
                         key: {
                             "item": item,
-                            "stages": filter_func(output.pop("stages", {})),
+                            "stages": filter_func(
+                                nestet_context.pop("stages", {})
+                            ),
                             "errors": StageError(error_msg).to_dict(),
                         },
                     },
                 )
-                if rs.status == SKIP:
-                    raise StageSkipError(error_msg, refs=key)
                 raise StageError(error_msg, refs=key)
 
         return result.catch(
@@ -1734,7 +1735,7 @@ class ForEachStage(BaseNestedStage):
             foreach={
                 key: {
                     "item": item,
-                    "stages": filter_func(output.pop("stages", {})),
+                    "stages": filter_func(nestet_context.pop("stages", {})),
                 },
             },
         )

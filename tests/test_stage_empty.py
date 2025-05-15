@@ -128,3 +128,35 @@ def test_empty_stage_get_outputs():
         {"id": "first-stage", "name": "Empty Stage", "echo": "hello world"}
     )
     assert stage.get_outputs(outputs) == {"foo": "bar"}
+
+
+@pytest.mark.asyncio
+async def test_empty_stage_axec():
+    stage: EmptyStage = EmptyStage(name="Empty Stage")
+    rs: Result = await stage.handler_axecute(params={})
+    assert rs.status == SUCCESS
+    assert rs.context == {}
+
+    stage: EmptyStage = EmptyStage(name="Empty Stage", echo="hello world")
+    rs: Result = await stage.handler_axecute(params={})
+    assert rs.status == SUCCESS
+    assert rs.context == {}
+
+    stage: EmptyStage = EmptyStage(
+        name="Empty Stage", echo="hello world", sleep=5.01
+    )
+    rs: Result = await stage.handler_axecute(params={})
+    assert rs.status == SUCCESS
+    assert rs.context == {}
+
+    stage: EmptyStage = EmptyStage(
+        name="Empty Stage",
+        echo=(
+            "Hello World\nThis is the newline message.\nI want to test newline "
+            "string doing well."
+        ),
+        sleep=0.01,
+    )
+    rs: Result = await stage.handler_axecute(params={})
+    assert rs.status == SUCCESS
+    assert rs.context == {}

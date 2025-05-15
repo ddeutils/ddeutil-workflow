@@ -1,0 +1,84 @@
+from datetime import datetime
+
+from ddeutil.workflow import (
+    FAILED,
+    SUCCESS,
+    Result,
+    Workflow,
+)
+from ddeutil.workflow.stages import Stage
+from pydantic import TypeAdapter
+
+
+def test_trigger_stage_exec():
+    workflow = Workflow.from_conf(name="wf-trigger", extras={})
+    stage: Stage = workflow.job("trigger-job").stage(stage_id="trigger-stage")
+    rs: Result = stage.handler_execute(params={})
+    assert rs.status == SUCCESS
+    assert rs.context == {
+        "status": SUCCESS,
+        "params": {
+            "author-run": "Trigger Runner",
+            "run-date": datetime(2024, 8, 1, 0, 0),
+        },
+        "jobs": {
+            "first-job": {
+                "stages": {
+                    "printing": {
+                        "outputs": {"x": "Trigger Runner", "status": SUCCESS}
+                    },
+                    "setting-x": {"outputs": {"x": 1, "status": SUCCESS}},
+                },
+                "status": SUCCESS,
+            },
+            "second-job": {
+                "stages": {
+                    "create-func": {
+                        "outputs": {
+                            "var_inside": "Create Function Inside",
+                            "echo": "echo",
+                            "status": SUCCESS,
+                        }
+                    },
+                    "call-func": {"outputs": {"status": SUCCESS}},
+                    "9150930869": {"outputs": {"status": SUCCESS}},
+                },
+                "status": SUCCESS,
+            },
+            "final-job": {
+                "stages": {
+                    "1772094681": {
+                        "outputs": {
+                            "status": SUCCESS,
+                            "return_code": 0,
+                            "stdout": "Hello World",
+                            "stderr": None,
+                        }
+                    }
+                },
+                "status": SUCCESS,
+            },
+        },
+    }
+
+
+def test_trigger_stage_exec_raise():
+    stage: Stage = TypeAdapter(Stage).validate_python(
+        {
+            "name": "Trigger to raise workflow",
+            "trigger": "wf-run-python-raise",
+            "params": {},
+        }
+    )
+    rs: Result = stage.handler_execute(params={})
+    assert rs.status == FAILED
+    assert rs.context == {
+        "status": FAILED,
+        "errors": {
+            "name": "StageError",
+            "message": (
+                "Trigger workflow return `FAILED` status with:\n"
+                "Job, 'first-job', return `FAILED` status."
+            ),
+        },
+    }

@@ -1,0 +1,17 @@
+tmp-wf-foreach-concurrent:
+  type: Workflow
+  jobs:
+    first-job:
+      stages:
+        - name: "Start run for-each stage"
+          id: foreach-stage
+          foreach: [1, 2, 3, 4]
+          concurrent: 3
+          stages:
+            - name: "Echo stage"
+              echo: |
+                Start run with item ${{ item }}
+            - name: "Final Echo"
+              if: ${{ item }} == 4
+              echo: |
+                Final run
