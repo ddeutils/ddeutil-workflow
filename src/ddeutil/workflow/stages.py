@@ -2645,7 +2645,7 @@ class VirtualPyStage(PyStage):  # pragma: no cov
         ) as py:
             result.trace.debug(f"[STAGE]: Create `{py}` file.")
             rs: CompletedProcess = subprocess.run(
-                ["uv", "run", py, "--no-cache"],
+                ["python", "-m", "uv", "run", py, "--no-cache"],
                 # ["uv", "run", "--python", "3.9", py],
                 shell=False,
                 capture_output=True,

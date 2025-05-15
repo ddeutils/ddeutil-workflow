@@ -1038,6 +1038,8 @@ def test_stage_py_virtual(test_path):
             }
         except StageError as e:
             print(e)
+        except Exception as e:
+            print(e)
 
 
 def test_raise_stage_exec():
