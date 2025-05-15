@@ -23,16 +23,14 @@ from concurrent.futures import (
 )
 from datetime import datetime
 from enum import Enum
-from functools import total_ordering
 from pathlib import Path
 from queue import Queue
 from textwrap import dedent
 from threading import Event
-from typing import Any, Optional, Union
+from typing import Any, Optional
 from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationInfo
-from pydantic.dataclasses import dataclass
+from pydantic import BaseModel, Field, ValidationInfo
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
@@ -52,91 +50,18 @@ from .utils import (
 
 
 class ReleaseType(str, Enum):
-    """Release Type Enum support the type field on the Release dataclass."""
+    """Release Type Enum."""
 
-    DEFAULT = "manual"
-    SCHEDULE = "schedule"
-    POKING = "poking"
+    NORMAL = "normal"
+    RERUN = "rerun"
+    EVENT = "event"
     FORCE = "force"
 
 
-@total_ordering
-@dataclass(config=ConfigDict(use_enum_values=True))
-class Release:
-    """Release object that use for represent the release datetime."""
-
-    date: datetime = Field(
-        description=(
-            "A release date that should has second and millisecond equal 0."
-        )
-    )
-    type: ReleaseType = Field(
-        default=ReleaseType.DEFAULT,
-        description="A type of release that create before start execution.",
-    )
-
-    def __repr__(self) -> str:
-        """Override __repr__ method for represent value of `date` field.
-
-        :rtype: str
-        """
-        return repr(f"{self.date:%Y-%m-%d %H:%M:%S}")
-
-    def __str__(self) -> str:
-        """Override string value of this release object with the `date` field.
-
-        :rtype: str
-        """
-        return f"{self.date:%Y-%m-%d %H:%M:%S}"
-
-    @classmethod
-    def from_dt(cls, dt: Union[datetime, str]) -> Self:
-        """Construct Release object from `datetime` or `str` objects.
-
-            This method will replace second and millisecond value to 0 and
-        replace timezone to the `tz` config setting or extras overriding before
-        create Release object.
-
-        :param dt: (Union[datetime, str]) A datetime object or string that want to
-            construct to the Release object.
-
-        :raise TypeError: If the type of the dt argument does not valid with
-            datetime or str object.
-
-        :rtype: Release
-        """
-        if isinstance(dt, str):
-            dt: datetime = datetime.fromisoformat(dt)
-        elif not isinstance(dt, datetime):
-            raise TypeError(
-                f"The `from_dt` need the `dt` parameter type be `str` or "
-                f"`datetime` only, not {type(dt)}."
-            )
-        return cls(date=replace_sec(dt.replace(tzinfo=None)))
-
-    def __eq__(self, other: Union[Release, datetime]) -> bool:
-        """Override equal property that will compare only the same type or
-        datetime.
-
-        :rtype: bool
-        """
-        if isinstance(other, self.__class__):
-            return self.date == other.date
-        elif isinstance(other, datetime):
-            return self.date == other
-        return NotImplemented
-
-    def __lt__(self, other: Union[Release, datetime]) -> bool:
-        """Override less-than property that will compare only the same type or
-        datetime.
-
-        :rtype: bool
-        """
-        if isinstance(other, self.__class__):
-            return self.date < other.date
-        elif isinstance(other, datetime):
-            return self.date < other
-        return NotImplemented
+NORMAL = ReleaseType.NORMAL
+RERUN = ReleaseType.RERUN
+EVENT = ReleaseType.EVENT
+FORCE = ReleaseType.FORCE
 
 
 class Workflow(BaseModel):
@@ -320,6 +245,7 @@ class Workflow(BaseModel):
 
         :raise WorkflowError: If it has not exists need value in this
             workflow job.
+        :raise ValueError: If the workflow name has template value.
 
         :rtype: Self
         """
@@ -332,6 +258,7 @@ class Workflow(BaseModel):
                     f"{self.name!r}."
                 )
 
+            # NOTE: Set job ID to the job model.
             self.jobs[job].id = job
 
         # VALIDATE: Validate workflow name should not dynamic with params
@@ -413,11 +340,32 @@ class Workflow(BaseModel):
             "jobs": {},
         }
 
+    def validate_release(self, dt: datetime) -> datetime:
+        """Validate the release datetime that should was replaced second and
+        millisecond to 0 and replaced timezone to None before checking it match
+        with the set `on` field.
+
+        :param dt: (datetime) A datetime object that want to validate.
+
+        :rtype: datetime
+        """
+        release: datetime = replace_sec(dt.replace(tzinfo=None))
+        if not self.on:
+            return release
+
+        for on in self.on:
+            if release == on.cronjob.schedule(release).next:
+                return release
+        raise WorkflowError(
+            "Release datetime does not support for this workflow"
+        )
+
     def release(
         self,
-        release: Union[Release, datetime],
+        release: datetime,
         params: DictData,
         *,
+        release_type: ReleaseType = NORMAL,
         run_id: Optional[str] = None,
         parent_run_id: Optional[str] = None,
         audit: type[Audit] = None,
@@ -439,8 +387,9 @@ class Workflow(BaseModel):
             - Execute this workflow with mapping release data to its parameters.
             - Writing result audit
 
-        :param release: A release datetime or Release object.
+        :param release: (datetime) A release datetime.
         :param params: A workflow parameter that pass to execute method.
+        :param release_type:
         :param run_id: (str) A workflow running ID.
         :param parent_run_id: (str) A parent workflow running ID.
         :param audit: An audit class that want to save the execution result.
@@ -461,20 +410,16 @@ class Workflow(BaseModel):
             id_logic=name,
             extras=self.extras,
         )
-
-        # VALIDATE: Change release value to Release object.
-        if isinstance(release, datetime):
-            release: Release = Release.from_dt(release)
-
+        release: datetime = self.validate_release(dt=release)
         result.trace.info(
-            f"[RELEASE]: Start {name!r} : {release.date:%Y-%m-%d %H:%M:%S}"
+            f"[RELEASE]: Start {name!r} : {release:%Y-%m-%d %H:%M:%S}"
         )
         tz: ZoneInfo = dynamic("tz", extras=self.extras)
         values: DictData = param2template(
             params,
             params={
                 "release": {
-                    "logical_date": release.date,
+                    "logical_date": release,
                     "execute_date": datetime.now(tz=tz),
                     "run_id": result.run_id,
                 }
@@ -488,14 +433,14 @@ class Workflow(BaseModel):
             timeout=timeout,
         )
         result.trace.info(
-            f"[RELEASE]: End {name!r} : {release.date:%Y-%m-%d %H:%M:%S}"
+            f"[RELEASE]: End {name!r} : {release:%Y-%m-%d %H:%M:%S}"
         )
         result.trace.debug(f"[RELEASE]: Writing audit: {name!r}.")
         (
             audit(
                 name=name,
-                release=release.date,
-                type=release.type,
+                release=release,
+                type=release_type,
                 context=result.context,
                 parent_run_id=result.parent_run_id,
                 run_id=result.run_id,
@@ -508,8 +453,8 @@ class Workflow(BaseModel):
             context={
                 "params": params,
                 "release": {
-                    "type": release.type,
-                    "logical_date": release.date,
+                    "type": release_type,
+                    "logical_date": release,
                 },
                 **{"jobs": result.context.pop("jobs", {})},
                 **(
@@ -627,7 +572,7 @@ class Workflow(BaseModel):
             This value does not force stop the task that still running more than
             this limit time. (Default: 60 * 60 seconds)
         :param max_job_parallel: (int) The maximum workers that use for job
-            execution in `PoolThreadExecutor` object. (Default: 2 workers)
+            execution in `ThreadPoolExecutor` object. (Default: 2 workers)
 
         :rtype: Result
         """

@@ -576,7 +576,7 @@ class Job(BaseModel):
             )
 
         _id: str = self.id or job_id
-        output: DictData = output.copy()
+        output: DictData = copy.deepcopy(output)
         errors: DictData = (
             {"errors": output.pop("errors", {})} if "errors" in output else {}
         )
@@ -598,6 +598,26 @@ class Job(BaseModel):
             _output.pop("matrix", {})
             to["jobs"][_id] = {**_output, **skipping, **errors}
         return to
+
+    def get_outputs(
+        self,
+        output: DictData,
+        *,
+        job_id: StrOrNone = None,
+    ) -> DictData:
+        """Get the outputs from jobs data. It will get this job ID or passing
+        custom ID from the job outputs mapping.
+
+        :param output: (DictData) A job outputs data that want to extract
+        :param job_id: (StrOrNone) A job ID if the `id` field does not set.
+
+        :rtype: DictData
+        """
+        _id: str = self.id or job_id
+        if self.strategy.is_set():
+            return output.get("jobs", {}).get(_id, {}).get("strategies", {})
+        else:
+            return output.get("jobs", {}).get(_id, {})
 
     def execute(
         self,
