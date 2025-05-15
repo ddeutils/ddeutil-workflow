@@ -61,7 +61,7 @@ from typing_extensions import Self
 
 from .__types import DictData, DictStr, StrOrInt, StrOrNone, TupleStr
 from .conf import dynamic, pass_env
-from .errors import StageError, to_dict
+from .errors import StageError, StageSkipError, to_dict
 from .result import CANCEL, FAILED, SUCCESS, WAIT, Result, Status
 from .reusables import (
     TagFunc,
@@ -247,6 +247,8 @@ class BaseStage(BaseModel, ABC):
             if self.desc:
                 result.trace.debug(f"[STAGE]: Description:||{self.desc}||")
             return self.execute(params, result=result, event=event)
+        except StageSkipError:
+            pass
         except Exception as e:
             e_name: str = e.__class__.__name__
             result.trace.error(
