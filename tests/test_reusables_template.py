@@ -195,6 +195,7 @@ def test_not_in_template():
         },
         not_in="foo.",
     )
+
     assert not_in_template(
         {
             "params": {"test": "${{ foo.value.test }}"},
@@ -202,6 +203,8 @@ def test_not_in_template():
         },
         not_in="foo.",
     )
+
+    assert not not_in_template(None)
 
 
 def test_has_template():
@@ -225,3 +228,5 @@ def test_has_template():
             "test": [1, False, "{{ stages.foo.matrix }}"],
         }
     )
+
+    assert not has_template(None)

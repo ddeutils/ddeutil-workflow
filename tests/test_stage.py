@@ -11,6 +11,7 @@ def test_empty_stage():
     )
     assert stage.iden == "Empty Stage"
     assert stage == EmptyStage(name="Empty Stage", echo="hello world")
+    assert not stage.is_nested
 
     # NOTE: Copy the stage model with adding the id field.
     new_stage: Stage = stage.model_copy(update={"id": "stage-empty"})
@@ -23,6 +24,11 @@ def test_empty_stage():
     )
     assert stage.id == "dummy"
     assert stage.iden == "dummy"
+
+    stage: Stage = EmptyStage.model_validate(
+        {"name": "Empty Stage", "desc": "\nThis is a test stage\n\tnewline"},
+    )
+    assert stage.desc == "This is a test stage\n\tnewline"
 
 
 def test_empty_stage_execute():
@@ -44,6 +50,13 @@ def test_empty_stage_execute():
     assert rs.context == {}
 
     stage: EmptyStage = EmptyStage(name="Empty Stage", sleep=5.1)
+    rs: Result = stage.handler_execute(params={})
+    assert rs.status == SUCCESS
+    assert rs.context == {}
+
+    stage: Stage = EmptyStage.model_validate(
+        {"name": "Empty Stage", "desc": "\nThis is a test stage\n\tnewline"},
+    )
     rs: Result = stage.handler_execute(params={})
     assert rs.status == SUCCESS
     assert rs.context == {}

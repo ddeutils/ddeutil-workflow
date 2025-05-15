@@ -56,7 +56,7 @@ from threading import Event
 from typing import Annotated, Any, Optional, TypeVar, Union, get_type_hints
 
 from pydantic import BaseModel, Field, ValidationError
-from pydantic.functional_validators import model_validator
+from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
 from .__types import DictData, DictStr, StrOrInt, StrOrNone, TupleStr
@@ -76,6 +76,7 @@ from .utils import (
     filter_func,
     gen_id,
     make_exec,
+    to_train,
 )
 
 T = TypeVar("T")
@@ -106,6 +107,12 @@ class BaseStage(BaseModel, ABC):
     name: str = Field(
         description="A stage name that want to logging when start execution.",
     )
+    desc: StrOrNone = Field(
+        default=None,
+        description=(
+            "A stage description that use to logging when start execution."
+        ),
+    )
     condition: StrOrNone = Field(
         default=None,
         description=(
@@ -124,6 +131,14 @@ class BaseStage(BaseModel, ABC):
         """
         return self.id or self.name
 
+    @field_validator("desc", mode="after")
+    def ___prepare_desc__(cls, value: str) -> str:
+        """Prepare description string that was created on a template.
+
+        :rtype: str
+        """
+        return dedent(value.lstrip("\n"))
+
     @model_validator(mode="after")
     def __prepare_running_id(self) -> Self:
         """Prepare stage running ID that use default value of field and this
@@ -135,14 +150,12 @@ class BaseStage(BaseModel, ABC):
 
         :rtype: Self
         """
-
         # VALIDATE: Validate stage id and name should not dynamic with params
         #   template. (allow only matrix)
         if not_in_template(self.id) or not_in_template(self.name):
             raise ValueError(
                 "Stage name and ID should only template with 'matrix.'"
             )
-
         return self
 
     @abstractmethod
@@ -227,6 +240,12 @@ class BaseStage(BaseModel, ABC):
             extras=self.extras,
         )
         try:
+            result.trace.info(
+                f"[STAGE]: Handler {to_train(self.__class__.__name__)}: "
+                f"{self.name!r}."
+            )
+            if self.desc:
+                result.trace.debug(f"[STAGE]: Description:||{self.desc}||")
             return self.execute(params, result=result, event=event)
         except Exception as e:
             e_name: str = e.__class__.__name__
@@ -372,6 +391,14 @@ class BaseStage(BaseModel, ABC):
             )
         )
 
+    @property
+    def is_nested(self) -> bool:
+        """Return true if this stage is nested stage.
+
+        :rtype: bool
+        """
+        return False
+
 
 class BaseAsyncStage(BaseStage):
     """Base Async Stage model to make any stage model allow async execution for
@@ -450,11 +477,22 @@ class BaseAsyncStage(BaseStage):
         )
 
         try:
+            await result.trace.ainfo(
+                f"[STAGE]: Handler {to_train(self.__class__.__name__)}: "
+                f"{self.name!r}."
+            )
+            if self.desc:
+                await result.trace.adebug(
+                    f"[STAGE]: Description:||{self.desc}||"
+                )
             rs: Result = await self.axecute(params, result=result, event=event)
             return rs
         except Exception as e:
             e_name: str = e.__class__.__name__
-            await result.trace.aerror(f"[STAGE]: Handler {e_name}: {e}")
+            await result.trace.aerror(
+                f"[STAGE]: Error Handler:||{e_name}:||{e}||"
+                f"{traceback.format_exc()}"
+            )
             if dynamic("stage_raise_error", f=raise_error, extras=self.extras):
                 if isinstance(e, StageError):
                     raise
@@ -527,12 +565,10 @@ class EmptyStage(BaseAsyncStage):
             else "..."
         )
 
-        result.trace.info(
-            f"[STAGE]: Execute Empty-Stage: {self.name!r}: ( {message} )"
-        )
+        result.trace.info(f"[STAGE]: Message: ( {message} )")
         if self.sleep > 0:
             if self.sleep > 5:
-                result.trace.info(f"[STAGE]: ... sleep ({self.sleep} sec)")
+                result.trace.info(f"[STAGE]: Sleep ... ({self.sleep} sec)")
             time.sleep(self.sleep)
         return result.catch(status=SUCCESS)
 
@@ -566,11 +602,11 @@ class EmptyStage(BaseAsyncStage):
             else "..."
         )
 
-        result.trace.info(f"[STAGE]: Empty-Stage: {self.name!r}: ( {message} )")
+        result.trace.info(f"[STAGE]: Message: ( {message} )")
         if self.sleep > 0:
             if self.sleep > 5:
                 await result.trace.ainfo(
-                    f"[STAGE]: ... sleep ({self.sleep} sec)"
+                    f"[STAGE]: Sleep ... ({self.sleep} sec)"
                 )
             await asyncio.sleep(self.sleep)
         return result.catch(status=SUCCESS)
@@ -703,19 +739,15 @@ class BashStage(BaseAsyncStage):
             run_id=gen_id(self.name + (self.id or ""), unique=True),
             extras=self.extras,
         )
-
-        result.trace.info(f"[STAGE]: Execute Shell-Stage: {self.name}")
-
         bash: str = param2template(
             dedent(self.bash.strip("\n")), params, extras=self.extras
         )
-
         with self.create_sh_file(
             bash=bash,
             env=param2template(self.env, params, extras=self.extras),
             run_id=result.run_id,
         ) as sh:
-            result.trace.debug(f"[STAGE]: ... Create `{sh[1]}` file.")
+            result.trace.debug(f"[STAGE]: Create `{sh[1]}` file.")
             rs: CompletedProcess = subprocess.run(
                 sh,
                 shell=False,
@@ -759,17 +791,15 @@ class BashStage(BaseAsyncStage):
             run_id=gen_id(self.name + (self.id or ""), unique=True),
             extras=self.extras,
         )
-        await result.trace.ainfo(f"[STAGE]: Execute Shell-Stage: {self.name}")
         bash: str = param2template(
             dedent(self.bash.strip("\n")), params, extras=self.extras
         )
-
         async with self.async_create_sh_file(
             bash=bash,
             env=param2template(self.env, params, extras=self.extras),
             run_id=result.run_id,
         ) as sh:
-            await result.trace.adebug(f"[STAGE]: ... Create `{sh[1]}` file.")
+            await result.trace.adebug(f"[STAGE]: Create `{sh[1]}` file.")
             rs: CompletedProcess = subprocess.run(
                 sh,
                 shell=False,
@@ -888,15 +918,12 @@ class PyStage(BaseAsyncStage):
             run_id=gen_id(self.name + (self.id or ""), unique=True),
             extras=self.extras,
         )
-
         lc: DictData = {}
         gb: DictData = (
             globals()
             | param2template(self.vars, params, extras=self.extras)
             | {"result": result}
         )
-
-        result.trace.info(f"[STAGE]: Execute Py-Stage: {self.name}")
 
         # WARNING: The exec build-in function is very dangerous. So, it
         #   should use the re module to validate exec-string before running.
@@ -956,8 +983,6 @@ class PyStage(BaseAsyncStage):
             | param2template(self.vars, params, extras=self.extras)
             | {"result": result}
         )
-        await result.trace.ainfo(f"[STAGE]: Execute Py-Stage: {self.name}")
-
         # WARNING: The exec build-in function is very dangerous. So, it
         #   should use the re module to validate exec-string before running.
         exec(
@@ -1060,7 +1085,7 @@ class CallStage(BaseAsyncStage):
         )()
 
         result.trace.info(
-            f"[STAGE]: Execute Call-Stage: {call_func.name}@{call_func.tag}"
+            f"[STAGE]: Caller Func: '{call_func.name}@{call_func.tag}'"
         )
 
         # VALIDATE: check input task caller parameters that exists before
@@ -1148,7 +1173,7 @@ class CallStage(BaseAsyncStage):
         )()
 
         await result.trace.ainfo(
-            f"[STAGE]: Execute Call-Stage: {call_func.name}@{call_func.tag}"
+            f"[STAGE]: Caller Func: '{call_func.name}@{call_func.tag}'"
         )
 
         # VALIDATE: check input task caller parameters that exists before
@@ -1297,7 +1322,6 @@ class TriggerStage(BaseStage):
         )
 
         _trigger: str = param2template(self.trigger, params, extras=self.extras)
-        result.trace.info(f"[STAGE]: Execute Trigger-Stage: {_trigger!r}")
         rs: Result = Workflow.from_conf(
             name=pass_env(_trigger),
             extras=self.extras | {"stage_raise_error": True},
@@ -1348,6 +1372,14 @@ class BaseNestedStage(BaseStage):
         raise NotImplementedError(
             "Nested-Stage should implement `execute` method."
         )
+
+    @property
+    def is_nested(self) -> bool:
+        """Check if this stage is a nested stage or not.
+
+        :rtype: bool
+        """
+        return True
 
 
 class ParallelStage(BaseNestedStage):
@@ -1514,9 +1546,7 @@ class ParallelStage(BaseNestedStage):
             extras=self.extras,
         )
         event: Event = event or Event()
-        result.trace.info(
-            f"[STAGE]: Execute Parallel-Stage: {self.max_workers} workers."
-        )
+        result.trace.info(f"[STAGE]: Parallel with {self.max_workers} workers.")
         result.catch(status=WAIT, context={"parallel": {}})
         if event and event.is_set():
             return result.catch(
@@ -1753,7 +1783,7 @@ class ForEachStage(BaseNestedStage):
                 "duplicate item, it should set `use_index_as_key: true`."
             )
 
-        result.trace.info(f"[STAGE]: Execute Foreach-Stage: {foreach!r}.")
+        result.trace.info(f"[STAGE]: Foreach: {foreach!r}.")
         result.catch(status=WAIT, context={"items": foreach, "foreach": {}})
         if event and event.is_set():
             return result.catch(
@@ -2005,7 +2035,7 @@ class UntilStage(BaseNestedStage):
             extras=self.extras,
         )
 
-        result.trace.info(f"[STAGE]: Execute Until-Stage: {self.until}")
+        result.trace.info(f"[STAGE]: Until: {self.until}")
         item: Union[str, int, bool] = param2template(
             self.item, params, extras=self.extras
         )
@@ -2228,7 +2258,7 @@ class CaseStage(BaseNestedStage):
 
         _case: StrOrNone = param2template(self.case, params, extras=self.extras)
 
-        result.trace.info(f"[STAGE]: Execute Case-Stage: {_case!r}.")
+        result.trace.info(f"[STAGE]: Case: {_case!r}.")
         _else: Optional[Match] = None
         stages: Optional[list[Stage]] = None
         for match in self.match:
@@ -2315,7 +2345,7 @@ class RaiseStage(BaseAsyncStage):
             extras=self.extras,
         )
         message: str = param2template(self.message, params, extras=self.extras)
-        result.trace.info(f"[STAGE]: Execute Raise-Stage: ( {message} )")
+        result.trace.info(f"[STAGE]: Message: ( {message} )")
         raise StageError(message)
 
     async def axecute(
@@ -2507,9 +2537,7 @@ class DockerStage(BaseStage):  # pragma: no cov
             extras=self.extras,
         )
 
-        result.trace.info(
-            f"[STAGE]: Execute Docker-Stage: {self.image}:{self.tag}"
-        )
+        result.trace.info(f"[STAGE]: Docker: {self.image}:{self.tag}")
         raise NotImplementedError("Docker Stage does not implement yet.")
 
 
@@ -2608,8 +2636,6 @@ class VirtualPyStage(PyStage):  # pragma: no cov
             run_id=gen_id(self.name + (self.id or ""), unique=True),
             extras=self.extras,
         )
-
-        result.trace.info(f"[STAGE]: Execute VirtualPy-Stage: {self.name}")
         run: str = param2template(dedent(self.run), params, extras=self.extras)
         with self.create_py_file(
             py=run,
@@ -2617,17 +2643,7 @@ class VirtualPyStage(PyStage):  # pragma: no cov
             deps=param2template(self.deps, params, extras=self.extras),
             run_id=result.run_id,
         ) as py:
-            result.trace.debug(f"[STAGE]: ... Create `{py}` file.")
-            try:
-                import uv
-
-                _ = uv
-            except ImportError:
-                raise ImportError(
-                    "The VirtualPyStage need you to install `uv` before"
-                    "execution."
-                ) from None
-
+            result.trace.debug(f"[STAGE]: Create `{py}` file.")
             rs: CompletedProcess = subprocess.run(
                 ["uv", "run", py, "--no-cache"],
                 # ["uv", "run", "--python", "3.9", py],

@@ -28,6 +28,16 @@ UTC: Final[ZoneInfo] = ZoneInfo("UTC")
 MARK_NEWLINE: Final[str] = "||"
 
 
+def to_train(camel: str) -> str:
+    """Convert camel case string to train case.
+
+    :param camel: (str) A camel case string that want to convert.
+
+    :rtype: str
+    """
+    return "".join("-" + i if i.isupper() else i for i in camel).lstrip("-")
+
+
 def prepare_newline(msg: str) -> str:
     """Prepare message that has multiple newline char.
 
