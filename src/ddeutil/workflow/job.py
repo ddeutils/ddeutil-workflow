@@ -40,11 +40,7 @@ from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
 from .__types import DictData, DictStr, Matrix, StrOrNone
-from .errors import (
-    JobError,
-    StageError,
-    to_dict,
-)
+from .errors import JobError, to_dict
 from .result import CANCEL, FAILED, SKIP, SUCCESS, WAIT, Result, Status
 from .reusables import has_template, param2template
 from .stages import Stage
@@ -743,30 +739,14 @@ def local_execute_strategy(
             )
             raise JobError(error_msg, refs=strategy_id)
 
-        try:
-            result.trace.info(f"[JOB]: Execute Stage: {stage.iden!r}")
-            rs: Result = stage.handler_execute(
-                params=context,
-                run_id=result.run_id,
-                parent_run_id=result.parent_run_id,
-                event=event,
-            )
-            stage.set_outputs(rs.context, to=context)
-        except StageError as e:
-            result.catch(
-                status=FAILED,
-                context={
-                    strategy_id: {
-                        "matrix": strategy,
-                        "stages": filter_func(context.pop("stages", {})),
-                        "errors": e.to_dict(),
-                    },
-                },
-            )
-            raise JobError(
-                message=f"Handler Error: {e.__class__.__name__}: {e}",
-                refs=strategy_id,
-            ) from e
+        result.trace.info(f"[JOB]: Execute Stage: {stage.iden!r}")
+        rs: Result = stage.handler_execute(
+            params=context,
+            run_id=result.run_id,
+            parent_run_id=result.parent_run_id,
+            event=event,
+        )
+        stage.set_outputs(rs.context, to=context)
 
         if rs.status == FAILED:
             error_msg: str = (

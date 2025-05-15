@@ -312,20 +312,15 @@ class BaseStage(BaseModel, ABC):
         ):
             return to
 
-        output: DictData = output.copy()
+        _id: str = self.gen_id(params=to)
+        output: DictData = copy.deepcopy(output)
         errors: DictData = (
-            {"errors": output.pop("errors", {})} if "errors" in output else {}
+            {"errors": output.pop("errors")} if "errors" in output else {}
         )
         skipping: dict[str, bool] = (
-            {"skipped": output.pop("skipped", False)}
-            if "skipped" in output
-            else {}
+            {"skipped": output.pop("skipped")} if "skipped" in output else {}
         )
-        to["stages"][self.gen_id(params=to)] = {
-            "outputs": copy.deepcopy(output),
-            **skipping,
-            **errors,
-        }
+        to["stages"][_id] = {"outputs": output, **skipping, **errors}
         return to
 
     def get_outputs(self, output: DictData) -> DictData:
@@ -361,7 +356,8 @@ class BaseStage(BaseModel, ABC):
 
         :rtype: bool
         """
-        if self.condition is None:
+        # NOTE: Support for condition value is empty string.
+        if not self.condition:
             return False
 
         try:
@@ -383,7 +379,7 @@ class BaseStage(BaseModel, ABC):
         """Generate stage ID that dynamic use stage's name if it ID does not
         set.
 
-        :param params: A parameter data.
+        :param params: (DictData) A parameter or context data.
 
         :rtype: str
         """
@@ -1211,7 +1207,7 @@ class CallStage(BaseAsyncStage):
         if "result" not in sig.parameters and not has_keyword:
             args.pop("result")
 
-        args = self.validate_model_args(call_func, args, result)
+        args: DictData = self.validate_model_args(call_func, args, result)
         if inspect.iscoroutinefunction(call_func):
             rs: DictOrModel = await call_func(
                 **param2template(args, params, extras=self.extras)
@@ -1241,18 +1237,19 @@ class CallStage(BaseAsyncStage):
     ) -> DictData:
         """Validate an input arguments before passing to the caller function.
 
-        :param func: A tag function that want to get typing.
-        :param args: An arguments before passing to this tag function.
+        :param func: (TagFunc) A tag function that want to get typing.
+        :param args: (DictData) An arguments before passing to this tag func.
         :param result: (Result) A result object for keeping context and status
             data.
 
         :rtype: DictData
         """
         try:
-            model_instance = create_model_from_caller(func).model_validate(args)
-            override = dict(model_instance)
+            model_instance: BaseModel = create_model_from_caller(
+                func
+            ).model_validate(args)
+            override: DictData = dict(model_instance)
             args.update(override)
-
             type_hints: dict[str, Any] = get_type_hints(func)
             for arg in type_hints:
 
@@ -1276,7 +1273,46 @@ class CallStage(BaseAsyncStage):
             return args
 
 
-class TriggerStage(BaseStage):
+class BaseNestedStage(BaseStage):
+    """Base Nested Stage model. This model is use for checking the child stage
+    is the nested stage or not.
+    """
+
+    @abstractmethod
+    def execute(
+        self,
+        params: DictData,
+        *,
+        result: Optional[Result] = None,
+        event: Optional[Event] = None,
+    ) -> Result:
+        """Execute abstraction method that action something by sub-model class.
+        This is important method that make this class is able to be the nested
+        stage.
+
+        :param params: (DictData) A parameter data that want to use in this
+            execution.
+        :param result: (Result) A result object for keeping context and status
+            data.
+        :param event: (Event) An event manager that use to track parent execute
+            was not force stopped.
+
+        :rtype: Result
+        """
+        raise NotImplementedError(
+            "Nested-Stage should implement `execute` method."
+        )
+
+    @property
+    def is_nested(self) -> bool:
+        """Check if this stage is a nested stage or not.
+
+        :rtype: bool
+        """
+        return True
+
+
+class TriggerStage(BaseNestedStage):
     """Trigger workflow executor stage that run an input trigger Workflow
     execute method. This is the stage that allow you to create the reusable
     Workflow template with dynamic parameters.
@@ -1328,7 +1364,7 @@ class TriggerStage(BaseStage):
         _trigger: str = param2template(self.trigger, params, extras=self.extras)
         rs: Result = Workflow.from_conf(
             name=pass_env(_trigger),
-            extras=self.extras | {"stage_raise_error": True},
+            extras=self.extras,
         ).execute(
             params=param2template(self.params, params, extras=self.extras),
             run_id=None,
@@ -1345,45 +1381,6 @@ class TriggerStage(BaseStage):
                 f"Trigger workflow return `FAILED` status{err_msg}"
             )
         return rs
-
-
-class BaseNestedStage(BaseStage):
-    """Base Nested Stage model. This model is use for checking the child stage
-    is the nested stage or not.
-    """
-
-    @abstractmethod
-    def execute(
-        self,
-        params: DictData,
-        *,
-        result: Optional[Result] = None,
-        event: Optional[Event] = None,
-    ) -> Result:
-        """Execute abstraction method that action something by sub-model class.
-        This is important method that make this class is able to be the nested
-        stage.
-
-        :param params: (DictData) A parameter data that want to use in this
-            execution.
-        :param result: (Result) A result object for keeping context and status
-            data.
-        :param event: (Event) An event manager that use to track parent execute
-            was not force stopped.
-
-        :rtype: Result
-        """
-        raise NotImplementedError(
-            "Nested-Stage should implement `execute` method."
-        )
-
-    @property
-    def is_nested(self) -> bool:
-        """Check if this stage is a nested stage or not.
-
-        :rtype: bool
-        """
-        return True
 
 
 class ParallelStage(BaseNestedStage):
@@ -1479,27 +1476,14 @@ class ParallelStage(BaseNestedStage):
                 )
                 raise StageError(error_msg, refs=branch)
 
-            try:
-                rs: Result = stage.handler_execute(
-                    params=context,
-                    run_id=result.run_id,
-                    parent_run_id=result.parent_run_id,
-                    event=event,
-                )
-                stage.set_outputs(rs.context, to=output)
-                stage.set_outputs(stage.get_outputs(output), to=context)
-            except StageError as e:
-                result.catch(
-                    status=FAILED,
-                    parallel={
-                        branch: {
-                            "branch": branch,
-                            "stages": filter_func(output.pop("stages", {})),
-                            "errors": e.to_dict(),
-                        },
-                    },
-                )
-                raise StageError(str(e), refs=branch) from e
+            rs: Result = stage.handler_execute(
+                params=context,
+                run_id=result.run_id,
+                parent_run_id=result.parent_run_id,
+                event=event,
+            )
+            stage.set_outputs(rs.context, to=output)
+            stage.set_outputs(stage.get_outputs(output), to=context)
 
             if rs.status == FAILED:  # pragma: no cov
                 error_msg: str = (
@@ -1697,27 +1681,14 @@ class ForEachStage(BaseNestedStage):
                 )
                 raise StageError(error_msg, refs=key)
 
-            try:
-                rs: Result = stage.handler_execute(
-                    params=context,
-                    run_id=result.run_id,
-                    parent_run_id=result.parent_run_id,
-                    event=event,
-                )
-                stage.set_outputs(rs.context, to=output)
-                stage.set_outputs(stage.get_outputs(output), to=context)
-            except StageError as e:
-                result.catch(
-                    status=FAILED,
-                    foreach={
-                        key: {
-                            "item": item,
-                            "stages": filter_func(output.pop("stages", {})),
-                            "errors": e.to_dict(),
-                        },
-                    },
-                )
-                raise StageError(str(e), refs=key) from e
+            rs: Result = stage.handler_execute(
+                params=context,
+                run_id=result.run_id,
+                parent_run_id=result.parent_run_id,
+                event=event,
+            )
+            stage.set_outputs(rs.context, to=output)
+            stage.set_outputs(stage.get_outputs(output), to=context)
 
             if rs.status == FAILED:  # pragma: no cov
                 error_msg: str = (
@@ -1956,32 +1927,18 @@ class UntilStage(BaseNestedStage):
                     next_item,
                 )
 
-            try:
-                rs: Result = stage.handler_execute(
-                    params=context,
-                    run_id=result.run_id,
-                    parent_run_id=result.parent_run_id,
-                    event=event,
-                )
-                stage.set_outputs(rs.context, to=output)
+            rs: Result = stage.handler_execute(
+                params=context,
+                run_id=result.run_id,
+                parent_run_id=result.parent_run_id,
+                event=event,
+            )
+            stage.set_outputs(rs.context, to=output)
 
-                if "item" in (_output := stage.get_outputs(output)):
-                    next_item = _output["item"]
+            if "item" in (_output := stage.get_outputs(output)):
+                next_item = _output["item"]
 
-                stage.set_outputs(_output, to=context)
-            except StageError as e:
-                result.catch(
-                    status=FAILED,
-                    until={
-                        loop: {
-                            "loop": loop,
-                            "item": item,
-                            "stages": filter_func(output.pop("stages", {})),
-                            "errors": e.to_dict(),
-                        }
-                    },
-                )
-                raise
+            stage.set_outputs(_output, to=context)
 
             if rs.status == FAILED:
                 error_msg: str = (
@@ -2195,24 +2152,14 @@ class CaseStage(BaseNestedStage):
                     },
                 )
 
-            try:
-                rs: Result = stage.handler_execute(
-                    params=context,
-                    run_id=result.run_id,
-                    parent_run_id=result.parent_run_id,
-                    event=event,
-                )
-                stage.set_outputs(rs.context, to=output)
-                stage.set_outputs(stage.get_outputs(output), to=context)
-            except StageError as e:
-                return result.catch(
-                    status=FAILED,
-                    context={
-                        "case": case,
-                        "stages": filter_func(output.pop("stages", {})),
-                        "errors": e.to_dict(),
-                    },
-                )
+            rs: Result = stage.handler_execute(
+                params=context,
+                run_id=result.run_id,
+                parent_run_id=result.parent_run_id,
+                event=event,
+            )
+            stage.set_outputs(rs.context, to=output)
+            stage.set_outputs(stage.get_outputs(output), to=context)
 
             if rs.status == FAILED:
                 error_msg: str = (
