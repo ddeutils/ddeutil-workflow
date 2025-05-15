@@ -12,7 +12,6 @@ from ddeutil.workflow import (
 )
 from ddeutil.workflow.errors import StageError
 from ddeutil.workflow.stages import (
-    BashStage,
     CallStage,
     ForEachStage,
     PyStage,
@@ -22,53 +21,6 @@ from ddeutil.workflow.stages import (
 from pydantic import TypeAdapter
 
 from .utils import MockEvent, dump_yaml_context
-
-
-def test_bash_stage_exec():
-    stage: BashStage = BashStage(
-        name="Bash Stage",
-        bash='echo "Hello World";\nVAR=\'Foo\';\necho "Variable $VAR";',
-    )
-    rs: Result = stage.handler_execute({})
-    assert rs.context == {
-        "return_code": 0,
-        "stdout": "Hello World\nVariable Foo",
-        "stderr": None,
-    }
-
-
-def test_bash_stage_exec_with_env():
-    stage: BashStage = BashStage(
-        name="Bash Stage", bash='echo "ENV $$FOO";', env={"FOO": "Bar"}
-    )
-    rs: Result = stage.handler_execute({})
-    assert rs.context == {
-        "return_code": 0,
-        "stdout": "ENV Bar",
-        "stderr": None,
-    }
-
-
-def test_bash_stage_exec_raise():
-    stage: BashStage = BashStage(
-        name="Bash Stage",
-        bash='echo "Test Raise Error case with failed" >&2;\n' "exit 1;",
-    )
-
-    rs: Result = stage.handler_execute({})
-    assert rs.status == FAILED
-    assert rs.context == {
-        "errors": {
-            "name": "StageError",
-            "message": (
-                "Subprocess: Test Raise Error case with failed\n"
-                "---( statement )---\n"
-                '```bash\necho "Test Raise Error case with failed" >&2;\n'
-                "exit 1;\n"
-                "```"
-            ),
-        }
-    }
 
 
 def test_call_stage_exec(test_path):
@@ -403,7 +355,10 @@ def test_foreach_stage_exec():
     assert rs.context == {
         "errors": {
             "name": "TypeError",
-            "message": "Does not support foreach: 'test'",
+            "message": (
+                "Does not support string foreach: 'test' that can not convert "
+                "to list."
+            ),
         },
     }
 

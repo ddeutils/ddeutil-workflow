@@ -57,6 +57,7 @@ from textwrap import dedent
 from threading import Event
 from typing import Annotated, Any, Optional, TypeVar, Union, get_type_hints
 
+from ddeutil.core import str2list
 from pydantic import BaseModel, Field, ValidationError
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
@@ -64,7 +65,16 @@ from typing_extensions import Self
 from .__types import DictData, DictStr, StrOrInt, StrOrNone, TupleStr
 from .conf import dynamic, pass_env
 from .errors import StageError, StageSkipError, to_dict
-from .result import CANCEL, FAILED, SKIP, SUCCESS, WAIT, Result, Status
+from .result import (
+    CANCEL,
+    FAILED,
+    SKIP,
+    SUCCESS,
+    WAIT,
+    Result,
+    Status,
+    validate_statuses,
+)
 from .reusables import (
     TagFunc,
     create_model_from_caller,
@@ -245,8 +255,14 @@ class BaseStage(BaseModel, ABC):
             )
             if self.desc:
                 result.trace.debug(f"[STAGE]: Description:||{self.desc}||")
+
+            if self.is_skipped(params):
+                raise StageSkipError(
+                    f"Skip because condition {self.condition} was valid."
+                )
+
             return self.execute(params, result=result, event=event)
-        except StageSkipError as e:
+        except StageSkipError as e:  # pragma: no cov
             result.trace.info(
                 f"[STAGE]: Skip Handler:||StageSkipError:{e}||"
                 f"{traceback.format_exc()}"
@@ -483,7 +499,7 @@ class BaseAsyncStage(BaseStage):
                     f"[STAGE]: Description:||{self.desc}||"
                 )
             return await self.axecute(params, result=result, event=event)
-        except StageSkipError as e:
+        except StageSkipError as e:  # pragma: no cov
             await result.trace.ainfo(
                 f"[STAGE]: Skip Handler:||StageSkipError:{e}||"
                 f"{traceback.format_exc()}"
@@ -1644,6 +1660,9 @@ class ForEachStage(BaseNestedStage):
         :param event: (Event) An Event manager instance that use to cancel this
             execution if it forces stopped by parent execution.
 
+            This method should raise error when it wants to stop the foreach
+        loop such as cancel event or getting the failed status.
+
         :raise StageError: If event was set.
         :raise StageError: If the stage execution raise any Exception error.
         :raise StageError: If the result from execution has `FAILED` status.
@@ -1690,14 +1709,14 @@ class ForEachStage(BaseNestedStage):
             stage.set_outputs(rs.context, to=output)
             stage.set_outputs(stage.get_outputs(output), to=context)
 
-            if rs.status == FAILED:  # pragma: no cov
+            if rs.status in (FAILED, SKIP):  # pragma: no cov
                 error_msg: str = (
                     f"Item-Stage was break because it has a sub stage, "
-                    f"{stage.iden}, failed without raise error."
+                    f"{stage.iden}, failed or skipped."
                 )
                 result.trace.warning(f"[STAGE]: {error_msg}")
                 result.catch(
-                    status=FAILED,
+                    status=rs.status,
                     foreach={
                         key: {
                             "item": item,
@@ -1706,6 +1725,8 @@ class ForEachStage(BaseNestedStage):
                         },
                     },
                 )
+                if rs.status == SKIP:
+                    raise StageSkipError(error_msg, refs=key)
                 raise StageError(error_msg, refs=key)
 
         return result.catch(
@@ -1741,15 +1762,25 @@ class ForEachStage(BaseNestedStage):
             extras=self.extras,
         )
         event: Event = event or Event()
-        foreach: Union[list[str], list[int]] = (
+        foreach: Union[list[str], list[int]] = pass_env(
             param2template(self.foreach, params, extras=self.extras)
-            if isinstance(self.foreach, str)
-            else self.foreach
         )
 
+        # [NOTE]: Force convert str to list.
+        if isinstance(foreach, str):
+            try:
+                foreach: list[Any] = str2list(foreach)
+            except ValueError as e:
+                raise TypeError(
+                    f"Does not support string foreach: {foreach!r} that can "
+                    f"not convert to list."
+                ) from e
+
         # [VALIDATE]: Type of the foreach should be `list` type.
-        if not isinstance(foreach, list):
-            raise TypeError(f"Does not support foreach: {foreach!r}")
+        elif not isinstance(foreach, list):
+            raise TypeError(
+                f"Does not support foreach: {foreach!r} ({type(foreach)})"
+            )
         elif len(set(foreach)) != len(foreach) and not self.use_index_as_key:
             raise ValueError(
                 "Foreach item should not duplicate. If this stage must to pass "
@@ -1758,6 +1789,7 @@ class ForEachStage(BaseNestedStage):
 
         result.trace.info(f"[STAGE]: Foreach: {foreach!r}.")
         result.catch(status=WAIT, context={"items": foreach, "foreach": {}})
+        len_foreach: int = len(foreach)
         if event and event.is_set():
             return result.catch(
                 status=CANCEL,
@@ -1769,10 +1801,7 @@ class ForEachStage(BaseNestedStage):
                 },
             )
 
-        with ThreadPoolExecutor(
-            max_workers=self.concurrent, thread_name_prefix="stage_foreach_"
-        ) as executor:
-
+        with ThreadPoolExecutor(self.concurrent, "stf") as executor:
             futures: list[Future] = [
                 executor.submit(
                     self.execute_item,
@@ -1785,7 +1814,7 @@ class ForEachStage(BaseNestedStage):
                 for i, item in enumerate(foreach, start=0)
             ]
             context: DictData = {}
-            status: Status = SUCCESS
+            statuses: list[Status] = [WAIT] * len_foreach
 
             done, not_done = wait(futures, return_when=FIRST_EXCEPTION)
             if len(list(done)) != len(futures):
@@ -1810,18 +1839,24 @@ class ForEachStage(BaseNestedStage):
                 )
                 done: Iterator[Future] = as_completed(futures)
 
-            for future in done:
+            for i, future in enumerate(done, start=0):
                 try:
                     future.result()
+                except StageSkipError:
+                    statuses[i] = SKIP
+                    context["skipped"] = True
                 except StageError as e:
-                    status = FAILED
+                    statuses[i] = FAILED
                     if "errors" in context:
                         context["errors"][e.refs] = e.to_dict()
                     else:
                         context["errors"] = e.to_dict(with_refs=True)
                 except CancelledError:
                     pass
-        return result.catch(status=status, context=context)
+        return result.catch(
+            status=validate_statuses(statuses),
+            context=context,
+        )
 
 
 class UntilStage(BaseNestedStage):

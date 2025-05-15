@@ -23,7 +23,7 @@ class ErrorData(TypedDict):
     message: str
 
 
-def to_dict(exception: Exception) -> ErrorData:  # pragma: no cov
+def to_dict(exception: Exception, **kwargs) -> ErrorData:  # pragma: no cov
     """Create dict data from exception instance.
 
     :param exception: An exception object.
@@ -33,6 +33,7 @@ def to_dict(exception: Exception) -> ErrorData:  # pragma: no cov
     return {
         "name": exception.__class__.__name__,
         "message": str(exception),
+        **kwargs,
     }
 
 
@@ -65,7 +66,9 @@ class BaseError(Exception):
     ) -> ErrorData: ...  # pragma: no cov
 
     def to_dict(
-        self, with_refs: bool = False
+        self,
+        with_refs: bool = False,
+        **kwargs,
     ) -> Union[ErrorData, dict[str, ErrorData]]:
         """Return ErrorData data from the current exception object. If with_refs
         flag was set, it will return mapping of refs and itself data.
@@ -75,7 +78,7 @@ class BaseError(Exception):
         data: ErrorData = to_dict(self)
         if with_refs and (self.refs is not None and self.refs != "EMPTY"):
             return {self.refs: data}
-        return data
+        return data | kwargs
 
 
 class UtilError(BaseError): ...

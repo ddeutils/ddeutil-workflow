@@ -1,0 +1,24 @@
+tmp-wf-foreach-trigger-task-raise:
+  type: Workflow
+  params:
+    item: int
+  jobs:
+    first-job:
+      stages:
+        - name: "Echo"
+          id: raise-stage
+          raise: "Raise trigger with item: ${{ params.item }}"
+
+tmp-wf-foreach-trigger-raise:
+  type: Workflow
+  jobs:
+    first-job:
+      stages:
+        - name: "Raise run for-each stage"
+          id: foreach-raise
+          foreach: [1, 2]
+          stages:
+            - name: "Stage trigger for raise"
+              trigger: tmp-wf-foreach-trigger-task-raise
+              params:
+                item: ${{ item }}

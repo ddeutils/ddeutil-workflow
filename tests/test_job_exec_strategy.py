@@ -4,7 +4,7 @@ from threading import Event
 import pytest
 from ddeutil.workflow.errors import JobError
 from ddeutil.workflow.job import Job, local_execute_strategy
-from ddeutil.workflow.result import CANCEL, FAILED, SUCCESS, Result
+from ddeutil.workflow.result import CANCEL, FAILED, SKIP, SUCCESS, Result
 from ddeutil.workflow.workflow import Workflow
 
 
@@ -29,11 +29,14 @@ def test_job_exec_strategy_skip_stage():
     rs = local_execute_strategy(job, {"sleep": "1"}, {})
     assert rs.status == SUCCESS
     assert rs.context == {
+        "status": SUCCESS,
         "2150810470": {
             "matrix": {"sleep": "1"},
             "stages": {
-                "equal-one": {"outputs": {"result": "pass-condition"}},
-                "not-equal-one": {"outputs": {}, "skipped": True},
+                "equal-one": {
+                    "outputs": {"result": "pass-condition", "status": SUCCESS}
+                },
+                "not-equal-one": {"outputs": {"status": SKIP}, "skipped": True},
             },
         },
     }

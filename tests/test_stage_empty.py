@@ -84,7 +84,7 @@ def test_empty_stage_raise():
         )
 
 
-def test_stage_if_condition():
+def test_empty_stage_if_condition():
     stage: EmptyStage = EmptyStage.model_validate(
         {
             "name": "If Condition",
@@ -108,7 +108,7 @@ def test_stage_if_condition():
         stage.is_skipped({"params": {"name": "foo"}})
 
 
-def test_stage_get_outputs():
+def test_empty_stage_get_outputs():
     stage: Stage = EmptyStage.model_validate(
         {"name": "Empty Stage", "echo": "hello world"}
     )

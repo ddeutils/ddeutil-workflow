@@ -740,11 +740,6 @@ def local_execute_strategy(
         if job.extras:
             stage.extras = job.extras
 
-        if stage.is_skipped(params=context):
-            result.trace.info(f"[JOB]: Skip Stage: {stage.iden!r}")
-            stage.set_outputs(output={"skipped": True}, to=context)
-            continue
-
         if event and event.is_set():
             error_msg: str = "Job strategy was canceled because event was set."
             result.catch(

@@ -53,6 +53,26 @@ SKIP = Status.SKIP
 CANCEL = Status.CANCEL
 
 
+def validate_statuses(statuses: list[Status]) -> Status:
+    """Validate the final status from list of Status object.
+
+    :param statuses: (list[Status]) A list of status that want to validate the
+        final status.
+
+    :rtype: Status
+    """
+    if any(s in (FAILED, CANCEL) for s in statuses):
+        return FAILED
+    for status in (SUCCESS, SKIP, WAIT):
+        if all(status == SUCCESS for s in statuses):
+            return SUCCESS
+    return FAILED
+
+
+def default_context() -> DictData:
+    return {"status": WAIT}
+
+
 @dataclass(
     config=ConfigDict(arbitrary_types_allowed=True, use_enum_values=True),
 )
@@ -70,7 +90,7 @@ class Result:
     """
 
     status: Status = field(default=WAIT)
-    context: DictData = field(default_factory=dict)
+    context: DictData = field(default_factory=default_context)
     run_id: Optional[str] = field(default_factory=default_gen_id)
     parent_run_id: Optional[str] = field(default=None, compare=False)
     ts: datetime = field(default_factory=get_dt_tznow, compare=False)
@@ -160,6 +180,7 @@ class Result:
             Status(status) if isinstance(status, int) else status
         )
         self.__dict__["context"].update(context or {})
+        self.__dict__["context"]["status"] = self.status
         if kwargs:
             for k in kwargs:
                 if k in self.__dict__["context"]:
