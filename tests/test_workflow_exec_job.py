@@ -48,14 +48,19 @@ def test_workflow_execute_job_raise_inside():
         },
         "jobs": {
             "demo-run": {
-                "stages": {},
+                "stages": {
+                    "9722867994": {
+                        "outputs": {},
+                        "errors": {
+                            "name": "NotImplementedError",
+                            "message": "",
+                        },
+                    }
+                },
                 "errors": {
                     "name": "JobError",
-                    "message": (
-                        "Handler Error: StageError: PyStage: "
-                        "NotImplementedError: "
-                    ),
+                    "message": "Strategy break because stage, 'raise error', return `FAILED` status.",
                 },
-            },
+            }
         },
     }

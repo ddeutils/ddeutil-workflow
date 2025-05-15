@@ -40,10 +40,9 @@ def test_job_exec_strategy_skip_stage():
 
 
 def test_job_exec_strategy_catch_stage_error():
-    job: Job = Workflow.from_conf(
-        "wf-run-python-raise-for-job",
-        extras={"stage_raise_error": False},
-    ).job("final-job")
+    job: Job = Workflow.from_conf("wf-run-python-raise-for-job").job(
+        "final-job"
+    )
 
     rs = Result()
     with pytest.raises(JobError):
@@ -75,10 +74,9 @@ def test_job_exec_strategy_catch_stage_error():
 
 
 def test_job_exec_strategy_catch_job_error():
-    job: Job = Workflow.from_conf(
-        "wf-run-python-raise-for-job",
-        extras={"stage_raise_error": True},
-    ).job("final-job")
+    job: Job = Workflow.from_conf("wf-run-python-raise-for-job").job(
+        "final-job"
+    )
     rs = Result()
     with pytest.raises(JobError):
         local_execute_strategy(job, {"name": "foo"}, {}, result=rs)
@@ -87,14 +85,21 @@ def test_job_exec_strategy_catch_job_error():
     assert rs.context == {
         "5027535057": {
             "matrix": {"name": "foo"},
-            "stages": {"1772094681": {"outputs": {}}},
-            "errors": {
-                "name": "StageError",
-                "message": (
-                    "PyStage: ValueError: Testing raise error inside PyStage!!!"
-                ),
+            "stages": {
+                "1772094681": {"outputs": {}},
+                "raise-error": {
+                    "outputs": {},
+                    "errors": {
+                        "name": "ValueError",
+                        "message": "Testing raise error inside PyStage!!!",
+                    },
+                },
             },
-        },
+            "errors": {
+                "name": "JobError",
+                "message": "Strategy break because stage, 'raise-error', return `FAILED` status.",
+            },
+        }
     }
 
 
@@ -132,12 +137,18 @@ def test_job_exec_strategy_raise():
     assert rs.context == {
         "EMPTY": {
             "matrix": {},
-            "stages": {},
-            "errors": {
-                "name": "StageError",
-                "message": (
-                    "PyStage: ValueError: Testing raise error inside PyStage!!!"
-                ),
+            "stages": {
+                "raise-error": {
+                    "outputs": {},
+                    "errors": {
+                        "name": "ValueError",
+                        "message": "Testing raise error inside PyStage!!!",
+                    },
+                }
             },
-        },
+            "errors": {
+                "name": "JobError",
+                "message": "Strategy break because stage, 'raise-error', return `FAILED` status.",
+            },
+        }
     }

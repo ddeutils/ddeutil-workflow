@@ -17,7 +17,9 @@ the stage execution method.
 
     Execution   --> Ok      ┬--( handler )--> Result with `SUCCESS` or `CANCEL`
                             |
-                            ╰--( handler )--> Result with `FAILED` (Set `raise_error` flag)
+                            ├--( handler )--> Result with `FAILED` (Set `raise_error` flag)
+                            |
+                            ╰--( handler )---> Result with `SKIP`
 
                 --> Error   ---( handler )--> Raise StageError(...)
 
@@ -62,7 +64,7 @@ from typing_extensions import Self
 from .__types import DictData, DictStr, StrOrInt, StrOrNone, TupleStr
 from .conf import dynamic, pass_env
 from .errors import StageError, StageSkipError, to_dict
-from .result import CANCEL, FAILED, SUCCESS, WAIT, Result, Status
+from .result import CANCEL, FAILED, SKIP, SUCCESS, WAIT, Result, Status
 from .reusables import (
     TagFunc,
     create_model_from_caller,
@@ -188,7 +190,6 @@ class BaseStage(BaseModel, ABC):
         parent_run_id: StrOrNone = None,
         result: Optional[Result] = None,
         event: Optional[Event] = None,
-        raise_error: Optional[bool] = None,
     ) -> Union[Result, DictData]:
         """Handler stage execution result from the stage `execute` method.
 
@@ -208,13 +209,15 @@ class BaseStage(BaseModel, ABC):
                                             |-name: ...
                                             ╰-message: ...
 
-                        --> Ok      --> Result (if `raise_error` was set)
+                        --> Ok      --> Result
+                                        |-status: SKIP
+                                        ╰-skipped: True
+
+                        --> Ok      --> Result
                                         |-status: FAILED
                                         ╰-errors:
                                             |-name: ...
                                             ╰-message: ...
-
-                        --> Error   --> Raise StageError(...)
 
             On the last step, it will set the running ID on a return result
         object from the current stage ID before release the final result.
@@ -225,10 +228,6 @@ class BaseStage(BaseModel, ABC):
         :param result: (Result) A result object for keeping context and status
             data before execution.
         :param event: (Event) An event manager that pass to the stage execution.
-        :param raise_error: (bool) A flag that all this method raise error
-
-        :raise StageError: If the raise_error was set and the execution
-            raise any error.
 
         :rtype: Result
         """
@@ -247,20 +246,23 @@ class BaseStage(BaseModel, ABC):
             if self.desc:
                 result.trace.debug(f"[STAGE]: Description:||{self.desc}||")
             return self.execute(params, result=result, event=event)
-        except StageSkipError:
-            pass
-        except Exception as e:
-            e_name: str = e.__class__.__name__
-            result.trace.error(
-                f"[STAGE]: Error Handler:||{e_name}:||{e}||"
+        except StageSkipError as e:
+            result.trace.info(
+                f"[STAGE]: Skip Handler:||StageSkipError:{e}||"
                 f"{traceback.format_exc()}"
             )
-            if dynamic("stage_raise_error", f=raise_error, extras=self.extras):
-                if isinstance(e, StageError):
-                    raise
-                raise StageError(
-                    f"{self.__class__.__name__}: {e_name}: {e}"
-                ) from e
+            return result.catch(status=SKIP, context={"skipped": True})
+        except StageError as e:
+            result.trace.error(
+                f"[STAGE]: Error Handler:||StageError:||{e}||"
+                f"{traceback.format_exc()}"
+            )
+            return result.catch(status=FAILED, context={"errors": e.to_dict()})
+        except Exception as e:
+            result.trace.error(
+                f"[STAGE]: Error Handler:||{e.__class__.__name__}:||{e}||"
+                f"{traceback.format_exc()}"
+            )
             return result.catch(status=FAILED, context={"errors": to_dict(e)})
 
     def set_outputs(self, output: DictData, to: DictData) -> DictData:
@@ -456,7 +458,6 @@ class BaseAsyncStage(BaseStage):
         parent_run_id: StrOrNone = None,
         result: Optional[Result] = None,
         event: Optional[Event] = None,
-        raise_error: Optional[bool] = None,
     ) -> Result:
         """Async Handler stage execution result from the stage `execute` method.
 
@@ -466,7 +467,6 @@ class BaseAsyncStage(BaseStage):
         :param result: (Result) A Result instance for return context and status.
         :param event: (Event) An Event manager instance that use to cancel this
             execution if it forces stopped by parent execution.
-        :param raise_error: (bool) A flag that all this method raise error
 
         :rtype: Result
         """
@@ -477,7 +477,6 @@ class BaseAsyncStage(BaseStage):
             id_logic=self.iden,
             extras=self.extras,
         )
-
         try:
             await result.trace.ainfo(
                 f"[STAGE]: Handler {to_train(self.__class__.__name__)}: "
@@ -487,21 +486,24 @@ class BaseAsyncStage(BaseStage):
                 await result.trace.adebug(
                     f"[STAGE]: Description:||{self.desc}||"
                 )
-            rs: Result = await self.axecute(params, result=result, event=event)
-            return rs
-        except Exception as e:
-            e_name: str = e.__class__.__name__
-            await result.trace.aerror(
-                f"[STAGE]: Error Handler:||{e_name}:||{e}||"
+            return await self.axecute(params, result=result, event=event)
+        except StageSkipError as e:
+            await result.trace.ainfo(
+                f"[STAGE]: Skip Handler:||StageSkipError:{e}||"
                 f"{traceback.format_exc()}"
             )
-            if dynamic("stage_raise_error", f=raise_error, extras=self.extras):
-                if isinstance(e, StageError):
-                    raise
-                raise StageError(
-                    f"{self.__class__.__name__}: {e_name}: {e}"
-                ) from None
-
+            return result.catch(status=SKIP, context={"skipped": True})
+        except StageError as e:
+            await result.trace.aerror(
+                f"[STAGE]: Error Handler:||StageError:||{e}||"
+                f"{traceback.format_exc()}"
+            )
+            return result.catch(status=FAILED, context={"errors": e.to_dict()})
+        except Exception as e:
+            await result.trace.aerror(
+                f"[STAGE]: Error Handler:||{e.__class__.__name__}:||{e}||"
+                f"{traceback.format_exc()}"
+            )
             return result.catch(status=FAILED, context={"errors": to_dict(e)})
 
 
@@ -1482,7 +1484,6 @@ class ParallelStage(BaseNestedStage):
                     params=context,
                     run_id=result.run_id,
                     parent_run_id=result.parent_run_id,
-                    raise_error=True,
                     event=event,
                 )
                 stage.set_outputs(rs.context, to=output)
@@ -1701,7 +1702,6 @@ class ForEachStage(BaseNestedStage):
                     params=context,
                     run_id=result.run_id,
                     parent_run_id=result.parent_run_id,
-                    raise_error=True,
                     event=event,
                 )
                 stage.set_outputs(rs.context, to=output)
@@ -1961,7 +1961,6 @@ class UntilStage(BaseNestedStage):
                     params=context,
                     run_id=result.run_id,
                     parent_run_id=result.parent_run_id,
-                    raise_error=True,
                     event=event,
                 )
                 stage.set_outputs(rs.context, to=output)
@@ -2201,7 +2200,6 @@ class CaseStage(BaseNestedStage):
                     params=context,
                     run_id=result.run_id,
                     parent_run_id=result.parent_run_id,
-                    raise_error=True,
                     event=event,
                 )
                 stage.set_outputs(rs.context, to=output)

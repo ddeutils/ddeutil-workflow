@@ -3,13 +3,11 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime
 from textwrap import dedent
 from threading import Event
-from unittest import mock
 
 from ddeutil.core import getdot
 from ddeutil.workflow import (
     FAILED,
     SUCCESS,
-    Config,
     Job,
     Result,
     Workflow,
@@ -262,14 +260,19 @@ def test_workflow_exec_py_raise():
         "params": {},
         "jobs": {
             "first-job": {
+                "stages": {
+                    "raise-error": {
+                        "outputs": {},
+                        "errors": {
+                            "name": "ValueError",
+                            "message": "Testing raise error inside PyStage!!!",
+                        },
+                    }
+                },
                 "errors": {
                     "name": "JobError",
-                    "message": (
-                        "Handler Error: StageError: PyStage: "
-                        "ValueError: Testing raise error inside PyStage!!!"
-                    ),
+                    "message": "Strategy break because stage, 'raise-error', return `FAILED` status.",
                 },
-                "stages": {},
             },
             "second-job": {"stages": {"1772094681": {"outputs": {}}}},
         },
@@ -282,23 +285,28 @@ def test_workflow_exec_py_raise_parallel():
     )
     assert rs.status == FAILED
     assert rs.context == {
+        "params": {},
+        "jobs": {
+            "second-job": {"stages": {"1772094681": {"outputs": {}}}},
+            "first-job": {
+                "stages": {
+                    "raise-error": {
+                        "outputs": {},
+                        "errors": {
+                            "name": "ValueError",
+                            "message": "Testing raise error inside PyStage!!!",
+                        },
+                    }
+                },
+                "errors": {
+                    "name": "JobError",
+                    "message": "Strategy break because stage, 'raise-error', return `FAILED` status.",
+                },
+            },
+        },
         "errors": {
             "name": "WorkflowError",
             "message": "Job, 'first-job', return `FAILED` status.",
-        },
-        "params": {},
-        "jobs": {
-            "first-job": {
-                "errors": {
-                    "name": "JobError",
-                    "message": (
-                        "Handler Error: StageError: PyStage: "
-                        "ValueError: Testing raise error inside PyStage!!!"
-                    ),
-                },
-                "stages": {},
-            },
-            "second-job": {"stages": {"1772094681": {"outputs": {}}}},
         },
     }
 
@@ -821,7 +829,6 @@ def test_workflow_exec_foreach_get_inside(test_path):
         }
 
 
-@mock.patch.object(Config, "stage_raise_error", False)
 def test_workflow_exec_raise_param(test_path):
     with dump_yaml_context(
         test_path / "conf/demo/01_99_wf_test_wf_exec_raise_param.yml",
@@ -846,7 +853,6 @@ def test_workflow_exec_raise_param(test_path):
     ):
         rs: Result = Workflow.from_conf(
             "tmp-wf-exec-raise-param",
-            extras={"stage_raise_error": False},
         ).execute(params={"stream": "demo-stream"}, max_job_parallel=1)
         assert rs.status == FAILED
         assert rs.context == {
@@ -881,7 +887,6 @@ def test_workflow_exec_raise_param(test_path):
         }
 
 
-@mock.patch.object(Config, "stage_raise_error", False)
 def test_workflow_exec_raise_job_trigger(test_path):
     with dump_yaml_context(
         test_path / "conf/demo/01_99_wf_test_wf_exec_raise_job_trigger.yml",

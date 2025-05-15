@@ -1,4 +1,4 @@
-from ddeutil.workflow import SUCCESS, Result, Stage, Workflow
+from ddeutil.workflow import FAILED, SUCCESS, Result, Stage, Workflow
 
 from ..utils import dump_yaml_context
 
@@ -114,43 +114,54 @@ def test_foreach_stage_exec_with_trigger_raise(test_path):
     ):
         workflow = Workflow.from_conf(name="tmp-wf-foreach-trigger-raise")
         stage: Stage = workflow.job("first-job").stage("foreach-raise")
-        rs = stage.set_outputs(stage.handler_execute({}).context, to={})
-        assert rs == {
-            "stages": {
-                "foreach-raise": {
-                    "outputs": {
-                        "items": [1, 2],
-                        "foreach": {
-                            1: {
-                                "item": 1,
-                                "stages": {},
-                                "errors": {
-                                    "name": "StageError",
-                                    "message": "Trigger workflow return `FAILED` status with:\nJob, 'first-job', return `FAILED` status.",
-                                },
+        rs: Result = stage.handler_execute({})
+        assert rs.status == FAILED
+        assert rs.context == {
+            "items": [1, 2],
+            "foreach": {
+                1: {
+                    "item": 1,
+                    "stages": {
+                        "2827845371": {
+                            "outputs": {},
+                            "errors": {
+                                "name": "StageError",
+                                "message": "Trigger workflow return `FAILED` status with:\nJob, 'first-job', return `FAILED` status.",
                             },
-                            2: {
-                                "item": 2,
-                                "stages": {},
-                                "errors": {
-                                    "name": "StageError",
-                                    "message": "Trigger workflow return `FAILED` status with:\nWorkflow job was canceled because event was set.",
-                                },
-                            },
-                        },
+                        }
                     },
                     "errors": {
-                        1: {
-                            "name": "StageError",
-                            "message": "Trigger workflow return `FAILED` status with:\nJob, 'first-job', return `FAILED` status.",
-                        },
-                        2: {
-                            "name": "StageError",
-                            "message": "Trigger workflow return `FAILED` status with:\nWorkflow job was canceled because event was set.",
-                        },
+                        "name": "StageError",
+                        "message": "Item-Stage was break because it has a sub stage, Stage trigger for raise, failed without raise error.",
                     },
-                }
-            }
+                },
+                2: {
+                    "item": 2,
+                    "stages": {
+                        "2827845371": {
+                            "outputs": {},
+                            "errors": {
+                                "name": "StageError",
+                                "message": "Trigger workflow return `FAILED` status with:\nWorkflow job was canceled because event was set.",
+                            },
+                        }
+                    },
+                    "errors": {
+                        "name": "StageError",
+                        "message": "Item-Stage was break because it has a sub stage, Stage trigger for raise, failed without raise error.",
+                    },
+                },
+            },
+            "errors": {
+                2: {
+                    "name": "StageError",
+                    "message": "Item-Stage was break because it has a sub stage, Stage trigger for raise, failed without raise error.",
+                },
+                1: {
+                    "name": "StageError",
+                    "message": "Item-Stage was break because it has a sub stage, Stage trigger for raise, failed without raise error.",
+                },
+            },
         }
 
 

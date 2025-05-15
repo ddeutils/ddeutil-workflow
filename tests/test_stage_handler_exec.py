@@ -2,7 +2,6 @@ from datetime import datetime
 from inspect import isfunction
 from threading import Event
 
-import pytest
 from ddeutil.workflow import (
     CANCEL,
     FAILED,
@@ -56,11 +55,7 @@ def test_bash_stage_exec_raise():
         bash='echo "Test Raise Error case with failed" >&2;\n' "exit 1;",
     )
 
-    # NOTE: Raise error from bash that force exit 1.
-    with pytest.raises(StageError):
-        stage.handler_execute({}, raise_error=True)
-
-    rs: Result = stage.handler_execute({}, raise_error=False)
+    rs: Result = stage.handler_execute({})
     assert rs.status == FAILED
     assert rs.context == {
         "errors": {
@@ -144,33 +139,70 @@ def test_call_stage_exec(test_path):
         }
 
         # NOTE: Raise because invalid return type.
-        with pytest.raises(StageError):
-            stage: Stage = CallStage(
-                name="Type not valid", uses="tasks/return-type-not-valid@raise"
-            )
-            stage.handler_execute({})
+        stage: Stage = CallStage(
+            name="Type not valid", uses="tasks/return-type-not-valid@raise"
+        )
+        rs: Result = stage.handler_execute({})
+        assert rs.status == FAILED
+        assert rs.context == {
+            "errors": {
+                "message": (
+                    "Return type: 'return-type-not-valid@raise' can not "
+                    "serialize, you must set return be `dict` or Pydantic "
+                    "model."
+                ),
+                "name": "TypeError",
+            },
+        }
 
         # NOTE: Raise because necessary args do not pass.
-        with pytest.raises(StageError):
-            stage: Stage = workflow.job("first-job").stage("args-necessary")
-            stage.handler_execute({})
+        stage: Stage = workflow.job("first-job").stage("args-necessary")
+        rs: Result = stage.handler_execute({})
+        assert rs.status == FAILED
+        assert rs.context == {
+            "errors": {
+                "name": "ValueError",
+                "message": (
+                    "Necessary params, (_exec, params, result, ), does not "
+                    "set to args, ['result', 'params']."
+                ),
+            }
+        }
 
         # NOTE: Raise because call does not valid.
-        with pytest.raises(StageError):
-            stage: Stage = CallStage(name="Not valid", uses="tasks-foo-bar")
-            stage.handler_execute({})
+        stage: Stage = CallStage(name="Not valid", uses="tasks-foo-bar")
+        rs: Result = stage.handler_execute({})
+        assert rs.status == FAILED
+        assert rs.context == {
+            "errors": {
+                "name": "ValueError",
+                "message": "Call 'tasks-foo-bar' does not match with the call regex format.",
+            }
+        }
 
         # NOTE: Raise because call does not register.
-        with pytest.raises(StageError):
-            stage: Stage = CallStage(name="Not register", uses="tasks/abc@foo")
-            stage.handler_execute({})
+        stage: Stage = CallStage(name="Not register", uses="tasks/abc@foo")
+        stage.handler_execute({})
+        assert rs.status == FAILED
+        assert rs.context == {
+            "errors": {
+                "name": "ValueError",
+                "message": "Call 'tasks-foo-bar' does not match with the call regex format.",
+            }
+        }
 
         # NOTE: Raise because type of args not valid.
-        with pytest.raises(StageError):
-            stage: Stage = workflow.job("second-job").stage(
-                "extract-load-raise-type"
-            )
-            stage.handler_execute({})
+        stage: Stage = workflow.job("second-job").stage(
+            "extract-load-raise-type"
+        )
+        stage.handler_execute({})
+        assert rs.status == FAILED
+        assert rs.context == {
+            "errors": {
+                "name": "ValueError",
+                "message": "Call 'tasks-foo-bar' does not match with the call regex format.",
+            }
+        }
 
         stage: Stage = CallStage.model_validate(
             {
@@ -196,10 +228,7 @@ def test_py_stage_exec_raise():
         run="raise ValueError('Testing raise error inside PyStage!!!')",
     )
 
-    with pytest.raises(StageError):
-        stage.handler_execute(params={"x": "Foo"}, raise_error=True)
-
-    rs = stage.handler_execute(params={"x": "Foo"}, raise_error=False)
+    rs = stage.handler_execute(params={"x": "Foo"})
     assert rs.status == FAILED
     assert rs.context == {
         "errors": {
@@ -300,8 +329,17 @@ def test_stage_exec_trigger_raise():
             "params": {},
         }
     )
-    with pytest.raises(StageError):
-        stage.handler_execute(params={})
+    rs: Result = stage.handler_execute(params={})
+    assert rs.status == FAILED
+    assert rs.context == {
+        "errors": {
+            "name": "StageError",
+            "message": (
+                "Trigger workflow return `FAILED` status with:\n"
+                "Job, 'first-job', return `FAILED` status."
+            ),
+        }
+    }
 
 
 def test_foreach_stage_exec():
@@ -318,51 +356,37 @@ def test_foreach_stage_exec():
             },
         ],
     )
-    rs: dict = stage.set_outputs(stage.handler_execute({}).context, to={})
-    assert rs == {
-        "stages": {
-            "foreach-stage": {
-                "outputs": {
-                    "items": [1, 2, 3, 4],
-                    "foreach": {
-                        1: {
-                            "item": 1,
-                            "stages": {
-                                "2709471980": {"outputs": {}},
-                                "9263488742": {
-                                    "outputs": {},
-                                    "skipped": True,
-                                },
-                            },
-                        },
-                        2: {
-                            "item": 2,
-                            "stages": {
-                                "2709471980": {"outputs": {}},
-                                "9263488742": {
-                                    "outputs": {},
-                                    "skipped": True,
-                                },
-                            },
-                        },
-                        3: {
-                            "item": 3,
-                            "stages": {
-                                "2709471980": {"outputs": {}},
-                                "9263488742": {
-                                    "outputs": {},
-                                    "skipped": True,
-                                },
-                            },
-                        },
-                        4: {
-                            "item": 4,
-                            "stages": {
-                                "2709471980": {"outputs": {}},
-                                "9263488742": {"outputs": {}},
-                            },
-                        },
-                    },
+    rs: Result = stage.handler_execute({})
+    assert rs.status == SUCCESS
+    assert rs.context == {
+        "items": [1, 2, 3, 4],
+        "foreach": {
+            1: {
+                "item": 1,
+                "stages": {
+                    "2709471980": {"outputs": {}},
+                    "9263488742": {"outputs": {}, "skipped": True},
+                },
+            },
+            2: {
+                "item": 2,
+                "stages": {
+                    "2709471980": {"outputs": {}},
+                    "9263488742": {"outputs": {}, "skipped": True},
+                },
+            },
+            3: {
+                "item": 3,
+                "stages": {
+                    "2709471980": {"outputs": {}},
+                    "9263488742": {"outputs": {}, "skipped": True},
+                },
+            },
+            4: {
+                "item": 4,
+                "stages": {
+                    "2709471980": {"outputs": {}},
+                    "9263488742": {"outputs": {}},
                 },
             },
         },
@@ -374,16 +398,28 @@ def test_foreach_stage_exec():
         id="foreach-raise",
         foreach="${{values.items}}",
     )
-    with pytest.raises(StageError):
-        stage.handler_execute({"values": {"items": "test"}})
+    rs: Result = stage.handler_execute({"values": {"items": "test"}})
+    assert rs.status == FAILED
+    assert rs.context == {
+        "errors": {
+            "name": "TypeError",
+            "message": "Does not support foreach: 'test'",
+        },
+    }
 
     # NOTE: Raise because foreach item was duplicated.
     stage: ForEachStage = ForEachStage(
         name="Foreach item was duplicated",
         foreach=[1, 1, 2, 3],
     )
-    with pytest.raises(StageError):
-        stage.handler_execute({})
+    rs: Result = stage.handler_execute({})
+    assert rs.status == FAILED
+    assert rs.context == {
+        "errors": {
+            "name": "ValueError",
+            "message": "Foreach item should not duplicate. If this stage must to pass duplicate item, it should set `use_index_as_key: true`.",
+        }
+    }
 
     stage: ForEachStage = ForEachStage(
         name="Foreach item was duplicated",
@@ -439,10 +475,19 @@ def test_foreach_stage_exec_raise(test_path):
             "foreach": {
                 2: {
                     "item": 2,
-                    "stages": {"2709471980": {"outputs": {}}},
+                    "stages": {
+                        "2709471980": {"outputs": {}},
+                        "9263488742": {
+                            "outputs": {},
+                            "errors": {
+                                "name": "StageError",
+                                "message": "Raise for item equal 2",
+                            },
+                        },
+                    },
                     "errors": {
                         "name": "StageError",
-                        "message": "Raise for item equal 2",
+                        "message": "Item-Stage was break because it has a sub stage, Final Echo, failed without raise error.",
                     },
                 },
                 1: {
@@ -461,7 +506,7 @@ def test_foreach_stage_exec_raise(test_path):
             "errors": {
                 2: {
                     "name": "StageError",
-                    "message": "Raise for item equal 2",
+                    "message": "Item-Stage was break because it has a sub stage, Final Echo, failed without raise error.",
                 },
                 1: {
                     "name": "StageError",
@@ -566,35 +611,34 @@ def test_foreach_stage_exec_concurrent_with_raise():
         extras={"stage_default_id": False},
     )
     event = MockEvent(n=4)
-    rs: dict = stage.set_outputs(
-        stage.handler_execute({}, event=event).context, to={}
-    )
-    assert rs == {
-        "stages": {
-            "foreach-stage": {
-                "outputs": {
-                    "items": [1, 2, 3, 4, 5],
-                    "foreach": {
-                        2: {
-                            "item": 2,
-                            "stages": {},
-                            "errors": {
-                                "name": "StageError",
-                                "message": "PyStage: ValueError: Raise error for item equal 2",
-                            },
-                        },
-                        3: {"item": 3, "stages": {}},
-                        1: {"item": 1, "stages": {}},
-                    },
-                },
+    rs: Result = stage.handler_execute({}, event=event)
+    assert rs.status == FAILED
+    assert rs.context == {
+        "items": [1, 2, 3, 4, 5],
+        "foreach": {
+            2: {
+                "item": 2,
+                "stages": {},
                 "errors": {
-                    2: {
-                        "name": "StageError",
-                        "message": "PyStage: ValueError: Raise error for item equal 2",
-                    },
+                    "name": "StageError",
+                    "message": (
+                        "Item-Stage was break because it has a sub stage, "
+                        "Raise with PyStage, failed without raise error."
+                    ),
                 },
+            },
+            1: {"item": 1, "stages": {}},
+            3: {"item": 3, "stages": {}},
+        },
+        "errors": {
+            2: {
+                "name": "StageError",
+                "message": (
+                    "Item-Stage was break because it has a sub stage, Raise "
+                    "with PyStage, failed without raise error."
+                ),
             }
-        }
+        },
     }
 
 
@@ -626,7 +670,6 @@ def test_parallel_stage_exec(test_path):
     ):
         workflow = Workflow.from_conf(
             name="tmp-wf-parallel",
-            extras={"stage_raise_error": False},
         )
         stage: Stage = workflow.job("first-job").stage("parallel-stage")
         rs = stage.set_outputs(stage.handler_execute({}).context, to={})
@@ -718,18 +761,26 @@ def test_parallel_stage_exec_raise():
         "parallel": {
             "branch01": {
                 "branch": "branch01",
-                "stages": {},
+                "stages": {
+                    "6966382767": {
+                        "outputs": {},
+                        "errors": {
+                            "name": "StageError",
+                            "message": "Raise error inside parallel stage.",
+                        },
+                    }
+                },
                 "errors": {
                     "name": "StageError",
-                    "message": "Raise error inside parallel stage.",
+                    "message": "Branch-Stage was break because it has a sub stage, Raise Stage, failed without raise error.",
                 },
             }
         },
         "errors": {
             "branch01": {
                 "name": "StageError",
-                "message": "Raise error inside parallel stage.",
-            },
+                "message": "Branch-Stage was break because it has a sub stage, Raise Stage, failed without raise error.",
+            }
         },
     }
 
@@ -915,8 +966,14 @@ def test_stage_exec_case_match(test_path):
 
         # NOTE: Raise because else condition does not set.
         stage: Stage = workflow.job("first-job").stage("raise-else")
-        with pytest.raises(StageError):
-            stage.handler_execute({"params": {"name": "test"}})
+        rs: Result = stage.handler_execute({"params": {"name": "test"}})
+        assert rs.status == FAILED
+        assert rs.context == {
+            "errors": {
+                "name": "StageError",
+                "message": "This stage does not set else for support not match any case.",
+            }
+        }
 
         stage: Stage = workflow.job("first-job").stage("not-else")
         rs = stage.set_outputs(
@@ -993,7 +1050,7 @@ def test_raise_stage_exec():
             ),
         },
     )
-    rs: Result = stage.handler_execute(params={}, raise_error=False)
+    rs: Result = stage.handler_execute(params={})
     assert rs.status == FAILED
     assert rs.context == {
         "errors": {
@@ -1004,6 +1061,3 @@ def test_raise_stage_exec():
             ),
         }
     }
-
-    with pytest.raises(StageError):
-        stage.handler_execute(params={}, raise_error=True)

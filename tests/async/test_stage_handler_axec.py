@@ -8,7 +8,6 @@ from ddeutil.workflow import (
     RaiseStage,
     Result,
     Stage,
-    StageError,
     Workflow,
 )
 
@@ -62,10 +61,7 @@ async def test_bash_stage_axec_raise():
     )
 
     # NOTE: Raise error from bash that force exit 1.
-    with pytest.raises(StageError):
-        await stage.handler_axecute({}, raise_error=True)
-
-    rs: Result = await stage.handler_axecute({}, raise_error=False)
+    rs: Result = await stage.handler_axecute({})
     assert rs.status == FAILED
     assert rs.context == {
         "errors": {
@@ -86,7 +82,7 @@ async def test_raise_stage_axec():
     stage: RaiseStage = RaiseStage.model_validate(
         {"name": "Raise Stage", "raise": "This is test message error"}
     )
-    rs: Result = await stage.handler_axecute(params={}, raise_error=False)
+    rs: Result = await stage.handler_axecute(params={})
     assert rs.status == FAILED
     assert rs.context == {
         "errors": {
@@ -94,9 +90,6 @@ async def test_raise_stage_axec():
             "message": "This is test message error",
         },
     }
-
-    with pytest.raises(StageError):
-        await stage.handler_axecute(params={}, raise_error=True)
 
 
 @pytest.mark.asyncio
@@ -147,19 +140,31 @@ async def test_call_stage_axec(test_path):
         assert rs.context == {"records": 1}
 
         # NOTE: Raise because invalid return type.
-        with pytest.raises(StageError):
-            stage: Stage = CallStage(
-                name="Type not valid", uses="tasks/return-type-not-valid@raise"
-            )
-            await stage.handler_axecute({}, raise_error=True)
+        stage: Stage = CallStage(
+            name="Type not valid", uses="tasks/return-type-not-valid@raise"
+        )
+        rs: Result = await stage.handler_axecute({})
+        assert rs.status == FAILED
+        assert rs.context == {
+            "errors": {
+                "name": "TypeError",
+                "message": "Return type: 'return-type-not-valid@raise' can not serialize, you must set return be `dict` or Pydantic model.",
+            }
+        }
 
         # NOTE: Raise because necessary args do not pass.
-        with pytest.raises(StageError):
-            stage: Stage = workflow.job("first-job").stage("args-necessary")
-            await stage.handler_axecute({}, raise_error=True)
+        stage: Stage = workflow.job("first-job").stage("args-necessary")
+        rs: Result = await stage.handler_axecute({})
+        assert rs.status == FAILED
+        assert rs.context == {
+            "errors": {
+                "name": "ValueError",
+                "message": "Necessary params, (_exec, params, result, ), does not set to args, ['result', 'params'].",
+            }
+        }
 
         stage: Stage = workflow.job("first-job").stage("args-necessary")
-        rs: Result = await stage.handler_axecute({}, raise_error=False)
+        rs: Result = await stage.handler_axecute({})
         assert rs.status == FAILED
         assert rs.context == {
             "errors": {
@@ -172,12 +177,18 @@ async def test_call_stage_axec(test_path):
         }
 
         # NOTE: Raise because call does not valid.
-        with pytest.raises(StageError):
-            stage: Stage = CallStage(name="Not valid", uses="tasks-foo-bar")
-            await stage.handler_axecute({}, raise_error=True)
+        stage: Stage = CallStage(name="Not valid", uses="tasks-foo-bar")
+        rs: Result = await stage.handler_axecute({})
+        assert rs.status == FAILED
+        assert rs.context == {
+            "errors": {
+                "name": "ValueError",
+                "message": "Call 'tasks-foo-bar' does not match with the call regex format.",
+            }
+        }
 
         stage: Stage = CallStage(name="Not valid", uses="tasks-foo-bar")
-        rs: Result = await stage.handler_axecute({}, raise_error=False)
+        rs: Result = await stage.handler_axecute({})
         assert rs.status == FAILED
         assert rs.context == {
             "errors": {
@@ -187,9 +198,15 @@ async def test_call_stage_axec(test_path):
         }
 
         # NOTE: Raise because call does not register.
-        with pytest.raises(StageError):
-            stage: Stage = CallStage(name="Not register", uses="tasks/abc@foo")
-            await stage.handler_axecute({})
+        stage: Stage = CallStage(name="Not register", uses="tasks/abc@foo")
+        rs: Result = await stage.handler_axecute({})
+        assert rs.status == FAILED
+        assert rs.context == {
+            "errors": {
+                "name": "NotImplementedError",
+                "message": "`REGISTERS.tasks.registries` not implement registry: 'abc'.",
+            }
+        }
 
         stage: Stage = CallStage.model_validate(
             {
@@ -210,9 +227,7 @@ async def test_call_stage_axec(test_path):
 
 @pytest.mark.asyncio
 async def test_py_stage_axec_not_raise():
-    workflow: Workflow = Workflow.from_conf(
-        name="wf-run-common", extras={"stage_raise_error": False}
-    )
+    workflow: Workflow = Workflow.from_conf(name="wf-run-common")
     stage: Stage = workflow.job("raise-run").stage(stage_id="raise-error")
 
     rs: Result = await stage.handler_axecute(params={"x": "Foo"})

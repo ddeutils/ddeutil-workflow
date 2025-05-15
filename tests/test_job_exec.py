@@ -51,19 +51,24 @@ def test_job_exec_py_raise():
     assert rs.status == FAILED
     assert rs.context == {
         "EMPTY": {
-            "errors": {
-                "message": "PyStage: ValueError: Testing raise error inside PyStage!!!",
-                "name": "StageError",
-            },
             "matrix": {},
-            "stages": {},
+            "stages": {
+                "raise-error": {
+                    "outputs": {},
+                    "errors": {
+                        "name": "ValueError",
+                        "message": "Testing raise error inside PyStage!!!",
+                    },
+                }
+            },
+            "errors": {
+                "name": "JobError",
+                "message": "Strategy break because stage, 'raise-error', return `FAILED` status.",
+            },
         },
         "errors": {
             "name": "JobError",
-            "message": (
-                "Handler Error: StageError: PyStage: "
-                "ValueError: Testing raise error inside PyStage!!!"
-            ),
+            "message": "Strategy break because stage, 'raise-error', return `FAILED` status.",
         },
     }
 
@@ -82,10 +87,7 @@ def test_job_exec_py_not_set_output():
 
 def test_job_exec_py_fail_fast():
     rs: Result = (
-        Workflow.from_conf(
-            name="wf-run-python-raise-for-job",
-            extras={"stage_raise_error": True},
-        )
+        Workflow.from_conf(name="wf-run-python-raise-for-job")
         .job("job-fail-fast")
         .execute({})
     )
@@ -110,17 +112,29 @@ def test_job_exec_py_fail_fast_raise_catch():
     rs: Result = (
         Workflow.from_conf(
             name="wf-run-python-raise-for-job",
-            extras={
-                "stage_raise_error": True,
-                "stage_default_id": False,
-            },
+            extras={"stage_default_id": False},
         )
         .job("job-fail-fast-raise")
         .execute({})
     )
-    print(rs.context)
     assert rs.status == FAILED
     assert rs.context == {
+        "2150810470": {
+            "matrix": {"sleep": "1"},
+            "stages": {
+                "raise-error": {
+                    "outputs": {},
+                    "errors": {
+                        "name": "ValueError",
+                        "message": "Testing raise error inside PyStage with the sleep not equal 4!!!",
+                    },
+                }
+            },
+            "errors": {
+                "name": "JobError",
+                "message": "Strategy break because stage, 'raise-error', return `FAILED` status.",
+            },
+        },
         "1067561285": {
             "matrix": {"sleep": "2"},
             "stages": {},
@@ -128,17 +142,6 @@ def test_job_exec_py_fail_fast_raise_catch():
                 "name": "JobError",
                 "message": "Job strategy was canceled because event was set.",
             },
-        },
-        "2150810470": {
-            "errors": {
-                "message": (
-                    "PyStage: ValueError: Testing raise error inside "
-                    "PyStage with the sleep not equal 4!!!"
-                ),
-                "name": "StageError",
-            },
-            "matrix": {"sleep": "1"},
-            "stages": {},
         },
         "9112472804": {
             "matrix": {"sleep": "4"},
@@ -149,13 +152,13 @@ def test_job_exec_py_fail_fast_raise_catch():
             },
         },
         "errors": {
+            "2150810470": {
+                "name": "JobError",
+                "message": "Strategy break because stage, 'raise-error', return `FAILED` status.",
+            },
             "1067561285": {
                 "name": "JobError",
                 "message": "Job strategy was canceled because event was set.",
-            },
-            "2150810470": {
-                "name": "JobError",
-                "message": "Handler Error: StageError: PyStage: ValueError: Testing raise error inside PyStage with the sleep not equal 4!!!",
             },
             "9112472804": {
                 "name": "JobError",
@@ -169,7 +172,6 @@ def test_job_exec_py_complete():
     rs: Result = (
         Workflow.from_conf(
             name="wf-run-python-raise-for-job",
-            extras={"stage_raise_error": True},
         )
         .job("job-complete")
         .execute({})
@@ -193,7 +195,6 @@ def test_job_exec_py_complete():
 def test_job_exec_py_complete_not_parallel():
     workflow: Workflow = Workflow.from_conf(
         name="wf-run-python-raise-for-job",
-        extras={"stage_raise_error": True},
     )
     job: Job = workflow.job("job-complete-not-parallel")
     rs: Result = job.execute({})
@@ -246,34 +247,12 @@ def test_job_exec_py_complete_raise():
     rs: Result = (
         Workflow.from_conf(
             "wf-run-python-raise-for-job",
-            extras={"stage_raise_error": True},
         )
         .job("job-complete-raise")
         .execute(params={})
     )
+    assert rs.status == FAILED
     assert rs.context == {
-        "2150810470": {
-            "errors": {
-                "message": (
-                    "PyStage: ValueError: Testing raise error inside "
-                    "PyStage!!!"
-                ),
-                "name": "StageError",
-            },
-            "matrix": {"sleep": "1"},
-            "stages": {"7972360640": {"outputs": {}}},
-        },
-        "9112472804": {
-            "errors": {
-                "message": (
-                    "PyStage: ValueError: Testing raise error inside "
-                    "PyStage!!!"
-                ),
-                "name": "StageError",
-            },
-            "matrix": {"sleep": "4"},
-            "stages": {"7972360640": {"outputs": {}}},
-        },
         "9873503202": {
             "matrix": {"sleep": "0.1"},
             "stages": {
@@ -281,20 +260,48 @@ def test_job_exec_py_complete_raise():
                 "raise-error": {"outputs": {"result": "success"}},
             },
         },
+        "2150810470": {
+            "matrix": {"sleep": "1"},
+            "stages": {
+                "7972360640": {"outputs": {}},
+                "raise-error": {
+                    "outputs": {},
+                    "errors": {
+                        "name": "ValueError",
+                        "message": "Testing raise error inside PyStage!!!",
+                    },
+                },
+            },
+            "errors": {
+                "name": "JobError",
+                "message": "Strategy break because stage, 'raise-error', return `FAILED` status.",
+            },
+        },
+        "9112472804": {
+            "matrix": {"sleep": "4"},
+            "stages": {
+                "7972360640": {"outputs": {}},
+                "raise-error": {
+                    "outputs": {},
+                    "errors": {
+                        "name": "ValueError",
+                        "message": "Testing raise error inside PyStage!!!",
+                    },
+                },
+            },
+            "errors": {
+                "name": "JobError",
+                "message": "Strategy break because stage, 'raise-error', return `FAILED` status.",
+            },
+        },
         "errors": {
             "2150810470": {
                 "name": "JobError",
-                "message": (
-                    "Handler Error: StageError: PyStage: "
-                    "ValueError: Testing raise error inside PyStage!!!"
-                ),
+                "message": "Strategy break because stage, 'raise-error', return `FAILED` status.",
             },
             "9112472804": {
                 "name": "JobError",
-                "message": (
-                    "Handler Error: StageError: PyStage: "
-                    "ValueError: Testing raise error inside PyStage!!!"
-                ),
+                "message": "Strategy break because stage, 'raise-error', return `FAILED` status.",
             },
         },
     }
@@ -303,7 +310,6 @@ def test_job_exec_py_complete_raise():
 def test_job_exec_runs_on_not_implement():
     job: Job = Workflow.from_conf(
         "wf-run-python-raise-for-job",
-        extras={"stage_raise_error": True},
     ).job("job-fail-runs-on")
     rs: Result = job.execute({})
     assert rs.status == FAILED

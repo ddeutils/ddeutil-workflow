@@ -38,7 +38,6 @@ def dotenv_setting() -> None:
             WORKFLOW_CORE_TIMEZONE=Asia/Bangkok
             WORKFLOW_CORE_DEBUG_MODE=true
             WORKFLOW_CORE_STAGE_DEFAULT_ID=true
-            WORKFLOW_CORE_STAGE_RAISE_ERROR=true
             WORKFLOW_CORE_GENERATE_ID_SIMPLE_MODE=true
             WORKFLOW_LOG_TRACE_ENABLE_WRITE=false
             WORKFLOW_LOG_AUDIT_ENABLE_WRITE=true
@@ -110,6 +109,7 @@ class MockEvent(Event):  # pragma: no cov
         self.lock: Lock = Lock()
 
     def is_set(self) -> bool:
+        """Check if the counter value is equal to n."""
         with self.lock:
             if self.counter == self.n:
                 return True
@@ -117,10 +117,12 @@ class MockEvent(Event):  # pragma: no cov
             return False
 
     def set(self) -> None:
+        """Set the counter value to n."""
         with self.lock:
             self.counter = self.n
 
     def clear(self):
+        """Clear the counter value to 0."""
         self.counter = 0
 
     def wait(self, timeout=None):

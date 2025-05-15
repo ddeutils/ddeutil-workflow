@@ -99,31 +99,48 @@ def test_parallel_stage_exec_with_trigger_raise(test_path):
         assert rs.status == FAILED
         assert rs.context == {
             "parallel": {
-                "branch01": {
-                    "branch": "branch01",
-                    "stages": {},
-                    "errors": {
-                        "name": "StageError",
-                        "message": "Trigger workflow return `FAILED` status with:\nJob, 'first-job', return `FAILED` status.",
-                    },
-                },
                 "branch02": {
                     "branch": "branch02",
-                    "stages": {"7741720823": {"outputs": {}}},
+                    "stages": {
+                        "7741720823": {"outputs": {}},
+                        "6966382767": {
+                            "outputs": {},
+                            "errors": {
+                                "name": "StageError",
+                                "message": "Raise with branch: branch02",
+                            },
+                        },
+                    },
                     "errors": {
                         "name": "StageError",
-                        "message": "Raise with branch: branch02",
+                        "message": "Branch-Stage was break because it has a sub stage, Raise Stage, failed without raise error.",
+                    },
+                },
+                "branch01": {
+                    "branch": "branch01",
+                    "stages": {
+                        "8713259197": {
+                            "outputs": {},
+                            "errors": {
+                                "name": "StageError",
+                                "message": "Trigger workflow return `FAILED` status with:\nJob, 'first-job', return `FAILED` status.",
+                            },
+                        }
+                    },
+                    "errors": {
+                        "name": "StageError",
+                        "message": "Branch-Stage was break because it has a sub stage, Stage trigger, failed without raise error.",
                     },
                 },
             },
             "errors": {
-                "branch01": {
-                    "name": "StageError",
-                    "message": "Trigger workflow return `FAILED` status with:\nJob, 'first-job', return `FAILED` status.",
-                },
                 "branch02": {
                     "name": "StageError",
-                    "message": "Raise with branch: branch02",
+                    "message": "Branch-Stage was break because it has a sub stage, Raise Stage, failed without raise error.",
+                },
+                "branch01": {
+                    "name": "StageError",
+                    "message": "Branch-Stage was break because it has a sub stage, Stage trigger, failed without raise error.",
                 },
             },
         }
@@ -173,41 +190,45 @@ def test_parallel_stage_exec_with_trigger_raise_bug(test_path):
             "parallel": {
                 "branch02": {
                     "branch": "branch02",
-                    "stages": {},
+                    "stages": {
+                        "4773288548": {
+                            "outputs": {},
+                            "errors": {
+                                "name": "StageError",
+                                "message": "Trigger workflow return `FAILED` status with:\nJob, 'first-job', return `FAILED` status.",
+                            },
+                        }
+                    },
                     "errors": {
                         "name": "StageError",
-                        "message": (
-                            "Trigger workflow return `FAILED` status with:\n"
-                            "Job, 'first-job', return `FAILED` status."
-                        ),
+                        "message": "Branch-Stage was break because it has a sub stage, Stage trigger 2, failed without raise error.",
                     },
                 },
                 "branch01": {
                     "branch": "branch01",
-                    "stages": {},
+                    "stages": {
+                        "2579951921": {
+                            "outputs": {},
+                            "errors": {
+                                "name": "StageError",
+                                "message": "Trigger workflow return `FAILED` status with:\nJob, 'first-job', return `FAILED` status.",
+                            },
+                        }
+                    },
                     "errors": {
                         "name": "StageError",
-                        "message": (
-                            "Trigger workflow return `FAILED` status with:\n"
-                            "Job, 'first-job', return `FAILED` status."
-                        ),
+                        "message": "Branch-Stage was break because it has a sub stage, Stage trigger 1, failed without raise error.",
                     },
                 },
             },
             "errors": {
                 "branch02": {
                     "name": "StageError",
-                    "message": (
-                        "Trigger workflow return `FAILED` status with:\n"
-                        "Job, 'first-job', return `FAILED` status."
-                    ),
+                    "message": "Branch-Stage was break because it has a sub stage, Stage trigger 2, failed without raise error.",
                 },
                 "branch01": {
                     "name": "StageError",
-                    "message": (
-                        "Trigger workflow return `FAILED` status with:\n"
-                        "Job, 'first-job', return `FAILED` status."
-                    ),
+                    "message": "Branch-Stage was break because it has a sub stage, Stage trigger 1, failed without raise error.",
                 },
             },
         }
