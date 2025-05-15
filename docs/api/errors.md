@@ -1,34 +1,34 @@
 # Exceptions
 
 The exception module include all exception class that use on this package.
-All exception class inherit from `BaseWorkflowException` class. So, if you do not
+All exception class inherit from `BaseError` class. So, if you do not
 know to catch error from this package function, you can use the base class to
 catch it.
 
 ```python
-from ddeutil.workflow.exceptions import BaseWorkflowException
+from ddeutil.workflow.errors import BaseError
 
 try:
     ...
-except BaseWorkflowException as e:
+except BaseError as e:
     print(e)
 ```
 
-## UtilException
+## UtilError
 
 The utility exception class that will raise from the `utils` and `reusables`
 modules.
 
-## ResultException
+## ResultError
 
 The result exception class that will raise from the `results` module.
 
-## StageException
+## StageError
 
-## JobException
+## JobError
 
-## WorkflowException
+## WorkflowError
 
-## ParamValueException
+## ParamError
 
 ## ScheduleException

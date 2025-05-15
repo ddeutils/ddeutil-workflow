@@ -17,7 +17,7 @@ Execution   ┬-> Ok      ---( handler )--> Result with SUCCESS/CANCEL
             │
             ╰-> Error   ┬--( handler )--> Result with FAILED (Set `raise_error` flag)
                         │
-                        ╰--( handler )--> Raise StageException(...)
+                        ╰--( handler )--> Raise StageError(...)
 ```
 
 On the context I/O that pass to a stage object at execute process. The
@@ -254,7 +254,7 @@ Case stage executor that execute all stages if the condition was matched.
 
 ## Raise Stage
 
-Raise error stage executor that raise `StageException` that use a message
+Raise error stage executor that raise `StageError` that use a message
 field for making error message before raise.
 
 ## Docker Stage

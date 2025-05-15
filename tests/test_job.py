@@ -1,5 +1,5 @@
 import pytest
-from ddeutil.workflow.exceptions import JobException
+from ddeutil.workflow.errors import JobError
 from ddeutil.workflow.job import (
     Job,
     OnDocker,
@@ -95,7 +95,7 @@ def test_job_set_outputs():
     }
 
     # NOTE: Raise because job ID does not set.
-    with pytest.raises(JobException):
+    with pytest.raises(JobError):
         Job().set_outputs({}, {})
 
     assert Job().set_outputs({}, {"jobs": {}}, job_id="1") == {
@@ -117,5 +117,5 @@ def test_job_if_condition():
     job = Job.model_validate({"if": '"${{ params.name }}"'})
 
     # NOTE: Raise because return type of condition does not match with boolean.
-    with pytest.raises(JobException):
+    with pytest.raises(JobError):
         job.is_skipped({"params": {"name": "foo"}})

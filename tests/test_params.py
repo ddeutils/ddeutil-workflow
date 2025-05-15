@@ -2,7 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 import pytest
-from ddeutil.workflow.exceptions import ParamValueException
+from ddeutil.workflow.errors import ParamError
 from ddeutil.workflow.params import (
     ArrayParam,
     ChoiceParam,
@@ -51,10 +51,10 @@ def test_param_date():
     assert DateParam().receive(date(2024, 1, 1)) == date(2024, 1, 1)
     assert DateParam().receive(datetime(2024, 1, 1, 13, 24)) == date(2024, 1, 1)
 
-    with pytest.raises(ParamValueException):
+    with pytest.raises(ParamError):
         DateParam().receive(2024)
 
-    with pytest.raises(ParamValueException):
+    with pytest.raises(ParamError):
         DateParam().receive("2024")
 
 
@@ -68,10 +68,10 @@ def test_param_datetime():
     assert DatetimeParam().receive(date(2024, 1, 1)) == datetime(2024, 1, 1)
     assert DatetimeParam().receive(datetime(2024, 1, 1)) == datetime(2024, 1, 1)
 
-    with pytest.raises(ParamValueException):
+    with pytest.raises(ParamError):
         DatetimeParam().receive(2024)
 
-    with pytest.raises(ParamValueException):
+    with pytest.raises(ParamError):
         DatetimeParam().receive("2024")
 
 
@@ -85,10 +85,10 @@ def test_param_int():
     assert 1 == IntParam().receive("1")
     assert 0 == IntParam(default=0).receive()
 
-    with pytest.raises(ParamValueException):
+    with pytest.raises(ParamError):
         IntParam().receive(1.0)
 
-    with pytest.raises(ParamValueException):
+    with pytest.raises(ParamError):
         IntParam().receive("test")
 
 
@@ -96,7 +96,7 @@ def test_param_choice():
     assert "foo" == ChoiceParam(options=["foo", "bar"]).receive("foo")
     assert "foo" == ChoiceParam(options=["foo", "bar"]).receive()
 
-    with pytest.raises(ParamValueException):
+    with pytest.raises(ParamError):
         ChoiceParam(options=["foo", "bar"]).receive("baz")
 
 
@@ -111,13 +111,13 @@ def test_param_array():
     assert [1] == ArrayParam(default=[1]).receive()
     assert [] == ArrayParam().receive()
 
-    with pytest.raises(ParamValueException):
+    with pytest.raises(ParamError):
         ArrayParam().receive('{"foo": 1}')
 
-    with pytest.raises(ParamValueException):
+    with pytest.raises(ParamError):
         ArrayParam().receive("foo")
 
-    with pytest.raises(ParamValueException):
+    with pytest.raises(ParamError):
         ArrayParam().receive(100)
 
 
@@ -131,10 +131,10 @@ def test_param_map():
     assert {"key": "value"} == MapParam(default={"key": "value"}).receive()
     assert {} == MapParam().receive()
 
-    with pytest.raises(ParamValueException):
+    with pytest.raises(ParamError):
         MapParam().receive('["foo", 1]')
 
-    with pytest.raises(ParamValueException):
+    with pytest.raises(ParamError):
         MapParam().receive(100)
 
 

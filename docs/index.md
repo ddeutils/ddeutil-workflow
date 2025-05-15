@@ -162,32 +162,35 @@ value (This config can override by extra parameters with `registry_caller` key).
 
 ```python
 from ddeutil.workflow import Result, tag
-from ddeutil.workflow.exceptions import StageException
+from ddeutil.workflow.errors import StageError
 from pydantic import BaseModel, SecretStr
+
 
 class AwsCredential(BaseModel):
     path: str
     access_client_id: str
     access_client_secret: SecretStr
 
+
 class RestAuth(BaseModel):
     type: str
     keys: SecretStr
 
+
 @tag("requests", alias="get-api-with-oauth-to-s3")
 def get_api_with_oauth_to_s3(
-    method: str,
-    url: str,
-    body: dict[str, str],
-    auth: RestAuth,
-    writing_node: str,
-    aws: AwsCredential,
-    result: Result,
+        method: str,
+        url: str,
+        body: dict[str, str],
+        auth: RestAuth,
+        writing_node: str,
+        aws: AwsCredential,
+        result: Result,
 ) -> dict[str, int]:
     result.trace.info("[CALLER]: Start get data via RestAPI to S3.")
     result.trace.info(f"... {method}: {url}")
     if method != "post":
-       raise StageException(f"RestAPI does not support for {method} action.")
+        raise StageError(f"RestAPI does not support for {method} action.")
     return {"records": 1000}
 ```
 

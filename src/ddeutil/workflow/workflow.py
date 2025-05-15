@@ -38,8 +38,8 @@ from typing_extensions import Self
 
 from .__types import DictData
 from .conf import FileLoad, Loader, dynamic
+from .errors import WorkflowError
 from .event import Crontab
-from .exceptions import WorkflowException
 from .job import Job
 from .logs import Audit, get_audit
 from .params import Param
@@ -318,7 +318,7 @@ class Workflow(BaseModel):
     def __validate_jobs_need__(self) -> Self:
         """Validate each need job in any jobs should exist.
 
-        :raise WorkflowException: If it has not exists need value in this
+        :raise WorkflowError: If it has not exists need value in this
             workflow job.
 
         :rtype: Self
@@ -327,7 +327,7 @@ class Workflow(BaseModel):
             if not_exist := [
                 need for need in self.jobs[job].needs if need not in self.jobs
             ]:
-                raise WorkflowException(
+                raise WorkflowError(
                     f"The needed jobs: {not_exist} do not found in "
                     f"{self.name!r}."
                 )
@@ -381,7 +381,7 @@ class Workflow(BaseModel):
         :param params: (DictData) A parameter data that receive from workflow
             execute method.
 
-        :raise WorkflowException: If parameter value that want to validate does
+        :raise WorkflowError: If parameter value that want to validate does
             not include the necessary parameter that had required flag.
 
         :rtype: DictData
@@ -395,7 +395,7 @@ class Workflow(BaseModel):
             if (k not in params and self.params[k].required)
         ]
         if check_key:
-            raise WorkflowException(
+            raise WorkflowError(
                 f"Required Param on this workflow setting does not set: "
                 f"{', '.join(check_key)}."
             )
@@ -535,7 +535,7 @@ class Workflow(BaseModel):
         model. It different with `self.execute` because this method run only
         one job and return with context of this job data.
 
-        :raise WorkflowException: If the job execution raise JobException.
+        :raise WorkflowError: If the job execution raise JobError.
 
         :param job: (Job) A job model that want to execute.
         :param params: (DictData) A parameter data.
@@ -556,7 +556,7 @@ class Workflow(BaseModel):
             return result.catch(
                 status=CANCEL,
                 context={
-                    "errors": WorkflowException(
+                    "errors": WorkflowError(
                         "Workflow job was canceled because event was set."
                     ).to_dict(),
                 },
@@ -577,7 +577,7 @@ class Workflow(BaseModel):
             return result.catch(
                 status=rs.status,
                 context={
-                    "errors": WorkflowException(error_msg).to_dict(),
+                    "errors": WorkflowError(error_msg).to_dict(),
                     **params,
                 },
             )
@@ -680,7 +680,7 @@ class Workflow(BaseModel):
                     return result.catch(
                         status=FAILED,
                         context={
-                            "errors": WorkflowException(
+                            "errors": WorkflowError(
                                 f"Validate job trigger rule was failed with "
                                 f"{job.trigger_rule.value!r}."
                             ).to_dict()
@@ -750,8 +750,6 @@ class Workflow(BaseModel):
         return result.catch(
             status=FAILED,
             context={
-                "errors": WorkflowException(
-                    f"{self.name!r} was timeout."
-                ).to_dict()
+                "errors": WorkflowError(f"{self.name!r} was timeout.").to_dict()
             },
         )

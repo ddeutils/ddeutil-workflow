@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 from ddeutil.workflow import SUCCESS, Job, Result, Workflow
-from ddeutil.workflow.exceptions import WorkflowException
+from ddeutil.workflow.errors import WorkflowError
 from pydantic import ValidationError
 
 from .utils import dump_yaml, dump_yaml_context
@@ -273,10 +273,10 @@ def test_workflow_from_conf_raise(test_path):
         },
     )
 
-    with pytest.raises(WorkflowException):
+    with pytest.raises(WorkflowError):
         Workflow.from_conf(name="wf-run-from-loader-raise")
 
-    with pytest.raises(WorkflowException):
+    with pytest.raises(WorkflowError):
         Workflow.from_conf(
             name="wf-run-from-loader-raise",
             path=test_path / "conf",
@@ -353,5 +353,5 @@ def test_workflow_parameterize(test_path):
         }
 
         # NOTE: Raise if passing parameter that does not set on the workflow.
-        with pytest.raises(WorkflowException):
+        with pytest.raises(WorkflowError):
             workflow.parameterize({"foo": "bar"})

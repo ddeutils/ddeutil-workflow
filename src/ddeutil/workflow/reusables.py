@@ -39,7 +39,7 @@ from pydantic.dataclasses import dataclass
 
 from .__types import DictData, Re
 from .conf import dynamic
-from .exceptions import UtilException
+from .errors import UtilError
 
 T = TypeVar("T")
 P = ParamSpec("P")
@@ -146,13 +146,13 @@ def get_args_const(
     try:
         mod: Module = parse(expr)
     except SyntaxError:
-        raise UtilException(
+        raise UtilError(
             f"Post-filter: {expr} does not valid because it raise syntax error."
         ) from None
 
     body: list[Expr] = mod.body
     if len(body) > 1:
-        raise UtilException(
+        raise UtilError(
             "Post-filter function should be only one calling per workflow."
         )
 
@@ -160,7 +160,7 @@ def get_args_const(
     if isinstance((caller := body[0].value), Name):
         return caller.id, [], {}
     elif not isinstance(caller, Call):
-        raise UtilException(
+        raise UtilError(
             f"Get arguments does not support for caller type: {type(caller)}"
         )
 
@@ -169,10 +169,10 @@ def get_args_const(
     keywords: dict[str, Constant] = {k.arg: k.value for k in caller.keywords}
 
     if any(not isinstance(i, Constant) for i in args):
-        raise UtilException(f"Argument of {expr} should be constant.")
+        raise UtilError(f"Argument of {expr} should be constant.")
 
     if any(not isinstance(i, Constant) for i in keywords.values()):
-        raise UtilException(f"Keyword argument of {expr} should be constant.")
+        raise UtilError(f"Keyword argument of {expr} should be constant.")
 
     return name.id, args, keywords
 
@@ -194,12 +194,10 @@ def get_args_from_filter(
     kwargs: dict[Any, Any] = {k: v.value for k, v in _kwargs.items()}
 
     if func_name not in filters:
-        raise UtilException(
-            f"The post-filter: {func_name!r} does not support yet."
-        )
+        raise UtilError(f"The post-filter: {func_name!r} does not support yet.")
 
     if isinstance((f_func := filters[func_name]), list) and (args or kwargs):
-        raise UtilException(
+        raise UtilError(
             "Chain filter function does not support for passing arguments."
         )
 
@@ -228,10 +226,10 @@ def map_post_filter(
                     value: T = func(value)
             else:
                 value: T = f_func(value, *args, **kwargs)
-        except UtilException:
+        except UtilError:
             raise
         except Exception:
-            raise UtilException(
+            raise UtilError(
                 f"The post-filter: {func_name!r} does not fit with {value!r} "
                 f"(type: {type(value).__name__})."
             ) from None
@@ -322,7 +320,7 @@ def str2template(
         try:
             getter: Any = getdot(caller, params)
         except ValueError:
-            raise UtilException(
+            raise UtilError(
                 f"Parameters does not get dot with caller: {caller!r}."
             ) from None
 
@@ -404,7 +402,7 @@ def datetime_format(value: datetime, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
     """
     if isinstance(value, datetime):
         return value.strftime(fmt)
-    raise UtilException(
+    raise UtilError(
         "This custom function should pass input value with datetime type."
     )
 
@@ -437,7 +435,7 @@ def get_item(
 
     """
     if not isinstance(value, dict):
-        raise UtilException(
+        raise UtilError(
             f"The value that pass to `getitem` filter should be `dict` not "
             f"`{type(value)}`."
         )
@@ -454,14 +452,14 @@ def get_index(value: list[Any], index: int) -> Any:
 
     """
     if not isinstance(value, list):
-        raise UtilException(
+        raise UtilError(
             f"The value that pass to `getindex` filter should be `list` not "
             f"`{type(value)}`."
         )
     try:
         return value[index]
     except IndexError as e:
-        raise UtilException(
+        raise UtilError(
             f"Index: {index} is out of range of value (The maximum range is "
             f"{len(value)})."
         ) from e

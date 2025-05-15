@@ -125,7 +125,7 @@ def test_foreach_stage_exec_with_trigger_raise(test_path):
                                 "item": 1,
                                 "stages": {},
                                 "errors": {
-                                    "name": "StageException",
+                                    "name": "StageError",
                                     "message": "Trigger workflow return `FAILED` status with:\nJob, 'first-job', return `FAILED` status.",
                                 },
                             },
@@ -133,7 +133,7 @@ def test_foreach_stage_exec_with_trigger_raise(test_path):
                                 "item": 2,
                                 "stages": {},
                                 "errors": {
-                                    "name": "StageException",
+                                    "name": "StageError",
                                     "message": "Trigger workflow return `FAILED` status with:\nWorkflow job was canceled because event was set.",
                                 },
                             },
@@ -141,11 +141,11 @@ def test_foreach_stage_exec_with_trigger_raise(test_path):
                     },
                     "errors": {
                         1: {
-                            "name": "StageException",
+                            "name": "StageError",
                             "message": "Trigger workflow return `FAILED` status with:\nJob, 'first-job', return `FAILED` status.",
                         },
                         2: {
-                            "name": "StageException",
+                            "name": "StageError",
                             "message": "Trigger workflow return `FAILED` status with:\nWorkflow job was canceled because event was set.",
                         },
                     },

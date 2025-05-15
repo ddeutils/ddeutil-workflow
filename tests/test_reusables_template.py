@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Any
 
 import pytest
-from ddeutil.workflow.exceptions import UtilException
+from ddeutil.workflow.errors import UtilError
 from ddeutil.workflow.reusables import (
     has_template,
     not_in_template,
@@ -51,7 +51,7 @@ def test_param2template():
         "str_env": "foo-Asia/Bangkok-",
     } == value
 
-    with pytest.raises(UtilException):
+    with pytest.raises(UtilError):
         param2template("${{ params.foo }}", {"params": {"value": -5}})
 
     value = param2template(
@@ -140,7 +140,7 @@ def test_param2template_with_filter():
         == 1
     )
 
-    with pytest.raises(UtilException):
+    with pytest.raises(UtilError):
         param2template(
             value="${{ params.value | abs12 }}",
             params={"params": {"value": -5}},
@@ -152,7 +152,7 @@ def test_param2template_with_filter():
     )
     assert "20240801" == value
 
-    with pytest.raises(UtilException):
+    with pytest.raises(UtilError):
         param2template(
             value="${{ params.asat-dt | fmt(fmt='%Y%m%d) }}",
             params={
@@ -160,13 +160,13 @@ def test_param2template_with_filter():
             },
         )
 
-    with pytest.raises(UtilException):
+    with pytest.raises(UtilError):
         param2template(
             value="${{ params.data | getitem(1, 'bar') }}",
             params={"params": {"data": 1}},
         )
 
-    with pytest.raises(UtilException):
+    with pytest.raises(UtilError):
         param2template(
             value="${{ params.range | getindex(4) }}",
             params={"params": {"range": [1, 2, 3]}},

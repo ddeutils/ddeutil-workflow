@@ -2,7 +2,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from threading import Event
 
 import pytest
-from ddeutil.workflow.exceptions import JobException
+from ddeutil.workflow.errors import JobError
 from ddeutil.workflow.job import Job, local_execute_strategy
 from ddeutil.workflow.result import CANCEL, FAILED, SUCCESS, Result
 from ddeutil.workflow.workflow import Workflow
@@ -46,7 +46,7 @@ def test_job_exec_strategy_catch_stage_error():
     ).job("final-job")
 
     rs = Result()
-    with pytest.raises(JobException):
+    with pytest.raises(JobError):
         local_execute_strategy(job, {"name": "foo"}, {}, result=rs)
 
     assert rs.status == FAILED
@@ -64,7 +64,7 @@ def test_job_exec_strategy_catch_stage_error():
                 },
             },
             "errors": {
-                "name": "JobException",
+                "name": "JobError",
                 "message": (
                     "Strategy break because stage, 'raise-error', return "
                     "`FAILED` status."
@@ -80,7 +80,7 @@ def test_job_exec_strategy_catch_job_error():
         extras={"stage_raise_error": True},
     ).job("final-job")
     rs = Result()
-    with pytest.raises(JobException):
+    with pytest.raises(JobError):
         local_execute_strategy(job, {"name": "foo"}, {}, result=rs)
 
     assert rs.status == FAILED
@@ -89,7 +89,7 @@ def test_job_exec_strategy_catch_job_error():
             "matrix": {"name": "foo"},
             "stages": {"1772094681": {"outputs": {}}},
             "errors": {
-                "name": "StageException",
+                "name": "StageError",
                 "message": (
                     "PyStage: ValueError: Testing raise error inside PyStage!!!"
                 ),
@@ -110,12 +110,12 @@ def test_job_exec_strategy_event_set():
         )
         event.set()
 
-    with pytest.raises(JobException):
+    with pytest.raises(JobError):
         future.result()
 
     assert rs.status == CANCEL
     assert rs.context["EMPTY"]["errors"] == {
-        "name": "JobException",
+        "name": "JobError",
         "message": "Job strategy was canceled because event was set.",
     }
 
@@ -125,7 +125,7 @@ def test_job_exec_strategy_raise():
         "first-job"
     )
     rs = Result()
-    with pytest.raises(JobException):
+    with pytest.raises(JobError):
         local_execute_strategy(job, {}, {}, result=rs)
 
     assert rs.status == FAILED
@@ -134,7 +134,7 @@ def test_job_exec_strategy_raise():
             "matrix": {},
             "stages": {},
             "errors": {
-                "name": "StageException",
+                "name": "StageError",
                 "message": (
                     "PyStage: ValueError: Testing raise error inside PyStage!!!"
                 ),

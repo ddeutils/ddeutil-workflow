@@ -6,8 +6,8 @@
 from .__cron import CronJob, CronRunner
 from .__types import DictData, DictStr, Matrix, Re, TupleStr
 from .conf import *
+from .errors import *
 from .event import *
-from .exceptions import *
 from .job import *
 from .logs import (
     Audit,

@@ -53,7 +53,7 @@ def test_workflow_exec_timeout():
     assert rs.status == FAILED
     assert rs.context == {
         "errors": {
-            "name": "WorkflowException",
+            "name": "WorkflowError",
             "message": "'demo-workflow' was timeout.",
         },
         "params": {},
@@ -61,7 +61,7 @@ def test_workflow_exec_timeout():
             "sleep-again-run": {
                 "stages": {"7972360640": {"outputs": {}}},
                 "errors": {
-                    "name": "JobException",
+                    "name": "JobError",
                     "message": "Job strategy was canceled because event was set.",
                 },
             },
@@ -92,7 +92,7 @@ def test_workflow_exec_raise_event_set():
     assert rs.status == FAILED
     assert rs.context == {
         "errors": {
-            "name": "WorkflowException",
+            "name": "WorkflowError",
             "message": "Workflow job was canceled because event was set.",
         },
         "jobs": {},
@@ -188,13 +188,13 @@ def test_workflow_exec_parallel_timeout():
             "sleep-run": {
                 "stages": {},
                 "errors": {
-                    "name": "JobException",
+                    "name": "JobError",
                     "message": "Job strategy was canceled because event was set.",
                 },
             },
         },
         "errors": {
-            "name": "WorkflowException",
+            "name": "WorkflowError",
             "message": "'demo-workflow' was timeout.",
         },
     }
@@ -256,16 +256,16 @@ def test_workflow_exec_py_raise():
     assert rs.status == FAILED
     assert rs.context == {
         "errors": {
-            "name": "WorkflowException",
+            "name": "WorkflowError",
             "message": "Job, 'first-job', return `FAILED` status.",
         },
         "params": {},
         "jobs": {
             "first-job": {
                 "errors": {
-                    "name": "JobException",
+                    "name": "JobError",
                     "message": (
-                        "Handler Error: StageException: PyStage: "
+                        "Handler Error: StageError: PyStage: "
                         "ValueError: Testing raise error inside PyStage!!!"
                     ),
                 },
@@ -283,16 +283,16 @@ def test_workflow_exec_py_raise_parallel():
     assert rs.status == FAILED
     assert rs.context == {
         "errors": {
-            "name": "WorkflowException",
+            "name": "WorkflowError",
             "message": "Job, 'first-job', return `FAILED` status.",
         },
         "params": {},
         "jobs": {
             "first-job": {
                 "errors": {
-                    "name": "JobException",
+                    "name": "JobError",
                     "message": (
-                        "Handler Error: StageException: PyStage: "
+                        "Handler Error: StageError: PyStage: "
                         "ValueError: Testing raise error inside PyStage!!!"
                     ),
                 },
@@ -857,7 +857,7 @@ def test_workflow_exec_raise_param(test_path):
                         "get-param": {
                             "outputs": {},
                             "errors": {
-                                "name": "UtilException",
+                                "name": "UtilError",
                                 "message": (
                                     "Parameters does not get dot with caller: "
                                     "'params.name'."
@@ -866,7 +866,7 @@ def test_workflow_exec_raise_param(test_path):
                         }
                     },
                     "errors": {
-                        "name": "JobException",
+                        "name": "JobError",
                         "message": (
                             "Strategy break because stage, 'get-param', "
                             "return `FAILED` status."
@@ -876,7 +876,7 @@ def test_workflow_exec_raise_param(test_path):
             },
             "errors": {
                 "message": "Job, 'start-job', return `FAILED` status.",
-                "name": "WorkflowException",
+                "name": "WorkflowError",
             },
         }
 
@@ -920,7 +920,7 @@ def test_workflow_exec_raise_job_trigger(test_path):
                         "get-param": {
                             "outputs": {},
                             "errors": {
-                                "name": "UtilException",
+                                "name": "UtilError",
                                 "message": (
                                     "Parameters does not get dot with caller: "
                                     "'params.name'."
@@ -929,7 +929,7 @@ def test_workflow_exec_raise_job_trigger(test_path):
                         },
                     },
                     "errors": {
-                        "name": "JobException",
+                        "name": "JobError",
                         "message": (
                             "Strategy break because stage, 'get-param', "
                             "return `FAILED` status."
@@ -938,7 +938,7 @@ def test_workflow_exec_raise_job_trigger(test_path):
                 },
             },
             "errors": {
-                "name": "WorkflowException",
+                "name": "WorkflowError",
                 "message": (
                     "Validate job trigger rule was failed with 'all_success'."
                 ),

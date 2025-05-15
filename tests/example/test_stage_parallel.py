@@ -103,7 +103,7 @@ def test_parallel_stage_exec_with_trigger_raise(test_path):
                     "branch": "branch01",
                     "stages": {},
                     "errors": {
-                        "name": "StageException",
+                        "name": "StageError",
                         "message": "Trigger workflow return `FAILED` status with:\nJob, 'first-job', return `FAILED` status.",
                     },
                 },
@@ -111,18 +111,18 @@ def test_parallel_stage_exec_with_trigger_raise(test_path):
                     "branch": "branch02",
                     "stages": {"7741720823": {"outputs": {}}},
                     "errors": {
-                        "name": "StageException",
+                        "name": "StageError",
                         "message": "Raise with branch: branch02",
                     },
                 },
             },
             "errors": {
                 "branch01": {
-                    "name": "StageException",
+                    "name": "StageError",
                     "message": "Trigger workflow return `FAILED` status with:\nJob, 'first-job', return `FAILED` status.",
                 },
                 "branch02": {
-                    "name": "StageException",
+                    "name": "StageError",
                     "message": "Raise with branch: branch02",
                 },
             },
@@ -175,7 +175,7 @@ def test_parallel_stage_exec_with_trigger_raise_bug(test_path):
                     "branch": "branch02",
                     "stages": {},
                     "errors": {
-                        "name": "StageException",
+                        "name": "StageError",
                         "message": (
                             "Trigger workflow return `FAILED` status with:\n"
                             "Job, 'first-job', return `FAILED` status."
@@ -186,7 +186,7 @@ def test_parallel_stage_exec_with_trigger_raise_bug(test_path):
                     "branch": "branch01",
                     "stages": {},
                     "errors": {
-                        "name": "StageException",
+                        "name": "StageError",
                         "message": (
                             "Trigger workflow return `FAILED` status with:\n"
                             "Job, 'first-job', return `FAILED` status."
@@ -196,14 +196,14 @@ def test_parallel_stage_exec_with_trigger_raise_bug(test_path):
             },
             "errors": {
                 "branch02": {
-                    "name": "StageException",
+                    "name": "StageError",
                     "message": (
                         "Trigger workflow return `FAILED` status with:\n"
                         "Job, 'first-job', return `FAILED` status."
                     ),
                 },
                 "branch01": {
-                    "name": "StageException",
+                    "name": "StageError",
                     "message": (
                         "Trigger workflow return `FAILED` status with:\n"
                         "Job, 'first-job', return `FAILED` status."

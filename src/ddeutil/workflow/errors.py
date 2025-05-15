@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from typing import Literal, Optional, TypedDict, Union, overload
 
+from .__types import DictData
+
 
 class ErrorData(TypedDict):
     """Error data type dict for typing necessary keys of return of to_dict func
@@ -34,14 +36,23 @@ def to_dict(exception: Exception) -> ErrorData:  # pragma: no cov
     }
 
 
-class BaseWorkflowException(Exception):
+class BaseError(Exception):
     """Base Workflow exception class will implement the `refs` argument for
     making an error context to the result context.
     """
 
-    def __init__(self, message: str, *, refs: Optional[str] = None):
+    def __init__(
+        self,
+        message: str,
+        *,
+        refs: Optional[str] = None,
+        context: Optional[DictData] = None,
+        params: Optional[DictData] = None,
+    ) -> None:
         super().__init__(message)
         self.refs: Optional[str] = refs
+        self.context: DictData = context or {}
+        self.params: DictData = params or {}
 
     @overload
     def to_dict(
@@ -67,19 +78,19 @@ class BaseWorkflowException(Exception):
         return data
 
 
-class UtilException(BaseWorkflowException): ...
+class UtilError(BaseError): ...
 
 
-class ResultException(UtilException): ...
+class ResultError(UtilError): ...
 
 
-class StageException(BaseWorkflowException): ...
+class StageError(BaseError): ...
 
 
-class JobException(BaseWorkflowException): ...
+class JobError(BaseError): ...
 
 
-class WorkflowException(BaseWorkflowException): ...
+class WorkflowError(BaseError): ...
 
 
-class ParamValueException(WorkflowException): ...
+class ParamError(WorkflowError): ...

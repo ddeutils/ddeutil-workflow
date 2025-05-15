@@ -79,7 +79,7 @@ nav:
       - Reusables: api/reusables.md
       - Logs: api/logs.md
       - Utils: api/utils.md
-      - Exceptions: api/exceptions.md
+      - Errors: api/errors.md
   - Examples:
       - RestAPI: examples/api.md
       - Postgres: examples/pg.md

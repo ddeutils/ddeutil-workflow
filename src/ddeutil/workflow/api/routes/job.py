@@ -12,7 +12,7 @@ from fastapi.responses import UJSONResponse
 from pydantic import BaseModel, Field
 
 from ...__types import DictData
-from ...exceptions import JobException
+from ...errors import JobError
 from ...job import Job
 from ...logs import get_logger
 from ...result import Result
@@ -59,7 +59,7 @@ async def job_execute(
             ).context,
             to=context,
         )
-    except JobException as err:
+    except JobError as err:
         rs.trace.error(f"[JOB]: {err.__class__.__name__}: {err}")
 
     return {

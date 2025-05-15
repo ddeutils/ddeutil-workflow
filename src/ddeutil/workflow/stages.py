@@ -19,7 +19,7 @@ the stage execution method.
                             |
                             ╰--( handler )--> Result with `FAILED` (Set `raise_error` flag)
 
-                --> Error   ---( handler )--> Raise StageException(...)
+                --> Error   ---( handler )--> Raise StageError(...)
 
     On the context I/O that pass to a stage object at execute process. The
 execute method receives a `params={"params": {...}}` value for passing template
@@ -61,7 +61,7 @@ from typing_extensions import Self
 
 from .__types import DictData, DictStr, StrOrInt, StrOrNone, TupleStr
 from .conf import dynamic, pass_env
-from .exceptions import StageException, to_dict
+from .errors import StageError, to_dict
 from .result import CANCEL, FAILED, SUCCESS, WAIT, Result, Status
 from .reusables import (
     TagFunc,
@@ -201,7 +201,7 @@ class BaseStage(BaseModel, ABC):
                                             |-name: ...
                                             ╰-message: ...
 
-                        --> Error   --> Raise StageException(...)
+                        --> Error   --> Raise StageError(...)
 
             On the last step, it will set the running ID on a return result
         object from the current stage ID before release the final result.
@@ -214,7 +214,7 @@ class BaseStage(BaseModel, ABC):
         :param event: (Event) An event manager that pass to the stage execution.
         :param raise_error: (bool) A flag that all this method raise error
 
-        :raise StageException: If the raise_error was set and the execution
+        :raise StageError: If the raise_error was set and the execution
             raise any error.
 
         :rtype: Result
@@ -235,9 +235,9 @@ class BaseStage(BaseModel, ABC):
                 f"{traceback.format_exc()}"
             )
             if dynamic("stage_raise_error", f=raise_error, extras=self.extras):
-                if isinstance(e, StageException):
+                if isinstance(e, StageError):
                     raise
-                raise StageException(
+                raise StageError(
                     f"{self.__class__.__name__}: {e_name}: {e}"
                 ) from e
             return result.catch(status=FAILED, context={"errors": to_dict(e)})
@@ -331,9 +331,9 @@ class BaseStage(BaseModel, ABC):
         :param params: (DictData) A parameters that want to pass to condition
             template.
 
-        :raise StageException: When it has any error raise from the eval
+        :raise StageError: When it has any error raise from the eval
             condition statement.
-        :raise StageException: When return type of the eval condition statement
+        :raise StageError: When return type of the eval condition statement
             does not return with boolean type.
 
         :rtype: bool
@@ -354,7 +354,7 @@ class BaseStage(BaseModel, ABC):
                 raise TypeError("Return type of condition does not be boolean")
             return not rs
         except Exception as e:
-            raise StageException(f"{e.__class__.__name__}: {e}") from e
+            raise StageError(f"{e.__class__.__name__}: {e}") from e
 
     def gen_id(self, params: DictData) -> str:
         """Generate stage ID that dynamic use stage's name if it ID does not
@@ -456,9 +456,9 @@ class BaseAsyncStage(BaseStage):
             e_name: str = e.__class__.__name__
             await result.trace.aerror(f"[STAGE]: Handler {e_name}: {e}")
             if dynamic("stage_raise_error", f=raise_error, extras=self.extras):
-                if isinstance(e, StageException):
+                if isinstance(e, StageError):
                     raise
-                raise StageException(
+                raise StageError(
                     f"{self.__class__.__name__}: {e_name}: {e}"
                 ) from None
 
@@ -726,7 +726,7 @@ class BashStage(BaseAsyncStage):
             )
         if rs.returncode > 0:
             e: str = rs.stderr.removesuffix("\n")
-            raise StageException(
+            raise StageError(
                 f"Subprocess: {e}\n---( statement )---\n```bash\n{bash}\n```"
             )
         return result.catch(
@@ -781,7 +781,7 @@ class BashStage(BaseAsyncStage):
 
         if rs.returncode > 0:
             e: str = rs.stderr.removesuffix("\n")
-            raise StageException(
+            raise StageError(
                 f"Subprocess: {e}\n---( statement )---\n```bash\n{bash}\n```"
             )
         return result.catch(
@@ -1236,7 +1236,7 @@ class CallStage(BaseAsyncStage):
 
             return args
         except ValidationError as e:
-            raise StageException(
+            raise StageError(
                 "Validate argument from the caller function raise invalid type."
             ) from e
         except TypeError as e:
@@ -1313,7 +1313,7 @@ class TriggerStage(BaseStage):
                 if (msg := rs.context.get("errors", {}).get("message"))
                 else "."
             )
-            raise StageException(
+            raise StageError(
                 f"Trigger workflow return `FAILED` status{err_msg}"
             )
         return rs
@@ -1437,11 +1437,11 @@ class ParallelStage(BaseNestedStage):
                         branch: {
                             "branch": branch,
                             "stages": filter_func(output.pop("stages", {})),
-                            "errors": StageException(error_msg).to_dict(),
+                            "errors": StageError(error_msg).to_dict(),
                         }
                     },
                 )
-                raise StageException(error_msg, refs=branch)
+                raise StageError(error_msg, refs=branch)
 
             try:
                 rs: Result = stage.handler_execute(
@@ -1453,7 +1453,7 @@ class ParallelStage(BaseNestedStage):
                 )
                 stage.set_outputs(rs.context, to=output)
                 stage.set_outputs(stage.get_outputs(output), to=context)
-            except StageException as e:
+            except StageError as e:
                 result.catch(
                     status=FAILED,
                     parallel={
@@ -1464,7 +1464,7 @@ class ParallelStage(BaseNestedStage):
                         },
                     },
                 )
-                raise StageException(str(e), refs=branch) from e
+                raise StageError(str(e), refs=branch) from e
 
             if rs.status == FAILED:  # pragma: no cov
                 error_msg: str = (
@@ -1477,11 +1477,11 @@ class ParallelStage(BaseNestedStage):
                         branch: {
                             "branch": branch,
                             "stages": filter_func(output.pop("stages", {})),
-                            "errors": StageException(error_msg).to_dict(),
+                            "errors": StageError(error_msg).to_dict(),
                         },
                     },
                 )
-                raise StageException(error_msg, refs=branch)
+                raise StageError(error_msg, refs=branch)
 
         return result.catch(
             status=SUCCESS,
@@ -1522,7 +1522,7 @@ class ParallelStage(BaseNestedStage):
             return result.catch(
                 status=CANCEL,
                 context={
-                    "errors": StageException(
+                    "errors": StageError(
                         "Stage was canceled from event that had set "
                         "before stage parallel execution."
                     ).to_dict()
@@ -1550,7 +1550,7 @@ class ParallelStage(BaseNestedStage):
             for future in as_completed(futures):
                 try:
                     future.result()
-                except StageException as e:
+                except StageError as e:
                     status = FAILED
                     if "errors" in context:
                         context["errors"][e.refs] = e.to_dict()
@@ -1627,9 +1627,9 @@ class ForEachStage(BaseNestedStage):
         :param event: (Event) An Event manager instance that use to cancel this
             execution if it forces stopped by parent execution.
 
-        :raise StageException: If event was set.
-        :raise StageException: If the stage execution raise any Exception error.
-        :raise StageException: If the result from execution has `FAILED` status.
+        :raise StageError: If event was set.
+        :raise StageError: If the stage execution raise any Exception error.
+        :raise StageError: If the result from execution has `FAILED` status.
 
         :rtype: Result
         """
@@ -1658,11 +1658,11 @@ class ForEachStage(BaseNestedStage):
                         key: {
                             "item": item,
                             "stages": filter_func(output.pop("stages", {})),
-                            "errors": StageException(error_msg).to_dict(),
+                            "errors": StageError(error_msg).to_dict(),
                         }
                     },
                 )
-                raise StageException(error_msg, refs=key)
+                raise StageError(error_msg, refs=key)
 
             try:
                 rs: Result = stage.handler_execute(
@@ -1674,7 +1674,7 @@ class ForEachStage(BaseNestedStage):
                 )
                 stage.set_outputs(rs.context, to=output)
                 stage.set_outputs(stage.get_outputs(output), to=context)
-            except StageException as e:
+            except StageError as e:
                 result.catch(
                     status=FAILED,
                     foreach={
@@ -1685,7 +1685,7 @@ class ForEachStage(BaseNestedStage):
                         },
                     },
                 )
-                raise StageException(str(e), refs=key) from e
+                raise StageError(str(e), refs=key) from e
 
             if rs.status == FAILED:  # pragma: no cov
                 error_msg: str = (
@@ -1699,11 +1699,11 @@ class ForEachStage(BaseNestedStage):
                         key: {
                             "item": item,
                             "stages": filter_func(output.pop("stages", {})),
-                            "errors": StageException(error_msg).to_dict(),
+                            "errors": StageError(error_msg).to_dict(),
                         },
                     },
                 )
-                raise StageException(error_msg, refs=key)
+                raise StageError(error_msg, refs=key)
 
         return result.catch(
             status=SUCCESS,
@@ -1759,7 +1759,7 @@ class ForEachStage(BaseNestedStage):
             return result.catch(
                 status=CANCEL,
                 context={
-                    "errors": StageException(
+                    "errors": StageError(
                         "Stage was canceled from event that had set "
                         "before stage foreach execution."
                     ).to_dict()
@@ -1810,7 +1810,7 @@ class ForEachStage(BaseNestedStage):
             for future in done:
                 try:
                     future.result()
-                except StageException as e:
+                except StageError as e:
                     status = FAILED
                     if "errors" in context:
                         context["errors"][e.refs] = e.to_dict()
@@ -1917,7 +1917,7 @@ class UntilStage(BaseNestedStage):
                                 "loop": loop,
                                 "item": item,
                                 "stages": filter_func(output.pop("stages", {})),
-                                "errors": StageException(error_msg).to_dict(),
+                                "errors": StageError(error_msg).to_dict(),
                             }
                         },
                     ),
@@ -1938,7 +1938,7 @@ class UntilStage(BaseNestedStage):
                     next_item = _output["item"]
 
                 stage.set_outputs(_output, to=context)
-            except StageException as e:
+            except StageError as e:
                 result.catch(
                     status=FAILED,
                     until={
@@ -1964,11 +1964,11 @@ class UntilStage(BaseNestedStage):
                             "loop": loop,
                             "item": item,
                             "stages": filter_func(output.pop("stages", {})),
-                            "errors": StageException(error_msg).to_dict(),
+                            "errors": StageError(error_msg).to_dict(),
                         }
                     },
                 )
-                raise StageException(error_msg)
+                raise StageError(error_msg)
 
         return (
             result.catch(
@@ -2019,7 +2019,7 @@ class UntilStage(BaseNestedStage):
                 return result.catch(
                     status=CANCEL,
                     context={
-                        "errors": StageException(
+                        "errors": StageError(
                             "Stage was canceled from event that had set "
                             "before stage loop execution."
                         ).to_dict()
@@ -2052,7 +2052,7 @@ class UntilStage(BaseNestedStage):
                 {},
             )
             if not isinstance(next_track, bool):
-                raise StageException(
+                raise StageError(
                     "Return type of until condition not be `boolean`, getting"
                     f": {next_track!r}"
                 )
@@ -2060,9 +2060,7 @@ class UntilStage(BaseNestedStage):
             delay(0.025)
 
         if exceed_loop:
-            raise StageException(
-                f"The until loop was exceed {self.max_loop} loops"
-            )
+            raise StageError(f"The until loop was exceed {self.max_loop} loops")
         return result.catch(status=SUCCESS)
 
 
@@ -2162,7 +2160,7 @@ class CaseStage(BaseNestedStage):
                     context={
                         "case": case,
                         "stages": filter_func(output.pop("stages", {})),
-                        "errors": StageException(error_msg).to_dict(),
+                        "errors": StageError(error_msg).to_dict(),
                     },
                 )
 
@@ -2176,7 +2174,7 @@ class CaseStage(BaseNestedStage):
                 )
                 stage.set_outputs(rs.context, to=output)
                 stage.set_outputs(stage.get_outputs(output), to=context)
-            except StageException as e:
+            except StageError as e:
                 return result.catch(
                     status=FAILED,
                     context={
@@ -2196,7 +2194,7 @@ class CaseStage(BaseNestedStage):
                     context={
                         "case": case,
                         "stages": filter_func(output.pop("stages", {})),
-                        "errors": StageException(error_msg).to_dict(),
+                        "errors": StageError(error_msg).to_dict(),
                     },
                 )
         return result.catch(
@@ -2245,7 +2243,7 @@ class CaseStage(BaseNestedStage):
         if stages is None:
             if _else is None:
                 if not self.skip_not_match:
-                    raise StageException(
+                    raise StageError(
                         "This stage does not set else for support not match "
                         "any case."
                     )
@@ -2258,7 +2256,7 @@ class CaseStage(BaseNestedStage):
                 )
                 return result.catch(
                     status=CANCEL,
-                    context={"errors": StageException(error_msg).to_dict()},
+                    context={"errors": StageError(error_msg).to_dict()},
                 )
             _case: str = "_"
             stages: list[Stage] = _else.stages
@@ -2267,7 +2265,7 @@ class CaseStage(BaseNestedStage):
             return result.catch(
                 status=CANCEL,
                 context={
-                    "errors": StageException(
+                    "errors": StageError(
                         "Stage was canceled from event that had set before "
                         "case-stage execution."
                     ).to_dict()
@@ -2280,7 +2278,7 @@ class CaseStage(BaseNestedStage):
 
 
 class RaiseStage(BaseAsyncStage):
-    """Raise error stage executor that raise `StageException` that use a message
+    """Raise error stage executor that raise `StageError` that use a message
     field for making error message before raise.
 
     Data Validate:
@@ -2293,7 +2291,7 @@ class RaiseStage(BaseAsyncStage):
 
     message: str = Field(
         description=(
-            "An error message that want to raise with `StageException` class"
+            "An error message that want to raise with `StageError` class"
         ),
         alias="raise",
     )
@@ -2305,7 +2303,7 @@ class RaiseStage(BaseAsyncStage):
         result: Optional[Result] = None,
         event: Optional[Event] = None,
     ) -> Result:
-        """Raise the StageException object with the message field execution.
+        """Raise the StageError object with the message field execution.
 
         :param params: (DictData) A parameter data.
         :param result: (Result) A Result instance for return context and status.
@@ -2318,7 +2316,7 @@ class RaiseStage(BaseAsyncStage):
         )
         message: str = param2template(self.message, params, extras=self.extras)
         result.trace.info(f"[STAGE]: Execute Raise-Stage: ( {message} )")
-        raise StageException(message)
+        raise StageError(message)
 
     async def axecute(
         self,
@@ -2345,7 +2343,7 @@ class RaiseStage(BaseAsyncStage):
         )
         message: str = param2template(self.message, params, extras=self.extras)
         await result.trace.ainfo(f"[STAGE]: Execute Raise-Stage: ( {message} )")
-        raise StageException(message)
+        raise StageError(message)
 
 
 class DockerStage(BaseStage):  # pragma: no cov
@@ -2439,7 +2437,7 @@ class DockerStage(BaseStage):  # pragma: no cov
             )
             return result.catch(
                 status=CANCEL,
-                context={"errors": StageException(error_msg).to_dict()},
+                context={"errors": StageError(error_msg).to_dict()},
             )
 
         unique_image_name: str = f"{self.image}_{datetime.now():%Y%m%d%H%M%S%f}"
@@ -2645,7 +2643,7 @@ class VirtualPyStage(PyStage):  # pragma: no cov
                 if "\\x00" in rs.stderr
                 else rs.stderr
             ).removesuffix("\n")
-            raise StageException(
+            raise StageError(
                 f"Subprocess: {e}\nRunning Statement:\n---\n"
                 f"```python\n{run}\n```"
             )

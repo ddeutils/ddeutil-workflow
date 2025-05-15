@@ -12,7 +12,7 @@ for execute on target machine instead of the current local machine.
 making matrix values before execution parallelism stage execution.
 
     The Job model does not implement `handler_execute` same as Stage model
-because the job should raise only `JobException` class from the execution
+because the job should raise only `JobError` class from the execution
 method.
 """
 from __future__ import annotations
@@ -40,9 +40,9 @@ from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
 from .__types import DictData, DictStr, Matrix, StrOrNone
-from .exceptions import (
-    JobException,
-    StageException,
+from .errors import (
+    JobError,
+    StageError,
     to_dict,
 )
 from .result import CANCEL, FAILED, SKIP, SUCCESS, WAIT, Result, Status
@@ -496,9 +496,9 @@ class Job(BaseModel):
         :param params: (DictData) A parameter value that want to pass to condition
             template.
 
-        :raise JobException: When it has any error raise from the eval
+        :raise JobError: When it has any error raise from the eval
             condition statement.
-        :raise JobException: When return type of the eval condition statement
+        :raise JobError: When return type of the eval condition statement
             does not return with boolean type.
 
         :rtype: bool
@@ -519,7 +519,7 @@ class Job(BaseModel):
                 raise TypeError("Return type of condition does not be boolean")
             return not rs
         except Exception as e:
-            raise JobException(f"{e.__class__.__name__}: {e}") from e
+            raise JobError(f"{e.__class__.__name__}: {e}") from e
 
     def set_outputs(
         self,
@@ -561,7 +561,7 @@ class Job(BaseModel):
         extract from the result context if it exists. If it does not found, it
         will not set on the received context.
 
-        :raise JobException: If the job's ID does not set and the setting
+        :raise JobError: If the job's ID does not set and the setting
             default job ID flag does not set.
 
         :param output: (DictData) A result data context that want to extract
@@ -575,7 +575,7 @@ class Job(BaseModel):
             to["jobs"] = {}
 
         if self.id is None and job_id is None:
-            raise JobException(
+            raise JobError(
                 "This job do not set the ID before setting execution output."
             )
 
@@ -593,7 +593,7 @@ class Job(BaseModel):
         if self.strategy.is_set():
             to["jobs"][_id] = {"strategies": output, **skipping, **errors}
         elif len(k := output.keys()) > 1:  # pragma: no cov
-            raise JobException(
+            raise JobError(
                 "Strategy output from execution return more than one ID while "
                 "this job does not set strategy."
             )
@@ -664,7 +664,7 @@ class Job(BaseModel):
         return result.catch(
             status=FAILED,
             context={
-                "errors": JobException(
+                "errors": JobError(
                     f"Execute runs-on type: {self.runs_on.type.value!r} does "
                     f"not support yet."
                 ).to_dict(),
@@ -700,9 +700,9 @@ def local_execute_strategy(
     :param event: (Event) An Event manager instance that use to cancel this
         execution if it forces stopped by parent execution.
 
-    :raise JobException: If event was set.
-    :raise JobException: If stage execution raise any error as `StageException`.
-    :raise JobException: If the result from execution has `FAILED` status.
+    :raise JobError: If event was set.
+    :raise JobError: If stage execution raise any error as `StageError`.
+    :raise JobError: If the result from execution has `FAILED` status.
 
     :rtype: Result
     """
@@ -737,11 +737,11 @@ def local_execute_strategy(
                     strategy_id: {
                         "matrix": strategy,
                         "stages": filter_func(context.pop("stages", {})),
-                        "errors": JobException(error_msg).to_dict(),
+                        "errors": JobError(error_msg).to_dict(),
                     },
                 },
             )
-            raise JobException(error_msg, refs=strategy_id)
+            raise JobError(error_msg, refs=strategy_id)
 
         try:
             result.trace.info(f"[JOB]: Execute Stage: {stage.iden!r}")
@@ -752,7 +752,7 @@ def local_execute_strategy(
                 event=event,
             )
             stage.set_outputs(rs.context, to=context)
-        except StageException as e:
+        except StageError as e:
             result.catch(
                 status=FAILED,
                 context={
@@ -763,7 +763,7 @@ def local_execute_strategy(
                     },
                 },
             )
-            raise JobException(
+            raise JobError(
                 message=f"Handler Error: {e.__class__.__name__}: {e}",
                 refs=strategy_id,
             ) from e
@@ -779,11 +779,11 @@ def local_execute_strategy(
                     strategy_id: {
                         "matrix": strategy,
                         "stages": filter_func(context.pop("stages", {})),
-                        "errors": JobException(error_msg).to_dict(),
+                        "errors": JobError(error_msg).to_dict(),
                     },
                 },
             )
-            raise JobException(error_msg, refs=strategy_id)
+            raise JobError(error_msg, refs=strategy_id)
 
     return result.catch(
         status=SUCCESS,
@@ -809,7 +809,7 @@ def local_execute(
     step and run multithread on this metrics to the `stages` field of this job.
 
     Important:
-        This method does not raise any `JobException` because it allows run
+        This method does not raise any `JobError` because it allows run
     parallel mode. If it raises error from strategy execution, it will catch
     that error and store it in the `errors` key with list of error.
 
@@ -848,7 +848,7 @@ def local_execute(
         return result.catch(
             status=CANCEL,
             context={
-                "errors": JobException(
+                "errors": JobError(
                     "Job was canceled from event that had set before "
                     "local job execution."
                 ).to_dict()
@@ -901,7 +901,7 @@ def local_execute(
         for future in done:
             try:
                 future.result()
-            except JobException as e:
+            except JobError as e:
                 status = FAILED
                 result.trace.error(
                     f"[JOB]: {ls} Error Handler:||{e.__class__.__name__}:||{e}"
@@ -947,7 +947,7 @@ def self_hosted_execute(
         return result.catch(
             status=CANCEL,
             context={
-                "errors": JobException(
+                "errors": JobError(
                     "Job was canceled from event that had set before start "
                     "self-hosted execution."
                 ).to_dict()
@@ -970,7 +970,7 @@ def self_hosted_execute(
         return result.catch(status=FAILED, context={"errors": to_dict(e)})
 
     if resp.status_code != 200:
-        raise JobException(
+        raise JobError(
             f"Job execution error from request to self-hosted: "
             f"{job.runs_on.args.host!r}"
         )
@@ -1022,7 +1022,7 @@ def azure_batch_execute(
         return result.catch(
             status=CANCEL,
             context={
-                "errors": JobException(
+                "errors": JobError(
                     "Job was canceled from event that had set before start "
                     "azure-batch execution."
                 ).to_dict()
@@ -1057,7 +1057,7 @@ def docker_execution(
         return result.catch(
             status=CANCEL,
             context={
-                "errors": JobException(
+                "errors": JobError(
                     "Job Docker execution was canceled from event that "
                     "had set before start execution."
                 ).to_dict()

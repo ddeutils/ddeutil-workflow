@@ -171,32 +171,35 @@ value (This config can override by extra parameters with `registry_caller` key).
 
 ```python
 from ddeutil.workflow import Result, CallerSecret, tag
-from ddeutil.workflow.exceptions import StageException
+from ddeutil.workflow.errors import StageError
 from pydantic import BaseModel
+
 
 class AwsCredential(BaseModel):
     path: str
     access_client_id: str
     access_client_secret: CallerSecret
 
+
 class RestAuth(BaseModel):
     type: str
     keys: CallerSecret
 
+
 @tag("requests", alias="get-api-with-oauth-to-s3")
 def get_api_with_oauth_to_s3(
-    method: str,
-    url: str,
-    body: dict[str, str],
-    auth: RestAuth,
-    writing_node: str,
-    aws: AwsCredential,
-    result: Result,
+        method: str,
+        url: str,
+        body: dict[str, str],
+        auth: RestAuth,
+        writing_node: str,
+        aws: AwsCredential,
+        result: Result,
 ) -> dict[str, int]:
     result.trace.info("[CALLER]: Start get data via RestAPI to S3.")
     result.trace.info(f"... {method}: {url}")
     if method != "post":
-       raise StageException(f"RestAPI does not support for {method} action.")
+        raise StageError(f"RestAPI does not support for {method} action.")
     # NOTE: If you want to use secret, you can use `auth.keys.get_secret_value()`.
     return {"records": 1000}
 ```
@@ -231,7 +234,7 @@ it will use default value and do not raise any error to you.
 | **CONF_PATH**                |   Core    | `./conf`                                                                                                                        | The config path that keep all template `.yaml` files.                                                              |
 | **TIMEZONE**                 |   Core    | `Asia/Bangkok`                                                                                                                  | A Timezone string value that will pass to `ZoneInfo` object.                                                       |
 | **STAGE_DEFAULT_ID**         |   Core    | `false`                                                                                                                         | A flag that enable default stage ID that use for catch an execution output.                                        |
-| **STAGE_RAISE_ERROR**        |   Core    | `false`                                                                                                                         | A flag that all stage raise StageException from stage execution.                                                   |
+| **STAGE_RAISE_ERROR**        |   Core    | `false`                                                                                                                         | A flag that all stage raise StageError from stage execution.                                                   |
 | **MAX_CRON_PER_WORKFLOW**    |   Core    | `5`                                                                                                                             |                                                                                                                    |
 | **MAX_QUEUE_COMPLETE_HIST**  |   Core    | `16`                                                                                                                            |                                                                                                                    |
 | **GENERATE_ID_SIMPLE_MODE**  |   Core    | `true`                                                                                                                          | A flog that enable generating ID with `md5` algorithm.                                                             |

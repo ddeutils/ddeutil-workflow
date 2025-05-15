@@ -21,7 +21,7 @@ from typing_extensions import Self
 
 from .__types import DictData
 from .conf import dynamic
-from .exceptions import ResultException
+from .errors import ResultError
 from .logs import TraceModel, get_dt_tznow, get_trace
 from .utils import default_gen_id, gen_id, get_dt_now
 
@@ -165,7 +165,7 @@ class Result:
                 if k in self.__dict__["context"]:
                     self.__dict__["context"][k].update(kwargs[k])
                 else:
-                    raise ResultException(
+                    raise ResultError(
                         f"The key {k!r} does not exists on context data."
                     )
         return self

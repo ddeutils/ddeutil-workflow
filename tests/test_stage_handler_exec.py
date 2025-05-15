@@ -11,7 +11,7 @@ from ddeutil.workflow import (
     Result,
     Workflow,
 )
-from ddeutil.workflow.exceptions import StageException
+from ddeutil.workflow.errors import StageError
 from ddeutil.workflow.stages import (
     BashStage,
     CallStage,
@@ -57,14 +57,14 @@ def test_bash_stage_exec_raise():
     )
 
     # NOTE: Raise error from bash that force exit 1.
-    with pytest.raises(StageException):
+    with pytest.raises(StageError):
         stage.handler_execute({}, raise_error=True)
 
     rs: Result = stage.handler_execute({}, raise_error=False)
     assert rs.status == FAILED
     assert rs.context == {
         "errors": {
-            "name": "StageException",
+            "name": "StageError",
             "message": (
                 "Subprocess: Test Raise Error case with failed\n"
                 "---( statement )---\n"
@@ -144,29 +144,29 @@ def test_call_stage_exec(test_path):
         }
 
         # NOTE: Raise because invalid return type.
-        with pytest.raises(StageException):
+        with pytest.raises(StageError):
             stage: Stage = CallStage(
                 name="Type not valid", uses="tasks/return-type-not-valid@raise"
             )
             stage.handler_execute({})
 
         # NOTE: Raise because necessary args do not pass.
-        with pytest.raises(StageException):
+        with pytest.raises(StageError):
             stage: Stage = workflow.job("first-job").stage("args-necessary")
             stage.handler_execute({})
 
         # NOTE: Raise because call does not valid.
-        with pytest.raises(StageException):
+        with pytest.raises(StageError):
             stage: Stage = CallStage(name="Not valid", uses="tasks-foo-bar")
             stage.handler_execute({})
 
         # NOTE: Raise because call does not register.
-        with pytest.raises(StageException):
+        with pytest.raises(StageError):
             stage: Stage = CallStage(name="Not register", uses="tasks/abc@foo")
             stage.handler_execute({})
 
         # NOTE: Raise because type of args not valid.
-        with pytest.raises(StageException):
+        with pytest.raises(StageError):
             stage: Stage = workflow.job("second-job").stage(
                 "extract-load-raise-type"
             )
@@ -196,7 +196,7 @@ def test_py_stage_exec_raise():
         run="raise ValueError('Testing raise error inside PyStage!!!')",
     )
 
-    with pytest.raises(StageException):
+    with pytest.raises(StageError):
         stage.handler_execute(params={"x": "Foo"}, raise_error=True)
 
     rs = stage.handler_execute(params={"x": "Foo"}, raise_error=False)
@@ -300,7 +300,7 @@ def test_stage_exec_trigger_raise():
             "params": {},
         }
     )
-    with pytest.raises(StageException):
+    with pytest.raises(StageError):
         stage.handler_execute(params={})
 
 
@@ -374,7 +374,7 @@ def test_foreach_stage_exec():
         id="foreach-raise",
         foreach="${{values.items}}",
     )
-    with pytest.raises(StageException):
+    with pytest.raises(StageError):
         stage.handler_execute({"values": {"items": "test"}})
 
     # NOTE: Raise because foreach item was duplicated.
@@ -382,7 +382,7 @@ def test_foreach_stage_exec():
         name="Foreach item was duplicated",
         foreach=[1, 1, 2, 3],
     )
-    with pytest.raises(StageException):
+    with pytest.raises(StageError):
         stage.handler_execute({})
 
     stage: ForEachStage = ForEachStage(
@@ -441,7 +441,7 @@ def test_foreach_stage_exec_raise(test_path):
                     "item": 2,
                     "stages": {"2709471980": {"outputs": {}}},
                     "errors": {
-                        "name": "StageException",
+                        "name": "StageError",
                         "message": "Raise for item equal 2",
                     },
                 },
@@ -453,18 +453,18 @@ def test_foreach_stage_exec_raise(test_path):
                         "2238460182": {"outputs": {}},
                     },
                     "errors": {
-                        "name": "StageException",
+                        "name": "StageError",
                         "message": "Item-Stage was canceled because event was set.",
                     },
                 },
             },
             "errors": {
                 2: {
-                    "name": "StageException",
+                    "name": "StageError",
                     "message": "Raise for item equal 2",
                 },
                 1: {
-                    "name": "StageException",
+                    "name": "StageError",
                     "message": "Item-Stage was canceled because event was set.",
                 },
             },
@@ -579,7 +579,7 @@ def test_foreach_stage_exec_concurrent_with_raise():
                             "item": 2,
                             "stages": {},
                             "errors": {
-                                "name": "StageException",
+                                "name": "StageError",
                                 "message": "PyStage: ValueError: Raise error for item equal 2",
                             },
                         },
@@ -589,7 +589,7 @@ def test_foreach_stage_exec_concurrent_with_raise():
                 },
                 "errors": {
                     2: {
-                        "name": "StageException",
+                        "name": "StageError",
                         "message": "PyStage: ValueError: Raise error for item equal 2",
                     },
                 },
@@ -662,7 +662,7 @@ def test_parallel_stage_exec(test_path):
         assert rs.context == {
             "parallel": {},
             "errors": {
-                "name": "StageException",
+                "name": "StageError",
                 "message": (
                     "Stage was canceled from event that had set before stage "
                     "parallel execution."
@@ -679,7 +679,7 @@ def test_parallel_stage_exec(test_path):
                     "branch": "branch02",
                     "stages": {},
                     "errors": {
-                        "name": "StageException",
+                        "name": "StageError",
                         "message": "Branch-Stage was canceled from event that had set before stage branch execution.",
                     },
                 },
@@ -693,7 +693,7 @@ def test_parallel_stage_exec(test_path):
             },
             "errors": {
                 "branch02": {
-                    "name": "StageException",
+                    "name": "StageError",
                     "message": "Branch-Stage was canceled from event that had set before stage branch execution.",
                 },
             },
@@ -720,14 +720,14 @@ def test_parallel_stage_exec_raise():
                 "branch": "branch01",
                 "stages": {},
                 "errors": {
-                    "name": "StageException",
+                    "name": "StageError",
                     "message": "Raise error inside parallel stage.",
                 },
             }
         },
         "errors": {
             "branch01": {
-                "name": "StageException",
+                "name": "StageError",
                 "message": "Raise error inside parallel stage.",
             },
         },
@@ -915,7 +915,7 @@ def test_stage_exec_case_match(test_path):
 
         # NOTE: Raise because else condition does not set.
         stage: Stage = workflow.job("first-job").stage("raise-else")
-        with pytest.raises(StageException):
+        with pytest.raises(StageError):
             stage.handler_execute({"params": {"name": "test"}})
 
         stage: Stage = workflow.job("first-job").stage("not-else")
@@ -927,7 +927,7 @@ def test_stage_exec_case_match(test_path):
                 "not-else": {
                     "outputs": {},
                     "errors": {
-                        "name": "StageException",
+                        "name": "StageError",
                         "message": (
                             "Case-Stage was canceled because it does not match "
                             "any case and else condition does not set too."
@@ -979,7 +979,7 @@ def test_stage_py_virtual(test_path):
                     },
                 },
             }
-        except StageException as e:
+        except StageError as e:
             print(e)
 
 
@@ -997,7 +997,7 @@ def test_raise_stage_exec():
     assert rs.status == FAILED
     assert rs.context == {
         "errors": {
-            "name": "StageException",
+            "name": "StageError",
             "message": (
                 "Demo raise error from the raise stage\n"
                 "This is the new line from error message."
@@ -1005,5 +1005,5 @@ def test_raise_stage_exec():
         }
     }
 
-    with pytest.raises(StageException):
+    with pytest.raises(StageError):
         stage.handler_execute(params={}, raise_error=True)

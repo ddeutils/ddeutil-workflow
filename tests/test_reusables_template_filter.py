@@ -3,7 +3,7 @@ from unittest import mock
 
 import pytest
 from ddeutil.workflow.conf import Config
-from ddeutil.workflow.exceptions import UtilException
+from ddeutil.workflow.errors import UtilError
 from ddeutil.workflow.reusables import (
     custom_filter,
     get_args_const,
@@ -24,7 +24,7 @@ def raise_err(_: str) -> None:  # pragma: no cov
 
 @custom_filter("raise_util_exception")
 def raise_util(_: str) -> None:  # pragma: no cov
-    raise UtilException("Demo raise error from filter function")
+    raise UtilError("Demo raise error from filter function")
 
 
 @mock.patch.object(
@@ -56,16 +56,16 @@ def test_get_args_const():
     assert args == []
     assert kwargs == {}
 
-    with pytest.raises(UtilException):
+    with pytest.raises(UtilError):
         get_args_const("lambda x: x + 1\nfoo()")
 
-    with pytest.raises(UtilException):
+    with pytest.raises(UtilError):
         get_args_const('fmt(fmt="str") + fmt()')
 
-    with pytest.raises(UtilException):
+    with pytest.raises(UtilError):
         get_args_const("foo(datetime.timedelta)")
 
-    with pytest.raises(UtilException):
+    with pytest.raises(UtilError):
         get_args_const("foo(fmt=datetime.timedelta)")
 
 
@@ -90,15 +90,15 @@ def test_map_post_filter():
         {"foo": 1, "bar": 2}, ["values", "list"], registry
     )
 
-    with pytest.raises(UtilException):
+    with pytest.raises(UtilError):
         map_post_filter("demo", ['rstr(fmt="foo")'], registry)
 
-    with pytest.raises(UtilException):
+    with pytest.raises(UtilError):
         map_post_filter("demo", ["raise_err"], registry)
 
-    with pytest.raises(UtilException):
+    with pytest.raises(UtilError):
         map_post_filter("2024", ["fmt"], registry)
 
     # NOTE: Raise util exception inside filter function
-    with pytest.raises(UtilException):
+    with pytest.raises(UtilError):
         map_post_filter("foo", ["raise_util_exception"], registry)

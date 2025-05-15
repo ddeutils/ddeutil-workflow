@@ -1,5 +1,5 @@
 import pytest
-from ddeutil.workflow.exceptions import StageException
+from ddeutil.workflow.errors import StageError
 from ddeutil.workflow.result import SUCCESS, Result
 from ddeutil.workflow.stages import EmptyStage, Stage
 from pydantic import ValidationError
@@ -91,7 +91,7 @@ def test_stage_if_condition():
     )
 
     # NOTE: Raise if the returning type after eval does not match with boolean.
-    with pytest.raises(StageException):
+    with pytest.raises(StageError):
         stage.is_skipped({"params": {"name": "foo"}})
 
 

@@ -36,7 +36,7 @@ def test_job_exec_py():
     assert rs.status == CANCEL
     assert rs.context == {
         "errors": {
-            "name": "JobException",
+            "name": "JobError",
             "message": "Job was canceled from event that had set before local job execution.",
         }
     }
@@ -53,15 +53,15 @@ def test_job_exec_py_raise():
         "EMPTY": {
             "errors": {
                 "message": "PyStage: ValueError: Testing raise error inside PyStage!!!",
-                "name": "StageException",
+                "name": "StageError",
             },
             "matrix": {},
             "stages": {},
         },
         "errors": {
-            "name": "JobException",
+            "name": "JobError",
             "message": (
-                "Handler Error: StageException: PyStage: "
+                "Handler Error: StageError: PyStage: "
                 "ValueError: Testing raise error inside PyStage!!!"
             ),
         },
@@ -125,7 +125,7 @@ def test_job_exec_py_fail_fast_raise_catch():
             "matrix": {"sleep": "2"},
             "stages": {},
             "errors": {
-                "name": "JobException",
+                "name": "JobError",
                 "message": "Job strategy was canceled because event was set.",
             },
         },
@@ -135,7 +135,7 @@ def test_job_exec_py_fail_fast_raise_catch():
                     "PyStage: ValueError: Testing raise error inside "
                     "PyStage with the sleep not equal 4!!!"
                 ),
-                "name": "StageException",
+                "name": "StageError",
             },
             "matrix": {"sleep": "1"},
             "stages": {},
@@ -144,21 +144,21 @@ def test_job_exec_py_fail_fast_raise_catch():
             "matrix": {"sleep": "4"},
             "stages": {},
             "errors": {
-                "name": "JobException",
+                "name": "JobError",
                 "message": "Job strategy was canceled because event was set.",
             },
         },
         "errors": {
             "1067561285": {
-                "name": "JobException",
+                "name": "JobError",
                 "message": "Job strategy was canceled because event was set.",
             },
             "2150810470": {
-                "name": "JobException",
-                "message": "Handler Error: StageException: PyStage: ValueError: Testing raise error inside PyStage with the sleep not equal 4!!!",
+                "name": "JobError",
+                "message": "Handler Error: StageError: PyStage: ValueError: Testing raise error inside PyStage with the sleep not equal 4!!!",
             },
             "9112472804": {
-                "name": "JobException",
+                "name": "JobError",
                 "message": "Job strategy was canceled because event was set.",
             },
         },
@@ -258,7 +258,7 @@ def test_job_exec_py_complete_raise():
                     "PyStage: ValueError: Testing raise error inside "
                     "PyStage!!!"
                 ),
-                "name": "StageException",
+                "name": "StageError",
             },
             "matrix": {"sleep": "1"},
             "stages": {"7972360640": {"outputs": {}}},
@@ -269,7 +269,7 @@ def test_job_exec_py_complete_raise():
                     "PyStage: ValueError: Testing raise error inside "
                     "PyStage!!!"
                 ),
-                "name": "StageException",
+                "name": "StageError",
             },
             "matrix": {"sleep": "4"},
             "stages": {"7972360640": {"outputs": {}}},
@@ -283,16 +283,16 @@ def test_job_exec_py_complete_raise():
         },
         "errors": {
             "2150810470": {
-                "name": "JobException",
+                "name": "JobError",
                 "message": (
-                    "Handler Error: StageException: PyStage: "
+                    "Handler Error: StageError: PyStage: "
                     "ValueError: Testing raise error inside PyStage!!!"
                 ),
             },
             "9112472804": {
-                "name": "JobException",
+                "name": "JobError",
                 "message": (
-                    "Handler Error: StageException: PyStage: "
+                    "Handler Error: StageError: PyStage: "
                     "ValueError: Testing raise error inside PyStage!!!"
                 ),
             },
@@ -310,6 +310,6 @@ def test_job_exec_runs_on_not_implement():
     assert rs.context == {
         "errors": {
             "message": "Execute runs-on type: 'self_hosted' does not support yet.",
-            "name": "JobException",
+            "name": "JobError",
         }
     }

@@ -9,7 +9,7 @@ This module include Strategy model that use on the job `strategy` field for
 making matrix values before execution parallelism stage execution.
 
 The Job model does not implement `handler_execute` same as Stage model
-because the job should raise only `JobException` class from the execution
+because the job should raise only `JobError` class from the execution
 method.
 
 ## Strategy

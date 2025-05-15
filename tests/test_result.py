@@ -1,7 +1,7 @@
 import time
 
 import pytest
-from ddeutil.workflow.exceptions import ResultException
+from ddeutil.workflow.errors import ResultError
 from ddeutil.workflow.result import (
     FAILED,
     SUCCESS,
@@ -75,7 +75,7 @@ def test_result_catch():
     assert rs.context == {"params": {"new_value": "bar"}}
 
     # NOTE: Raise because kwargs get the key that does not exist on the context.
-    with pytest.raises(ResultException):
+    with pytest.raises(ResultError):
         rs.catch(status=SUCCESS, not_exists={"foo": "bar"})
 
 

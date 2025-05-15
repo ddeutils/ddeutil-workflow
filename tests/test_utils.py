@@ -134,12 +134,12 @@ def test_reach_next_minute():
 def test_trace_meta_prepare_msg():
     print()
     rs = prepare_newline(
-        "[STAGE]: StageException: PyStage:\nRaise error from python code."
+        "[STAGE]: StageError: PyStage:\nRaise error from python code."
     )
     print(rs)
 
     rs = prepare_newline(
-        "[STAGE]: StageException: PyStage:\nRaise error from python code\n"
+        "[STAGE]: StageError: PyStage:\nRaise error from python code\n"
         "with newline statement (this is the last line for this message)."
     )
     print(rs)

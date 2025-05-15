@@ -8,7 +8,7 @@ from ddeutil.workflow import (
     RaiseStage,
     Result,
     Stage,
-    StageException,
+    StageError,
     Workflow,
 )
 
@@ -62,14 +62,14 @@ async def test_bash_stage_axec_raise():
     )
 
     # NOTE: Raise error from bash that force exit 1.
-    with pytest.raises(StageException):
+    with pytest.raises(StageError):
         await stage.handler_axecute({}, raise_error=True)
 
     rs: Result = await stage.handler_axecute({}, raise_error=False)
     assert rs.status == FAILED
     assert rs.context == {
         "errors": {
-            "name": "StageException",
+            "name": "StageError",
             "message": (
                 "Subprocess: Test Raise Error case with failed\n"
                 "---( statement )---\n"
@@ -90,12 +90,12 @@ async def test_raise_stage_axec():
     assert rs.status == FAILED
     assert rs.context == {
         "errors": {
-            "name": "StageException",
+            "name": "StageError",
             "message": "This is test message error",
         },
     }
 
-    with pytest.raises(StageException):
+    with pytest.raises(StageError):
         await stage.handler_axecute(params={}, raise_error=True)
 
 
@@ -147,14 +147,14 @@ async def test_call_stage_axec(test_path):
         assert rs.context == {"records": 1}
 
         # NOTE: Raise because invalid return type.
-        with pytest.raises(StageException):
+        with pytest.raises(StageError):
             stage: Stage = CallStage(
                 name="Type not valid", uses="tasks/return-type-not-valid@raise"
             )
             await stage.handler_axecute({}, raise_error=True)
 
         # NOTE: Raise because necessary args do not pass.
-        with pytest.raises(StageException):
+        with pytest.raises(StageError):
             stage: Stage = workflow.job("first-job").stage("args-necessary")
             await stage.handler_axecute({}, raise_error=True)
 
@@ -172,7 +172,7 @@ async def test_call_stage_axec(test_path):
         }
 
         # NOTE: Raise because call does not valid.
-        with pytest.raises(StageException):
+        with pytest.raises(StageError):
             stage: Stage = CallStage(name="Not valid", uses="tasks-foo-bar")
             await stage.handler_axecute({}, raise_error=True)
 
@@ -187,7 +187,7 @@ async def test_call_stage_axec(test_path):
         }
 
         # NOTE: Raise because call does not register.
-        with pytest.raises(StageException):
+        with pytest.raises(StageError):
             stage: Stage = CallStage(name="Not register", uses="tasks/abc@foo")
             await stage.handler_axecute({})
 

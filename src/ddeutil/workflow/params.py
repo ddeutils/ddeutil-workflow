@@ -21,7 +21,7 @@ from ddeutil.core import str2dict, str2list
 from pydantic import BaseModel, Field
 
 from .__types import StrOrInt
-from .exceptions import ParamValueException
+from .errors import ParamError
 from .utils import get_d_now, get_dt_now
 
 T = TypeVar("T")
@@ -101,14 +101,14 @@ class DateParam(DefaultParam):  # pragma: no cov
         elif isinstance(value, date):
             return value
         elif not isinstance(value, str):
-            raise ParamValueException(
+            raise ParamError(
                 f"Value that want to convert to date does not support for "
                 f"type: {type(value)}"
             )
         try:
             return date.fromisoformat(value)
         except ValueError:
-            raise ParamValueException(
+            raise ParamError(
                 f"Invalid the ISO format string for date: {value!r}"
             ) from None
 
@@ -143,14 +143,14 @@ class DatetimeParam(DefaultParam):
         elif isinstance(value, date):
             return datetime(value.year, value.month, value.day)
         elif not isinstance(value, str):
-            raise ParamValueException(
+            raise ParamError(
                 f"Value that want to convert to datetime does not support for "
                 f"type: {type(value)}"
             )
         try:
             return datetime.fromisoformat(value)
         except ValueError:
-            raise ParamValueException(
+            raise ParamError(
                 f"Invalid the ISO format string for datetime: {value!r}"
             ) from None
 
@@ -189,7 +189,7 @@ class IntParam(DefaultParam):
             try:
                 return int(str(value))
             except ValueError as err:
-                raise ParamValueException(
+                raise ParamError(
                     f"Value can not convert to int, {value}, with base 10"
                 ) from err
         return value
@@ -299,7 +299,7 @@ class ChoiceParam(BaseParam):
         if value is None:
             return self.options[0]
         if value not in self.options:
-            raise ParamValueException(
+            raise ParamError(
                 f"{value!r} does not match any value in choice options."
             )
         return value
@@ -331,12 +331,12 @@ class MapParam(DefaultParam):
             try:
                 value: dict[Any, Any] = str2dict(value)
             except ValueError as e:
-                raise ParamValueException(
+                raise ParamError(
                     f"Value that want to convert to map does not support for "
                     f"type: {type(value)}"
                 ) from e
         elif not isinstance(value, dict):
-            raise ParamValueException(
+            raise ParamError(
                 f"Value of map param support only string-dict or dict type, "
                 f"not {type(value)}"
             )
@@ -366,14 +366,14 @@ class ArrayParam(DefaultParam):
             try:
                 value: list[T] = str2list(value)
             except ValueError as e:
-                raise ParamValueException(
+                raise ParamError(
                     f"Value that want to convert to array does not support for "
                     f"type: {type(value)}"
                 ) from e
         elif isinstance(value, (tuple, set)):
             return list(value)
         elif not isinstance(value, list):
-            raise ParamValueException(
+            raise ParamError(
                 f"Value of map param support only string-list or list type, "
                 f"not {type(value)}"
             )
