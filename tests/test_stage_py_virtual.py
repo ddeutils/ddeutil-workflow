@@ -1,4 +1,4 @@
-from ddeutil.workflow import Stage, StageError, Workflow
+from ddeutil.workflow import Result, Stage, StageError, Workflow
 
 from .utils import dump_yaml_context
 
@@ -28,16 +28,17 @@ def test_stage_py_virtual(test_path):
         stage: Stage = workflow.job("first-job").stage("py-virtual")
         # TODO: This testcase raise error for uv does not exist on GH action.
         try:
-            rs: dict = stage.set_outputs(
-                stage.handler_execute({"params": {}}).context, to={}
-            )
-            assert rs == {
+            rs: Result = stage.handler_execute(params={"params": {}})
+            print(rs.context)
+
+            output = stage.set_outputs(rs.context, to={})
+            assert output == {
                 "stages": {
                     "py-virtual": {
                         "outputs": {
                             "return_code": 0,
                             "stdout": "[1 2 3 4 5]\n<class 'numpy.ndarray'>",
-                            "stderr": rs["stages"]["py-virtual"]["outputs"][
+                            "stderr": output["stages"]["py-virtual"]["outputs"][
                                 "stderr"
                             ],
                         },

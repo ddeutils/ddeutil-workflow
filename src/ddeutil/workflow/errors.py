@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Literal, Optional, TypedDict, Union, overload
 
-from .__types import DictData
+from .__types import DictData, StrOrInt
 
 
 class ErrorData(TypedDict):
@@ -46,7 +46,7 @@ class BaseError(Exception):
         self,
         message: str,
         *,
-        refs: Optional[str] = None,
+        refs: Optional[StrOrInt] = None,
         context: Optional[DictData] = None,
         params: Optional[DictData] = None,
     ) -> None:
@@ -90,7 +90,13 @@ class ResultError(UtilError): ...
 class StageError(BaseError): ...
 
 
-class StageSkipError(BaseError): ...
+class StageRetryError(StageError): ...
+
+
+class StageCancelError(StageError): ...
+
+
+class StageSkipError(StageError): ...
 
 
 class JobError(BaseError): ...

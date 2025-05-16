@@ -3,6 +3,8 @@ from threading import Event
 from ddeutil.workflow import (
     CANCEL,
     FAILED,
+    SKIP,
+    SUCCESS,
     ParallelStage,
     Result,
     Workflow,
@@ -42,30 +44,66 @@ def test_parallel_stage_exec(test_path):
             name="tmp-wf-parallel",
         )
         stage: Stage = workflow.job("first-job").stage("parallel-stage")
-        rs = stage.set_outputs(stage.handler_execute({}).context, to={})
-        assert rs == {
+        rs: Result = stage.handler_execute(params={})
+        assert rs.status == SUCCESS
+        assert rs.context == {
+            "status": SUCCESS,
+            "workers": 2,
+            "parallel": {
+                "branch02": {
+                    "status": SUCCESS,
+                    "branch": "branch02",
+                    "stages": {
+                        "4967824305": {"outputs": {}, "status": SUCCESS}
+                    },
+                },
+                "branch01": {
+                    "status": SUCCESS,
+                    "branch": "branch01",
+                    "stages": {
+                        "0573477600": {"outputs": {}, "status": SUCCESS},
+                        "skip-stage": {"outputs": {}, "status": SKIP},
+                    },
+                },
+            },
+        }
+
+        output = stage.set_outputs(rs.context, to={})
+        assert output == {
             "stages": {
                 "parallel-stage": {
+                    "status": SUCCESS,
                     "outputs": {
+                        "workers": 2,
                         "parallel": {
                             "branch02": {
+                                "status": SUCCESS,
                                 "branch": "branch02",
-                                "stages": {"4967824305": {"outputs": {}}},
+                                "stages": {
+                                    "4967824305": {
+                                        "outputs": {},
+                                        "status": SUCCESS,
+                                    }
+                                },
                             },
                             "branch01": {
+                                "status": SUCCESS,
                                 "branch": "branch01",
                                 "stages": {
-                                    "0573477600": {"outputs": {}},
+                                    "0573477600": {
+                                        "outputs": {},
+                                        "status": SUCCESS,
+                                    },
                                     "skip-stage": {
                                         "outputs": {},
-                                        "skipped": True,
+                                        "status": SKIP,
                                     },
                                 },
                             },
                         },
                     },
-                },
-            },
+                }
+            }
         }
 
         event = Event()
@@ -73,13 +111,12 @@ def test_parallel_stage_exec(test_path):
         rs: Result = stage.handler_execute({}, event=event)
         assert rs.status == CANCEL
         assert rs.context == {
+            "status": CANCEL,
+            "workers": 2,
             "parallel": {},
             "errors": {
                 "name": "StageError",
-                "message": (
-                    "Stage was canceled from event that had set before stage "
-                    "parallel execution."
-                ),
+                "message": "Stage was canceled from event that had set before stage parallel execution.",
             },
         }
 
@@ -87,8 +124,11 @@ def test_parallel_stage_exec(test_path):
         rs: Result = stage.handler_execute({}, event=event)
         assert rs.status == FAILED
         assert rs.context == {
+            "status": FAILED,
+            "workers": 2,
             "parallel": {
                 "branch02": {
+                    "status": CANCEL,
                     "branch": "branch02",
                     "stages": {},
                     "errors": {
@@ -97,16 +137,24 @@ def test_parallel_stage_exec(test_path):
                     },
                 },
                 "branch01": {
+                    "status": CANCEL,
                     "branch": "branch01",
                     "stages": {
-                        "0573477600": {"outputs": {}},
-                        "skip-stage": {"outputs": {}, "skipped": True},
+                        "0573477600": {"outputs": {}, "status": SUCCESS}
+                    },
+                    "errors": {
+                        "name": "StageError",
+                        "message": "Branch-Stage was canceled from event that had set before stage branch execution.",
                     },
                 },
             },
             "errors": {
                 "branch02": {
-                    "name": "StageError",
+                    "name": "StageCancelError",
+                    "message": "Branch-Stage was canceled from event that had set before stage branch execution.",
+                },
+                "branch01": {
+                    "name": "StageCancelError",
                     "message": "Branch-Stage was canceled from event that had set before stage branch execution.",
                 },
             },
@@ -128,8 +176,11 @@ def test_parallel_stage_exec_raise():
     rs: Result = stage.handler_execute({})
     assert rs.status == FAILED
     assert rs.context == {
+        "status": FAILED,
+        "workers": 2,
         "parallel": {
             "branch01": {
+                "status": FAILED,
                 "branch": "branch01",
                 "stages": {
                     "6966382767": {
@@ -138,18 +189,19 @@ def test_parallel_stage_exec_raise():
                             "name": "StageError",
                             "message": "Raise error inside parallel stage.",
                         },
+                        "status": FAILED,
                     }
                 },
                 "errors": {
                     "name": "StageError",
-                    "message": "Branch-Stage was break because it has a sub stage, Raise Stage, failed without raise error.",
+                    "message": "Branch-Stage was break because it has a nested-stage, Raise Stage, failed.",
                 },
             }
         },
         "errors": {
             "branch01": {
                 "name": "StageError",
-                "message": "Branch-Stage was break because it has a sub stage, Raise Stage, failed without raise error.",
+                "message": "Branch-Stage was break because it has a nested-stage, Raise Stage, failed.",
             }
         },
     }

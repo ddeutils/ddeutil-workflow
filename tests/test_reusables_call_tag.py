@@ -97,17 +97,17 @@ def test_make_registry(call_function):
 def test_make_registry_from_env():
     rs: dict[str, Registry] = make_registry("tasks")
     assert set(rs.keys()) == {
-        "async-el-csv-to-parquet",
-        "el-csv-to-parquet",
         "gen-type",
         "get-groups-from-priority",
         "get-items",
         "get-processes-from-group",
         "get-stream-info",
-        "mssql-proc",
+        "private-args-task",
         "return-type-not-valid",
         "routing-01",
         "routing-02",
+        "simple-task",
+        "simple-task-async",
         "start-process",
         "start-stream",
     }
@@ -126,8 +126,8 @@ def test_make_registry_raise(call_function_dup):
 
 
 def test_extract_caller():
-    func = extract_call("tasks/el-csv-to-parquet@polars-dir")
+    func = extract_call("tasks/simple-task@demo")
     call_func = func()
-    assert call_func.name == "el-csv-to-parquet"
-    assert call_func.tag == "polars-dir"
+    assert call_func.name == "simple-task"
+    assert call_func.tag == "demo"
     assert call_func.mark == "tag"

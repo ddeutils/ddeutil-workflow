@@ -1,7 +1,6 @@
-from threading import Event
-
 from ddeutil.workflow import Job, Workflow
 from ddeutil.workflow.result import CANCEL, FAILED, SUCCESS, Result
+from utils import MockEvent
 
 
 def test_job_exec_py():
@@ -9,11 +8,15 @@ def test_job_exec_py():
     rs: Result = job.execute(params={"params": {"name": "Foo"}})
     assert rs.status == SUCCESS
     assert rs.context == {
+        "status": SUCCESS,
         "EMPTY": {
             "matrix": {},
             "stages": {
-                "hello-world": {"outputs": {"x": "New Name"}},
-                "run-var": {"outputs": {"x": 1}},
+                "hello-world": {
+                    "outputs": {"x": "New Name"},
+                    "status": SUCCESS,
+                },
+                "run-var": {"outputs": {"x": 1}, "status": SUCCESS},
             },
         },
     }
@@ -22,23 +25,27 @@ def test_job_exec_py():
     assert output == {
         "jobs": {
             "demo-run": {
+                "status": SUCCESS,
                 "stages": {
-                    "hello-world": {"outputs": {"x": "New Name"}},
-                    "run-var": {"outputs": {"x": 1}},
+                    "hello-world": {
+                        "outputs": {"x": "New Name"},
+                        "status": SUCCESS,
+                    },
+                    "run-var": {"outputs": {"x": 1}, "status": SUCCESS},
                 },
             },
         },
     }
 
-    event = Event()
-    event.set()
+    event = MockEvent(n=0)
     rs: Result = job.execute(params={"params": {"name": "Foo"}}, event=event)
     assert rs.status == CANCEL
     assert rs.context == {
+        "status": CANCEL,
         "errors": {
             "name": "JobError",
             "message": "Job was canceled from event that had set before local job execution.",
-        }
+        },
     }
 
 
@@ -50,10 +57,12 @@ def test_job_exec_py_raise():
     )
     assert rs.status == FAILED
     assert rs.context == {
+        "status": FAILED,
         "EMPTY": {
             "matrix": {},
             "stages": {
                 "raise-error": {
+                    "status": FAILED,
                     "outputs": {},
                     "errors": {
                         "name": "ValueError",
@@ -78,10 +87,13 @@ def test_job_exec_py_not_set_output():
         name="wf-run-python-raise", extras={"stage_default_id": False}
     )
     job: Job = workflow.job("second-job")
-    rs = job.execute(params={})
-    assert {"EMPTY": {"matrix": {}, "stages": {}}} == rs.context
+    rs: Result = job.execute(params={})
+    assert rs.context == {
+        "status": SUCCESS,
+        "EMPTY": {"matrix": {}, "stages": {}},
+    }
     assert job.set_outputs(rs.context, to={}) == {
-        "jobs": {"second-job": {"stages": {}}}
+        "jobs": {"second-job": {"status": SUCCESS, "stages": {}}}
     }
 
 
@@ -93,17 +105,30 @@ def test_job_exec_py_fail_fast():
     )
     assert rs.status == SUCCESS
     assert rs.context == {
+        "status": SUCCESS,
         "2150810470": {
             "matrix": {"sleep": "1"},
-            "stages": {"success": {"outputs": {"result": "fast-success"}}},
+            "stages": {
+                "success": {
+                    "outputs": {"result": "fast-success"},
+                    "status": SUCCESS,
+                }
+            },
         },
         "4855178605": {
             "matrix": {"sleep": "5"},
-            "stages": {"success": {"outputs": {"result": "fast-success"}}},
+            "stages": {
+                "success": {
+                    "outputs": {"result": "fast-success"},
+                    "status": SUCCESS,
+                }
+            },
         },
         "9873503202": {
             "matrix": {"sleep": "0.1"},
-            "stages": {"success": {"outputs": {"result": "success"}}},
+            "stages": {
+                "success": {"outputs": {"result": "success"}, "status": SUCCESS}
+            },
         },
     }
 
@@ -119,10 +144,12 @@ def test_job_exec_py_fail_fast_raise_catch():
     )
     assert rs.status == FAILED
     assert rs.context == {
+        "status": FAILED,
         "2150810470": {
             "matrix": {"sleep": "1"},
             "stages": {
                 "raise-error": {
+                    "status": FAILED,
                     "outputs": {},
                     "errors": {
                         "name": "ValueError",

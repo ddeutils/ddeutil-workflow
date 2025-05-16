@@ -1,16 +1,8 @@
 from inspect import isfunction
 
 import pytest
-from ddeutil.workflow import (
-    FAILED,
-    SUCCESS,
-    Result,
-    Workflow,
-)
-from ddeutil.workflow.stages import (
-    PyStage,
-    Stage,
-)
+from ddeutil.workflow import FAILED, SUCCESS, Result, Workflow
+from ddeutil.workflow.stages import PyStage, Stage
 
 
 def test_py_stage_exec_raise():
@@ -23,16 +15,18 @@ def test_py_stage_exec_raise():
     rs = stage.handler_execute(params={"x": "Foo"})
     assert rs.status == FAILED
     assert rs.context == {
+        "status": FAILED,
         "errors": {
             "name": "ValueError",
             "message": "Testing raise error inside PyStage!!!",
-        }
+        },
     }
 
     output = stage.set_outputs(rs.context, {})
     assert output == {
         "stages": {
             "raise-error": {
+                "status": FAILED,
                 "outputs": {},
                 "errors": {
                     "name": "ValueError",
@@ -61,17 +55,12 @@ def test_py_stage_exec():
         }
     )
     assert rs.status == SUCCESS
+    assert rs.context == {"status": SUCCESS, "locals": {"x": 1}, "globals": {}}
 
-    rs: dict = stage.set_outputs(
-        stage.handler_execute(
-            params={
-                "params": {"name": "Author"},
-                "stages": {"hello-world": {"outputs": {"x": "Foo"}}},
-            }
-        ).context,
-        to={},
-    )
-    assert rs == {"stages": {"run-var": {"outputs": {"x": 1}}}}
+    output = stage.set_outputs(rs.context, to={})
+    assert output == {
+        "stages": {"run-var": {"outputs": {"x": 1}, "status": SUCCESS}}
+    }
 
 
 def test_py_stage_exec_create_func():
@@ -87,10 +76,10 @@ def test_py_stage_exec_create_func():
     rs: Result = stage.handler_execute(params={})
     assert rs.status == SUCCESS
 
-    rs: dict = stage.set_outputs(rs.context, {})
-    assert isfunction(rs["stages"]["create-func"]["outputs"]["echo"])
+    output = stage.set_outputs(rs.context, {})
+    assert isfunction(output["stages"]["create-func"]["outputs"]["echo"])
     assert (
-        rs["stages"]["create-func"]["outputs"]["var_inside"]
+        output["stages"]["create-func"]["outputs"]["var_inside"]
         == "Create Function Inside"
     )
 
@@ -98,8 +87,11 @@ def test_py_stage_exec_create_func():
 def test_py_stage_exec_create_object():
     workflow: Workflow = Workflow.from_conf(name="wf-run-python-filter")
     stage: Stage = workflow.job("create-job").stage(stage_id="create-stage")
-    rs = stage.set_outputs(stage.handler_execute(params={}).context, to={})
-    assert len(rs["stages"]["create-stage"]["outputs"]) == 1
+    rs: Result = stage.handler_execute(params={})
+    assert rs.status == SUCCESS
+
+    output = stage.set_outputs(rs.context, to={})
+    assert len(output["stages"]["create-stage"]["outputs"]) == 1
 
 
 @pytest.mark.asyncio
@@ -110,16 +102,18 @@ async def test_py_stage_axec_not_raise():
     rs: Result = await stage.handler_axecute(params={"x": "Foo"})
     assert rs.status == FAILED
     assert rs.context == {
+        "status": FAILED,
         "errors": {
             "name": "ValueError",
             "message": "Testing raise error inside PyStage!!!",
-        }
+        },
     }
 
     output = stage.set_outputs(rs.context, {})
     assert output == {
         "stages": {
             "raise-error": {
+                "status": FAILED,
                 "outputs": {},
                 "errors": {
                     "name": "ValueError",
@@ -137,15 +131,16 @@ async def test_py_stage_axec_with_vars():
         .job("demo-run")
         .stage("run-var")
     )
-    rs = stage.set_outputs(
-        (
-            await stage.handler_axecute(
-                params={
-                    "params": {"name": "Author"},
-                    "stages": {"hello-world": {"outputs": {"x": "Foo"}}},
-                }
-            )
-        ).context,
-        to={},
+    rs: Result = await stage.handler_axecute(
+        params={
+            "params": {"name": "Author"},
+            "stages": {"hello-world": {"outputs": {"x": "Foo"}}},
+        }
     )
-    assert rs == {"stages": {"run-var": {"outputs": {"x": 1}}}}
+    assert rs.status == SUCCESS
+    assert rs.context == {"status": SUCCESS, "locals": {"x": 1}, "globals": {}}
+
+    output = stage.set_outputs(rs.context, to={})
+    assert output == {
+        "stages": {"run-var": {"outputs": {"x": 1}, "status": SUCCESS}}
+    }

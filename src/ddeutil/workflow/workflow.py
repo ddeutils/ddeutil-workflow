@@ -8,9 +8,6 @@ ReleaseQueue, and Workflow models.
 
     This package implement timeout strategy on the workflow execution layer only
 because the main propose of this package is using Workflow to be orchestrator.
-
-    ReleaseQueue is the memory storage of Release for tracking this release
-already run or pending in the current session.
 """
 from __future__ import annotations
 
@@ -606,9 +603,7 @@ class Workflow(BaseModel):
             "max_job_exec_timeout", f=timeout, extras=self.extras
         )
 
-        with ThreadPoolExecutor(
-            max_workers=max_job_parallel, thread_name_prefix="wf_exec_"
-        ) as executor:
+        with ThreadPoolExecutor(max_job_parallel, "wf") as executor:
             futures: list[Future] = []
 
             while not job_queue.empty() and (

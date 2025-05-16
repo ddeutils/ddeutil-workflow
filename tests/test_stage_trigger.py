@@ -25,9 +25,10 @@ def test_trigger_stage_exec():
             "first-job": {
                 "stages": {
                     "printing": {
-                        "outputs": {"x": "Trigger Runner", "status": SUCCESS}
+                        "outputs": {"x": "Trigger Runner"},
+                        "status": SUCCESS,
                     },
-                    "setting-x": {"outputs": {"x": 1, "status": SUCCESS}},
+                    "setting-x": {"outputs": {"x": 1}, "status": SUCCESS},
                 },
                 "status": SUCCESS,
             },
@@ -37,11 +38,11 @@ def test_trigger_stage_exec():
                         "outputs": {
                             "var_inside": "Create Function Inside",
                             "echo": "echo",
-                            "status": SUCCESS,
-                        }
+                        },
+                        "status": SUCCESS,
                     },
-                    "call-func": {"outputs": {"status": SUCCESS}},
-                    "9150930869": {"outputs": {"status": SUCCESS}},
+                    "call-func": {"outputs": {}, "status": SUCCESS},
+                    "9150930869": {"outputs": {}, "status": SUCCESS},
                 },
                 "status": SUCCESS,
             },
@@ -49,11 +50,11 @@ def test_trigger_stage_exec():
                 "stages": {
                     "1772094681": {
                         "outputs": {
-                            "status": SUCCESS,
                             "return_code": 0,
                             "stdout": "Hello World",
                             "stderr": None,
-                        }
+                        },
+                        "status": SUCCESS,
                     }
                 },
                 "status": SUCCESS,

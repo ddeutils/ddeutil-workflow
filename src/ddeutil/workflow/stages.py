@@ -62,6 +62,7 @@ from pydantic import BaseModel, Field, ValidationError
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
+from . import StageCancelError, StageRetryError
 from .__types import DictData, DictStr, StrOrInt, StrOrNone, TupleStr
 from .conf import dynamic, pass_env
 from .errors import StageError, StageSkipError, to_dict
@@ -261,25 +262,46 @@ class BaseStage(BaseModel, ABC):
                     f"Skip because condition {self.condition} was valid."
                 )
 
-            return self.execute(params, result=result, event=event)
+            return self.__execute(params, result=result, event=event)
+        # NOTE: Catch this error in this line because the execution can raise
+        #   this exception class at other location.
         except StageSkipError as e:  # pragma: no cov
             result.trace.info(
                 f"[STAGE]: Skip Handler:||StageSkipError: {e}||"
                 f"{traceback.format_exc()}"
             )
-            return result.catch(status=SKIP, context={"skipped": True})
-        except StageError as e:
+            return result.catch(status=SKIP)
+        except (StageError, StageCancelError) as e:
             result.trace.error(
                 f"[STAGE]: Error Handler:||StageError: {e}||"
                 f"{traceback.format_exc()}"
             )
-            return result.catch(status=FAILED, context={"errors": e.to_dict()})
+            return result.catch(
+                status=CANCEL if isinstance(e, StageCancelError) else FAILED,
+                context={"errors": e.to_dict()},
+            )
         except Exception as e:
             result.trace.error(
                 f"[STAGE]: Error Handler:||{e.__class__.__name__}: {e}||"
                 f"{traceback.format_exc()}"
             )
             return result.catch(status=FAILED, context={"errors": to_dict(e)})
+
+    def __execute(
+        self, params: DictData, result: Result, event: Optional[Event]
+    ) -> Result:
+        """Wrapped the execute method before returning to handler execution.
+
+        :param params: (DictData) A parameter data that want to use in this
+            execution.
+        :param result: (Result) A result object for keeping context and status
+            data.
+        :param event: (Event) An event manager that use to track parent execute
+            was not force stopped.
+
+        :rtype: Result
+        """
+        return self.execute(params, result=result, event=event)
 
     def set_outputs(self, output: DictData, to: DictData) -> DictData:
         """Set an outputs from execution result context to the received context
@@ -333,10 +355,10 @@ class BaseStage(BaseModel, ABC):
         errors: DictData = (
             {"errors": output.pop("errors")} if "errors" in output else {}
         )
-        skipping: dict[str, bool] = (
-            {"skipped": output.pop("skipped")} if "skipped" in output else {}
+        status: dict[str, Status] = (
+            {"status": output.pop("status")} if "status" in output else {}
         )
-        to["stages"][_id] = {"outputs": output, **skipping, **errors}
+        to["stages"][_id] = {"outputs": output} | errors | status
         return to
 
     def get_outputs(self, output: DictData) -> DictData:
@@ -416,7 +438,7 @@ class BaseStage(BaseModel, ABC):
         return False
 
 
-class BaseAsyncStage(BaseStage):
+class BaseAsyncStage(BaseStage, ABC):
     """Base Async Stage model to make any stage model allow async execution for
     optimize CPU and Memory on the current node. If you want to implement any
     custom async stage, you can inherit this class and implement
@@ -425,18 +447,6 @@ class BaseAsyncStage(BaseStage):
         This class is the abstraction class for any inherit asyncable stage
     model.
     """
-
-    @abstractmethod
-    def execute(
-        self,
-        params: DictData,
-        *,
-        result: Optional[Result] = None,
-        event: Optional[Event] = None,
-    ) -> Result:
-        raise NotImplementedError(
-            "Async Stage should implement `execute` method."
-        )
 
     @abstractmethod
     async def axecute(
@@ -498,7 +508,7 @@ class BaseAsyncStage(BaseStage):
                 await result.trace.adebug(
                     f"[STAGE]: Description:||{self.desc}||"
                 )
-            return await self.axecute(params, result=result, event=event)
+            return await self.__axecute(params, result=result, event=event)
         except StageSkipError as e:  # pragma: no cov
             await result.trace.ainfo(
                 f"[STAGE]: Skip Handler:||StageSkipError: {e}||"
@@ -517,6 +527,87 @@ class BaseAsyncStage(BaseStage):
                 f"{traceback.format_exc()}"
             )
             return result.catch(status=FAILED, context={"errors": to_dict(e)})
+
+    async def __axecute(
+        self, params: DictData, result: Result, event: Optional[Event]
+    ) -> Result:
+        """Wrapped the axecute method before returning to handler axecute.
+
+        :param params: (DictData) A parameter data that want to use in this
+            execution.
+        :param result: (Result) A result object for keeping context and status
+            data.
+        :param event: (Event) An event manager that use to track parent execute
+            was not force stopped.
+
+        :rtype: Result
+        """
+        return await self.axecute(params, result=result, event=event)
+
+
+class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
+    """Base Retry Stage model that will execute again when it raises with the
+    `StageRetryError`.
+    """
+
+    retry: int = Field(
+        default=0,
+        ge=0,
+        lt=20,
+        description="Retry number if stage execution get the error.",
+    )
+
+    def __execute(
+        self,
+        params: DictData,
+        result: Result,
+        event: Optional[Event],
+    ) -> Result:
+        """Wrapped the execute method with retry strategy before returning to
+        handler execute.
+
+        :param params: (DictData) A parameter data that want to use in this
+            execution.
+        :param result: (Result) A result object for keeping context and status
+            data.
+        :param event: (Event) An event manager that use to track parent execute
+            was not force stopped.
+
+        :rtype: Result
+        """
+        current_retry: int = 0
+        with current_retry < (self.retry + 1):
+            try:
+                return self.execute(params, result=result, event=event)
+            except StageRetryError:
+                current_retry += 1
+        raise StageError("Reach of retry number")
+
+    async def __axecute(
+        self,
+        params: DictData,
+        result: Result,
+        event: Optional[Event],
+    ) -> Result:
+        """Wrapped the axecute method with retry strategy before returning to
+        handler axecute.
+
+        :param params: (DictData) A parameter data that want to use in this
+            execution.
+        :param result: (Result) A result object for keeping context and status
+            data.
+        :param event: (Event) An event manager that use to track parent execute
+            was not force stopped.
+
+        :rtype: Result
+        """
+        current_retry: int = 0
+        with current_retry < (self.retry + 1):
+            try:
+                return await self.axecute(params, result=result, event=event)
+            except StageRetryError:
+                current_retry += 1
+        raise StageError("Reach of retry number")
 
 
 class EmptyStage(BaseAsyncStage):
@@ -964,6 +1055,7 @@ class PyStage(BaseAsyncStage):
                         and not ismodule(gb[k])
                         and not isclass(gb[k])
                         and not isfunction(gb[k])
+                        and k in params
                     )
                 },
             },
@@ -1019,6 +1111,7 @@ class PyStage(BaseAsyncStage):
                         and not ismodule(gb[k])
                         and not isclass(gb[k])
                         and not isfunction(gb[k])
+                        and k in params
                     )
                 },
             },
@@ -1289,35 +1382,16 @@ class CallStage(BaseAsyncStage):
             return args
 
 
-class BaseNestedStage(BaseStage):
+class BaseNestedStage(BaseStage, ABC):
     """Base Nested Stage model. This model is use for checking the child stage
     is the nested stage or not.
     """
 
-    @abstractmethod
-    def execute(
-        self,
-        params: DictData,
-        *,
-        result: Optional[Result] = None,
-        event: Optional[Event] = None,
-    ) -> Result:
-        """Execute abstraction method that action something by sub-model class.
-        This is important method that make this class is able to be the nested
-        stage.
+    def set_outputs(self, output: DictData, to: DictData) -> DictData:
+        return super().set_outputs(output, to=to)
 
-        :param params: (DictData) A parameter data that want to use in this
-            execution.
-        :param result: (Result) A result object for keeping context and status
-            data.
-        :param event: (Event) An event manager that use to track parent execute
-            was not force stopped.
-
-        :rtype: Result
-        """
-        raise NotImplementedError(
-            "Nested-Stage should implement `execute` method."
-        )
+    def get_outputs(self, output: DictData) -> DictData:
+        return super().get_outputs(output)
 
     @property
     def is_nested(self) -> bool:
@@ -1326,6 +1400,13 @@ class BaseNestedStage(BaseStage):
         :rtype: bool
         """
         return True
+
+    @staticmethod
+    def mark_errors(context: DictData, error: StageError) -> None:
+        if "errors" in context:
+            context["errors"][error.refs] = error.to_dict()
+        else:
+            context["errors"] = error.to_dict(with_refs=True)
 
 
 class TriggerStage(BaseNestedStage):
@@ -1465,15 +1546,12 @@ class ParallelStage(BaseNestedStage):
         context: DictData = copy.deepcopy(params)
         context.update({"branch": branch})
         output: DictData = {"branch": branch, "stages": {}}
-        for stage in self.parallel[branch]:
+        total_stage: int = len(self.parallel[branch])
+        skips: list[bool] = [False] * total_stage
+        for i, stage in enumerate(self.parallel[branch], start=0):
 
             if self.extras:
                 stage.extras = self.extras
-
-            if stage.is_skipped(params=context):
-                result.trace.info(f"[STAGE]: Skip stage: {stage.iden!r}")
-                stage.set_outputs(output={"skipped": True}, to=output)
-                continue
 
             if event and event.is_set():
                 error_msg: str = (
@@ -1484,13 +1562,14 @@ class ParallelStage(BaseNestedStage):
                     status=CANCEL,
                     parallel={
                         branch: {
+                            "status": CANCEL,
                             "branch": branch,
                             "stages": filter_func(output.pop("stages", {})),
                             "errors": StageError(error_msg).to_dict(),
                         }
                     },
                 )
-                raise StageError(error_msg, refs=branch)
+                raise StageCancelError(error_msg, refs=branch)
 
             rs: Result = stage.handler_execute(
                 params=context,
@@ -1501,15 +1580,20 @@ class ParallelStage(BaseNestedStage):
             stage.set_outputs(rs.context, to=output)
             stage.set_outputs(stage.get_outputs(output), to=context)
 
+            if rs.status == SKIP:
+                skips[i] = True
+                continue
+
             if rs.status == FAILED:  # pragma: no cov
                 error_msg: str = (
-                    f"Branch-Stage was break because it has a sub stage, "
-                    f"{stage.iden}, failed without raise error."
+                    f"Branch-Stage was break because it has a nested-stage, "
+                    f"{stage.iden}, failed."
                 )
                 result.catch(
                     status=FAILED,
                     parallel={
                         branch: {
+                            "status": FAILED,
                             "branch": branch,
                             "stages": filter_func(output.pop("stages", {})),
                             "errors": StageError(error_msg).to_dict(),
@@ -1518,10 +1602,12 @@ class ParallelStage(BaseNestedStage):
                 )
                 raise StageError(error_msg, refs=branch)
 
+        status: Status = SKIP if sum(skips) == total_stage else SUCCESS
         return result.catch(
-            status=SUCCESS,
+            status=status,
             parallel={
                 branch: {
+                    "status": status,
                     "branch": branch,
                     "stages": filter_func(output.pop("stages", {})),
                 },
@@ -1550,7 +1636,11 @@ class ParallelStage(BaseNestedStage):
         )
         event: Event = event or Event()
         result.trace.info(f"[STAGE]: Parallel with {self.max_workers} workers.")
-        result.catch(status=WAIT, context={"parallel": {}})
+        result.catch(
+            status=WAIT,
+            context={"workers": self.max_workers, "parallel": {}},
+        )
+        len_parallel: int = len(self.parallel)
         if event and event.is_set():
             return result.catch(
                 status=CANCEL,
@@ -1562,13 +1652,7 @@ class ParallelStage(BaseNestedStage):
                 },
             )
 
-        with ThreadPoolExecutor(
-            max_workers=self.max_workers, thread_name_prefix="stage_parallel_"
-        ) as executor:
-
-            context: DictData = {}
-            status: Status = SUCCESS
-
+        with ThreadPoolExecutor(self.max_workers, "stp") as executor:
             futures: list[Future] = [
                 executor.submit(
                     self.execute_branch,
@@ -1579,17 +1663,18 @@ class ParallelStage(BaseNestedStage):
                 )
                 for branch in self.parallel
             ]
-
-            for future in as_completed(futures):
+            context: DictData = {}
+            statuses: list[Status] = [WAIT] * len_parallel
+            for i, future in enumerate(as_completed(futures), start=0):
                 try:
-                    future.result()
+                    statuses[i] = future.result().status
                 except StageError as e:
-                    status = FAILED
-                    if "errors" in context:
-                        context["errors"][e.refs] = e.to_dict()
-                    else:
-                        context["errors"] = e.to_dict(with_refs=True)
-        return result.catch(status=status, context=context)
+                    statuses[i] = FAILED
+                    self.mark_errors(context, e)
+        return result.catch(
+            status=validate_statuses(statuses),
+            context=context,
+        )
 
 
 class ForEachStage(BaseNestedStage):
@@ -1653,6 +1738,9 @@ class ForEachStage(BaseNestedStage):
         """Execute all nested stage that set on this stage with specific foreach
         item parameter.
 
+            This method will create the nested-context from an input context
+        data and use it instead the context data.
+
         :param index: (int) An index value of foreach loop.
         :param item: (str | int) An item that want to execution.
         :param params: (DictData) A parameter data.
@@ -1675,19 +1763,22 @@ class ForEachStage(BaseNestedStage):
         context: DictData = copy.deepcopy(params)
         context.update({"item": item, "loop": index})
         nestet_context: DictData = {"item": item, "stages": {}}
-        for stage in self.stages:
+        total_stage: int = len(self.stages)
+        skips: list[bool] = [False] * total_stage
+        for i, stage in enumerate(self.stages, start=0):
 
             if self.extras:
                 stage.extras = self.extras
 
             if event and event.is_set():
                 error_msg: str = (
-                    "Item-Stage was canceled because event was set."
+                    "Item execution was canceled because event was set."
                 )
                 result.catch(
                     status=CANCEL,
                     foreach={
                         key: {
+                            "status": CANCEL,
                             "item": item,
                             "stages": filter_func(
                                 nestet_context.pop("stages", {})
@@ -1696,7 +1787,7 @@ class ForEachStage(BaseNestedStage):
                         }
                     },
                 )
-                raise StageError(error_msg, refs=key)
+                raise StageCancelError(error_msg, refs=key)
 
             rs: Result = stage.handler_execute(
                 params=context,
@@ -1708,6 +1799,7 @@ class ForEachStage(BaseNestedStage):
             stage.set_outputs(stage.get_outputs(nestet_context), to=context)
 
             if rs.status == SKIP:
+                skips[i] = True
                 continue
 
             if rs.status == FAILED:  # pragma: no cov
@@ -1720,6 +1812,7 @@ class ForEachStage(BaseNestedStage):
                     status=FAILED,
                     foreach={
                         key: {
+                            "status": FAILED,
                             "item": item,
                             "stages": filter_func(
                                 nestet_context.pop("stages", {})
@@ -1730,10 +1823,14 @@ class ForEachStage(BaseNestedStage):
                 )
                 raise StageError(error_msg, refs=key)
 
+        # NOTE: Should not raise `StageSkipError` because I do not want to break
+        #   foreach loop.
+        status: Status = SKIP if sum(skips) == total_stage else SUCCESS
         return result.catch(
-            status=SUCCESS,
+            status=status,
             foreach={
                 key: {
+                    "status": status,
                     "item": item,
                     "stages": filter_func(nestet_context.pop("stages", {})),
                 },
@@ -1814,9 +1911,9 @@ class ForEachStage(BaseNestedStage):
                 )
                 for i, item in enumerate(foreach, start=0)
             ]
+
             context: DictData = {}
             statuses: list[Status] = [WAIT] * len_foreach
-
             done, not_done = wait(futures, return_when=FIRST_EXCEPTION)
             if len(list(done)) != len(futures):
                 result.trace.warning(
@@ -1842,16 +1939,10 @@ class ForEachStage(BaseNestedStage):
 
             for i, future in enumerate(done, start=0):
                 try:
-                    future.result()
-                except StageSkipError:
-                    statuses[i] = SKIP
-                    context["skipped"] = True
-                except StageError as e:
+                    statuses[i] = future.result().status
+                except (StageCancelError, StageError) as e:
                     statuses[i] = FAILED
-                    if "errors" in context:
-                        context["errors"][e.refs] = e.to_dict()
-                    else:
-                        context["errors"] = e.to_dict(with_refs=True)
+                    self.mark_errors(context, e)
                 except CancelledError:
                     pass
         return result.catch(
@@ -1928,40 +2019,37 @@ class UntilStage(BaseNestedStage):
         :rtype: tuple[Result, T]
         :return: Return a pair of Result and changed item.
         """
-        result.trace.debug(f"[STAGE]: ... Execute until item: {item!r}")
+        result.trace.debug(f"[STAGE]: Execute Item: {item!r} (Loop {loop})")
+
         context: DictData = copy.deepcopy(params)
-        context.update({"item": item})
+        context.update({"item": item, "loop": loop})
         output: DictData = {"loop": loop, "item": item, "stages": {}}
-        next_item: T = None
-        for stage in self.stages:
+        next_item: Optional[T] = None
+        total_stage: int = len(self.stages)
+        skips: list[bool] = [False] * total_stage
+        for i, stage in enumerate(self.stages, start=0):
 
             if self.extras:
                 stage.extras = self.extras
-
-            if stage.is_skipped(params=context):
-                result.trace.info(f"[STAGE]: Skip stage: {stage.iden!r}")
-                stage.set_outputs(output={"skipped": True}, to=output)
-                continue
 
             if event and event.is_set():
                 error_msg: str = (
                     "Loop-Stage was canceled from event that had set before "
                     "stage loop execution."
                 )
-                return (
-                    result.catch(
-                        status=CANCEL,
-                        until={
-                            loop: {
-                                "loop": loop,
-                                "item": item,
-                                "stages": filter_func(output.pop("stages", {})),
-                                "errors": StageError(error_msg).to_dict(),
-                            }
-                        },
-                    ),
-                    next_item,
+                result.catch(
+                    status=CANCEL,
+                    until={
+                        loop: {
+                            "status": CANCEL,
+                            "loop": loop,
+                            "item": item,
+                            "stages": filter_func(output.pop("stages", {})),
+                            "errors": StageError(error_msg).to_dict(),
+                        }
+                    },
                 )
+                raise StageCancelError(error_msg, refs=loop)
 
             rs: Result = stage.handler_execute(
                 params=context,
@@ -1976,15 +2064,20 @@ class UntilStage(BaseNestedStage):
 
             stage.set_outputs(_output, to=context)
 
+            if rs.status == SKIP:
+                skips[i] = True
+                continue
+
             if rs.status == FAILED:
                 error_msg: str = (
                     f"Loop-Stage was break because it has a sub stage, "
-                    f"{stage.iden}, failed without raise error."
+                    f"{stage.iden!r}, failed."
                 )
                 result.catch(
                     status=FAILED,
                     until={
                         loop: {
+                            "status": FAILED,
                             "loop": loop,
                             "item": item,
                             "stages": filter_func(output.pop("stages", {})),
@@ -1994,11 +2087,13 @@ class UntilStage(BaseNestedStage):
                 )
                 raise StageError(error_msg)
 
+        status: Status = SKIP if sum(skips) == total_stage else SUCCESS
         return (
             result.catch(
-                status=SUCCESS,
+                status=status,
                 until={
                     loop: {
+                        "status": status,
                         "loop": loop,
                         "item": item,
                         "stages": filter_func(output.pop("stages", {})),
@@ -2029,15 +2124,16 @@ class UntilStage(BaseNestedStage):
             extras=self.extras,
         )
 
-        result.trace.info(f"[STAGE]: Until: {self.until}")
-        item: Union[str, int, bool] = param2template(
-            self.item, params, extras=self.extras
+        result.trace.info(f"[STAGE]: Until: {self.until!r}")
+        item: Union[str, int, bool] = pass_env(
+            param2template(self.item, params, extras=self.extras)
         )
         loop: int = 1
         track: bool = True
         exceed_loop: bool = False
         result.catch(status=WAIT, context={"until": {}})
-        while track and not (exceed_loop := loop >= self.max_loop):
+        statuses: list[Status] = []
+        while track and not (exceed_loop := (loop > self.max_loop)):
 
             if event and event.is_set():
                 return result.catch(
@@ -2061,16 +2157,18 @@ class UntilStage(BaseNestedStage):
             loop += 1
             if item is None:
                 result.trace.warning(
-                    f"[STAGE]: ... Loop-Execute not set item. It use loop: {loop} by "
-                    f"default."
+                    f"[STAGE]: ... Loop-Execute not set item. It use loop: "
+                    f"{loop} by default."
                 )
                 item: int = loop
 
             next_track: bool = eval(
-                param2template(
-                    self.until,
-                    params | {"item": item, "loop": loop},
-                    extras=self.extras,
+                pass_env(
+                    param2template(
+                        self.until,
+                        params | {"item": item, "loop": loop},
+                        extras=self.extras,
+                    ),
                 ),
                 globals() | params | {"item": item},
                 {},
@@ -2081,11 +2179,12 @@ class UntilStage(BaseNestedStage):
                     f": {next_track!r}"
                 )
             track: bool = not next_track
-            delay(0.025)
+            statuses.append(result.status)
+            delay(0.005)
 
         if exceed_loop:
             raise StageError(f"The until loop was exceed {self.max_loop} loops")
-        return result.catch(status=SUCCESS)
+        return result.catch(status=validate_statuses(statuses))
 
 
 class Match(BaseModel):
@@ -2169,11 +2268,6 @@ class CaseStage(BaseNestedStage):
             if self.extras:
                 stage.extras = self.extras
 
-            if stage.is_skipped(params=context):
-                result.trace.info(f"[STAGE]: ... Skip stage: {stage.iden!r}")
-                stage.set_outputs(output={"skipped": True}, to=output)
-                continue
-
             if event and event.is_set():
                 error_msg: str = (
                     "Case-Stage was canceled from event that had set before "
@@ -2250,7 +2344,7 @@ class CaseStage(BaseNestedStage):
                 continue
 
             _condition: str = param2template(c, params, extras=self.extras)
-            if stages is None and _case == _condition:
+            if stages is None and pass_env(_case) == pass_env(_condition):
                 stages: list[Stage] = match.stages
 
         if stages is None:

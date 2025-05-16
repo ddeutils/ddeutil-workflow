@@ -451,7 +451,9 @@ class Job(BaseModel):
         }
         if len(need_exist) != len(self.needs):
             return WAIT
-        elif all(need_exist[job].get("skipped", False) for job in need_exist):
+        elif all(
+            need_exist[job].get("status", WAIT) == SKIP for job in need_exist
+        ):
             return SKIP
         elif self.trigger_rule == Rule.ALL_DONE:
             return SUCCESS
@@ -459,17 +461,23 @@ class Job(BaseModel):
             rs = all(
                 (
                     "errors" not in need_exist[job]
-                    and not need_exist[job].get("skipped", False)
+                    and need_exist[job].get("status", WAIT) != SKIP
                 )
                 for job in need_exist
             )
         elif self.trigger_rule == Rule.ALL_FAILED:
-            rs = all("errors" in need_exist[job] for job in need_exist)
+            rs = all(
+                (
+                    "errors" in need_exist[job]
+                    or need_exist[job].get("status", WAIT) == FAILED
+                )
+                for job in need_exist
+            )
         elif self.trigger_rule == Rule.ONE_SUCCESS:
             rs = sum(
                 (
                     "errors" not in need_exist[job]
-                    and not need_exist[job].get("skipped", False)
+                    and need_exist[job].get("status", WAIT) != SKIP
                 )
                 for job in need_exist
             ) + 1 == len(self.needs)
@@ -587,14 +595,10 @@ class Job(BaseModel):
             {"status": output.pop("status")} if "status" in output else {}
         )
         if self.strategy.is_set():
-            to["jobs"][_id] = {
-                "strategies": output,
-                **skipping,
-                **errors,
-                **status,
-            }
+            to["jobs"][_id] = (
+                {"strategies": output} | skipping | errors | status
+            )
         elif len(k := output.keys()) > 1:  # pragma: no cov
-            print(output)
             raise JobError(
                 "Strategy output from execution return more than one ID while "
                 "this job does not set strategy."
@@ -602,7 +606,7 @@ class Job(BaseModel):
         else:
             _output: DictData = {} if len(k) == 0 else output[list(k)[0]]
             _output.pop("matrix", {})
-            to["jobs"][_id] = {**_output, **skipping, **errors, **status}
+            to["jobs"][_id] = _output | skipping | errors | status
         return to
 
     def get_outputs(

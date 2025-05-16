@@ -1,16 +1,32 @@
 import pytest
-from ddeutil.workflow import (
-    FAILED,
-    SUCCESS,
-    Result,
-    Workflow,
-)
-from ddeutil.workflow.stages import (
-    CallStage,
-    Stage,
-)
+from ddeutil.workflow import FAILED, SUCCESS, Result, Workflow
+from ddeutil.workflow.stages import CallStage, Stage
 
 from .utils import dump_yaml_context
+
+
+def test_call_stage_exec_necessary_args():
+    stage: Stage = CallStage.model_validate(
+        {
+            "name": "Necessary argument do not pass",
+            "id": "private-args",
+            "uses": "tasks/private-args-task@demo",
+            "with": {"params": {"run_mode": "T"}},
+        }
+    )
+    # NOTE: Raise because necessary args do not pass.
+    rs: Result = stage.handler_execute({})
+    assert rs.status == FAILED
+    assert rs.context == {
+        "status": FAILED,
+        "errors": {
+            "name": "ValueError",
+            "message": (
+                "Necessary params, (_exec, params, result, ), does not "
+                "set to args, ['result', 'params']."
+            ),
+        },
+    }
 
 
 def test_call_stage_exec(test_path):
@@ -22,18 +38,9 @@ def test_call_stage_exec(test_path):
           jobs:
             first-job:
               stages:
-                - name: "Necessary argument do not pass"
-                  id: args-necessary
-                  uses: tasks/mssql-proc@odbc
-                  with:
-                    params:
-                      run_mode: "T"
-                      run_date: 2024-08-01
-                      source: src
-                      target: tgt
                 - name: "Private args should pass"
                   id: args-private
-                  uses: tasks/mssql-proc@odbc
+                  uses: tasks/private-args-task@demo
                   with:
                     params:
                       run_mode: "T"
@@ -42,19 +49,19 @@ def test_call_stage_exec(test_path):
               stages:
                 - name: "Extract & Load Local System"
                   id: extract-load
-                  uses: tasks/el-csv-to-parquet@polars-dir
+                  uses: tasks/simple-task@demo
                   with:
                     source: src
                     sink: sink
                 - name: "Extract & Load Local System"
                   id: async-extract-load
-                  uses: tasks/async-el-csv-to-parquet@polars-dir
+                  uses: tasks/simple-task-async@demo
                   with:
                     source: src
                     sink: sink
                 - name: "Extract & Load Local System"
                   id: extract-load-raise-type
-                  uses: tasks/el-csv-to-parquet@polars-dir
+                  uses: tasks/simple-task@demo
                   with:
                     source: 1
                     sink: sink
@@ -65,12 +72,12 @@ def test_call_stage_exec(test_path):
         stage: Stage = workflow.job("second-job").stage("extract-load")
         rs: Result = stage.handler_execute({})
         assert rs.status == SUCCESS
-        assert {"records": 1} == rs.context
+        assert rs.context == {"records": 1, "status": SUCCESS}
 
         stage: Stage = workflow.job("second-job").stage("async-extract-load")
         rs: Result = stage.handler_execute({})
         assert rs.status == SUCCESS
-        assert rs.context == {"records": 1}
+        assert rs.context == {"records": 1, "status": SUCCESS}
 
         stage: Stage = workflow.job("first-job").stage("args-private")
         rs: Result = stage.handler_execute({})
@@ -78,72 +85,21 @@ def test_call_stage_exec(test_path):
         assert rs.context == {
             "exec": "Test this arge should pass",
             "params": {"run_mode": "T"},
-        }
-
-        # NOTE: Raise because invalid return type.
-        stage: Stage = CallStage(
-            name="Type not valid", uses="tasks/return-type-not-valid@raise"
-        )
-        rs: Result = stage.handler_execute({})
-        assert rs.status == FAILED
-        assert rs.context == {
-            "errors": {
-                "message": (
-                    "Return type: 'return-type-not-valid@raise' can not "
-                    "serialize, you must set return be `dict` or Pydantic "
-                    "model."
-                ),
-                "name": "TypeError",
-            },
-        }
-
-        # NOTE: Raise because necessary args do not pass.
-        stage: Stage = workflow.job("first-job").stage("args-necessary")
-        rs: Result = stage.handler_execute({})
-        assert rs.status == FAILED
-        assert rs.context == {
-            "errors": {
-                "name": "ValueError",
-                "message": (
-                    "Necessary params, (_exec, params, result, ), does not "
-                    "set to args, ['result', 'params']."
-                ),
-            }
-        }
-
-        # NOTE: Raise because call does not valid.
-        stage: Stage = CallStage(name="Not valid", uses="tasks-foo-bar")
-        rs: Result = stage.handler_execute({})
-        assert rs.status == FAILED
-        assert rs.context == {
-            "errors": {
-                "name": "ValueError",
-                "message": "Call 'tasks-foo-bar' does not match with the call regex format.",
-            }
-        }
-
-        # NOTE: Raise because call does not register.
-        stage: Stage = CallStage(name="Not register", uses="tasks/abc@foo")
-        stage.handler_execute({})
-        assert rs.status == FAILED
-        assert rs.context == {
-            "errors": {
-                "name": "ValueError",
-                "message": "Call 'tasks-foo-bar' does not match with the call regex format.",
-            }
+            "status": SUCCESS,
         }
 
         # NOTE: Raise because type of args not valid.
         stage: Stage = workflow.job("second-job").stage(
             "extract-load-raise-type"
         )
-        stage.handler_execute({})
+        rs = stage.handler_execute({})
         assert rs.status == FAILED
         assert rs.context == {
+            "status": FAILED,
             "errors": {
-                "name": "ValueError",
-                "message": "Call 'tasks-foo-bar' does not match with the call regex format.",
-            }
+                "name": "StageError",
+                "message": "Validate argument from the caller function raise invalid type.",
+            },
         }
 
         stage: Stage = CallStage.model_validate(
@@ -160,7 +116,61 @@ def test_call_stage_exec(test_path):
         )
         rs: Result = stage.handler_execute({})
         assert rs.status == SUCCESS
-        assert rs.context == {"name": "foo", "data": {"key": "value"}}
+        assert rs.context == {
+            "status": SUCCESS,
+            "name": "foo",
+            "data": {"key": "value"},
+        }
+
+
+def test_call_stage_exec_raise():
+    # NOTE: Raise because invalid return type.
+    stage: Stage = CallStage(
+        name="Type not valid",
+        uses="tasks/return-type-not-valid@raise",
+    )
+    rs: Result = stage.handler_execute({})
+    assert rs.status == FAILED
+    assert rs.context == {
+        "status": FAILED,
+        "errors": {
+            "message": (
+                "Return type: 'return-type-not-valid@raise' can not "
+                "serialize, you must set return be `dict` or Pydantic "
+                "model."
+            ),
+            "name": "TypeError",
+        },
+    }
+
+    # NOTE: Raise because call does not valid.
+    stage: Stage = CallStage(name="Not valid", uses="tasks-foo-bar")
+    rs: Result = stage.handler_execute({})
+    assert rs.status == FAILED
+    assert rs.context == {
+        "status": FAILED,
+        "errors": {
+            "name": "ValueError",
+            "message": (
+                "Call 'tasks-foo-bar' does not match with the call regex format."
+            ),
+        },
+    }
+
+    # NOTE: Raise because call does not register.
+    stage: Stage = CallStage(
+        name="Not register",
+        uses="tasks/abc@foo",
+    )
+    rs: Result = stage.handler_execute({})
+    assert rs.status == FAILED
+    assert rs.context == {
+        "status": FAILED,
+        "errors": {
+            "name": "NotImplementedError",
+            "message": "`REGISTERS.tasks.registries` not implement registry: 'abc'.",
+        },
+    }
 
 
 @pytest.mark.asyncio
@@ -175,24 +185,21 @@ async def test_call_stage_axec(test_path):
               stages:
                 - name: "Necessary argument do not pass"
                   id: args-necessary
-                  uses: tasks/mssql-proc@odbc
+                  uses: tasks/private-args-task@demo
                   with:
                     params:
                       run_mode: "T"
-                      run_date: 2024-08-01
-                      source: src
-                      target: tgt
             second-job:
               stages:
                 - name: "Extract & Load Local System"
                   id: extract-load
-                  uses: tasks/el-csv-to-parquet@polars-dir
+                  uses: tasks/simple-task@demo
                   with:
                     source: src
                     sink: sink
                 - name: "Extract & Load Local System"
                   id: async-extract-load
-                  uses: tasks/async-el-csv-to-parquet@polars-dir
+                  uses: tasks/simple-task-async@demo
                   with:
                     source: src
                     sink: sink
@@ -203,12 +210,12 @@ async def test_call_stage_axec(test_path):
         stage: Stage = workflow.job("second-job").stage("extract-load")
         rs: Result = await stage.handler_axecute({})
         assert rs.status == SUCCESS
-        assert {"records": 1} == rs.context
+        assert rs.context == {"records": 1, "status": SUCCESS}
 
         stage: Stage = workflow.job("second-job").stage("async-extract-load")
         rs: Result = await stage.handler_axecute({})
         assert rs.status == SUCCESS
-        assert rs.context == {"records": 1}
+        assert rs.context == {"records": 1, "status": SUCCESS}
 
         # NOTE: Raise because invalid return type.
         stage: Stage = CallStage(
@@ -217,10 +224,11 @@ async def test_call_stage_axec(test_path):
         rs: Result = await stage.handler_axecute({})
         assert rs.status == FAILED
         assert rs.context == {
+            "status": FAILED,
             "errors": {
                 "name": "TypeError",
                 "message": "Return type: 'return-type-not-valid@raise' can not serialize, you must set return be `dict` or Pydantic model.",
-            }
+            },
         }
 
         # NOTE: Raise because necessary args do not pass.
@@ -228,16 +236,18 @@ async def test_call_stage_axec(test_path):
         rs: Result = await stage.handler_axecute({})
         assert rs.status == FAILED
         assert rs.context == {
+            "status": FAILED,
             "errors": {
                 "name": "ValueError",
                 "message": "Necessary params, (_exec, params, result, ), does not set to args, ['result', 'params'].",
-            }
+            },
         }
 
         stage: Stage = workflow.job("first-job").stage("args-necessary")
         rs: Result = await stage.handler_axecute({})
         assert rs.status == FAILED
         assert rs.context == {
+            "status": FAILED,
             "errors": {
                 "name": "ValueError",
                 "message": (
@@ -252,16 +262,18 @@ async def test_call_stage_axec(test_path):
         rs: Result = await stage.handler_axecute({})
         assert rs.status == FAILED
         assert rs.context == {
+            "status": FAILED,
             "errors": {
                 "name": "ValueError",
                 "message": "Call 'tasks-foo-bar' does not match with the call regex format.",
-            }
+            },
         }
 
         stage: Stage = CallStage(name="Not valid", uses="tasks-foo-bar")
         rs: Result = await stage.handler_axecute({})
         assert rs.status == FAILED
         assert rs.context == {
+            "status": FAILED,
             "errors": {
                 "name": "ValueError",
                 "message": "Call 'tasks-foo-bar' does not match with the call regex format.",
@@ -273,10 +285,11 @@ async def test_call_stage_axec(test_path):
         rs: Result = await stage.handler_axecute({})
         assert rs.status == FAILED
         assert rs.context == {
+            "status": FAILED,
             "errors": {
                 "name": "NotImplementedError",
                 "message": "`REGISTERS.tasks.registries` not implement registry: 'abc'.",
-            }
+            },
         }
 
         stage: Stage = CallStage.model_validate(
@@ -293,4 +306,8 @@ async def test_call_stage_axec(test_path):
         )
         rs: Result = await stage.handler_axecute({})
         assert rs.status == SUCCESS
-        assert rs.context == {"name": "foo", "data": {"key": "value"}}
+        assert rs.context == {
+            "status": SUCCESS,
+            "name": "foo",
+            "data": {"key": "value"},
+        }

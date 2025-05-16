@@ -45,6 +45,10 @@ class Status(IntEnum):
         """
         return {0: "✅", 1: "❌", 2: "🟡", 3: "⏩", 4: "🚫"}[self.value]
 
+    # TODO: Remove this line before release.
+    def __repr__(self) -> str:
+        return self.name
+
 
 SUCCESS = Status.SUCCESS
 FAILED = Status.FAILED
@@ -61,11 +65,11 @@ def validate_statuses(statuses: list[Status]) -> Status:
 
     :rtype: Status
     """
-    if any(s in (FAILED, CANCEL) for s in statuses):
+    if any(s == FAILED for s in statuses):
         return FAILED
-    for status in (SUCCESS, SKIP, WAIT):
-        if all(status == SUCCESS for s in statuses):
-            return SUCCESS
+    for status in (SUCCESS, SKIP, WAIT, CANCEL):
+        if all(s == status for s in statuses):
+            return status
     return FAILED
 
 
@@ -184,6 +188,9 @@ class Result:
         if kwargs:
             for k in kwargs:
                 if k in self.__dict__["context"]:
+                    self.__dict__["context"][k].update(kwargs[k])
+                # NOTE: Exclude the `info` key for update information data.
+                elif k == "info":
                     self.__dict__["context"][k].update(kwargs[k])
                 else:
                     raise ResultError(

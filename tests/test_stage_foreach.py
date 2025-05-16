@@ -1,4 +1,5 @@
 from ddeutil.workflow import (
+    CANCEL,
     FAILED,
     SKIP,
     SUCCESS,
@@ -8,6 +9,58 @@ from ddeutil.workflow import (
 from ddeutil.workflow.stages import ForEachStage, Stage
 
 from .utils import MockEvent, dump_yaml_context
+
+
+def test_foreach_stage_exec_all_skipped():
+    stage: Stage = ForEachStage(
+        name="Start run for-each stage",
+        id="foreach-stage",
+        foreach=[1, 2, 3],
+        stages=[
+            {
+                "name": "Echo stage",
+                "if": "${{ item }} == 4",
+                "echo": "Start run with item ${{ item }}",
+            },
+            {
+                "name": "Final Echo",
+                "if": "${{ item }} == 4",
+                "echo": "Final stage",
+            },
+        ],
+    )
+    rs: Result = stage.handler_execute({})
+    assert rs.status == SKIP
+    assert rs.context == {
+        "status": SKIP,
+        "items": [1, 2, 3],
+        "foreach": {
+            1: {
+                "status": SKIP,
+                "item": 1,
+                "stages": {
+                    "2709471980": {"outputs": {}, "status": SKIP},
+                    "9263488742": {"outputs": {}, "status": SKIP},
+                },
+            },
+            2: {
+                "status": SKIP,
+                "item": 2,
+                "stages": {
+                    "2709471980": {"outputs": {}, "status": SKIP},
+                    "9263488742": {"outputs": {}, "status": SKIP},
+                },
+            },
+            3: {
+                "status": SKIP,
+                "item": 3,
+                "stages": {
+                    "2709471980": {"outputs": {}, "status": SKIP},
+                    "9263488742": {"outputs": {}, "status": SKIP},
+                },
+            },
+        },
+    }
 
 
 def test_foreach_stage_exec_skipped():
@@ -33,40 +86,35 @@ def test_foreach_stage_exec_skipped():
         "items": [1, 2, 3, 4],
         "foreach": {
             1: {
+                "status": SUCCESS,
                 "item": 1,
                 "stages": {
-                    "2709471980": {"outputs": {"status": SUCCESS}},
-                    "9263488742": {
-                        "outputs": {"status": SKIP},
-                        "skipped": True,
-                    },
+                    "2709471980": {"outputs": {}, "status": SUCCESS},
+                    "9263488742": {"outputs": {}, "status": SKIP},
                 },
             },
             2: {
+                "status": SUCCESS,
                 "item": 2,
                 "stages": {
-                    "2709471980": {"outputs": {"status": SUCCESS}},
-                    "9263488742": {
-                        "outputs": {"status": SKIP},
-                        "skipped": True,
-                    },
+                    "2709471980": {"outputs": {}, "status": SUCCESS},
+                    "9263488742": {"outputs": {}, "status": SKIP},
                 },
             },
             3: {
+                "status": SUCCESS,
                 "item": 3,
                 "stages": {
-                    "2709471980": {"outputs": {"status": SUCCESS}},
-                    "9263488742": {
-                        "outputs": {"status": SKIP},
-                        "skipped": True,
-                    },
+                    "2709471980": {"outputs": {}, "status": SUCCESS},
+                    "9263488742": {"outputs": {}, "status": SKIP},
                 },
             },
             4: {
+                "status": SUCCESS,
                 "item": 4,
                 "stages": {
-                    "2709471980": {"outputs": {"status": SUCCESS}},
-                    "9263488742": {"outputs": {"status": SUCCESS}},
+                    "2709471980": {"outputs": {}, "status": SUCCESS},
+                    "9263488742": {"outputs": {}, "status": SUCCESS},
                 },
             },
         },
@@ -88,20 +136,24 @@ def test_foreach_stage_exec():
         "items": [1, 1, 2, 3],
         "foreach": {
             0: {
+                "status": SUCCESS,
                 "item": 1,
-                "stages": {"2709471980": {"outputs": {"status": SUCCESS}}},
+                "stages": {"2709471980": {"outputs": {}, "status": SUCCESS}},
             },
             1: {
+                "status": SUCCESS,
                 "item": 1,
-                "stages": {"2709471980": {"outputs": {"status": SUCCESS}}},
+                "stages": {"2709471980": {"outputs": {}, "status": SUCCESS}},
             },
             2: {
+                "status": SUCCESS,
                 "item": 2,
-                "stages": {"2709471980": {"outputs": {"status": SUCCESS}}},
+                "stages": {"2709471980": {"outputs": {}, "status": SUCCESS}},
             },
             3: {
+                "status": SUCCESS,
                 "item": 3,
-                "stages": {"2709471980": {"outputs": {"status": SUCCESS}}},
+                "stages": {"2709471980": {"outputs": {}, "status": SUCCESS}},
             },
         },
     }
@@ -178,52 +230,46 @@ def test_foreach_stage_exec_raise_full(test_path):
             "items": [1, 2],
             "foreach": {
                 2: {
+                    "status": FAILED,
                     "item": 2,
                     "stages": {
-                        "2709471980": {"outputs": {"status": SUCCESS}},
+                        "2709471980": {"outputs": {}, "status": SUCCESS},
                         "9263488742": {
-                            "outputs": {"status": FAILED},
+                            "outputs": {},
                             "errors": {
                                 "name": "StageError",
                                 "message": "Raise for item equal 2",
                             },
+                            "status": FAILED,
                         },
                     },
                     "errors": {
                         "name": "StageError",
-                        "message": (
-                            "Item-Stage was break because it has a "
-                            "nested-stage, 'Final Echo', failed."
-                        ),
+                        "message": "Item-Stage was break because it has a nested-stage, 'Final Echo', failed.",
                     },
                 },
                 1: {
+                    "status": CANCEL,
                     "item": 1,
                     "stages": {
-                        "2709471980": {"outputs": {"status": SUCCESS}},
-                        "9263488742": {
-                            "outputs": {"status": SKIP},
-                            "skipped": True,
-                        },
-                        "2238460182": {"outputs": {"status": SUCCESS}},
+                        "2709471980": {"outputs": {}, "status": SUCCESS},
+                        "9263488742": {"outputs": {}, "status": SKIP},
+                        "2238460182": {"outputs": {}, "status": SUCCESS},
                     },
                     "errors": {
                         "name": "StageError",
-                        "message": "Item-Stage was canceled because event was set.",
+                        "message": "Item execution was canceled because event was set.",
                     },
                 },
             },
             "errors": {
                 2: {
                     "name": "StageError",
-                    "message": (
-                        "Item-Stage was break because it has a nested-stage, "
-                        "'Final Echo', failed."
-                    ),
+                    "message": "Item-Stage was break because it has a nested-stage, 'Final Echo', failed.",
                 },
                 1: {
-                    "name": "StageError",
-                    "message": "Item-Stage was canceled because event was set.",
+                    "name": "StageCancelError",
+                    "message": "Item execution was canceled because event was set.",
                 },
             },
         }
@@ -243,7 +289,7 @@ def test_foreach_stage_exec_concurrent(test_path):
                   foreach: [1, 2, 3, 4]
                   concurrent: 3
                   stages:
-                    - name: "Echo stage"
+                    - name: "Start Echo stage"
                       echo: |
                         Start run with item ${{ item }}
                     - name: "Final Echo"
@@ -254,63 +300,113 @@ def test_foreach_stage_exec_concurrent(test_path):
     ):
         workflow = Workflow.from_conf(name="tmp-wf-foreach-concurrent")
         stage: Stage = workflow.job("first-job").stage("foreach-stage")
-        rs = stage.set_outputs(stage.handler_execute({}).context, to={})
-        assert rs == {
+        rs: Result = stage.handler_execute(params={})
+        assert rs.status == SUCCESS
+        assert rs.context == {
+            "status": SUCCESS,
+            "items": [1, 2, 3, 4],
+            "foreach": {
+                2: {
+                    "status": SUCCESS,
+                    "item": 2,
+                    "stages": {
+                        "0257114922": {"outputs": {}, "status": SUCCESS},
+                        "9263488742": {"outputs": {}, "status": SKIP},
+                    },
+                },
+                1: {
+                    "status": SUCCESS,
+                    "item": 1,
+                    "stages": {
+                        "0257114922": {"outputs": {}, "status": SUCCESS},
+                        "9263488742": {"outputs": {}, "status": SKIP},
+                    },
+                },
+                3: {
+                    "status": SUCCESS,
+                    "item": 3,
+                    "stages": {
+                        "0257114922": {"outputs": {}, "status": SUCCESS},
+                        "9263488742": {"outputs": {}, "status": SKIP},
+                    },
+                },
+                4: {
+                    "status": SUCCESS,
+                    "item": 4,
+                    "stages": {
+                        "0257114922": {"outputs": {}, "status": SUCCESS},
+                        "9263488742": {"outputs": {}, "status": SUCCESS},
+                    },
+                },
+            },
+        }
+
+        output = stage.set_outputs(rs.context, {})
+        assert output == {
             "stages": {
                 "foreach-stage": {
                     "outputs": {
-                        "status": SUCCESS,
                         "items": [1, 2, 3, 4],
                         "foreach": {
                             1: {
+                                "status": SUCCESS,
                                 "item": 1,
                                 "stages": {
-                                    "2709471980": {
-                                        "outputs": {"status": SUCCESS}
+                                    "0257114922": {
+                                        "outputs": {},
+                                        "status": SUCCESS,
                                     },
                                     "9263488742": {
-                                        "outputs": {"status": SKIP},
-                                        "skipped": True,
-                                    },
-                                },
-                            },
-                            3: {
-                                "item": 3,
-                                "stages": {
-                                    "2709471980": {
-                                        "outputs": {"status": SUCCESS}
-                                    },
-                                    "9263488742": {
-                                        "outputs": {"status": SKIP},
-                                        "skipped": True,
+                                        "outputs": {},
+                                        "status": SKIP,
                                     },
                                 },
                             },
                             2: {
+                                "status": SUCCESS,
                                 "item": 2,
                                 "stages": {
-                                    "2709471980": {
-                                        "outputs": {"status": SUCCESS}
+                                    "0257114922": {
+                                        "outputs": {},
+                                        "status": SUCCESS,
                                     },
                                     "9263488742": {
-                                        "outputs": {"status": SKIP},
-                                        "skipped": True,
+                                        "outputs": {},
+                                        "status": SKIP,
+                                    },
+                                },
+                            },
+                            3: {
+                                "status": SUCCESS,
+                                "item": 3,
+                                "stages": {
+                                    "0257114922": {
+                                        "outputs": {},
+                                        "status": SUCCESS,
+                                    },
+                                    "9263488742": {
+                                        "outputs": {},
+                                        "status": SKIP,
                                     },
                                 },
                             },
                             4: {
+                                "status": SUCCESS,
                                 "item": 4,
                                 "stages": {
-                                    "2709471980": {
-                                        "outputs": {"status": SUCCESS}
+                                    "0257114922": {
+                                        "outputs": {},
+                                        "status": SUCCESS,
                                     },
                                     "9263488742": {
-                                        "outputs": {"status": SUCCESS}
+                                        "outputs": {},
+                                        "status": SUCCESS,
                                     },
                                 },
                             },
                         },
-                    }
+                    },
+                    "status": SUCCESS,
                 }
             }
         }
@@ -345,6 +441,7 @@ def test_foreach_stage_exec_concurrent_with_raise():
         "items": [1, 2, 3, 4, 5],
         "foreach": {
             2: {
+                "status": FAILED,
                 "item": 2,
                 "stages": {},
                 "errors": {
@@ -352,8 +449,8 @@ def test_foreach_stage_exec_concurrent_with_raise():
                     "message": "Item-Stage was break because it has a nested-stage, 'Raise with PyStage', failed.",
                 },
             },
-            1: {"item": 1, "stages": {}},
-            3: {"item": 3, "stages": {}},
+            1: {"status": SUCCESS, "item": 1, "stages": {}},
+            3: {"status": SUCCESS, "item": 3, "stages": {}},
         },
         "errors": {
             2: {
@@ -361,4 +458,35 @@ def test_foreach_stage_exec_concurrent_with_raise():
                 "message": "Item-Stage was break because it has a nested-stage, 'Raise with PyStage', failed.",
             }
         },
+    }
+
+    output = stage.set_outputs(rs.context, {})
+    assert output == {
+        "stages": {
+            "foreach-stage": {
+                "status": FAILED,
+                "outputs": {
+                    "items": [1, 2, 3, 4, 5],
+                    "foreach": {
+                        2: {
+                            "status": FAILED,
+                            "item": 2,
+                            "stages": {},
+                            "errors": {
+                                "name": "StageError",
+                                "message": "Item-Stage was break because it has a nested-stage, 'Raise with PyStage', failed.",
+                            },
+                        },
+                        1: {"status": SUCCESS, "item": 1, "stages": {}},
+                        3: {"status": SUCCESS, "item": 3, "stages": {}},
+                    },
+                },
+                "errors": {
+                    2: {
+                        "name": "StageError",
+                        "message": "Item-Stage was break because it has a nested-stage, 'Raise with PyStage', failed.",
+                    }
+                },
+            }
+        }
     }

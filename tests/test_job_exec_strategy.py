@@ -15,14 +15,17 @@ def test_job_exec_strategy():
     rs = local_execute_strategy(job, {"sleep": "0.1"}, {})
     assert rs.status == SUCCESS
     assert rs.context == {
+        "status": SUCCESS,
         "9873503202": {
             "matrix": {"sleep": "0.1"},
-            "stages": {"success": {"outputs": {"result": "success"}}},
+            "stages": {
+                "success": {"outputs": {"result": "success"}, "status": SUCCESS}
+            },
         },
     }
 
 
-def test_job_exec_strategy_skip_stage():
+def test_job_exec_strategy_skipped_stage():
     job: Job = Workflow.from_conf(name="wf-run-python-raise-for-job").job(
         "job-stage-condition"
     )
@@ -34,9 +37,10 @@ def test_job_exec_strategy_skip_stage():
             "matrix": {"sleep": "1"},
             "stages": {
                 "equal-one": {
-                    "outputs": {"result": "pass-condition", "status": SUCCESS}
+                    "status": SUCCESS,
+                    "outputs": {"result": "pass-condition"},
                 },
-                "not-equal-one": {"outputs": {"status": SKIP}, "skipped": True},
+                "not-equal-one": {"outputs": {}, "status": SKIP},
             },
         },
     }
@@ -53,11 +57,13 @@ def test_job_exec_strategy_catch_stage_error():
 
     assert rs.status == FAILED
     assert rs.context == {
+        "status": FAILED,
         "5027535057": {
             "matrix": {"name": "foo"},
             "stages": {
-                "1772094681": {"outputs": {}},
+                "1772094681": {"outputs": {}, "status": SUCCESS},
                 "raise-error": {
+                    "status": FAILED,
                     "outputs": {},
                     "errors": {
                         "name": "ValueError",
@@ -86,11 +92,13 @@ def test_job_exec_strategy_catch_job_error():
 
     assert rs.status == FAILED
     assert rs.context == {
+        "status": FAILED,
         "5027535057": {
             "matrix": {"name": "foo"},
             "stages": {
-                "1772094681": {"outputs": {}},
+                "1772094681": {"outputs": {}, "status": SUCCESS},
                 "raise-error": {
+                    "status": FAILED,
                     "outputs": {},
                     "errors": {
                         "name": "ValueError",
@@ -102,7 +110,7 @@ def test_job_exec_strategy_catch_job_error():
                 "name": "JobError",
                 "message": "Strategy break because stage, 'raise-error', return `FAILED` status.",
             },
-        }
+        },
     }
 
 
@@ -122,9 +130,16 @@ def test_job_exec_strategy_event_set():
         future.result()
 
     assert rs.status == CANCEL
-    assert rs.context["EMPTY"]["errors"] == {
-        "name": "JobError",
-        "message": "Job strategy was canceled because event was set.",
+    assert rs.context == {
+        "status": CANCEL,
+        "EMPTY": {
+            "matrix": {},
+            "stages": {"1772094681": {"outputs": {}, "status": SUCCESS}},
+            "errors": {
+                "name": "JobError",
+                "message": "Job strategy was canceled because event was set.",
+            },
+        },
     }
 
 
@@ -138,10 +153,12 @@ def test_job_exec_strategy_raise():
 
     assert rs.status == FAILED
     assert rs.context == {
+        "status": FAILED,
         "EMPTY": {
             "matrix": {},
             "stages": {
                 "raise-error": {
+                    "status": FAILED,
                     "outputs": {},
                     "errors": {
                         "name": "ValueError",
@@ -153,5 +170,5 @@ def test_job_exec_strategy_raise():
                 "name": "JobError",
                 "message": "Strategy break because stage, 'raise-error', return `FAILED` status.",
             },
-        }
+        },
     }
