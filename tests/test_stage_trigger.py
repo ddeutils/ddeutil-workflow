@@ -1,13 +1,16 @@
 from datetime import datetime
 
 from ddeutil.workflow import (
+    CANCEL,
     FAILED,
     SUCCESS,
     Result,
     Workflow,
 )
 from ddeutil.workflow.stages import Stage
-from pydantic import TypeAdapter
+from utils import MockEvent
+
+from src.ddeutil.workflow import TriggerStage
 
 
 def test_trigger_stage_exec():
@@ -63,10 +66,32 @@ def test_trigger_stage_exec():
     }
 
 
-def test_trigger_stage_exec_raise():
-    stage: Stage = TypeAdapter(Stage).validate_python(
+def test_trigger_stage_exec_raise(test_path):
+    # NOTE: Raise because the workflow name that pass to execution does not exist.
+    stage: Stage = TriggerStage.model_validate(
         {
-            "name": "Trigger to raise workflow",
+            "name": "Trigger raise with workflow not exist.",
+            "trigger": "not-exist-workflow",
+            "params": {},
+        }
+    )
+    rs: Result = stage.handler_execute(params={})
+    assert rs.status == FAILED
+    assert rs.context == {
+        "status": FAILED,
+        "errors": {
+            "name": "ValueError",
+            "message": (
+                f"Config 'not-exist-workflow' does not found on the conf path: "
+                f"{test_path / 'conf'}."
+            ),
+        },
+    }
+
+    # NOTE: Raise with job execution raise failed status from execution.
+    stage: Stage = TriggerStage.model_validate(
+        {
+            "name": "Trigger raise with failed status",
             "trigger": "wf-run-python-raise",
             "params": {},
         }
@@ -78,8 +103,28 @@ def test_trigger_stage_exec_raise():
         "errors": {
             "name": "StageError",
             "message": (
-                "Trigger workflow return `FAILED` status with:\n"
+                "Trigger workflow was failed with:\n"
                 "Job, 'first-job', return `FAILED` status."
             ),
+        },
+    }
+
+
+def test_trigger_stage_exec_cancel():
+    stage: Stage = TriggerStage.model_validate(
+        {
+            "name": "Trigger to raise workflow",
+            "trigger": "wf-run-python-raise",
+            "params": {},
+        }
+    )
+    event = MockEvent(n=0)
+    rs: Result = stage.handler_execute(params={}, event=event)
+    assert rs.status == CANCEL
+    assert rs.context == {
+        "status": CANCEL,
+        "errors": {
+            "name": "StageCancelError",
+            "message": "Trigger workflow was cancel.",
         },
     }

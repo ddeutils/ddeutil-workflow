@@ -3,9 +3,9 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-"""Stages module include all stage model that use be the minimum execution layer
-of this workflow engine. The stage handle the minimize task that run in some
-thread (same thread at its job owner) that mean it is the lowest executor that
+"""Stages module include all stage model that implemented to be the minimum execution
+layer of this workflow core engine. The stage handle the minimize task that run
+in a thread (same thread at its job owner) that mean it is the lowest executor that
 you can track logs.
 
     The output of stage execution only return SUCCESS or CANCEL status because
@@ -74,6 +74,7 @@ from .result import (
     WAIT,
     Result,
     Status,
+    get_status_from_error,
     validate_statuses,
 )
 from .reusables import (
@@ -204,25 +205,20 @@ class BaseStage(BaseModel, ABC):
     ) -> Union[Result, DictData]:
         """Handler stage execution result from the stage `execute` method.
 
-            This stage exception handler still use ok-error concept, but it
-        allows you force catching an output result with error message by
-        specific environment variable,`WORKFLOW_CORE_STAGE_RAISE_ERROR` or set
-        `raise_error` parameter to True.
+            This handler strategy will catch and mapping message to the result
+        context data before returning. All possible status that will return from
+        this method be:
 
-            Execution   --> Ok      --> Result
+            Handler     --> Ok      --> Result
                                         |-status: SUCCESS
                                         ╰-context:
                                             ╰-outputs: ...
 
                         --> Ok      --> Result
-                                        |-status: CANCEL
-                                        ╰-errors:
-                                            |-name: ...
-                                            ╰-message: ...
+                                        ╰-status: CANCEL
 
                         --> Ok      --> Result
-                                        |-status: SKIP
-                                        ╰-skipped: True
+                                        ╰-status: SKIP
 
                         --> Ok      --> Result
                                         |-status: FAILED
@@ -234,11 +230,13 @@ class BaseStage(BaseModel, ABC):
         object from the current stage ID before release the final result.
 
         :param params: (DictData) A parameter data.
-        :param run_id: (str) A running stage ID.
-        :param parent_run_id: (str) A parent running ID.
+        :param run_id: (str) A running stage ID. (Default be None)
+        :param parent_run_id: (str) A parent running ID. (Default be None)
         :param result: (Result) A result object for keeping context and status
             data before execution.
+            (Default be None)
         :param event: (Event) An event manager that pass to the stage execution.
+            (Default be None)
 
         :rtype: Result
         """
@@ -261,24 +259,33 @@ class BaseStage(BaseModel, ABC):
                 raise StageSkipError(
                     f"Skip because condition {self.condition} was valid."
                 )
+            # NOTE: Start call wrapped execution method that will use custom
+            #   execution before the real execution from inherit stage model.
+            result_caught = self.__execute(params, result=result, event=event)
+            if result_caught.status == WAIT:
+                raise StageError(
+                    "Status from execution should not return waiting status."
+                )
+            return result_caught
 
-            return self.__execute(params, result=result, event=event)
         # NOTE: Catch this error in this line because the execution can raise
         #   this exception class at other location.
-        except StageSkipError as e:  # pragma: no cov
+        except (
+            StageSkipError,
+            StageCancelError,
+            StageError,
+        ) as e:  # pragma: no cov
             result.trace.info(
-                f"[STAGE]: Skip Handler:||StageSkipError: {e}||"
-                f"{traceback.format_exc()}"
-            )
-            return result.catch(status=SKIP)
-        except (StageError, StageCancelError) as e:
-            result.trace.error(
-                f"[STAGE]: Error Handler:||StageError: {e}||"
+                f"[STAGE]: Skip Handler:||{e.__class__.__name__}: {e}||"
                 f"{traceback.format_exc()}"
             )
             return result.catch(
-                status=CANCEL if isinstance(e, StageCancelError) else FAILED,
-                context={"errors": e.to_dict()},
+                status=get_status_from_error(e),
+                context=(
+                    {"errors": e.to_dict()}
+                    if isinstance(e, StageError)
+                    else None
+                ),
             )
         except Exception as e:
             result.trace.error(
@@ -301,6 +308,7 @@ class BaseStage(BaseModel, ABC):
 
         :rtype: Result
         """
+        result.catch(status=WAIT)
         return self.execute(params, result=result, event=event)
 
     def set_outputs(self, output: DictData, to: DictData) -> DictData:
@@ -578,10 +586,11 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
         current_retry: int = 0
         with current_retry < (self.retry + 1):
             try:
+                result.catch(status=WAIT, context={"retry": current_retry})
                 return self.execute(params, result=result, event=event)
             except StageRetryError:
                 current_retry += 1
-        raise StageError("Reach of retry number")
+        raise StageError(f"Reach the maximum of retry number: {self.retry}.")
 
     async def __axecute(
         self,
@@ -604,10 +613,11 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
         current_retry: int = 0
         with current_retry < (self.retry + 1):
             try:
+                result.catch(status=WAIT, context={"retry": current_retry})
                 return await self.axecute(params, result=result, event=event)
             except StageRetryError:
                 current_retry += 1
-        raise StageError("Reach of retry number")
+        raise StageError(f"Reach the maximum of retry number: {self.retry}.")
 
 
 class EmptyStage(BaseAsyncStage):
@@ -1403,6 +1413,12 @@ class BaseNestedStage(BaseStage, ABC):
 
     @staticmethod
     def mark_errors(context: DictData, error: StageError) -> None:
+        """Make the errors context result with the refs value depends on the nested
+        execute func.
+
+        :param context: (DictData) A context data.
+        :param error: (StageError) A stage exception object.
+        """
         if "errors" in context:
             context["errors"][error.refs] = error.to_dict()
         else:
@@ -1459,25 +1475,26 @@ class TriggerStage(BaseNestedStage):
         )
 
         _trigger: str = param2template(self.trigger, params, extras=self.extras)
-        rs: Result = Workflow.from_conf(
+        result: Result = Workflow.from_conf(
             name=pass_env(_trigger),
             extras=self.extras,
         ).execute(
+            # NOTE: Should not use the `pass_env` function on this params parameter.
             params=param2template(self.params, params, extras=self.extras),
             run_id=None,
             parent_run_id=result.parent_run_id,
             event=event,
         )
-        if rs.status == FAILED:
+        if result.status == FAILED:
             err_msg: StrOrNone = (
                 f" with:\n{msg}"
-                if (msg := rs.context.get("errors", {}).get("message"))
+                if (msg := result.context.get("errors", {}).get("message"))
                 else "."
             )
-            raise StageError(
-                f"Trigger workflow return `FAILED` status{err_msg}"
-            )
-        return rs
+            raise StageError(f"Trigger workflow was failed{err_msg}")
+        elif result.status == CANCEL:
+            raise StageCancelError("Trigger workflow was cancel.")
+        return result
 
 
 class ParallelStage(BaseNestedStage):

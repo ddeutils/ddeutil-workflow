@@ -121,7 +121,7 @@ class MockEvent(Event):  # pragma: no cov
         with self.lock:
             self.counter = self.n
 
-    def clear(self):
+    def clear(self) -> None:
         """Clear the counter value to 0."""
         self.counter = 0
 

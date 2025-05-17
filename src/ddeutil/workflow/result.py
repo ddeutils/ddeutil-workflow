@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import field
 from datetime import datetime
-from enum import IntEnum
+from enum import IntEnum, auto
 from typing import Optional, Union
 
 from pydantic import ConfigDict
@@ -19,6 +19,7 @@ from pydantic.dataclasses import dataclass
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
+from . import StageCancelError, StageError, StageSkipError
 from .__types import DictData
 from .conf import dynamic
 from .errors import ResultError
@@ -31,11 +32,11 @@ class Status(IntEnum):
     Result dataclass object.
     """
 
-    SUCCESS = 0
-    FAILED = 1
-    WAIT = 2
-    SKIP = 3
-    CANCEL = 4
+    SUCCESS = auto()
+    FAILED = auto()
+    WAIT = auto()
+    SKIP = auto()
+    CANCEL = auto()
 
     @property
     def emoji(self) -> str:  # pragma: no cov
@@ -70,6 +71,16 @@ def validate_statuses(statuses: list[Status]) -> Status:
     for status in (SUCCESS, SKIP, WAIT, CANCEL):
         if all(s == status for s in statuses):
             return status
+    return FAILED
+
+
+def get_status_from_error(
+    error: Union[StageError, StageCancelError, StageSkipError, Exception]
+) -> Status:
+    if isinstance(error, StageSkipError):
+        return SKIP
+    elif isinstance(error, StageCancelError):
+        return CANCEL
     return FAILED
 
 

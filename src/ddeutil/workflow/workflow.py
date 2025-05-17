@@ -558,6 +558,14 @@ class Workflow(BaseModel):
         the job execution. It will warp that error and keep it in the key `errors`
         at the result context.
 
+
+            Execution   --> Ok      --> Result
+                                        |-status: CANCEL
+                                        ╰-context:
+                                            ╰-errors:
+                                                |-name: ...
+                                                ╰-message: ...
+
         :param params: A parameter data that will parameterize before execution.
         :param run_id: (Optional[str]) A workflow running ID.
         :param parent_run_id: (Optional[str]) A parent workflow running ID.
@@ -602,6 +610,17 @@ class Workflow(BaseModel):
         timeout: float = dynamic(
             "max_job_exec_timeout", f=timeout, extras=self.extras
         )
+
+        if event and event.is_set():
+            return result.catch(
+                status=CANCEL,
+                context={
+                    "errors": WorkflowError(
+                        "Workflow was canceled from event that had set before "
+                        "workflow execution"
+                    ).to_dict()
+                },
+            )
 
         with ThreadPoolExecutor(max_job_parallel, "wf") as executor:
             futures: list[Future] = []
