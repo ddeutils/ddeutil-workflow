@@ -261,7 +261,9 @@ class BaseStage(BaseModel, ABC):
                 )
             # NOTE: Start call wrapped execution method that will use custom
             #   execution before the real execution from inherit stage model.
-            result_caught = self.__execute(params, result=result, event=event)
+            result_caught: Result = self.__execute(
+                params, result=result, event=event
+            )
             if result_caught.status == WAIT:
                 raise StageError(
                     "Status from execution should not return waiting status."
@@ -516,19 +518,42 @@ class BaseAsyncStage(BaseStage, ABC):
                 await result.trace.adebug(
                     f"[STAGE]: Description:||{self.desc}||"
                 )
-            return await self.__axecute(params, result=result, event=event)
-        except StageSkipError as e:  # pragma: no cov
+
+            if self.is_skipped(params):
+                raise StageSkipError(
+                    f"Skip because condition {self.condition} was valid."
+                )
+
+            # NOTE: Start call wrapped execution method that will use custom
+            #   execution before the real execution from inherit stage model.
+            result_caught: Result = await self.__axecute(
+                params, result=result, event=event
+            )
+            if result_caught.status == WAIT:
+                raise StageError(
+                    "Status from execution should not return waiting status."
+                )
+            return result_caught
+
+        # NOTE: Catch this error in this line because the execution can raise
+        #   this exception class at other location.
+        except (
+            StageSkipError,
+            StageCancelError,
+            StageError,
+        ) as e:  # pragma: no cov
             await result.trace.ainfo(
-                f"[STAGE]: Skip Handler:||StageSkipError: {e}||"
+                f"[STAGE]: Skip Handler:||{e.__class__.__name__}: {e}||"
                 f"{traceback.format_exc()}"
             )
-            return result.catch(status=SKIP, context={"skipped": True})
-        except StageError as e:
-            await result.trace.aerror(
-                f"[STAGE]: Error Handler:||StageError: {e}||"
-                f"{traceback.format_exc()}"
+            return result.catch(
+                status=get_status_from_error(e),
+                context=(
+                    {"errors": e.to_dict()}
+                    if isinstance(e, StageError)
+                    else None
+                ),
             )
-            return result.catch(status=FAILED, context={"errors": e.to_dict()})
         except Exception as e:
             await result.trace.aerror(
                 f"[STAGE]: Error Handler:||{e.__class__.__name__}: {e}||"
@@ -550,6 +575,7 @@ class BaseAsyncStage(BaseStage, ABC):
 
         :rtype: Result
         """
+        result.catch(status=WAIT)
         return await self.axecute(params, result=result, event=event)
 
 
@@ -1398,9 +1424,11 @@ class BaseNestedStage(BaseStage, ABC):
     """
 
     def set_outputs(self, output: DictData, to: DictData) -> DictData:
+        """Override the set outputs method that support for nested-stage."""
         return super().set_outputs(output, to=to)
 
     def get_outputs(self, output: DictData) -> DictData:
+        """Override the get outputs method that support for nested-stage"""
         return super().get_outputs(output)
 
     @property
@@ -1457,13 +1485,14 @@ class TriggerStage(BaseNestedStage):
         event: Optional[Event] = None,
     ) -> Result:
         """Trigger another workflow execution. It will wait the trigger
-        workflow running complete before catching its result.
+        workflow running complete before catching its result and raise error
+        when the result status does not be SUCCESS.
 
         :param params: (DictData) A parameter data.
         :param result: (Result) A result object for keeping context and status
-            data.
+            data. (Default is None)
         :param event: (Event) An event manager that use to track parent execute
-            was not force stopped.
+            was not force stopped. (Default is None)
 
         :rtype: Result
         """
@@ -1494,6 +1523,8 @@ class TriggerStage(BaseNestedStage):
             raise StageError(f"Trigger workflow was failed{err_msg}")
         elif result.status == CANCEL:
             raise StageCancelError("Trigger workflow was cancel.")
+        elif result.status == SKIP:
+            raise StageSkipError("Trigger workflow was skipped.")
         return result
 
 
@@ -1515,10 +1546,14 @@ class ParallelStage(BaseNestedStage):
         ...                 "echo": "Start run with branch 1",
         ...                 "sleep": 3,
         ...             },
+        ...             {
+        ...                 "name": "Echo second stage",
+        ...                 "echo": "Start run with branch 1",
+        ...             },
         ...         ],
         ...         "branch02": [
         ...             {
-        ...                 "name": "Echo second stage",
+        ...                 "name": "Echo first stage",
         ...                 "echo": "Start run with branch 2",
         ...                 "sleep": 1,
         ...             },
@@ -1549,20 +1584,24 @@ class ParallelStage(BaseNestedStage):
         *,
         event: Optional[Event] = None,
     ) -> Result:
-        """Execute all stage with specific branch ID.
+        """Execute all nested-stage that config with specific branch ID.
 
         :param branch: (str) A branch ID.
         :param params: (DictData) A parameter data.
         :param result: (Result) A Result instance for return context and status.
         :param event: (Event) An Event manager instance that use to cancel this
             execution if it forces stopped by parent execution.
+            (Default is None)
 
         :rtype: Result
         """
         result.trace.debug(f"[STAGE]: Execute Branch: {branch!r}")
+
+        # NOTE: Create nested-context
         context: DictData = copy.deepcopy(params)
         context.update({"branch": branch})
         output: DictData = {"branch": branch, "stages": {}}
+
         total_stage: int = len(self.parallel[branch])
         skips: list[bool] = [False] * total_stage
         for i, stage in enumerate(self.parallel[branch], start=0):
@@ -1603,8 +1642,8 @@ class ParallelStage(BaseNestedStage):
 
             if rs.status == FAILED:  # pragma: no cov
                 error_msg: str = (
-                    f"Branch-Stage was break because it has a nested-stage, "
-                    f"{stage.iden}, failed."
+                    f"Branch-Stage was break because its nested-stage, "
+                    f"{stage.iden!r}, failed."
                 )
                 result.catch(
                     status=FAILED,
@@ -1664,7 +1703,7 @@ class ParallelStage(BaseNestedStage):
                 context={
                     "errors": StageError(
                         "Stage was canceled from event that had set "
-                        "before stage parallel execution."
+                        "before start stage parallel execution."
                     ).to_dict()
                 },
             )
