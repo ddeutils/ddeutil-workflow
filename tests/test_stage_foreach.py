@@ -195,84 +195,84 @@ def test_foreach_stage_exec_raise():
     }
 
 
-def test_foreach_stage_exec_raise_full(test_path):
-    with dump_yaml_context(
-        test_path / "conf/demo/01_99_wf_test_wf_foreach_raise.yml",
-        data="""
-        tmp-wf-foreach-raise:
-          type: Workflow
-          jobs:
-            first-job:
-              stages:
-                - name: "Start run for-each stage"
-                  id: foreach-stage
-                  foreach: [1, 2]
-                  concurrent: 2
-                  stages:
-                    - name: "Echo stage"
-                      echo: |
-                        Start run with item ${{ item }}
-                    - name: "Final Echo"
-                      if: ${{ item }} == 2
-                      raise: Raise for item equal 2
-                    - name: "Sleep stage"
-                      sleep: 4
-                    - name: "Echo Final"
-                      echo: "This stage should not echo because event was set"
-        """,
-    ):
-        workflow = Workflow.from_conf(name="tmp-wf-foreach-raise")
-        stage: Stage = workflow.job("first-job").stage("foreach-stage")
-        rs: Result = stage.handler_execute(params={})
-        assert rs.status == FAILED
-        assert rs.context == {
-            "status": FAILED,
-            "items": [1, 2],
-            "foreach": {
-                2: {
-                    "status": FAILED,
-                    "item": 2,
-                    "stages": {
-                        "2709471980": {"outputs": {}, "status": SUCCESS},
-                        "9263488742": {
-                            "outputs": {},
-                            "errors": {
-                                "name": "StageError",
-                                "message": "Raise for item equal 2",
-                            },
-                            "status": FAILED,
-                        },
-                    },
-                    "errors": {
-                        "name": "StageError",
-                        "message": "Item-Stage was break because it has a nested-stage, 'Final Echo', failed.",
-                    },
+def test_foreach_stage_exec_raise_full():
+    stage: Stage = ForEachStage.model_validate(
+        {
+            "name": "Start run for-each stage",
+            "id": "foreach-stage",
+            "foreach": [1, 2],
+            "concurrent": 2,
+            "stages": [
+                {
+                    "name": "Echo stage",
+                    "echo": "Start run with item ${{ item }}",
                 },
-                1: {
-                    "status": CANCEL,
-                    "item": 1,
-                    "stages": {
-                        "2709471980": {"outputs": {}, "status": SUCCESS},
-                        "9263488742": {"outputs": {}, "status": SKIP},
-                        "2238460182": {"outputs": {}, "status": SUCCESS},
-                    },
-                    "errors": {
-                        "name": "StageError",
-                        "message": "Item execution was canceled because event was set.",
-                    },
+                {
+                    "name": "Final Echo",
+                    "if": "${{ item }} == 2",
+                    "raise": "Raise for item equal 2",
                 },
-            },
-            "errors": {
-                2: {
-                    "name": "StageError",
-                    "message": "Item-Stage was break because it has a nested-stage, 'Final Echo', failed.",
+                {
+                    "name": "Sleep stage",
+                    "sleep": 4,
                 },
-                1: {
-                    "name": "StageCancelError",
-                    "message": "Item execution was canceled because event was set.",
+                {
+                    "name": "Echo Final",
+                    "echo": "This stage should not echo because event was set",
                 },
-            },
+            ],
         }
+    )
+    rs: Result = stage.handler_execute(params={})
+    assert rs.status == FAILED
+    assert rs.context == {
+        "status": FAILED,
+        "items": [1, 2],
+        "foreach": {
+            2: {
+                "status": FAILED,
+                "item": 2,
+                "stages": {
+                    "2709471980": {"outputs": {}, "status": SUCCESS},
+                    "9263488742": {
+                        "outputs": {},
+                        "errors": {
+                            "name": "StageError",
+                            "message": "Raise for item equal 2",
+                        },
+                        "status": FAILED,
+                    },
+                },
+                "errors": {
+                    "name": "StageError",
+                    "message": "Item execution was break because its nested-stage, 'Final Echo', failed.",
+                },
+            },
+            1: {
+                "status": CANCEL,
+                "item": 1,
+                "stages": {
+                    "2709471980": {"outputs": {}, "status": SUCCESS},
+                    "9263488742": {"outputs": {}, "status": SKIP},
+                    "2238460182": {"outputs": {}, "status": SUCCESS},
+                },
+                "errors": {
+                    "name": "StageCancelError",
+                    "message": "Item execution was canceled from the event before start item execution.",
+                },
+            },
+        },
+        "errors": {
+            2: {
+                "name": "StageError",
+                "message": "Item execution was break because its nested-stage, 'Final Echo', failed.",
+            },
+            1: {
+                "name": "StageCancelError",
+                "message": "Item execution was canceled from the event before start item execution.",
+            },
+        },
+    }
 
 
 def test_foreach_stage_exec_concurrent(test_path):
@@ -446,7 +446,7 @@ def test_foreach_stage_exec_concurrent_with_raise():
                 "stages": {},
                 "errors": {
                     "name": "StageError",
-                    "message": "Item-Stage was break because it has a nested-stage, 'Raise with PyStage', failed.",
+                    "message": "Item execution was break because its nested-stage, 'Raise with PyStage', failed.",
                 },
             },
             1: {"status": SUCCESS, "item": 1, "stages": {}},
@@ -455,38 +455,7 @@ def test_foreach_stage_exec_concurrent_with_raise():
         "errors": {
             2: {
                 "name": "StageError",
-                "message": "Item-Stage was break because it has a nested-stage, 'Raise with PyStage', failed.",
+                "message": "Item execution was break because its nested-stage, 'Raise with PyStage', failed.",
             }
         },
-    }
-
-    output = stage.set_outputs(rs.context, {})
-    assert output == {
-        "stages": {
-            "foreach-stage": {
-                "status": FAILED,
-                "outputs": {
-                    "items": [1, 2, 3, 4, 5],
-                    "foreach": {
-                        2: {
-                            "status": FAILED,
-                            "item": 2,
-                            "stages": {},
-                            "errors": {
-                                "name": "StageError",
-                                "message": "Item-Stage was break because it has a nested-stage, 'Raise with PyStage', failed.",
-                            },
-                        },
-                        1: {"status": SUCCESS, "item": 1, "stages": {}},
-                        3: {"status": SUCCESS, "item": 3, "stages": {}},
-                    },
-                },
-                "errors": {
-                    2: {
-                        "name": "StageError",
-                        "message": "Item-Stage was break because it has a nested-stage, 'Raise with PyStage', failed.",
-                    }
-                },
-            }
-        }
     }

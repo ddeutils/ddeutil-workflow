@@ -1,6 +1,7 @@
 from ddeutil.workflow import Job, Workflow
 from ddeutil.workflow.result import CANCEL, FAILED, SUCCESS, Result
-from utils import MockEvent
+
+from .utils import MockEvent
 
 
 def test_job_exec_py():
@@ -10,6 +11,7 @@ def test_job_exec_py():
     assert rs.context == {
         "status": SUCCESS,
         "EMPTY": {
+            "status": SUCCESS,
             "matrix": {},
             "stages": {
                 "hello-world": {
@@ -43,8 +45,8 @@ def test_job_exec_py():
     assert rs.context == {
         "status": CANCEL,
         "errors": {
-            "name": "JobError",
-            "message": "Job was canceled from event that had set before local job execution.",
+            "name": "JobCancelError",
+            "message": "Execution was canceled from the event before start local job execution.",
         },
     }
 
@@ -59,6 +61,7 @@ def test_job_exec_py_raise():
     assert rs.context == {
         "status": FAILED,
         "EMPTY": {
+            "status": FAILED,
             "matrix": {},
             "stages": {
                 "raise-error": {
@@ -72,12 +75,18 @@ def test_job_exec_py_raise():
             },
             "errors": {
                 "name": "JobError",
-                "message": "Strategy break because stage, 'raise-error', return `FAILED` status.",
+                "message": (
+                    "Strategy execution was break because its nested-stage, "
+                    "'raise-error', failed."
+                ),
             },
         },
         "errors": {
             "name": "JobError",
-            "message": "Strategy break because stage, 'raise-error', return `FAILED` status.",
+            "message": (
+                "Strategy execution was break because its nested-stage, "
+                "'raise-error', failed."
+            ),
         },
     }
 
@@ -88,9 +97,10 @@ def test_job_exec_py_not_set_output():
     )
     job: Job = workflow.job("second-job")
     rs: Result = job.execute(params={})
+    assert rs.status == SUCCESS
     assert rs.context == {
         "status": SUCCESS,
-        "EMPTY": {"matrix": {}, "stages": {}},
+        "EMPTY": {"status": SUCCESS, "matrix": {}, "stages": {}},
     }
     assert job.set_outputs(rs.context, to={}) == {
         "jobs": {"second-job": {"status": SUCCESS, "stages": {}}}
@@ -101,12 +111,13 @@ def test_job_exec_py_fail_fast():
     rs: Result = (
         Workflow.from_conf(name="wf-run-python-raise-for-job")
         .job("job-fail-fast")
-        .execute({})
+        .execute(params={})
     )
     assert rs.status == SUCCESS
     assert rs.context == {
         "status": SUCCESS,
         "2150810470": {
+            "status": SUCCESS,
             "matrix": {"sleep": "1"},
             "stages": {
                 "success": {
@@ -116,6 +127,7 @@ def test_job_exec_py_fail_fast():
             },
         },
         "4855178605": {
+            "status": SUCCESS,
             "matrix": {"sleep": "5"},
             "stages": {
                 "success": {
@@ -125,9 +137,13 @@ def test_job_exec_py_fail_fast():
             },
         },
         "9873503202": {
+            "status": SUCCESS,
             "matrix": {"sleep": "0.1"},
             "stages": {
-                "success": {"outputs": {"result": "success"}, "status": SUCCESS}
+                "success": {
+                    "outputs": {"result": "success"},
+                    "status": SUCCESS,
+                }
             },
         },
     }
@@ -140,56 +156,59 @@ def test_job_exec_py_fail_fast_raise_catch():
             extras={"stage_default_id": False},
         )
         .job("job-fail-fast-raise")
-        .execute({})
+        .execute(params={})
     )
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,
         "2150810470": {
+            "status": FAILED,
             "matrix": {"sleep": "1"},
             "stages": {
                 "raise-error": {
-                    "status": FAILED,
                     "outputs": {},
                     "errors": {
                         "name": "ValueError",
                         "message": "Testing raise error inside PyStage with the sleep not equal 4!!!",
                     },
+                    "status": FAILED,
                 }
             },
             "errors": {
                 "name": "JobError",
-                "message": "Strategy break because stage, 'raise-error', return `FAILED` status.",
+                "message": "Strategy execution was break because its nested-stage, 'raise-error', failed.",
             },
         },
         "1067561285": {
+            "status": CANCEL,
             "matrix": {"sleep": "2"},
             "stages": {},
             "errors": {
-                "name": "JobError",
-                "message": "Job strategy was canceled because event was set.",
+                "name": "JobCancelError",
+                "message": "Strategy execution was canceled from the event before start stage execution.",
             },
         },
         "9112472804": {
+            "status": CANCEL,
             "matrix": {"sleep": "4"},
             "stages": {},
             "errors": {
-                "name": "JobError",
-                "message": "Job strategy was canceled because event was set.",
+                "name": "JobCancelError",
+                "message": "Strategy execution was canceled from the event before start stage execution.",
             },
         },
         "errors": {
             "2150810470": {
                 "name": "JobError",
-                "message": "Strategy break because stage, 'raise-error', return `FAILED` status.",
+                "message": "Strategy execution was break because its nested-stage, 'raise-error', failed.",
             },
             "1067561285": {
-                "name": "JobError",
-                "message": "Job strategy was canceled because event was set.",
+                "name": "JobCancelError",
+                "message": "Strategy execution was canceled from the event before start stage execution.",
             },
             "9112472804": {
-                "name": "JobError",
-                "message": "Job strategy was canceled because event was set.",
+                "name": "JobCancelError",
+                "message": "Strategy execution was canceled from the event before start stage execution.",
             },
         },
     }
@@ -203,18 +222,38 @@ def test_job_exec_py_complete():
         .job("job-complete")
         .execute({})
     )
+    assert rs.status == SUCCESS
     assert rs.context == {
+        "status": SUCCESS,
         "2150810470": {
+            "status": SUCCESS,
             "matrix": {"sleep": "1"},
-            "stages": {"success": {"outputs": {"result": "fast-success"}}},
+            "stages": {
+                "success": {
+                    "outputs": {"result": "fast-success"},
+                    "status": SUCCESS,
+                }
+            },
         },
         "4855178605": {
+            "status": SUCCESS,
             "matrix": {"sleep": "5"},
-            "stages": {"success": {"outputs": {"result": "fast-success"}}},
+            "stages": {
+                "success": {
+                    "outputs": {"result": "fast-success"},
+                    "status": SUCCESS,
+                }
+            },
         },
         "9873503202": {
+            "status": SUCCESS,
             "matrix": {"sleep": "0.1"},
-            "stages": {"success": {"outputs": {"result": "success"}}},
+            "stages": {
+                "success": {
+                    "outputs": {"result": "success"},
+                    "status": SUCCESS,
+                }
+            },
         },
     }
 
@@ -225,43 +264,72 @@ def test_job_exec_py_complete_not_parallel():
     )
     job: Job = workflow.job("job-complete-not-parallel")
     rs: Result = job.execute({})
+    assert rs.status == SUCCESS
     assert rs.context == {
+        "status": SUCCESS,
         "2150810470": {
+            "status": SUCCESS,
             "matrix": {"sleep": "1"},
-            "stages": {"success": {"outputs": {"result": "fast-success"}}},
+            "stages": {
+                "success": {
+                    "outputs": {"result": "fast-success"},
+                    "status": SUCCESS,
+                }
+            },
         },
         "4855178605": {
+            "status": SUCCESS,
             "matrix": {"sleep": "5"},
-            "stages": {"success": {"outputs": {"result": "fast-success"}}},
+            "stages": {
+                "success": {
+                    "outputs": {"result": "fast-success"},
+                    "status": SUCCESS,
+                }
+            },
         },
         "9873503202": {
+            "status": SUCCESS,
             "matrix": {"sleep": "0.1"},
-            "stages": {"success": {"outputs": {"result": "success"}}},
+            "stages": {
+                "success": {"outputs": {"result": "success"}, "status": SUCCESS}
+            },
         },
     }
 
-    output = {}
-    job.set_outputs(rs.context, to=output)
+    output = job.set_outputs(rs.context, to={})
     assert output == {
         "jobs": {
             "job-complete-not-parallel": {
+                "status": SUCCESS,
                 "strategies": {
                     "9873503202": {
+                        "status": SUCCESS,
                         "matrix": {"sleep": "0.1"},
                         "stages": {
-                            "success": {"outputs": {"result": "success"}},
+                            "success": {
+                                "outputs": {"result": "success"},
+                                "status": SUCCESS,
+                            },
                         },
                     },
                     "4855178605": {
+                        "status": SUCCESS,
                         "matrix": {"sleep": "5"},
                         "stages": {
-                            "success": {"outputs": {"result": "fast-success"}},
+                            "success": {
+                                "outputs": {"result": "fast-success"},
+                                "status": SUCCESS,
+                            },
                         },
                     },
                     "2150810470": {
+                        "status": SUCCESS,
                         "matrix": {"sleep": "1"},
                         "stages": {
-                            "success": {"outputs": {"result": "fast-success"}},
+                            "success": {
+                                "outputs": {"result": "fast-success"},
+                                "status": SUCCESS,
+                            },
                         },
                     },
                 },
@@ -280,55 +348,64 @@ def test_job_exec_py_complete_raise():
     )
     assert rs.status == FAILED
     assert rs.context == {
+        "status": FAILED,
         "9873503202": {
+            "status": SUCCESS,
             "matrix": {"sleep": "0.1"},
             "stages": {
-                "7972360640": {"outputs": {}},
-                "raise-error": {"outputs": {"result": "success"}},
+                "7972360640": {"outputs": {}, "status": SUCCESS},
+                "raise-error": {
+                    "outputs": {"result": "success"},
+                    "status": SUCCESS,
+                },
             },
         },
         "2150810470": {
+            "status": FAILED,
             "matrix": {"sleep": "1"},
             "stages": {
-                "7972360640": {"outputs": {}},
+                "7972360640": {"outputs": {}, "status": SUCCESS},
                 "raise-error": {
                     "outputs": {},
                     "errors": {
                         "name": "ValueError",
                         "message": "Testing raise error inside PyStage!!!",
                     },
+                    "status": FAILED,
                 },
             },
             "errors": {
                 "name": "JobError",
-                "message": "Strategy break because stage, 'raise-error', return `FAILED` status.",
+                "message": "Strategy execution was break because its nested-stage, 'raise-error', failed.",
             },
         },
         "9112472804": {
+            "status": FAILED,
             "matrix": {"sleep": "4"},
             "stages": {
-                "7972360640": {"outputs": {}},
+                "7972360640": {"outputs": {}, "status": SUCCESS},
                 "raise-error": {
                     "outputs": {},
                     "errors": {
                         "name": "ValueError",
                         "message": "Testing raise error inside PyStage!!!",
                     },
+                    "status": FAILED,
                 },
             },
             "errors": {
                 "name": "JobError",
-                "message": "Strategy break because stage, 'raise-error', return `FAILED` status.",
+                "message": "Strategy execution was break because its nested-stage, 'raise-error', failed.",
             },
         },
         "errors": {
             "2150810470": {
                 "name": "JobError",
-                "message": "Strategy break because stage, 'raise-error', return `FAILED` status.",
+                "message": "Strategy execution was break because its nested-stage, 'raise-error', failed.",
             },
             "9112472804": {
                 "name": "JobError",
-                "message": "Strategy break because stage, 'raise-error', return `FAILED` status.",
+                "message": "Strategy execution was break because its nested-stage, 'raise-error', failed.",
             },
         },
     }
@@ -341,8 +418,9 @@ def test_job_exec_runs_on_not_implement():
     rs: Result = job.execute({})
     assert rs.status == FAILED
     assert rs.context == {
+        "status": FAILED,
         "errors": {
             "message": "Execute runs-on type: 'self_hosted' does not support yet.",
             "name": "JobError",
-        }
+        },
     }

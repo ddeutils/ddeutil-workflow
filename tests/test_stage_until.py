@@ -103,7 +103,7 @@ def test_until_stage_exec_exceed_loop():
         },
         "errors": {
             "name": "StageError",
-            "message": "The until loop was exceed 1 loops",
+            "message": "Loop was exceed the maximum 1 loop.",
         },
     }
 

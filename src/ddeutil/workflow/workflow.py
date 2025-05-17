@@ -33,7 +33,7 @@ from typing_extensions import Self
 
 from .__types import DictData
 from .conf import FileLoad, Loader, dynamic
-from .errors import WorkflowError
+from .errors import WorkflowCancelError, WorkflowError, WorkflowTimeoutError
 from .event import Crontab
 from .job import Job
 from .logs import Audit, get_audit
@@ -489,17 +489,13 @@ class Workflow(BaseModel):
         """
         result: Result = result or Result(run_id=gen_id(self.name, unique=True))
 
-        if job.is_skipped(params=params):
-            result.trace.info(f"[WORKFLOW]: Skip Job: {job.id!r}")
-            job.set_outputs(output={"skipped": True}, to=params)
-            return result.catch(status=SKIP, context=params)
-
         if event and event.is_set():
             return result.catch(
                 status=CANCEL,
                 context={
-                    "errors": WorkflowError(
-                        "Workflow job was canceled because event was set."
+                    "errors": WorkflowCancelError(
+                        "Job execution was canceled because the event was set "
+                        "before start job execution."
                     ).to_dict(),
                 },
             )
@@ -512,6 +508,7 @@ class Workflow(BaseModel):
             event=event,
         )
         job.set_outputs(rs.context, to=params)
+
         if rs.status in (FAILED, CANCEL):
             error_msg: str = (
                 f"Job, {job.id!r}, return `{rs.status.name}` status."
@@ -615,9 +612,9 @@ class Workflow(BaseModel):
             return result.catch(
                 status=CANCEL,
                 context={
-                    "errors": WorkflowError(
-                        "Workflow was canceled from event that had set before "
-                        "workflow execution"
+                    "errors": WorkflowCancelError(
+                        "Execution was canceled from the event was set before "
+                        "workflow execution."
                     ).to_dict()
                 },
             )
@@ -647,7 +644,7 @@ class Workflow(BaseModel):
                     )
                 elif check == SKIP:  # pragma: no cov
                     result.trace.info(f"[JOB]: Skip job: {job_id!r}")
-                    job.set_outputs(output={"skipped": True}, to=context)
+                    job.set_outputs(output={"status": SKIP}, to=context)
                     job_queue.task_done()
                     continue
 
@@ -706,9 +703,13 @@ class Workflow(BaseModel):
             for future in futures:
                 future.cancel()
 
+            time.sleep(0.0025)
+
         return result.catch(
             status=FAILED,
             context={
-                "errors": WorkflowError(f"{self.name!r} was timeout.").to_dict()
+                "errors": WorkflowTimeoutError(
+                    f"{self.name!r} was timeout."
+                ).to_dict()
             },
         )

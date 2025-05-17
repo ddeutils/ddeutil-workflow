@@ -1,11 +1,10 @@
-from concurrent.futures import Future, ThreadPoolExecutor
-from threading import Event
-
 import pytest
 from ddeutil.workflow.errors import JobError
 from ddeutil.workflow.job import Job, local_execute_strategy
 from ddeutil.workflow.result import CANCEL, FAILED, SKIP, SUCCESS, Result
 from ddeutil.workflow.workflow import Workflow
+
+from .utils import MockEvent
 
 
 def test_job_exec_strategy():
@@ -17,6 +16,7 @@ def test_job_exec_strategy():
     assert rs.context == {
         "status": SUCCESS,
         "9873503202": {
+            "status": SUCCESS,
             "matrix": {"sleep": "0.1"},
             "stages": {
                 "success": {"outputs": {"result": "success"}, "status": SUCCESS}
@@ -34,6 +34,7 @@ def test_job_exec_strategy_skipped_stage():
     assert rs.context == {
         "status": SUCCESS,
         "2150810470": {
+            "status": SUCCESS,
             "matrix": {"sleep": "1"},
             "stages": {
                 "equal-one": {
@@ -59,6 +60,7 @@ def test_job_exec_strategy_catch_stage_error():
     assert rs.context == {
         "status": FAILED,
         "5027535057": {
+            "status": FAILED,
             "matrix": {"name": "foo"},
             "stages": {
                 "1772094681": {"outputs": {}, "status": SUCCESS},
@@ -74,8 +76,8 @@ def test_job_exec_strategy_catch_stage_error():
             "errors": {
                 "name": "JobError",
                 "message": (
-                    "Strategy break because stage, 'raise-error', return "
-                    "`FAILED` status."
+                    "Strategy execution was break because its nested-stage, "
+                    "'raise-error', failed."
                 ),
             },
         },
@@ -94,6 +96,7 @@ def test_job_exec_strategy_catch_job_error():
     assert rs.context == {
         "status": FAILED,
         "5027535057": {
+            "status": FAILED,
             "matrix": {"name": "foo"},
             "stages": {
                 "1772094681": {"outputs": {}, "status": SUCCESS},
@@ -108,7 +111,10 @@ def test_job_exec_strategy_catch_job_error():
             },
             "errors": {
                 "name": "JobError",
-                "message": "Strategy break because stage, 'raise-error', return `FAILED` status.",
+                "message": (
+                    "Strategy execution was break because its nested-stage, "
+                    "'raise-error', failed."
+                ),
             },
         },
     }
@@ -118,26 +124,24 @@ def test_job_exec_strategy_event_set():
     job: Job = Workflow.from_conf(name="wf-run-python-raise-for-job").job(
         "second-job"
     )
-    event = Event()
+    event = MockEvent(n=0)
     rs = Result()
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        future: Future = executor.submit(
-            local_execute_strategy, job, {}, {}, result=rs, event=event
-        )
-        event.set()
-
     with pytest.raises(JobError):
-        future.result()
+        local_execute_strategy(job, {}, {}, result=rs, event=event)
 
     assert rs.status == CANCEL
     assert rs.context == {
         "status": CANCEL,
         "EMPTY": {
+            "status": CANCEL,
             "matrix": {},
-            "stages": {"1772094681": {"outputs": {}, "status": SUCCESS}},
+            "stages": {},
             "errors": {
                 "name": "JobError",
-                "message": "Job strategy was canceled because event was set.",
+                "message": (
+                    "Strategy execution was canceled from the event before "
+                    "start stage execution."
+                ),
             },
         },
     }
@@ -155,6 +159,7 @@ def test_job_exec_strategy_raise():
     assert rs.context == {
         "status": FAILED,
         "EMPTY": {
+            "status": FAILED,
             "matrix": {},
             "stages": {
                 "raise-error": {
@@ -168,7 +173,10 @@ def test_job_exec_strategy_raise():
             },
             "errors": {
                 "name": "JobError",
-                "message": "Strategy break because stage, 'raise-error', return `FAILED` status.",
+                "message": (
+                    "Strategy execution was break because its nested-stage, "
+                    "'raise-error', failed."
+                ),
             },
         },
     }

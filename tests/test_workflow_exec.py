@@ -1,11 +1,10 @@
 import shutil
-from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime
 from textwrap import dedent
-from threading import Event
 
 from ddeutil.core import getdot
 from ddeutil.workflow import (
+    CANCEL,
     FAILED,
     SUCCESS,
     Job,
@@ -14,7 +13,7 @@ from ddeutil.workflow import (
     extract_call,
 )
 
-from .utils import dump_yaml_context
+from .utils import MockEvent, dump_yaml_context
 
 
 def test_workflow_exec():
@@ -25,12 +24,19 @@ def test_workflow_exec():
         name="demo-workflow", jobs={"sleep-run": job, "sleep-again-run": job}
     )
     rs: Result = workflow.execute(params={}, max_job_parallel=1)
-    assert rs.status == 0
+    assert rs.status == SUCCESS
     assert rs.context == {
+        "status": SUCCESS,
         "params": {},
         "jobs": {
             "sleep-again-run": {
-                "stages": {"7972360640": {"outputs": {}}},
+                "status": SUCCESS,
+                "stages": {
+                    "7972360640": {
+                        "outputs": {},
+                        "status": SUCCESS,
+                    }
+                },
             },
         },
     }
@@ -50,17 +56,22 @@ def test_workflow_exec_timeout():
     rs: Result = workflow.execute(params={}, timeout=1.25, max_job_parallel=1)
     assert rs.status == FAILED
     assert rs.context == {
+        "status": FAILED,
         "errors": {
-            "name": "WorkflowError",
+            "name": "WorkflowTimeoutError",
             "message": "'demo-workflow' was timeout.",
         },
         "params": {},
         "jobs": {
             "sleep-again-run": {
-                "stages": {"7972360640": {"outputs": {}}},
+                "status": CANCEL,
+                "stages": {"7972360640": {"outputs": {}, "status": SUCCESS}},
                 "errors": {
-                    "name": "JobError",
-                    "message": "Job strategy was canceled because event was set.",
+                    "name": "JobCancelError",
+                    "message": (
+                        "Strategy execution was canceled from the event before "
+                        "start stage execution."
+                    ),
                 },
             },
         },
@@ -75,26 +86,20 @@ def test_workflow_exec_raise_event_set():
         name="demo-workflow",
         jobs={"sleep-run": job, "sleep-again-run": job},
     )
-    event = Event()
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        future: Future = executor.submit(
-            workflow.execute,
-            params={},
-            timeout=1,
-            event=event,
-            max_job_parallel=1,
-        )
-        event.set()
-
-    rs: Result = future.result()
-    assert rs.status == FAILED
+    event = MockEvent(n=0)
+    rs: Result = workflow.execute(
+        params={}, timeout=1, event=event, max_job_parallel=1
+    )
+    assert rs.status == CANCEL
     assert rs.context == {
+        "status": CANCEL,
         "errors": {
-            "name": "WorkflowError",
-            "message": "Workflow job was canceled because event was set.",
+            "name": "WorkflowCancelError",
+            "message": (
+                "Execution was canceled from the event was set before workflow "
+                "execution."
+            ),
         },
-        "jobs": {},
-        "params": {},
     }
 
 
@@ -108,37 +113,55 @@ def test_workflow_exec_py():
     )
     assert rs.status == SUCCESS
     assert rs.context == {
+        "status": SUCCESS,
         "params": {
             "author-run": "Local Workflow",
             "run-date": datetime(2024, 1, 1, 0, 0),
         },
         "jobs": {
             "first-job": {
+                "status": SUCCESS,
                 "stages": {
-                    "printing": {"outputs": {"x": "Local Workflow"}},
-                    "setting-x": {"outputs": {"x": 1}},
+                    "printing": {
+                        "outputs": {"x": "Local Workflow"},
+                        "status": SUCCESS,
+                    },
+                    "setting-x": {
+                        "outputs": {"x": 1},
+                        "status": SUCCESS,
+                    },
                 },
             },
             "second-job": {
+                "status": SUCCESS,
                 "stages": {
                     "create-func": {
+                        "status": SUCCESS,
                         "outputs": {
                             "var_inside": "Create Function Inside",
                             "echo": "echo",
                         },
                     },
-                    "call-func": {"outputs": {}},
-                    "9150930869": {"outputs": {}},
+                    "call-func": {
+                        "outputs": {},
+                        "status": SUCCESS,
+                    },
+                    "9150930869": {
+                        "outputs": {},
+                        "status": SUCCESS,
+                    },
                 },
             },
             "final-job": {
+                "status": SUCCESS,
                 "stages": {
                     "1772094681": {
+                        "status": SUCCESS,
                         "outputs": {
                             "return_code": 0,
                             "stdout": "Hello World",
                             "stderr": None,
-                        }
+                        },
                     }
                 },
             },
@@ -156,9 +179,13 @@ def test_workflow_exec_parallel():
     rs: Result = workflow.execute(params={}, max_job_parallel=2)
     assert rs.status == SUCCESS
     assert rs.context == {
+        "status": SUCCESS,
         "params": {},
         "jobs": {
-            "sleep-again-run": {"stages": {"7972360640": {"outputs": {}}}},
+            "sleep-again-run": {
+                "status": SUCCESS,
+                "stages": {"7972360640": {"outputs": {}, "status": SUCCESS}},
+            },
         },
     }
 
@@ -181,18 +208,23 @@ def test_workflow_exec_parallel_timeout():
     rs: Result = workflow.execute(params={}, timeout=1.25, max_job_parallel=2)
     assert rs.status == FAILED
     assert rs.context == {
+        "status": FAILED,
         "params": {},
         "jobs": {
             "sleep-run": {
+                "status": CANCEL,
                 "stages": {},
                 "errors": {
-                    "name": "JobError",
-                    "message": "Job strategy was canceled because event was set.",
+                    "name": "JobCancelError",
+                    "message": (
+                        "Strategy execution was canceled from the event before "
+                        "start stage execution."
+                    ),
                 },
             },
         },
         "errors": {
-            "name": "WorkflowError",
+            "name": "WorkflowTimeoutError",
             "message": "'demo-workflow' was timeout.",
         },
     }

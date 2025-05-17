@@ -1,5 +1,7 @@
-from ddeutil.workflow import CANCEL, FAILED, SUCCESS, Result
+from ddeutil.workflow import CANCEL, FAILED, SKIP, SUCCESS, Result
 from ddeutil.workflow.stages import CaseStage, Stage
+
+from .utils import MockEvent
 
 
 def test_case_stage_exec(test_path):
@@ -127,6 +129,39 @@ def test_case_stage_exec_raise():
 def test_case_stage_exec_cancel():
     stage: Stage = CaseStage.model_validate(
         {
+            "name": "Stage raise not has else condition",
+            "id": "raise-else",
+            "case": "${{ params.name }}",
+            "match": [
+                {
+                    "case": "bar",
+                    "stages": [
+                        {
+                            "name": "Match name with Bar",
+                            "echo": "Hello ${{ params.name }}",
+                        }
+                    ],
+                },
+            ],
+        }
+    )
+    event = MockEvent(n=0)
+    rs: Result = stage.handler_execute({"params": {"name": "bar"}}, event=event)
+    assert rs.status == CANCEL
+    assert rs.context == {
+        "status": CANCEL,
+        "errors": {
+            "name": "StageCancelError",
+            "message": (
+                "Execution was canceled from event before start case execution."
+            ),
+        },
+    }
+
+
+def test_case_stage_exec_skipped():
+    stage: Stage = CaseStage.model_validate(
+        {
             "name": "Stage skip not has else condition",
             "id": "not-else",
             "case": "${{ params.name }}",
@@ -145,14 +180,5 @@ def test_case_stage_exec_cancel():
         }
     )
     rs: Result = stage.handler_execute({"params": {"name": "test"}})
-    assert rs.status == CANCEL
-    assert rs.context == {
-        "status": CANCEL,
-        "errors": {
-            "name": "StageError",
-            "message": (
-                "Case-Stage was canceled because it does not match "
-                "any case and else condition does not set too."
-            ),
-        },
-    }
+    assert rs.status == SKIP
+    assert rs.context == {"status": SKIP}

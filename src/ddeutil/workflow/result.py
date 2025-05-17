@@ -19,7 +19,13 @@ from pydantic.dataclasses import dataclass
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
-from . import StageCancelError, StageError, StageSkipError
+from . import (
+    JobCancelError,
+    JobError,
+    StageCancelError,
+    StageError,
+    StageSkipError,
+)
 from .__types import DictData
 from .conf import dynamic
 from .errors import ResultError
@@ -66,20 +72,30 @@ def validate_statuses(statuses: list[Status]) -> Status:
 
     :rtype: Status
     """
-    if any(s == FAILED for s in statuses):
+    if any(s == CANCEL for s in statuses):
+        return CANCEL
+    elif any(s == FAILED for s in statuses):
         return FAILED
-    for status in (SUCCESS, SKIP, WAIT, CANCEL):
+    for status in (SUCCESS, SKIP, WAIT):
         if all(s == status for s in statuses):
             return status
     return FAILED
 
 
 def get_status_from_error(
-    error: Union[StageError, StageCancelError, StageSkipError, Exception]
+    error: Union[
+        StageError,
+        StageCancelError,
+        StageSkipError,
+        JobError,
+        JobCancelError,
+        Exception,
+    ]
 ) -> Status:
+    """Get the Status from the error object."""
     if isinstance(error, StageSkipError):
         return SKIP
-    elif isinstance(error, StageCancelError):
+    elif isinstance(error, (StageCancelError, JobCancelError)):
         return CANCEL
     return FAILED
 

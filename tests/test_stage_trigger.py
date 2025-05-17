@@ -8,9 +8,10 @@ from ddeutil.workflow import (
     Workflow,
 )
 from ddeutil.workflow.stages import Stage
-from utils import MockEvent
 
 from src.ddeutil.workflow import TriggerStage
+
+from .utils import MockEvent
 
 
 def test_trigger_stage_exec():

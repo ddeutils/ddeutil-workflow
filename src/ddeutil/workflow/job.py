@@ -40,8 +40,18 @@ from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
 from .__types import DictData, DictStr, Matrix, StrOrNone
-from .errors import JobError, to_dict
-from .result import CANCEL, FAILED, SKIP, SUCCESS, WAIT, Result, Status
+from .errors import JobCancelError, JobError, to_dict
+from .result import (
+    CANCEL,
+    FAILED,
+    SKIP,
+    SUCCESS,
+    WAIT,
+    Result,
+    Status,
+    get_status_from_error,
+    validate_statuses,
+)
 from .reusables import has_template, param2template
 from .stages import Stage
 from .utils import cross_product, filter_func, gen_id
@@ -427,11 +437,10 @@ class Job(BaseModel):
                 return stage
         raise ValueError(f"Stage {stage_id!r} does not exists in this job.")
 
-    def check_needs(
-        self, jobs: dict[str, DictData]
-    ) -> Status:  # pragma: no cov
+    def check_needs(self, jobs: dict[str, DictData]) -> Status:
         """Return trigger status from checking job's need trigger rule logic was
-        valid. The return status should be SUCCESS, FAILED, WAIT, or SKIP.
+        valid. The return status should be `SUCCESS`, `FAILED`, `WAIT`, or
+        `SKIP` status.
 
         :param jobs: (dict[str, DictData]) A mapping of job ID and its context
             data that return from execution process.
@@ -446,22 +455,41 @@ class Job(BaseModel):
         def make_return(result: bool) -> Status:
             return SUCCESS if result else FAILED
 
+        # NOTE: Filter all job result context only needed in this job.
         need_exist: dict[str, Any] = {
-            need: jobs[need] for need in self.needs if need in jobs
+            need: jobs[need] or {"status": WAIT}
+            for need in self.needs
+            if need in jobs
         }
-        if len(need_exist) != len(self.needs):
+
+        # NOTE: Return WAIT status if result context not complete, or it has any
+        #   waiting status.
+        if len(need_exist) < len(self.needs) or any(
+            need_exist[job].get("status", WAIT) == WAIT for job in need_exist
+        ):
             return WAIT
+
+        # NOTE: Return SKIP status if all status are SKIP.
         elif all(
             need_exist[job].get("status", WAIT) == SKIP for job in need_exist
         ):
             return SKIP
+
+        # NOTE: Return CANCEL status if any status is CANCEL.
+        elif any(
+            need_exist[job].get("status", WAIT) == CANCEL for job in need_exist
+        ):
+            return CANCEL
+
+        # NOTE: Return SUCCESS if all status not be WAIT or all SKIP.
         elif self.trigger_rule == Rule.ALL_DONE:
             return SUCCESS
+
         elif self.trigger_rule == Rule.ALL_SUCCESS:
             rs = all(
                 (
                     "errors" not in need_exist[job]
-                    and need_exist[job].get("status", WAIT) != SKIP
+                    and need_exist[job].get("status", WAIT) == SUCCESS
                 )
                 for job in need_exist
             )
@@ -473,24 +501,51 @@ class Job(BaseModel):
                 )
                 for job in need_exist
             )
+
         elif self.trigger_rule == Rule.ONE_SUCCESS:
-            rs = sum(
-                (
-                    "errors" not in need_exist[job]
-                    and need_exist[job].get("status", WAIT) != SKIP
+            rs = (
+                sum(
+                    (
+                        "errors" not in need_exist[job]
+                        and need_exist[job].get("status", WAIT) == SUCCESS
+                    )
+                    for job in need_exist
                 )
-                for job in need_exist
-            ) + 1 == len(self.needs)
+                == 1
+            )
+
         elif self.trigger_rule == Rule.ONE_FAILED:
-            rs = sum("errors" in need_exist[job] for job in need_exist) == 1
+            rs = (
+                sum(
+                    (
+                        "errors" in need_exist[job]
+                        or need_exist[job].get("status", WAIT) == FAILED
+                    )
+                    for job in need_exist
+                )
+                == 1
+            )
+
         elif self.trigger_rule == Rule.NONE_SKIPPED:
             rs = all(
-                not need_exist[job].get("skipped", False) for job in need_exist
+                need_exist[job].get("status", WAIT) != SKIP
+                for job in need_exist
             )
+
         elif self.trigger_rule == Rule.NONE_FAILED:
-            rs = all("errors" not in need_exist[job] for job in need_exist)
+            rs = all(
+                (
+                    "errors" not in need_exist[job]
+                    and need_exist[job].get("status", WAIT) != FAILED
+                )
+                for job in need_exist
+            )
+
         else:  # pragma: no cov
-            return FAILED
+            raise NotImplementedError(
+                f"Trigger rule {self.trigger_rule} does not implement on this "
+                f"`check_needs` method yet."
+            )
         return make_return(rs)
 
     def is_skipped(self, params: DictData) -> bool:
@@ -660,10 +715,11 @@ class Job(BaseModel):
         )
 
         result.trace.info(
-            f"[JOB]: Execute "
+            f"[JOB]: Routing for "
             f"{''.join(self.runs_on.type.value.split('_')).title()}: "
             f"{self.id!r}"
         )
+
         if self.runs_on.type == RunsOn.LOCAL:
             return local_execute(
                 self,
@@ -684,7 +740,7 @@ class Job(BaseModel):
             )
 
         result.trace.error(
-            f"[JOB]: Execute not support runs-on: {self.runs_on.type.value!r} "
+            f"[JOB]: Execution not support runs-on: {self.runs_on.type.value!r} "
             f"yet."
         )
         return result.catch(
@@ -696,6 +752,19 @@ class Job(BaseModel):
                 ).to_dict(),
             },
         )
+
+
+def mark_errors(context: DictData, error: JobError) -> None:
+    """Make the errors context result with the refs value depends on the nested
+    execute func.
+
+    :param context: (DictData) A context data.
+    :param error: (JobError) A stage exception object.
+    """
+    if "errors" in context:
+        context["errors"][error.refs] = error.to_dict()
+    else:
+        context["errors"] = error.to_dict(with_refs=True)
 
 
 def local_execute_strategy(
@@ -745,24 +814,30 @@ def local_execute_strategy(
 
     context: DictData = copy.deepcopy(params)
     context.update({"matrix": strategy, "stages": {}})
-    for stage in job.stages:
+    total_stage: int = len(job.stages)
+    skips: list[bool] = [False] * total_stage
+    for i, stage in enumerate(job.stages, start=0):
 
         if job.extras:
             stage.extras = job.extras
 
         if event and event.is_set():
-            error_msg: str = "Job strategy was canceled because event was set."
+            error_msg: str = (
+                "Strategy execution was canceled from the event before "
+                "start stage execution."
+            )
             result.catch(
                 status=CANCEL,
                 context={
                     strategy_id: {
+                        "status": CANCEL,
                         "matrix": strategy,
                         "stages": filter_func(context.pop("stages", {})),
-                        "errors": JobError(error_msg).to_dict(),
+                        "errors": JobCancelError(error_msg).to_dict(),
                     },
                 },
             )
-            raise JobError(error_msg, refs=strategy_id)
+            raise JobCancelError(error_msg, refs=strategy_id)
 
         result.trace.info(f"[JOB]: Execute Stage: {stage.iden!r}")
         rs: Result = stage.handler_execute(
@@ -773,15 +848,20 @@ def local_execute_strategy(
         )
         stage.set_outputs(rs.context, to=context)
 
+        if rs.status == SKIP:
+            skips[i] = True
+            continue
+
         if rs.status == FAILED:
             error_msg: str = (
-                f"Strategy break because stage, {stage.iden!r}, return "
-                f"`FAILED` status."
+                f"Strategy execution was break because its nested-stage, "
+                f"{stage.iden!r}, failed."
             )
             result.catch(
                 status=FAILED,
                 context={
                     strategy_id: {
+                        "status": FAILED,
                         "matrix": strategy,
                         "stages": filter_func(context.pop("stages", {})),
                         "errors": JobError(error_msg).to_dict(),
@@ -790,10 +870,30 @@ def local_execute_strategy(
             )
             raise JobError(error_msg, refs=strategy_id)
 
+        elif rs.status == CANCEL:
+            error_msg: str = (
+                "Strategy execution was canceled from the event after "
+                "start stage execution."
+            )
+            result.catch(
+                status=CANCEL,
+                context={
+                    strategy_id: {
+                        "status": CANCEL,
+                        "matrix": strategy,
+                        "stages": filter_func(context.pop("stages", {})),
+                        "errors": JobCancelError(error_msg).to_dict(),
+                    },
+                },
+            )
+            raise JobCancelError(error_msg, refs=strategy_id)
+
+    status: Status = SKIP if sum(skips) == total_stage else SUCCESS
     return result.catch(
-        status=SUCCESS,
+        status=status,
         context={
             strategy_id: {
+                "status": status,
                 "matrix": strategy,
                 "stages": filter_func(context.pop("stages", {})),
             },
@@ -840,10 +940,20 @@ def local_execute(
         extras=job.extras,
     )
 
+    result.trace.info("[JOB]: Start Local executor.")
+
+    if job.desc:
+        result.trace.debug(f"[JOB]: Description:||{job.desc}||")
+
+    if job.is_skipped(params=params):
+        result.trace.info("[JOB]: Skip because job condition was valid.")
+        return result.catch(status=SKIP)
+
     event: Event = event or Event()
-    fail_fast_flag: bool = job.strategy.fail_fast
-    ls: str = "Fail-Fast" if fail_fast_flag else "All-Completed"
+    ls: str = "Fail-Fast" if job.strategy.fail_fast else "All-Completed"
     workers: int = job.strategy.max_parallel
+    strategies: list[DictStr] = job.strategy.make()
+    len_strategy: int = len(strategies)
     result.trace.info(
         f"[JOB]: Execute {ls}: {job.id!r} with {workers} "
         f"worker{'s' if workers > 1 else ''}."
@@ -853,8 +963,8 @@ def local_execute(
         return result.catch(
             status=CANCEL,
             context={
-                "errors": JobError(
-                    "Job was canceled from event that had set before "
+                "errors": JobCancelError(
+                    "Execution was canceled from the event before start "
                     "local job execution."
                 ).to_dict()
             },
@@ -870,50 +980,57 @@ def local_execute(
                 result=result,
                 event=event,
             )
-            for strategy in job.strategy.make()
+            for strategy in strategies
         ]
 
         context: DictData = {}
-        status: Status = SUCCESS
+        statuses: list[Status] = [WAIT] * len_strategy
+        fail_fast: bool = False
 
-        if not fail_fast_flag:
+        if not job.strategy.fail_fast:
             done: Iterator[Future] = as_completed(futures)
         else:
             done, not_done = wait(futures, return_when=FIRST_EXCEPTION)
             if len(list(done)) != len(futures):
                 result.trace.warning(
-                    "[JOB]: Handler Fail-Fast: Got exception and set event."
+                    "[JOB]: Set the event for stop pending job-execution."
                 )
                 event.set()
                 for future in not_done:
                     future.cancel()
-                time.sleep(0.075)
 
-            nd: str = (
-                (
-                    f", {len(not_done)} strateg"
-                    f"{'ies' if len(not_done) > 1 else 'y'} not run!!!"
+                time.sleep(0.025)
+                nd: str = (
+                    (
+                        f", {len(not_done)} strateg"
+                        f"{'ies' if len(not_done) > 1 else 'y'} not run!!!"
+                    )
+                    if not_done
+                    else ""
                 )
-                if not_done
-                else ""
-            )
-            result.trace.debug(f"[JOB]: ... Job was set Fail-Fast{nd}")
-            done: Iterator[Future] = as_completed(futures)
+                result.trace.debug(f"[JOB]: ... Job was set Fail-Fast{nd}")
+                done: Iterator[Future] = as_completed(futures)
+                fail_fast: bool = True
 
-        for future in done:
+        for i, future in enumerate(done, start=0):
             try:
-                future.result()
+                statuses[i] = future.result().status
             except JobError as e:
-                status = FAILED
+                statuses[i] = get_status_from_error(e)
                 result.trace.error(
-                    f"[JOB]: {ls} Error Handler:||{e.__class__.__name__}:||{e}"
+                    f"[JOB]: {ls} Error Handler:||{e.__class__.__name__}: {e}"
                 )
-                if "errors" in context:
-                    context["errors"][e.refs] = e.to_dict()
-                else:
-                    context["errors"] = e.to_dict(with_refs=True)
+                mark_errors(context, e)
             except CancelledError:
                 pass
+
+    status: Status = validate_statuses(statuses)
+
+    # NOTE: Prepare status because it does not cancel from parent event but
+    #   cancel from failed item execution.
+    if fail_fast and status == CANCEL:
+        status = FAILED
+
     return result.catch(status=status, context=context)
 
 
@@ -944,6 +1061,8 @@ def self_hosted_execute(
         id_logic=(job.id or "EMPTY"),
         extras=job.extras,
     )
+
+    result.trace.info("[JOB]: Start self-hosted executor.")
 
     if event and event.is_set():
         return result.catch(
