@@ -121,6 +121,8 @@ console_output_style = "count"
 addopts = [
     "--strict-config",
     "--strict-markers",
+#    "-p no:launch",
+#    "-p no:launch_ros",
 ]
 filterwarnings = [
     "error",

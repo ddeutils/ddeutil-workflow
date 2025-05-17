@@ -6,10 +6,12 @@
 """Utility function model."""
 from __future__ import annotations
 
+import asyncio
 import stat
 import time
 from collections.abc import Iterator
 from datetime import date, datetime, timedelta
+from functools import wraps
 from hashlib import md5
 from inspect import isfunction
 from itertools import chain, islice, product
@@ -26,6 +28,16 @@ from .__types import DictData, Matrix
 T = TypeVar("T")
 UTC: Final[ZoneInfo] = ZoneInfo("UTC")
 MARK_NEWLINE: Final[str] = "||"
+
+
+def to_train(camel: str) -> str:
+    """Convert camel case string to train case.
+
+    :param camel: (str) A camel case string that want to convert.
+
+    :rtype: str
+    """
+    return "".join("-" + i if i.isupper() else i for i in camel).lstrip("-")
 
 
 def prepare_newline(msg: str) -> str:
@@ -313,3 +325,24 @@ def dump_all(
     elif isinstance(value, BaseModel):
         return value.model_dump(by_alias=by_alias)
     return value
+
+
+def awaitable(func):
+    """Dynamic function to async or not depend on the called statement."""
+
+    @wraps(func)
+    async def async_wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+
+    @wraps(func)
+    def sync_wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+
+    def dispatch(*args, **kwargs):
+        try:
+            asyncio.get_running_loop()
+            return async_wrapper(*args, **kwargs)
+        except RuntimeError:
+            return sync_wrapper(*args, **kwargs)
+
+    return dispatch

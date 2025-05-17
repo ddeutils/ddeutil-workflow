@@ -142,10 +142,6 @@ class Config:  # pragma: no cov
         return env("LOG_DATETIME_FORMAT", "%Y-%m-%d %H:%M:%S")
 
     @property
-    def stage_raise_error(self) -> bool:
-        return str2bool(env("CORE_STAGE_RAISE_ERROR", "false"))
-
-    @property
     def stage_default_id(self) -> bool:
         return str2bool(env("CORE_STAGE_DEFAULT_ID", "false"))
 

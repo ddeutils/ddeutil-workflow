@@ -40,11 +40,7 @@ from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
 from .__types import DictData, DictStr, Matrix, StrOrNone
-from .errors import (
-    JobError,
-    StageError,
-    to_dict,
-)
+from .errors import JobError, to_dict
 from .result import CANCEL, FAILED, SKIP, SUCCESS, WAIT, Result, Status
 from .reusables import has_template, param2template
 from .stages import Stage
@@ -455,7 +451,9 @@ class Job(BaseModel):
         }
         if len(need_exist) != len(self.needs):
             return WAIT
-        elif all(need_exist[job].get("skipped", False) for job in need_exist):
+        elif all(
+            need_exist[job].get("status", WAIT) == SKIP for job in need_exist
+        ):
             return SKIP
         elif self.trigger_rule == Rule.ALL_DONE:
             return SUCCESS
@@ -463,17 +461,23 @@ class Job(BaseModel):
             rs = all(
                 (
                     "errors" not in need_exist[job]
-                    and not need_exist[job].get("skipped", False)
+                    and need_exist[job].get("status", WAIT) != SKIP
                 )
                 for job in need_exist
             )
         elif self.trigger_rule == Rule.ALL_FAILED:
-            rs = all("errors" in need_exist[job] for job in need_exist)
+            rs = all(
+                (
+                    "errors" in need_exist[job]
+                    or need_exist[job].get("status", WAIT) == FAILED
+                )
+                for job in need_exist
+            )
         elif self.trigger_rule == Rule.ONE_SUCCESS:
             rs = sum(
                 (
                     "errors" not in need_exist[job]
-                    and not need_exist[job].get("skipped", False)
+                    and need_exist[job].get("status", WAIT) != SKIP
                 )
                 for job in need_exist
             ) + 1 == len(self.needs)
@@ -580,18 +584,20 @@ class Job(BaseModel):
             )
 
         _id: str = self.id or job_id
-        output: DictData = output.copy()
+        output: DictData = copy.deepcopy(output)
         errors: DictData = (
-            {"errors": output.pop("errors", {})} if "errors" in output else {}
+            {"errors": output.pop("errors")} if "errors" in output else {}
         )
         skipping: dict[str, bool] = (
-            {"skipped": output.pop("skipped", False)}
-            if "skipped" in output
-            else {}
+            {"skipped": output.pop("skipped")} if "skipped" in output else {}
         )
-
+        status: dict[str, Status] = (
+            {"status": output.pop("status")} if "status" in output else {}
+        )
         if self.strategy.is_set():
-            to["jobs"][_id] = {"strategies": output, **skipping, **errors}
+            to["jobs"][_id] = (
+                {"strategies": output} | skipping | errors | status
+            )
         elif len(k := output.keys()) > 1:  # pragma: no cov
             raise JobError(
                 "Strategy output from execution return more than one ID while "
@@ -600,8 +606,28 @@ class Job(BaseModel):
         else:
             _output: DictData = {} if len(k) == 0 else output[list(k)[0]]
             _output.pop("matrix", {})
-            to["jobs"][_id] = {**_output, **skipping, **errors}
+            to["jobs"][_id] = _output | skipping | errors | status
         return to
+
+    def get_outputs(
+        self,
+        output: DictData,
+        *,
+        job_id: StrOrNone = None,
+    ) -> DictData:
+        """Get the outputs from jobs data. It will get this job ID or passing
+        custom ID from the job outputs mapping.
+
+        :param output: (DictData) A job outputs data that want to extract
+        :param job_id: (StrOrNone) A job ID if the `id` field does not set.
+
+        :rtype: DictData
+        """
+        _id: str = self.id or job_id
+        if self.strategy.is_set():
+            return output.get("jobs", {}).get(_id, {}).get("strategies", {})
+        else:
+            return output.get("jobs", {}).get(_id, {})
 
     def execute(
         self,
@@ -724,11 +750,6 @@ def local_execute_strategy(
         if job.extras:
             stage.extras = job.extras
 
-        if stage.is_skipped(params=context):
-            result.trace.info(f"[JOB]: Skip Stage: {stage.iden!r}")
-            stage.set_outputs(output={"skipped": True}, to=context)
-            continue
-
         if event and event.is_set():
             error_msg: str = "Job strategy was canceled because event was set."
             result.catch(
@@ -743,30 +764,14 @@ def local_execute_strategy(
             )
             raise JobError(error_msg, refs=strategy_id)
 
-        try:
-            result.trace.info(f"[JOB]: Execute Stage: {stage.iden!r}")
-            rs: Result = stage.handler_execute(
-                params=context,
-                run_id=result.run_id,
-                parent_run_id=result.parent_run_id,
-                event=event,
-            )
-            stage.set_outputs(rs.context, to=context)
-        except StageError as e:
-            result.catch(
-                status=FAILED,
-                context={
-                    strategy_id: {
-                        "matrix": strategy,
-                        "stages": filter_func(context.pop("stages", {})),
-                        "errors": e.to_dict(),
-                    },
-                },
-            )
-            raise JobError(
-                message=f"Handler Error: {e.__class__.__name__}: {e}",
-                refs=strategy_id,
-            ) from e
+        result.trace.info(f"[JOB]: Execute Stage: {stage.iden!r}")
+        rs: Result = stage.handler_execute(
+            params=context,
+            run_id=result.run_id,
+            parent_run_id=result.parent_run_id,
+            event=event,
+        )
+        stage.set_outputs(rs.context, to=context)
 
         if rs.status == FAILED:
             error_msg: str = (
@@ -855,10 +860,7 @@ def local_execute(
             },
         )
 
-    with ThreadPoolExecutor(
-        max_workers=workers, thread_name_prefix="job_strategy_exec_"
-    ) as executor:
-
+    with ThreadPoolExecutor(workers, "jb_stg") as executor:
         futures: list[Future] = [
             executor.submit(
                 local_execute_strategy,
