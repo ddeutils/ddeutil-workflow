@@ -1,8 +1,8 @@
 FROM python:3.9.13-slim
 
-RUN useradd --create-home --shell /bin/bash workflow
+RUN useradd --create-home --shell /bin/bash worker
 
-WORKDIR /home/workflow
+WORKDIR /home/worker
 
 RUN apt-get -y update  \
     && apt-get install -y sqlite3 \
@@ -12,6 +12,6 @@ COPY . .
 
 RUN pip install --no-cache-dir -U ddeutil-workflow[app]
 
-USER workflow
+USER worker
 
-ENTRYPOINT ["python", "--version"]
+ENTRYPOINT ["workflow-cli", "job", "--params", "{\"test\": 1"}"]

@@ -589,6 +589,19 @@ class Workflow(BaseModel):
                                                 |-name: ...
                                                 ╰-message: ...
 
+                        --> Ok      --> Result
+                                        |-status: FAILED
+                                        ╰-context:
+                                            ╰-errors:
+                                                |-name: ...
+                                                ╰-message: ...
+
+                        --> Ok      --> Result
+                                        ╰-status: SKIP
+
+                        --> Ok      --> Result
+                                        ╰-status: SUCCESS
+
         :param params: A parameter data that will parameterize before execution.
         :param run_id: (Optional[str]) A workflow running ID.
         :param parent_run_id: (Optional[str]) A parent workflow running ID.
@@ -728,25 +741,23 @@ class Workflow(BaseModel):
 
             if not_timeout_flag:
                 job_queue.join()
-                total_future: int = 0
-                for i, future in enumerate(as_completed(futures), start=0):
+                for total, future in enumerate(as_completed(futures), start=0):
                     try:
-                        statuses[i], _ = future.result()
+                        statuses[total], _ = future.result()
                     except WorkflowError as e:
-                        statuses[i] = get_status_from_error(e)
-                    total_future += 1
+                        statuses[total] = get_status_from_error(e)
 
                 # NOTE: Update skipped status from the job trigger.
                 for i in range(skip_count):
-                    statuses[total_future + i] = SKIP
+                    statuses[total + 1 + i] = SKIP
 
                 # NOTE: Update status from none-parallel job execution.
                 for i, s in enumerate(sequence_statuses, start=0):
-                    statuses[total_future + skip_count + i] = s
+                    statuses[total + 1 + skip_count + i] = s
 
-                status: Status = validate_statuses(statuses)
-
-                return result.catch(status=status, context=context)
+                return result.catch(
+                    status=validate_statuses(statuses), context=context
+                )
 
             event.set()
             for future in futures:
