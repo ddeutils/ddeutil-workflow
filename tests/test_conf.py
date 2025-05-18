@@ -9,7 +9,6 @@ import pytest
 import rtoml
 import yaml
 from ddeutil.workflow.conf import (
-    CallerSecretType,
     Config,
     FileLoad,
     config,
@@ -171,8 +170,3 @@ def test_dynamic():
 
     conf = dynamic("max_job_exec_timeout", f=0, extras={})
     assert conf == 0
-
-
-def test_workflow_secret_model():
-    data = CallerSecretType.validate_python("${WORKFLOW_CORE_TIMEZONE}")
-    assert data.get_secret_value() == "Asia/Bangkok"
