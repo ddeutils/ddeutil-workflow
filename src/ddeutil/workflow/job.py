@@ -39,7 +39,6 @@ from pydantic import BaseModel, Discriminator, Field, SecretStr, Tag
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
-from . import JobSkipError
 from .__types import DictData, DictStr, Matrix, StrOrNone
 from .errors import JobCancelError, JobError, to_dict
 from .result import (
@@ -774,7 +773,7 @@ def local_execute_strategy(
     *,
     result: Optional[Result] = None,
     event: Optional[Event] = None,
-) -> Result:
+) -> tuple[Status, Result]:
     """Local strategy execution with passing dynamic parameters from the
     job execution and strategy matrix.
 
@@ -799,7 +798,7 @@ def local_execute_strategy(
     :raise JobError: If stage execution raise any error as `StageError`.
     :raise JobError: If the result from execution has `FAILED` status.
 
-    :rtype: Result
+    :rtype: tuple[Status, Result]
     """
     result: Result = result or Result(
         run_id=gen_id(job.id or "EMPTY", unique=True),
@@ -899,9 +898,7 @@ def local_execute_strategy(
             },
         },
     )
-    if status == SKIP:
-        raise JobSkipError("All stage was skipped.")
-    return result
+    return status, result
 
 
 def local_execute(
@@ -1017,14 +1014,13 @@ def local_execute(
 
         for i, future in enumerate(done, start=0):
             try:
-                statuses[i] = future.result().status
+                statuses[i], _ = future.result()
             except JobError as e:
                 statuses[i] = get_status_from_error(e)
                 result.trace.error(
                     f"[JOB]: {ls} Handler:||{e.__class__.__name__}: {e}"
                 )
-                if not isinstance(e, JobSkipError):
-                    mark_errors(context, e)
+                mark_errors(context, e)
             except CancelledError:
                 pass
 

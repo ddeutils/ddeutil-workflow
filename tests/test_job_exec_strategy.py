@@ -11,7 +11,8 @@ def test_job_exec_strategy():
     job: Job = Workflow.from_conf(name="wf-run-python-raise-for-job").job(
         "job-complete"
     )
-    rs = local_execute_strategy(job, {"sleep": "0.1"}, {})
+    st, rs = local_execute_strategy(job, {"sleep": "0.1"}, {})
+    assert st == SUCCESS
     assert rs.status == SUCCESS
     assert rs.context == {
         "status": SUCCESS,
@@ -29,7 +30,8 @@ def test_job_exec_strategy_skipped_stage():
     job: Job = Workflow.from_conf(name="wf-run-python-raise-for-job").job(
         "job-stage-condition"
     )
-    rs = local_execute_strategy(job, {"sleep": "1"}, {})
+    st, rs = local_execute_strategy(job, {"sleep": "1"}, {})
+    assert st == SUCCESS
     assert rs.status == SUCCESS
     assert rs.context == {
         "status": SUCCESS,

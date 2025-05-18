@@ -1857,9 +1857,11 @@ class ForEachStage(BaseNestedStage):
         result.trace.debug(f"[STAGE]: Execute Item: {item!r}")
         key: StrOrInt = index if self.use_index_as_key else item
 
+        # NOTE: Create nested-context data from the passing context.
         context: DictData = copy.deepcopy(params)
         context.update({"item": item, "loop": index})
         nestet_context: DictData = {"item": item, "stages": {}}
+
         total_stage: int = len(self.stages)
         skips: list[bool] = [False] * total_stage
         for i, stage in enumerate(self.stages, start=0):
@@ -1961,6 +1963,10 @@ class ForEachStage(BaseNestedStage):
         event: Optional[Event] = None,
     ) -> Result:
         """Execute the stages that pass each item form the foreach field.
+
+            This stage will use fail-fast strategy if it was set concurrency
+        value more than 1. It will cancel all nested-stage execution when it has
+        any item loop raise failed or canceled error.
 
         :param params: (DictData) A parameter data.
         :param result: (Result) A Result instance for return context and status.
