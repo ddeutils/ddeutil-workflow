@@ -39,6 +39,7 @@ from pydantic import BaseModel, Discriminator, Field, SecretStr, Tag
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
+from . import JobSkipError
 from .__types import DictData, DictStr, Matrix, StrOrNone
 from .errors import JobCancelError, JobError, to_dict
 from .result import (
@@ -888,7 +889,7 @@ def local_execute_strategy(
             raise JobCancelError(error_msg, refs=strategy_id)
 
     status: Status = SKIP if sum(skips) == total_stage else SUCCESS
-    return result.catch(
+    result.catch(
         status=status,
         context={
             strategy_id: {
@@ -898,6 +899,9 @@ def local_execute_strategy(
             },
         },
     )
+    if status == SKIP:
+        raise JobSkipError("All stage was skipped.")
+    return result
 
 
 def local_execute(
@@ -1019,7 +1023,8 @@ def local_execute(
                 result.trace.error(
                     f"[JOB]: {ls} Error Handler:||{e.__class__.__name__}: {e}"
                 )
-                mark_errors(context, e)
+                if not isinstance(e, JobSkipError):
+                    mark_errors(context, e)
             except CancelledError:
                 pass
 

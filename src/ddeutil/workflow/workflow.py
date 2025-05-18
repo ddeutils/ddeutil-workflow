@@ -31,6 +31,7 @@ from pydantic import BaseModel, Field, ValidationInfo
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
+from . import WorkflowSkipError, get_status_from_error
 from .__types import DictData
 from .conf import FileLoad, Loader, dynamic
 from .errors import WorkflowCancelError, WorkflowError, WorkflowTimeoutError
@@ -478,7 +479,7 @@ class Workflow(BaseModel):
         *,
         result: Optional[Result] = None,
         event: Optional[Event] = None,
-    ) -> tuple[Status, Result]:
+    ) -> Result:
         """Job execution with passing dynamic parameters from the main workflow
         execution to the target job object via job's ID.
 
@@ -500,15 +501,17 @@ class Workflow(BaseModel):
         result: Result = result or Result(run_id=gen_id(self.name, unique=True))
 
         if event and event.is_set():
-            return CANCEL, result.catch(
+            error_msg: str = (
+                "Job execution was canceled because the event was set "
+                "before start job execution."
+            )
+            result.catch(
                 status=CANCEL,
                 context={
-                    "errors": WorkflowCancelError(
-                        "Job execution was canceled because the event was set "
-                        "before start job execution."
-                    ).to_dict(),
+                    "errors": WorkflowCancelError(error_msg).to_dict(),
                 },
             )
+            raise WorkflowCancelError(error_msg)
 
         result.trace.info(f"[WORKFLOW]: Execute Job: {job.id!r}")
         rs: Result = job.execute(
@@ -521,28 +524,33 @@ class Workflow(BaseModel):
 
         if rs.status == FAILED:
             error_msg: str = f"Job execution, {job.id!r}, was failed."
-            return FAILED, result.catch(
+            result.catch(
                 status=FAILED,
                 context={
                     "errors": WorkflowError(error_msg).to_dict(),
                     **params,
                 },
             )
+            raise WorkflowError(error_msg)
 
         elif rs.status == CANCEL:
             error_msg: str = (
                 f"Job execution, {job.id!r}, was canceled from the event after "
                 f"end job execution."
             )
-            return CANCEL, result.catch(
+            result.catch(
                 status=CANCEL,
                 context={
                     "errors": WorkflowCancelError(error_msg).to_dict(),
                     **params,
                 },
             )
+            raise WorkflowCancelError(error_msg)
 
-        return rs.status, result.catch(status=rs.status, context=params)
+        result.catch(status=rs.status, context=params)
+        if rs.status == SKIP:
+            raise WorkflowSkipError(f"Job execution, {job.id!r}, was skipped")
+        return result
 
     def execute(
         self,
@@ -630,7 +638,7 @@ class Workflow(BaseModel):
         timeout: float = dynamic(
             "max_job_exec_timeout", f=timeout, extras=self.extras
         )
-
+        result.catch(status=WAIT, context=context)
         if event and event.is_set():
             return result.catch(
                 status=CANCEL,
@@ -639,7 +647,6 @@ class Workflow(BaseModel):
                         "Execution was canceled from the event was set before "
                         "workflow execution."
                     ).to_dict(),
-                    **context,
                 },
             )
 
@@ -699,22 +706,22 @@ class Workflow(BaseModel):
                             event=event,
                         )
                     )
-                    # time.sleep(0.025)
                 elif (future := futures.pop(0)).done():
-                    s, rs = future.result()
-                    sequence_statuses.append(s)
+                    if e := future.exception():
+                        sequence_statuses.append(get_status_from_error(e))
+                    else:
+                        rs: Result = future.result()
+                        sequence_statuses.append(rs.status)
                     job_queue.put(job_id)
                 elif future.cancelled():
                     sequence_statuses.append(CANCEL)
                     job_queue.put(job_id)
                 elif future.running() or "state=pending" in str(future):
-                    time.sleep(0.075)
                     futures.insert(0, future)
                     job_queue.put(job_id)
                 else:  # pragma: no cov
                     job_queue.put(job_id)
                     futures.insert(0, future)
-                    time.sleep(0.025)
                     result.trace.warning(
                         f"[WORKFLOW]: ... Execution non-threading not "
                         f"handle: {future}."
@@ -726,8 +733,10 @@ class Workflow(BaseModel):
                 job_queue.join()
                 total_future: int = 0
                 for i, future in enumerate(as_completed(futures), start=0):
-                    s, _ = future.result()
-                    statuses[i] = s
+                    try:
+                        statuses[i] = future.result().status
+                    except WorkflowError as e:
+                        statuses[i] = get_status_from_error(e)
                     total_future += 1
 
                 # NOTE: Update skipped status from the job trigger.
@@ -742,13 +751,14 @@ class Workflow(BaseModel):
 
                 return result.catch(status=status, context=context)
 
+            event.set()
+            for future in futures:
+                future.cancel()
+
             result.trace.error(
                 f"[WORKFLOW]: {self.name!r} was timeout because it use exec "
                 f"time more than {timeout} seconds."
             )
-            event.set()
-            for future in futures:
-                future.cancel()
 
             time.sleep(0.0025)
 
@@ -758,6 +768,6 @@ class Workflow(BaseModel):
                 "errors": WorkflowTimeoutError(
                     f"{self.name!r} was timeout because it use exec time more "
                     f"than {timeout} seconds."
-                ).to_dict()
+                ).to_dict(),
             },
         )

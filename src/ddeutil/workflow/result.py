@@ -22,9 +22,13 @@ from typing_extensions import Self
 from . import (
     JobCancelError,
     JobError,
+    JobSkipError,
     StageCancelError,
     StageError,
     StageSkipError,
+    WorkflowCancelError,
+    WorkflowError,
+    WorkflowSkipError,
 )
 from .__types import DictData
 from .conf import dynamic
@@ -99,13 +103,20 @@ def get_status_from_error(
         StageSkipError,
         JobError,
         JobCancelError,
+        JobSkipError,
+        WorkflowError,
+        WorkflowCancelError,
+        WorkflowSkipError,
         Exception,
+        BaseException,
     ]
 ) -> Status:
     """Get the Status from the error object."""
-    if isinstance(error, StageSkipError):
+    if isinstance(error, (StageSkipError, JobSkipError, WorkflowSkipError)):
         return SKIP
-    elif isinstance(error, (StageCancelError, JobCancelError)):
+    elif isinstance(
+        error, (StageCancelError, JobCancelError, WorkflowCancelError)
+    ):
         return CANCEL
     return FAILED
 

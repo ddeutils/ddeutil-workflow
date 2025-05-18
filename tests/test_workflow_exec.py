@@ -53,19 +53,15 @@ def test_workflow_exec_timeout():
     )
     workflow: Workflow = Workflow(
         name="demo-workflow",
-        jobs={"sleep-run": job, "sleep-again-run": job},
+        jobs={
+            "sleep-run": job,
+            "sleep-again-run": job,
+        },
     )
     rs: Result = workflow.execute(params={}, timeout=1.25, max_job_parallel=1)
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,
-        "errors": {
-            "name": "WorkflowTimeoutError",
-            "message": (
-                "'demo-workflow' was timeout because it use exec time more "
-                "than 1.25 seconds."
-            ),
-        },
         "params": {},
         "jobs": {
             "sleep-again-run": {
@@ -78,7 +74,11 @@ def test_workflow_exec_timeout():
                         "start stage execution."
                     ),
                 },
-            },
+            }
+        },
+        "errors": {
+            "name": "WorkflowTimeoutError",
+            "message": "'demo-workflow' was timeout because it use exec time more than 1.25 seconds.",
         },
     }
 
