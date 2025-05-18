@@ -21,7 +21,7 @@ def test_str2template():
 
     os.environ["ENV_VAR"] = "foo"
     value = str2template("${ ENV_VAR }", params={})
-    assert value == "null"
+    assert value == "foo"
 
 
 def test_param2template():
