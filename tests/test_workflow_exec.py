@@ -339,6 +339,7 @@ def test_workflow_exec_py_raise_parallel():
     rs: Result = Workflow.from_conf("wf-run-python-raise").execute(
         params={}, max_job_parallel=2, event=event
     )
+    print(rs.context)
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,
