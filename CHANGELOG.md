@@ -2,6 +2,30 @@
 
 ## Latest Changes
 
+## 0.0.66
+
+### :sparkles: Features
+
+- :dart: feat: add cli module.
+- :dart: feat: remove raise when job skip on the jon exec.
+- :dart: feat: add excluded parameter on release method.
+
+### :bug: Bug fixes
+
+- :gear: fixed: remove caller secret import.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: add validate release testcase.
+
+### :package: Build & Workflow
+
+- :toolbox: build: prepare config on the pyproject file.
+
+### :book: Documentations
+
+- :page_facing_up: docs: update docs-string.
+
 ## 0.0.65
 
 ### :sparkles: Features
