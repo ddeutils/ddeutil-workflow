@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from textwrap import dedent
-from threading import Event, Lock
+from threading import Event, RLock
 from typing import Any, Optional, Union
 from zoneinfo import ZoneInfo
 
@@ -106,7 +106,7 @@ class MockEvent(Event):  # pragma: no cov
     def __init__(self, n: int = 1):
         self.n: int = n
         self.counter: int = 0
-        self.lock: Lock = Lock()
+        self.lock: RLock = RLock()
 
     def is_set(self) -> bool:
         """Check if the counter value is equal to n."""
@@ -123,7 +123,8 @@ class MockEvent(Event):  # pragma: no cov
 
     def clear(self) -> None:
         """Clear the counter value to 0."""
-        self.counter = 0
+        with self.lock:
+            self.counter = 0
 
     def wait(self, timeout=None):
         raise NotImplementedError(
