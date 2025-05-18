@@ -13,30 +13,18 @@ on:
 jobs:
 
   docker-image:
-    strategy:
-      fail-fast: true
-      matrix:
-        os:
-          - ubuntu-latest
-        python-version:
-          - "3.9"
-          - "3.10"
-          - "3.11"
-          - "3.12"
-          - "3.13"
-
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        id: setup_python
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
         with:
-          python-version: ${{ matrix.python-version }}
-          allow-prereleases: true
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build Docker Image
+      - name: Build the dfa-fastapi Docker image
         run: |
-          docker build -t ddeutil-workflow:python${{ matrix.python-version }} -f .container/Dockerfile .
-          docker image ls
+          docker build -t ${{ vars.GH_REPO_URL }}:latest -f ./.container/Dockerfile .
+          docker push ${{ vars.GH_REPO_URL }}:latest
