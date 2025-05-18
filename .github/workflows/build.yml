@@ -36,5 +36,5 @@ jobs:
 
       - name: Build the dfa-fastapi Docker image
         run: |
-          docker build -t ${{ vars.GH_REPO_URL }}:latest -f ./.container/Dockerfile .
+          docker build -t ${{ vars.GH_REPO_URL }}:latest --platform linux/amd64,linux/arm64 -f ./.container/Dockerfile .
           docker push ${{ vars.GH_REPO_URL }}:latest
