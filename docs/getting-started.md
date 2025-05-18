@@ -63,8 +63,7 @@ from .https_call import *
 ```
 
 ```python title="./src/https_call.py"
-from ddeutil.workflow.reusables import tag
-from ddeutil.workflow.result import Result
+from ddeutil.workflow import Result, tag
 
 
 @tag("httpx", alias="https-external")
@@ -80,8 +79,7 @@ def dummy_task_polars_dir(url: str, auth: str, result: Result) -> dict[str, int]
 At the `main.py` file:
 
 ```python title="./main.py"
-from ddeutil.workflow import Workflow
-from ddeutil.workflow.result import Result
+from ddeutil.workflow import Workflow, Result
 
 
 def call_execute():
@@ -107,8 +105,7 @@ At the `main.py` file:
 
 ```python title="./main.py"
 from datetime import datetime
-from ddeutil.workflow import Workflow, config
-from ddeutil.workflow.result import Result
+from ddeutil.workflow import Workflow, Result, config
 
 
 def call_release():

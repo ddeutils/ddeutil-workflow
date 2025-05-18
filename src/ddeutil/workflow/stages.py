@@ -1610,6 +1610,9 @@ class ParallelStage(BaseNestedStage):
             (Default is None)
 
         :raise StageCancelError: If event was set.
+        :raise StageCancelError: If result from a nested-stage return canceled
+            status.
+        :raise StageError: If result from a nested-stage return failed status.
 
         :rtype: tuple[Status, Result]
         """

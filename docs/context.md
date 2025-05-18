@@ -9,20 +9,26 @@ Input       --> {params: {}}
 Workflow    --> {params: {}, jobs: {<job-id>: {}}}
 |
 Job         --> {
+|                   status: SUCCESS,
 |                   params: {},
 |                   jobs: {
 |                       <job-id>: {
+|                           status: SUCCESS,
 |                           strategies: {
 |                               <strategy-id>: {metrix: {}, stages: {}}
+|                           },
+|                           errors: {
+|                               <strategy-id>: {}
 |                           }
 |                       }
 |                   },
 |                   metrix: {},
 |                   stages: {}
 |           --> {
+|                   status: SUCCESS,
 |                   params: {},
 |                   jobs: {
-|                       <job-id>: {stages: {}}
+|                       <job-id>: {stages: {}, errors: {}, status: SUCCESS}
 |                   },
 |                   metrix: {},
 |                   stages: {}
@@ -32,7 +38,7 @@ Stage       --> {
                     params: {},
                     jobs: {},
                     metrix: {},
-                    stages: {<stage-id>: {outputs: {}, errors: {}, skipped: False}}
+                    stages: {<stage-id>: {outputs: {}, errors: {}, status: SUCCESS}}
                 }
 ```
 
@@ -84,7 +90,7 @@ but it will keep in nested-stage ID instead parent output.
 {
     "stages": {
         "<stage-ID>": {
-            "skipped": True,
+            "status": SKIP,
         }
     }
 }
