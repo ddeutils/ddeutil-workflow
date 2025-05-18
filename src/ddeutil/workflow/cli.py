@@ -4,6 +4,7 @@ from typing import Annotated, Any
 import typer
 import uvicorn
 
+from .__about__ import __version__
 from .api import app as fastapp
 from .api.logs import LOGGING_CONFIG
 
@@ -18,6 +19,12 @@ def callback():
     Awesome Portal Gun
     """
     typer.echo("Start call from callback function")
+
+
+@app.command()
+def version():
+    """Get the ddeutil-workflow package version."""
+    typer.echo(__version__)
 
 
 @app.command()

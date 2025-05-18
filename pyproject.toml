@@ -91,15 +91,13 @@ omit = [
     "src/ddeutil/workflow/__about__.py",
     "src/ddeutil/workflow/__cron.py",
     "src/ddeutil/workflow/__main__.py",
+    "src/ddeutil/workflow/cli.py",
     "src/ddeutil/workflow/api/__init__.py",
     "src/ddeutil/workflow/api/logs.py",
-    "src/ddeutil/workflow/api/utils.py",
     "src/ddeutil/workflow/api/routes/__init__.py",
     "src/ddeutil/workflow/api/routes/job.py",
     "src/ddeutil/workflow/api/routes/logs.py",
-    "src/ddeutil/workflow/api/routes/schedules.py",
     "src/ddeutil/workflow/api/routes/workflows.py",
-    "app.py",
 ]
 
 [tool.coverage.report]
