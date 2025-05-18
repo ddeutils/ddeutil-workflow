@@ -848,7 +848,7 @@ class FileAudit(BaseAudit):
             "audit_path", extras=self.extras
         ) / self.filename_fmt.format(name=self.name, release=self.release)
 
-    def save(self, excluded: Optional[list[str]]) -> Self:
+    def save(self, excluded: Optional[list[str]] = None) -> Self:
         """Save logging data that receive a context data from a workflow
         execution result.
 

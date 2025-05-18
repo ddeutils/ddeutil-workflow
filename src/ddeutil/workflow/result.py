@@ -28,7 +28,6 @@ from . import (
     StageSkipError,
     WorkflowCancelError,
     WorkflowError,
-    WorkflowSkipError,
 )
 from .__types import DictData
 from .conf import dynamic
@@ -106,13 +105,12 @@ def get_status_from_error(
         JobSkipError,
         WorkflowError,
         WorkflowCancelError,
-        WorkflowSkipError,
         Exception,
         BaseException,
     ]
 ) -> Status:
     """Get the Status from the error object."""
-    if isinstance(error, (StageSkipError, JobSkipError, WorkflowSkipError)):
+    if isinstance(error, (StageSkipError, JobSkipError)):
         return SKIP
     elif isinstance(
         error, (StageCancelError, JobCancelError, WorkflowCancelError)

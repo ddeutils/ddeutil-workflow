@@ -9,7 +9,7 @@ import time
 from datetime import datetime
 from functools import partial
 
-from ddeutil.workflow import Result, tag
+from ddeutil.workflow import CallerSecret, Result, tag
 from ddeutil.workflow.__types import DictData
 
 VERSION: str = "v1"
@@ -118,20 +118,21 @@ def routing_ingest_file(
     process: str,
     audit_date: datetime,
     result: Result,
+    secret_token: CallerSecret,
 ) -> DictData:
     """Routing file.
 
     :param process: (str)
     :param audit_date: (datetime)
     :param result: (Result)
+    :param secret_token: (CallerSecret)
     """
     result.trace.info(f"Routing: 01 with process: {process!r}")
     result.trace.info("... This routing is ingest data with file type.")
     result.trace.info(f"... Audit date: {audit_date}")
-    time.sleep(2)
-    return {
-        "records": 1000,
-    }
+    result.trace.info(f"... Secret token: {secret_token}")
+    time.sleep(1)
+    return {"records": 1000}
 
 
 @tag("v1", alias="routing-02")
@@ -139,17 +140,18 @@ def routing_ingest_db(
     process: str,
     audit_date: datetime,
     result: Result,
+    secret_token: CallerSecret,
 ) -> DictData:
     """Routing database.
 
     :param process: (str)
     :param audit_date: (datetime)
     :param result: (Result)
+    :param secret_token: (CallerSecret)
     """
     result.trace.info(f"Routing: 02 with process: {process!r}")
     result.trace.info("... This routing is ingest data with database type.")
     result.trace.info(f"... Audit date: {audit_date}")
-    time.sleep(2)
-    return {
-        "records": 2000,
-    }
+    result.trace.info(f"... Secret token: {secret_token}")
+    time.sleep(1)
+    return {"records": 2000}

@@ -1,3 +1,4 @@
+import os
 import shutil
 from datetime import datetime
 
@@ -17,6 +18,9 @@ def test_example_stage_exec_nested_trigger(test_path):
             "enable_write_audit": True,
         },
     )
+
+    os.environ["EXAMPLE_SECRET_TOKEN"] = "very-secret-value"
+
     rs: Result = workflow.release(
         datetime(2025, 5, 10, 12, 35),
         params={

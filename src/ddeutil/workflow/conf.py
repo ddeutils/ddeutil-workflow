@@ -18,7 +18,7 @@ from zoneinfo import ZoneInfo
 from ddeutil.core import str2bool
 from ddeutil.io import YamlFlResolve, search_env_replace
 from ddeutil.io.paths import glob_files, is_ignored, read_ignore
-from pydantic import SecretStr, TypeAdapter
+from pydantic import SecretStr
 
 from .__types import DictData
 
@@ -470,7 +470,3 @@ class CallerSecret(SecretStr):  # pragma: no cov
         :rtype: str
         """
         return pass_env(super().get_secret_value())
-
-
-# NOTE: Define the caller secret type for use it directly in the caller func.
-CallerSecretType = TypeAdapter(CallerSecret)

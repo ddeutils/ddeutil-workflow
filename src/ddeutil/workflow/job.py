@@ -1021,7 +1021,7 @@ def local_execute(
             except JobError as e:
                 statuses[i] = get_status_from_error(e)
                 result.trace.error(
-                    f"[JOB]: {ls} Error Handler:||{e.__class__.__name__}: {e}"
+                    f"[JOB]: {ls} Handler:||{e.__class__.__name__}: {e}"
                 )
                 if not isinstance(e, JobSkipError):
                     mark_errors(context, e)

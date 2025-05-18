@@ -11,9 +11,11 @@ routing-1-workflow:
 
         - name: Process file from RAW -> Bronze
           uses: tasks/routing-01@v1
+          id: call-route-01
           with:
             process: ${{ params.name }}
             audit_date: ${{ params.audit-date }}
+            secret_token: ${ EXAMPLE_SECRET_TOKEN }
 
 routing-2-workflow:
   type: Workflow
@@ -28,6 +30,8 @@ routing-2-workflow:
 
         - name: Process file from RAW -> Bronze
           uses: tasks/routing-02@v1
+          id: call-route-02
           with:
             process: ${{ params.name }}
             audit_date: ${{ params.audit-date }}
+            secret_token: ${ EXAMPLE_SECRET_TOKEN }

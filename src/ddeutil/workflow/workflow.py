@@ -379,6 +379,7 @@ class Workflow(BaseModel):
         override_log_name: Optional[str] = None,
         result: Optional[Result] = None,
         timeout: int = 600,
+        excluded: Optional[list[str]] = None,
     ) -> Result:
         """Release the workflow which is executes workflow with writing audit
         log tracking. The method is overriding parameter with the release
@@ -405,6 +406,8 @@ class Workflow(BaseModel):
         :param result: (Result) A result object for keeping context and status
             data.
         :param timeout: (int) A workflow execution time out in second unit.
+        :param excluded: (list[str]) A list of key that want to exclude from
+            audit data.
 
         :rtype: Result
         """
@@ -453,7 +456,7 @@ class Workflow(BaseModel):
                 run_id=result.run_id,
                 execution_time=result.alive_time(),
                 extras=self.extras,
-            ).save(excluded=None)
+            ).save(excluded=excluded)
         )
         return result.catch(
             status=rs.status,
