@@ -7,8 +7,7 @@ from ddeutil.workflow import (
     Workflow,
 )
 from ddeutil.workflow.stages import ForEachStage, Stage
-
-from .utils import MockEvent, dump_yaml_context
+from utils import MockEvent, dump_yaml_context
 
 
 def test_foreach_stage_exec_all_skipped():

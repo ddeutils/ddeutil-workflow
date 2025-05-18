@@ -6,8 +6,7 @@ from ddeutil.workflow import (
     Result,
 )
 from ddeutil.workflow.stages import ParallelStage, Stage
-
-from .utils import MockEvent
+from utils import MockEvent
 
 
 def test_parallel_stage_exec():

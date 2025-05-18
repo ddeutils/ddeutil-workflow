@@ -3,7 +3,7 @@ from ddeutil.workflow import CANCEL, FAILED, SUCCESS, Result, Stage, Workflow
 from ..utils import dump_yaml_context
 
 
-def test_foreach_stage_exec_with_trigger(test_path):
+def test_example_foreach_stage_exec_with_trigger(test_path):
     with dump_yaml_context(
         test_path / "conf/demo/01_99_wf_test_wf_foreach_with_trigger.yml",
         data="""
@@ -95,7 +95,7 @@ def test_foreach_stage_exec_with_trigger(test_path):
         }
 
 
-def test_foreach_stage_exec_with_trigger_raise(test_path):
+def test_example_foreach_stage_exec_with_trigger_raise(test_path):
     with dump_yaml_context(
         test_path / "conf/demo/01_99_wf_test_wf_foreach_with_trigger_raise.yml",
         data="""
@@ -183,7 +183,7 @@ def test_foreach_stage_exec_with_trigger_raise(test_path):
         }
 
 
-def test_foreach_stage_exec_nested_foreach_and_trigger(test_path):
+def test_example_foreach_stage_exec_nested_foreach_and_trigger(test_path):
     with dump_yaml_context(
         test_path / "conf/demo/01_99_wf_test_foreach_with_trigger.yml",
         data="""

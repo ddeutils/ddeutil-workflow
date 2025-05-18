@@ -1,8 +1,7 @@
 import pytest
 from ddeutil.workflow import FAILED, SUCCESS, Result, Workflow
 from ddeutil.workflow.stages import CallStage, Stage
-
-from .utils import dump_yaml_context
+from utils import dump_yaml_context
 
 
 def test_call_stage_exec_necessary_args():

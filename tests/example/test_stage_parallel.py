@@ -3,7 +3,7 @@ from ddeutil.workflow import FAILED, SUCCESS, Result, Stage, Workflow
 from ..utils import dump_yaml_context
 
 
-def test_parallel_stage_exec_with_trigger(test_path):
+def test_example_parallel_stage_exec_with_trigger(test_path):
     with dump_yaml_context(
         test_path / "conf/demo/01_99_wf_test_wf_parallel_with_trigger.yml",
         data="""
@@ -67,7 +67,7 @@ def test_parallel_stage_exec_with_trigger(test_path):
         }
 
 
-def test_parallel_stage_exec_with_trigger_raise(test_path):
+def test_example_parallel_stage_exec_with_trigger_raise(test_path):
     with dump_yaml_context(
         test_path
         / "conf/demo/01_99_wf_test_wf_parallel_with_trigger-raise.yml",
@@ -162,7 +162,7 @@ def test_parallel_stage_exec_with_trigger_raise(test_path):
         }
 
 
-def test_parallel_stage_exec_with_trigger_raise_bug(test_path):
+def test_example_parallel_stage_exec_with_trigger_raise_bug(test_path):
     with dump_yaml_context(
         test_path
         / "conf/demo/01_99_wf_test_wf_parallel_with_trigger-raise.yml",

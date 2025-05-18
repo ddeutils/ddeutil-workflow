@@ -1,6 +1,5 @@
 from ddeutil.workflow import Result, Stage, StageError, Workflow
-
-from .utils import dump_yaml_context
+from utils import dump_yaml_context
 
 
 def test_stage_py_virtual(test_path):

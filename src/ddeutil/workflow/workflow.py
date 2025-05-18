@@ -434,10 +434,10 @@ class Workflow(BaseModel):
         )
         rs: Result = self.execute(
             params=values,
-            result=result,
             parent_run_id=result.run_id,
             timeout=timeout,
         )
+        result.catch(status=rs.status, context=rs.context)
         result.trace.info(
             f"[RELEASE]: End {name!r} : {release:%Y-%m-%d %H:%M:%S}"
         )
@@ -550,7 +550,6 @@ class Workflow(BaseModel):
         *,
         run_id: Optional[str] = None,
         parent_run_id: Optional[str] = None,
-        result: Optional[Result] = None,
         event: Optional[Event] = None,
         timeout: float = 3600,
         max_job_parallel: int = 2,
@@ -588,7 +587,6 @@ class Workflow(BaseModel):
         :param params: A parameter data that will parameterize before execution.
         :param run_id: (Optional[str]) A workflow running ID.
         :param parent_run_id: (Optional[str]) A parent workflow running ID.
-        :param result: (Result) A Result instance for return context and status.
         :param event: (Event) An Event manager instance that use to cancel this
             execution if it forces stopped by parent execution.
         :param timeout: (float) A workflow execution time out in second unit
@@ -602,7 +600,6 @@ class Workflow(BaseModel):
         """
         ts: float = time.monotonic()
         result: Result = Result.construct_with_rs_or_id(
-            result,
             run_id=run_id,
             parent_run_id=parent_run_id,
             id_logic=self.name,
@@ -641,7 +638,8 @@ class Workflow(BaseModel):
                     "errors": WorkflowCancelError(
                         "Execution was canceled from the event was set before "
                         "workflow execution."
-                    ).to_dict()
+                    ).to_dict(),
+                    **context,
                 },
             )
 
