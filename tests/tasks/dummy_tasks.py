@@ -32,6 +32,23 @@ def simple_task(
     return {"records": 1}
 
 
+@tag("demo", alias="simple-csv-task")
+def simple_csv_task(
+    source: str,
+    sink: str,
+    result: Result,
+    conversion: Optional[dict[str, Any]] = None,
+) -> dict[str, int]:
+    """Simple Task function."""
+    result.trace.info("[CALLER]: Start Simple CSV Task")
+    conversion: dict[str, Any] = conversion or {}
+    result.trace.info(
+        f"Information||>source: {source}||>sink: {sink}||"
+        f">conversion: {conversion}"
+    )
+    return {"records": 1}
+
+
 @tag("demo", alias="simple-task-async")
 async def simple_task_async(
     source: str,

@@ -244,6 +244,7 @@ class SelfHostedArgs(BaseModel):
     """Self-Hosted arguments."""
 
     host: str = Field(description="A host URL of the target self-hosted.")
+    token: SecretStr = Field(description="An API or Access token.")
 
 
 class OnSelfHosted(BaseRunsOn):  # pragma: no cov
@@ -256,6 +257,8 @@ class OnSelfHosted(BaseRunsOn):  # pragma: no cov
 
 
 class AzBatchArgs(BaseModel):
+    """Azure Batch arguments."""
+
     batch_account_name: str
     batch_account_key: SecretStr
     batch_account_url: str
@@ -457,7 +460,7 @@ class Job(BaseModel):
 
         # NOTE: Filter all job result context only needed in this job.
         need_exist: dict[str, Any] = {
-            need: jobs[need] or {"status": WAIT}
+            need: jobs[need] or {"status": SUCCESS}
             for need in self.needs
             if need in jobs
         }
@@ -465,19 +468,20 @@ class Job(BaseModel):
         # NOTE: Return WAIT status if result context not complete, or it has any
         #   waiting status.
         if len(need_exist) < len(self.needs) or any(
-            need_exist[job].get("status", WAIT) == WAIT for job in need_exist
+            need_exist[job].get("status", SUCCESS) == WAIT for job in need_exist
         ):
             return WAIT
 
         # NOTE: Return SKIP status if all status are SKIP.
         elif all(
-            need_exist[job].get("status", WAIT) == SKIP for job in need_exist
+            need_exist[job].get("status", SUCCESS) == SKIP for job in need_exist
         ):
             return SKIP
 
         # NOTE: Return CANCEL status if any status is CANCEL.
         elif any(
-            need_exist[job].get("status", WAIT) == CANCEL for job in need_exist
+            need_exist[job].get("status", SUCCESS) == CANCEL
+            for job in need_exist
         ):
             return CANCEL
 
@@ -489,7 +493,7 @@ class Job(BaseModel):
             rs = all(
                 (
                     "errors" not in need_exist[job]
-                    and need_exist[job].get("status", WAIT) == SUCCESS
+                    and need_exist[job].get("status", SUCCESS) == SUCCESS
                 )
                 for job in need_exist
             )
@@ -497,7 +501,7 @@ class Job(BaseModel):
             rs = all(
                 (
                     "errors" in need_exist[job]
-                    or need_exist[job].get("status", WAIT) == FAILED
+                    or need_exist[job].get("status", SUCCESS) == FAILED
                 )
                 for job in need_exist
             )
@@ -507,7 +511,7 @@ class Job(BaseModel):
                 sum(
                     (
                         "errors" not in need_exist[job]
-                        and need_exist[job].get("status", WAIT) == SUCCESS
+                        and need_exist[job].get("status", SUCCESS) == SUCCESS
                     )
                     for job in need_exist
                 )
@@ -519,7 +523,7 @@ class Job(BaseModel):
                 sum(
                     (
                         "errors" in need_exist[job]
-                        or need_exist[job].get("status", WAIT) == FAILED
+                        or need_exist[job].get("status", SUCCESS) == FAILED
                     )
                     for job in need_exist
                 )
@@ -528,7 +532,7 @@ class Job(BaseModel):
 
         elif self.trigger_rule == Rule.NONE_SKIPPED:
             rs = all(
-                need_exist[job].get("status", WAIT) != SKIP
+                need_exist[job].get("status", SUCCESS) != SKIP
                 for job in need_exist
             )
 
@@ -536,7 +540,7 @@ class Job(BaseModel):
             rs = all(
                 (
                     "errors" not in need_exist[job]
-                    and need_exist[job].get("status", WAIT) != FAILED
+                    and need_exist[job].get("status", SUCCESS) != FAILED
                 )
                 for job in need_exist
             )
@@ -643,16 +647,11 @@ class Job(BaseModel):
         errors: DictData = (
             {"errors": output.pop("errors")} if "errors" in output else {}
         )
-        skipping: dict[str, bool] = (
-            {"skipped": output.pop("skipped")} if "skipped" in output else {}
-        )
         status: dict[str, Status] = (
             {"status": output.pop("status")} if "status" in output else {}
         )
         if self.strategy.is_set():
-            to["jobs"][_id] = (
-                {"strategies": output} | skipping | errors | status
-            )
+            to["jobs"][_id] = {"strategies": output} | errors | status
         elif len(k := output.keys()) > 1:  # pragma: no cov
             raise JobError(
                 "Strategy output from execution return more than one ID while "
@@ -661,7 +660,7 @@ class Job(BaseModel):
         else:
             _output: DictData = {} if len(k) == 0 else output[list(k)[0]]
             _output.pop("matrix", {})
-            to["jobs"][_id] = _output | skipping | errors | status
+            to["jobs"][_id] = _output | errors | status
         return to
 
     def get_outputs(
@@ -873,7 +872,7 @@ def local_execute_strategy(
         elif rs.status == CANCEL:
             error_msg: str = (
                 "Strategy execution was canceled from the event after "
-                "start stage execution."
+                "end stage execution."
             )
             result.catch(
                 status=CANCEL,
@@ -955,7 +954,7 @@ def local_execute(
     strategies: list[DictStr] = job.strategy.make()
     len_strategy: int = len(strategies)
     result.trace.info(
-        f"[JOB]: Execute {ls}: {job.id!r} with {workers} "
+        f"[JOB]: ... Mode {ls}: {job.id!r} with {workers} "
         f"worker{'s' if workers > 1 else ''}."
     )
 
@@ -1068,8 +1067,8 @@ def self_hosted_execute(
         return result.catch(
             status=CANCEL,
             context={
-                "errors": JobError(
-                    "Job was canceled from event that had set before start "
+                "errors": JobCancelError(
+                    "Execution was canceled from the event before start "
                     "self-hosted execution."
                 ).to_dict()
             },
@@ -1092,7 +1091,7 @@ def self_hosted_execute(
 
     if resp.status_code != 200:
         raise JobError(
-            f"Job execution error from request to self-hosted: "
+            f"Job execution got error response from self-hosted: "
             f"{job.runs_on.args.host!r}"
         )
 
@@ -1139,12 +1138,15 @@ def azure_batch_execute(
         id_logic=(job.id or "EMPTY"),
         extras=job.extras,
     )
+
+    result.trace.info("[JOB]: Start Azure Batch executor.")
+
     if event and event.is_set():
         return result.catch(
             status=CANCEL,
             context={
-                "errors": JobError(
-                    "Job was canceled from event that had set before start "
+                "errors": JobCancelError(
+                    "Execution was canceled from the event before start "
                     "azure-batch execution."
                 ).to_dict()
             },
@@ -1174,13 +1176,16 @@ def docker_execution(
         id_logic=(job.id or "EMPTY"),
         extras=job.extras,
     )
+
+    result.trace.info("[JOB]: Start Docker executor.")
+
     if event and event.is_set():
         return result.catch(
             status=CANCEL,
             context={
-                "errors": JobError(
-                    "Job Docker execution was canceled from event that "
-                    "had set before start execution."
+                "errors": JobCancelError(
+                    "Execution was canceled from the event before start "
+                    "start docker execution."
                 ).to_dict()
             },
         )

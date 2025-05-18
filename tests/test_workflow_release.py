@@ -30,6 +30,7 @@ def test_workflow_release():
     )
     assert rs.status == SUCCESS
     assert rs.context == {
+        "status": SUCCESS,
         "params": {"asat-dt": datetime(2024, 10, 1, 0, 0)},
         "release": {
             "type": NORMAL,
@@ -37,9 +38,16 @@ def test_workflow_release():
         },
         "jobs": {
             "first-job": {
+                "status": SUCCESS,
                 "stages": {
-                    "first-stage": {"outputs": {}},
-                    "second-stage": {"outputs": {}},
+                    "first-stage": {
+                        "outputs": {},
+                        "status": SUCCESS,
+                    },
+                    "second-stage": {
+                        "outputs": {},
+                        "status": SUCCESS,
+                    },
                 },
             },
         },
@@ -68,6 +76,7 @@ def test_workflow_release_with_datetime():
     )
     assert rs.status == SUCCESS
     assert rs.context == {
+        "status": SUCCESS,
         "params": {"asat-dt": datetime(2024, 10, 1, 0, 0)},
         "release": {
             "type": NORMAL,
@@ -75,9 +84,16 @@ def test_workflow_release_with_datetime():
         },
         "jobs": {
             "first-job": {
+                "status": SUCCESS,
                 "stages": {
-                    "first-stage": {"outputs": {}},
-                    "second-stage": {"outputs": {}},
+                    "first-stage": {
+                        "outputs": {},
+                        "status": SUCCESS,
+                    },
+                    "second-stage": {
+                        "outputs": {},
+                        "status": SUCCESS,
+                    },
                 },
             },
         },

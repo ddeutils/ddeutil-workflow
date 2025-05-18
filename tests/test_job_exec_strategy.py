@@ -137,7 +137,7 @@ def test_job_exec_strategy_event_set():
             "matrix": {},
             "stages": {},
             "errors": {
-                "name": "JobError",
+                "name": "JobCancelError",
                 "message": (
                     "Strategy execution was canceled from the event before "
                     "start stage execution."

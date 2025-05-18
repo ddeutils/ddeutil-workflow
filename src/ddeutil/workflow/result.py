@@ -50,10 +50,18 @@ class Status(IntEnum):
 
         :rtype: str
         """
-        return {0: "✅", 1: "❌", 2: "🟡", 3: "⏩", 4: "🚫"}[self.value]
+        return {
+            "SUCCESS": "✅",
+            "FAILED": "❌",
+            "WAIT": "🟡",
+            "SKIP": "⏩",
+            "CANCEL": "🚫",
+        }[self.name]
 
-    # TODO: Remove this line before release.
     def __repr__(self) -> str:
+        return self.name
+
+    def __str__(self) -> str:
         return self.name
 
 
@@ -76,10 +84,12 @@ def validate_statuses(statuses: list[Status]) -> Status:
         return CANCEL
     elif any(s == FAILED for s in statuses):
         return FAILED
-    for status in (SUCCESS, SKIP, WAIT):
+    elif any(s == WAIT for s in statuses):
+        return WAIT
+    for status in (SUCCESS, SKIP):
         if all(s == status for s in statuses):
             return status
-    return FAILED
+    return FAILED if FAILED in statuses else SUCCESS
 
 
 def get_status_from_error(

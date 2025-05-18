@@ -105,7 +105,7 @@ def test_trigger_stage_exec_raise(test_path):
             "name": "StageError",
             "message": (
                 "Trigger workflow was failed with:\n"
-                "Job, 'first-job', return `FAILED` status."
+                "Job execution, 'first-job', was failed."
             ),
         },
     }

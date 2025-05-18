@@ -153,7 +153,7 @@ def test_case_stage_exec_cancel():
         "errors": {
             "name": "StageCancelError",
             "message": (
-                "Execution was canceled from event before start case execution."
+                "Execution was canceled from the event before start case execution."
             ),
         },
     }

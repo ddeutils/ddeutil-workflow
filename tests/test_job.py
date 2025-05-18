@@ -16,7 +16,7 @@ def test_run_ons():
     model = TypeAdapter(RunsOnModel).validate_python(
         {
             "type": "self_hosted",
-            "with": {"host": "localhost:88"},
+            "with": {"host": "localhost:88", "token": "dummy"},
         },
     )
     assert isinstance(model, OnSelfHosted)
@@ -97,8 +97,8 @@ def test_job_set_outputs():
     job = Job(id="final-job")
     assert job.set_outputs({}, {}) == {"jobs": {"final-job": {}}}
     assert job.set_outputs({}, {"jobs": {}}) == {"jobs": {"final-job": {}}}
-    assert job.set_outputs({"skipped": False}, {"jobs": {}}) == {
-        "jobs": {"final-job": {"skipped": False}}
+    assert job.set_outputs({"status": SKIP}, {"jobs": {}}) == {
+        "jobs": {"final-job": {"status": SKIP}}
     }
     assert job.set_outputs({"errors": {}}, {"jobs": {}}) == {
         "jobs": {"final-job": {"errors": {}}}

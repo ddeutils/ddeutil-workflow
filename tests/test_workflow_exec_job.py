@@ -49,7 +49,7 @@ def test_workflow_execute_job_raise_inside():
         "status": FAILED,
         "errors": {
             "name": "WorkflowError",
-            "message": "Job, 'demo-run', return `FAILED` status.",
+            "message": "Job execution, 'demo-run', was failed.",
         },
         "jobs": {
             "demo-run": {

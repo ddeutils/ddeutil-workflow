@@ -1,5 +1,5 @@
 from ddeutil.workflow import Job, Workflow
-from ddeutil.workflow.result import CANCEL, FAILED, SUCCESS, Result
+from ddeutil.workflow.result import CANCEL, FAILED, SKIP, SUCCESS, Result
 
 from .utils import MockEvent
 
@@ -39,6 +39,7 @@ def test_job_exec_py():
         },
     }
 
+    # NOTE: Cancel job execution by set the event.
     event = MockEvent(n=0)
     rs: Result = job.execute(params={"params": {"name": "Foo"}}, event=event)
     assert rs.status == CANCEL
@@ -376,7 +377,10 @@ def test_job_exec_py_complete_raise():
             },
             "errors": {
                 "name": "JobError",
-                "message": "Strategy execution was break because its nested-stage, 'raise-error', failed.",
+                "message": (
+                    "Strategy execution was break because its nested-stage, "
+                    "'raise-error', failed."
+                ),
             },
         },
         "9112472804": {
@@ -395,18 +399,94 @@ def test_job_exec_py_complete_raise():
             },
             "errors": {
                 "name": "JobError",
-                "message": "Strategy execution was break because its nested-stage, 'raise-error', failed.",
+                "message": (
+                    "Strategy execution was break because its nested-stage, "
+                    "'raise-error', failed."
+                ),
             },
         },
         "errors": {
             "2150810470": {
                 "name": "JobError",
-                "message": "Strategy execution was break because its nested-stage, 'raise-error', failed.",
+                "message": (
+                    "Strategy execution was break because its nested-stage, "
+                    "'raise-error', failed."
+                ),
             },
             "9112472804": {
                 "name": "JobError",
-                "message": "Strategy execution was break because its nested-stage, 'raise-error', failed.",
+                "message": (
+                    "Strategy execution was break because its nested-stage, "
+                    "'raise-error', failed."
+                ),
             },
+        },
+    }
+
+
+def test_job_exec_skipped():
+    job: Job = Job.model_validate(
+        {
+            "id": "first-job",
+            "if": "False",
+            "stages": [{"name": "Echo empty", "echo": "Hello World"}],
+        }
+    )
+    rs: Result = job.execute(params={})
+    assert rs.status == SKIP
+    assert rs.context == {"status": SKIP}
+
+    job: Job = Job.model_validate(
+        {
+            "id": "first-job",
+            "if": "True",
+            "stages": [
+                {
+                    "name": "Echo empty",
+                    "if": "False",
+                    "echo": "Hello World",
+                }
+            ],
+        }
+    )
+    rs: Result = job.execute(params={})
+    assert rs.status == SKIP
+    assert rs.context == {
+        "status": SKIP,
+        "EMPTY": {
+            "status": SKIP,
+            "matrix": {},
+            "stages": {"2419214589": {"outputs": {}, "status": SKIP}},
+        },
+    }
+
+    job: Job = Job.model_validate(
+        {
+            "id": "first-job",
+            "strategy": {"matrix": {"number": [1, 2]}},
+            "if": "True",
+            "stages": [
+                {
+                    "name": "Echo empty",
+                    "if": "False",
+                    "echo": "Hello World",
+                }
+            ],
+        }
+    )
+    rs: Result = job.execute(params={})
+    assert rs.status == SKIP
+    assert rs.context == {
+        "status": SKIP,
+        "3568447778": {
+            "status": SKIP,
+            "matrix": {"number": 1},
+            "stages": {"2419214589": {"outputs": {}, "status": SKIP}},
+        },
+        "9176483042": {
+            "status": SKIP,
+            "matrix": {"number": 2},
+            "stages": {"2419214589": {"outputs": {}, "status": SKIP}},
         },
     }
 

@@ -1683,7 +1683,7 @@ class ParallelStage(BaseNestedStage):
             elif rs.status == CANCEL:
                 error_msg: str = (
                     "Branch execution was canceled from the event after "
-                    "start branch execution."
+                    "end branch execution."
                 )
                 result.catch(
                     status=CANCEL,
@@ -1921,7 +1921,7 @@ class ForEachStage(BaseNestedStage):
             elif rs.status == CANCEL:
                 error_msg: str = (
                     "Item execution was canceled from the event after "
-                    "start item execution."
+                    "end item execution."
                 )
                 result.catch(
                     status=CANCEL,
@@ -2214,7 +2214,7 @@ class UntilStage(BaseNestedStage):
             elif rs.status == CANCEL:
                 error_msg: str = (
                     "Loop execution was canceled from the event after "
-                    "start loop execution."
+                    "end loop execution."
                 )
                 result.catch(
                     status=CANCEL,

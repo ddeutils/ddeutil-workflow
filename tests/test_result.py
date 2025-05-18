@@ -13,7 +13,6 @@ from ddeutil.workflow.result import (
 
 def test_status():
     assert Status.SUCCESS == Status.__getitem__("SUCCESS")
-    assert Status.FAILED == Status(1)
     assert Status.SUCCESS.emoji == "✅"
     assert repr(Status.SUCCESS) == "SUCCESS"
     assert str(Status.SUCCESS) == "SUCCESS"
@@ -66,7 +65,7 @@ def test_result_context():
 def test_result_catch():
     rs: Result = Result()
     data = {"params": {"source": "src", "target": "tgt"}}
-    rs.catch(status=0, context=data)
+    rs.catch(status=SUCCESS, context=data)
     assert rs.status == SUCCESS
     assert rs.context == data | {"status": SUCCESS}
 

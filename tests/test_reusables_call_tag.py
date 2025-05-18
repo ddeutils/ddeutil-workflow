@@ -107,6 +107,7 @@ def test_make_registry_from_env():
         "routing-01",
         "routing-02",
         "simple-task",
+        "simple-csv-task",
         "simple-task-async",
         "start-process",
         "start-stream",

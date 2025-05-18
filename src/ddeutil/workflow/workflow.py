@@ -38,7 +38,16 @@ from .event import Crontab
 from .job import Job
 from .logs import Audit, get_audit
 from .params import Param
-from .result import CANCEL, FAILED, SKIP, SUCCESS, WAIT, Result
+from .result import (
+    CANCEL,
+    FAILED,
+    SKIP,
+    SUCCESS,
+    WAIT,
+    Result,
+    Status,
+    validate_statuses,
+)
 from .reusables import has_template, param2template
 from .utils import (
     gen_id,
@@ -477,7 +486,8 @@ class Workflow(BaseModel):
         model. It different with `self.execute` because this method run only
         one job and return with context of this job data.
 
-        :raise WorkflowError: If the job execution raise JobError.
+            This method do not raise any error, and it will handle all exception
+        from the job execution.
 
         :param job: (Job) A job model that want to execute.
         :param params: (DictData) A parameter data.
@@ -509,18 +519,30 @@ class Workflow(BaseModel):
         )
         job.set_outputs(rs.context, to=params)
 
-        if rs.status in (FAILED, CANCEL):
-            error_msg: str = (
-                f"Job, {job.id!r}, return `{rs.status.name}` status."
-            )
+        if rs.status == FAILED:
+            error_msg: str = f"Job execution, {job.id!r}, was failed."
             return result.catch(
-                status=rs.status,
+                status=FAILED,
                 context={
                     "errors": WorkflowError(error_msg).to_dict(),
                     **params,
                 },
             )
-        return result.catch(status=SUCCESS, context=params)
+
+        elif rs.status == CANCEL:
+            error_msg: str = (
+                f"Job execution, {job.id!r}, was canceled from the event after "
+                f"end job execution."
+            )
+            return result.catch(
+                status=CANCEL,
+                context={
+                    "errors": WorkflowCancelError(error_msg).to_dict(),
+                    **params,
+                },
+            )
+
+        return result.catch(status=rs.status, context=params)
 
     def execute(
         self,
@@ -604,6 +626,10 @@ class Workflow(BaseModel):
             job_queue.put(job_id)
 
         not_timeout_flag: bool = True
+        total_job: int = len(self.jobs)
+        statuses: list[Status] = [WAIT] * total_job
+        skip_count: int = 0
+        sequence_statuses: list[Status] = []
         timeout: float = dynamic(
             "max_job_exec_timeout", f=timeout, extras=self.extras
         )
@@ -636,16 +662,20 @@ class Workflow(BaseModel):
                     return result.catch(
                         status=FAILED,
                         context={
+                            "status": FAILED,
                             "errors": WorkflowError(
                                 f"Validate job trigger rule was failed with "
                                 f"{job.trigger_rule.value!r}."
-                            ).to_dict()
+                            ).to_dict(),
                         },
                     )
                 elif check == SKIP:  # pragma: no cov
-                    result.trace.info(f"[JOB]: Skip job: {job_id!r}")
+                    result.trace.info(
+                        f"[JOB]: Skip job: {job_id!r} from trigger rule."
+                    )
                     job.set_outputs(output={"status": SKIP}, to=context)
                     job_queue.task_done()
+                    skip_count += 1
                     continue
 
                 if max_job_parallel > 1:
@@ -672,7 +702,11 @@ class Workflow(BaseModel):
                         )
                     )
                     time.sleep(0.025)
-                elif (future := futures.pop(0)).done() or future.cancelled():
+                elif (future := futures.pop(0)).done():
+                    sequence_statuses.append(future.result().status)
+                    job_queue.put(job_id)
+                elif future.cancelled():
+                    sequence_statuses.append(CANCEL)
                     job_queue.put(job_id)
                 elif future.running() or "state=pending" in str(future):
                     time.sleep(0.075)
@@ -691,14 +725,26 @@ class Workflow(BaseModel):
 
             if not_timeout_flag:
                 job_queue.join()
-                for future in as_completed(futures):
-                    future.result()
-                return result.catch(
-                    status=FAILED if "errors" in result.context else SUCCESS,
-                    context=context,
-                )
+                total_future: int = 0
+                for i, future in enumerate(as_completed(futures), start=0):
+                    statuses[i] = future.result().status
+                    total_future += 1
 
-            result.trace.error(f"[WORKFLOW]: {self.name!r} was timeout.")
+                # NOTE: Update skipped status from the job trigger.
+                for i in range(skip_count):
+                    statuses[total_future + i] = SKIP
+
+                # NOTE: Update status from none-parallel job execution.
+                for i, s in enumerate(sequence_statuses, start=0):
+                    statuses[total_future + skip_count + i] = s
+
+                status: Status = validate_statuses(statuses)
+                return result.catch(status=status, context=context)
+
+            result.trace.error(
+                f"[WORKFLOW]: {self.name!r} was timeout because it use exec "
+                f"time more than {timeout} seconds."
+            )
             event.set()
             for future in futures:
                 future.cancel()
@@ -709,7 +755,8 @@ class Workflow(BaseModel):
             status=FAILED,
             context={
                 "errors": WorkflowTimeoutError(
-                    f"{self.name!r} was timeout."
+                    f"{self.name!r} was timeout because it use exec time more "
+                    f"than {timeout} seconds."
                 ).to_dict()
             },
         )
