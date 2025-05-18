@@ -14,5 +14,4 @@ RUN pip install --no-cache-dir -U ddeutil-workflow[all]
 
 USER worker
 
-# ENTRYPOINT ["workflow-cli", "job", "--params", "{\"test\": 1}"]
 ENTRYPOINT ["workflow-cli"]

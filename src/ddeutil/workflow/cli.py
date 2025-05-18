@@ -48,6 +48,7 @@ def api(
     host: Annotated[str, typer.Option(help="A host url.")] = "0.0.0.0",
     port: Annotated[int, typer.Option(help="A port url.")] = 80,
     debug: Annotated[bool, typer.Option(help="A debug mode flag")] = True,
+    worker: Annotated[int, typer.Option(help="A worker number")] = None,
 ):
     """
     Provision API application from the FastAPI.
@@ -59,6 +60,7 @@ def api(
         port=port,
         log_config=uvicorn.config.LOGGING_CONFIG | LOGGING_CONFIG,
         log_level=("DEBUG" if debug else "INFO"),
+        workers=worker,
     )
 
 

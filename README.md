@@ -91,10 +91,10 @@ the base deps.
 If you want to install this package with application add-ons, you should add
 `app` in installation;
 
-| Use-case       | Install Optional         |       Support       |
-|----------------|--------------------------|:-------------------:|
-| Python         | `ddeutil-workflow`       | :heavy_check_mark:  |
-| FastAPI Server | `ddeutil-workflow[api]`  | :heavy_check_mark:  |
+| Use-case       | Install Optional         | Support |
+|----------------|--------------------------|:-------:|
+| Python         | `ddeutil-workflow`       |    ✅    |
+| FastAPI Server | `ddeutil-workflow[api]`  |    ✅    |
 
 ## 🎯 Usage
 
@@ -249,40 +249,27 @@ it will use default value and do not raise any error to you.
 ## :rocket: Deployment
 
 This package able to run as an application service for receive manual trigger
-from any node via RestAPI or use to be Scheduler background application
-like crontab job but via Python API or FastAPI app.
+from any node via RestAPI with the FastAPI package.
 
 ### API Server
 
 This server use FastAPI package to be the base application.
 
 ```shell
-(.venv) $ uvicorn ddeutil.workflow.api:app \
-  --host 127.0.0.1 \
-  --port 80 \
-  --no-access-log
+(.venv) $ workflow-cli api --host 127.0.0.1 --port 80
 ```
 
 > [!NOTE]
 > If this package already deploy, it is able to use multiprocess;
-> `uvicorn ddeutil.workflow.api:app --host 127.0.0.1 --port 80 --workers 4`
-
-### Local Schedule
-
-> [!WARNING]
-> This CLI does not implement yet.
-
-```shell
-(.venv) $ ddeutil-workflow schedule
-```
+> `$ workflow-cli api --host 127.0.0.1 --port 80 --workers 4`
 
 ### Docker Container
 
 Build a Docker container from this package.
 
 ```shell
-$ docker build -t ddeutil-workflow:latest -f .container/Dockerfile .
-$ docker run -i ddeutil-workflow:latest ddeutil-workflow
+$ docker pull ghcr.io/ddeutils/ddeutil-workflow:latest
+$ docker run --rm ghcr.io/ddeutils/ddeutil-workflow:latest ddeutil-worker
 ```
 
 ## :speech_balloon: Contribute
