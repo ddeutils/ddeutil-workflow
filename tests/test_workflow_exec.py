@@ -335,18 +335,19 @@ def test_workflow_exec_py_raise():
 
 
 def test_workflow_exec_py_raise_parallel():
+    event = MockEvent(n=10)
     rs: Result = Workflow.from_conf("wf-run-python-raise").execute(
-        params={}, max_job_parallel=2
+        params={}, max_job_parallel=2, event=event
     )
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,
+        "errors": {
+            "name": "WorkflowError",
+            "message": "Job execution, 'first-job', was failed.",
+        },
         "params": {},
         "jobs": {
-            "second-job": {
-                "status": SUCCESS,
-                "stages": {"1772094681": {"outputs": {}, "status": SUCCESS}},
-            },
             "first-job": {
                 "status": FAILED,
                 "stages": {
@@ -364,10 +365,10 @@ def test_workflow_exec_py_raise_parallel():
                     "message": "Strategy execution was break because its nested-stage, 'raise-error', failed.",
                 },
             },
-        },
-        "errors": {
-            "name": "WorkflowError",
-            "message": "Job execution, 'first-job', was failed.",
+            "second-job": {
+                "status": SUCCESS,
+                "stages": {"1772094681": {"outputs": {}, "status": SUCCESS}},
+            },
         },
     }
 

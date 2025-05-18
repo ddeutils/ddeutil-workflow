@@ -478,7 +478,7 @@ class Workflow(BaseModel):
         *,
         result: Optional[Result] = None,
         event: Optional[Event] = None,
-    ) -> Result:
+    ) -> tuple[Status, Result]:
         """Job execution with passing dynamic parameters from the main workflow
         execution to the target job object via job's ID.
 
@@ -495,12 +495,12 @@ class Workflow(BaseModel):
         :param event: (Event) An Event manager instance that use to cancel this
             execution if it forces stopped by parent execution.
 
-        :rtype: Result
+        :rtype: tuple[Status, Result]
         """
         result: Result = result or Result(run_id=gen_id(self.name, unique=True))
 
         if event and event.is_set():
-            return result.catch(
+            return CANCEL, result.catch(
                 status=CANCEL,
                 context={
                     "errors": WorkflowCancelError(
@@ -521,7 +521,7 @@ class Workflow(BaseModel):
 
         if rs.status == FAILED:
             error_msg: str = f"Job execution, {job.id!r}, was failed."
-            return result.catch(
+            return FAILED, result.catch(
                 status=FAILED,
                 context={
                     "errors": WorkflowError(error_msg).to_dict(),
@@ -534,7 +534,7 @@ class Workflow(BaseModel):
                 f"Job execution, {job.id!r}, was canceled from the event after "
                 f"end job execution."
             )
-            return result.catch(
+            return CANCEL, result.catch(
                 status=CANCEL,
                 context={
                     "errors": WorkflowCancelError(error_msg).to_dict(),
@@ -542,7 +542,7 @@ class Workflow(BaseModel):
                 },
             )
 
-        return result.catch(status=rs.status, context=params)
+        return rs.status, result.catch(status=rs.status, context=params)
 
     def execute(
         self,
@@ -701,9 +701,10 @@ class Workflow(BaseModel):
                             event=event,
                         )
                     )
-                    time.sleep(0.025)
+                    # time.sleep(0.025)
                 elif (future := futures.pop(0)).done():
-                    sequence_statuses.append(future.result().status)
+                    s, rs = future.result()
+                    sequence_statuses.append(s)
                     job_queue.put(job_id)
                 elif future.cancelled():
                     sequence_statuses.append(CANCEL)
@@ -727,7 +728,8 @@ class Workflow(BaseModel):
                 job_queue.join()
                 total_future: int = 0
                 for i, future in enumerate(as_completed(futures), start=0):
-                    statuses[i] = future.result().status
+                    s, _ = future.result()
+                    statuses[i] = s
                     total_future += 1
 
                 # NOTE: Update skipped status from the job trigger.
@@ -739,6 +741,7 @@ class Workflow(BaseModel):
                     statuses[total_future + skip_count + i] = s
 
                 status: Status = validate_statuses(statuses)
+
                 return result.catch(status=status, context=context)
 
             result.trace.error(
