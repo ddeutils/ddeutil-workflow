@@ -24,7 +24,7 @@ wf-run-matrix:
             partition: 4
       stages:
         - name: Extract & Load Multi-System
-          uses: tasks/el-${{ matrix.system }}-to-parquet@polars-dir
+          uses: tasks/simple-${{ matrix.system }}-task@demo
           id: ${{ matrix.table }}-${{ matrix.partition }}
           with:
             source: ${{ params.source }}/${{ matrix.table }}
@@ -62,7 +62,7 @@ wf-run-matrix-parallel:
             partition: 4
       stages:
         - name: Extract & Load Multi-System
-          uses: tasks/el-${{ matrix.system }}-to-parquet@polars-dir
+          uses: tasks/simple-${{ matrix.system }}-task@demo
           id: ${{ matrix.table }}-${{ matrix.partition }}
           with:
             source:

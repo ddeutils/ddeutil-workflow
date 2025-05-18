@@ -16,7 +16,7 @@ def test_run_ons():
     model = TypeAdapter(RunsOnModel).validate_python(
         {
             "type": "self_hosted",
-            "with": {"host": "localhost:88"},
+            "with": {"host": "localhost:88", "token": "dummy"},
         },
     )
     assert isinstance(model, OnSelfHosted)
@@ -38,6 +38,11 @@ def test_job():
     job = Job(desc="\n\t# Desc\n\tThis is a demo job.")
     assert job.desc == "# Desc\nThis is a demo job."
 
+    job = Job.model_validate({"runs-on": {"type": "docker"}})
+    assert isinstance(job.runs_on, OnDocker)
+
+
+def test_job_check_needs():
     job = Job(id="final-job", needs=["job-before"])
     assert job.id == "final-job"
 
@@ -45,12 +50,17 @@ def test_job():
     assert job.check_needs({"job-before": {"stages": "foo"}}) == SUCCESS
     assert job.check_needs({"job-before": {}}) == SUCCESS
     assert job.check_needs({"job-after": {"stages": "foo"}}) == WAIT
-    assert job.check_needs({"job-before": {"errors": {}}}) == FAILED
-    assert job.check_needs({"job-before": {"skipped": True}}) == SKIP
-    assert job.check_needs({"job-before": {"skipped": False}}) == SUCCESS
+    assert (
+        job.check_needs({"job-before": {"status": FAILED, "errors": {}}})
+        == FAILED
+    )
+    assert job.check_needs({"job-before": {"status": SKIP}}) == SKIP
+    assert job.check_needs({"job-before": {"status": SUCCESS}}) == SUCCESS
 
-    job = Job.model_validate({"runs-on": {"type": "docker"}})
-    assert isinstance(job.runs_on, OnDocker)
+    job = Job(id="final-job", needs=["job-before1", "job-before2"])
+    assert job.check_needs({"job-before1": {}, "job-before2": {}}) == SUCCESS
+    assert job.check_needs({"job-before1": {"stages": "foo"}}) == WAIT
+    # assert job.check_needs({"job-before1": {"errors": {}}}) == FAILED
 
 
 def test_job_raise():
@@ -87,8 +97,8 @@ def test_job_set_outputs():
     job = Job(id="final-job")
     assert job.set_outputs({}, {}) == {"jobs": {"final-job": {}}}
     assert job.set_outputs({}, {"jobs": {}}) == {"jobs": {"final-job": {}}}
-    assert job.set_outputs({"skipped": False}, {"jobs": {}}) == {
-        "jobs": {"final-job": {"skipped": False}}
+    assert job.set_outputs({"status": SKIP}, {"jobs": {}}) == {
+        "jobs": {"final-job": {"status": SKIP}}
     }
     assert job.set_outputs({"errors": {}}, {"jobs": {}}) == {
         "jobs": {"final-job": {"errors": {}}}

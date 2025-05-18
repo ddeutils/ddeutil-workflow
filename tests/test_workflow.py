@@ -2,7 +2,7 @@ import shutil
 from pathlib import Path
 
 import pytest
-from ddeutil.workflow import SUCCESS, Job, Result, Workflow
+from ddeutil.workflow import SKIP, SUCCESS, Job, Result, Workflow
 from ddeutil.workflow.errors import WorkflowError
 from pydantic import ValidationError
 
@@ -129,7 +129,7 @@ def test_workflow_from_conf_without_job():
     workflow = Workflow(name="wf-without-jobs")
     rs: Result = workflow.execute({})
     assert rs.status == SUCCESS
-    assert rs.context == {"params": {}, "jobs": {}}
+    assert rs.context == {"status": SUCCESS, "params": {}, "jobs": {}}
 
 
 def test_workflow_from_conf_override(test_path):
@@ -168,8 +168,16 @@ def test_workflow_from_conf_override(test_path):
         rs: Result = workflow.execute(params={"name": "foo"})
         assert rs.status == SUCCESS
         assert rs.context == {
+            "status": SUCCESS,
             "params": {"name": "foo"},
-            "jobs": {"first-job": {"stages": {"1926515049": {"outputs": {}}}}},
+            "jobs": {
+                "first-job": {
+                    "status": SUCCESS,
+                    "stages": {
+                        "1926515049": {"outputs": {}, "status": SUCCESS}
+                    },
+                }
+            },
         }
 
         workflow = Workflow.from_conf(
@@ -181,23 +189,30 @@ def test_workflow_from_conf_override(test_path):
         rs: Result = workflow.execute(params={"name": "bar"})
         assert rs.status == SUCCESS
         assert rs.context == {
+            "status": SUCCESS,
             "params": {"name": "bar"},
             "jobs": {
                 "trigger-job": {
+                    "status": SUCCESS,
                     "stages": {
                         "trigger-stage": {
+                            "status": SUCCESS,
                             "outputs": {
                                 "params": {"name": "bar"},
                                 "jobs": {
                                     "first-job": {
+                                        "status": SUCCESS,
                                         "stages": {
-                                            "1926515049": {"outputs": {}}
-                                        }
+                                            "1926515049": {
+                                                "outputs": {},
+                                                "status": SUCCESS,
+                                            }
+                                        },
                                     }
                                 },
-                            }
+                            },
                         }
-                    }
+                    },
                 }
             },
         }
@@ -307,23 +322,31 @@ def test_workflow_condition():
     )
     rs: Result = workflow.execute(params={"name": "bar"})
     assert rs.context == {
+        "status": SKIP,
         "params": {"name": "bar"},
         "jobs": {
             "condition-job": {
+                "status": SKIP,
                 "stages": {
-                    "condition-stage": {"outputs": {}, "skipped": True},
+                    "condition-stage": {"outputs": {}, "status": SKIP},
                 },
             },
         },
     }
 
     rs: Result = workflow.execute(params={"name": "foo"})
+    assert rs.status == SUCCESS
     assert rs.context == {
+        "status": SUCCESS,
         "params": {"name": "foo"},
         "jobs": {
             "condition-job": {
+                "status": SUCCESS,
                 "stages": {
-                    "condition-stage": {"outputs": {"message": "Hello World"}}
+                    "condition-stage": {
+                        "status": SUCCESS,
+                        "outputs": {"message": "Hello World"},
+                    }
                 },
             },
         },

@@ -1,22 +1,20 @@
 import shutil
-from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime
 from textwrap import dedent
-from threading import Event
-from unittest import mock
 
 from ddeutil.core import getdot
 from ddeutil.workflow import (
+    CANCEL,
     FAILED,
+    SKIP,
     SUCCESS,
-    Config,
     Job,
     Result,
     Workflow,
     extract_call,
 )
 
-from .utils import dump_yaml_context
+from .utils import MockEvent, dump_yaml_context
 
 
 def test_workflow_exec():
@@ -24,15 +22,23 @@ def test_workflow_exec():
         stages=[{"name": "Sleep", "run": "import time\ntime.sleep(2)"}],
     )
     workflow: Workflow = Workflow(
-        name="demo-workflow", jobs={"sleep-run": job, "sleep-again-run": job}
+        name="demo-workflow",
+        jobs={"sleep-run": job, "sleep-again-run": job},
     )
     rs: Result = workflow.execute(params={}, max_job_parallel=1)
-    assert rs.status == 0
+    assert rs.status == SUCCESS
     assert rs.context == {
+        "status": SUCCESS,
         "params": {},
         "jobs": {
             "sleep-again-run": {
-                "stages": {"7972360640": {"outputs": {}}},
+                "status": SUCCESS,
+                "stages": {
+                    "7972360640": {
+                        "outputs": {},
+                        "status": SUCCESS,
+                    }
+                },
             },
         },
     }
@@ -52,17 +58,25 @@ def test_workflow_exec_timeout():
     rs: Result = workflow.execute(params={}, timeout=1.25, max_job_parallel=1)
     assert rs.status == FAILED
     assert rs.context == {
+        "status": FAILED,
         "errors": {
-            "name": "WorkflowError",
-            "message": "'demo-workflow' was timeout.",
+            "name": "WorkflowTimeoutError",
+            "message": (
+                "'demo-workflow' was timeout because it use exec time more "
+                "than 1.25 seconds."
+            ),
         },
         "params": {},
         "jobs": {
             "sleep-again-run": {
-                "stages": {"7972360640": {"outputs": {}}},
+                "status": CANCEL,
+                "stages": {"7972360640": {"outputs": {}, "status": SUCCESS}},
                 "errors": {
-                    "name": "JobError",
-                    "message": "Job strategy was canceled because event was set.",
+                    "name": "JobCancelError",
+                    "message": (
+                        "Strategy execution was canceled from the event before "
+                        "start stage execution."
+                    ),
                 },
             },
         },
@@ -77,26 +91,20 @@ def test_workflow_exec_raise_event_set():
         name="demo-workflow",
         jobs={"sleep-run": job, "sleep-again-run": job},
     )
-    event = Event()
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        future: Future = executor.submit(
-            workflow.execute,
-            params={},
-            timeout=1,
-            event=event,
-            max_job_parallel=1,
-        )
-        event.set()
-
-    rs: Result = future.result()
-    assert rs.status == FAILED
+    event = MockEvent(n=0)
+    rs: Result = workflow.execute(
+        params={}, timeout=1, event=event, max_job_parallel=1
+    )
+    assert rs.status == CANCEL
     assert rs.context == {
+        "status": CANCEL,
         "errors": {
-            "name": "WorkflowError",
-            "message": "Workflow job was canceled because event was set.",
+            "name": "WorkflowCancelError",
+            "message": (
+                "Execution was canceled from the event was set before workflow "
+                "execution."
+            ),
         },
-        "jobs": {},
-        "params": {},
     }
 
 
@@ -110,37 +118,55 @@ def test_workflow_exec_py():
     )
     assert rs.status == SUCCESS
     assert rs.context == {
+        "status": SUCCESS,
         "params": {
             "author-run": "Local Workflow",
             "run-date": datetime(2024, 1, 1, 0, 0),
         },
         "jobs": {
             "first-job": {
+                "status": SUCCESS,
                 "stages": {
-                    "printing": {"outputs": {"x": "Local Workflow"}},
-                    "setting-x": {"outputs": {"x": 1}},
+                    "printing": {
+                        "outputs": {"x": "Local Workflow"},
+                        "status": SUCCESS,
+                    },
+                    "setting-x": {
+                        "outputs": {"x": 1},
+                        "status": SUCCESS,
+                    },
                 },
             },
             "second-job": {
+                "status": SUCCESS,
                 "stages": {
                     "create-func": {
+                        "status": SUCCESS,
                         "outputs": {
                             "var_inside": "Create Function Inside",
                             "echo": "echo",
                         },
                     },
-                    "call-func": {"outputs": {}},
-                    "9150930869": {"outputs": {}},
+                    "call-func": {
+                        "outputs": {},
+                        "status": SUCCESS,
+                    },
+                    "9150930869": {
+                        "outputs": {},
+                        "status": SUCCESS,
+                    },
                 },
             },
             "final-job": {
+                "status": SUCCESS,
                 "stages": {
                     "1772094681": {
+                        "status": SUCCESS,
                         "outputs": {
                             "return_code": 0,
                             "stdout": "Hello World",
                             "stderr": None,
-                        }
+                        },
                     }
                 },
             },
@@ -158,9 +184,13 @@ def test_workflow_exec_parallel():
     rs: Result = workflow.execute(params={}, max_job_parallel=2)
     assert rs.status == SUCCESS
     assert rs.context == {
+        "status": SUCCESS,
         "params": {},
         "jobs": {
-            "sleep-again-run": {"stages": {"7972360640": {"outputs": {}}}},
+            "sleep-again-run": {
+                "status": SUCCESS,
+                "stages": {"7972360640": {"outputs": {}, "status": SUCCESS}},
+            },
         },
     }
 
@@ -183,19 +213,27 @@ def test_workflow_exec_parallel_timeout():
     rs: Result = workflow.execute(params={}, timeout=1.25, max_job_parallel=2)
     assert rs.status == FAILED
     assert rs.context == {
+        "status": FAILED,
         "params": {},
         "jobs": {
             "sleep-run": {
+                "status": CANCEL,
                 "stages": {},
                 "errors": {
-                    "name": "JobError",
-                    "message": "Job strategy was canceled because event was set.",
+                    "name": "JobCancelError",
+                    "message": (
+                        "Strategy execution was canceled from the event before "
+                        "start stage execution."
+                    ),
                 },
             },
         },
         "errors": {
-            "name": "WorkflowError",
-            "message": "'demo-workflow' was timeout.",
+            "name": "WorkflowTimeoutError",
+            "message": (
+                "'demo-workflow' was timeout because it use exec time more "
+                "than 1.25 seconds."
+            ),
         },
     }
 
@@ -211,37 +249,46 @@ def test_workflow_exec_py_with_parallel():
     )
     assert rs.status == SUCCESS
     assert rs.context == {
+        "status": SUCCESS,
         "params": {
             "author-run": "Local Workflow",
             "run-date": datetime(2024, 1, 1, 0, 0),
         },
         "jobs": {
             "first-job": {
+                "status": SUCCESS,
                 "stages": {
-                    "printing": {"outputs": {"x": "Local Workflow"}},
-                    "setting-x": {"outputs": {"x": 1}},
+                    "printing": {
+                        "outputs": {"x": "Local Workflow"},
+                        "status": SUCCESS,
+                    },
+                    "setting-x": {"outputs": {"x": 1}, "status": SUCCESS},
                 },
             },
             "second-job": {
+                "status": SUCCESS,
                 "stages": {
                     "create-func": {
                         "outputs": {
                             "var_inside": "Create Function Inside",
                             "echo": "echo",
                         },
+                        "status": SUCCESS,
                     },
-                    "call-func": {"outputs": {}},
-                    "9150930869": {"outputs": {}},
+                    "call-func": {"outputs": {}, "status": SUCCESS},
+                    "9150930869": {"outputs": {}, "status": SUCCESS},
                 },
             },
             "final-job": {
+                "status": SUCCESS,
                 "stages": {
                     "1772094681": {
                         "outputs": {
                             "return_code": 0,
                             "stdout": "Hello World",
                             "stderr": None,
-                        }
+                        },
+                        "status": SUCCESS,
                     }
                 },
             },
@@ -255,23 +302,34 @@ def test_workflow_exec_py_raise():
     )
     assert rs.status == FAILED
     assert rs.context == {
+        "status": FAILED,
         "errors": {
             "name": "WorkflowError",
-            "message": "Job, 'first-job', return `FAILED` status.",
+            "message": "Job execution, 'first-job', was failed.",
         },
         "params": {},
         "jobs": {
             "first-job": {
+                "status": FAILED,
+                "stages": {
+                    "raise-error": {
+                        "outputs": {},
+                        "errors": {
+                            "name": "ValueError",
+                            "message": "Testing raise error inside PyStage!!!",
+                        },
+                        "status": FAILED,
+                    }
+                },
                 "errors": {
                     "name": "JobError",
-                    "message": (
-                        "Handler Error: StageError: PyStage: "
-                        "ValueError: Testing raise error inside PyStage!!!"
-                    ),
+                    "message": "Strategy execution was break because its nested-stage, 'raise-error', failed.",
                 },
-                "stages": {},
             },
-            "second-job": {"stages": {"1772094681": {"outputs": {}}}},
+            "second-job": {
+                "status": SUCCESS,
+                "stages": {"1772094681": {"outputs": {}, "status": SUCCESS}},
+            },
         },
     }
 
@@ -282,23 +340,34 @@ def test_workflow_exec_py_raise_parallel():
     )
     assert rs.status == FAILED
     assert rs.context == {
-        "errors": {
-            "name": "WorkflowError",
-            "message": "Job, 'first-job', return `FAILED` status.",
-        },
+        "status": FAILED,
         "params": {},
         "jobs": {
+            "second-job": {
+                "status": SUCCESS,
+                "stages": {"1772094681": {"outputs": {}, "status": SUCCESS}},
+            },
             "first-job": {
+                "status": FAILED,
+                "stages": {
+                    "raise-error": {
+                        "outputs": {},
+                        "errors": {
+                            "name": "ValueError",
+                            "message": "Testing raise error inside PyStage!!!",
+                        },
+                        "status": FAILED,
+                    }
+                },
                 "errors": {
                     "name": "JobError",
-                    "message": (
-                        "Handler Error: StageError: PyStage: "
-                        "ValueError: Testing raise error inside PyStage!!!"
-                    ),
+                    "message": "Strategy execution was break because its nested-stage, 'raise-error', failed.",
                 },
-                "stages": {},
             },
-            "second-job": {"stages": {"1772094681": {"outputs": {}}}},
+        },
+        "errors": {
+            "name": "WorkflowError",
+            "message": "Job execution, 'first-job', was failed.",
         },
     }
 
@@ -308,67 +377,104 @@ def test_workflow_exec_with_matrix():
     rs: Result = workflow.execute(params={"source": "src", "target": "tgt"})
     assert rs.status == SUCCESS
     assert rs.context == {
+        "status": SUCCESS,
         "params": {"source": "src", "target": "tgt"},
         "jobs": {
             "multiple-system": {
                 "strategies": {
                     "9696245497": {
+                        "status": SUCCESS,
                         "matrix": {
                             "table": "customer",
                             "system": "csv",
                             "partition": 2,
                         },
                         "stages": {
-                            "customer-2": {"outputs": {"records": 1}},
-                            "end-stage": {"outputs": {"passing_value": 10}},
+                            "customer-2": {
+                                "outputs": {"records": 1},
+                                "status": SUCCESS,
+                            },
+                            "end-stage": {
+                                "outputs": {"passing_value": 10},
+                                "status": SUCCESS,
+                            },
                         },
                     },
                     "8141249744": {
+                        "status": SUCCESS,
                         "matrix": {
                             "table": "customer",
                             "system": "csv",
                             "partition": 3,
                         },
                         "stages": {
-                            "customer-3": {"outputs": {"records": 1}},
-                            "end-stage": {"outputs": {"passing_value": 10}},
+                            "customer-3": {
+                                "outputs": {"records": 1},
+                                "status": SUCCESS,
+                            },
+                            "end-stage": {
+                                "outputs": {"passing_value": 10},
+                                "status": SUCCESS,
+                            },
                         },
                     },
                     "3590257855": {
+                        "status": SUCCESS,
                         "matrix": {
                             "table": "sales",
                             "system": "csv",
                             "partition": 1,
                         },
                         "stages": {
-                            "sales-1": {"outputs": {"records": 1}},
-                            "end-stage": {"outputs": {"passing_value": 10}},
+                            "sales-1": {
+                                "outputs": {"records": 1},
+                                "status": SUCCESS,
+                            },
+                            "end-stage": {
+                                "outputs": {"passing_value": 10},
+                                "status": SUCCESS,
+                            },
                         },
                     },
                     "3698996074": {
+                        "status": SUCCESS,
                         "matrix": {
                             "table": "sales",
                             "system": "csv",
                             "partition": 2,
                         },
                         "stages": {
-                            "sales-2": {"outputs": {"records": 1}},
-                            "end-stage": {"outputs": {"passing_value": 10}},
+                            "sales-2": {
+                                "outputs": {"records": 1},
+                                "status": SUCCESS,
+                            },
+                            "end-stage": {
+                                "outputs": {"passing_value": 10},
+                                "status": SUCCESS,
+                            },
                         },
                     },
                     "4390593385": {
+                        "status": SUCCESS,
                         "matrix": {
                             "table": "customer",
                             "system": "csv",
                             "partition": 4,
                         },
                         "stages": {
-                            "customer-4": {"outputs": {"records": 1}},
-                            "end-stage": {"outputs": {"passing_value": 10}},
+                            "customer-4": {
+                                "outputs": {"records": 1},
+                                "status": SUCCESS,
+                            },
+                            "end-stage": {
+                                "outputs": {"passing_value": 10},
+                                "status": SUCCESS,
+                            },
                         },
                     },
                 },
-            },
+                "status": SUCCESS,
+            }
         },
     }
 
@@ -378,28 +484,20 @@ def test_workflow_exec_needs():
     rs: Result = workflow.execute(params={"name": "bar"})
     assert rs.status == SUCCESS
     assert rs.context == {
+        "status": SUCCESS,
         "params": {"name": "bar"},
         "jobs": {
             "final-job": {
-                "stages": {
-                    "8797330324": {
-                        "outputs": {},
-                    },
-                },
-            },
-            "first-job": {
-                "stages": {
-                    "7824513474": {
-                        "outputs": {},
-                    },
-                },
+                "status": SUCCESS,
+                "stages": {"8797330324": {"outputs": {}, "status": SUCCESS}},
             },
             "second-job": {
-                "stages": {
-                    "1772094681": {
-                        "outputs": {},
-                    },
-                },
+                "status": SUCCESS,
+                "stages": {"1772094681": {"outputs": {}, "status": SUCCESS}},
+            },
+            "first-job": {
+                "status": SUCCESS,
+                "stages": {"7824513474": {"outputs": {}, "status": SUCCESS}},
             },
         },
     }
@@ -408,51 +506,43 @@ def test_workflow_exec_needs():
 def test_workflow_exec_needs_condition():
     workflow = Workflow.from_conf(name="wf-run-depends-condition")
     rs: Result = workflow.execute(params={"name": "bar"})
-    assert {
+    assert rs.status == SUCCESS
+    assert rs.context == {
+        "status": SUCCESS,
         "params": {"name": "bar"},
         "jobs": {
+            "second-job": {"status": SKIP},
+            "first-job": {"status": SKIP},
             "final-job": {
-                "stages": {
-                    "8797330324": {
-                        "outputs": {},
-                    },
-                },
+                "status": SUCCESS,
+                "stages": {"8797330324": {"outputs": {}, "status": SUCCESS}},
             },
-            "first-job": {"skipped": True},
-            "second-job": {"skipped": True},
         },
-    } == rs.context
+    }
 
 
 def test_workflow_exec_needs_parallel():
     workflow = Workflow.from_conf(name="wf-run-depends", extras={})
     rs: Result = workflow.execute(params={"name": "bar"}, max_job_parallel=3)
-    assert {
+    assert rs.status == SUCCESS
+    assert rs.context == {
+        "status": SUCCESS,
         "params": {"name": "bar"},
         "jobs": {
             "final-job": {
-                "stages": {
-                    "8797330324": {
-                        "outputs": {},
-                    },
-                },
-            },
-            "first-job": {
-                "stages": {
-                    "7824513474": {
-                        "outputs": {},
-                    },
-                },
+                "status": SUCCESS,
+                "stages": {"8797330324": {"outputs": {}, "status": SUCCESS}},
             },
             "second-job": {
-                "stages": {
-                    "1772094681": {
-                        "outputs": {},
-                    },
-                },
+                "status": SUCCESS,
+                "stages": {"1772094681": {"outputs": {}, "status": SUCCESS}},
+            },
+            "first-job": {
+                "status": SUCCESS,
+                "stages": {"7824513474": {"outputs": {}, "status": SUCCESS}},
             },
         },
-    } == rs.context
+    }
 
 
 def test_workflow_exec_call(test_path):
@@ -470,7 +560,7 @@ def test_workflow_exec_call(test_path):
               stages:
                 - name: "Extract & Load Local System"
                   id: extract-load
-                  uses: tasks/el-csv-to-parquet@polars-dir
+                  uses: tasks/simple-task@demo
                   with:
                     source: ${{ params.source }}
                     sink: ${{ params.sink }}
@@ -486,19 +576,22 @@ def test_workflow_exec_call(test_path):
         )
         assert rs.status == SUCCESS
         assert rs.context == {
+            "status": SUCCESS,
             "params": {
-                "run-date": datetime(2024, 1, 1),
+                "run-date": datetime(2024, 1, 1, 0, 0),
                 "source": "ds_csv_local_file",
                 "sink": "ds_parquet_local_file_dir",
             },
             "jobs": {
                 "extract-load": {
+                    "status": SUCCESS,
                     "stages": {
                         "extract-load": {
                             "outputs": {"records": 1},
-                        },
+                            "status": SUCCESS,
+                        }
                     },
-                },
+                }
             },
         }
 
@@ -547,13 +640,18 @@ def test_workflow_exec_call_override_registry(test_path):
         rs: Result = workflow.execute(params={})
         assert rs.status == SUCCESS
         assert rs.context == {
+            "status": SUCCESS,
             "params": {},
             "jobs": {
                 "first-job": {
+                    "status": SUCCESS,
                     "stages": {
-                        "4030788970": {"outputs": {"get-info": "success"}}
+                        "4030788970": {
+                            "outputs": {"get-info": "success"},
+                            "status": SUCCESS,
+                        }
                     },
-                },
+                }
             },
         }
 
@@ -562,9 +660,9 @@ def test_workflow_exec_call_override_registry(test_path):
 
 def test_workflow_exec_call_with_prefix(test_path):
     with dump_yaml_context(
-        test_path / "conf/demo/01_99_wf_test_wf_call_mssql_proc.yml",
+        test_path / "conf/demo/01_99_wf_test_wf_call_private_args.yml",
         data="""
-        tmp-wf-call-mssql-proc:
+        tmp-wf-call-private-args:
           type: Workflow
           params:
             run_date: datetime
@@ -576,7 +674,7 @@ def test_workflow_exec_call_with_prefix(test_path):
               stages:
                 - name: "Transform Data in MS SQL Server"
                   id: transform
-                  uses: tasks/mssql-proc@odbc
+                  uses: tasks/private-args-task@demo
                   with:
                     exec: ${{ params.sp_name }}
                     params:
@@ -586,7 +684,7 @@ def test_workflow_exec_call_with_prefix(test_path):
                       target: ${{ params.target_name }}
         """,
     ):
-        workflow = Workflow.from_conf(name="tmp-wf-call-mssql-proc")
+        workflow = Workflow.from_conf(name="tmp-wf-call-private-args")
         rs = workflow.execute(
             params={
                 "run_date": datetime(2024, 1, 1),
@@ -597,28 +695,31 @@ def test_workflow_exec_call_with_prefix(test_path):
         )
         assert rs.status == SUCCESS
         assert rs.context == {
+            "status": SUCCESS,
             "params": {
-                "run_date": datetime(2024, 1, 1),
+                "run_date": datetime(2024, 1, 1, 0, 0),
                 "sp_name": "proc-name",
                 "source_name": "src",
                 "target_name": "tgt",
             },
             "jobs": {
                 "transform": {
+                    "status": SUCCESS,
                     "stages": {
                         "transform": {
                             "outputs": {
                                 "exec": "proc-name",
                                 "params": {
                                     "run_mode": "T",
-                                    "run_date": datetime(2024, 1, 1),
+                                    "run_date": datetime(2024, 1, 1, 0, 0),
                                     "source": "src",
                                     "target": "tgt",
                                 },
                             },
-                        },
+                            "status": SUCCESS,
+                        }
                     },
-                },
+                }
             },
         }
 
@@ -667,57 +768,85 @@ def test_workflow_exec_foreach(test_path):
         rs = workflow.execute(params={})
         assert rs.status == SUCCESS
         assert rs.context == {
+            "status": SUCCESS,
             "params": {},
             "jobs": {
                 "transform": {
+                    "status": SUCCESS,
                     "stages": {
-                        "get-items": {"outputs": {"items": [1, 2, 3, 4]}},
-                        "create-variable": {"outputs": {"foo": "bar"}},
+                        "get-items": {
+                            "outputs": {"items": [1, 2, 3, 4]},
+                            "status": SUCCESS,
+                        },
+                        "create-variable": {
+                            "outputs": {"foo": "bar"},
+                            "status": SUCCESS,
+                        },
                         "foreach-stage": {
                             "outputs": {
                                 "items": [1, 2, 3, 4],
                                 "foreach": {
                                     1: {
+                                        "status": SUCCESS,
                                         "item": 1,
                                         "stages": {
-                                            "2709471980": {"outputs": {}},
+                                            "2709471980": {
+                                                "outputs": {},
+                                                "status": SUCCESS,
+                                            },
                                             "9263488742": {
                                                 "outputs": {},
-                                                "skipped": True,
+                                                "status": SKIP,
                                             },
                                         },
                                     },
                                     2: {
+                                        "status": SUCCESS,
                                         "item": 2,
                                         "stages": {
-                                            "2709471980": {"outputs": {}},
+                                            "2709471980": {
+                                                "outputs": {},
+                                                "status": SUCCESS,
+                                            },
                                             "9263488742": {
                                                 "outputs": {},
-                                                "skipped": True,
+                                                "status": SKIP,
                                             },
                                         },
                                     },
                                     3: {
+                                        "status": SUCCESS,
                                         "item": 3,
                                         "stages": {
-                                            "2709471980": {"outputs": {}},
+                                            "2709471980": {
+                                                "outputs": {},
+                                                "status": SUCCESS,
+                                            },
                                             "9263488742": {
                                                 "outputs": {},
-                                                "skipped": True,
+                                                "status": SKIP,
                                             },
                                         },
                                     },
                                     4: {
+                                        "status": SUCCESS,
                                         "item": 4,
                                         "stages": {
-                                            "2709471980": {"outputs": {}},
-                                            "9263488742": {"outputs": {}},
+                                            "2709471980": {
+                                                "outputs": {},
+                                                "status": SUCCESS,
+                                            },
+                                            "9263488742": {
+                                                "outputs": {},
+                                                "status": SUCCESS,
+                                            },
                                         },
                                     },
                                 },
-                            }
+                            },
+                            "status": SUCCESS,
                         },
-                    }
+                    },
                 }
             },
         }
@@ -757,71 +886,90 @@ def test_workflow_exec_foreach_get_inside(test_path):
         rs = workflow.execute(params={})
         assert rs.status == SUCCESS
         assert rs.context == {
+            "status": SUCCESS,
             "params": {},
             "jobs": {
                 "transform": {
+                    "status": SUCCESS,
                     "stages": {
-                        "get-items": {"outputs": {"items": [1, 2, 3, 4]}},
-                        "create-variable": {"outputs": {"foo": "bar"}},
+                        "get-items": {
+                            "outputs": {"items": [1, 2, 3, 4]},
+                            "status": SUCCESS,
+                        },
+                        "create-variable": {
+                            "outputs": {"foo": "bar"},
+                            "status": SUCCESS,
+                        },
                         "foreach-stage": {
                             "outputs": {
                                 "items": [1, 2, 3, 4],
                                 "foreach": {
                                     1: {
+                                        "status": SUCCESS,
                                         "item": 1,
                                         "stages": {
                                             "prepare-variable": {
-                                                "outputs": {"foo": "baz1"}
+                                                "outputs": {"foo": "baz1"},
+                                                "status": SUCCESS,
                                             },
                                             "9263488742": {
                                                 "outputs": {},
-                                                "skipped": True,
+                                                "status": SKIP,
                                             },
                                         },
                                     },
                                     2: {
+                                        "status": SUCCESS,
                                         "item": 2,
                                         "stages": {
                                             "prepare-variable": {
-                                                "outputs": {"foo": "baz2"}
+                                                "outputs": {"foo": "baz2"},
+                                                "status": SUCCESS,
                                             },
                                             "9263488742": {
                                                 "outputs": {},
-                                                "skipped": True,
+                                                "status": SKIP,
                                             },
                                         },
                                     },
                                     3: {
+                                        "status": SUCCESS,
                                         "item": 3,
                                         "stages": {
                                             "prepare-variable": {
-                                                "outputs": {"foo": "baz3"}
+                                                "outputs": {"foo": "baz3"},
+                                                "status": SUCCESS,
                                             },
                                             "9263488742": {
                                                 "outputs": {},
-                                                "skipped": True,
+                                                "status": SKIP,
                                             },
                                         },
                                     },
                                     4: {
+                                        "status": SUCCESS,
                                         "item": 4,
                                         "stages": {
                                             "prepare-variable": {
-                                                "outputs": {"foo": "baz4"}
+                                                "outputs": {"foo": "baz4"},
+                                                "status": SUCCESS,
                                             },
-                                            "9263488742": {"outputs": {}},
+                                            "9263488742": {
+                                                "outputs": {},
+                                                "status": SUCCESS,
+                                            },
                                         },
                                     },
                                 },
-                            }
+                            },
+                            "status": SUCCESS,
                         },
-                    }
+                    },
                 }
             },
         }
 
 
-@mock.patch.object(Config, "stage_raise_error", False)
 def test_workflow_exec_raise_param(test_path):
     with dump_yaml_context(
         test_path / "conf/demo/01_99_wf_test_wf_exec_raise_param.yml",
@@ -846,42 +994,37 @@ def test_workflow_exec_raise_param(test_path):
     ):
         rs: Result = Workflow.from_conf(
             "tmp-wf-exec-raise-param",
-            extras={"stage_raise_error": False},
         ).execute(params={"stream": "demo-stream"}, max_job_parallel=1)
         assert rs.status == FAILED
         assert rs.context == {
+            "status": FAILED,
+            "errors": {
+                "name": "WorkflowError",
+                "message": "Job execution, 'start-job', was failed.",
+            },
             "params": {"stream": "demo-stream"},
             "jobs": {
                 "start-job": {
+                    "status": FAILED,
                     "stages": {
                         "get-param": {
                             "outputs": {},
                             "errors": {
                                 "name": "UtilError",
-                                "message": (
-                                    "Parameters does not get dot with caller: "
-                                    "'params.name'."
-                                ),
+                                "message": "Parameters does not get dot with caller: 'params.name'.",
                             },
+                            "status": FAILED,
                         }
                     },
                     "errors": {
                         "name": "JobError",
-                        "message": (
-                            "Strategy break because stage, 'get-param', "
-                            "return `FAILED` status."
-                        ),
+                        "message": "Strategy execution was break because its nested-stage, 'get-param', failed.",
                     },
                 }
-            },
-            "errors": {
-                "message": "Job, 'start-job', return `FAILED` status.",
-                "name": "WorkflowError",
             },
         }
 
 
-@mock.patch.object(Config, "stage_raise_error", False)
 def test_workflow_exec_raise_job_trigger(test_path):
     with dump_yaml_context(
         test_path / "conf/demo/01_99_wf_test_wf_exec_raise_job_trigger.yml",
@@ -913,34 +1056,29 @@ def test_workflow_exec_raise_job_trigger(test_path):
         )
         assert rs.status == FAILED
         assert rs.context == {
+            "status": FAILED,
+            "errors": {
+                "name": "WorkflowError",
+                "message": "Validate job trigger rule was failed with 'all_success'.",
+            },
             "params": {"stream": "demo-stream"},
             "jobs": {
                 "start-job": {
+                    "status": FAILED,
                     "stages": {
                         "get-param": {
                             "outputs": {},
                             "errors": {
                                 "name": "UtilError",
-                                "message": (
-                                    "Parameters does not get dot with caller: "
-                                    "'params.name'."
-                                ),
+                                "message": "Parameters does not get dot with caller: 'params.name'.",
                             },
-                        },
+                            "status": FAILED,
+                        }
                     },
                     "errors": {
                         "name": "JobError",
-                        "message": (
-                            "Strategy break because stage, 'get-param', "
-                            "return `FAILED` status."
-                        ),
+                        "message": "Strategy execution was break because its nested-stage, 'get-param', failed.",
                     },
-                },
-            },
-            "errors": {
-                "name": "WorkflowError",
-                "message": (
-                    "Validate job trigger rule was failed with 'all_success'."
-                ),
+                }
             },
         }

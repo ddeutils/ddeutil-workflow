@@ -1,6 +1,5 @@
-from ddeutil.workflow import Workflow
+from ddeutil.workflow import FAILED, SUCCESS, Result, Workflow
 from ddeutil.workflow.job import Job
-from ddeutil.workflow.result import FAILED, Result
 
 
 def test_workflow_execute_job():
@@ -19,12 +18,18 @@ def test_workflow_execute_job():
     )
     workflow: Workflow = Workflow(name="workflow", jobs={"demo-run": job})
     rs: Result = workflow.execute_job(job=workflow.job("demo-run"), params={})
+    assert rs.status == SUCCESS
     assert rs.context == {
+        "status": SUCCESS,
         "jobs": {
             "demo-run": {
+                "status": SUCCESS,
                 "stages": {
-                    "9371661540": {"outputs": {"var": "Foo", "echo": "echo"}},
-                    "3008506540": {"outputs": {}},
+                    "9371661540": {
+                        "outputs": {"var": "Foo", "echo": "echo"},
+                        "status": SUCCESS,
+                    },
+                    "3008506540": {"outputs": {}, "status": SUCCESS},
                 },
             },
         },
@@ -38,24 +43,34 @@ def test_workflow_execute_job_raise_inside():
         ],
     )
     workflow: Workflow = Workflow(name="workflow", jobs={"demo-run": job})
-
     rs: Result = workflow.execute_job(job=workflow.job("demo-run"), params={})
     assert rs.status == FAILED
     assert rs.context == {
+        "status": FAILED,
         "errors": {
             "name": "WorkflowError",
-            "message": "Job, 'demo-run', return `FAILED` status.",
+            "message": "Job execution, 'demo-run', was failed.",
         },
         "jobs": {
             "demo-run": {
-                "stages": {},
+                "status": FAILED,
+                "stages": {
+                    "9722867994": {
+                        "status": FAILED,
+                        "outputs": {},
+                        "errors": {
+                            "name": "NotImplementedError",
+                            "message": "",
+                        },
+                    }
+                },
                 "errors": {
                     "name": "JobError",
                     "message": (
-                        "Handler Error: StageError: PyStage: "
-                        "NotImplementedError: "
+                        "Strategy execution was break because its "
+                        "nested-stage, 'raise error', failed."
                     ),
                 },
-            },
+            }
         },
     }

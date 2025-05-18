@@ -15,83 +15,69 @@ from ddeutil.workflow.reusables import tag
 from pydantic import BaseModel
 
 
-@tag("polars-dir", alias="el-csv-to-parquet")
-def dummy_task_polars_dir(
+@tag("demo", alias="simple-task")
+def simple_task(
     source: str,
     sink: str,
     result: Result,
     conversion: Optional[dict[str, Any]] = None,
 ) -> dict[str, int]:
-    result.trace.info("[CALLER]: el-csv-to-parquet@polars-dir")
-    result.trace.debug(
-        "[CALLER]: ... Start EL for CSV to Parquet with Polars Engine"
-    )
-    result.trace.debug(f"[CALLER]: ... Reading data from {source}")
-
+    """Simple Task function."""
+    result.trace.info("[CALLER]: Start Simple Task")
     conversion: dict[str, Any] = conversion or {}
-    if conversion:
-        result.trace.debug("[CALLER]: ... Start Schema Conversion ...")
-    result.trace.debug(f"[CALLER]: ... Writing data to {sink}")
+    result.trace.info(
+        f"Information||>source: {source}||>sink: {sink}||"
+        f">conversion: {conversion}"
+    )
     return {"records": 1}
 
 
-@tag("polars-dir", alias="async-el-csv-to-parquet")
-async def dummy_async_task_polars_dir(
+@tag("demo", alias="simple-csv-task")
+def simple_csv_task(
     source: str,
     sink: str,
     result: Result,
-    conversion: dict[str, Any] | None = None,
+    conversion: Optional[dict[str, Any]] = None,
 ) -> dict[str, int]:
-    result.trace.info("[CALLER]: async-el-csv-to-parquet@polars-dir")
-    result.trace.debug(
-        "[CALLER]: ... Start EL for CSV to Parquet with Polars Engine"
+    """Simple Task function."""
+    result.trace.info("[CALLER]: Start Simple CSV Task")
+    conversion: dict[str, Any] = conversion or {}
+    result.trace.info(
+        f"Information||>source: {source}||>sink: {sink}||"
+        f">conversion: {conversion}"
     )
-    result.trace.debug(f"[CALLER]: ... Reading data from {source}")
+    return {"records": 1}
 
+
+@tag("demo", alias="simple-task-async")
+async def simple_task_async(
+    source: str,
+    sink: str,
+    result: Result,
+    conversion: Optional[dict[str, Any]] = None,
+) -> dict[str, int]:
+    result.trace.info("[CALLER]: Start Simple Task with Async")
     await asyncio.sleep(0.1)
     conversion: dict[str, Any] = conversion or {}
-    if conversion:
-        result.trace.debug("[CALLER]: ... Start Schema Conversion ...")
-    result.trace.debug(f"[CALLER]: ... Writing data to {sink}")
-    return {"records": 1}
-
-
-@tag("polars-dir-scan", alias="el-csv-to-parquet")
-def dummy_task_polars_dir_scan(
-    source: str,
-    sink: str,
-    result: Result,
-    conversion: Optional[dict[str, Any]] | None = None,
-) -> dict[str, int]:
-    result.trace.info("[CALLER]: el-csv-to-parquet@polars-dir-scan")
-    result.trace.debug(
-        "[CALLER]: ... Start EL for CSV to Parquet with Polars Engine"
+    result.trace.info(
+        f"Information||>source: {source}||>sink: {sink}||"
+        f">conversion: {conversion}"
     )
-    result.trace.debug("... ---||... Reading data from {source}")
-
-    conversion: dict[str, Any] = conversion or {}
-    if conversion:
-        result.trace.debug("[CALLER]: ... Start Schema Conversion ...")
-    result.trace.debug(f"[CALLER]: ... Writing data to {sink}")
     return {"records": 1}
 
 
-@tag("odbc", alias="mssql-proc")
-def dummy_task_odbc_mssql_procedure(_exec: str, params: dict, result: Result):
+@tag("demo", alias="private-args-task")
+def private_args(_exec: str, params: dict[str, Any], result: Result):
     result.trace.info(
         f"Private args: `_exec` receive from `exec` params||"
-        f"with value: {_exec!r}"
+        f"> exec: {_exec!r}"
     )
     return {"exec": _exec, "params": params}
 
 
 @tag("raise", alias="return-type-not-valid")
-def dummy_task_raise_return_type_not_valid():
+def raise_returned_type():
     return True
-
-
-def simple_function():  # pragma: no cov
-    return "bar"
 
 
 @tag("demo", alias="get-items")

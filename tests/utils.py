@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from textwrap import dedent
-from threading import Event, Lock
+from threading import Event, RLock
 from typing import Any, Optional, Union
 from zoneinfo import ZoneInfo
 
@@ -38,7 +38,6 @@ def dotenv_setting() -> None:
             WORKFLOW_CORE_TIMEZONE=Asia/Bangkok
             WORKFLOW_CORE_DEBUG_MODE=true
             WORKFLOW_CORE_STAGE_DEFAULT_ID=true
-            WORKFLOW_CORE_STAGE_RAISE_ERROR=true
             WORKFLOW_CORE_GENERATE_ID_SIMPLE_MODE=true
             WORKFLOW_LOG_TRACE_ENABLE_WRITE=false
             WORKFLOW_LOG_AUDIT_ENABLE_WRITE=true
@@ -107,9 +106,10 @@ class MockEvent(Event):  # pragma: no cov
     def __init__(self, n: int = 1):
         self.n: int = n
         self.counter: int = 0
-        self.lock: Lock = Lock()
+        self.lock: RLock = RLock()
 
     def is_set(self) -> bool:
+        """Check if the counter value is equal to n."""
         with self.lock:
             if self.counter == self.n:
                 return True
@@ -117,11 +117,14 @@ class MockEvent(Event):  # pragma: no cov
             return False
 
     def set(self) -> None:
+        """Set the counter value to n."""
         with self.lock:
             self.counter = self.n
 
-    def clear(self):
-        self.counter = 0
+    def clear(self) -> None:
+        """Clear the counter value to 0."""
+        with self.lock:
+            self.counter = 0
 
     def wait(self, timeout=None):
         raise NotImplementedError(

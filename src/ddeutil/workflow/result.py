@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import field
 from datetime import datetime
-from enum import IntEnum
+from enum import IntEnum, auto
 from typing import Optional, Union
 
 from pydantic import ConfigDict
@@ -19,6 +19,13 @@ from pydantic.dataclasses import dataclass
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
+from . import (
+    JobCancelError,
+    JobError,
+    StageCancelError,
+    StageError,
+    StageSkipError,
+)
 from .__types import DictData
 from .conf import dynamic
 from .errors import ResultError
@@ -31,11 +38,11 @@ class Status(IntEnum):
     Result dataclass object.
     """
 
-    SUCCESS = 0
-    FAILED = 1
-    WAIT = 2
-    SKIP = 3
-    CANCEL = 4
+    SUCCESS = auto()
+    FAILED = auto()
+    WAIT = auto()
+    SKIP = auto()
+    CANCEL = auto()
 
     @property
     def emoji(self) -> str:  # pragma: no cov
@@ -43,7 +50,19 @@ class Status(IntEnum):
 
         :rtype: str
         """
-        return {0: "✅", 1: "❌", 2: "🟡", 3: "⏩", 4: "🚫"}[self.value]
+        return {
+            "SUCCESS": "✅",
+            "FAILED": "❌",
+            "WAIT": "🟡",
+            "SKIP": "⏩",
+            "CANCEL": "🚫",
+        }[self.name]
+
+    def __repr__(self) -> str:
+        return self.name
+
+    def __str__(self) -> str:
+        return self.name
 
 
 SUCCESS = Status.SUCCESS
@@ -51,6 +70,48 @@ FAILED = Status.FAILED
 WAIT = Status.WAIT
 SKIP = Status.SKIP
 CANCEL = Status.CANCEL
+
+
+def validate_statuses(statuses: list[Status]) -> Status:
+    """Validate the final status from list of Status object.
+
+    :param statuses: (list[Status]) A list of status that want to validate the
+        final status.
+
+    :rtype: Status
+    """
+    if any(s == CANCEL for s in statuses):
+        return CANCEL
+    elif any(s == FAILED for s in statuses):
+        return FAILED
+    elif any(s == WAIT for s in statuses):
+        return WAIT
+    for status in (SUCCESS, SKIP):
+        if all(s == status for s in statuses):
+            return status
+    return FAILED if FAILED in statuses else SUCCESS
+
+
+def get_status_from_error(
+    error: Union[
+        StageError,
+        StageCancelError,
+        StageSkipError,
+        JobError,
+        JobCancelError,
+        Exception,
+    ]
+) -> Status:
+    """Get the Status from the error object."""
+    if isinstance(error, StageSkipError):
+        return SKIP
+    elif isinstance(error, (StageCancelError, JobCancelError)):
+        return CANCEL
+    return FAILED
+
+
+def default_context() -> DictData:
+    return {"status": WAIT}
 
 
 @dataclass(
@@ -70,7 +131,7 @@ class Result:
     """
 
     status: Status = field(default=WAIT)
-    context: DictData = field(default_factory=dict)
+    context: DictData = field(default_factory=default_context)
     run_id: Optional[str] = field(default_factory=default_gen_id)
     parent_run_id: Optional[str] = field(default=None, compare=False)
     ts: datetime = field(default_factory=get_dt_tznow, compare=False)
@@ -160,9 +221,13 @@ class Result:
             Status(status) if isinstance(status, int) else status
         )
         self.__dict__["context"].update(context or {})
+        self.__dict__["context"]["status"] = self.status
         if kwargs:
             for k in kwargs:
                 if k in self.__dict__["context"]:
+                    self.__dict__["context"][k].update(kwargs[k])
+                # NOTE: Exclude the `info` key for update information data.
+                elif k == "info":
                     self.__dict__["context"][k].update(kwargs[k])
                 else:
                     raise ResultError(

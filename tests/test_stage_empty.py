@@ -11,6 +11,7 @@ def test_empty_stage():
     )
     assert stage.iden == "Empty Stage"
     assert stage == EmptyStage(name="Empty Stage", echo="hello world")
+    assert not stage.is_nested
 
     # NOTE: Copy the stage model with adding the id field.
     new_stage: Stage = stage.model_copy(update={"id": "stage-empty"})
@@ -24,29 +25,41 @@ def test_empty_stage():
     assert stage.id == "dummy"
     assert stage.iden == "dummy"
 
+    stage: Stage = EmptyStage.model_validate(
+        {"name": "Empty Stage", "desc": "\nThis is a test stage\n\tnewline"},
+    )
+    assert stage.desc == "This is a test stage\n\tnewline"
+
 
 def test_empty_stage_execute():
     stage: EmptyStage = EmptyStage(name="Empty Stage", echo="hello world")
     rs: Result = stage.handler_execute(params={})
     assert rs.status == SUCCESS
-    assert rs.context == {}
+    assert rs.context == {"status": SUCCESS}
 
     stage: EmptyStage = EmptyStage(
         name="Empty Stage", echo="hello world\nand this is newline to echo"
     )
     rs: Result = stage.handler_execute(params={})
     assert rs.status == SUCCESS
-    assert rs.context == {}
+    assert rs.context == {"status": SUCCESS}
 
     stage: EmptyStage = EmptyStage(name="Empty Stage")
     rs: Result = stage.handler_execute(params={})
     assert rs.status == SUCCESS
-    assert rs.context == {}
+    assert rs.context == {"status": SUCCESS}
 
     stage: EmptyStage = EmptyStage(name="Empty Stage", sleep=5.1)
     rs: Result = stage.handler_execute(params={})
     assert rs.status == SUCCESS
-    assert rs.context == {}
+    assert rs.context == {"status": SUCCESS}
+
+    stage: Stage = EmptyStage.model_validate(
+        {"name": "Empty Stage", "desc": "\nThis is a test stage\n\tnewline"},
+    )
+    rs: Result = stage.handler_execute(params={})
+    assert rs.status == SUCCESS
+    assert rs.context == {"status": SUCCESS}
 
 
 def test_empty_stage_raise():
@@ -71,7 +84,7 @@ def test_empty_stage_raise():
         )
 
 
-def test_stage_if_condition():
+def test_empty_stage_if_condition():
     stage: EmptyStage = EmptyStage.model_validate(
         {
             "name": "If Condition",
@@ -95,7 +108,7 @@ def test_stage_if_condition():
         stage.is_skipped({"params": {"name": "foo"}})
 
 
-def test_stage_get_outputs():
+def test_empty_stage_get_outputs():
     stage: Stage = EmptyStage.model_validate(
         {"name": "Empty Stage", "echo": "hello world"}
     )
@@ -115,3 +128,35 @@ def test_stage_get_outputs():
         {"id": "first-stage", "name": "Empty Stage", "echo": "hello world"}
     )
     assert stage.get_outputs(outputs) == {"foo": "bar"}
+
+
+@pytest.mark.asyncio
+async def test_empty_stage_axec():
+    stage: EmptyStage = EmptyStage(name="Empty Stage")
+    rs: Result = await stage.handler_axecute(params={})
+    assert rs.status == SUCCESS
+    assert rs.context == {"status": SUCCESS}
+
+    stage: EmptyStage = EmptyStage(name="Empty Stage", echo="hello world")
+    rs: Result = await stage.handler_axecute(params={})
+    assert rs.status == SUCCESS
+    assert rs.context == {"status": SUCCESS}
+
+    stage: EmptyStage = EmptyStage(
+        name="Empty Stage", echo="hello world", sleep=5.01
+    )
+    rs: Result = await stage.handler_axecute(params={})
+    assert rs.status == SUCCESS
+    assert rs.context == {"status": SUCCESS}
+
+    stage: EmptyStage = EmptyStage(
+        name="Empty Stage",
+        echo=(
+            "Hello World\nThis is the newline message.\nI want to test newline "
+            "string doing well."
+        ),
+        sleep=0.01,
+    )
+    rs: Result = await stage.handler_axecute(params={})
+    assert rs.status == SUCCESS
+    assert rs.context == {"status": SUCCESS}

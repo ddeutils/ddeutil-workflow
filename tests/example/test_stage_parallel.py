@@ -34,11 +34,14 @@ def test_parallel_stage_exec_with_trigger(test_path):
     ):
         workflow = Workflow.from_conf("tmp-wf-parallel-trigger")
         stage: Stage = workflow.job("first-job").stage("parallel-stage")
-        rs = stage.handler_execute({})
+        rs = stage.handler_execute(params={})
         assert rs.status == SUCCESS
         assert rs.context == {
+            "status": SUCCESS,
+            "workers": 2,
             "parallel": {
                 "trigger-branch": {
+                    "status": SUCCESS,
                     "branch": "trigger-branch",
                     "stages": {
                         "8713259197": {
@@ -46,14 +49,21 @@ def test_parallel_stage_exec_with_trigger(test_path):
                                 "params": {"branch": "trigger-branch"},
                                 "jobs": {
                                     "first-job": {
-                                        "stages": {"hello": {"outputs": {}}}
+                                        "status": SUCCESS,
+                                        "stages": {
+                                            "hello": {
+                                                "outputs": {},
+                                                "status": SUCCESS,
+                                            }
+                                        },
                                     }
                                 },
-                            }
+                            },
+                            "status": SUCCESS,
                         }
                     },
                 }
-            }
+            },
         }
 
 
@@ -98,32 +108,55 @@ def test_parallel_stage_exec_with_trigger_raise(test_path):
         rs: Result = stage.handler_execute({})
         assert rs.status == FAILED
         assert rs.context == {
+            "status": FAILED,
+            "workers": 2,
             "parallel": {
-                "branch01": {
-                    "branch": "branch01",
-                    "stages": {},
+                "branch02": {
+                    "status": FAILED,
+                    "branch": "branch02",
+                    "stages": {
+                        "7741720823": {"outputs": {}, "status": SUCCESS},
+                        "6966382767": {
+                            "outputs": {},
+                            "errors": {
+                                "name": "StageError",
+                                "message": "Raise with branch: branch02",
+                            },
+                            "status": FAILED,
+                        },
+                    },
                     "errors": {
                         "name": "StageError",
-                        "message": "Trigger workflow return `FAILED` status with:\nJob, 'first-job', return `FAILED` status.",
+                        "message": "Branch execution was break because its nested-stage, 'Raise Stage', failed.",
                     },
                 },
-                "branch02": {
-                    "branch": "branch02",
-                    "stages": {"7741720823": {"outputs": {}}},
+                "branch01": {
+                    "status": FAILED,
+                    "branch": "branch01",
+                    "stages": {
+                        "8713259197": {
+                            "outputs": {},
+                            "errors": {
+                                "name": "StageError",
+                                "message": "Trigger workflow was failed with:\nJob execution, 'first-job', was failed.",
+                            },
+                            "status": FAILED,
+                        }
+                    },
                     "errors": {
                         "name": "StageError",
-                        "message": "Raise with branch: branch02",
+                        "message": "Branch execution was break because its nested-stage, 'Stage trigger', failed.",
                     },
                 },
             },
             "errors": {
-                "branch01": {
-                    "name": "StageError",
-                    "message": "Trigger workflow return `FAILED` status with:\nJob, 'first-job', return `FAILED` status.",
-                },
                 "branch02": {
                     "name": "StageError",
-                    "message": "Raise with branch: branch02",
+                    "message": "Branch execution was break because its nested-stage, 'Raise Stage', failed.",
+                },
+                "branch01": {
+                    "name": "StageError",
+                    "message": "Branch execution was break because its nested-stage, 'Stage trigger', failed.",
                 },
             },
         }
@@ -170,44 +203,54 @@ def test_parallel_stage_exec_with_trigger_raise_bug(test_path):
         rs: Result = stage.handler_execute({})
         assert rs.status == FAILED
         assert rs.context == {
+            "status": FAILED,
+            "workers": 2,
             "parallel": {
-                "branch02": {
-                    "branch": "branch02",
-                    "stages": {},
+                "branch01": {
+                    "status": FAILED,
+                    "branch": "branch01",
+                    "stages": {
+                        "2579951921": {
+                            "outputs": {},
+                            "errors": {
+                                "name": "StageError",
+                                "message": "Trigger workflow was failed with:\nJob execution, 'first-job', was failed.",
+                            },
+                            "status": FAILED,
+                        }
+                    },
                     "errors": {
                         "name": "StageError",
-                        "message": (
-                            "Trigger workflow return `FAILED` status with:\n"
-                            "Job, 'first-job', return `FAILED` status."
-                        ),
+                        "message": "Branch execution was break because its nested-stage, 'Stage trigger 1', failed.",
                     },
                 },
-                "branch01": {
-                    "branch": "branch01",
-                    "stages": {},
+                "branch02": {
+                    "status": FAILED,
+                    "branch": "branch02",
+                    "stages": {
+                        "4773288548": {
+                            "outputs": {},
+                            "errors": {
+                                "name": "StageError",
+                                "message": "Trigger workflow was failed with:\nJob execution, 'first-job', was failed.",
+                            },
+                            "status": FAILED,
+                        }
+                    },
                     "errors": {
                         "name": "StageError",
-                        "message": (
-                            "Trigger workflow return `FAILED` status with:\n"
-                            "Job, 'first-job', return `FAILED` status."
-                        ),
+                        "message": "Branch execution was break because its nested-stage, 'Stage trigger 2', failed.",
                     },
                 },
             },
             "errors": {
-                "branch02": {
-                    "name": "StageError",
-                    "message": (
-                        "Trigger workflow return `FAILED` status with:\n"
-                        "Job, 'first-job', return `FAILED` status."
-                    ),
-                },
                 "branch01": {
                     "name": "StageError",
-                    "message": (
-                        "Trigger workflow return `FAILED` status with:\n"
-                        "Job, 'first-job', return `FAILED` status."
-                    ),
+                    "message": "Branch execution was break because its nested-stage, 'Stage trigger 1', failed.",
+                },
+                "branch02": {
+                    "name": "StageError",
+                    "message": "Branch execution was break because its nested-stage, 'Stage trigger 2', failed.",
                 },
             },
         }

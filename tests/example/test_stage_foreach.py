@@ -1,4 +1,4 @@
-from ddeutil.workflow import SUCCESS, Result, Stage, Workflow
+from ddeutil.workflow import CANCEL, FAILED, SUCCESS, Result, Stage, Workflow
 
 from ..utils import dump_yaml_context
 
@@ -38,19 +38,26 @@ def test_foreach_stage_exec_with_trigger(test_path):
         assert rs == {
             "stages": {
                 "foreach-stage": {
+                    "status": SUCCESS,
                     "outputs": {
                         "items": [1, 2],
                         "foreach": {
                             1: {
+                                "status": SUCCESS,
                                 "item": 1,
                                 "stages": {
                                     "8713259197": {
+                                        "status": SUCCESS,
                                         "outputs": {
                                             "params": {"item": 1},
                                             "jobs": {
                                                 "first-job": {
+                                                    "status": SUCCESS,
                                                     "stages": {
-                                                        "hello": {"outputs": {}}
+                                                        "hello": {
+                                                            "status": SUCCESS,
+                                                            "outputs": {},
+                                                        }
                                                     },
                                                 },
                                             },
@@ -59,15 +66,21 @@ def test_foreach_stage_exec_with_trigger(test_path):
                                 },
                             },
                             2: {
+                                "status": SUCCESS,
                                 "item": 2,
                                 "stages": {
                                     "8713259197": {
+                                        "status": SUCCESS,
                                         "outputs": {
                                             "params": {"item": 2},
                                             "jobs": {
                                                 "first-job": {
+                                                    "status": SUCCESS,
                                                     "stages": {
-                                                        "hello": {"outputs": {}}
+                                                        "hello": {
+                                                            "status": SUCCESS,
+                                                            "outputs": {},
+                                                        }
                                                     },
                                                 },
                                             },
@@ -114,43 +127,59 @@ def test_foreach_stage_exec_with_trigger_raise(test_path):
     ):
         workflow = Workflow.from_conf(name="tmp-wf-foreach-trigger-raise")
         stage: Stage = workflow.job("first-job").stage("foreach-raise")
-        rs = stage.set_outputs(stage.handler_execute({}).context, to={})
-        assert rs == {
-            "stages": {
-                "foreach-raise": {
-                    "outputs": {
-                        "items": [1, 2],
-                        "foreach": {
-                            1: {
-                                "item": 1,
-                                "stages": {},
-                                "errors": {
-                                    "name": "StageError",
-                                    "message": "Trigger workflow return `FAILED` status with:\nJob, 'first-job', return `FAILED` status.",
-                                },
+        rs: Result = stage.handler_execute({})
+        assert rs.status == FAILED
+        assert rs.context == {
+            "status": FAILED,
+            "items": [1, 2],
+            "foreach": {
+                1: {
+                    "status": FAILED,
+                    "item": 1,
+                    "stages": {
+                        "2827845371": {
+                            "outputs": {},
+                            "errors": {
+                                "name": "StageError",
+                                "message": "Trigger workflow was failed with:\nJob execution, 'first-job', was failed.",
                             },
-                            2: {
-                                "item": 2,
-                                "stages": {},
-                                "errors": {
-                                    "name": "StageError",
-                                    "message": "Trigger workflow return `FAILED` status with:\nWorkflow job was canceled because event was set.",
-                                },
-                            },
-                        },
+                            "status": FAILED,
+                        }
                     },
                     "errors": {
-                        1: {
-                            "name": "StageError",
-                            "message": "Trigger workflow return `FAILED` status with:\nJob, 'first-job', return `FAILED` status.",
-                        },
-                        2: {
-                            "name": "StageError",
-                            "message": "Trigger workflow return `FAILED` status with:\nWorkflow job was canceled because event was set.",
-                        },
+                        "name": "StageError",
+                        "message": "Item execution was break because its nested-stage, 'Stage trigger for raise', failed.",
                     },
-                }
-            }
+                },
+                2: {
+                    "status": CANCEL,
+                    "item": 2,
+                    "stages": {
+                        "2827845371": {
+                            "outputs": {},
+                            "errors": {
+                                "name": "StageCancelError",
+                                "message": "Trigger workflow was cancel.",
+                            },
+                            "status": CANCEL,
+                        }
+                    },
+                    "errors": {
+                        "name": "StageCancelError",
+                        "message": "Item execution was canceled from the event after end item execution.",
+                    },
+                },
+            },
+            "errors": {
+                1: {
+                    "name": "StageError",
+                    "message": "Item execution was break because its nested-stage, 'Stage trigger for raise', failed.",
+                },
+                2: {
+                    "name": "StageCancelError",
+                    "message": "Item execution was canceled from the event after end item execution.",
+                },
+            },
         }
 
 
@@ -200,9 +229,11 @@ def test_foreach_stage_exec_nested_foreach_and_trigger(test_path):
         rs: Result = stage.handler_execute({})
         assert rs.status == SUCCESS
         assert rs.context == {
+            "status": SUCCESS,
             "items": [1, 2],
             "foreach": {
                 1: {
+                    "status": SUCCESS,
                     "item": 1,
                     "stages": {
                         "foreach-nested": {
@@ -210,6 +241,7 @@ def test_foreach_stage_exec_nested_foreach_and_trigger(test_path):
                                 "items": [3, 4],
                                 "foreach": {
                                     3: {
+                                        "status": SUCCESS,
                                         "item": 3,
                                         "stages": {
                                             "trigger-stage": {
@@ -217,18 +249,22 @@ def test_foreach_stage_exec_nested_foreach_and_trigger(test_path):
                                                     "params": {"item": 3},
                                                     "jobs": {
                                                         "first-job": {
+                                                            "status": SUCCESS,
                                                             "stages": {
                                                                 "hello": {
-                                                                    "outputs": {}
+                                                                    "outputs": {},
+                                                                    "status": SUCCESS,
                                                                 }
-                                                            }
+                                                            },
                                                         }
                                                     },
-                                                }
+                                                },
+                                                "status": SUCCESS,
                                             }
                                         },
                                     },
                                     4: {
+                                        "status": SUCCESS,
                                         "item": 4,
                                         "stages": {
                                             "trigger-stage": {
@@ -236,23 +272,28 @@ def test_foreach_stage_exec_nested_foreach_and_trigger(test_path):
                                                     "params": {"item": 4},
                                                     "jobs": {
                                                         "first-job": {
+                                                            "status": SUCCESS,
                                                             "stages": {
                                                                 "hello": {
-                                                                    "outputs": {}
+                                                                    "outputs": {},
+                                                                    "status": SUCCESS,
                                                                 }
-                                                            }
+                                                            },
                                                         }
                                                     },
-                                                }
+                                                },
+                                                "status": SUCCESS,
                                             }
                                         },
                                     },
                                 },
-                            }
+                            },
+                            "status": SUCCESS,
                         }
                     },
                 },
                 2: {
+                    "status": SUCCESS,
                     "item": 2,
                     "stages": {
                         "foreach-nested": {
@@ -260,6 +301,7 @@ def test_foreach_stage_exec_nested_foreach_and_trigger(test_path):
                                 "items": [3, 4],
                                 "foreach": {
                                     3: {
+                                        "status": SUCCESS,
                                         "item": 3,
                                         "stages": {
                                             "trigger-stage": {
@@ -267,18 +309,22 @@ def test_foreach_stage_exec_nested_foreach_and_trigger(test_path):
                                                     "params": {"item": 3},
                                                     "jobs": {
                                                         "first-job": {
+                                                            "status": SUCCESS,
                                                             "stages": {
                                                                 "hello": {
-                                                                    "outputs": {}
+                                                                    "outputs": {},
+                                                                    "status": SUCCESS,
                                                                 }
-                                                            }
+                                                            },
                                                         }
                                                     },
-                                                }
+                                                },
+                                                "status": SUCCESS,
                                             }
                                         },
                                     },
                                     4: {
+                                        "status": SUCCESS,
                                         "item": 4,
                                         "stages": {
                                             "trigger-stage": {
@@ -286,19 +332,23 @@ def test_foreach_stage_exec_nested_foreach_and_trigger(test_path):
                                                     "params": {"item": 4},
                                                     "jobs": {
                                                         "first-job": {
+                                                            "status": SUCCESS,
                                                             "stages": {
                                                                 "hello": {
-                                                                    "outputs": {}
+                                                                    "outputs": {},
+                                                                    "status": SUCCESS,
                                                                 }
-                                                            }
+                                                            },
                                                         }
                                                     },
-                                                }
+                                                },
+                                                "status": SUCCESS,
                                             }
                                         },
                                     },
                                 },
-                            }
+                            },
+                            "status": SUCCESS,
                         }
                     },
                 },

@@ -3,8 +3,7 @@ from datetime import datetime
 from ddeutil.workflow.conf import config
 from ddeutil.workflow.result import SUCCESS, Result
 from ddeutil.workflow.workflow import (
-    Release,
-    ReleaseType,
+    NORMAL,
     Workflow,
 )
 
@@ -24,23 +23,31 @@ def test_workflow_release():
             "extra": {"enable_write_audit": False},
         }
     )
-    release: Release = Release.from_dt(datetime.now())
+    release: datetime = datetime.now().replace(second=0, microsecond=0)
     rs: Result = workflow.release(
         release=release,
         params={"asat-dt": datetime(2024, 10, 1)},
     )
     assert rs.status == SUCCESS
     assert rs.context == {
+        "status": SUCCESS,
         "params": {"asat-dt": datetime(2024, 10, 1, 0, 0)},
         "release": {
-            "type": ReleaseType.DEFAULT,
-            "logical_date": release.date,
+            "type": NORMAL,
+            "logical_date": release,
         },
         "jobs": {
             "first-job": {
+                "status": SUCCESS,
                 "stages": {
-                    "first-stage": {"outputs": {}},
-                    "second-stage": {"outputs": {}},
+                    "first-stage": {
+                        "outputs": {},
+                        "status": SUCCESS,
+                    },
+                    "second-stage": {
+                        "outputs": {},
+                        "status": SUCCESS,
+                    },
                 },
             },
         },
@@ -69,16 +76,24 @@ def test_workflow_release_with_datetime():
     )
     assert rs.status == SUCCESS
     assert rs.context == {
+        "status": SUCCESS,
         "params": {"asat-dt": datetime(2024, 10, 1, 0, 0)},
         "release": {
-            "type": ReleaseType.DEFAULT,
+            "type": NORMAL,
             "logical_date": dt.replace(tzinfo=None),
         },
         "jobs": {
             "first-job": {
+                "status": SUCCESS,
                 "stages": {
-                    "first-stage": {"outputs": {}},
-                    "second-stage": {"outputs": {}},
+                    "first-stage": {
+                        "outputs": {},
+                        "status": SUCCESS,
+                    },
+                    "second-stage": {
+                        "outputs": {},
+                        "status": SUCCESS,
+                    },
                 },
             },
         },

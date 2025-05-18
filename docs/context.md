@@ -114,6 +114,7 @@ it will return result be;
   "params": {"key": "value"},
   "stages": {
     "<stage-id>": {
+      "status": "0",
       "outputs": {"result": "100"},
       "errors": {
         "name": "class-name",
