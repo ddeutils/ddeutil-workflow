@@ -91,10 +91,10 @@ the base deps.
 If you want to install this package with application add-ons, you should add
 `app` in installation;
 
-| Use-case       | Install Optional         | Support |
-|----------------|--------------------------|:-------:|
-| Python         | `ddeutil-workflow`       |    ✅    |
-| FastAPI Server | `ddeutil-workflow[api]`  |    ✅    |
+| Use-case       | Install Optional        | Support |
+|----------------|-------------------------|:-------:|
+| Python         | `ddeutil-workflow`      |    ✅    |
+| FastAPI Server | `ddeutil-workflow[all]` |    ✅    |
 
 ## 🎯 Usage
 
