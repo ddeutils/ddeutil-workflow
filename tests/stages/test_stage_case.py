@@ -1,6 +1,7 @@
 from ddeutil.workflow import CANCEL, FAILED, SKIP, SUCCESS, Result
 from ddeutil.workflow.stages import CaseStage, Stage
-from utils import MockEvent
+
+from ..utils import MockEvent
 
 
 def test_case_stage_exec(test_path):

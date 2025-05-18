@@ -31,7 +31,7 @@ from pydantic import BaseModel, Field, ValidationInfo
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
-from . import WorkflowSkipError, get_status_from_error
+from . import get_status_from_error
 from .__types import DictData
 from .conf import FileLoad, Loader, dynamic
 from .errors import WorkflowCancelError, WorkflowError, WorkflowTimeoutError
@@ -479,7 +479,7 @@ class Workflow(BaseModel):
         *,
         result: Optional[Result] = None,
         event: Optional[Event] = None,
-    ) -> Result:
+    ) -> tuple[Status, Result]:
         """Job execution with passing dynamic parameters from the main workflow
         execution to the target job object via job's ID.
 
@@ -505,13 +505,12 @@ class Workflow(BaseModel):
                 "Job execution was canceled because the event was set "
                 "before start job execution."
             )
-            result.catch(
+            return CANCEL, result.catch(
                 status=CANCEL,
                 context={
                     "errors": WorkflowCancelError(error_msg).to_dict(),
                 },
             )
-            raise WorkflowCancelError(error_msg)
 
         result.trace.info(f"[WORKFLOW]: Execute Job: {job.id!r}")
         rs: Result = job.execute(
@@ -524,33 +523,28 @@ class Workflow(BaseModel):
 
         if rs.status == FAILED:
             error_msg: str = f"Job execution, {job.id!r}, was failed."
-            result.catch(
+            return FAILED, result.catch(
                 status=FAILED,
                 context={
                     "errors": WorkflowError(error_msg).to_dict(),
                     **params,
                 },
             )
-            raise WorkflowError(error_msg)
 
         elif rs.status == CANCEL:
             error_msg: str = (
                 f"Job execution, {job.id!r}, was canceled from the event after "
                 f"end job execution."
             )
-            result.catch(
+            return CANCEL, result.catch(
                 status=CANCEL,
                 context={
                     "errors": WorkflowCancelError(error_msg).to_dict(),
                     **params,
                 },
             )
-            raise WorkflowCancelError(error_msg)
 
-        result.catch(status=rs.status, context=params)
-        if rs.status == SKIP:
-            raise WorkflowSkipError(f"Job execution, {job.id!r}, was skipped")
-        return result
+        return rs.status, result.catch(status=rs.status, context=params)
 
     def execute(
         self,
@@ -710,8 +704,8 @@ class Workflow(BaseModel):
                     if e := future.exception():
                         sequence_statuses.append(get_status_from_error(e))
                     else:
-                        rs: Result = future.result()
-                        sequence_statuses.append(rs.status)
+                        st, _ = future.result()
+                        sequence_statuses.append(st)
                     job_queue.put(job_id)
                 elif future.cancelled():
                     sequence_statuses.append(CANCEL)
@@ -734,7 +728,7 @@ class Workflow(BaseModel):
                 total_future: int = 0
                 for i, future in enumerate(as_completed(futures), start=0):
                     try:
-                        statuses[i] = future.result().status
+                        statuses[i], _ = future.result()
                     except WorkflowError as e:
                         statuses[i] = get_status_from_error(e)
                     total_future += 1

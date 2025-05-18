@@ -1598,7 +1598,7 @@ class ParallelStage(BaseNestedStage):
         result: Result,
         *,
         event: Optional[Event] = None,
-    ) -> Result:
+    ) -> tuple[Status, Result]:
         """Execute branch that will execute all nested-stage that was set in
         this stage with specific branch ID.
 
@@ -1611,7 +1611,7 @@ class ParallelStage(BaseNestedStage):
 
         :raise StageCancelError: If event was set.
 
-        :rtype: Result
+        :rtype: tuple[Status, Result]
         """
         result.trace.debug(f"[STAGE]: Execute Branch: {branch!r}")
 
@@ -1701,7 +1701,7 @@ class ParallelStage(BaseNestedStage):
                 raise StageCancelError(error_msg, refs=branch)
 
         status: Status = SKIP if sum(skips) == total_stage else SUCCESS
-        return result.catch(
+        return status, result.catch(
             status=status,
             parallel={
                 branch: {
@@ -1760,7 +1760,7 @@ class ParallelStage(BaseNestedStage):
             statuses: list[Status] = [WAIT] * len_parallel
             for i, future in enumerate(as_completed(futures), start=0):
                 try:
-                    statuses[i] = future.result().status
+                    statuses[i], _ = future.result()
                 except StageError as e:
                     statuses[i] = get_status_from_error(e)
                     self.mark_errors(context, e)
@@ -1827,7 +1827,7 @@ class ForEachStage(BaseNestedStage):
         result: Result,
         *,
         event: Optional[Event] = None,
-    ) -> Result:
+    ) -> tuple[Status, Result]:
         """Execute item that will execute all nested-stage that was set in this
         stage with specific foreach item.
 
@@ -1849,7 +1849,7 @@ class ForEachStage(BaseNestedStage):
         :raise StageError: If the stage execution raise any Exception error.
         :raise StageError: If the result from execution has `FAILED` status.
 
-        :rtype: Result
+        :rtype: tuple[Status, Result]
         """
         result.trace.debug(f"[STAGE]: Execute Item: {item!r}")
         key: StrOrInt = index if self.use_index_as_key else item
@@ -1939,7 +1939,7 @@ class ForEachStage(BaseNestedStage):
                 raise StageCancelError(error_msg, refs=key)
 
         status: Status = SKIP if sum(skips) == total_stage else SUCCESS
-        return result.catch(
+        return status, result.catch(
             status=status,
             foreach={
                 key: {
@@ -2051,7 +2051,7 @@ class ForEachStage(BaseNestedStage):
 
             for i, future in enumerate(done, start=0):
                 try:
-                    statuses[i] = future.result().status
+                    statuses[i], _ = future.result()
                 except StageError as e:
                     statuses[i] = get_status_from_error(e)
                     self.mark_errors(context, e)
@@ -2123,7 +2123,7 @@ class UntilStage(BaseNestedStage):
         params: DictData,
         result: Result,
         event: Optional[Event] = None,
-    ) -> tuple[Result, T]:
+    ) -> tuple[Status, Result, T]:
         """Execute loop that will execute all nested-stage that was set in this
         stage with specific loop and item.
 
@@ -2134,7 +2134,7 @@ class UntilStage(BaseNestedStage):
         :param event: (Event) An Event manager instance that use to cancel this
             execution if it forces stopped by parent execution.
 
-        :rtype: tuple[Result, T]
+        :rtype: tuple[Status, Result, T]
         :return: Return a pair of Result and changed item.
         """
         result.trace.debug(f"[STAGE]: Execute Loop: {loop} (Item {item!r})")
@@ -2234,6 +2234,7 @@ class UntilStage(BaseNestedStage):
 
         status: Status = SKIP if sum(skips) == total_stage else SUCCESS
         return (
+            status,
             result.catch(
                 status=status,
                 until={
@@ -2287,7 +2288,7 @@ class UntilStage(BaseNestedStage):
                     "Execution was canceled from the event before start loop."
                 )
 
-            result, item = self.execute_loop(
+            status, result, item = self.execute_loop(
                 item=item,
                 loop=loop,
                 params=params,
@@ -2320,7 +2321,7 @@ class UntilStage(BaseNestedStage):
                     f": {next_track!r}"
                 )
             until_rs: bool = not next_track
-            statuses.append(result.status)
+            statuses.append(status)
             delay(0.005)
 
         if exceed_loop:

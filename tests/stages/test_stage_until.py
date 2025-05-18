@@ -1,6 +1,7 @@
 from ddeutil.workflow import FAILED, SKIP, SUCCESS, Result, Stage, Workflow
 from ddeutil.workflow.stages import EmptyStage, UntilStage
-from utils import dump_yaml_context
+
+from ..utils import dump_yaml_context
 
 
 def test_until_stage():

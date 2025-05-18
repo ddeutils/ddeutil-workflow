@@ -7,7 +7,8 @@ from ddeutil.workflow import (
     Workflow,
 )
 from ddeutil.workflow.stages import ForEachStage, Stage
-from utils import MockEvent, dump_yaml_context
+
+from ..utils import MockEvent, dump_yaml_context
 
 
 def test_foreach_stage_exec_all_skipped():
@@ -56,6 +57,59 @@ def test_foreach_stage_exec_all_skipped():
                 "stages": {
                     "2709471980": {"outputs": {}, "status": SKIP},
                     "9263488742": {"outputs": {}, "status": SKIP},
+                },
+            },
+        },
+    }
+
+
+def test_foreach_stage_exec_other_skipped():
+    stage: Stage = ForEachStage(
+        name="Start run for-each stage",
+        id="foreach-stage",
+        foreach=[1, 2, 3],
+        concurrent=3,
+        stages=[
+            {
+                "name": "Echo stage",
+                "if": "${{ item }} == 3",
+                "echo": "Start run with item ${{ item }}",
+            },
+            {
+                "name": "Final Echo",
+                "if": "${{ item }} == 3",
+                "echo": "Final stage",
+            },
+        ],
+    )
+    rs: Result = stage.handler_execute(params={})
+    assert rs.status == SUCCESS
+    assert rs.context == {
+        "status": SUCCESS,
+        "items": [1, 2, 3],
+        "foreach": {
+            1: {
+                "status": SKIP,
+                "item": 1,
+                "stages": {
+                    "2709471980": {"outputs": {}, "status": SKIP},
+                    "9263488742": {"outputs": {}, "status": SKIP},
+                },
+            },
+            2: {
+                "status": SKIP,
+                "item": 2,
+                "stages": {
+                    "2709471980": {"outputs": {}, "status": SKIP},
+                    "9263488742": {"outputs": {}, "status": SKIP},
+                },
+            },
+            3: {
+                "status": SUCCESS,
+                "item": 3,
+                "stages": {
+                    "2709471980": {"outputs": {}, "status": SUCCESS},
+                    "9263488742": {"outputs": {}, "status": SUCCESS},
                 },
             },
         },

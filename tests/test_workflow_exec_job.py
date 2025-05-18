@@ -1,5 +1,4 @@
-import pytest
-from ddeutil.workflow import FAILED, SUCCESS, Result, Workflow, WorkflowError
+from ddeutil.workflow import FAILED, SUCCESS, Workflow
 from ddeutil.workflow.job import Job
 
 
@@ -18,7 +17,8 @@ def test_workflow_execute_job():
         ],
     )
     workflow: Workflow = Workflow(name="workflow", jobs={"demo-run": job})
-    rs = workflow.execute_job(job=workflow.job("demo-run"), params={})
+    st, rs = workflow.execute_job(job=workflow.job("demo-run"), params={})
+    assert st == SUCCESS
     assert rs.status == SUCCESS
     assert rs.context == {
         "status": SUCCESS,
@@ -44,9 +44,8 @@ def test_workflow_execute_job_raise_inside():
         ],
     )
     workflow: Workflow = Workflow(name="workflow", jobs={"demo-run": job})
-    rs = Result()
-    with pytest.raises(WorkflowError):
-        workflow.execute_job(job=workflow.job("demo-run"), result=rs, params={})
+    st, rs = workflow.execute_job(job=workflow.job("demo-run"), params={})
+    assert st == FAILED
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,
