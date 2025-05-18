@@ -2,6 +2,32 @@
 
 ## Latest Changes
 
+## 0.0.65
+
+### :sparkles: Features
+
+- :dart: feat: add workflow raise error on job exec.
+- :dart: feat: remove result param from workflow exec.
+- :dart: feat: add return status from workflow job exec method.
+- :dart: feat: revise context and params for more performance and monitoring improvements (#47)
+- :dart: feat: draft caller exception for call stage.
+
+### :bug: Bug fixes
+
+- :gear: fixed: change config on parallel stage.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: add testcase support foreach stage exec concurrent.
+- :art: format: clean and revise job exec on workflow model.
+- :test_tube: tests: update testcase for job exec method on workflow model.
+- :construction: refactored: change exception to error for minimal styled.
+- :test_tube: tests: update testcase for making coverage.
+
+### :broom: Deprecate & Clean
+
+- :recycle: clean: remove workflow poke and task object.
+
 ## 0.0.64
 
 ### :stars: Highlight Features
