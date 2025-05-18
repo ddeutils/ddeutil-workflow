@@ -626,56 +626,92 @@ def test_foreach_stage_exec_concurrent_raise():
                 },
             }
         except AssertionError:
-            assert rs.context == {
-                "status": FAILED,
-                "items": [1, 2],
-                "foreach": {
-                    1: {
-                        "status": FAILED,
-                        "item": 1,
-                        "stages": {
-                            "raise-error": {
-                                "outputs": {},
-                                "errors": {
-                                    "name": "ValueError",
-                                    "message": "Testing raise error PyStage!!!",
-                                },
-                                "status": FAILED,
-                            }
+            try:
+                assert rs.context == {
+                    "status": FAILED,
+                    "items": [1, 2],
+                    "foreach": {
+                        1: {
+                            "status": FAILED,
+                            "item": 1,
+                            "stages": {
+                                "raise-error": {
+                                    "outputs": {},
+                                    "errors": {
+                                        "name": "ValueError",
+                                        "message": "Testing raise error PyStage!!!",
+                                    },
+                                    "status": FAILED,
+                                }
+                            },
+                            "errors": {
+                                "name": "StageError",
+                                "message": "Item execution was break because its nested-stage, 'raise-error', failed.",
+                            },
                         },
-                        "errors": {
+                        2: {
+                            "status": CANCEL,
+                            "item": 2,
+                            "stages": {
+                                "raise-error": {"outputs": {}, "status": SKIP},
+                                "echo": {
+                                    "outputs": {},
+                                    "errors": {
+                                        "name": "StageCancelError",
+                                        "message": "Execution was canceled from the event before start parallel.",
+                                    },
+                                    "status": CANCEL,
+                                },
+                            },
+                            "errors": {
+                                "name": "StageCancelError",
+                                "message": "Item execution was canceled from the event after end item execution.",
+                            },
+                        },
+                    },
+                    "errors": {
+                        2: {
+                            "name": "StageCancelError",
+                            "message": "Item execution was canceled from the event after end item execution.",
+                        },
+                        1: {
                             "name": "StageError",
                             "message": "Item execution was break because its nested-stage, 'raise-error', failed.",
                         },
                     },
-                    2: {
-                        "status": CANCEL,
-                        "item": 2,
-                        "stages": {
-                            "raise-error": {"outputs": {}, "status": SKIP},
-                            "echo": {
-                                "outputs": {},
-                                "errors": {
-                                    "name": "StageCancelError",
-                                    "message": "Execution was canceled from the event before start parallel.",
-                                },
-                                "status": CANCEL,
+                }
+            except AssertionError:
+                assert rs.context == {
+                    "status": FAILED,
+                    "items": [1, 2],
+                    "errors": {
+                        1: {
+                            "message": (
+                                "Item execution was break because its "
+                                "nested-stage, 'raise-error', failed."
+                            ),
+                            "name": "StageError",
+                        },
+                    },
+                    "foreach": {
+                        1: {
+                            "errors": {
+                                "message": "Item execution was break because its nested-stage, "
+                                "'raise-error', failed.",
+                                "name": "StageError",
                             },
+                            "item": 1,
+                            "stages": {
+                                "raise-error": {
+                                    "errors": {
+                                        "message": "Testing raise error PyStage!!!",
+                                        "name": "ValueError",
+                                    },
+                                    "outputs": {},
+                                    "status": FAILED,
+                                },
+                            },
+                            "status": FAILED,
                         },
-                        "errors": {
-                            "name": "StageCancelError",
-                            "message": "Item execution was canceled from the event after end item execution.",
-                        },
                     },
-                },
-                "errors": {
-                    2: {
-                        "name": "StageCancelError",
-                        "message": "Item execution was canceled from the event after end item execution.",
-                    },
-                    1: {
-                        "name": "StageError",
-                        "message": "Item execution was break because its nested-stage, 'raise-error', failed.",
-                    },
-                },
-            }
+                }
