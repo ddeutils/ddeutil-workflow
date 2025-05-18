@@ -65,6 +65,7 @@ def test_parallel_stage_exec_cancel_from_stage():
         {
             "id": "parallel-stage",
             "name": "Start run parallel stage",
+            "max-workers": 1,
             "parallel": {
                 "branch01": [
                     {
@@ -83,57 +84,30 @@ def test_parallel_stage_exec_cancel_from_stage():
     )
     event = MockEvent(n=3)
     rs: Result = stage.handler_execute({}, event=event)
-    assert rs.status == CANCEL
     assert rs.context == {
         "status": CANCEL,
-        "workers": 2,
+        "workers": 1,
         "parallel": {
+            "branch01": {
+                "status": SUCCESS,
+                "branch": "branch01",
+                "stages": {"0573477600": {"outputs": {}, "status": SUCCESS}},
+            },
             "branch02": {
                 "status": CANCEL,
                 "branch": "branch02",
-                "stages": {
-                    "4967824305": {
-                        "outputs": {},
-                        "errors": {
-                            "name": "StageCancelError",
-                            "message": "Execution was canceled from the event before start parallel.",
-                        },
-                        "status": CANCEL,
-                    }
-                },
+                "stages": {},
                 "errors": {
                     "name": "StageCancelError",
-                    "message": "Branch execution was canceled from the event after end branch execution.",
-                },
-            },
-            "branch01": {
-                "status": CANCEL,
-                "branch": "branch01",
-                "stages": {
-                    "0573477600": {
-                        "outputs": {},
-                        "errors": {
-                            "name": "StageCancelError",
-                            "message": "Execution was canceled from the event before start parallel.",
-                        },
-                        "status": CANCEL,
-                    }
-                },
-                "errors": {
-                    "name": "StageCancelError",
-                    "message": "Branch execution was canceled from the event after end branch execution.",
+                    "message": "Branch execution was canceled from the event before start branch execution.",
                 },
             },
         },
         "errors": {
             "branch02": {
                 "name": "StageCancelError",
-                "message": "Branch execution was canceled from the event after end branch execution.",
-            },
-            "branch01": {
-                "name": "StageCancelError",
-                "message": "Branch execution was canceled from the event after end branch execution.",
-            },
+                "message": "Branch execution was canceled from the event before start branch execution.",
+            }
         },
     }
 
