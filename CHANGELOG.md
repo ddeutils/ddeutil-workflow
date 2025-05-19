@@ -2,6 +2,33 @@
 
 ## Latest Changes
 
+## 0.0.67
+
+### :stars: Highlight Features
+
+- :star: hl: add handler retry on stage exec.
+
+### :bug: Bug fixes
+
+- :gear: fixed: revise retry logic for map result context data.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: fixed foreach concurency testcase.
+
+### :package: Build & Workflow
+
+- :toolbox: build: format pyproject config.
+- :toolbox: build: add platform support docker build.
+- :toolbox: build: update variable from env.
+- :toolbox: build: revise build gh workflow for push image to ghcr.
+
+### :book: Documentations
+
+- :page_facing_up: docs: update comment on stage module.
+- :page_facing_up: docs: fixed readme file.
+- :page_facing_up: docs: update readme file.
+
 ## 0.0.66
 
 ### :sparkles: Features
