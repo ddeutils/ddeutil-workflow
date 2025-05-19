@@ -56,6 +56,64 @@ def test_bash_stage_exec_raise():
     }
 
 
+def test_bash_stage_exec_retry():
+    stage: BashStage = BashStage(
+        name="Retry Bash Stage",
+        bash=(
+            "VAR=${{ retry }};\n"
+            'if [ "$VAR" -eq 1 ]; then\n'
+            'echo "This value do not break retry step.";\n'
+            "else\n"
+            'echo "Raise Error for test retry strategy." >&2;\n'
+            "exit 1;\n"
+            "fi;"
+        ),
+        retry=1,
+    )
+    rs: Result = stage.handler_execute(params={})
+    assert rs.status == SUCCESS
+    assert rs.context == {
+        "status": SUCCESS,
+        "retry": 1,
+        "return_code": 0,
+        "stdout": "This value do not break retry step.",
+        "stderr": None,
+    }
+
+
+def test_bash_stage_exec_retry_exceed():
+    stage: BashStage = BashStage(
+        name="Retry Bash Stage",
+        bash=(
+            "VAR=${{ retry }};\n"
+            'if [ "$VAR" -eq 3 ]; then\n'
+            'echo "This value do not break retry step.";\n'
+            "else\n"
+            'echo "Raise Error for test retry strategy." >&2;\n'
+            "exit 1;\n"
+            "fi;"
+        ),
+        retry=1,
+    )
+    rs: Result = stage.handler_execute(params={})
+    assert rs.status == FAILED
+    assert rs.context == {
+        "status": FAILED,
+        "retry": 1,
+        "errors": {
+            "name": "StageError",
+            "message": (
+                "Subprocess: Raise Error for test retry strategy.\n\t"
+                "```bash\n\t"
+                'VAR=1;\n\tif [ "$VAR" -eq 3 ]; then\n\t'
+                'echo "This value do not break retry step.";\n\t'
+                'else\n\techo "Raise Error for test retry strategy." >&2;\n\t'
+                "exit 1;\n\tfi;\n\t```"
+            ),
+        },
+    }
+
+
 @pytest.mark.asyncio
 async def test_bash_stage_axec():
     stage: BashStage = BashStage(name="Bash Stage", bash='echo "Hello World"')
@@ -65,6 +123,32 @@ async def test_bash_stage_axec():
         "status": SUCCESS,
         "return_code": 0,
         "stdout": "Hello World",
+        "stderr": None,
+    }
+
+
+@pytest.mark.asyncio
+async def test_bash_stage_axec_retry():
+    stage: BashStage = BashStage(
+        name="Retry Bash Stage",
+        bash=(
+            "VAR=${{ retry }};\n"
+            'if [ "$VAR" -eq 1 ]; then\n'
+            'echo "This value do not break retry step.";\n'
+            "else\n"
+            'echo "Raise Error for test retry strategy." >&2;\n'
+            "exit 1;\n"
+            "fi;"
+        ),
+        retry=1,
+    )
+    rs: Result = await stage.handler_axecute(params={})
+    assert rs.status == SUCCESS
+    assert rs.context == {
+        "status": SUCCESS,
+        "retry": 1,
+        "return_code": 0,
+        "stdout": "This value do not break retry step.",
         "stderr": None,
     }
 

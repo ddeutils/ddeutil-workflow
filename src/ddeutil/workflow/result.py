@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import field
 from datetime import datetime
-from enum import IntEnum, auto
+from enum import Enum
 from typing import Optional, Union
 
 from pydantic import ConfigDict
@@ -36,16 +36,16 @@ from .logs import TraceModel, get_dt_tznow, get_trace
 from .utils import default_gen_id, gen_id, get_dt_now
 
 
-class Status(IntEnum):
+class Status(Enum):
     """Status Int Enum object that use for tracking execution status to the
     Result dataclass object.
     """
 
-    SUCCESS = auto()
-    FAILED = auto()
-    WAIT = auto()
-    SKIP = auto()
-    CANCEL = auto()
+    SUCCESS = "SUCCESS"
+    FAILED = "FAILED"
+    WAIT = "WAIT"
+    SKIP = "SKIP"
+    CANCEL = "CANCEL"
 
     @property
     def emoji(self) -> str:  # pragma: no cov
@@ -67,12 +67,17 @@ class Status(IntEnum):
     def __str__(self) -> str:
         return self.name
 
+    def is_result(self) -> bool:
+        return self in ResultStatuses
+
 
 SUCCESS = Status.SUCCESS
 FAILED = Status.FAILED
 WAIT = Status.WAIT
 SKIP = Status.SKIP
 CANCEL = Status.CANCEL
+
+ResultStatuses: list[Status] = [SUCCESS, FAILED, CANCEL, SKIP]
 
 
 def validate_statuses(statuses: list[Status]) -> Status:

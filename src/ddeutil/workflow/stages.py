@@ -62,10 +62,9 @@ from pydantic import BaseModel, Field, ValidationError
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
-from . import StageCancelError, StageRetryError
 from .__types import DictData, DictStr, StrOrInt, StrOrNone, TupleStr
 from .conf import dynamic, pass_env
-from .errors import StageError, StageSkipError, to_dict
+from .errors import StageCancelError, StageError, StageSkipError, to_dict
 from .result import (
     CANCEL,
     FAILED,
@@ -261,7 +260,7 @@ class BaseStage(BaseModel, ABC):
                 )
             # NOTE: Start call wrapped execution method that will use custom
             #   execution before the real execution from inherit stage model.
-            result_caught: Result = self.__execute(
+            result_caught: Result = self._execute(
                 params, result=result, event=event
             )
             if result_caught.status == WAIT:
@@ -296,7 +295,7 @@ class BaseStage(BaseModel, ABC):
             )
             return result.catch(status=FAILED, context={"errors": to_dict(e)})
 
-    def __execute(
+    def _execute(
         self, params: DictData, result: Result, event: Optional[Event]
     ) -> Result:
         """Wrapped the execute method before returning to handler execution.
@@ -526,7 +525,7 @@ class BaseAsyncStage(BaseStage, ABC):
 
             # NOTE: Start call wrapped execution method that will use custom
             #   execution before the real execution from inherit stage model.
-            result_caught: Result = await self.__axecute(
+            result_caught: Result = await self._axecute(
                 params, result=result, event=event
             )
             if result_caught.status == WAIT:
@@ -561,7 +560,7 @@ class BaseAsyncStage(BaseStage, ABC):
             )
             return result.catch(status=FAILED, context={"errors": to_dict(e)})
 
-    async def __axecute(
+    async def _axecute(
         self, params: DictData, result: Result, event: Optional[Event]
     ) -> Result:
         """Wrapped the axecute method before returning to handler axecute.
@@ -591,7 +590,7 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
         description="Retry number if stage execution get the error.",
     )
 
-    def __execute(
+    def _execute(
         self,
         params: DictData,
         result: Result,
@@ -610,15 +609,32 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
         :rtype: Result
         """
         current_retry: int = 0
-        with current_retry < (self.retry + 1):
+        exception: Optional[Exception] = None
+        while current_retry < (self.retry + 1):
             try:
                 result.catch(status=WAIT, context={"retry": current_retry})
-                return self.execute(params, result=result, event=event)
-            except StageRetryError:
+                return self.execute(
+                    params | {"retry": current_retry},
+                    result=result,
+                    event=event,
+                )
+            except Exception as e:
+                result.trace.warning(
+                    f"[STAGE]: Retry count: {current_retry} ..."
+                )
                 current_retry += 1
-        raise StageError(f"Reach the maximum of retry number: {self.retry}.")
+                exception = e
 
-    async def __axecute(
+        result.trace.warning(
+            f"[STAGE]: Reach the maximum of retry number: {self.retry}."
+        )
+        if not exception:  # pragma: no cov
+            raise StageError(
+                "Raise from retry execution with default exception object."
+            )
+        raise exception
+
+    async def _axecute(
         self,
         params: DictData,
         result: Result,
@@ -637,13 +653,30 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
         :rtype: Result
         """
         current_retry: int = 0
-        with current_retry < (self.retry + 1):
+        exception: Optional[Exception] = None
+        while current_retry < (self.retry + 1):
             try:
                 result.catch(status=WAIT, context={"retry": current_retry})
-                return await self.axecute(params, result=result, event=event)
-            except StageRetryError:
+                return await self.axecute(
+                    params | {"retry": current_retry},
+                    result=result,
+                    event=event,
+                )
+            except Exception as e:
+                await result.trace.awarning(
+                    f"[STAGE]: Retry count: {current_retry} ..."
+                )
                 current_retry += 1
-        raise StageError(f"Reach the maximum of retry number: {self.retry}.")
+                exception = e
+
+        await result.trace.awarning(
+            f"[STAGE]: Reach the maximum of retry number: {self.retry}."
+        )
+        if not exception:  # pragma: no cov
+            raise StageError(
+                "Raise from retry execution with default exception object."
+            )
+        raise exception
 
 
 class EmptyStage(BaseAsyncStage):
@@ -765,7 +798,7 @@ class EmptyStage(BaseAsyncStage):
         return result.catch(status=SUCCESS)
 
 
-class BashStage(BaseAsyncStage):
+class BashStage(BaseRetryStage):
     """Bash stage executor that execute bash script on the current OS.
     If your current OS is Windows, it will run on the bash from the current WSL.
     It will use `bash` for Windows OS and use `sh` for Linux OS.
@@ -911,9 +944,8 @@ class BashStage(BaseAsyncStage):
             )
         if rs.returncode > 0:
             e: str = rs.stderr.removesuffix("\n")
-            raise StageError(
-                f"Subprocess: {e}\n---( statement )---\n```bash\n{bash}\n```"
-            )
+            e_bash: str = bash.replace("\n", "\n\t")
+            raise StageError(f"Subprocess: {e}\n\t```bash\n\t{e_bash}\n\t```")
         return result.catch(
             status=SUCCESS,
             context={
@@ -964,9 +996,8 @@ class BashStage(BaseAsyncStage):
 
         if rs.returncode > 0:
             e: str = rs.stderr.removesuffix("\n")
-            raise StageError(
-                f"Subprocess: {e}\n---( statement )---\n```bash\n{bash}\n```"
-            )
+            e_bash: str = bash.replace("\n", "\n\t")
+            raise StageError(f"Subprocess: {e}\n\t```bash\n\t{e_bash}\n\t```")
         return result.catch(
             status=SUCCESS,
             context={
@@ -977,7 +1008,7 @@ class BashStage(BaseAsyncStage):
         )
 
 
-class PyStage(BaseAsyncStage):
+class PyStage(BaseRetryStage):
     """Python stage that running the Python statement with the current globals
     and passing an input additional variables via `exec` built-in function.
 
@@ -1164,7 +1195,7 @@ class PyStage(BaseAsyncStage):
         )
 
 
-class CallStage(BaseAsyncStage):
+class CallStage(BaseRetryStage):
     """Call stage executor that call the Python function from registry with tag
     decorator function in `reusables` module and run it with input arguments.
 
@@ -1433,7 +1464,7 @@ class CallStage(BaseAsyncStage):
             return args
 
 
-class BaseNestedStage(BaseStage, ABC):
+class BaseNestedStage(BaseRetryStage, ABC):
     """Base Nested Stage model. This model is use for checking the child stage
     is the nested stage or not.
     """
@@ -1466,6 +1497,17 @@ class BaseNestedStage(BaseStage, ABC):
             context["errors"][error.refs] = error.to_dict()
         else:
             context["errors"] = error.to_dict(with_refs=True)
+
+    async def axecute(
+        self,
+        params: DictData,
+        *,
+        result: Optional[Result] = None,
+        event: Optional[Event] = None,
+    ) -> Result:
+        raise NotImplementedError(
+            "The nested-stage does not implement the `axecute` method yet."
+        )
 
 
 class TriggerStage(BaseNestedStage):

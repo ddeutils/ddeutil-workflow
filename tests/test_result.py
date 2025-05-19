@@ -17,6 +17,9 @@ def test_status():
     assert repr(Status.SUCCESS) == "SUCCESS"
     assert str(Status.SUCCESS) == "SUCCESS"
 
+    assert SUCCESS.is_result()
+    assert not WAIT.is_result()
+
 
 def test_result_default():
     rs = Result()
