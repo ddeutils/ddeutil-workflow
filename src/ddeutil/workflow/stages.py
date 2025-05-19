@@ -251,13 +251,17 @@ class BaseStage(BaseModel, ABC):
                 f"[STAGE]: Handler {to_train(self.__class__.__name__)}: "
                 f"{self.name!r}."
             )
+
+            # NOTE: Show the description of this stage before execution.
             if self.desc:
                 result.trace.debug(f"[STAGE]: Description:||{self.desc}||")
 
+            # VALIDATE: Checking stage condition before execution.
             if self.is_skipped(params):
                 raise StageSkipError(
                     f"Skip because condition {self.condition} was valid."
                 )
+
             # NOTE: Start call wrapped execution method that will use custom
             #   execution before the real execution from inherit stage model.
             result_caught: Result = self._execute(
@@ -513,11 +517,14 @@ class BaseAsyncStage(BaseStage, ABC):
                 f"[STAGE]: Handler {to_train(self.__class__.__name__)}: "
                 f"{self.name!r}."
             )
+
+            # NOTE: Show the description of this stage before execution.
             if self.desc:
                 await result.trace.adebug(
                     f"[STAGE]: Description:||{self.desc}||"
                 )
 
+            # VALIDATE: Checking stage condition before execution.
             if self.is_skipped(params=params):
                 raise StageSkipError(
                     f"Skip because condition {self.condition} was valid."
