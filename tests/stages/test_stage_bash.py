@@ -46,10 +46,9 @@ def test_bash_stage_exec_raise():
         "errors": {
             "name": "StageError",
             "message": (
-                "Subprocess: Test Raise Error case with failed\n"
-                "---( statement )---\n"
-                '```bash\necho "Test Raise Error case with failed" >&2;\n'
-                "exit 1;\n"
+                "Subprocess: Test Raise Error case with failed\n\t"
+                '```bash\n\techo "Test Raise Error case with failed" >&2;\n\t'
+                "exit 1;\n\t"
                 "```"
             ),
         },
@@ -168,10 +167,9 @@ async def test_bash_stage_axec_raise():
         "errors": {
             "name": "StageError",
             "message": (
-                "Subprocess: Test Raise Error case with failed\n"
-                "---( statement )---\n"
-                '```bash\necho "Test Raise Error case with failed" >&2;\n'
-                "exit 1;\n"
+                "Subprocess: Test Raise Error case with failed\n\t"
+                '```bash\n\techo "Test Raise Error case with failed" >&2;\n\t'
+                "exit 1;\n\t"
                 "```"
             ),
         },

@@ -609,7 +609,28 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
         :rtype: Result
         """
         current_retry: int = 0
-        exception: Optional[Exception] = None
+        exception: Exception
+
+        # NOTE: First execution for not pass to retry step if it passes.
+        try:
+            result.catch(status=WAIT)
+            return self.execute(
+                params | {"retry": current_retry},
+                result=result,
+                event=event,
+            )
+        except Exception as e:
+            current_retry += 1
+            exception = e
+
+        if self.retry == 0:
+            raise exception
+
+        result.trace.warning(
+            f"[STAGE]: Retry count: {current_retry} ... "
+            f"( {exception.__class__.__name__} )"
+        )
+
         while current_retry < (self.retry + 1):
             try:
                 result.catch(status=WAIT, context={"retry": current_retry})
@@ -619,19 +640,16 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
                     event=event,
                 )
             except Exception as e:
-                result.trace.warning(
-                    f"[STAGE]: Retry count: {current_retry} ..."
-                )
                 current_retry += 1
+                result.trace.warning(
+                    f"[STAGE]: Retry count: {current_retry} ... "
+                    f"( {e.__class__.__name__} )"
+                )
                 exception = e
 
-        result.trace.warning(
+        result.trace.error(
             f"[STAGE]: Reach the maximum of retry number: {self.retry}."
         )
-        if not exception:  # pragma: no cov
-            raise StageError(
-                "Raise from retry execution with default exception object."
-            )
         raise exception
 
     async def _axecute(
@@ -653,7 +671,28 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
         :rtype: Result
         """
         current_retry: int = 0
-        exception: Optional[Exception] = None
+        exception: Exception
+
+        # NOTE: First execution for not pass to retry step if it passes.
+        try:
+            result.catch(status=WAIT)
+            return await self.axecute(
+                params | {"retry": current_retry},
+                result=result,
+                event=event,
+            )
+        except Exception as e:
+            current_retry += 1
+            exception = e
+
+        if self.retry == 0:
+            raise exception
+
+        await result.trace.awarning(
+            f"[STAGE]: Retry count: {current_retry} ... "
+            f"( {exception.__class__.__name__} )"
+        )
+
         while current_retry < (self.retry + 1):
             try:
                 result.catch(status=WAIT, context={"retry": current_retry})
@@ -663,19 +702,16 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
                     event=event,
                 )
             except Exception as e:
-                await result.trace.awarning(
-                    f"[STAGE]: Retry count: {current_retry} ..."
-                )
                 current_retry += 1
+                await result.trace.awarning(
+                    f"[STAGE]: Retry count: {current_retry} ... "
+                    f"( {e.__class__.__name__} )"
+                )
                 exception = e
 
-        await result.trace.awarning(
+        await result.trace.aerror(
             f"[STAGE]: Reach the maximum of retry number: {self.retry}."
         )
-        if not exception:  # pragma: no cov
-            raise StageError(
-                "Raise from retry execution with default exception object."
-            )
         raise exception
 
 

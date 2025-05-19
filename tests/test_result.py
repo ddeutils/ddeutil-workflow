@@ -12,7 +12,7 @@ from ddeutil.workflow.result import (
 
 
 def test_status():
-    assert Status.SUCCESS == Status.__getitem__("SUCCESS")
+    assert Status.SUCCESS == Status("SUCCESS")
     assert Status.SUCCESS.emoji == "✅"
     assert repr(Status.SUCCESS) == "SUCCESS"
     assert str(Status.SUCCESS) == "SUCCESS"

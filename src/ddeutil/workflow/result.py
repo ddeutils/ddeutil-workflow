@@ -36,7 +36,7 @@ from .logs import TraceModel, get_dt_tznow, get_trace
 from .utils import default_gen_id, gen_id, get_dt_now
 
 
-class Status(Enum):
+class Status(str, Enum):
     """Status Int Enum object that use for tracking execution status to the
     Result dataclass object.
     """
