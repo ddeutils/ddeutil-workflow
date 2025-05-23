@@ -3,7 +3,7 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-"""Stages module include all stage model that implemented to be the minimum execution
+r"""Stages module include all stage model that implemented to be the minimum execution
 layer of this workflow core engine. The stage handle the minimize task that run
 in a thread (same thread at its job owner) that mean it is the lowest executor that
 you can track logs.
@@ -15,17 +15,39 @@ have a lot of use-case, and it should does not worry about it error output.
     So, I will create `handler_execute` for any exception class that raise from
 the stage execution method.
 
-    Execution   --> Ok      ┬--( handler )--> Result with `SUCCESS` or `CANCEL`
-                            |
-                            ├--( handler )--> Result with `FAILED` (Set `raise_error` flag)
-                            |
-                            ╰--( handler )---> Result with `SKIP`
+    Handler     --> Ok      --> Result
+                                        |-status: SUCCESS
+                                        ╰-context:
+                                            ╰-outputs: ...
 
-                --> Error   ---( handler )--> Raise StageError(...)
+                --> Ok      --> Result
+                                ╰-status: CANCEL
+
+                --> Ok      --> Result
+                                ╰-status: SKIP
+
+                --> Ok      --> Result
+                                |-status: FAILED
+                                ╰-errors:
+                                    |-name: ...
+                                    ╰-message: ...
 
     On the context I/O that pass to a stage object at execute process. The
 execute method receives a `params={"params": {...}}` value for passing template
 searching.
+
+    All stages model inherit from `BaseStage` or `AsyncBaseStage` models that has the
+base fields:
+
+| field     | alias | data type   | default  | description                                                           |
+|-----------|-------|-------------|:--------:|-----------------------------------------------------------------------|
+| id        |       | str \| None |  `None`  | A stage ID that use to keep execution output or getting by job owner. |
+| name      |       | str         |          | A stage name that want to log when start execution.               |
+| condition | if    | str \| None |  `None`  | A stage condition statement to allow stage executable.                |
+| extras    |       | dict        | `dict()` | An extra parameter that override core config values.                  |
+
+    It has a special base class is `BaseRetryStage` that inherit from `AsyncBaseStage`
+that use to handle retry execution when it got any error with `retry` field.
 """
 from __future__ import annotations
 
@@ -594,7 +616,7 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
         default=0,
         ge=0,
         lt=20,
-        description="Retry number if stage execution get the error.",
+        description="A retry number if stage execution get the error.",
     )
 
     def _execute(
@@ -1249,7 +1271,7 @@ class CallStage(BaseRetryStage):
     function complexly that you can for your objective to invoked by this stage
     object.
 
-        This stage is the most powerfull stage of this package for run every
+        This stage is the most powerful stage of this package for run every
     use-case by a custom requirement that you want by creating the Python
     function and adding it to the caller registry value by importer syntax like
     `module.caller.registry` not path style like `module/caller/registry`.

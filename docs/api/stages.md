@@ -1,8 +1,8 @@
 # Stages
 
-Stages module include all stage model that use be the minimum execution layer
-of this workflow engine. The stage handle the minimize task that run in some
-thread (same thread at its job owner) that mean it is the lowest executor that
+Stages module include all stage model that implemented to be the minimum execution
+layer of this workflow core engine. The stage handle the minimize task that run
+in a thread (same thread at its job owner) that mean it is the lowest executor that
 you can track logs.
 
 The output of stage execution only return SUCCESS or CANCEL status because
@@ -13,16 +13,27 @@ So, I will create `handler_execute` for any exception class that raise from
 the stage execution method.
 
 ```text
-Execution   ┬-> Ok      ---( handler )--> Result with SUCCESS/CANCEL
+Handler     ┬-> Ok      --> Result
+            │               |-status: SUCCESS
+            │               ╰-context:
+            │                   ╰-outputs: ...
             │
-            ╰-> Error   ┬--( handler )--> Result with FAILED (Set `raise_error` flag)
-                        │
-                        ╰--( handler )--> Raise StageError(...)
+            ├-> Ok      --> Result
+            │               ╰-status: CANCEL
+            │
+            ├-> Ok      --> Result
+            │               ╰-status: SKIP
+            │
+            ╰-> Ok      --> Result
+                            |-status: FAILED
+                            ╰-errors:
+                                |-name: ...
+                                ╰-message: ...
 ```
 
 On the context I/O that pass to a stage object at execute process. The
-execute method receives a `params={"params": {...}}` value for mapping to
-template searching.
+execute method receives a `params={"params": {...}}` value for passing template
+searching.
 
 All stages model inherit from `BaseStage` or `AsyncBaseStage` models that has the
 base fields:
@@ -30,18 +41,38 @@ base fields:
 | field     | alias | data type   | default  | description                                                           |
 |-----------|-------|-------------|:--------:|-----------------------------------------------------------------------|
 | id        |       | str \| None |  `None`  | A stage ID that use to keep execution output or getting by job owner. |
-| name      |       | str         |          | A stage name that want to logging when start execution.               |
+| name      |       | str         |          | A stage name that want to log when start execution.                   |
 | condition | if    | str \| None |  `None`  | A stage condition statement to allow stage executable.                |
 | extras    |       | dict        | `dict()` | An extra parameter that override core config values.                  |
 
-## Empty Stage
+It has a special base class is `BaseRetryStage` that inherit from `AsyncBaseStage`
+that use to handle retry execution when it got any error with `retry` field.
+
+| field | alias | data type | default | description                                      |
+|-------|-------|-----------|:-------:|--------------------------------------------------|
+| retry |       | int       |   `0`   | A retry number if stage execution get the error. |
+
+## Methods
+
+- `handler_execution`
+- `_execution`
+- `execution`
+- `set_outputs`
+- `get_outputs`
+- `is_skipped`
+- `gen_id`
+- `is_nested`
+
+## Implemented Stage
+
+### Empty Stage
 
 Empty stage executor that do nothing and log the `message` field to
 stdout only. It can use for tracking a template parameter on the workflow or
 debug step.
 
-You can pass a sleep value in second unit to this stage for waiting after log
-message.
+You can pass a sleep value in second unit to this stage for waiting
+after log message.
 
 !!! example "YAML"
 
@@ -77,17 +108,18 @@ message.
 | echo  | str \| None | `None`  | A message that want to show on the stdout.                                                                       |
 | sleep | float       |   `0`   | A second value to sleep before start execution. This value should gather or equal 0, and less than 1800 seconds. |
 
-## Bash Stage
+### Bash Stage
 
-Bash execution stage that execute bash script on the current OS.
-If your current OS is Windows, it will run on the bash in the WSL.
+Bash stage executor that execute bash script on the current OS.
+If your current OS is Windows, it will run on the bash from the current WSL.
+It will use `bash` for Windows OS and use `sh` for Linux OS.
 
 !!! warning
 
-    I get some limitation when I run shell statement with the built-in
-    subprocess package. It does not good enough to use multiline statement.
-    Thus, I add writing ``.sh`` file before execution process for fix this
-    issue.
+    This stage has some limitation when it runs shell statement with the
+    built-in subprocess package. It does not good enough to use multiline
+    statement. Thus, it will write the `.sh` file before start running bash
+    command for fix this issue.
 
 !!! example "YAML"
 
@@ -116,7 +148,7 @@ If your current OS is Windows, it will run on the bash in the WSL.
 | bash    | str            |          | A bash statement that want to execute via Python subprocess.                                            |
 | env     | dict[str, Any] | `dict()` | An environment variables that set before run bash command. It will add on the header of the `.sh` file. |
 
-## Python Stage
+### Python Stage
 
 Python stage that running the Python statement with the current globals
 and passing an input additional variables via `exec` built-in function.
@@ -136,7 +168,7 @@ such as import your installed package.
 
         ```yaml
         stages:
-            - name: Call Python
+            - name: Call Python Version
               run: |
                 import sys
                 print(sys.version_info)
@@ -147,10 +179,10 @@ such as import your installed package.
 | run   | str            |          | A Python string statement that want to run with `exec`.                       |
 | vars  | dict[str, Any] | `dict()` | A variable mapping that want to pass to globals parameter in the `exec` func. |
 
-## Call Stage
+### Call Stage
 
 Call stage executor that call the Python function from registry with tag
-    decorator function in `reusables` module and run it with input arguments.
+decorator function in `reusables` module and run it with input arguments.
 
 This stage is different with PyStage because the PyStage is just run
 a Python statement with the `exec` function and pass the current locals and
@@ -159,7 +191,7 @@ function can call it with an input arguments. So, you can create your
 function complexly that you can for your objective to invoked by this stage
 object.
 
-This stage is the most powerfull stage of this package for run every
+This stage is the most powerful stage of this package for run every
 use-case by a custom requirement that you want by creating the Python
 function and adding it to the caller registry value by importer syntax like
 `module.caller.registry` not path style like `module/caller/registry`.
@@ -171,7 +203,7 @@ function and adding it to the caller registry value by importer syntax like
 
 !!! example "YAML"
 
-    === "Call"
+    === "Call with Args"
 
         ```yaml
         stages:
@@ -187,7 +219,7 @@ function and adding it to the caller registry value by importer syntax like
 | uses   |       | str                 |          | A caller function with registry importer syntax that use to load function before execute step. The caller registry syntax should be `<import.part>/<func-name>@<tag-name>`. |
 | args   | with  | dict[str, Any]      | `dict()` | An argument parameter that will pass to this caller function.                                                                                                               |
 
-## Trigger Stage
+### Trigger Stage
 
 Trigger workflow executor stage that run an input trigger Workflow
 execute method. This is the stage that allow you to create the reusable
@@ -195,14 +227,14 @@ Workflow template with dynamic parameters.
 
 !!! example "YAML"
 
-    === "Trigger"
+    === "Trigger with Params"
 
         ```yaml
         stages:
             - name: Call trigger
               trigger: trigger-workflow-name
               params:
-                name: foo
+                name: some-name
         ```
 
 | field     | data type      | default  | description                                                      |
@@ -211,7 +243,7 @@ Workflow template with dynamic parameters.
 | params    | dict[str, Any] | `dict()` | A parameter that want to pass to workflow execution.             |
 
 
-## Parallel Stage
+### Parallel Stage
 
 Parallel stage executor that execute branch stages with multithreading.
 This stage let you set the fix branches for running child stage inside it on
@@ -222,12 +254,30 @@ multithread pool.
     This stage is not the low-level stage model because it runs multi-stages
     in this stage execution.
 
+!!! example "YAML"
+
+    === "Parallel"
+
+        ```yaml
+        stages:
+            - name: Call parallel
+              parallel:
+                branch-a:
+                  - name: Echo in Branch
+                    echo: "This is branch: ${{ branch }}"
+                branch-b:
+                  - name: Echo in Branch
+                    echo: "This is branch: ${{ branch }}"
+                    sleep: 1
+        ```
+
+
 | field       | alias       | data type              | default | description                                                                                                                      |
 |-------------|-------------|------------------------|:-------:|----------------------------------------------------------------------------------------------------------------------------------|
 | parallel    |             | dict[str, list[Stage]] |         | A mapping of branch name and its stages.                                                                                         |
 | max_workers | max-workers | int                    |   `2`   | The maximum multi-thread pool worker size for execution parallel. This value should be gather or equal than 1, and less than 20. |
 
-## ForEach Stage
+### ForEach Stage
 
 For-Each stage executor that execute all stages with each item in the
 foreach list.
@@ -237,7 +287,15 @@ foreach list.
     This stage is not the low-level stage model because it runs
     multi-stages in this stage execution.
 
-## Until Stage
+| field            | alias | data type                        | default | description |
+|------------------|-------|----------------------------------|:-------:|-------------|
+| foreach          |       | Union[list[str], list[int], str] |         |             |
+| stages           |       | list[Stage]                      | `list`  |             |
+| concurrent       |       | int                              |   `1`   |             |
+| use_index_as_key |       | bool                             | `False` |             |
+
+
+### Until Stage
 
 Until stage executor that will run stages in each loop until it valid
 with stop loop condition.
@@ -248,16 +306,42 @@ with stop loop condition.
     This stage is not the low-level stage model because it runs
     multi-stages in this stage execution.
 
-## Case Stage
+| field    | alias    | data type             | default | description |
+|----------|----------|-----------------------|:-------:|-------------|
+| item     |          | Union[str, int, bool] |   `0`   |             |
+| until    |          | str                   |         |             |
+| stages   |          | list[Stage]           | `list`  |             |
+| max_loop | max-loop | int                   | `False` |             |
+
+### Case Stage
 
 Case stage executor that execute all stages if the condition was matched.
 
-## Raise Stage
+| field          | alias    | data type   | default | description |
+|----------------|----------|-------------|:-------:|-------------|
+| case           |          | str         |         |             |
+| match          |          | list[Match] |         |             |
+| skip_not_match |          | bool        | `False` |             |
+
+!!! note
+
+    When `Match` is the BaseModel for a case.
+
+    | field  | alias    | data type   | default | description |
+    |--------|----------|-------------|:-------:|-------------|
+    | case   |          | str \| None |         |             |
+    | stages |          | list[Stage] |         |             |
+
+### Raise Stage
 
 Raise error stage executor that raise `StageError` that use a message
 field for making error message before raise.
 
-## Docker Stage
+| field   | alias | data type   | default | description                                                 |
+|---------|-------|-------------|:-------:|-------------------------------------------------------------|
+| message | raise | str         |         | An error message that want to raise with `StageError` class |
+
+### Docker Stage
 
 Docker container stage execution that will pull the specific Docker image
 with custom authentication and run this image by passing environment
@@ -266,7 +350,7 @@ variables and mounting local volume to this Docker container.
 The volume path that mount to this Docker container will limit. That is
 this stage does not allow you to mount any path to this container.
 
-## Virtual Python Stage
+### Virtual Python Stage
 
 Virtual Python stage executor that run Python statement on the dependent
 Python virtual environment via the `uv` package.
