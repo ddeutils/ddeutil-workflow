@@ -27,11 +27,28 @@ job execution.
 
 ## Job
 
+Job Pydantic model object (short description: **a group of stages**).
+
+This job model allow you to use for-loop that call matrix strategy. If
+you pass matrix mapping, and it is able to generate, you will see it running
+with loop of matrix values.
+
 !!! example "YAML"
 
     === "Job"
 
         ```yaml
+        jobs:
+          first-job:
+            stages:
+              - name: Start Import
+                echo: "Start Import data to raw zone."
+
+              - name: Start Transform
+                echo: "Start Transform data from ra to in-memory."
+
+              - name: Start Load
+                echo: "Start Load data to bronze zone."
         ```
 
     === "Job Matrix"
@@ -81,6 +98,19 @@ job execution.
 
 Trigger rules enum object.
 
+ALL_SUCCESS = "all_success"
+ALL_FAILED = "all_failed"
+ALL_DONE = "all_done"
+ONE_FAILED = "one_failed"
+ONE_SUCCESS = "one_success"
+NONE_FAILED = "none_failed"
+NONE_SKIPPED = "none_skipped"
+
 ## RunsOn
 
 Runs-On enum object.
+
+LOCAL = "local"
+SELF_HOSTED = "self_hosted"
+AZ_BATCH = "azure_batch"
+DOCKER = "docker"

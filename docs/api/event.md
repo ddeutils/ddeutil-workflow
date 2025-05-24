@@ -1,5 +1,11 @@
 # Event
 
+An Event module keep all triggerable object to the Workflow model. The simple
+event trigger that use to run workflow is `Crontab` model.
+
+Now, it has only `Crontab` and `CrontabYear` event models in this module because
+I think it is the core event for workflow orchestration.
+
 ## Crontab
 
 The **Crontab** is schedule object that receive crontab value and able to generate
@@ -15,8 +21,10 @@ datetime value with next or previous with any start point of an input datetime.
           cron: "*/5 * * * *"
         ```
 
-| field          | data type   |    default    | description |
-|----------------|-------------|:-------------:|-------------|
+| field   | data type    | default | description                                                  |
+|---------|--------------|:-------:|--------------------------------------------------------------|
+| cronjob | CronJob      |         | An extras parameters that want to pass to the CronJob field. |
+| tz      | TimeZoneName |  `UTC`  | A timezone string value.                                     |
 
 !!! note "Usage"
 
@@ -37,4 +45,17 @@ datetime value with next or previous with any start point of an input datetime.
 
 ## CrontabYear
 
-The `Crontab` model that add Year unit.
+The `Crontab` model that add the Year unit for limit the year value.
+
+    === "Cron"
+
+        ```yaml
+        on_every_5_min:
+          type: CrontabYear
+          cron: "*/5 * * * * *"
+        ```
+
+| field   | data type    | default | description                                                  |
+|---------|--------------|:-------:|--------------------------------------------------------------|
+| cronjob | CronJobYear  |         | An extras parameters that want to pass to the CronJob field. |
+| tz      | TimeZoneName |  `UTC`  | A timezone string value.                                     |

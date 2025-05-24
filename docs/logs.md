@@ -1,6 +1,12 @@
 # Logs
 
-The log from the Workflow can be split with 2 parts: **Trace** and **Audit**.
+A Logs module contain Trace and Audit Pydantic models for process log from
+the core workflow engine.
+
+**I separate part of log to 2 types:**
+
+- **Trace**: A stdout and stderr log
+- **Audit**: An audit release log for tracking incremental running workflow.
 
 ## Trace
 

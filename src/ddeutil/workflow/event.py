@@ -3,8 +3,9 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-"""Event module include all event object for trigger the Workflow to release.
-Now, it has only `Crontab` and `CrontabYear` event models on this module because
+"""An Event module keep all triggerable object to the Workflow model. The simple
+event trigger that use to run workflow is `Crontab` model.
+Now, it has only `Crontab` and `CrontabYear` event models in this module because
 I think it is the core event for workflow orchestration.
 """
 from __future__ import annotations
@@ -95,7 +96,7 @@ class Crontab(BaseModel):
     tz: Annotated[
         TimeZoneName,
         Field(
-            description="A timezone string value",
+            description="A timezone string value.",
             alias="timezone",
         ),
     ] = "UTC"
