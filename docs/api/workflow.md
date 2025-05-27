@@ -1,5 +1,11 @@
 # Workflow
 
+Workflow module is the core module of this package. It keeps Release,
+ReleaseQueue, and Workflow models.
+
+This package implement timeout strategy on the workflow execution layer only
+because the main propose of this package is using Workflow to be orchestrator.
+
 ## Workflow
 
 !!! example "YAML"
@@ -47,18 +53,10 @@
         And for the type, you can remove `ddeutil.workflow` prefix because we can find
         it by looping search from `WORKFLOW_CORE_REGISTRY` value.
 
-### Fields
-
-| field    | data type        | default  | description |
-|----------|------------------|:--------:|-------------|
-| name     | str              |          |             |
-| desc     | str \| None      |  `None`  |             |
-| params   | dict[str, Param] | `dict()` |             |
-| on       | list[Crontab]         | `list()` |             |
-| jobs     | dict[str, Job]   | `dict()` |             |
-
-## WorkflowTask
-
-## Release
-
-## ReleaseQueue
+| field    | data type         | default  | description |
+|----------|-------------------|:--------:|-------------|
+| name     | str               |          |             |
+| desc     | str \| None       |  `None`  |             |
+| params   | dict[str, Param]  | `dict()` |             |
+| on       | list[Crontab]     | `list()` |             |
+| jobs     | dict[str, Job]    | `dict()` |             |

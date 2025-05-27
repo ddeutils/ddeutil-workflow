@@ -73,7 +73,6 @@ nav:
       - Event: api/event.md
       - Job: api/job.md
       - Workflow: api/workflow.md
-      - Scheduler: api/scheduler.md
       - Params: api/params.md
       - Result: api/result.md
       - Reusables: api/reusables.md
