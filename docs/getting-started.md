@@ -56,23 +56,33 @@ wf-run-manual:
             incremental: {{ params.run_date }}
 ```
 
-Create the call function that use on your stage.
+Create the called function that use on your stage.
 
-```python title="./src/__init__.py"
-from .https_call import *
-```
+1. Create `__init__.py` file inside `./src/tasks` folder for import your called
+   function from your module.
 
-```python title="./src/https_call.py"
-from ddeutil.workflow import Result, tag
+   ```python title="./src/__init__.py"
+   from .https_call import *
+   ```
+
+2. Create `https_call.py` file inside `./src/tasks` folder to be task module.
+
+   ```python title="./src/https_call.py"
+   from ddeutil.workflow import Result, tag
 
 
-@tag("httpx", alias="https-external")
-def dummy_task_polars_dir(url: str, auth: str, result: Result) -> dict[str, int]:
-    result.trace.info(f"Start POST: {url} with auth: {auth}")
-    return {"counts": 0}
-```
+   @tag("httpx", alias="https-external")
+   def demo_http_to_external_task(url: str, auth: str, result: Result) -> dict[str, int]:
+       result.trace.info(f"Start POST: {url} with auth: {auth}")
+       return {"counts": 0}
+   ```
+
+   The name of called function can be free text with snake case. The stage will
+   use `alias` name to search this function instead its function name.
 
 ## Run Workflow
+
+The workflow allow you to run with 2 modes, `execute` and `release` modes.
 
 ### Execute
 
