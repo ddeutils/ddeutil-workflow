@@ -472,6 +472,13 @@ class BaseStage(BaseModel, ABC):
         """
         return False
 
+    def docs(self) -> str:  # pragma: no cov
+        """Return generated document that will be the interface of this stage.
+
+        :rtype: str
+        """
+        return self.desc
+
 
 class BaseAsyncStage(BaseStage, ABC):
     """Base Async Stage model to make any stage model allow async execution for

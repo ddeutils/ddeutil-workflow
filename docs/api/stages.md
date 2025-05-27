@@ -54,9 +54,9 @@ that use to handle retry execution when it got any error with `retry` field.
 
 ## Methods
 
-- `handler_execution`
-- `_execution`
-- `execution`
+- `handler_execution`: This method will be exception handler for the `execute` method.
+- `_execution`: Pre-execution method that use to override when that stage want to have pre-execution.
+- `execution`: The main execution.
 - `set_outputs`
 - `get_outputs`
 - `is_skipped`
@@ -350,7 +350,22 @@ variables and mounting local volume to this Docker container.
 The volume path that mount to this Docker container will limit. That is
 this stage does not allow you to mount any path to this container.
 
-### Virtual Python Stage
+| field  | alias | data type       | default  | description                                                        |
+|--------|-------|-----------------|:--------:|--------------------------------------------------------------------|
+| image  |       | str             |          | A Docker image url with tag that want to run.                      |
+| tag    |       | str             | `latest` | An Docker image tag.                                               |
+| env    |       | dict[str, Any]  |          | An environment variable that want pass to Docker container.        |
+| volume |       | dict[str, Any]  |          | A mapping of local and target mounting path.                       |
+| auth   |       | dict[str, Any]  |          | An authentication of the Docker registry that use in pulling step. |
+
+### Virtual-Python Stage
 
 Virtual Python stage executor that run Python statement on the dependent
 Python virtual environment via the `uv` package.
+
+| field   | data type      | default  | description                                                                   |
+|---------|----------------|:--------:|-------------------------------------------------------------------------------|
+| run     | str            |          | A Python string statement that want to run with `exec`.                       |
+| vars    | dict[str, Any] | `dict()` | A variable mapping that want to pass to globals parameter in the `exec` func. |
+| version | str            |  `3.9`   | A Python version that want to run.                                            |
+| deps    | list[str]      |          | list of Python dependency that want to install before execution stage.        |
