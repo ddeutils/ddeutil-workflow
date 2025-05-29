@@ -6,15 +6,13 @@
 """Utility function model."""
 from __future__ import annotations
 
-import asyncio
 import stat
 import time
 from collections.abc import Iterator
 from datetime import date, datetime, timedelta
-from functools import wraps
 from hashlib import md5
 from inspect import isfunction
-from itertools import chain, islice, product
+from itertools import product
 from pathlib import Path
 from random import randrange
 from typing import Any, Final, Optional, TypeVar, Union, overload
@@ -258,34 +256,6 @@ def cross_product(matrix: Matrix) -> Iterator[DictData]:
     )
 
 
-def batch(iterable: Union[Iterator[Any], range], n: int) -> Iterator[Any]:
-    """Batch data into iterators of length n. The last batch may be shorter.
-
-    Example:
-        >>> for b in batch(iter('ABCDEFG'), 3):
-        ...     print(list(b))
-        ['A', 'B', 'C']
-        ['D', 'E', 'F']
-        ['G']
-
-    :param iterable:
-    :param n: (int) A number of returning batch size.
-
-    :rtype: Iterator[Any]
-    """
-    if n < 1:
-        raise ValueError("n must be at least one")
-
-    it: Iterator[Any] = iter(iterable)
-    while True:
-        chunk_it = islice(it, n)
-        try:
-            first_el = next(chunk_it)
-        except StopIteration:
-            return
-        yield chain((first_el,), chunk_it)
-
-
 def cut_id(run_id: str, *, num: int = 6) -> str:
     """Cutting running ID with length.
 
@@ -325,24 +295,3 @@ def dump_all(
     elif isinstance(value, BaseModel):
         return value.model_dump(by_alias=by_alias)
     return value
-
-
-def awaitable(func):
-    """Dynamic function to async or not depend on the called statement."""
-
-    @wraps(func)
-    async def async_wrapper(*args, **kwargs):
-        return func(*args, **kwargs)
-
-    @wraps(func)
-    def sync_wrapper(*args, **kwargs):
-        return func(*args, **kwargs)
-
-    def dispatch(*args, **kwargs):
-        try:
-            asyncio.get_running_loop()
-            return async_wrapper(*args, **kwargs)
-        except RuntimeError:
-            return sync_wrapper(*args, **kwargs)
-
-    return dispatch
