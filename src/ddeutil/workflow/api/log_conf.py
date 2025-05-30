@@ -9,10 +9,10 @@ LOGGING_CONFIG: dict[str, Any] = {  # pragma: no cov
         "standard": {
             "format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
         },
-        # "custom_formatter": {
-        #     "format": config.log_format,
-        #     "datefmt": config.log_datetime_format,
-        # },
+        "custom_formatter": {
+            "format": config.log_format,
+            "datefmt": config.log_datetime_format,
+        },
     },
     "root": {
         "level": "DEBUG" if config.debug else "INFO",
@@ -24,8 +24,8 @@ LOGGING_CONFIG: dict[str, Any] = {  # pragma: no cov
             "stream": "ext://sys.stderr",
         },
         "stream_handler": {
-            "formatter": "standard",
-            # "formatter": "custom_formatter",
+            # "formatter": "standard",
+            "formatter": "custom_formatter",
             "class": "logging.StreamHandler",
             "stream": "ext://sys.stdout",
         },
@@ -62,11 +62,11 @@ LOGGING_CONFIG: dict[str, Any] = {  # pragma: no cov
             "level": "TRACE",
             "propagate": False,
         },
-        "ddeutil.workflow": {
-            "handlers": ["stream_handler"],
-            "level": "INFO",
-            # "propagate": False,
-            "propagate": True,
-        },
+        # "ddeutil.workflow": {
+        #     "handlers": ["stream_handler"],
+        #     "level": "INFO",
+        #     # "propagate": False,
+        #     "propagate": True,
+        # },
     },
 }

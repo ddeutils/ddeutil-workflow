@@ -36,29 +36,31 @@ METADATA: str = "metadata.json"
 
 
 def get_logger(name: str) -> logging.Logger:
-    """Return logger object with an input module name.
+    """Return logger object with an input module name that already implement the
+    custom handler and formatter from this package config.
 
     :param name: (str) A module name that want to log.
+
+    :rtype: logging.Logger
     """
-    lg = logging.getLogger(name)
+    _logger = logging.getLogger(name)
 
     # NOTE: Developers using this package can then disable all logging just for
     #   this package by;
     #
     #   `logging.getLogger('ddeutil.workflow').propagate = False`
     #
-    lg.addHandler(logging.NullHandler())
+    _logger.addHandler(logging.NullHandler())
 
     formatter = logging.Formatter(
         fmt=config.log_format,
         datefmt=config.log_datetime_format,
     )
-    stream = logging.StreamHandler()
-    stream.setFormatter(formatter)
-    lg.addHandler(stream)
-
-    lg.setLevel(logging.DEBUG if config.debug else logging.INFO)
-    return lg
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(formatter)
+    _logger.addHandler(stream_handler)
+    _logger.setLevel(logging.DEBUG if config.debug else logging.INFO)
+    return _logger
 
 
 logger = get_logger("ddeutil.workflow")

@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from platform import python_version
 from typing import Annotated, Any, Optional
 
@@ -19,8 +20,10 @@ app = typer.Typer(
 
 @app.callback()
 def callback():
-    """Awesome Workflow CLI tool."""
-    typer.echo("Start call from callback function")
+    """Manage Workflow CLI app.
+
+    Use it with the interface workflow engine.
+    """
 
 
 @app.command()
@@ -78,13 +81,15 @@ def api(
     host: Annotated[str, typer.Option(help="A host url.")] = "0.0.0.0",
     port: Annotated[int, typer.Option(help="A port url.")] = 80,
     debug: Annotated[bool, typer.Option(help="A debug mode flag")] = True,
-    worker: Annotated[int, typer.Option(help="A worker number")] = None,
+    workers: Annotated[int, typer.Option(help="A worker number")] = None,
+    reload: Annotated[bool, typer.Option(help="A reload flag")] = False,
 ):
     """
     Provision API application from the FastAPI.
     """
-    # from .api.log_conf import LOGGING_CONFIG
-    LOGGING_CONFIG = {}
+    from .api.log_conf import LOGGING_CONFIG
+
+    # LOGGING_CONFIG = {}
 
     uvicorn.run(
         fastapp,
@@ -93,8 +98,21 @@ def api(
         log_config=uvicorn.config.LOGGING_CONFIG | LOGGING_CONFIG,
         # NOTE: Logging level of uvicorn should be lowered case.
         log_level=("debug" if debug else "info"),
-        workers=worker,
+        workers=workers,
+        reload=reload,
     )
+
+
+@app.command()
+def make(
+    name: Annotated[Path, typer.Argument()],
+) -> None:
+    """
+    Create Workflow YAML template.
+
+    :param name:
+    """
+    typer.echo(f"Start create YAML template filename: {name.resolve()}")
 
 
 if __name__ == "__main__":

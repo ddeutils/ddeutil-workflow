@@ -109,9 +109,9 @@ class Config:  # pragma: no cov
         return env(
             "LOG_FORMAT",
             (
-                "%(asctime)s.%(msecs)03d (%(name)-10s, %(process)-5d, "
+                "%(asctime)s.%(msecs)03d (%(process)-5d, "
                 "%(thread)-5d) [%(levelname)-7s] %(message)-120s "
-                "(%(filename)s:%(lineno)s)"
+                "(%(filename)s:%(lineno)s) (%(name)-10s)"
             ),
         )
 

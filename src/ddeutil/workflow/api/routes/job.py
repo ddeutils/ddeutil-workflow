@@ -45,6 +45,7 @@ async def job_execute(
     extras: Optional[dict[str, Any]] = None,
 ) -> UJSONResponse:
     """Execute job via RestAPI with execute route path."""
+    logger.info("[API]: Start execute job ...")
     rs: Result = Result(
         run_id=result.run_id,
         parent_run_id=result.parent_run_id,
@@ -81,7 +82,7 @@ async def job_execute(
                 "params": params,
                 "context": context,
             },
-            status_code=st.HTTP_404_NOT_FOUND,
+            status_code=st.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
     return UJSONResponse(
