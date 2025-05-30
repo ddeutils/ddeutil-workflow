@@ -18,7 +18,6 @@ import re
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from datetime import datetime
-from functools import lru_cache
 from inspect import Traceback, currentframe, getframeinfo
 from pathlib import Path
 from threading import get_ident
@@ -36,8 +35,7 @@ from .utils import cut_id, get_dt_now, prepare_newline
 METADATA: str = "metadata.json"
 
 
-@lru_cache
-def get_logger(name: str):
+def get_logger(name: str) -> logging.Logger:
     """Return logger object with an input module name.
 
     :param name: (str) A module name that want to log.

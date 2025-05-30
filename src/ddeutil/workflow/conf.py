@@ -162,8 +162,12 @@ class APIConfig:
     """API Config object."""
 
     @property
+    def version(self) -> str:
+        return env("API_VERSION", "1")
+
+    @property
     def prefix_path(self) -> str:
-        return env("API_PREFIX_PATH", "/api/v1")
+        return env("API_PREFIX_PATH", f"/api/v{self.version}")
 
 
 class BaseLoad(ABC):  # pragma: no cov

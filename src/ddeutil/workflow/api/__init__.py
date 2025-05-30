@@ -71,12 +71,20 @@ app.include_router(workflow, prefix=api_config.prefix_path)
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(
-    request: Request, exc: RequestValidationError
-):
+    request: Request,
+    exc: RequestValidationError,
+) -> UJSONResponse:
+    """Error Handler for model validate does not valid."""
     _ = request
     return UJSONResponse(
         status_code=st.HTTP_422_UNPROCESSABLE_ENTITY,
-        content=jsonable_encoder({"detail": exc.errors(), "body": exc.body}),
+        content=jsonable_encoder(
+            {
+                "message": "Body does not parsing with model.",
+                "detail": exc.errors(),
+                "body": exc.body,
+            }
+        ),
     )
 
 
