@@ -58,12 +58,16 @@ app.add_middleware(
 
 
 @app.get(path="/", response_class=UJSONResponse)
-async def health():
+async def health() -> UJSONResponse:
     """Index view that not return any template without json status."""
-    return {"message": "Workflow already start up with healthy status."}
+    logger.info("[API]: Workflow API Application already running ...")
+    return UJSONResponse(
+        content={"message": "Workflow already start up with healthy status."},
+        status_code=st.HTTP_200_OK,
+    )
 
 
-# NOTE Add the jobs and logs routes by default.
+# NOTE: Add the jobs and logs routes by default.
 app.include_router(job, prefix=api_config.prefix_path)
 app.include_router(log, prefix=api_config.prefix_path)
 app.include_router(workflow, prefix=api_config.prefix_path)
@@ -71,21 +75,18 @@ app.include_router(workflow, prefix=api_config.prefix_path)
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(
-    request: Request, exc: RequestValidationError
-):
+    request: Request,
+    exc: RequestValidationError,
+) -> UJSONResponse:
+    """Error Handler for model validate does not valid."""
     _ = request
     return UJSONResponse(
         status_code=st.HTTP_422_UNPROCESSABLE_ENTITY,
-        content=jsonable_encoder({"detail": exc.errors(), "body": exc.body}),
-    )
-
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(
-        app,
-        host="0.0.0.0",
-        port=80,
-        log_level="DEBUG",
+        content=jsonable_encoder(
+            {
+                "message": "Body does not parsing with model.",
+                "detail": exc.errors(),
+                "body": exc.body,
+            }
+        ),
     )

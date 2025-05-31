@@ -30,7 +30,7 @@ dependencies = [
     "pydantic==2.11.4",
     "pydantic-extra-types==2.10.4",
     "python-dotenv==1.1.0",
-    "typer==0.15.4",
+    "typer>=0.16.0",
 ]
 dynamic = ["version"]
 
@@ -78,9 +78,10 @@ omit = [
     "src/ddeutil/workflow/__about__.py",
     "src/ddeutil/workflow/__cron.py",
     "src/ddeutil/workflow/__main__.py",
+    "src/ddeutil/workflow/__types.py",
     "src/ddeutil/workflow/cli.py",
     "src/ddeutil/workflow/api/__init__.py",
-    "src/ddeutil/workflow/api/logs.py",
+    "src/ddeutil/workflow/api/log_conf.py",
     "src/ddeutil/workflow/api/routes/__init__.py",
     "src/ddeutil/workflow/api/routes/job.py",
     "src/ddeutil/workflow/api/routes/logs.py",

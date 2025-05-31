@@ -16,19 +16,19 @@ from pydantic import BaseModel
 
 from ...__types import DictData
 from ...conf import Loader
-from ...logs import Audit, get_audit, get_logger
+from ...logs import AuditModel, get_audit, get_logger
 from ...result import Result
 from ...workflow import Workflow
 
 logger = get_logger("uvicorn.error")
-workflow_route = APIRouter(
+router = APIRouter(
     prefix="/workflows",
     tags=["workflows"],
     default_response_class=UJSONResponse,
 )
 
 
-@workflow_route.get(path="/", status_code=st.HTTP_200_OK)
+@router.get(path="/", status_code=st.HTTP_200_OK)
 async def get_workflows() -> DictData:
     """Return all workflow workflows that exists in config path."""
     workflows: DictData = dict(Loader.finds(Workflow))
@@ -39,7 +39,7 @@ async def get_workflows() -> DictData:
     }
 
 
-@workflow_route.get(path="/{name}", status_code=st.HTTP_200_OK)
+@router.get(path="/{name}", status_code=st.HTTP_200_OK)
 async def get_workflow_by_name(name: str) -> DictData:
     """Return model of workflow that passing an input workflow name."""
     try:
@@ -63,7 +63,7 @@ class ExecutePayload(BaseModel):
     params: dict[str, Any]
 
 
-@workflow_route.post(path="/{name}/execute", status_code=st.HTTP_202_ACCEPTED)
+@router.post(path="/{name}/execute", status_code=st.HTTP_202_ACCEPTED)
 async def workflow_execute(name: str, payload: ExecutePayload) -> DictData:
     """Return model of workflow that passing an input workflow name."""
     try:
@@ -88,7 +88,7 @@ async def workflow_execute(name: str, payload: ExecutePayload) -> DictData:
     return asdict(result)
 
 
-@workflow_route.get(path="/{name}/audits", status_code=st.HTTP_200_OK)
+@router.get(path="/{name}/audits", status_code=st.HTTP_200_OK)
 async def get_workflow_audits(name: str):
     try:
         return {
@@ -109,11 +109,11 @@ async def get_workflow_audits(name: str):
         ) from None
 
 
-@workflow_route.get(path="/{name}/audits/{release}", status_code=st.HTTP_200_OK)
+@router.get(path="/{name}/audits/{release}", status_code=st.HTTP_200_OK)
 async def get_workflow_release_audit(name: str, release: str):
     """Get Workflow audit log with an input release value."""
     try:
-        audit: Audit = get_audit().find_audit_with_release(
+        audit: AuditModel = get_audit().find_audit_with_release(
             name=name,
             release=datetime.strptime(release, "%Y%m%d%H%M%S"),
         )

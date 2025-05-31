@@ -1,6 +1,8 @@
+from typing import Any
+
 from ..conf import config
 
-LOGGING_CONFIG = {  # pragma: no cov
+LOGGING_CONFIG: dict[str, Any] = {  # pragma: no cov
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
@@ -22,38 +24,49 @@ LOGGING_CONFIG = {  # pragma: no cov
             "stream": "ext://sys.stderr",
         },
         "stream_handler": {
+            # "formatter": "standard",
             "formatter": "custom_formatter",
             "class": "logging.StreamHandler",
             "stream": "ext://sys.stdout",
         },
-        "file_handler": {
-            "formatter": "custom_formatter",
-            "class": "logging.handlers.RotatingFileHandler",
-            "filename": "logs/app.log",
-            "maxBytes": 1024 * 1024 * 1,
-            "backupCount": 3,
-        },
+        # "file_handler": {
+        #     "formatter": "custom_formatter",
+        #     "class": "logging.handlers.RotatingFileHandler",
+        #     "filename": "logs/app.log",
+        #     "maxBytes": 1024 * 1024 * 1,
+        #     "backupCount": 3,
+        # },
     },
     "loggers": {
         "uvicorn": {
-            "handlers": ["default", "file_handler"],
+            # "handlers": ["default", "file_handler"],
+            "handlers": ["default"],
             "level": "DEBUG" if config.debug else "INFO",
             "propagate": False,
         },
         "uvicorn.access": {
-            "handlers": ["stream_handler", "file_handler"],
+            # "handlers": ["stream_handler", "file_handler"],
+            "handlers": ["stream_handler"],
             "level": "DEBUG" if config.debug else "INFO",
             "propagate": False,
         },
         "uvicorn.error": {
-            "handlers": ["stream_handler", "file_handler"],
+            # "handlers": ["stream_handler", "file_handler"],
+            "handlers": ["stream_handler"],
             "level": "DEBUG" if config.debug else "INFO",
             "propagate": False,
         },
-        # "uvicorn.asgi": {
-        #     "handlers": ["stream_handler", "file_handler"],
-        #     "level": "TRACE",
-        #     "propagate": False,
+        "uvicorn.asgi": {
+            # "handlers": ["stream_handler", "file_handler"],
+            "handlers": ["stream_handler"],
+            "level": "TRACE",
+            "propagate": False,
+        },
+        # "ddeutil.workflow": {
+        #     "handlers": ["stream_handler"],
+        #     "level": "INFO",
+        #     # "propagate": False,
+        #     "propagate": True,
         # },
     },
 }

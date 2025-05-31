@@ -109,9 +109,9 @@ class Config:  # pragma: no cov
         return env(
             "LOG_FORMAT",
             (
-                "%(asctime)s.%(msecs)03d (%(name)-10s, %(process)-5d, "
+                "%(asctime)s.%(msecs)03d (%(process)-5d, "
                 "%(thread)-5d) [%(levelname)-7s] %(message)-120s "
-                "(%(filename)s:%(lineno)s)"
+                "(%(filename)s:%(lineno)s) (%(name)-10s)"
             ),
         )
 
@@ -162,8 +162,12 @@ class APIConfig:
     """API Config object."""
 
     @property
+    def version(self) -> str:
+        return env("API_VERSION", "1")
+
+    @property
     def prefix_path(self) -> str:
-        return env("API_PREFIX_PATH", "/api/v1")
+        return env("API_PREFIX_PATH", f"/api/v{self.version}")
 
 
 class BaseLoad(ABC):  # pragma: no cov
