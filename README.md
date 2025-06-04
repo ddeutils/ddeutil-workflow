@@ -19,12 +19,13 @@ by a `.yaml` template.
 
 ---
 
-**:pushpin: <u>Rules of This Workflow engine</u>**:
+**:pushpin: <u>Rules of This Workflow</u>**:
 
 1. The Minimum frequency unit of built-in scheduling is **1 Minute** 🕘
 2. **Can not** re-run only failed stage and its pending downstream ↩️
 3. All parallel tasks inside workflow core engine use **Multi-Threading** pool
    (Python 3.13 unlock GIL 🐍🔓)
+4. Recommend to pass a **Secret Value** with environment variable in YAML template 🔐
 
 ---
 
