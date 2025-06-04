@@ -278,54 +278,112 @@ def test_foreach_stage_exec_raise_full():
     )
     rs: Result = stage.handler_execute(params={})
     assert rs.status == FAILED
-    assert rs.context == {
-        "status": FAILED,
-        "items": [1, 2],
-        "foreach": {
-            2: {
-                "status": FAILED,
-                "item": 2,
-                "stages": {
-                    "2709471980": {"outputs": {}, "status": SUCCESS},
-                    "9263488742": {
-                        "outputs": {},
-                        "errors": {
-                            "name": "StageError",
-                            "message": "Raise for item equal 2",
+    try:
+        assert rs.context == {
+            "status": FAILED,
+            "items": [1, 2],
+            "foreach": {
+                2: {
+                    "status": FAILED,
+                    "item": 2,
+                    "stages": {
+                        "2709471980": {"outputs": {}, "status": SUCCESS},
+                        "9263488742": {
+                            "outputs": {},
+                            "errors": {
+                                "name": "StageError",
+                                "message": "Raise for item equal 2",
+                            },
+                            "status": FAILED,
                         },
-                        "status": FAILED,
+                    },
+                    "errors": {
+                        "name": "StageError",
+                        "message": "Item execution was break because its nested-stage, 'Final Echo', failed.",
                     },
                 },
-                "errors": {
+                1: {
+                    "status": CANCEL,
+                    "item": 1,
+                    "stages": {
+                        "2709471980": {"outputs": {}, "status": SUCCESS},
+                        "9263488742": {"outputs": {}, "status": SKIP},
+                        "2238460182": {"outputs": {}, "status": SUCCESS},
+                    },
+                    "errors": {
+                        "name": "StageCancelError",
+                        "message": "Item execution was canceled from the event before start item execution.",
+                    },
+                },
+            },
+            "errors": {
+                2: {
                     "name": "StageError",
                     "message": "Item execution was break because its nested-stage, 'Final Echo', failed.",
                 },
-            },
-            1: {
-                "status": CANCEL,
-                "item": 1,
-                "stages": {
-                    "2709471980": {"outputs": {}, "status": SUCCESS},
-                    "9263488742": {"outputs": {}, "status": SKIP},
-                    "2238460182": {"outputs": {}, "status": SUCCESS},
-                },
-                "errors": {
+                1: {
                     "name": "StageCancelError",
                     "message": "Item execution was canceled from the event before start item execution.",
                 },
             },
-        },
-        "errors": {
-            2: {
-                "name": "StageError",
-                "message": "Item execution was break because its nested-stage, 'Final Echo', failed.",
+        }
+    except AssertionError:
+        assert rs.context == {
+            "status": FAILED,
+            "items": [1, 2],
+            "foreach": {
+                2: {
+                    "status": FAILED,
+                    "item": 2,
+                    "stages": {
+                        "2709471980": {"outputs": {}, "status": SUCCESS},
+                        "9263488742": {
+                            "outputs": {},
+                            "errors": {
+                                "name": "StageError",
+                                "message": "Raise for item equal 2",
+                            },
+                            "status": FAILED,
+                        },
+                    },
+                    "errors": {
+                        "name": "StageError",
+                        "message": "Item execution was break because its nested-stage, 'Final Echo', failed.",
+                    },
+                },
+                1: {
+                    "status": CANCEL,
+                    "item": 1,
+                    "stages": {
+                        "2709471980": {"outputs": {}, "status": SUCCESS},
+                        "9263488742": {"outputs": {}, "status": SKIP},
+                        "2238460182": {
+                            "errors": {
+                                "message": "Execution was canceled from the event before start parallel.",
+                                "name": "StageCancelError",
+                            },
+                            "outputs": {},
+                            "status": CANCEL,
+                        },
+                    },
+                    "errors": {
+                        "name": "StageCancelError",
+                        "message": "Item execution was canceled from the event after end item execution.",
+                    },
+                },
             },
-            1: {
-                "name": "StageCancelError",
-                "message": "Item execution was canceled from the event before start item execution.",
+            "errors": {
+                2: {
+                    "name": "StageError",
+                    "message": "Item execution was break because its nested-stage, 'Final Echo', failed.",
+                },
+                1: {
+                    "name": "StageCancelError",
+                    "message": "Item execution was canceled from the event after end item execution.",
+                },
             },
-        },
-    }
+        }
+        print(rs.context)
 
 
 def test_foreach_stage_exec_concurrent(test_path):

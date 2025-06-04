@@ -13,14 +13,14 @@ from fastapi.responses import UJSONResponse
 from ...logs import get_audit
 from ...result import Result
 
-log_route = APIRouter(
+router = APIRouter(
     prefix="/logs",
     tags=["logs"],
     default_response_class=UJSONResponse,
 )
 
 
-@log_route.get(
+@router.get(
     path="/traces/",
     response_class=UJSONResponse,
     status_code=st.HTTP_200_OK,
@@ -50,7 +50,7 @@ async def get_traces(
     }
 
 
-@log_route.get(
+@router.get(
     path="/traces/{run_id}",
     response_class=UJSONResponse,
     status_code=st.HTTP_200_OK,
@@ -77,7 +77,7 @@ async def get_trace_with_id(run_id: str):
     }
 
 
-@log_route.get(
+@router.get(
     path="/audits/",
     response_class=UJSONResponse,
     status_code=st.HTTP_200_OK,
@@ -94,7 +94,7 @@ async def get_audits():
     }
 
 
-@log_route.get(
+@router.get(
     path="/audits/{workflow}/",
     response_class=UJSONResponse,
     status_code=st.HTTP_200_OK,
@@ -113,7 +113,7 @@ async def get_audit_with_workflow(workflow: str):
     }
 
 
-@log_route.get(
+@router.get(
     path="/audits/{workflow}/{release}",
     response_class=UJSONResponse,
     status_code=st.HTTP_200_OK,
@@ -140,7 +140,7 @@ async def get_audit_with_workflow_release(
     }
 
 
-@log_route.get(
+@router.get(
     path="/audits/{workflow}/{release}/{run_id}",
     response_class=UJSONResponse,
     status_code=st.HTTP_200_OK,

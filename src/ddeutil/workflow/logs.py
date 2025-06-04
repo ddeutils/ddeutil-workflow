@@ -37,33 +37,34 @@ METADATA: str = "metadata.json"
 
 
 @lru_cache
-def get_logger(name: str):
-    """Return logger object with an input module name.
+def set_logging(name: str) -> logging.Logger:
+    """Return logger object with an input module name that already implement the
+    custom handler and formatter from this package config.
 
     :param name: (str) A module name that want to log.
+
+    :rtype: logging.Logger
     """
-    lg = logging.getLogger(name)
+    _logger = logging.getLogger(name)
 
     # NOTE: Developers using this package can then disable all logging just for
     #   this package by;
     #
     #   `logging.getLogger('ddeutil.workflow').propagate = False`
     #
-    lg.addHandler(logging.NullHandler())
+    _logger.addHandler(logging.NullHandler())
 
     formatter = logging.Formatter(
-        fmt=config.log_format,
-        datefmt=config.log_datetime_format,
+        fmt=config.log_format, datefmt=config.log_datetime_format
     )
-    stream = logging.StreamHandler()
-    stream.setFormatter(formatter)
-    lg.addHandler(stream)
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(formatter)
+    _logger.addHandler(stream_handler)
+    _logger.setLevel(logging.DEBUG if config.debug else logging.INFO)
+    return _logger
 
-    lg.setLevel(logging.DEBUG if config.debug else logging.INFO)
-    return lg
 
-
-logger = get_logger("ddeutil.workflow")
+logger = logging.getLogger("ddeutil.workflow")
 
 
 def get_dt_tznow() -> datetime:  # pragma: no cov
@@ -689,6 +690,9 @@ class BaseAudit(BaseModel, ABC):
         """
         if dynamic("enable_write_audit", extras=self.extras):
             self.do_before()
+
+        # NOTE: Start setting log config in this line with cache.
+        set_logging("ddeutil.workflow")
         return self
 
     @classmethod
@@ -732,7 +736,7 @@ class BaseAudit(BaseModel, ABC):
     @abstractmethod
     def save(self, excluded: Optional[list[str]]) -> None:  # pragma: no cov
         """Save this model logging to target logging store."""
-        raise NotImplementedError("Audit should implement ``save`` method.")
+        raise NotImplementedError("Audit should implement `save` method.")
 
 
 class FileAudit(BaseAudit):

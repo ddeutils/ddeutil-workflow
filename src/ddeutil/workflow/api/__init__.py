@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import contextlib
+import logging
 from collections.abc import AsyncIterator
 
 from dotenv import load_dotenv
@@ -19,11 +20,10 @@ from fastapi.responses import UJSONResponse
 
 from ..__about__ import __version__
 from ..conf import api_config
-from ..logs import get_logger
 from .routes import job, log, workflow
 
 load_dotenv()
-logger = get_logger("uvicorn.error")
+logger = logging.getLogger("uvicorn.error")
 
 
 @contextlib.asynccontextmanager
@@ -58,12 +58,16 @@ app.add_middleware(
 
 
 @app.get(path="/", response_class=UJSONResponse)
-async def health():
+async def health() -> UJSONResponse:
     """Index view that not return any template without json status."""
-    return {"message": "Workflow already start up with healthy status."}
+    logger.info("[API]: Workflow API Application already running ...")
+    return UJSONResponse(
+        content={"message": "Workflow already start up with healthy status."},
+        status_code=st.HTTP_200_OK,
+    )
 
 
-# NOTE Add the jobs and logs routes by default.
+# NOTE: Add the jobs and logs routes by default.
 app.include_router(job, prefix=api_config.prefix_path)
 app.include_router(log, prefix=api_config.prefix_path)
 app.include_router(workflow, prefix=api_config.prefix_path)
@@ -71,21 +75,18 @@ app.include_router(workflow, prefix=api_config.prefix_path)
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(
-    request: Request, exc: RequestValidationError
-):
+    request: Request,
+    exc: RequestValidationError,
+) -> UJSONResponse:
+    """Error Handler for model validate does not valid."""
     _ = request
     return UJSONResponse(
         status_code=st.HTTP_422_UNPROCESSABLE_ENTITY,
-        content=jsonable_encoder({"detail": exc.errors(), "body": exc.body}),
-    )
-
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(
-        app,
-        host="0.0.0.0",
-        port=80,
-        log_level="DEBUG",
+        content=jsonable_encoder(
+            {
+                "message": "Body does not parsing with model.",
+                "detail": exc.errors(),
+                "body": exc.body,
+            }
+        ),
     )
