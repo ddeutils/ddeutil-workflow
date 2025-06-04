@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import contextlib
+import logging
 from collections.abc import AsyncIterator
 
 from dotenv import load_dotenv
@@ -19,11 +20,10 @@ from fastapi.responses import UJSONResponse
 
 from ..__about__ import __version__
 from ..conf import api_config
-from ..logs import get_logger
 from .routes import job, log, workflow
 
 load_dotenv()
-logger = get_logger("uvicorn.error")
+logger = logging.getLogger("uvicorn.error")
 
 
 @contextlib.asynccontextmanager

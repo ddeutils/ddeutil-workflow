@@ -18,6 +18,7 @@ import re
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from datetime import datetime
+from functools import lru_cache
 from inspect import Traceback, currentframe, getframeinfo
 from pathlib import Path
 from threading import get_ident
@@ -35,7 +36,8 @@ from .utils import cut_id, get_dt_now, prepare_newline
 METADATA: str = "metadata.json"
 
 
-def get_logger(name: str) -> logging.Logger:
+@lru_cache
+def set_logging(name: str) -> logging.Logger:
     """Return logger object with an input module name that already implement the
     custom handler and formatter from this package config.
 
@@ -53,8 +55,7 @@ def get_logger(name: str) -> logging.Logger:
     _logger.addHandler(logging.NullHandler())
 
     formatter = logging.Formatter(
-        fmt=config.log_format,
-        datefmt=config.log_datetime_format,
+        fmt=config.log_format, datefmt=config.log_datetime_format
     )
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(formatter)
@@ -63,7 +64,7 @@ def get_logger(name: str) -> logging.Logger:
     return _logger
 
 
-logger = get_logger("ddeutil.workflow")
+logger = logging.getLogger("ddeutil.workflow")
 
 
 def get_dt_tznow() -> datetime:  # pragma: no cov
@@ -689,6 +690,9 @@ class BaseAudit(BaseModel, ABC):
         """
         if dynamic("enable_write_audit", extras=self.extras):
             self.do_before()
+
+        # NOTE: Start setting log config in this line with cache.
+        set_logging("ddeutil.workflow")
         return self
 
     @classmethod
@@ -732,7 +736,7 @@ class BaseAudit(BaseModel, ABC):
     @abstractmethod
     def save(self, excluded: Optional[list[str]]) -> None:  # pragma: no cov
         """Save this model logging to target logging store."""
-        raise NotImplementedError("Audit should implement ``save`` method.")
+        raise NotImplementedError("Audit should implement `save` method.")
 
 
 class FileAudit(BaseAudit):

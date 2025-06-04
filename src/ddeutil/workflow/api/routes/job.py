@@ -5,6 +5,7 @@
 # ------------------------------------------------------------------------------
 from __future__ import annotations
 
+import logging
 from typing import Any, Optional
 
 from fastapi import APIRouter
@@ -15,10 +16,9 @@ from pydantic import BaseModel, Field
 from ...__types import DictData
 from ...errors import JobError
 from ...job import Job
-from ...logs import get_logger
 from ...result import Result
 
-logger = get_logger("uvicorn.error")
+logger = logging.getLogger("uvicorn.error")
 router = APIRouter(prefix="/job", tags=["job"])
 
 

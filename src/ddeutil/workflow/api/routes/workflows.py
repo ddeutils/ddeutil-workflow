@@ -5,6 +5,7 @@
 # ------------------------------------------------------------------------------
 from __future__ import annotations
 
+import logging
 from dataclasses import asdict
 from datetime import datetime
 from typing import Any
@@ -16,11 +17,11 @@ from pydantic import BaseModel
 
 from ...__types import DictData
 from ...conf import Loader
-from ...logs import AuditModel, get_audit, get_logger
+from ...logs import AuditModel, get_audit
 from ...result import Result
 from ...workflow import Workflow
 
-logger = get_logger("uvicorn.error")
+logger = logging.getLogger("uvicorn.error")
 router = APIRouter(
     prefix="/workflows",
     tags=["workflows"],
