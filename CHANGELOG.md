@@ -2,6 +2,28 @@
 
 ## Latest Changes
 
+## 0.0.68
+
+### :sparkles: Features
+
+- :dart: feat: improve logging module for overridable from child package (#49).
+
+### :broom: Deprecate & Clean
+
+- :recycle: clean: remove unuse function in utils module.
+
+### :package: Build & Workflow
+
+- :package: build: bump pydantic from 2.11.4 to 2.11.5 (#50)
+
+### :book: Documentations
+
+- :page_facing_up: docs: clean and update workflow topic.
+- :page_facing_up: docs: update docs on stages topic.
+- :page_facing_up: docs: update draft dockerfile that run with dynamic python version.
+- :page_facing_up: docs: update mkdocs on job and event sections.
+- :page_facing_up: docs: update stage mkdocs.
+
 ## 0.0.67
 
 ### :stars: Highlight Features
