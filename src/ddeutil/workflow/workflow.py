@@ -27,7 +27,7 @@ from threading import Event
 from typing import Any, Optional
 from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel, Field, ValidationInfo
+from pydantic import BaseModel, Field
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
@@ -206,7 +206,6 @@ class Workflow(BaseModel):
     def __on_no_dup_and_reach_limit__(
         cls,
         value: list[Crontab],
-        info: ValidationInfo,
     ) -> list[Crontab]:
         """Validate the on fields should not contain duplicate values and if it
         contains the every minute value more than one value, it will remove to
@@ -237,12 +236,9 @@ class Workflow(BaseModel):
                 f"{list(set_tz)}."
             )
 
-        extras: Optional[DictData] = info.data.get("extras")
-        if len(set_ons) > (
-            conf := dynamic("max_cron_per_workflow", extras=extras)
-        ):
+        if len(set_ons) > 10:
             raise ValueError(
-                f"The number of the on should not more than {conf} crontabs."
+                "The number of the on should not more than 10 crontabs."
             )
         return value
 

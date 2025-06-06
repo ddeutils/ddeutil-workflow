@@ -146,14 +146,6 @@ class Config:  # pragma: no cov
         return str2bool(env("CORE_STAGE_DEFAULT_ID", "false"))
 
     @property
-    def max_cron_per_workflow(self) -> int:
-        """The maximum on value that store in workflow model.
-
-        :rtype: int
-        """
-        return int(env("CORE_MAX_CRON_PER_WORKFLOW", "5"))
-
-    @property
     def max_queue_complete_hist(self) -> int:
         return int(env("CORE_MAX_QUEUE_COMPLETE_HIST", "16"))
 
