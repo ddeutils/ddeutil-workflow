@@ -19,22 +19,22 @@ app = typer.Typer(
 
 
 @app.callback()
-def callback():
-    """Manage Workflow CLI app.
+def callback() -> None:
+    """Manage Workflow Orchestration CLI.
 
     Use it with the interface workflow engine.
     """
 
 
 @app.command()
-def version():
+def version() -> None:
     """Get the ddeutil-workflow package version."""
     typer.echo(f"ddeutil-workflow=={__version__}")
     typer.echo(f"python-version=={python_version()}")
 
 
-@app.command()
-def job(
+@app.command(name="job")
+def execute_job(
     params: Annotated[str, typer.Option(help="A job execute parameters")],
     job: Annotated[str, typer.Option(help="A job model")],
     parent_run_id: Annotated[str, typer.Option(help="A parent running ID")],
@@ -113,6 +113,20 @@ def make(
     :param name:
     """
     typer.echo(f"Start create YAML template filename: {name.resolve()}")
+
+
+workflow_app = typer.Typer()
+app.add_typer(workflow_app, name="workflow", help="An Only Workflow CLI.")
+
+
+@workflow_app.callback()
+def workflow_callback():
+    """Manage Only Workflow CLI."""
+
+
+@workflow_app.command(name="execute")
+def workflow_execute():
+    """"""
 
 
 if __name__ == "__main__":
