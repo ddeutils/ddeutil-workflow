@@ -34,6 +34,7 @@ from .conf import config, dynamic
 from .utils import cut_id, get_dt_now, prepare_newline
 
 METADATA: str = "metadata.json"
+logger = logging.getLogger("ddeutil.workflow")
 
 
 @lru_cache
@@ -64,17 +65,6 @@ def set_logging(name: str) -> logging.Logger:
     return _logger
 
 
-logger = logging.getLogger("ddeutil.workflow")
-
-
-def get_dt_tznow() -> datetime:  # pragma: no cov
-    """Return the current datetime object that passing the config timezone.
-
-    :rtype: datetime
-    """
-    return get_dt_now(tz=config.tz)
-
-
 PREFIX_LOGS: Final[dict[str, dict]] = {
     "CALLER": {
         "emoji": "📍",
@@ -98,8 +88,8 @@ class PrefixMsg(BaseModel):
     from logging message.
     """
 
-    name: Optional[str] = Field(default=None)
-    message: Optional[str] = Field(default=None)
+    name: Optional[str] = Field(default=None, description="A prefix name.")
+    message: Optional[str] = Field(default=None, description="A message.")
 
     def prepare(self, extras: Optional[DictData] = None) -> str:
         """Prepare message with force add prefix before writing trace log.
@@ -328,6 +318,87 @@ class BaseTrace(BaseModel, ABC):  # pragma: no cov
             "Adjust make message method for this trace object before using."
         )
 
+
+class ConsoleTrace(BaseTrace):  # pragma: no cov
+
+    @classmethod
+    def find_traces(
+        cls,
+        path: Optional[Path] = None,
+        extras: Optional[DictData] = None,
+    ) -> Iterator[TraceData]:  # pragma: no cov
+        raise NotImplementedError(
+            "Trace dataclass should implement `find_traces` class-method."
+        )
+
+    @classmethod
+    def find_trace_with_id(
+        cls,
+        run_id: str,
+        force_raise: bool = True,
+        *,
+        path: Optional[Path] = None,
+        extras: Optional[DictData] = None,
+    ) -> TraceData:
+        raise NotImplementedError(
+            "Trace dataclass should implement `find_trace_with_id` "
+            "class-method."
+        )
+
+    def writer(
+        self,
+        message: str,
+        level: str,
+        is_err: bool = False,
+    ) -> None:
+        """Write a trace message after making to target pointer object. The
+        target can be anything be inherited this class and overwrite this method
+        such as file, console, or database.
+
+        :param message: (str) A message after making.
+        :param level: (str) A log level.
+        :param is_err: (bool) A flag for writing with an error trace or not.
+            (Default be False)
+        """
+
+    async def awriter(
+        self,
+        message: str,
+        level: str,
+        is_err: bool = False,
+    ) -> None:
+        """Async Write a trace message after making to target pointer object.
+
+        :param message: (str) A message after making.
+        :param level: (str) A log level.
+        :param is_err: (bool) A flag for writing with an error trace or not.
+            (Default be False)
+        """
+
+    @property
+    def cut_id(self) -> str:
+        """Combine cutting ID of parent running ID if it set.
+
+        :rtype: str
+        """
+        cut_run_id: str = cut_id(self.run_id)
+        if not self.parent_run_id:
+            return f"{cut_run_id}"
+
+        cut_parent_run_id: str = cut_id(self.parent_run_id)
+        return f"{cut_parent_run_id} -> {cut_run_id}"
+
+    def make_message(self, message: str) -> str:
+        """Prepare and Make a message before write and log steps.
+
+        :param message: (str) A message that want to prepare and make before.
+
+        :rtype: str
+        """
+        return prepare_newline(
+            f"({self.cut_id}) {extract_msg_prefix(message).prepare(self.extras)}"
+        )
+
     def __logging(
         self, message: str, mode: str, *, is_err: bool = False
     ) -> None:
@@ -443,7 +514,7 @@ class BaseTrace(BaseModel, ABC):  # pragma: no cov
         await self.__alogging(message, mode="exception", is_err=True)
 
 
-class FileTrace(BaseTrace):  # pragma: no cov
+class FileTrace(ConsoleTrace):  # pragma: no cov
     """File Trace dataclass that write file to the local storage."""
 
     @classmethod
@@ -500,31 +571,12 @@ class FileTrace(BaseTrace):  # pragma: no cov
             log_file.mkdir(parents=True)
         return log_file
 
-    @property
-    def cut_id(self) -> str:
-        """Combine cutting ID of parent running ID if it set.
-
-        :rtype: str
-        """
-        cut_run_id: str = cut_id(self.run_id)
-        if not self.parent_run_id:
-            return f"{cut_run_id}"
-
-        cut_parent_run_id: str = cut_id(self.parent_run_id)
-        return f"{cut_parent_run_id} -> {cut_run_id}"
-
-    def make_message(self, message: str) -> str:
-        """Prepare and Make a message before write and log steps.
-
-        :param message: (str) A message that want to prepare and make before.
-
-        :rtype: str
-        """
-        return prepare_newline(
-            f"({self.cut_id}) {extract_msg_prefix(message).prepare(self.extras)}"
-        )
-
-    def writer(self, message: str, level: str, is_err: bool = False) -> None:
+    def writer(
+        self,
+        message: str,
+        level: str,
+        is_err: bool = False,
+    ) -> None:
         """Write a trace message after making to target file and write metadata
         in the same path of standard files.
 
@@ -556,7 +608,10 @@ class FileTrace(BaseTrace):  # pragma: no cov
             f.write(trace_meta.model_dump_json() + "\n")
 
     async def awriter(
-        self, message: str, level: str, is_err: bool = False
+        self,
+        message: str,
+        level: str,
+        is_err: bool = False,
     ) -> None:  # pragma: no cov
         """Write with async mode."""
         if not dynamic("enable_write_log", extras=self.extras):
@@ -584,7 +639,7 @@ class FileTrace(BaseTrace):  # pragma: no cov
             await f.write(trace_meta.model_dump_json() + "\n")
 
 
-class SQLiteTrace(BaseTrace):  # pragma: no cov
+class SQLiteTrace(ConsoleTrace):  # pragma: no cov
     """SQLite Trace dataclass that write trace log to the SQLite database file."""
 
     table_name: ClassVar[str] = "audits"
@@ -618,16 +673,23 @@ class SQLiteTrace(BaseTrace):  # pragma: no cov
     def make_message(self, message: str) -> str: ...
 
     def writer(
-        self, message: str, level: str, is_err: bool = False
+        self,
+        message: str,
+        level: str,
+        is_err: bool = False,
     ) -> None: ...
 
     def awriter(
-        self, message: str, level: str, is_err: bool = False
+        self,
+        message: str,
+        level: str,
+        is_err: bool = False,
     ) -> None: ...
 
 
 Trace = TypeVar("Trace", bound=BaseTrace)
 TraceModel = Union[
+    ConsoleTrace,
     FileTrace,
     SQLiteTrace,
 ]
@@ -679,7 +741,6 @@ class BaseAudit(BaseModel, ABC):
         default=None, description="A parent running ID."
     )
     run_id: str = Field(description="A running ID")
-    update: datetime = Field(default_factory=get_dt_tznow)
     execution_time: float = Field(default=0, description="An execution time.")
 
     @model_validator(mode="after")
@@ -711,7 +772,10 @@ class BaseAudit(BaseModel, ABC):
     @classmethod
     @abstractmethod
     def find_audits(
-        cls, name: str, *, extras: Optional[DictData] = None
+        cls,
+        name: str,
+        *,
+        extras: Optional[DictData] = None,
     ) -> Iterator[Self]:
         raise NotImplementedError(
             "Audit should implement `find_audits` class-method"
@@ -914,7 +978,10 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
 
     @classmethod
     def find_audits(
-        cls, name: str, *, extras: Optional[DictData] = None
+        cls,
+        name: str,
+        *,
+        extras: Optional[DictData] = None,
     ) -> Iterator[Self]: ...
 
     @classmethod

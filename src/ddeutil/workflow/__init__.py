@@ -19,7 +19,6 @@ from .logs import (
     TraceMeta,
     TraceModel,
     get_audit,
-    get_dt_tznow,
     get_trace,
 )
 from .params import *

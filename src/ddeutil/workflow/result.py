@@ -13,6 +13,7 @@ from dataclasses import field
 from datetime import datetime
 from enum import Enum
 from typing import Optional, Union
+from zoneinfo import ZoneInfo
 
 from pydantic import ConfigDict
 from pydantic.dataclasses import dataclass
@@ -32,8 +33,16 @@ from . import (
 from .__types import DictData
 from .conf import dynamic
 from .errors import ResultError
-from .logs import TraceModel, get_dt_tznow, get_trace
+from .logs import TraceModel, get_trace
 from .utils import default_gen_id, gen_id, get_dt_now
+
+
+def get_dt_tznow(tz: Optional[ZoneInfo] = None) -> datetime:  # pragma: no cov
+    """Return the current datetime object that passing the config timezone.
+
+    :rtype: datetime
+    """
+    return get_dt_now(tz=dynamic("tz", f=tz))
 
 
 class Status(str, Enum):
