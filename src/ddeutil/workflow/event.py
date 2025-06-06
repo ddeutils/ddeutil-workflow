@@ -23,7 +23,7 @@ from typing_extensions import Self
 
 from .__cron import WEEKDAYS, CronJob, CronJobYear, CronRunner, Options
 from .__types import DictData, DictStr
-from .conf import FileLoad
+from .conf import YamlParser
 
 Interval = Literal["daily", "weekly", "monthly"]
 
@@ -139,7 +139,7 @@ class Crontab(BaseModel):
         :rtype: Self
         """
         extras: DictData = extras or {}
-        loader: FileLoad = FileLoad(name, extras=extras)
+        loader: YamlParser = YamlParser(name, extras=extras)
 
         # NOTE: Validate the config type match with current connection model
         if loader.type != cls.__name__:

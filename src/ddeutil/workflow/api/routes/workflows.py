@@ -16,7 +16,7 @@ from fastapi.responses import UJSONResponse
 from pydantic import BaseModel
 
 from ...__types import DictData
-from ...conf import Loader
+from ...conf import YamlParser
 from ...logs import AuditModel, get_audit
 from ...result import Result
 from ...workflow import Workflow
@@ -32,7 +32,7 @@ router = APIRouter(
 @router.get(path="/", status_code=st.HTTP_200_OK)
 async def get_workflows() -> DictData:
     """Return all workflow workflows that exists in config path."""
-    workflows: DictData = dict(Loader.finds(Workflow))
+    workflows: DictData = dict(YamlParser.finds(Workflow))
     return {
         "message": f"Getting all workflows: {len(workflows)}",
         "count": len(workflows),

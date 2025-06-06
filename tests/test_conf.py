@@ -10,7 +10,7 @@ import rtoml
 import yaml
 from ddeutil.workflow.conf import (
     Config,
-    FileLoad,
+    YamlParser,
     config,
     dynamic,
     pass_env,
@@ -43,13 +43,13 @@ def test_load_file(target_path: Path):
     with mock.patch.object(Config, "conf_path", target_path):
 
         with pytest.raises(ValueError):
-            FileLoad("test_load_file_raise", path=config.conf_path)
+            YamlParser("test_load_file_raise", path=config.conf_path)
 
         with pytest.raises(ValueError):
-            FileLoad("wf-ignore-inside", path=config.conf_path)
+            YamlParser("wf-ignore-inside", path=config.conf_path)
 
         with pytest.raises(ValueError):
-            FileLoad("wf-ignore", path=config.conf_path)
+            YamlParser("wf-ignore", path=config.conf_path)
 
     with (target_path / "test_simple_file_raise.yaml").open(mode="w") as f:
         yaml.dump(
@@ -63,7 +63,7 @@ def test_load_file(target_path: Path):
             f,
         )
 
-    load = FileLoad("test_load_file", extras={"conf_paths": [target_path]})
+    load = YamlParser("test_load_file", extras={"conf_paths": [target_path]})
     assert load.data == {
         "type": "Workflow",
         "desc": "Test multi config path",
@@ -78,7 +78,7 @@ def test_load_file(target_path: Path):
 
     # NOTE: Raise because passing `conf_paths` invalid type.
     with pytest.raises(TypeError):
-        FileLoad("test_load_file", extras={"conf_paths": target_path})
+        YamlParser("test_load_file", extras={"conf_paths": target_path})
 
 
 def test_load_file_finds(target_path: Path):
@@ -101,9 +101,9 @@ def test_load_file_finds(target_path: Path):
                 "test_load_file_config",
                 {"type": "Config", "foo": "bar"},
             )
-        ] == list(FileLoad.finds(Config, path=config.conf_path))
+        ] == list(YamlParser.finds(Config, path=config.conf_path))
         assert [] == list(
-            FileLoad.finds(
+            YamlParser.finds(
                 Config,
                 path=config.conf_path,
                 excluded=["test_load_file_config"],
@@ -128,7 +128,7 @@ def test_load_file_finds_raise(target_path: Path):
 
     with mock.patch.object(Config, "conf_path", target_path):
         with pytest.raises(ValueError):
-            _ = FileLoad("test_load_file_config", path=config.conf_path).type
+            _ = YamlParser("test_load_file_config", path=config.conf_path).type
 
 
 @pytest.fixture(scope="module")

@@ -7,12 +7,11 @@ from __future__ import annotations
 
 import copy
 import os
-from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from functools import cached_property
 from inspect import isclass
 from pathlib import Path
-from typing import Final, Optional, Protocol, TypeVar, Union
+from typing import Final, Optional, TypeVar, Union
 from zoneinfo import ZoneInfo
 
 from ddeutil.core import str2bool
@@ -162,23 +161,7 @@ class APIConfig:
         return env("API_PREFIX_PATH", f"/api/v{self.version}")
 
 
-class BaseLoad(ABC):  # pragma: no cov
-    """Base Load object is the abstraction object for any Load object that
-    should to inherit from this base class.
-    """
-
-    @classmethod
-    @abstractmethod
-    def find(cls, name: str, *args, **kwargs) -> DictData: ...
-
-    @classmethod
-    @abstractmethod
-    def finds(
-        cls, obj: object, *args, **kwargs
-    ) -> Iterator[tuple[str, DictData]]: ...
-
-
-class FileLoad(BaseLoad):
+class YamlParser:
     """Base Load object that use to search config data by given some identity
     value like name of `Workflow` or `Crontab` templates.
 
@@ -418,24 +401,6 @@ def dynamic(
             f"as config {type(conf)}."
         )
     return extra
-
-
-class Loader(Protocol):  # pragma: no cov
-    type: str
-    path: Path
-    data: DictData
-    extras: DictData
-    externals: DictData
-
-    def __init__(self, *args, **kwargs) -> None: ...
-
-    @classmethod
-    def find(cls, name: str, *args, **kwargs) -> DictData: ...
-
-    @classmethod
-    def finds(
-        cls, obj: object, *args, **kwargs
-    ) -> Iterator[tuple[str, DictData]]: ...
 
 
 def pass_env(value: T) -> T:  # pragma: no cov

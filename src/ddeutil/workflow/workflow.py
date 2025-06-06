@@ -33,7 +33,7 @@ from typing_extensions import Self
 
 from . import get_status_from_error
 from .__types import DictData
-from .conf import FileLoad, Loader, dynamic
+from .conf import YamlParser, dynamic
 from .errors import WorkflowCancelError, WorkflowError, WorkflowTimeoutError
 from .event import Crontab
 from .job import Job
@@ -112,7 +112,6 @@ class Workflow(BaseModel):
         *,
         path: Optional[Path] = None,
         extras: DictData | None = None,
-        loader: type[Loader] = None,
     ) -> Self:
         """Create Workflow instance from the Loader object that only receive
         an input workflow name. The loader object will use this workflow name to
@@ -122,14 +121,12 @@ class Workflow(BaseModel):
         :param path: (Path) An override config path.
         :param extras: (DictData) An extra parameters that want to override core
             config values.
-        :param loader: A loader class for override default loader object.
 
         :raise ValueError: If the type does not match with current object.
 
         :rtype: Self
         """
-        loader: type[Loader] = loader or FileLoad
-        load: Loader = loader(name, path=path, extras=extras)
+        load: YamlParser = YamlParser(name, path=path, extras=extras)
 
         # NOTE: Validate the config type match with current connection model
         if load.type != cls.__name__:
@@ -141,7 +138,7 @@ class Workflow(BaseModel):
         if extras:
             data["extras"] = extras
 
-        cls.__bypass_on__(data, path=load.path, extras=extras, loader=loader)
+        cls.__bypass_on__(data, path=load.path, extras=extras)
         return cls.model_validate(obj=data)
 
     @classmethod
@@ -150,7 +147,6 @@ class Workflow(BaseModel):
         data: DictData,
         path: Path,
         extras: DictData | None = None,
-        loader: type[Loader] = None,
     ) -> DictData:
         """Bypass the on data to loaded config data.
 
@@ -171,7 +167,7 @@ class Workflow(BaseModel):
             #   field.
             data["on"] = [
                 (
-                    (loader or FileLoad)(n, path=path, extras=extras).data
+                    YamlParser(n, path=path, extras=extras).data
                     if isinstance(n, str)
                     else n
                 )
