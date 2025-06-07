@@ -1,15 +1,16 @@
 from typing import Any
 
+from uvicorn.config import LOGGING_CONFIG as LOGGING_CONFIG_UVICORN
+
 from ..conf import config
 
 LOGGING_CONFIG: dict[str, Any] = {  # pragma: no cov
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
-        "standard": {
-            "format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-        },
-        "custom_formatter": {
+        "default": LOGGING_CONFIG_UVICORN["formatters"]["default"],
+        "access": LOGGING_CONFIG_UVICORN["formatters"]["access"],
+        "custom": {
             "format": config.log_format,
             "datefmt": config.log_datetime_format,
         },
@@ -18,14 +19,10 @@ LOGGING_CONFIG: dict[str, Any] = {  # pragma: no cov
         "level": "DEBUG" if config.debug else "INFO",
     },
     "handlers": {
-        "default": {
-            "formatter": "standard",
-            "class": "logging.StreamHandler",
-            "stream": "ext://sys.stderr",
-        },
+        "default": LOGGING_CONFIG_UVICORN["handlers"]["default"],
+        "access": LOGGING_CONFIG_UVICORN["handlers"]["access"],
         "stream_handler": {
-            # "formatter": "standard",
-            "formatter": "custom_formatter",
+            "formatter": "custom",
             "class": "logging.StreamHandler",
             "stream": "ext://sys.stdout",
         },
@@ -39,34 +36,24 @@ LOGGING_CONFIG: dict[str, Any] = {  # pragma: no cov
     },
     "loggers": {
         "uvicorn": {
-            # "handlers": ["default", "file_handler"],
             "handlers": ["default"],
             "level": "DEBUG" if config.debug else "INFO",
             "propagate": False,
         },
         "uvicorn.access": {
-            # "handlers": ["stream_handler", "file_handler"],
-            "handlers": ["stream_handler"],
+            "handlers": ["access"],
             "level": "DEBUG" if config.debug else "INFO",
             "propagate": False,
         },
         "uvicorn.error": {
-            # "handlers": ["stream_handler", "file_handler"],
-            "handlers": ["stream_handler"],
+            "handlers": ["default"],
             "level": "DEBUG" if config.debug else "INFO",
-            "propagate": False,
         },
-        "uvicorn.asgi": {
-            # "handlers": ["stream_handler", "file_handler"],
+        "ddeutil.workflow": {
             "handlers": ["stream_handler"],
-            "level": "TRACE",
-            "propagate": False,
+            "level": "INFO",
+            # "propagate": False,
+            "propagate": True,
         },
-        # "ddeutil.workflow": {
-        #     "handlers": ["stream_handler"],
-        #     "level": "INFO",
-        #     # "propagate": False,
-        #     "propagate": True,
-        # },
     },
 }

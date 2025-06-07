@@ -6,7 +6,6 @@ from ddeutil.workflow.traces import (
     FileTrace,
     PrefixMsg,
     TraceMeta,
-    extract_msg_prefix,
 )
 
 
@@ -26,7 +25,7 @@ def test_trace_regex_message():
         "[STAGE]: Execute Empty-Stage: 'End trigger Priority Group': "
         "( End trigger Priority Group: 2 )"
     )
-    prefix: PrefixMsg = extract_msg_prefix(msg)
+    prefix: PrefixMsg = PrefixMsg.from_str(msg)
     assert prefix.name == "STAGE"
     assert prefix.message == (
         "Execute Empty-Stage: 'End trigger Priority Group': "
@@ -37,7 +36,7 @@ def test_trace_regex_message():
         "[]: Execute Empty-Stage: 'End trigger Priority Group': "
         "( End trigger Priority Group: 2 )"
     )
-    prefix: PrefixMsg = extract_msg_prefix(msg)
+    prefix: PrefixMsg = PrefixMsg.from_str(msg)
     assert prefix.name is None
     assert prefix.message == (
         "[]: Execute Empty-Stage: 'End trigger Priority Group': "
@@ -45,7 +44,7 @@ def test_trace_regex_message():
     )
 
     msg: str = ""
-    prefix: PrefixMsg = extract_msg_prefix(msg)
+    prefix: PrefixMsg = PrefixMsg.from_str(msg)
     assert prefix.name is None
     assert prefix.message == ""
 
@@ -53,7 +52,7 @@ def test_trace_regex_message():
         "[WORKFLOW]: Execute Empty-Stage:\n'End trigger Priority Group':\n"
         "( End trigger Priority Group: 2 )"
     )
-    prefix: PrefixMsg = extract_msg_prefix(msg)
+    prefix: PrefixMsg = PrefixMsg.from_str(msg)
     assert prefix.name == "WORKFLOW"
     assert prefix.message == (
         "Execute Empty-Stage:\n'End trigger Priority Group':\n"

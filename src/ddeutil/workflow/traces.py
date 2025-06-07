@@ -417,7 +417,7 @@ class ConsoleTrace(BaseTrace):  # pragma: no cov
         ):
             self.writer(msg, level=mode, is_err=is_err)
 
-        getattr(logger, mode)(msg, stacklevel=3)
+        getattr(logger, mode)(msg, stacklevel=3, extra={"cut_id": self.cut_id})
 
     def debug(self, message: str):
         """Write trace log with append mode and logging this message with the
@@ -474,7 +474,7 @@ class ConsoleTrace(BaseTrace):  # pragma: no cov
         ):
             await self.awriter(msg, level=mode, is_err=is_err)
 
-        getattr(logger, mode)(msg, stacklevel=3)
+        getattr(logger, mode)(msg, stacklevel=3, extra={"cut_id": self.cut_id})
 
     async def adebug(self, message: str) -> None:  # pragma: no cov
         """Async write trace log with append mode and logging this message with
