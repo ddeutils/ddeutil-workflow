@@ -104,6 +104,11 @@ def test_workflow_on():
                 {"cronjob": "5 * * * *"},
                 {"cronjob": "6 * * * *"},
                 {"cronjob": "7 * * * *"},
+                {"cronjob": "8 * * * *"},
+                {"cronjob": "9 * * * *"},
+                {"cronjob": "10 * * * *"},
+                {"cronjob": "11 * * * *"},
+                {"cronjob": "12 * * * *"},
             ],
         )
 

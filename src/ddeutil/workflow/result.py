@@ -31,9 +31,9 @@ from . import (
     WorkflowError,
 )
 from .__types import DictData
+from .audits import TraceModel, get_trace
 from .conf import dynamic
 from .errors import ResultError
-from .logs import TraceModel, get_trace
 from .utils import default_gen_id, gen_id, get_dt_now
 
 

@@ -33,11 +33,11 @@ from typing_extensions import Self
 
 from . import get_status_from_error
 from .__types import DictData
+from .audits import Audit, get_audit
 from .conf import YamlParser, dynamic
 from .errors import WorkflowCancelError, WorkflowError, WorkflowTimeoutError
 from .event import Crontab
 from .job import Job
-from .logs import Audit, get_audit
 from .params import Param
 from .result import (
     CANCEL,

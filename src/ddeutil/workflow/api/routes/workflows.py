@@ -16,8 +16,8 @@ from fastapi.responses import UJSONResponse
 from pydantic import BaseModel
 
 from ...__types import DictData
+from ...audits import AuditModel, get_audit
 from ...conf import YamlParser
-from ...logs import AuditModel, get_audit
 from ...result import Result
 from ...workflow import Workflow
 

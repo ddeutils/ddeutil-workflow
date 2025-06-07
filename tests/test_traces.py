@@ -2,7 +2,7 @@ import traceback
 
 import pytest
 from ddeutil.workflow import Result
-from ddeutil.workflow.logs import (
+from ddeutil.workflow.traces import (
     FileTrace,
     PrefixMsg,
     TraceMeta,
@@ -79,7 +79,7 @@ def test_trace_meta():
         level="info",
         extras={"logs_trace_frame_layer": 1},
     )
-    assert meta.filename == "test_logs_trace.py"
+    assert meta.filename == "test_traces.py"
 
     meta = TraceMeta.make(
         mode="stderr",

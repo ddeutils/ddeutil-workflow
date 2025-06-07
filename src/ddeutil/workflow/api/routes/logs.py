@@ -10,7 +10,7 @@ from fastapi import APIRouter, Path, Query
 from fastapi import status as st
 from fastapi.responses import UJSONResponse
 
-from ...logs import get_audit
+from ...audits import get_audit
 from ...result import Result
 
 router = APIRouter(

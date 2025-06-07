@@ -76,7 +76,8 @@ nav:
       - Params: api/params.md
       - Result: api/result.md
       - Reusables: api/reusables.md
-      - Logs: api/logs.md
+      - Traces: api/traces.md
+      - Audits: api/audits.md
       - Utils: api/utils.md
       - Errors: api/errors.md
   - Examples:

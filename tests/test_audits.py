@@ -3,8 +3,8 @@ from datetime import datetime
 from unittest import mock
 
 import pytest
+from ddeutil.workflow.audits import FileAudit
 from ddeutil.workflow.conf import Config
-from ddeutil.workflow.logs import FileAudit
 
 
 @mock.patch.object(Config, "enable_write_audit", False)

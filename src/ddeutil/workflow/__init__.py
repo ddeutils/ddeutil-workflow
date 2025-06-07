@@ -5,22 +5,16 @@
 # ------------------------------------------------------------------------------
 from .__cron import CronJob, CronRunner
 from .__types import DictData, DictStr, Matrix, Re, TupleStr
+from .audits import (
+    Audit,
+    AuditModel,
+    FileAudit,
+    get_audit,
+)
 from .conf import *
 from .errors import *
 from .event import *
 from .job import *
-from .logs import (
-    Audit,
-    AuditModel,
-    FileAudit,
-    FileTrace,
-    Trace,
-    TraceData,
-    TraceMeta,
-    TraceModel,
-    get_audit,
-    get_trace,
-)
 from .params import *
 from .result import (
     CANCEL,
@@ -33,5 +27,14 @@ from .result import (
 )
 from .reusables import *
 from .stages import *
+from .traces import (
+    ConsoleTrace,
+    FileTrace,
+    Trace,
+    TraceData,
+    TraceMeta,
+    TraceModel,
+    get_trace,
+)
 from .utils import *
 from .workflow import *
