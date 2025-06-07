@@ -21,7 +21,7 @@ LOGGING_CONFIG: dict[str, Any] = {  # pragma: no cov
     "handlers": {
         "default": LOGGING_CONFIG_UVICORN["handlers"]["default"],
         "access": LOGGING_CONFIG_UVICORN["handlers"]["access"],
-        "stream_handler": {
+        "stream_custom": {
             "formatter": "custom",
             "class": "logging.StreamHandler",
             "stream": "ext://sys.stdout",
@@ -50,7 +50,7 @@ LOGGING_CONFIG: dict[str, Any] = {  # pragma: no cov
             "level": "DEBUG" if config.debug else "INFO",
         },
         "ddeutil.workflow": {
-            "handlers": ["stream_handler"],
+            "handlers": ["stream_custom"],
             "level": "INFO",
             # "propagate": False,
             "propagate": True,
