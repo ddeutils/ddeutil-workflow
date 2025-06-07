@@ -1,0 +1,63 @@
+{
+    'errors': {
+        1: {
+            'message': 'Item execution was canceled from the event before start item '
+            'execution.',
+            'name': 'StageCancelError',
+        },
+        2: {
+            'message': "Item execution was break because its nested-stage, 'Final Echo', "
+            'failed.',
+            'name': 'StageError',
+        },
+    },
+    'foreach': {
+        1: {
+            'errors': {
+                'message': 'Item execution was canceled from the event before start item '
+                'execution.',
+                'name': 'StageCancelError',
+            },
+            'item': 1,
+            'stages': {
+                '2709471980': {
+                    'outputs': {},
+                    'status': SUCCESS,
+                },
+                '9263488742': {
+                    'outputs': {},
+                    'status': SKIP,
+                },
+            },
+            'status': CANCEL,
+        },
+        2: {
+            'errors': {
+                'message': "Item execution was break because its nested-stage, 'Final "
+                "Echo', failed.",
+                'name': 'StageError',
+            },
+            'item': 2,
+            'stages': {
+                '2709471980': {
+                    'outputs': {},
+                    'status': SUCCESS,
+                },
+                '9263488742': {
+                    'errors': {
+                        'message': 'Raise for item equal 2',
+                        'name': 'StageError',
+                    },
+                    'outputs': {},
+                    'status': FAILED,
+                },
+            },
+            'status': FAILED,
+        },
+    },
+    'items': [
+        1,
+        2,
+    ],
+    'status': FAILED,
+}
