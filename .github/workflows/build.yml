@@ -62,9 +62,8 @@ jobs:
         run: |
           TAG=$(echo ${GITHUB_REF#refs/tags/} | tr "[:upper:]" "[:lower:]" | sed -e 's/v//g')
           echo $TAG
-
-#          docker buildx build \
-#            --file ./.container/Dockerfile \
-#            --platform linux/amd64,linux/arm64 \
-#            --tag ${{ vars.GH_REPO_URL }}:${{ github.ref_name }} \
-#            --push .
+          docker buildx build \
+            --file ./.container/Dockerfile \
+            --platform linux/amd64,linux/arm64 \
+            --tag ${{ vars.GH_REPO_URL }}:$TAG \
+            --push .
