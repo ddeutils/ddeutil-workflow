@@ -1,7 +1,6 @@
-# Logs
+# Traces
 
-The log module include audit log and trace log objects.
+The Traces module include trace log objects that is the stdout and stderr of the
+execution process.
 
-## FileAudit
-
-## FileTraceLog
+## FileTrace

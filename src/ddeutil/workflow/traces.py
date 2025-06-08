@@ -88,9 +88,11 @@ class PrefixMsg(BaseModel):
     def from_str(cls, msg: str) -> Self:
         """Extract message prefix from an input message.
 
-        :param msg: A message that want to extract.
+        Args:
+            msg (str): A message that want to extract.
 
-        :rtype: PrefixMsg
+        Returns:
+            PrefixMsg: the validated model from a string message.
         """
         return PrefixMsg.model_validate(
             obj=PREFIX_LOGS_REGEX.search(msg).groupdict()
@@ -231,17 +233,17 @@ class BaseTrace(BaseModel, ABC):  # pragma: no cov
 
     model_config = ConfigDict(frozen=True)
 
-    run_id: str = Field(default="A running ID")
-    parent_run_id: Optional[str] = Field(
-        default=None,
-        description="A parent running ID",
-    )
     extras: DictData = Field(
         default_factory=dict,
         description=(
             "An extra parameter that want to override on the core config "
             "values."
         ),
+    )
+    run_id: str = Field(description="A running ID")
+    parent_run_id: Optional[str] = Field(
+        default=None,
+        description="A parent running ID",
     )
 
     @classmethod
@@ -251,6 +253,17 @@ class BaseTrace(BaseModel, ABC):  # pragma: no cov
         path: Optional[Path] = None,
         extras: Optional[DictData] = None,
     ) -> Iterator[TraceData]:  # pragma: no cov
+        """Return iterator of TraceData models from the target pointer.
+
+        Args:
+            path (:obj:`Path`, optional): A pointer path that want to override.
+            extras (:obj:`DictData`, optional): An extras parameter that want to
+                override default engine config.
+
+        Returns:
+            Iterator[TracData]: An iterator object that generate a TracData
+                model.
+        """
         raise NotImplementedError(
             "Trace dataclass should implement `find_traces` class-method."
         )
@@ -322,6 +335,7 @@ class BaseTrace(BaseModel, ABC):  # pragma: no cov
 
 
 class ConsoleTrace(BaseTrace):  # pragma: no cov
+    """Console Trace log model."""
 
     @classmethod
     def find_traces(
