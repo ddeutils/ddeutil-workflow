@@ -189,14 +189,17 @@ class RestAuth(BaseModel):
 
 @tag("requests", alias="get-api-with-oauth-to-s3")
 def get_api_with_oauth_to_s3(
-        method: str,
-        url: str,
-        body: dict[str, str],
-        auth: RestAuth,
-        writing_node: str,
-        aws: AwsCredential,
-        result: Result,
+     method: str,
+     url: str,
+     body: dict[str, str],
+     auth: RestAuth,
+     writing_node: str,
+     aws: AwsCredential,
+     result: Result,
 ) -> dict[str, int]:
+    """Get the data from RestAPI via Authenticate with OAuth and then store to
+    AWS S3 service.
+    """
     result.trace.info("[CALLER]: Start get data via RestAPI to S3.")
     result.trace.info(f"... {method}: {url}")
     if method != "post":
@@ -228,23 +231,22 @@ it will use default value and do not raise any error to you.
 > The config value that you will set on the environment should combine with
 > prefix, component, and name which is `WORKFLOW_{component}_{name}` (Upper case).
 
-| Name                         | Component | Default                                                                                                                         | Description                                                                                                        |
-|:-----------------------------|:---------:|:--------------------------------------------------------------------------------------------------------------------------------|:-------------------------------------------------------------------------------------------------------------------|
-| **REGISTRY_CALLER**          |   CORE    | `.`                                                                                                                             | List of importable string for the call stage.                                                                      |
-| **REGISTRY_FILTER**          |   CORE    | `ddeutil.workflow.templates`                                                                                                    | List of importable string for the filter template.                                                                 |
-| **CONF_PATH**                |   CORE    | `./conf`                                                                                                                        | The config path that keep all template `.yaml` files.                                                              |
-| **TIMEZONE**                 |   CORE    | `Asia/Bangkok`                                                                                                                  | A Timezone string value that will pass to `ZoneInfo` object.                                                       |
-| **STAGE_DEFAULT_ID**         |   CORE    | `false`                                                                                                                         | A flag that enable default stage ID that use for catch an execution output.                                        |
-| **MAX_QUEUE_COMPLETE_HIST**  |   CORE    | `16`                                                                                                                            |                                                                                                                    |
-| **GENERATE_ID_SIMPLE_MODE**  |   CORE    | `true`                                                                                                                          | A flog that enable generating ID with `md5` algorithm.                                                             |
-| **DEBUG_MODE**               |    LOG    | `true`                                                                                                                          | A flag that enable logging with debug level mode.                                                                  |
-| **FORMAT**                   |    LOG    | `%(asctime)s.%(msecs)03d (%(name)-10s, %(process)-5d,%(thread)-5d) [%(levelname)-7s] %(message)-120s (%(filename)s:%(lineno)s)` |                                                                                                                    |
-| **FORMAT_FILE**              |    LOG    | `{datetime} ({process:5d}, {thread:5d}) {message:120s} ({filename}:{lineno})`                                                   |                                                                                                                    |
-| **DATETIME_FORMAT**          |    LOG    | `%Y-%m-%d %H:%M:%S`                                                                                                             |                                                                                                                    |
-| **TRACE_PATH**               |    LOG    | `./logs`                                                                                                                        | The log path of the workflow saving log.                                                                           |
-| **TRACE_ENABLE_WRITE**       |    LOG    | `false`                                                                                                                         |                                                                                                                    |
-| **AUDIT_PATH**               |    LOG    | `./audits`                                                                                                                      |                                                                                                                    |
-| **AUDIT_ENABLE_WRITE**       |    LOG    | `true`                                                                                                                          | A flag that enable logging object saving log to its destination.                                                   |
+| Name                         | Component | Default                                                                                                                         | Description                                                                            |
+|:-----------------------------|:---------:|:--------------------------------------------------------------------------------------------------------------------------------|:---------------------------------------------------------------------------------------|
+| **REGISTRY_CALLER**          |   CORE    | `.`                                                                                                                             | List of importable string for the call stage.                                          |
+| **REGISTRY_FILTER**          |   CORE    | `ddeutil.workflow.templates`                                                                                                    | List of importable string for the filter template.                                     |
+| **CONF_PATH**                |   CORE    | `./conf`                                                                                                                        | The config path that keep all template `.yaml` files.                                  |
+| **TIMEZONE**                 |   CORE    | `Asia/Bangkok`                                                                                                                  | A Timezone string value that will pass to `ZoneInfo` object.                           |
+| **STAGE_DEFAULT_ID**         |   CORE    | `false`                                                                                                                         | A flag that enable default stage ID that use for catch an execution output.            |
+| **GENERATE_ID_SIMPLE_MODE**  |   CORE    | `true`                                                                                                                          | A flog that enable generating ID with `md5` algorithm.                                 |
+| **DEBUG_MODE**               |    LOG    | `true`                                                                                                                          | A flag that enable logging with debug level mode.                                      |
+| **FORMAT**                   |    LOG    | `%(asctime)s.%(msecs)03d (%(name)-10s, %(process)-5d,%(thread)-5d) [%(levelname)-7s] %(message)-120s (%(filename)s:%(lineno)s)` | A trace message console format.                                                        |
+| **FORMAT_FILE**              |    LOG    | `{datetime} ({process:5d}, {thread:5d}) {message:120s} ({filename}:{lineno})`                                                   | A trace message format that use to write to target pointer.                            |
+| **DATETIME_FORMAT**          |    LOG    | `%Y-%m-%d %H:%M:%S`                                                                                                             | A datetime format of the trace log.                                                    |
+| **TRACE_PATH**               |    LOG    | `./logs`                                                                                                                        | A pointer of trace log that use to store.                                              |
+| **TRACE_ENABLE_WRITE**       |    LOG    | `false`                                                                                                                         | A flag that enable writing trace log.                                                  |
+| **AUDIT_PATH**               |    LOG    | `./audits`                                                                                                                      | A pointer of audit log that use to store.                                              |
+| **AUDIT_ENABLE_WRITE**       |    LOG    | `true`                                                                                                                          | A flag that enable writing audit log after end execution in the workflow release step. |
 
 ## :rocket: Deployment
 

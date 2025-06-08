@@ -179,18 +179,22 @@ class RestAuth(BaseModel):
 
 @tag("requests", alias="get-api-with-oauth-to-s3")
 def get_api_with_oauth_to_s3(
-        method: str,
-        url: str,
-        body: dict[str, str],
-        auth: RestAuth,
-        writing_node: str,
-        aws: AwsCredential,
-        result: Result,
+     method: str,
+     url: str,
+     body: dict[str, str],
+     auth: RestAuth,
+     writing_node: str,
+     aws: AwsCredential,
+     result: Result,
 ) -> dict[str, int]:
+    """Get the data from RestAPI via Authenticate with OAuth and then store to
+    AWS S3 service.
+    """
     result.trace.info("[CALLER]: Start get data via RestAPI to S3.")
     result.trace.info(f"... {method}: {url}")
     if method != "post":
         raise StageError(f"RestAPI does not support for {method} action.")
+    # NOTE: If you want to use secret, you can use `auth.keys.get_secret_value()`.
     return {"records": 1000}
 ```
 
@@ -203,13 +207,6 @@ from ddeutil.workflow import Workflow, Result
 
 workflow: Workflow = Workflow.from_conf('run-py-local')
 result: Result = workflow.execute(
-   params={"source-extract": "USD-THB", "asat-dt": "2024-01-01"}
+   params={"source-extract": "USD-THB", "run-date": "2024-01-01"}
 )
 ```
-
-!!! example
-
-    For more examples, this workflow can use with these scenarios:
-
-    - Extract metadata (1 ~ 15 MB per request) from external API every 15 minutes
-    - Sensor data on S3 and send that data to Azure Service Bus every minute

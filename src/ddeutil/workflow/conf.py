@@ -144,10 +144,6 @@ class Config:  # pragma: no cov
     def stage_default_id(self) -> bool:
         return str2bool(env("CORE_STAGE_DEFAULT_ID", "false"))
 
-    @property
-    def max_queue_complete_hist(self) -> int:
-        return int(env("CORE_MAX_QUEUE_COMPLETE_HIST", "16"))
-
 
 class APIConfig:
     """API Config object."""

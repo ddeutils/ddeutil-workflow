@@ -156,11 +156,16 @@ def test_dynamic():
     conf = dynamic("audit_path", extras={"audit_path": Path("/extras-audits")})
     assert conf == Path("/extras-audits")
 
-    conf = dynamic("max_queue_complete_hist", f=10, extras={})
-    assert conf == 10
+    conf = dynamic("log_datetime_format", f="%Y%m%d", extras={})
+    assert conf == "%Y%m%d"
 
-    conf = dynamic("max_queue_complete_hist", f=None, extras={})
-    assert conf == 16
+    conf = dynamic("log_datetime_format", f=None, extras={})
+    assert conf == "%Y-%m-%d %H:%M:%S"
+
+    conf = dynamic(
+        "log_datetime_format", f="%Y%m%d", extras={"log_datetime_format": "%Y"}
+    )
+    assert conf == "%Y"
 
     with pytest.raises(TypeError):
         dynamic("audit_path", extras={"audit_path": "audits"})
