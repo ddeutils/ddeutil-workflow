@@ -45,11 +45,11 @@ jobs:
 
       - name: Set date
         id: date
-        run: echo "::set-output name=date::$(date +'%m-%d-%Y')"
+        run: echo "name=$(date +'%m-%d-%Y')" >> $GITHUB_OUTPUT
 
       - name: Build the dfa-fastapi Docker image
         run: |
-          docker buildx build
+          docker buildx build \
             --no-cache \
             --file ./.container/Dockerfile \
             --platform linux/amd64,linux/arm64 \
