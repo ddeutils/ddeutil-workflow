@@ -2,6 +2,31 @@
 
 ## Latest Changes
 
+## 0.0.69
+
+### :sparkles: Features
+
+- :dart: feat: override logging when use fastapi with uvicorn.
+- :dart: feat: add sub-typer command for workflow.
+
+### :black_nib: Code Changes
+
+- :art: format: split trace and audit log modules.
+- :test_tube: tests: update foreach case matching.
+- :art: format: add console trace object.
+
+### :broom: Deprecate & Clean
+
+- :recycle: clean: remove unuse config.
+- :recycle: clean: remove uv.lock file.
+- :recycle: clean: remove multi-loader support and use only YAML parser.
+- :recycle: clean: remove max_cron_per_workflow config.
+
+### :book: Documentations
+
+- :page_facing_up: docs: update docstring and mkdocs on logs session.
+- :page_facing_up: docs: update readme file.
+
 ## 0.0.68
 
 ### :sparkles: Features
