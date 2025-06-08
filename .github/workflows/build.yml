@@ -47,7 +47,8 @@ jobs:
         id: date
         run: echo "name=$(date +'%m-%d-%Y')" >> $GITHUB_OUTPUT
 
-      - name: Build the dfa-fastapi Docker image
+      - name: Build the ddeutil-workflow Docker image latest
+        if: ${{ github.ref_name }}
         run: |
           docker buildx build \
             --no-cache \
@@ -55,3 +56,15 @@ jobs:
             --platform linux/amd64,linux/arm64 \
             --tag ${{ vars.GH_REPO_URL }}:latest \
             --push .
+
+      - name: Build the ddeutil-workflow Docker image with tag
+        if: github.ref_type == 'tag'
+        run: |
+          TAG=$(echo ${GITHUB_REF#refs/tags/} | tr "[:upper:]" "[:lower:]" | sed -e 's/v//g')
+          echo $TAG
+
+#          docker buildx build \
+#            --file ./.container/Dockerfile \
+#            --platform linux/amd64,linux/arm64 \
+#            --tag ${{ vars.GH_REPO_URL }}:${{ github.ref_name }} \
+#            --push .
