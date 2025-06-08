@@ -333,6 +333,124 @@ class BaseTrace(BaseModel, ABC):  # pragma: no cov
             "Adjust make message method for this trace object before using."
         )
 
+    @abstractmethod
+    def _logging(
+        self,
+        message: str,
+        mode: str,
+        *,
+        is_err: bool = False,
+    ):
+        """Write trace log with append mode and logging this message with any
+        logging level.
+
+        :param message: (str) A message that want to log.
+        :param mode: (str)
+        :param is_err: (bool)
+        """
+        raise NotImplementedError(
+            "Logging action should be implement for making trace log."
+        )
+
+    def debug(self, message: str):
+        """Write trace log with append mode and logging this message with the
+        DEBUG level.
+
+        :param message: (str) A message that want to log.
+        """
+        self._logging(message, mode="debug")
+
+    def info(self, message: str) -> None:
+        """Write trace log with append mode and logging this message with the
+        INFO level.
+
+        :param message: (str) A message that want to log.
+        """
+        self._logging(message, mode="info")
+
+    def warning(self, message: str) -> None:
+        """Write trace log with append mode and logging this message with the
+        WARNING level.
+
+        :param message: (str) A message that want to log.
+        """
+        self._logging(message, mode="warning")
+
+    def error(self, message: str) -> None:
+        """Write trace log with append mode and logging this message with the
+        ERROR level.
+
+        :param message: (str) A message that want to log.
+        """
+        self._logging(message, mode="error", is_err=True)
+
+    def exception(self, message: str) -> None:
+        """Write trace log with append mode and logging this message with the
+        EXCEPTION level.
+
+        :param message: (str) A message that want to log.
+        """
+        self._logging(message, mode="exception", is_err=True)
+
+    @abstractmethod
+    async def _alogging(
+        self,
+        message: str,
+        mode: str,
+        *,
+        is_err: bool = False,
+    ) -> None:
+        """Async write trace log with append mode and logging this message with
+        any logging level.
+
+        :param message: (str) A message that want to log.
+        :param mode: (str)
+        :param is_err: (bool)
+        """
+        raise NotImplementedError(
+            "Async Logging action should be implement for making trace log."
+        )
+
+    async def adebug(self, message: str) -> None:  # pragma: no cov
+        """Async write trace log with append mode and logging this message with
+        the DEBUG level.
+
+        :param message: (str) A message that want to log.
+        """
+        await self._alogging(message, mode="debug")
+
+    async def ainfo(self, message: str) -> None:  # pragma: no cov
+        """Async write trace log with append mode and logging this message with
+        the INFO level.
+
+        :param message: (str) A message that want to log.
+        """
+        await self._alogging(message, mode="info")
+
+    async def awarning(self, message: str) -> None:  # pragma: no cov
+        """Async write trace log with append mode and logging this message with
+        the WARNING level.
+
+        :param message: (str) A message that want to log.
+        """
+        await self._alogging(message, mode="warning")
+
+    async def aerror(self, message: str) -> None:  # pragma: no cov
+        """Async write trace log with append mode and logging this message with
+        the ERROR level.
+
+        :param message: (str) A message that want to log.
+        """
+        await self._alogging(message, mode="error", is_err=True)
+
+    async def aexception(self, message: str) -> None:  # pragma: no cov
+        """Async write trace log with append mode and logging this message with
+        the EXCEPTION level.
+
+        :param message: (str) A message that want to log.
+        """
+        await self._alogging(message, mode="exception", is_err=True)
+
 
 class ConsoleTrace(BaseTrace):  # pragma: no cov
     """Console Trace log model."""
@@ -416,7 +534,7 @@ class ConsoleTrace(BaseTrace):  # pragma: no cov
             f"{PrefixMsg.from_str(message).prepare(self.extras)}"
         )
 
-    def __logging(
+    def _logging(
         self, message: str, mode: str, *, is_err: bool = False
     ) -> None:
         """Write trace log with append mode and logging this message with any
@@ -433,47 +551,7 @@ class ConsoleTrace(BaseTrace):  # pragma: no cov
 
         getattr(logger, mode)(msg, stacklevel=3, extra={"cut_id": self.cut_id})
 
-    def debug(self, message: str):
-        """Write trace log with append mode and logging this message with the
-        DEBUG level.
-
-        :param message: (str) A message that want to log.
-        """
-        self.__logging(message, mode="debug")
-
-    def info(self, message: str) -> None:
-        """Write trace log with append mode and logging this message with the
-        INFO level.
-
-        :param message: (str) A message that want to log.
-        """
-        self.__logging(message, mode="info")
-
-    def warning(self, message: str) -> None:
-        """Write trace log with append mode and logging this message with the
-        WARNING level.
-
-        :param message: (str) A message that want to log.
-        """
-        self.__logging(message, mode="warning")
-
-    def error(self, message: str) -> None:
-        """Write trace log with append mode and logging this message with the
-        ERROR level.
-
-        :param message: (str) A message that want to log.
-        """
-        self.__logging(message, mode="error", is_err=True)
-
-    def exception(self, message: str) -> None:
-        """Write trace log with append mode and logging this message with the
-        EXCEPTION level.
-
-        :param message: (str) A message that want to log.
-        """
-        self.__logging(message, mode="exception", is_err=True)
-
-    async def __alogging(
+    async def _alogging(
         self, message: str, mode: str, *, is_err: bool = False
     ) -> None:
         """Write trace log with append mode and logging this message with any
@@ -489,46 +567,6 @@ class ConsoleTrace(BaseTrace):  # pragma: no cov
             await self.awriter(msg, level=mode, is_err=is_err)
 
         getattr(logger, mode)(msg, stacklevel=3, extra={"cut_id": self.cut_id})
-
-    async def adebug(self, message: str) -> None:  # pragma: no cov
-        """Async write trace log with append mode and logging this message with
-        the DEBUG level.
-
-        :param message: (str) A message that want to log.
-        """
-        await self.__alogging(message, mode="debug")
-
-    async def ainfo(self, message: str) -> None:  # pragma: no cov
-        """Async write trace log with append mode and logging this message with
-        the INFO level.
-
-        :param message: (str) A message that want to log.
-        """
-        await self.__alogging(message, mode="info")
-
-    async def awarning(self, message: str) -> None:  # pragma: no cov
-        """Async write trace log with append mode and logging this message with
-        the WARNING level.
-
-        :param message: (str) A message that want to log.
-        """
-        await self.__alogging(message, mode="warning")
-
-    async def aerror(self, message: str) -> None:  # pragma: no cov
-        """Async write trace log with append mode and logging this message with
-        the ERROR level.
-
-        :param message: (str) A message that want to log.
-        """
-        await self.__alogging(message, mode="error", is_err=True)
-
-    async def aexception(self, message: str) -> None:  # pragma: no cov
-        """Async write trace log with append mode and logging this message with
-        the EXCEPTION level.
-
-        :param message: (str) A message that want to log.
-        """
-        await self.__alogging(message, mode="exception", is_err=True)
 
 
 class FileTrace(ConsoleTrace):  # pragma: no cov

@@ -163,21 +163,23 @@ def gen_id(
     extras: DictData | None = None,
 ) -> str:
     """Generate running ID for able to tracking. This generates process use
-    `md5` algorithm function if `WORKFLOW_CORE_WORKFLOW_ID_SIMPLE_MODE` set
+    ``md5`` algorithm function if ``WORKFLOW_CORE_WORKFLOW_ID_SIMPLE_MODE`` set
     to false. But it will cut this hashing value length to 10 it the setting
     value set to true.
 
     Simple Mode:
 
-        ... 0000 00    00  00   00     00     000000        T   0000000000
-        ... year month day hour minute second microsecond   sep simple-id
+        ... 0000 00    00  00   00     00     000000       T    0000000000
+        ... year month day hour minute second microsecond  sep  simple-id
 
     :param value: A value that want to add to prefix before hashing with md5.
-    :param sensitive: A flag that convert the value to lower case before hashing
-    :param unique: A flag that add timestamp at microsecond level to value
-        before hashing.
-    :param simple_mode: A flag for generate ID by simple mode.
-    :param extras: An extra parameter that use for override config value.
+    :param sensitive: (bool) A flag that enable to convert the value to lower
+        case before hashing that value before generate ID.
+    :param unique: (bool) A flag that add timestamp at microsecond level to
+        value before hashing.
+    :param simple_mode: (bool | None) A flag for generate ID by simple mode.
+    :param extras: (DictData) An extra parameter that use for override config
+        value.
 
     :rtype: str
     """
@@ -212,7 +214,8 @@ def default_gen_id() -> str:
 def make_exec(path: Union[Path, str]) -> None:
     """Change mode of file to be executable file.
 
-    :param path: A file path that want to make executable permission.
+    :param path: (Path | str) A file path that want to make executable
+        permission.
     """
     f: Path = Path(path) if isinstance(path, str) else path
     f.chmod(f.stat().st_mode | stat.S_IEXEC)
@@ -285,9 +288,14 @@ def dump_all(value: T, by_alias: bool = False) -> T: ...  # pragma: no cov
 
 
 def dump_all(
-    value: Union[T, BaseModel], by_alias: bool = False
+    value: Union[T, BaseModel],
+    by_alias: bool = False,
 ) -> Union[T, DictData]:
-    """Dump all BaseModel object to dict."""
+    """Dump all nested BaseModel object to dict object.
+
+    :param value: (T | BaseModel)
+    :param by_alias: (bool)
+    """
     if isinstance(value, dict):
         return {k: dump_all(value[k], by_alias=by_alias) for k in value}
     elif isinstance(value, (list, tuple, set)):

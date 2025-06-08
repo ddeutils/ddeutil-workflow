@@ -38,8 +38,14 @@ def to_dict(exception: Exception, **kwargs) -> ErrorData:  # pragma: no cov
 
 
 class BaseError(Exception):
-    """Base Workflow exception class will implement the `refs` argument for
+    """Base Workflow exception class will implement the ``refs`` argument for
     making an error context to the result context.
+
+    Attributes:
+        refs: (:obj:str, optional)
+        context: (:obj:DictData)
+        params: (:obj:DictData)
+
     """
 
     def __init__(

@@ -44,7 +44,7 @@ from .errors import UtilError
 T = TypeVar("T")
 P = ParamSpec("P")
 
-# NOTE: Adjust logging level of the `asyncio` to INFO level.
+# NOTE: Adjust logging level of the ``asyncio`` to INFO level.
 logging.getLogger("asyncio").setLevel(logging.INFO)
 
 

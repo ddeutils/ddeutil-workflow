@@ -327,13 +327,13 @@ class YamlParser:
         *,
         ignore_filename: Optional[str] = None,
     ) -> bool:
-        """Check this file was ignored.
+        """Check this file was ignored from the `.confignore` format.
 
         :param file: (Path) A file path that want to check.
         :param path: (Path) A config path that want to read the config
             ignore file.
         :param ignore_filename: (str) An ignore filename. Default is
-            `.confignore` filename.
+            ``.confignore`` filename.
 
         :rtype: bool
         """
