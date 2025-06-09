@@ -47,23 +47,22 @@ jobs:
         id: date
         run: echo "name=$(date +'%m-%d-%Y')" >> $GITHUB_OUTPUT
 
-      - name: Build the ddeutil-workflow Docker image latest
+      - name: Build the ddeutil-workflow Docker image without tag
+        if: github.ref_type == 'tag'
         run: |
           docker buildx build \
             --file ./.container/Dockerfile \
             --platform linux/amd64,linux/arm64 \
-            --tag ${{ vars.GH_REPO_URL }}:latest .
-
-          docker push ${{ vars.GH_REPO_URL }}:latest
+            --tag ${{ vars.GH_REPO_URL }}:latest \
+            --push .
 
       - name: Build the ddeutil-workflow Docker image with tag
         if: github.ref_type == 'tag'
         run: |
           TAG=$(echo ${GITHUB_REF#refs/tags/} | tr "[:upper:]" "[:lower:]" | sed -e 's/v//g')
-          echo $TAG
           docker buildx build \
             --file ./.container/Dockerfile \
             --platform linux/amd64,linux/arm64 \
-            --tag ${{ vars.GH_REPO_URL }}:$TAG .
-
-          docker push --tag ${{ vars.GH_REPO_URL }}:$TAG
+            --tag ${{ vars.GH_REPO_URL }}:$TAG \
+            --tag ${{ vars.GH_REPO_URL }}:latest \
+            --push .
