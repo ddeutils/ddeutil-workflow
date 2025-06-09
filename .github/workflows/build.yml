@@ -52,7 +52,7 @@ jobs:
           docker buildx build \
             --file ./.container/Dockerfile \
             --platform linux/amd64,linux/arm64 \
-            --tag ${{ vars.GH_REPO_URL }}:latest
+            --tag ${{ vars.GH_REPO_URL }}:latest .
 
           docker push ${{ vars.GH_REPO_URL }}:latest
 
@@ -64,6 +64,6 @@ jobs:
           docker buildx build \
             --file ./.container/Dockerfile \
             --platform linux/amd64,linux/arm64 \
-            --tag ${{ vars.GH_REPO_URL }}:$TAG
+            --tag ${{ vars.GH_REPO_URL }}:$TAG .
 
           docker push --tag ${{ vars.GH_REPO_URL }}:$TAG
