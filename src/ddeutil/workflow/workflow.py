@@ -257,8 +257,10 @@ class Workflow(BaseModel):
                     f"{self.name!r}."
                 )
 
-            # NOTE: Set job ID to the job model.
-            self.jobs[job].id = job
+            # NOTE: Copy the job model and set job ID to the job model.
+            job_model = self.jobs[job].model_copy()
+            job_model.id = job
+            self.jobs[job] = job_model
 
         # VALIDATE: Validate workflow name should not dynamic with params
         #   template.
@@ -749,6 +751,220 @@ class Workflow(BaseModel):
 
                 return result.catch(
                     status=validate_statuses(statuses), context=context
+                )
+
+            event.set()
+            for future in futures:
+                future.cancel()
+
+            result.trace.error(
+                f"[WORKFLOW]: {self.name!r} was timeout because it use exec "
+                f"time more than {timeout} seconds."
+            )
+
+            time.sleep(0.0025)
+
+        return result.catch(
+            status=FAILED,
+            context={
+                "errors": WorkflowTimeoutError(
+                    f"{self.name!r} was timeout because it use exec time more "
+                    f"than {timeout} seconds."
+                ).to_dict(),
+            },
+        )
+
+    def rerun(
+        self,
+        context: DictData,
+        *,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
+        timeout: float = 3600,
+        max_job_parallel: int = 2,
+    ) -> Result:
+        """Re-Execute workflow with passing the error context data.
+
+        :param context: A context result that get the failed status.
+        :param parent_run_id: (Optional[str]) A parent workflow running ID.
+        :param event: (Event) An Event manager instance that use to cancel this
+            execution if it forces stopped by parent execution.
+        :param timeout: (float) A workflow execution time out in second unit
+            that use for limit time of execution and waiting job dependency.
+            This value does not force stop the task that still running more than
+            this limit time. (Default: 60 * 60 seconds)
+        :param max_job_parallel: (int) The maximum workers that use for job
+            execution in `ThreadPoolExecutor` object. (Default: 2 workers)
+
+        :rtype: Result
+        """
+        ts: float = time.monotonic()
+
+        result: Result = Result.construct_with_rs_or_id(
+            parent_run_id=parent_run_id,
+            id_logic=self.name,
+            extras=self.extras,
+        )
+        if context["status"] == SUCCESS:
+            result.trace.info(
+                "[WORKFLOW]: Does not rerun because it already executed with "
+                "success status."
+            )
+            return result.catch(status=SUCCESS, context=context)
+
+        err = context["errors"]
+        result.trace.info(f"[WORKFLOW]: Previous error: {err}")
+
+        event: Event = event or Event()
+        max_job_parallel: int = dynamic(
+            "max_job_parallel", f=max_job_parallel, extras=self.extras
+        )
+        result.trace.info(
+            f"[WORKFLOW]: Execute: {self.name!r} ("
+            f"{'parallel' if max_job_parallel > 1 else 'sequential'} jobs)"
+        )
+        if not self.jobs:
+            result.trace.warning(f"[WORKFLOW]: {self.name!r} does not set jobs")
+            return result.catch(status=SUCCESS, context=context)
+
+        # NOTE: Prepare the new context for rerun process.
+        jobs: DictData = context.get("jobs")
+        new_context: DictData = {
+            "params": context["params"].copy(),
+            "jobs": {j: jobs[j] for j in jobs if jobs[j]["status"] == SUCCESS},
+        }
+
+        total_job: int = 0
+        job_queue: Queue = Queue()
+        for job_id in self.jobs:
+
+            if job_id in new_context["jobs"]:
+                continue
+
+            job_queue.put(job_id)
+            total_job += 1
+
+        if total_job == 0:
+            result.trace.warning("[WORKFLOW]: It does not have job to rerun.")
+            return result.catch(status=SUCCESS, context=context)
+
+        not_timeout_flag: bool = True
+        statuses: list[Status] = [WAIT] * total_job
+        skip_count: int = 0
+        sequence_statuses: list[Status] = []
+        timeout: float = dynamic(
+            "max_job_exec_timeout", f=timeout, extras=self.extras
+        )
+
+        result.catch(status=WAIT, context=new_context)
+        if event and event.is_set():
+            return result.catch(
+                status=CANCEL,
+                context={
+                    "errors": WorkflowCancelError(
+                        "Execution was canceled from the event was set before "
+                        "workflow execution."
+                    ).to_dict(),
+                },
+            )
+
+        with ThreadPoolExecutor(max_job_parallel, "wf") as executor:
+            futures: list[Future] = []
+
+            while not job_queue.empty() and (
+                not_timeout_flag := ((time.monotonic() - ts) < timeout)
+            ):
+                job_id: str = job_queue.get()
+                job: Job = self.job(name=job_id)
+                if (check := job.check_needs(new_context["jobs"])) == WAIT:
+                    job_queue.task_done()
+                    job_queue.put(job_id)
+                    time.sleep(0.15)
+                    continue
+                elif check == FAILED:  # pragma: no cov
+                    return result.catch(
+                        status=FAILED,
+                        context={
+                            "status": FAILED,
+                            "errors": WorkflowError(
+                                f"Validate job trigger rule was failed with "
+                                f"{job.trigger_rule.value!r}."
+                            ).to_dict(),
+                        },
+                    )
+                elif check == SKIP:  # pragma: no cov
+                    result.trace.info(
+                        f"[JOB]: Skip job: {job_id!r} from trigger rule."
+                    )
+                    job.set_outputs(output={"status": SKIP}, to=new_context)
+                    job_queue.task_done()
+                    skip_count += 1
+                    continue
+
+                if max_job_parallel > 1:
+                    futures.append(
+                        executor.submit(
+                            self.execute_job,
+                            job=job,
+                            params=new_context,
+                            result=result,
+                            event=event,
+                        ),
+                    )
+                    job_queue.task_done()
+                    continue
+
+                if len(futures) < 1:
+                    futures.append(
+                        executor.submit(
+                            self.execute_job,
+                            job=job,
+                            params=new_context,
+                            result=result,
+                            event=event,
+                        )
+                    )
+                elif (future := futures.pop(0)).done():
+                    if e := future.exception():
+                        sequence_statuses.append(get_status_from_error(e))
+                    else:
+                        st, _ = future.result()
+                        sequence_statuses.append(st)
+                    job_queue.put(job_id)
+                elif future.cancelled():
+                    sequence_statuses.append(CANCEL)
+                    job_queue.put(job_id)
+                elif future.running() or "state=pending" in str(future):
+                    futures.insert(0, future)
+                    job_queue.put(job_id)
+                else:  # pragma: no cov
+                    job_queue.put(job_id)
+                    futures.insert(0, future)
+                    result.trace.warning(
+                        f"[WORKFLOW]: ... Execution non-threading not "
+                        f"handle: {future}."
+                    )
+
+                job_queue.task_done()
+
+            if not_timeout_flag:
+                job_queue.join()
+                for total, future in enumerate(as_completed(futures), start=0):
+                    try:
+                        statuses[total], _ = future.result()
+                    except WorkflowError as e:
+                        statuses[total] = get_status_from_error(e)
+
+                # NOTE: Update skipped status from the job trigger.
+                for i in range(skip_count):
+                    statuses[total + 1 + i] = SKIP
+
+                # NOTE: Update status from none-parallel job execution.
+                for i, s in enumerate(sequence_statuses, start=0):
+                    statuses[total + 1 + skip_count + i] = s
+
+                return result.catch(
+                    status=validate_statuses(statuses), context=new_context
                 )
 
             event.set()

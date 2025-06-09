@@ -42,7 +42,10 @@ def test_workflow():
     )
 
     assert workflow.name == "manual-workflow"
-    assert workflow.job("demo-run") == job
+
+    set_job_id = job.model_copy()
+    set_job_id.id = "demo-run"
+    assert workflow.job("demo-run") == set_job_id
 
     # NOTE: Raise ValueError when get a job with ID that does not exist.
     with pytest.raises(ValueError):

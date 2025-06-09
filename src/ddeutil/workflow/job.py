@@ -402,13 +402,19 @@ class Job(BaseModel):
         """
         # VALIDATE: Validate stage id should not duplicate.
         rs: list[str] = []
+        rs_raise: list[str] = []
         for stage in value:
             name: str = stage.iden
             if name in rs:
-                raise ValueError(
-                    f"Stage name, {name!r}, should not be duplicate."
-                )
+                rs_raise.append(name)
+                continue
             rs.append(name)
+
+        if rs_raise:
+            raise ValueError(
+                f"Stage name, {', '.join(repr(s) for s in rs_raise)}, should "
+                f"not be duplicate."
+            )
         return value
 
     @model_validator(mode="after")

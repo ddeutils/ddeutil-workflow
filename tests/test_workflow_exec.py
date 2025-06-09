@@ -25,20 +25,21 @@ def test_workflow_exec():
         name="demo-workflow",
         jobs={"sleep-run": job, "sleep-again-run": job},
     )
+    assert all(j in workflow.jobs for j in ("sleep-run", "sleep-again-run"))
+
     rs: Result = workflow.execute(params={}, max_job_parallel=1)
     assert rs.status == SUCCESS
     assert rs.context == {
         "status": SUCCESS,
         "params": {},
         "jobs": {
+            "sleep-run": {
+                "status": SUCCESS,
+                "stages": {"7972360640": {"outputs": {}, "status": SUCCESS}},
+            },
             "sleep-again-run": {
                 "status": SUCCESS,
-                "stages": {
-                    "7972360640": {
-                        "outputs": {},
-                        "status": SUCCESS,
-                    }
-                },
+                "stages": {"7972360640": {"outputs": {}, "status": SUCCESS}},
             },
         },
     }
@@ -64,7 +65,7 @@ def test_workflow_exec_timeout():
         "status": FAILED,
         "params": {},
         "jobs": {
-            "sleep-again-run": {
+            "sleep-run": {
                 "status": CANCEL,
                 "stages": {"7972360640": {"outputs": {}, "status": SUCCESS}},
                 "errors": {
@@ -189,6 +190,10 @@ def test_workflow_exec_parallel():
         "status": SUCCESS,
         "params": {},
         "jobs": {
+            "sleep-run": {
+                "status": SUCCESS,
+                "stages": {"7972360640": {"outputs": {}, "status": SUCCESS}},
+            },
             "sleep-again-run": {
                 "status": SUCCESS,
                 "stages": {"7972360640": {"outputs": {}, "status": SUCCESS}},
