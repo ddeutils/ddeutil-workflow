@@ -1,4 +1,7 @@
 {
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Workflow Configuration Schema",
+  "version": "1.0.0",
   "$defs": {
     "ArrayParam": {
       "description": "Array parameter.",
@@ -2569,6 +2572,7 @@
       "type": "object"
     },
     "WorkflowSchema": {
+      "description": "Override workflow model fields for generate JSON schema file.",
       "properties": {
         "extras": {
           "additionalProperties": true,
@@ -2689,8 +2693,17 @@
           "description": "A mapping of job ID and job model that already loaded.",
           "title": "Jobs",
           "type": "object"
+        },
+        "type": {
+          "const": "Workflow",
+          "description": "A type of workflow template.",
+          "title": "Type",
+          "type": "string"
         }
       },
+      "required": [
+        "type"
+      ],
       "title": "WorkflowSchema",
       "type": "object"
     }

@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 from platform import python_version
-from typing import Annotated, Any, Optional, Union
+from typing import Annotated, Any, Literal, Optional, Union
 
 import typer
 import uvicorn
@@ -133,9 +133,13 @@ def workflow_execute():
     """"""
 
 
+WORKFLOW_TYPE = Literal["Workflow"]
+
+
 class WorkflowSchema(Workflow):
     """Override workflow model fields for generate JSON schema file."""
 
+    type: WORKFLOW_TYPE = Field(description="A type of workflow template.")
     name: Optional[str] = Field(default=None, description="A workflow name.")
     params: dict[str, Union[Param, str]] = Field(
         default_factory=dict,
@@ -154,11 +158,16 @@ def workflow_json_schema(
         typer.Option(help="An output file that want to export the JSON schema"),
     ] = Path("./json-schema.json"),
 ) -> None:
-    """Generate JSON schema."""
+    """Generate JSON schema file from the Workflow model."""
     template = dict[str, WorkflowSchema]
     json_schema = TypeAdapter(template).json_schema(by_alias=True)
+    template_schema: dict[str, str] = {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "Workflow Configuration Schema",
+        "version": "1.0.0",
+    }
     with open(output, mode="w", encoding="utf-8") as f:
-        json.dump(json_schema, f, indent=2)
+        json.dump(template_schema | json_schema, f, indent=2)
 
 
 if __name__ == "__main__":
