@@ -837,7 +837,15 @@ class Workflow(BaseModel):
         timeout: float = dynamic(
             "max_job_exec_timeout", f=timeout, extras=self.extras
         )
-        result.catch(status=WAIT, context=context)
+
+        # NOTE: Prepare the new context for rerun process.
+        jobs: DictData = context.get("jobs")
+        new_context: DictData = {
+            "params": context["params"].copy(),
+            "jobs": {j: jobs[j] for j in jobs if jobs[j]["status"] == SUCCESS},
+        }
+
+        result.catch(status=WAIT, context=new_context)
         if event and event.is_set():
             return result.catch(
                 status=CANCEL,
@@ -848,12 +856,6 @@ class Workflow(BaseModel):
                     ).to_dict(),
                 },
             )
-
-        jobs: DictData = context.get("jobs")
-        new_context: DictData = {
-            "params": context["params"].copy(),
-            "jobs": {j: jobs[j] for j in jobs if jobs[j]["status"] == SUCCESS},
-        }
 
         with ThreadPoolExecutor(max_job_parallel, "wf") as executor:
             futures: list[Future] = []

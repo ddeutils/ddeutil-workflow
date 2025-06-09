@@ -1,4 +1,5 @@
 from ddeutil.workflow import (
+    FAILED,
     SUCCESS,
     Job,
     Result,
@@ -30,3 +31,42 @@ def test_workflow_rerun():
         max_job_parallel=1,
     )
     assert rs.status == SUCCESS
+    assert rs.context == {
+        "status": SUCCESS,
+        "params": {},
+        "jobs": {
+            "sleep-again-run": {
+                "status": SUCCESS,
+                "stages": {"7972360640": {"outputs": {}, "status": SUCCESS}},
+            },
+        },
+    }
+
+    rs: Result = workflow.rerun(
+        context={
+            "status": FAILED,
+            "params": {},
+            "jobs": {
+                "sleep-again-run": {
+                    "status": FAILED,
+                    "stages": {"7972360640": {"outputs": {}, "status": FAILED}},
+                },
+            },
+            "errors": {
+                "name": "DemoError",
+                "message": "Force error in context data before rerun.",
+            },
+        },
+        max_job_parallel=1,
+    )
+    assert rs.status == SUCCESS
+    assert rs.context == {
+        "status": SUCCESS,
+        "params": {},
+        "jobs": {
+            "sleep-again-run": {
+                "status": SUCCESS,
+                "stages": {"7972360640": {"outputs": {}, "status": SUCCESS}},
+            },
+        },
+    }
