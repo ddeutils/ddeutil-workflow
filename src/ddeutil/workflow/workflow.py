@@ -257,8 +257,10 @@ class Workflow(BaseModel):
                     f"{self.name!r}."
                 )
 
-            # NOTE: Set job ID to the job model.
-            self.jobs[job].id = job
+            # NOTE: Copy the job model and set job ID to the job model.
+            job_model = self.jobs[job].model_copy()
+            job_model.id = job
+            self.jobs[job] = job_model
 
         # VALIDATE: Validate workflow name should not dynamic with params
         #   template.

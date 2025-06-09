@@ -20,6 +20,12 @@ def test_workflow_rerun():
             "status": SUCCESS,
             "params": {},
             "jobs": {
+                "sleep-run": {
+                    "status": SUCCESS,
+                    "stages": {
+                        "7972360640": {"outputs": {}, "status": SUCCESS}
+                    },
+                },
                 "sleep-again-run": {
                     "status": SUCCESS,
                     "stages": {
@@ -35,6 +41,10 @@ def test_workflow_rerun():
         "status": SUCCESS,
         "params": {},
         "jobs": {
+            "sleep-run": {
+                "status": SUCCESS,
+                "stages": {"7972360640": {"outputs": {}, "status": SUCCESS}},
+            },
             "sleep-again-run": {
                 "status": SUCCESS,
                 "stages": {"7972360640": {"outputs": {}, "status": SUCCESS}},
@@ -47,9 +57,19 @@ def test_workflow_rerun():
             "status": FAILED,
             "params": {},
             "jobs": {
+                "sleep-run": {
+                    "status": SUCCESS,
+                    "stages": {
+                        "7972360640": {"outputs": {}, "status": SUCCESS}
+                    },
+                },
                 "sleep-again-run": {
                     "status": FAILED,
                     "stages": {"7972360640": {"outputs": {}, "status": FAILED}},
+                    "errors": {
+                        "name": "DemoError",
+                        "message": "Force error in job context.",
+                    },
                 },
             },
             "errors": {
@@ -64,6 +84,10 @@ def test_workflow_rerun():
         "status": SUCCESS,
         "params": {},
         "jobs": {
+            "sleep-run": {
+                "status": SUCCESS,
+                "stages": {"7972360640": {"outputs": {}, "status": SUCCESS}},
+            },
             "sleep-again-run": {
                 "status": SUCCESS,
                 "stages": {"7972360640": {"outputs": {}, "status": SUCCESS}},
