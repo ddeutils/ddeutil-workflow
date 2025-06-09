@@ -151,6 +151,13 @@ class WorkflowSchema(Workflow):
     )
 
 
+CRONTAB_TYPE = Literal["Crontab"]
+
+
+class CrontabSchema(Crontab):
+    type: CRONTAB_TYPE = Field(description="A type of crontab template.")
+
+
 @workflow_app.command(name="json-schema")
 def workflow_json_schema(
     output: Annotated[
@@ -159,7 +166,7 @@ def workflow_json_schema(
     ] = Path("./json-schema.json"),
 ) -> None:
     """Generate JSON schema file from the Workflow model."""
-    template = dict[str, WorkflowSchema]
+    template = dict[str, Union[WorkflowSchema, CrontabSchema]]
     json_schema = TypeAdapter(template).json_schema(by_alias=True)
     template_schema: dict[str, str] = {
         "$schema": "http://json-schema.org/draft-07/schema#",
