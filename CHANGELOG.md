@@ -2,6 +2,18 @@
 
 ## Latest Changes
 
+## 0.0.71
+
+### :bug: Bug fixes
+
+- :gear: fixed: move uvicorn package to api cli.
+- :gear: fixed: dynamic create docker image with tag and not tag.
+- :gear: fixed: add context for docker build cmd.
+
+### :package: Build & Workflow
+
+- :toolbox: build: add cache build on build workflow.
+
 ## 0.0.70
 
 ### :sparkles: Features
