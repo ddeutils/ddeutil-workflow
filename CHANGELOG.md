@@ -2,6 +2,21 @@
 
 ## Latest Changes
 
+## 0.0.70
+
+### :sparkles: Features
+
+- :dart: feat: add cli for generate json schema file. (#54)
+- :dart: feat: handle workflow rerun method for job failed. (#53)
+- :dart: feat: move logging trace data to the base object.
+
+### :package: Build & Workflow
+
+- :toolbox: build: add docker push image to the current tag.
+- :toolbox: build: add push with tag.
+- :toolbox: build: fix build build command not valid.
+- :toolbox: build: fix build workflow support multi-platform.
+
 ## 0.0.69
 
 ### :sparkles: Features
