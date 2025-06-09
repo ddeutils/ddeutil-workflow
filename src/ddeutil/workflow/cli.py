@@ -155,6 +155,8 @@ CRONTAB_TYPE = Literal["Crontab"]
 
 
 class CrontabSchema(Crontab):
+    """Override crontab model fields for generate JSON schema file."""
+
     type: CRONTAB_TYPE = Field(description="A type of crontab template.")
 
 
@@ -162,7 +164,7 @@ class CrontabSchema(Crontab):
 def workflow_json_schema(
     output: Annotated[
         Path,
-        typer.Option(help="An output file that want to export the JSON schema"),
+        typer.Option(help="An output file to export the JSON schema."),
     ] = Path("./json-schema.json"),
 ) -> None:
     """Generate JSON schema file from the Workflow model."""
