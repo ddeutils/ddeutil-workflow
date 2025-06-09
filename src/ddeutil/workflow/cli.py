@@ -4,7 +4,6 @@ from platform import python_version
 from typing import Annotated, Any, Literal, Optional, Union
 
 import typer
-import uvicorn
 from pydantic import Field, TypeAdapter
 
 from .__about__ import __version__
@@ -91,6 +90,8 @@ def api(
     """
     Provision API application from the FastAPI.
     """
+    import uvicorn
+
     from .api.log_conf import LOGGING_CONFIG
 
     # LOGGING_CONFIG = {}
