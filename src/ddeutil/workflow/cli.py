@@ -8,7 +8,6 @@ from pydantic import Field, TypeAdapter
 
 from .__about__ import __version__
 from .__types import DictData
-from .api import app as fastapp
 from .errors import JobError
 from .event import Crontab
 from .job import Job
@@ -92,6 +91,7 @@ def api(
     """
     import uvicorn
 
+    from .api import app as fastapp
     from .api.log_conf import LOGGING_CONFIG
 
     # LOGGING_CONFIG = {}
