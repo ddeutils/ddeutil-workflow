@@ -48,14 +48,13 @@ jobs:
         run: echo "name=$(date +'%m-%d-%Y')" >> $GITHUB_OUTPUT
 
       - name: Build the ddeutil-workflow Docker image latest
-        if: ${{ github.ref_name }}
         run: |
           docker buildx build \
-            --no-cache \
             --file ./.container/Dockerfile \
             --platform linux/amd64,linux/arm64 \
-            --tag ${{ vars.GH_REPO_URL }}:latest \
-            --push .
+            --tag ${{ vars.GH_REPO_URL }}:latest
+
+          docker push ${{ vars.GH_REPO_URL }}:latest
 
       - name: Build the ddeutil-workflow Docker image with tag
         if: github.ref_type == 'tag'
@@ -65,5 +64,6 @@ jobs:
           docker buildx build \
             --file ./.container/Dockerfile \
             --platform linux/amd64,linux/arm64 \
-            --tag ${{ vars.GH_REPO_URL }}:$TAG \
-            --push .
+            --tag ${{ vars.GH_REPO_URL }}:$TAG
+
+          docker push --tag ${{ vars.GH_REPO_URL }}:$TAG
