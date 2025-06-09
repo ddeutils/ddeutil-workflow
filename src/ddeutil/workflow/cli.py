@@ -1,17 +1,21 @@
 import json
 from pathlib import Path
 from platform import python_version
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any, Optional, Union
 
 import typer
 import uvicorn
+from pydantic import Field, TypeAdapter
 
 from .__about__ import __version__
 from .__types import DictData
 from .api import app as fastapp
 from .errors import JobError
+from .event import Crontab
 from .job import Job
+from .params import Param
 from .result import Result
+from .workflow import Workflow
 
 app = typer.Typer(
     pretty_exceptions_enable=True,
@@ -127,6 +131,34 @@ def workflow_callback():
 @workflow_app.command(name="execute")
 def workflow_execute():
     """"""
+
+
+class WorkflowSchema(Workflow):
+    """Override workflow model fields for generate JSON schema file."""
+
+    name: Optional[str] = Field(default=None, description="A workflow name.")
+    params: dict[str, Union[Param, str]] = Field(
+        default_factory=dict,
+        description="A parameters that need to use on this workflow.",
+    )
+    on: Union[list[Union[Crontab, str]], str] = Field(
+        default_factory=list,
+        description="A list of Crontab instance for this workflow schedule.",
+    )
+
+
+@workflow_app.command(name="json-schema")
+def workflow_json_schema(
+    output: Annotated[
+        Path,
+        typer.Option(help="An output file that want to export the JSON schema"),
+    ] = Path("./json-schema.json"),
+) -> None:
+    """Generate JSON schema."""
+    template = dict[str, WorkflowSchema]
+    json_schema = TypeAdapter(template).json_schema(by_alias=True)
+    with open(output, mode="w", encoding="utf-8") as f:
+        json.dump(json_schema, f, indent=2)
 
 
 if __name__ == "__main__":

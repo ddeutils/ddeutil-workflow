@@ -174,7 +174,7 @@ wf-run-python-raise-for-job:
       strategy:
         fail-fast: True
         matrix:
-          name: ['foo', 'bar']
+          name: [ 'foo', 'bar' ]
       stages:
         - name: Echo hello world
           echo: "Hello World"
@@ -260,7 +260,7 @@ wf-run-python-raise-for-job:
         fail-fast: True
         max-parallel: 2
         matrix:
-          sleep: [ '1', '4', '2', '3', '5']
+          sleep: [ '1', '4', '2', '3', '5' ]
       stages:
         - name: Python Sleep
           run: |
@@ -293,7 +293,7 @@ wf-run-depends:
   type: Workflow
   jobs:
     first-job:
-      needs: ['second-job']
+      needs: [ 'second-job' ]
       stages:
         - name: Echo next
           echo: "Wait fist job success full"

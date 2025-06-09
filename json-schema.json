@@ -1,0 +1,2702 @@
+{
+  "$defs": {
+    "ArrayParam": {
+      "description": "Array parameter.",
+      "properties": {
+        "desc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A description of this parameter provide to the workflow model.",
+          "title": "Desc"
+        },
+        "required": {
+          "default": false,
+          "description": "A require flag for the default-able parameter value.",
+          "title": "Required",
+          "type": "boolean"
+        },
+        "type": {
+          "const": "array",
+          "default": "array",
+          "title": "Type",
+          "type": "string"
+        },
+        "default": {
+          "type": "array",
+          "items": {},
+          "description": "A default list that make from the list built-in func.",
+          "title": "Default"
+        }
+      },
+      "title": "ArrayParam",
+      "type": "object"
+    },
+    "BashStage": {
+      "description": "Bash stage executor that execute bash script on the current OS.\nIf your current OS is Windows, it will run on the bash from the current WSL.\nIt will use `bash` for Windows OS and use `sh` for Linux OS.\n\n    This stage has some limitation when it runs shell statement with the\nbuilt-in subprocess package. It does not good enough to use multiline\nstatement. Thus, it will write the `.sh` file before start running bash\ncommand for fix this issue.\n\nData Validate:\n    >>> stage = {\n    ...     \"name\": \"The Shell stage execution\",\n    ...     \"bash\": 'echo \"Hello $FOO\"',\n    ...     \"env\": {\n    ...         \"FOO\": \"BAR\",\n    ...     },\n    ... }",
+      "properties": {
+        "extras": {
+          "additionalProperties": true,
+          "description": "An extra parameter that override core config values.",
+          "title": "Extras",
+          "type": "object"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage ID that use to keep execution output or getting by job owner.",
+          "title": "Id"
+        },
+        "name": {
+          "description": "A stage name that want to logging when start execution.",
+          "title": "Name",
+          "type": "string"
+        },
+        "desc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage description that use to logging when start execution.",
+          "title": "Desc"
+        },
+        "if": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage condition statement to allow stage executable. This field alise with `if` field.",
+          "title": "If"
+        },
+        "retry": {
+          "default": 0,
+          "description": "A retry number if stage execution get the error.",
+          "exclusiveMaximum": 20,
+          "minimum": 0,
+          "title": "Retry",
+          "type": "integer"
+        },
+        "bash": {
+          "description": "A bash statement that want to execute via Python subprocess.",
+          "title": "Bash",
+          "type": "string"
+        },
+        "env": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "An environment variables that set before run bash command. It will add on the header of the `.sh` file.",
+          "title": "Env",
+          "type": "object"
+        }
+      },
+      "required": [
+        "name",
+        "bash"
+      ],
+      "title": "BashStage",
+      "type": "object"
+    },
+    "CallStage": {
+      "description": "Call stage executor that call the Python function from registry with tag\ndecorator function in `reusables` module and run it with input arguments.\n\n    This stage is different with PyStage because the PyStage is just run\na Python statement with the `exec` function and pass the current locals and\nglobals before exec that statement. This stage will import the caller\nfunction can call it with an input arguments. So, you can create your\nfunction complexly that you can for your objective to invoked by this stage\nobject.\n\n    This stage is the most powerful stage of this package for run every\nuse-case by a custom requirement that you want by creating the Python\nfunction and adding it to the caller registry value by importer syntax like\n`module.caller.registry` not path style like `module/caller/registry`.\n\nWarning:\n\n    The caller registry to get a caller function should importable by the\ncurrent Python execution pointer.\n\nData Validate:\n    >>> stage = {\n    ...     \"name\": \"Task stage execution\",\n    ...     \"uses\": \"tasks/function-name@tag-name\",\n    ...     \"args\": {\"arg01\": \"BAR\", \"kwarg01\": 10},\n    ... }",
+      "properties": {
+        "extras": {
+          "additionalProperties": true,
+          "description": "An extra parameter that override core config values.",
+          "title": "Extras",
+          "type": "object"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage ID that use to keep execution output or getting by job owner.",
+          "title": "Id"
+        },
+        "name": {
+          "description": "A stage name that want to logging when start execution.",
+          "title": "Name",
+          "type": "string"
+        },
+        "desc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage description that use to logging when start execution.",
+          "title": "Desc"
+        },
+        "if": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage condition statement to allow stage executable. This field alise with `if` field.",
+          "title": "If"
+        },
+        "retry": {
+          "default": 0,
+          "description": "A retry number if stage execution get the error.",
+          "exclusiveMaximum": 20,
+          "minimum": 0,
+          "title": "Retry",
+          "type": "integer"
+        },
+        "uses": {
+          "description": "A caller function with registry importer syntax that use to load function before execute step. The caller registry syntax should be `<import.part>/<func-name>@<tag-name>`.",
+          "title": "Uses",
+          "type": "string"
+        },
+        "with": {
+          "additionalProperties": true,
+          "description": "An argument parameter that will pass to this caller function.",
+          "title": "With",
+          "type": "object"
+        }
+      },
+      "required": [
+        "name",
+        "uses"
+      ],
+      "title": "CallStage",
+      "type": "object"
+    },
+    "CaseStage": {
+      "description": "Case stage executor that execute all stages if the condition was matched.\n\nData Validate:\n    >>> stage = {\n    ...     \"name\": \"If stage execution.\",\n    ...     \"case\": \"${{ param.test }}\",\n    ...     \"match\": [\n    ...         {\n    ...             \"case\": \"1\",\n    ...             \"stages\": [\n    ...                 {\n    ...                     \"name\": \"Stage case 1\",\n    ...                     \"eche\": \"Hello case 1\",\n    ...                 },\n    ...             ],\n    ...         },\n    ...         {\n    ...             \"case\": \"_\",\n    ...             \"stages\": [\n    ...                 {\n    ...                     \"name\": \"Stage else\",\n    ...                     \"eche\": \"Hello case else\",\n    ...                 },\n    ...             ],\n    ...         },\n    ...     ],\n    ... }",
+      "properties": {
+        "extras": {
+          "additionalProperties": true,
+          "description": "An extra parameter that override core config values.",
+          "title": "Extras",
+          "type": "object"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage ID that use to keep execution output or getting by job owner.",
+          "title": "Id"
+        },
+        "name": {
+          "description": "A stage name that want to logging when start execution.",
+          "title": "Name",
+          "type": "string"
+        },
+        "desc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage description that use to logging when start execution.",
+          "title": "Desc"
+        },
+        "if": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage condition statement to allow stage executable. This field alise with `if` field.",
+          "title": "If"
+        },
+        "retry": {
+          "default": 0,
+          "description": "A retry number if stage execution get the error.",
+          "exclusiveMaximum": 20,
+          "minimum": 0,
+          "title": "Retry",
+          "type": "integer"
+        },
+        "case": {
+          "description": "A case condition for routing.",
+          "title": "Case",
+          "type": "string"
+        },
+        "match": {
+          "description": "A list of Match model that should not be an empty list.",
+          "items": {
+            "$ref": "#/$defs/Match"
+          },
+          "title": "Match",
+          "type": "array"
+        },
+        "skip-not-match": {
+          "default": false,
+          "description": "A flag for making skip if it does not match and else condition does not set too.",
+          "title": "Skip-Not-Match",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "case",
+        "match"
+      ],
+      "title": "CaseStage",
+      "type": "object"
+    },
+    "ChoiceParam": {
+      "description": "Choice parameter.",
+      "properties": {
+        "desc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A description of this parameter provide to the workflow model.",
+          "title": "Desc"
+        },
+        "required": {
+          "default": true,
+          "description": "A require flag that force to pass this parameter value.",
+          "title": "Required",
+          "type": "boolean"
+        },
+        "type": {
+          "const": "choice",
+          "default": "choice",
+          "title": "Type",
+          "type": "string"
+        },
+        "options": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            }
+          ],
+          "description": "A list of choice parameters that able be str or int.",
+          "title": "Options"
+        }
+      },
+      "required": [
+        "options"
+      ],
+      "title": "ChoiceParam",
+      "type": "object"
+    },
+    "Crontab": {
+      "description": "Cron event model (Warped the CronJob object by Pydantic model) to keep\ncrontab value and generate CronRunner object from this crontab value.\n\nMethods:\n    - generate: is the main use-case of this schedule object.",
+      "properties": {
+        "extras": {
+          "additionalProperties": true,
+          "description": "An extras parameters that want to pass to the CronJob field.",
+          "title": "Extras",
+          "type": "object"
+        },
+        "cronjob": {
+          "description": "A Cronjob object that use for validate and generate datetime.",
+          "title": "Cronjob",
+          "type": "string"
+        },
+        "timezone": {
+          "default": "UTC",
+          "description": "A timezone string value.",
+          "enum": [
+            "Africa/Abidjan",
+            "Africa/Accra",
+            "Africa/Addis_Ababa",
+            "Africa/Algiers",
+            "Africa/Asmara",
+            "Africa/Asmera",
+            "Africa/Bamako",
+            "Africa/Bangui",
+            "Africa/Banjul",
+            "Africa/Bissau",
+            "Africa/Blantyre",
+            "Africa/Brazzaville",
+            "Africa/Bujumbura",
+            "Africa/Cairo",
+            "Africa/Casablanca",
+            "Africa/Ceuta",
+            "Africa/Conakry",
+            "Africa/Dakar",
+            "Africa/Dar_es_Salaam",
+            "Africa/Djibouti",
+            "Africa/Douala",
+            "Africa/El_Aaiun",
+            "Africa/Freetown",
+            "Africa/Gaborone",
+            "Africa/Harare",
+            "Africa/Johannesburg",
+            "Africa/Juba",
+            "Africa/Kampala",
+            "Africa/Khartoum",
+            "Africa/Kigali",
+            "Africa/Kinshasa",
+            "Africa/Lagos",
+            "Africa/Libreville",
+            "Africa/Lome",
+            "Africa/Luanda",
+            "Africa/Lubumbashi",
+            "Africa/Lusaka",
+            "Africa/Malabo",
+            "Africa/Maputo",
+            "Africa/Maseru",
+            "Africa/Mbabane",
+            "Africa/Mogadishu",
+            "Africa/Monrovia",
+            "Africa/Nairobi",
+            "Africa/Ndjamena",
+            "Africa/Niamey",
+            "Africa/Nouakchott",
+            "Africa/Ouagadougou",
+            "Africa/Porto-Novo",
+            "Africa/Sao_Tome",
+            "Africa/Timbuktu",
+            "Africa/Tripoli",
+            "Africa/Tunis",
+            "Africa/Windhoek",
+            "America/Adak",
+            "America/Anchorage",
+            "America/Anguilla",
+            "America/Antigua",
+            "America/Araguaina",
+            "America/Argentina/Buenos_Aires",
+            "America/Argentina/Catamarca",
+            "America/Argentina/ComodRivadavia",
+            "America/Argentina/Cordoba",
+            "America/Argentina/Jujuy",
+            "America/Argentina/La_Rioja",
+            "America/Argentina/Mendoza",
+            "America/Argentina/Rio_Gallegos",
+            "America/Argentina/Salta",
+            "America/Argentina/San_Juan",
+            "America/Argentina/San_Luis",
+            "America/Argentina/Tucuman",
+            "America/Argentina/Ushuaia",
+            "America/Aruba",
+            "America/Asuncion",
+            "America/Atikokan",
+            "America/Atka",
+            "America/Bahia",
+            "America/Bahia_Banderas",
+            "America/Barbados",
+            "America/Belem",
+            "America/Belize",
+            "America/Blanc-Sablon",
+            "America/Boa_Vista",
+            "America/Bogota",
+            "America/Boise",
+            "America/Buenos_Aires",
+            "America/Cambridge_Bay",
+            "America/Campo_Grande",
+            "America/Cancun",
+            "America/Caracas",
+            "America/Catamarca",
+            "America/Cayenne",
+            "America/Cayman",
+            "America/Chicago",
+            "America/Chihuahua",
+            "America/Ciudad_Juarez",
+            "America/Coral_Harbour",
+            "America/Cordoba",
+            "America/Costa_Rica",
+            "America/Coyhaique",
+            "America/Creston",
+            "America/Cuiaba",
+            "America/Curacao",
+            "America/Danmarkshavn",
+            "America/Dawson",
+            "America/Dawson_Creek",
+            "America/Denver",
+            "America/Detroit",
+            "America/Dominica",
+            "America/Edmonton",
+            "America/Eirunepe",
+            "America/El_Salvador",
+            "America/Ensenada",
+            "America/Fort_Nelson",
+            "America/Fort_Wayne",
+            "America/Fortaleza",
+            "America/Glace_Bay",
+            "America/Godthab",
+            "America/Goose_Bay",
+            "America/Grand_Turk",
+            "America/Grenada",
+            "America/Guadeloupe",
+            "America/Guatemala",
+            "America/Guayaquil",
+            "America/Guyana",
+            "America/Halifax",
+            "America/Havana",
+            "America/Hermosillo",
+            "America/Indiana/Indianapolis",
+            "America/Indiana/Knox",
+            "America/Indiana/Marengo",
+            "America/Indiana/Petersburg",
+            "America/Indiana/Tell_City",
+            "America/Indiana/Vevay",
+            "America/Indiana/Vincennes",
+            "America/Indiana/Winamac",
+            "America/Indianapolis",
+            "America/Inuvik",
+            "America/Iqaluit",
+            "America/Jamaica",
+            "America/Jujuy",
+            "America/Juneau",
+            "America/Kentucky/Louisville",
+            "America/Kentucky/Monticello",
+            "America/Knox_IN",
+            "America/Kralendijk",
+            "America/La_Paz",
+            "America/Lima",
+            "America/Los_Angeles",
+            "America/Louisville",
+            "America/Lower_Princes",
+            "America/Maceio",
+            "America/Managua",
+            "America/Manaus",
+            "America/Marigot",
+            "America/Martinique",
+            "America/Matamoros",
+            "America/Mazatlan",
+            "America/Mendoza",
+            "America/Menominee",
+            "America/Merida",
+            "America/Metlakatla",
+            "America/Mexico_City",
+            "America/Miquelon",
+            "America/Moncton",
+            "America/Monterrey",
+            "America/Montevideo",
+            "America/Montreal",
+            "America/Montserrat",
+            "America/Nassau",
+            "America/New_York",
+            "America/Nipigon",
+            "America/Nome",
+            "America/Noronha",
+            "America/North_Dakota/Beulah",
+            "America/North_Dakota/Center",
+            "America/North_Dakota/New_Salem",
+            "America/Nuuk",
+            "America/Ojinaga",
+            "America/Panama",
+            "America/Pangnirtung",
+            "America/Paramaribo",
+            "America/Phoenix",
+            "America/Port-au-Prince",
+            "America/Port_of_Spain",
+            "America/Porto_Acre",
+            "America/Porto_Velho",
+            "America/Puerto_Rico",
+            "America/Punta_Arenas",
+            "America/Rainy_River",
+            "America/Rankin_Inlet",
+            "America/Recife",
+            "America/Regina",
+            "America/Resolute",
+            "America/Rio_Branco",
+            "America/Rosario",
+            "America/Santa_Isabel",
+            "America/Santarem",
+            "America/Santiago",
+            "America/Santo_Domingo",
+            "America/Sao_Paulo",
+            "America/Scoresbysund",
+            "America/Shiprock",
+            "America/Sitka",
+            "America/St_Barthelemy",
+            "America/St_Johns",
+            "America/St_Kitts",
+            "America/St_Lucia",
+            "America/St_Thomas",
+            "America/St_Vincent",
+            "America/Swift_Current",
+            "America/Tegucigalpa",
+            "America/Thule",
+            "America/Thunder_Bay",
+            "America/Tijuana",
+            "America/Toronto",
+            "America/Tortola",
+            "America/Vancouver",
+            "America/Virgin",
+            "America/Whitehorse",
+            "America/Winnipeg",
+            "America/Yakutat",
+            "America/Yellowknife",
+            "Antarctica/Casey",
+            "Antarctica/Davis",
+            "Antarctica/DumontDUrville",
+            "Antarctica/Macquarie",
+            "Antarctica/Mawson",
+            "Antarctica/McMurdo",
+            "Antarctica/Palmer",
+            "Antarctica/Rothera",
+            "Antarctica/South_Pole",
+            "Antarctica/Syowa",
+            "Antarctica/Troll",
+            "Antarctica/Vostok",
+            "Arctic/Longyearbyen",
+            "Asia/Aden",
+            "Asia/Almaty",
+            "Asia/Amman",
+            "Asia/Anadyr",
+            "Asia/Aqtau",
+            "Asia/Aqtobe",
+            "Asia/Ashgabat",
+            "Asia/Ashkhabad",
+            "Asia/Atyrau",
+            "Asia/Baghdad",
+            "Asia/Bahrain",
+            "Asia/Baku",
+            "Asia/Bangkok",
+            "Asia/Barnaul",
+            "Asia/Beirut",
+            "Asia/Bishkek",
+            "Asia/Brunei",
+            "Asia/Calcutta",
+            "Asia/Chita",
+            "Asia/Choibalsan",
+            "Asia/Chongqing",
+            "Asia/Chungking",
+            "Asia/Colombo",
+            "Asia/Dacca",
+            "Asia/Damascus",
+            "Asia/Dhaka",
+            "Asia/Dili",
+            "Asia/Dubai",
+            "Asia/Dushanbe",
+            "Asia/Famagusta",
+            "Asia/Gaza",
+            "Asia/Harbin",
+            "Asia/Hebron",
+            "Asia/Ho_Chi_Minh",
+            "Asia/Hong_Kong",
+            "Asia/Hovd",
+            "Asia/Irkutsk",
+            "Asia/Istanbul",
+            "Asia/Jakarta",
+            "Asia/Jayapura",
+            "Asia/Jerusalem",
+            "Asia/Kabul",
+            "Asia/Kamchatka",
+            "Asia/Karachi",
+            "Asia/Kashgar",
+            "Asia/Kathmandu",
+            "Asia/Katmandu",
+            "Asia/Khandyga",
+            "Asia/Kolkata",
+            "Asia/Krasnoyarsk",
+            "Asia/Kuala_Lumpur",
+            "Asia/Kuching",
+            "Asia/Kuwait",
+            "Asia/Macao",
+            "Asia/Macau",
+            "Asia/Magadan",
+            "Asia/Makassar",
+            "Asia/Manila",
+            "Asia/Muscat",
+            "Asia/Nicosia",
+            "Asia/Novokuznetsk",
+            "Asia/Novosibirsk",
+            "Asia/Omsk",
+            "Asia/Oral",
+            "Asia/Phnom_Penh",
+            "Asia/Pontianak",
+            "Asia/Pyongyang",
+            "Asia/Qatar",
+            "Asia/Qostanay",
+            "Asia/Qyzylorda",
+            "Asia/Rangoon",
+            "Asia/Riyadh",
+            "Asia/Saigon",
+            "Asia/Sakhalin",
+            "Asia/Samarkand",
+            "Asia/Seoul",
+            "Asia/Shanghai",
+            "Asia/Singapore",
+            "Asia/Srednekolymsk",
+            "Asia/Taipei",
+            "Asia/Tashkent",
+            "Asia/Tbilisi",
+            "Asia/Tehran",
+            "Asia/Tel_Aviv",
+            "Asia/Thimbu",
+            "Asia/Thimphu",
+            "Asia/Tokyo",
+            "Asia/Tomsk",
+            "Asia/Ujung_Pandang",
+            "Asia/Ulaanbaatar",
+            "Asia/Ulan_Bator",
+            "Asia/Urumqi",
+            "Asia/Ust-Nera",
+            "Asia/Vientiane",
+            "Asia/Vladivostok",
+            "Asia/Yakutsk",
+            "Asia/Yangon",
+            "Asia/Yekaterinburg",
+            "Asia/Yerevan",
+            "Atlantic/Azores",
+            "Atlantic/Bermuda",
+            "Atlantic/Canary",
+            "Atlantic/Cape_Verde",
+            "Atlantic/Faeroe",
+            "Atlantic/Faroe",
+            "Atlantic/Jan_Mayen",
+            "Atlantic/Madeira",
+            "Atlantic/Reykjavik",
+            "Atlantic/South_Georgia",
+            "Atlantic/St_Helena",
+            "Atlantic/Stanley",
+            "Australia/ACT",
+            "Australia/Adelaide",
+            "Australia/Brisbane",
+            "Australia/Broken_Hill",
+            "Australia/Canberra",
+            "Australia/Currie",
+            "Australia/Darwin",
+            "Australia/Eucla",
+            "Australia/Hobart",
+            "Australia/LHI",
+            "Australia/Lindeman",
+            "Australia/Lord_Howe",
+            "Australia/Melbourne",
+            "Australia/NSW",
+            "Australia/North",
+            "Australia/Perth",
+            "Australia/Queensland",
+            "Australia/South",
+            "Australia/Sydney",
+            "Australia/Tasmania",
+            "Australia/Victoria",
+            "Australia/West",
+            "Australia/Yancowinna",
+            "Brazil/Acre",
+            "Brazil/DeNoronha",
+            "Brazil/East",
+            "Brazil/West",
+            "CET",
+            "CST6CDT",
+            "Canada/Atlantic",
+            "Canada/Central",
+            "Canada/Eastern",
+            "Canada/Mountain",
+            "Canada/Newfoundland",
+            "Canada/Pacific",
+            "Canada/Saskatchewan",
+            "Canada/Yukon",
+            "Chile/Continental",
+            "Chile/EasterIsland",
+            "Cuba",
+            "EET",
+            "EST",
+            "EST5EDT",
+            "Egypt",
+            "Eire",
+            "Etc/GMT",
+            "Etc/GMT+0",
+            "Etc/GMT+1",
+            "Etc/GMT+10",
+            "Etc/GMT+11",
+            "Etc/GMT+12",
+            "Etc/GMT+2",
+            "Etc/GMT+3",
+            "Etc/GMT+4",
+            "Etc/GMT+5",
+            "Etc/GMT+6",
+            "Etc/GMT+7",
+            "Etc/GMT+8",
+            "Etc/GMT+9",
+            "Etc/GMT-0",
+            "Etc/GMT-1",
+            "Etc/GMT-10",
+            "Etc/GMT-11",
+            "Etc/GMT-12",
+            "Etc/GMT-13",
+            "Etc/GMT-14",
+            "Etc/GMT-2",
+            "Etc/GMT-3",
+            "Etc/GMT-4",
+            "Etc/GMT-5",
+            "Etc/GMT-6",
+            "Etc/GMT-7",
+            "Etc/GMT-8",
+            "Etc/GMT-9",
+            "Etc/GMT0",
+            "Etc/Greenwich",
+            "Etc/UCT",
+            "Etc/UTC",
+            "Etc/Universal",
+            "Etc/Zulu",
+            "Europe/Amsterdam",
+            "Europe/Andorra",
+            "Europe/Astrakhan",
+            "Europe/Athens",
+            "Europe/Belfast",
+            "Europe/Belgrade",
+            "Europe/Berlin",
+            "Europe/Bratislava",
+            "Europe/Brussels",
+            "Europe/Bucharest",
+            "Europe/Budapest",
+            "Europe/Busingen",
+            "Europe/Chisinau",
+            "Europe/Copenhagen",
+            "Europe/Dublin",
+            "Europe/Gibraltar",
+            "Europe/Guernsey",
+            "Europe/Helsinki",
+            "Europe/Isle_of_Man",
+            "Europe/Istanbul",
+            "Europe/Jersey",
+            "Europe/Kaliningrad",
+            "Europe/Kiev",
+            "Europe/Kirov",
+            "Europe/Kyiv",
+            "Europe/Lisbon",
+            "Europe/Ljubljana",
+            "Europe/London",
+            "Europe/Luxembourg",
+            "Europe/Madrid",
+            "Europe/Malta",
+            "Europe/Mariehamn",
+            "Europe/Minsk",
+            "Europe/Monaco",
+            "Europe/Moscow",
+            "Europe/Nicosia",
+            "Europe/Oslo",
+            "Europe/Paris",
+            "Europe/Podgorica",
+            "Europe/Prague",
+            "Europe/Riga",
+            "Europe/Rome",
+            "Europe/Samara",
+            "Europe/San_Marino",
+            "Europe/Sarajevo",
+            "Europe/Saratov",
+            "Europe/Simferopol",
+            "Europe/Skopje",
+            "Europe/Sofia",
+            "Europe/Stockholm",
+            "Europe/Tallinn",
+            "Europe/Tirane",
+            "Europe/Tiraspol",
+            "Europe/Ulyanovsk",
+            "Europe/Uzhgorod",
+            "Europe/Vaduz",
+            "Europe/Vatican",
+            "Europe/Vienna",
+            "Europe/Vilnius",
+            "Europe/Volgograd",
+            "Europe/Warsaw",
+            "Europe/Zagreb",
+            "Europe/Zaporozhye",
+            "Europe/Zurich",
+            "Factory",
+            "GB",
+            "GB-Eire",
+            "GMT",
+            "GMT+0",
+            "GMT-0",
+            "GMT0",
+            "Greenwich",
+            "HST",
+            "Hongkong",
+            "Iceland",
+            "Indian/Antananarivo",
+            "Indian/Chagos",
+            "Indian/Christmas",
+            "Indian/Cocos",
+            "Indian/Comoro",
+            "Indian/Kerguelen",
+            "Indian/Mahe",
+            "Indian/Maldives",
+            "Indian/Mauritius",
+            "Indian/Mayotte",
+            "Indian/Reunion",
+            "Iran",
+            "Israel",
+            "Jamaica",
+            "Japan",
+            "Kwajalein",
+            "Libya",
+            "MET",
+            "MST",
+            "MST7MDT",
+            "Mexico/BajaNorte",
+            "Mexico/BajaSur",
+            "Mexico/General",
+            "NZ",
+            "NZ-CHAT",
+            "Navajo",
+            "PRC",
+            "PST8PDT",
+            "Pacific/Apia",
+            "Pacific/Auckland",
+            "Pacific/Bougainville",
+            "Pacific/Chatham",
+            "Pacific/Chuuk",
+            "Pacific/Easter",
+            "Pacific/Efate",
+            "Pacific/Enderbury",
+            "Pacific/Fakaofo",
+            "Pacific/Fiji",
+            "Pacific/Funafuti",
+            "Pacific/Galapagos",
+            "Pacific/Gambier",
+            "Pacific/Guadalcanal",
+            "Pacific/Guam",
+            "Pacific/Honolulu",
+            "Pacific/Johnston",
+            "Pacific/Kanton",
+            "Pacific/Kiritimati",
+            "Pacific/Kosrae",
+            "Pacific/Kwajalein",
+            "Pacific/Majuro",
+            "Pacific/Marquesas",
+            "Pacific/Midway",
+            "Pacific/Nauru",
+            "Pacific/Niue",
+            "Pacific/Norfolk",
+            "Pacific/Noumea",
+            "Pacific/Pago_Pago",
+            "Pacific/Palau",
+            "Pacific/Pitcairn",
+            "Pacific/Pohnpei",
+            "Pacific/Ponape",
+            "Pacific/Port_Moresby",
+            "Pacific/Rarotonga",
+            "Pacific/Saipan",
+            "Pacific/Samoa",
+            "Pacific/Tahiti",
+            "Pacific/Tarawa",
+            "Pacific/Tongatapu",
+            "Pacific/Truk",
+            "Pacific/Wake",
+            "Pacific/Wallis",
+            "Pacific/Yap",
+            "Poland",
+            "Portugal",
+            "ROC",
+            "ROK",
+            "Singapore",
+            "Turkey",
+            "UCT",
+            "US/Alaska",
+            "US/Aleutian",
+            "US/Arizona",
+            "US/Central",
+            "US/East-Indiana",
+            "US/Eastern",
+            "US/Hawaii",
+            "US/Indiana-Starke",
+            "US/Michigan",
+            "US/Mountain",
+            "US/Pacific",
+            "US/Samoa",
+            "UTC",
+            "Universal",
+            "W-SU",
+            "WET",
+            "Zulu"
+          ],
+          "minLength": 1,
+          "title": "Timezone",
+          "type": "string"
+        }
+      },
+      "required": [
+        "cronjob"
+      ],
+      "title": "Crontab",
+      "type": "object"
+    },
+    "DateParam": {
+      "description": "Date parameter model.",
+      "properties": {
+        "desc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A description of this parameter provide to the workflow model.",
+          "title": "Desc"
+        },
+        "required": {
+          "default": false,
+          "description": "A require flag for the default-able parameter value.",
+          "title": "Required",
+          "type": "boolean"
+        },
+        "type": {
+          "const": "date",
+          "default": "date",
+          "title": "Type",
+          "type": "string"
+        },
+        "default": {
+          "type": "string",
+          "format": "date",
+          "description": "A default date that make from the current date func.",
+          "title": "Default"
+        }
+      },
+      "title": "DateParam",
+      "type": "object"
+    },
+    "DatetimeParam": {
+      "description": "Datetime parameter model.",
+      "properties": {
+        "desc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A description of this parameter provide to the workflow model.",
+          "title": "Desc"
+        },
+        "required": {
+          "default": false,
+          "description": "A require flag for the default-able parameter value.",
+          "title": "Required",
+          "type": "boolean"
+        },
+        "type": {
+          "const": "datetime",
+          "default": "datetime",
+          "title": "Type",
+          "type": "string"
+        },
+        "default": {
+          "type": "string",
+          "format": "date-time",
+          "description": "A default datetime that make from the current datetime func.",
+          "title": "Default"
+        }
+      },
+      "title": "DatetimeParam",
+      "type": "object"
+    },
+    "DecimalParam": {
+      "description": "Decimal parameter.",
+      "properties": {
+        "desc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A description of this parameter provide to the workflow model.",
+          "title": "Desc"
+        },
+        "required": {
+          "default": false,
+          "description": "A require flag for the default-able parameter value.",
+          "title": "Required",
+          "type": "boolean"
+        },
+        "type": {
+          "const": "decimal",
+          "default": "decimal",
+          "title": "Type",
+          "type": "string"
+        },
+        "default": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A default value if parameter does not pass.",
+          "title": "Default"
+        },
+        "precision": {
+          "default": 6,
+          "title": "Precision",
+          "type": "integer"
+        }
+      },
+      "title": "DecimalParam",
+      "type": "object"
+    },
+    "DockerArgs": {
+      "properties": {
+        "image": {
+          "default": "ubuntu-latest",
+          "description": "An image that want to run like `ubuntu-22.04`, `windows-latest`, , `ubuntu-24.04-arm`, or `macos-14`",
+          "title": "Image",
+          "type": "string"
+        },
+        "env": {
+          "additionalProperties": true,
+          "title": "Env",
+          "type": "object"
+        },
+        "volume": {
+          "additionalProperties": true,
+          "title": "Volume",
+          "type": "object"
+        }
+      },
+      "title": "DockerArgs",
+      "type": "object"
+    },
+    "DockerStage": {
+      "description": "Docker container stage execution that will pull the specific Docker image\nwith custom authentication and run this image by passing environment\nvariables and mounting local volume to this Docker container.\n\n    The volume path that mount to this Docker container will limit. That is\nthis stage does not allow you to mount any path to this container.\n\nData Validate:\n    >>> stage = {\n    ...     \"name\": \"Docker stage execution\",\n    ...     \"image\": \"image-name.pkg.com\",\n    ...     \"env\": {\n    ...         \"ENV\": \"dev\",\n    ...         \"SECRET\": \"${SPECIFIC_SECRET}\",\n    ...     },\n    ...     \"auth\": {\n    ...         \"username\": \"__json_key\",\n    ...         \"password\": \"${GOOGLE_CREDENTIAL_JSON_STRING}\",\n    ...     },\n    ... }",
+      "properties": {
+        "extras": {
+          "additionalProperties": true,
+          "description": "An extra parameter that override core config values.",
+          "title": "Extras",
+          "type": "object"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage ID that use to keep execution output or getting by job owner.",
+          "title": "Id"
+        },
+        "name": {
+          "description": "A stage name that want to logging when start execution.",
+          "title": "Name",
+          "type": "string"
+        },
+        "desc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage description that use to logging when start execution.",
+          "title": "Desc"
+        },
+        "if": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage condition statement to allow stage executable. This field alise with `if` field.",
+          "title": "If"
+        },
+        "image": {
+          "description": "A Docker image url with tag that want to run.",
+          "title": "Image",
+          "type": "string"
+        },
+        "tag": {
+          "default": "latest",
+          "description": "An Docker image tag.",
+          "title": "Tag",
+          "type": "string"
+        },
+        "env": {
+          "additionalProperties": true,
+          "description": "An environment variable that want pass to Docker container.",
+          "title": "Env",
+          "type": "object"
+        },
+        "volume": {
+          "additionalProperties": true,
+          "description": "A mapping of local and target mounting path.",
+          "title": "Volume",
+          "type": "object"
+        },
+        "auth": {
+          "additionalProperties": true,
+          "description": "An authentication of the Docker registry that use in pulling step.",
+          "title": "Auth",
+          "type": "object"
+        }
+      },
+      "required": [
+        "name",
+        "image"
+      ],
+      "title": "DockerStage",
+      "type": "object"
+    },
+    "EmptyStage": {
+      "description": "Empty stage executor that do nothing and log the `message` field to\nstdout only. It can use for tracking a template parameter on the workflow or\ndebug step.\n\n    You can pass a sleep value in second unit to this stage for waiting\nafter log message.\n\nData Validate:\n    >>> stage = {\n    ...     \"name\": \"Empty stage execution\",\n    ...     \"echo\": \"Hello World\",\n    ...     \"sleep\": 1,\n    ... }",
+      "properties": {
+        "extras": {
+          "additionalProperties": true,
+          "description": "An extra parameter that override core config values.",
+          "title": "Extras",
+          "type": "object"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage ID that use to keep execution output or getting by job owner.",
+          "title": "Id"
+        },
+        "name": {
+          "description": "A stage name that want to logging when start execution.",
+          "title": "Name",
+          "type": "string"
+        },
+        "desc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage description that use to logging when start execution.",
+          "title": "Desc"
+        },
+        "if": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage condition statement to allow stage executable. This field alise with `if` field.",
+          "title": "If"
+        },
+        "echo": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A message that want to show on the stdout.",
+          "title": "Echo"
+        },
+        "sleep": {
+          "default": 0,
+          "description": "A second value to sleep before start execution. This value should gather or equal 0, and less than 1800 seconds.",
+          "exclusiveMaximum": 1800,
+          "minimum": 0,
+          "title": "Sleep",
+          "type": "number"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "EmptyStage",
+      "type": "object"
+    },
+    "FloatParam": {
+      "description": "Float parameter.",
+      "properties": {
+        "desc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A description of this parameter provide to the workflow model.",
+          "title": "Desc"
+        },
+        "required": {
+          "default": false,
+          "description": "A require flag for the default-able parameter value.",
+          "title": "Required",
+          "type": "boolean"
+        },
+        "type": {
+          "const": "float",
+          "default": "float",
+          "title": "Type",
+          "type": "string"
+        },
+        "default": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A default value if parameter does not pass.",
+          "title": "Default"
+        },
+        "precision": {
+          "default": 6,
+          "title": "Precision",
+          "type": "integer"
+        }
+      },
+      "title": "FloatParam",
+      "type": "object"
+    },
+    "ForEachStage": {
+      "description": "For-Each stage executor that execute all stages with each item in the\nforeach list.\n\n    This stage is not the low-level stage model because it runs\nmulti-stages in this stage execution.\n\nData Validate:\n    >>> stage = {\n    ...     \"name\": \"For-each stage execution\",\n    ...     \"foreach\": [1, 2, 3]\n    ...     \"stages\": [\n    ...         {\n    ...             \"name\": \"Echo stage\",\n    ...             \"echo\": \"Start run with item ${{ item }}\"\n    ...         },\n    ...     ],\n    ... }",
+      "properties": {
+        "extras": {
+          "additionalProperties": true,
+          "description": "An extra parameter that override core config values.",
+          "title": "Extras",
+          "type": "object"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage ID that use to keep execution output or getting by job owner.",
+          "title": "Id"
+        },
+        "name": {
+          "description": "A stage name that want to logging when start execution.",
+          "title": "Name",
+          "type": "string"
+        },
+        "desc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage description that use to logging when start execution.",
+          "title": "Desc"
+        },
+        "if": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage condition statement to allow stage executable. This field alise with `if` field.",
+          "title": "If"
+        },
+        "retry": {
+          "default": 0,
+          "description": "A retry number if stage execution get the error.",
+          "exclusiveMaximum": 20,
+          "minimum": 0,
+          "title": "Retry",
+          "type": "integer"
+        },
+        "foreach": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "description": "A items for passing to stages via ${{ item }} template parameter.",
+          "title": "Foreach"
+        },
+        "stages": {
+          "description": "A list of stage that will run with each item in the `foreach` field.",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/DockerStage"
+              },
+              {
+                "$ref": "#/$defs/BashStage"
+              },
+              {
+                "$ref": "#/$defs/CallStage"
+              },
+              {
+                "$ref": "#/$defs/TriggerStage"
+              },
+              {
+                "$ref": "#/$defs/ForEachStage"
+              },
+              {
+                "$ref": "#/$defs/UntilStage"
+              },
+              {
+                "$ref": "#/$defs/ParallelStage"
+              },
+              {
+                "$ref": "#/$defs/CaseStage"
+              },
+              {
+                "$ref": "#/$defs/VirtualPyStage"
+              },
+              {
+                "$ref": "#/$defs/PyStage"
+              },
+              {
+                "$ref": "#/$defs/RaiseStage"
+              },
+              {
+                "$ref": "#/$defs/EmptyStage"
+              }
+            ],
+            "description": "A stage models that already implemented on this package."
+          },
+          "title": "Stages",
+          "type": "array"
+        },
+        "concurrent": {
+          "default": 1,
+          "description": "A concurrent value allow to run each item at the same time. It will be sequential mode if this value equal 1.",
+          "exclusiveMaximum": 10,
+          "minimum": 1,
+          "title": "Concurrent",
+          "type": "integer"
+        },
+        "use_index_as_key": {
+          "default": false,
+          "description": "A flag for using the loop index as a key instead item value. This flag allow to skip checking duplicate item step.",
+          "title": "Use Index As Key",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "foreach"
+      ],
+      "title": "ForEachStage",
+      "type": "object"
+    },
+    "IntParam": {
+      "description": "Integer parameter.",
+      "properties": {
+        "desc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A description of this parameter provide to the workflow model.",
+          "title": "Desc"
+        },
+        "required": {
+          "default": false,
+          "description": "A require flag for the default-able parameter value.",
+          "title": "Required",
+          "type": "boolean"
+        },
+        "type": {
+          "const": "int",
+          "default": "int",
+          "title": "Type",
+          "type": "string"
+        },
+        "default": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A default value if parameter does not pass.",
+          "title": "Default"
+        }
+      },
+      "title": "IntParam",
+      "type": "object"
+    },
+    "Job": {
+      "description": "Job Pydantic model object (short descripte: a group of stages).\n\n    This job model allow you to use for-loop that call matrix strategy. If\nyou pass matrix mapping, and it is able to generate, you will see it running\nwith loop of matrix values.\n\nData Validate:\n    >>> job = {\n    ...     \"runs-on\": {\"type\": \"local\"},\n    ...     \"strategy\": {\n    ...         \"max-parallel\": 1,\n    ...         \"matrix\": {\n    ...             \"first\": [1, 2, 3],\n    ...             \"second\": ['foo', 'bar'],\n    ...         },\n    ...     },\n    ...     \"needs\": [],\n    ...     \"stages\": [\n    ...         {\n    ...             \"name\": \"Some stage\",\n    ...             \"run\": \"print('Hello World')\",\n    ...         },\n    ...     ],\n    ... }",
+      "properties": {
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A job ID that was set from Workflow model after initialize step. If this model create standalone, it will be None.",
+          "title": "Id"
+        },
+        "desc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A job description that can be markdown syntax.",
+          "title": "Desc"
+        },
+        "runs-on": {
+          "description": "A target node for this job to use for execution.",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OnSelfHosted"
+            },
+            {
+              "$ref": "#/$defs/OnDocker"
+            },
+            {
+              "$ref": "#/$defs/OnLocal"
+            }
+          ],
+          "title": "Runs-On"
+        },
+        "if": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A job condition statement to allow job executable.",
+          "title": "If"
+        },
+        "stages": {
+          "description": "A list of Stage model of this job.",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/DockerStage"
+              },
+              {
+                "$ref": "#/$defs/BashStage"
+              },
+              {
+                "$ref": "#/$defs/CallStage"
+              },
+              {
+                "$ref": "#/$defs/TriggerStage"
+              },
+              {
+                "$ref": "#/$defs/ForEachStage"
+              },
+              {
+                "$ref": "#/$defs/UntilStage"
+              },
+              {
+                "$ref": "#/$defs/ParallelStage"
+              },
+              {
+                "$ref": "#/$defs/CaseStage"
+              },
+              {
+                "$ref": "#/$defs/VirtualPyStage"
+              },
+              {
+                "$ref": "#/$defs/PyStage"
+              },
+              {
+                "$ref": "#/$defs/RaiseStage"
+              },
+              {
+                "$ref": "#/$defs/EmptyStage"
+              }
+            ],
+            "description": "A stage models that already implemented on this package."
+          },
+          "title": "Stages",
+          "type": "array"
+        },
+        "trigger-rule": {
+          "$ref": "#/$defs/Rule",
+          "default": "all_success",
+          "description": "A trigger rule of tracking needed jobs if feature will use when the `raise_error` did not set from job and stage executions."
+        },
+        "needs": {
+          "description": "A list of the job that want to run before this job model.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Needs",
+          "type": "array"
+        },
+        "strategy": {
+          "$ref": "#/$defs/Strategy",
+          "description": "A strategy matrix that want to generate."
+        },
+        "extras": {
+          "additionalProperties": true,
+          "description": "An extra override config values.",
+          "title": "Extras",
+          "type": "object"
+        }
+      },
+      "title": "Job",
+      "type": "object"
+    },
+    "MapParam": {
+      "description": "Map parameter.",
+      "properties": {
+        "desc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A description of this parameter provide to the workflow model.",
+          "title": "Desc"
+        },
+        "required": {
+          "default": false,
+          "description": "A require flag for the default-able parameter value.",
+          "title": "Required",
+          "type": "boolean"
+        },
+        "type": {
+          "const": "map",
+          "default": "map",
+          "title": "Type",
+          "type": "string"
+        },
+        "default": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "A default dict that make from the dict built-in func.",
+          "title": "Default"
+        }
+      },
+      "title": "MapParam",
+      "type": "object"
+    },
+    "Match": {
+      "description": "Match model for the Case Stage.",
+      "properties": {
+        "case": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "description": "A match case.",
+          "title": "Case"
+        },
+        "stages": {
+          "description": "A list of stage to execution for this case.",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/DockerStage"
+              },
+              {
+                "$ref": "#/$defs/BashStage"
+              },
+              {
+                "$ref": "#/$defs/CallStage"
+              },
+              {
+                "$ref": "#/$defs/TriggerStage"
+              },
+              {
+                "$ref": "#/$defs/ForEachStage"
+              },
+              {
+                "$ref": "#/$defs/UntilStage"
+              },
+              {
+                "$ref": "#/$defs/ParallelStage"
+              },
+              {
+                "$ref": "#/$defs/CaseStage"
+              },
+              {
+                "$ref": "#/$defs/VirtualPyStage"
+              },
+              {
+                "$ref": "#/$defs/PyStage"
+              },
+              {
+                "$ref": "#/$defs/RaiseStage"
+              },
+              {
+                "$ref": "#/$defs/EmptyStage"
+              }
+            ],
+            "description": "A stage models that already implemented on this package."
+          },
+          "title": "Stages",
+          "type": "array"
+        }
+      },
+      "required": [
+        "case",
+        "stages"
+      ],
+      "title": "Match",
+      "type": "object"
+    },
+    "OnDocker": {
+      "description": "Runs-on Docker container.",
+      "properties": {
+        "type": {
+          "const": "docker",
+          "default": "docker",
+          "title": "Type",
+          "type": "string"
+        },
+        "with": {
+          "$ref": "#/$defs/DockerArgs"
+        }
+      },
+      "title": "OnDocker",
+      "type": "object"
+    },
+    "OnLocal": {
+      "description": "Runs-on local.",
+      "properties": {
+        "type": {
+          "const": "local",
+          "default": "local",
+          "title": "Type",
+          "type": "string"
+        },
+        "with": {
+          "additionalProperties": true,
+          "description": "An argument that pass to the runs-on execution function. This args will override by this child-model with specific args model.",
+          "title": "With",
+          "type": "object"
+        }
+      },
+      "title": "OnLocal",
+      "type": "object"
+    },
+    "OnSelfHosted": {
+      "description": "Runs-on self-hosted.",
+      "properties": {
+        "type": {
+          "const": "self_hosted",
+          "default": "self_hosted",
+          "title": "Type",
+          "type": "string"
+        },
+        "with": {
+          "$ref": "#/$defs/SelfHostedArgs"
+        }
+      },
+      "required": [
+        "with"
+      ],
+      "title": "OnSelfHosted",
+      "type": "object"
+    },
+    "ParallelStage": {
+      "description": "Parallel stage executor that execute branch stages with multithreading.\nThis stage let you set the fix branches for running child stage inside it on\nmultithread pool.\n\n    This stage is not the low-level stage model because it runs multi-stages\nin this stage execution.\n\nData Validate:\n    >>> stage = {\n    ...     \"name\": \"Parallel stage execution.\",\n    ...     \"parallel\": {\n    ...         \"branch01\": [\n    ...             {\n    ...                 \"name\": \"Echo first stage\",\n    ...                 \"echo\": \"Start run with branch 1\",\n    ...                 \"sleep\": 3,\n    ...             },\n    ...             {\n    ...                 \"name\": \"Echo second stage\",\n    ...                 \"echo\": \"Start run with branch 1\",\n    ...             },\n    ...         ],\n    ...         \"branch02\": [\n    ...             {\n    ...                 \"name\": \"Echo first stage\",\n    ...                 \"echo\": \"Start run with branch 2\",\n    ...                 \"sleep\": 1,\n    ...             },\n    ...         ],\n    ...     }\n    ... }",
+      "properties": {
+        "extras": {
+          "additionalProperties": true,
+          "description": "An extra parameter that override core config values.",
+          "title": "Extras",
+          "type": "object"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage ID that use to keep execution output or getting by job owner.",
+          "title": "Id"
+        },
+        "name": {
+          "description": "A stage name that want to logging when start execution.",
+          "title": "Name",
+          "type": "string"
+        },
+        "desc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage description that use to logging when start execution.",
+          "title": "Desc"
+        },
+        "if": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage condition statement to allow stage executable. This field alise with `if` field.",
+          "title": "If"
+        },
+        "retry": {
+          "default": 0,
+          "description": "A retry number if stage execution get the error.",
+          "exclusiveMaximum": 20,
+          "minimum": 0,
+          "title": "Retry",
+          "type": "integer"
+        },
+        "parallel": {
+          "additionalProperties": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DockerStage"
+                },
+                {
+                  "$ref": "#/$defs/BashStage"
+                },
+                {
+                  "$ref": "#/$defs/CallStage"
+                },
+                {
+                  "$ref": "#/$defs/TriggerStage"
+                },
+                {
+                  "$ref": "#/$defs/ForEachStage"
+                },
+                {
+                  "$ref": "#/$defs/UntilStage"
+                },
+                {
+                  "$ref": "#/$defs/ParallelStage"
+                },
+                {
+                  "$ref": "#/$defs/CaseStage"
+                },
+                {
+                  "$ref": "#/$defs/VirtualPyStage"
+                },
+                {
+                  "$ref": "#/$defs/PyStage"
+                },
+                {
+                  "$ref": "#/$defs/RaiseStage"
+                },
+                {
+                  "$ref": "#/$defs/EmptyStage"
+                }
+              ],
+              "description": "A stage models that already implemented on this package."
+            },
+            "type": "array"
+          },
+          "description": "A mapping of branch name and its stages.",
+          "title": "Parallel",
+          "type": "object"
+        },
+        "max-workers": {
+          "default": 2,
+          "description": "The maximum multi-thread pool worker size for execution parallel. This value should be gather or equal than 1, and less than 20.",
+          "exclusiveMaximum": 20,
+          "minimum": 1,
+          "title": "Max-Workers",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "parallel"
+      ],
+      "title": "ParallelStage",
+      "type": "object"
+    },
+    "PyStage": {
+      "description": "Python stage that running the Python statement with the current globals\nand passing an input additional variables via `exec` built-in function.\n\n    This stage allow you to use any Python object that exists on the globals\nsuch as import your installed package.\n\nWarning:\n\n    The exec build-in function is very dangerous. So, it should use the `re`\nmodule to validate exec-string before running or exclude the `os` package\nfrom the current globals variable.\n\nData Validate:\n    >>> stage = {\n    ...     \"name\": \"Python stage execution\",\n    ...     \"run\": 'print(f\"Hello {VARIABLE}\")',\n    ...     \"vars\": {\n    ...         \"VARIABLE\": \"WORLD\",\n    ...     },\n    ... }",
+      "properties": {
+        "extras": {
+          "additionalProperties": true,
+          "description": "An extra parameter that override core config values.",
+          "title": "Extras",
+          "type": "object"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage ID that use to keep execution output or getting by job owner.",
+          "title": "Id"
+        },
+        "name": {
+          "description": "A stage name that want to logging when start execution.",
+          "title": "Name",
+          "type": "string"
+        },
+        "desc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage description that use to logging when start execution.",
+          "title": "Desc"
+        },
+        "if": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage condition statement to allow stage executable. This field alise with `if` field.",
+          "title": "If"
+        },
+        "retry": {
+          "default": 0,
+          "description": "A retry number if stage execution get the error.",
+          "exclusiveMaximum": 20,
+          "minimum": 0,
+          "title": "Retry",
+          "type": "integer"
+        },
+        "run": {
+          "description": "A Python string statement that want to run with `exec`.",
+          "title": "Run",
+          "type": "string"
+        },
+        "vars": {
+          "additionalProperties": true,
+          "description": "A variable mapping that want to pass to globals parameter in the `exec` func.",
+          "title": "Vars",
+          "type": "object"
+        }
+      },
+      "required": [
+        "name",
+        "run"
+      ],
+      "title": "PyStage",
+      "type": "object"
+    },
+    "RaiseStage": {
+      "description": "Raise error stage executor that raise `StageError` that use a message\nfield for making error message before raise.\n\nData Validate:\n    >>> stage = {\n    ...     \"name\": \"Raise stage\",\n    ...     \"raise\": \"raise this stage\",\n    ... }",
+      "properties": {
+        "extras": {
+          "additionalProperties": true,
+          "description": "An extra parameter that override core config values.",
+          "title": "Extras",
+          "type": "object"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage ID that use to keep execution output or getting by job owner.",
+          "title": "Id"
+        },
+        "name": {
+          "description": "A stage name that want to logging when start execution.",
+          "title": "Name",
+          "type": "string"
+        },
+        "desc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage description that use to logging when start execution.",
+          "title": "Desc"
+        },
+        "if": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage condition statement to allow stage executable. This field alise with `if` field.",
+          "title": "If"
+        },
+        "raise": {
+          "description": "An error message that want to raise with `StageError` class",
+          "title": "Raise",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "raise"
+      ],
+      "title": "RaiseStage",
+      "type": "object"
+    },
+    "Rule": {
+      "description": "Rule enum object for assign trigger option.",
+      "enum": [
+        "all_success",
+        "all_failed",
+        "all_done",
+        "one_failed",
+        "one_success",
+        "none_failed",
+        "none_skipped"
+      ],
+      "title": "Rule",
+      "type": "string"
+    },
+    "SelfHostedArgs": {
+      "description": "Self-Hosted arguments.",
+      "properties": {
+        "host": {
+          "description": "A host URL of the target self-hosted.",
+          "title": "Host",
+          "type": "string"
+        },
+        "token": {
+          "description": "An API or Access token.",
+          "format": "password",
+          "title": "Token",
+          "type": "string",
+          "writeOnly": true
+        }
+      },
+      "required": [
+        "host",
+        "token"
+      ],
+      "title": "SelfHostedArgs",
+      "type": "object"
+    },
+    "StrParam": {
+      "description": "String parameter.",
+      "properties": {
+        "desc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A description of this parameter provide to the workflow model.",
+          "title": "Desc"
+        },
+        "required": {
+          "default": false,
+          "description": "A require flag for the default-able parameter value.",
+          "title": "Required",
+          "type": "boolean"
+        },
+        "type": {
+          "const": "str",
+          "default": "str",
+          "title": "Type",
+          "type": "string"
+        },
+        "default": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A default value if parameter does not pass.",
+          "title": "Default"
+        }
+      },
+      "title": "StrParam",
+      "type": "object"
+    },
+    "Strategy": {
+      "description": "Strategy model that will combine a matrix together for running the\nspecial job with combination of matrix data.\n\n    This model does not be the part of job only because you can use it to\nany model object. The objective of this model is generating metrix result\nthat comming from combination logic with any matrix values for running it\nwith parallelism.\n\n    [1, 2, 3] x [a, b] --> [1a], [1b], [2a], [2b], [3a], [3b]\n\nData Validate:\n    >>> strategy = {\n    ...     'max-parallel': 1,\n    ...     'fail-fast': False,\n    ...     'matrix': {\n    ...         'first': [1, 2, 3],\n    ...         'second': ['foo', 'bar'],\n    ...     },\n    ...     'include': [{'first': 4, 'second': 'foo'}],\n    ...     'exclude': [{'first': 1, 'second': 'bar'}],\n    ... }",
+      "properties": {
+        "fail-fast": {
+          "default": false,
+          "description": "A fail-fast flag that use to cancel strategy execution when it has some execution was failed.",
+          "title": "Fail-Fast",
+          "type": "boolean"
+        },
+        "max-parallel": {
+          "default": 1,
+          "description": "The maximum number of executor thread pool that want to run parallel. This value should gather than 0 and less than 10.",
+          "exclusiveMaximum": 10,
+          "exclusiveMinimum": 0,
+          "title": "Max-Parallel",
+          "type": "integer"
+        },
+        "matrix": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              }
+            ]
+          },
+          "description": "A matrix values that want to cross product to possible strategies.",
+          "title": "Matrix",
+          "type": "object"
+        },
+        "include": {
+          "description": "A list of additional matrix that want to adds-in.",
+          "items": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "object"
+          },
+          "title": "Include",
+          "type": "array"
+        },
+        "exclude": {
+          "description": "A list of exclude matrix that want to filter-out.",
+          "items": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "object"
+          },
+          "title": "Exclude",
+          "type": "array"
+        }
+      },
+      "title": "Strategy",
+      "type": "object"
+    },
+    "TriggerStage": {
+      "description": "Trigger workflow executor stage that run an input trigger Workflow\nexecute method. This is the stage that allow you to create the reusable\nWorkflow template with dynamic parameters.\n\nData Validate:\n    >>> stage = {\n    ...     \"name\": \"Trigger workflow stage execution\",\n    ...     \"trigger\": 'workflow-name-for-loader',\n    ...     \"params\": {\"run-date\": \"2024-08-01\", \"source\": \"src\"},\n    ... }",
+      "properties": {
+        "extras": {
+          "additionalProperties": true,
+          "description": "An extra parameter that override core config values.",
+          "title": "Extras",
+          "type": "object"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage ID that use to keep execution output or getting by job owner.",
+          "title": "Id"
+        },
+        "name": {
+          "description": "A stage name that want to logging when start execution.",
+          "title": "Name",
+          "type": "string"
+        },
+        "desc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage description that use to logging when start execution.",
+          "title": "Desc"
+        },
+        "if": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage condition statement to allow stage executable. This field alise with `if` field.",
+          "title": "If"
+        },
+        "retry": {
+          "default": 0,
+          "description": "A retry number if stage execution get the error.",
+          "exclusiveMaximum": 20,
+          "minimum": 0,
+          "title": "Retry",
+          "type": "integer"
+        },
+        "trigger": {
+          "description": "A trigger workflow name. This workflow name should exist on the config path because it will load by the `load_conf` method.",
+          "title": "Trigger",
+          "type": "string"
+        },
+        "params": {
+          "additionalProperties": true,
+          "description": "A parameter that will pass to workflow execution method.",
+          "title": "Params",
+          "type": "object"
+        }
+      },
+      "required": [
+        "name",
+        "trigger"
+      ],
+      "title": "TriggerStage",
+      "type": "object"
+    },
+    "UntilStage": {
+      "description": "Until stage executor that will run stages in each loop until it valid\nwith stop loop condition.\n\n    This stage is not the low-level stage model because it runs\nmulti-stages in this stage execution.\n\nData Validate:\n    >>> stage = {\n    ...     \"name\": \"Until stage execution\",\n    ...     \"item\": 1,\n    ...     \"until\": \"${{ item }} > 3\"\n    ...     \"stages\": [\n    ...         {\n    ...             \"name\": \"Start increase item value.\",\n    ...             \"run\": (\n    ...                 \"item = ${{ item }}\\n\"\n    ...                 \"item += 1\\n\"\n    ...             )\n    ...         },\n    ...     ],\n    ... }",
+      "properties": {
+        "extras": {
+          "additionalProperties": true,
+          "description": "An extra parameter that override core config values.",
+          "title": "Extras",
+          "type": "object"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage ID that use to keep execution output or getting by job owner.",
+          "title": "Id"
+        },
+        "name": {
+          "description": "A stage name that want to logging when start execution.",
+          "title": "Name",
+          "type": "string"
+        },
+        "desc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage description that use to logging when start execution.",
+          "title": "Desc"
+        },
+        "if": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage condition statement to allow stage executable. This field alise with `if` field.",
+          "title": "If"
+        },
+        "retry": {
+          "default": 0,
+          "description": "A retry number if stage execution get the error.",
+          "exclusiveMaximum": 20,
+          "minimum": 0,
+          "title": "Retry",
+          "type": "integer"
+        },
+        "item": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "boolean"
+            }
+          ],
+          "default": 0,
+          "description": "An initial value that can be any value in str, int, or bool type.",
+          "title": "Item"
+        },
+        "until": {
+          "description": "A until condition for stop the while loop.",
+          "title": "Until",
+          "type": "string"
+        },
+        "stages": {
+          "description": "A list of stage that will run with each item in until loop.",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/DockerStage"
+              },
+              {
+                "$ref": "#/$defs/BashStage"
+              },
+              {
+                "$ref": "#/$defs/CallStage"
+              },
+              {
+                "$ref": "#/$defs/TriggerStage"
+              },
+              {
+                "$ref": "#/$defs/ForEachStage"
+              },
+              {
+                "$ref": "#/$defs/UntilStage"
+              },
+              {
+                "$ref": "#/$defs/ParallelStage"
+              },
+              {
+                "$ref": "#/$defs/CaseStage"
+              },
+              {
+                "$ref": "#/$defs/VirtualPyStage"
+              },
+              {
+                "$ref": "#/$defs/PyStage"
+              },
+              {
+                "$ref": "#/$defs/RaiseStage"
+              },
+              {
+                "$ref": "#/$defs/EmptyStage"
+              }
+            ],
+            "description": "A stage models that already implemented on this package."
+          },
+          "title": "Stages",
+          "type": "array"
+        },
+        "max-loop": {
+          "default": 10,
+          "description": "The maximum value of loop for this until stage. This value should be gather or equal than 1, and less than 100.",
+          "exclusiveMaximum": 100,
+          "minimum": 1,
+          "title": "Max-Loop",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "until"
+      ],
+      "title": "UntilStage",
+      "type": "object"
+    },
+    "VirtualPyStage": {
+      "description": "Virtual Python stage executor that run Python statement on the dependent\nPython virtual environment via the `uv` package.",
+      "properties": {
+        "extras": {
+          "additionalProperties": true,
+          "description": "An extra parameter that override core config values.",
+          "title": "Extras",
+          "type": "object"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage ID that use to keep execution output or getting by job owner.",
+          "title": "Id"
+        },
+        "name": {
+          "description": "A stage name that want to logging when start execution.",
+          "title": "Name",
+          "type": "string"
+        },
+        "desc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage description that use to logging when start execution.",
+          "title": "Desc"
+        },
+        "if": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A stage condition statement to allow stage executable. This field alise with `if` field.",
+          "title": "If"
+        },
+        "retry": {
+          "default": 0,
+          "description": "A retry number if stage execution get the error.",
+          "exclusiveMaximum": 20,
+          "minimum": 0,
+          "title": "Retry",
+          "type": "integer"
+        },
+        "run": {
+          "description": "A Python string statement that want to run with `exec`.",
+          "title": "Run",
+          "type": "string"
+        },
+        "vars": {
+          "additionalProperties": true,
+          "description": "A variable mapping that want to pass to globals parameter in the `exec` func.",
+          "title": "Vars",
+          "type": "object"
+        },
+        "version": {
+          "default": "3.9",
+          "description": "A Python version that want to run.",
+          "title": "Version",
+          "type": "string"
+        },
+        "deps": {
+          "description": "list of Python dependency that want to install before execution stage.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Deps",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "run",
+        "deps"
+      ],
+      "title": "VirtualPyStage",
+      "type": "object"
+    },
+    "WorkflowSchema": {
+      "properties": {
+        "extras": {
+          "additionalProperties": true,
+          "description": "An extra parameters that want to override config values.",
+          "title": "Extras",
+          "type": "object"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A workflow name.",
+          "title": "Name"
+        },
+        "desc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A workflow description that can be string of markdown content.",
+          "title": "Desc"
+        },
+        "params": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "description": "A parameter models that use for validate and receive on the workflow execution.",
+                "discriminator": {
+                  "mapping": {
+                    "array": "#/$defs/ArrayParam",
+                    "choice": "#/$defs/ChoiceParam",
+                    "date": "#/$defs/DateParam",
+                    "datetime": "#/$defs/DatetimeParam",
+                    "decimal": "#/$defs/DecimalParam",
+                    "float": "#/$defs/FloatParam",
+                    "int": "#/$defs/IntParam",
+                    "map": "#/$defs/MapParam",
+                    "str": "#/$defs/StrParam"
+                  },
+                  "propertyName": "type"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/MapParam"
+                  },
+                  {
+                    "$ref": "#/$defs/ArrayParam"
+                  },
+                  {
+                    "$ref": "#/$defs/ChoiceParam"
+                  },
+                  {
+                    "$ref": "#/$defs/DatetimeParam"
+                  },
+                  {
+                    "$ref": "#/$defs/DateParam"
+                  },
+                  {
+                    "$ref": "#/$defs/FloatParam"
+                  },
+                  {
+                    "$ref": "#/$defs/DecimalParam"
+                  },
+                  {
+                    "$ref": "#/$defs/IntParam"
+                  },
+                  {
+                    "$ref": "#/$defs/StrParam"
+                  }
+                ]
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "description": "A parameters that need to use on this workflow.",
+          "title": "Params",
+          "type": "object"
+        },
+        "on": {
+          "anyOf": [
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Crontab"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "description": "A list of Crontab instance for this workflow schedule.",
+          "title": "On"
+        },
+        "jobs": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Job"
+          },
+          "description": "A mapping of job ID and job model that already loaded.",
+          "title": "Jobs",
+          "type": "object"
+        }
+      },
+      "title": "WorkflowSchema",
+      "type": "object"
+    }
+  },
+  "additionalProperties": {
+    "$ref": "#/$defs/WorkflowSchema"
+  },
+  "type": "object"
+}
