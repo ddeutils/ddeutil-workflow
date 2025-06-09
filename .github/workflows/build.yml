@@ -48,7 +48,7 @@ jobs:
         run: echo "name=$(date +'%m-%d-%Y')" >> $GITHUB_OUTPUT
 
       - name: Build the ddeutil-workflow Docker image without tag
-        if: github.ref_type == 'tag'
+        if: github.ref_type != 'tag'
         run: |
           docker buildx build \
             --file ./.container/Dockerfile \
