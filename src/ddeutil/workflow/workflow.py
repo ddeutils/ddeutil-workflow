@@ -827,25 +827,34 @@ class Workflow(BaseModel):
             result.trace.warning(f"[WORKFLOW]: {self.name!r} does not set jobs")
             return result.catch(status=SUCCESS, context=context)
 
-        job_queue: Queue = Queue()
-        for job_id in self.jobs:
-            job_queue.put(job_id)
-
-        not_timeout_flag: bool = True
-        total_job: int = len(self.jobs)
-        statuses: list[Status] = [WAIT] * total_job
-        skip_count: int = 0
-        sequence_statuses: list[Status] = []
-        timeout: float = dynamic(
-            "max_job_exec_timeout", f=timeout, extras=self.extras
-        )
-
         # NOTE: Prepare the new context for rerun process.
         jobs: DictData = context.get("jobs")
         new_context: DictData = {
             "params": context["params"].copy(),
             "jobs": {j: jobs[j] for j in jobs if jobs[j]["status"] == SUCCESS},
         }
+
+        total_job: int = 0
+        job_queue: Queue = Queue()
+        for job_id in self.jobs:
+
+            if job_id in new_context["jobs"]:
+                continue
+
+            job_queue.put(job_id)
+            total_job += 1
+
+        if total_job == 0:
+            result.trace.warning("[WORKFLOW]: It does not have job to rerun.")
+            return result.catch(status=SUCCESS, context=context)
+
+        not_timeout_flag: bool = True
+        statuses: list[Status] = [WAIT] * total_job
+        skip_count: int = 0
+        sequence_statuses: list[Status] = []
+        timeout: float = dynamic(
+            "max_job_exec_timeout", f=timeout, extras=self.extras
+        )
 
         result.catch(status=WAIT, context=new_context)
         if event and event.is_set():
