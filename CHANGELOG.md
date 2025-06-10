@@ -2,6 +2,22 @@
 
 ## Latest Changes
 
+## 0.0.72
+
+### :stars: Highlight Features
+
+- :star: hl: add obj type for finding data with specific class type with duplicate key.
+
+### :bug: Bug fixes
+
+- :gear: fixed: move import app to api cli.
+- :gear: fixed: build condition not valid.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: add testcase for cli.
+- :art: format: move get object type to utils module.
+
 ## 0.0.71
 
 ### :bug: Bug fixes
