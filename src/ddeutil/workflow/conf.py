@@ -222,6 +222,7 @@ class YamlParser:
         paths: Optional[list[Path]] = None,
         obj: Optional[Union[object, str]] = None,
         extras: Optional[DictData] = None,
+        ignore_filename: Optional[str] = None,
     ) -> DictData:
         """Find data with specific key and return the latest modify date data if
         this key exists multiple files.
@@ -229,9 +230,12 @@ class YamlParser:
         :param name: (str) A name of data that want to find.
         :param path: (Path) A config path object.
         :param paths: (list[Path]) A list of config path object.
-        :param obj:
+        :param obj: (object | str) An object that want to validate matching
+            before return.
         :param extras: (DictData)  An extra parameter that use to override core
             config values.
+        :param ignore_filename: (str) An ignore filename. Default is
+            ``.confignore`` filename.
 
         :rtype: DictData
         """
@@ -252,13 +256,13 @@ class YamlParser:
         for path in paths:
             for file in glob_files(path):
 
-                if cls.is_ignore(file, path):
+                if cls.is_ignore(file, path, ignore_filename=ignore_filename):
                     continue
 
                 if data := cls.filter_yaml(file, name=name):
                     if not obj_type:
                         all_data.append((file.lstat().st_mtime, data))
-                    elif data.get("type", "") == obj_type:
+                    elif (t := data.get("type")) and t == obj_type:
                         all_data.append((file.lstat().st_mtime, data))
                     else:
                         continue
@@ -274,6 +278,7 @@ class YamlParser:
         paths: Optional[list[Path]] = None,
         excluded: Optional[list[str]] = None,
         extras: Optional[DictData] = None,
+        ignore_filename: Optional[str] = None,
     ) -> Iterator[tuple[str, DictData]]:
         """Find all data that match with object type in config path. This class
         method can use include and exclude list of identity name for filter and
@@ -287,6 +292,8 @@ class YamlParser:
             data.
         :param extras: (DictData) An extra parameter that use to override core
             config values.
+        :param ignore_filename: (str) An ignore filename. Default is
+            ``.confignore`` filename.
 
         :rtype: Iterator[tuple[str, DictData]]
         """
@@ -308,7 +315,7 @@ class YamlParser:
         for path in paths:
             for file in glob_files(path):
 
-                if cls.is_ignore(file, path):
+                if cls.is_ignore(file, path, ignore_filename=ignore_filename):
                     continue
 
                 for key, data in cls.filter_yaml(file).items():
@@ -316,7 +323,7 @@ class YamlParser:
                     if key in excluded:
                         continue
 
-                    if data.get("type", "") == obj_type:
+                    if (t := data.get("type")) and t == obj_type:
                         marking: tuple[float, DictData] = (
                             file.lstat().st_mtime,
                             data,
