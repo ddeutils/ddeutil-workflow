@@ -67,10 +67,15 @@ async def simple_task_async(
 
 
 @tag("demo", alias="private-args-task")
-def private_args(_exec: str, params: dict[str, Any], result: Result):
+def private_args(
+    _exec: str,
+    params: dict[str, Any],
+    result: Result,
+    extras: dict[str, Any],
+) -> dict[str, Any]:
     result.trace.info(
         f"Private args: `_exec` receive from `exec` params||"
-        f"> exec: {_exec!r}"
+        f"> exec: {_exec!r}||> extra: {extras}"
     )
     return {"exec": _exec, "params": params}
 

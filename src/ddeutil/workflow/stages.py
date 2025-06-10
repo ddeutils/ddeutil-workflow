@@ -1348,9 +1348,10 @@ class CallStage(BaseRetryStage):
 
         # VALIDATE: check input task caller parameters that exists before
         #   calling.
-        args: DictData = {"result": result} | param2template(
-            self.args, params, extras=self.extras
-        )
+        args: DictData = {
+            "result": result,
+            "extras": self.extras,
+        } | param2template(self.args, params, extras=self.extras)
         sig = inspect.signature(call_func)
         necessary_params: list[str] = []
         has_keyword: bool = False
@@ -1369,13 +1370,20 @@ class CallStage(BaseRetryStage):
             (k.removeprefix("_") not in args and k not in args)
             for k in necessary_params
         ):
+            necessary_params.remove("result")
+            necessary_params.remove("extras")
+            args.pop("result")
+            args.pop("extras")
             raise ValueError(
                 f"Necessary params, ({', '.join(necessary_params)}, ), "
-                f"does not set to args, {list(args.keys())}."
+                f"does not set to args. It already set {list(args.keys())}."
             )
 
         if "result" not in sig.parameters and not has_keyword:
             args.pop("result")
+
+        if "extras" not in sig.parameters and not has_keyword:
+            args.pop("extras")
 
         if event and event.is_set():
             raise StageCancelError(
@@ -1441,9 +1449,10 @@ class CallStage(BaseRetryStage):
 
         # VALIDATE: check input task caller parameters that exists before
         #   calling.
-        args: DictData = {"result": result} | param2template(
-            self.args, params, extras=self.extras
-        )
+        args: DictData = {
+            "result": result,
+            "extras": self.extras,
+        } | param2template(self.args, params, extras=self.extras)
         sig = inspect.signature(call_func)
         necessary_params: list[str] = []
         has_keyword: bool = False
@@ -1462,13 +1471,19 @@ class CallStage(BaseRetryStage):
             (k.removeprefix("_") not in args and k not in args)
             for k in necessary_params
         ):
+            necessary_params.remove("result")
+            necessary_params.remove("extras")
+            args.pop("result")
+            args.pop("extras")
             raise ValueError(
                 f"Necessary params, ({', '.join(necessary_params)}, ), "
-                f"does not set to args, {list(args.keys())}."
+                f"does not set to args. It already set {list(args.keys())}."
             )
-
         if "result" not in sig.parameters and not has_keyword:
             args.pop("result")
+
+        if "extras" not in sig.parameters and not has_keyword:
+            args.pop("extras")
 
         args: DictData = self.validate_model_args(call_func, args, result)
         if inspect.iscoroutinefunction(call_func):

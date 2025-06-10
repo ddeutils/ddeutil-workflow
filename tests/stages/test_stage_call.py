@@ -22,8 +22,8 @@ def test_call_stage_exec_necessary_args():
         "errors": {
             "name": "ValueError",
             "message": (
-                "Necessary params, (_exec, params, result, ), does not "
-                "set to args, ['result', 'params']."
+                "Necessary params, (_exec, params, ), does not "
+                "set to args. It already set ['params']."
             ),
         },
     }
@@ -98,7 +98,10 @@ def test_call_stage_exec(test_path):
             "status": FAILED,
             "errors": {
                 "name": "StageError",
-                "message": "Validate argument from the caller function raise invalid type.",
+                "message": (
+                    "Validate argument from the caller function raise invalid "
+                    "type."
+                ),
             },
         }
 
@@ -239,7 +242,7 @@ async def test_call_stage_axec(test_path):
             "status": FAILED,
             "errors": {
                 "name": "ValueError",
-                "message": "Necessary params, (_exec, params, result, ), does not set to args, ['result', 'params'].",
+                "message": "Necessary params, (_exec, params, ), does not set to args. It already set ['params'].",
             },
         }
 
@@ -251,8 +254,8 @@ async def test_call_stage_axec(test_path):
             "errors": {
                 "name": "ValueError",
                 "message": (
-                    "Necessary params, (_exec, params, result, ), does not set to args, "
-                    "['result', 'params']."
+                    "Necessary params, (_exec, params, ), does not set to "
+                    "args. It already set ['params']."
                 ),
             },
         }
