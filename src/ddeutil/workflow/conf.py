@@ -192,6 +192,7 @@ class YamlParser:
         path: Optional[Union[str, Path]] = None,
         externals: DictData | None = None,
         extras: DictData | None = None,
+        obj: Optional[Union[object, str]] = None,
     ) -> None:
         self.path: Path = Path(dynamic("conf_path", f=path, extras=extras))
         self.externals: DictData = externals or {}
@@ -201,6 +202,7 @@ class YamlParser:
             path=path,
             paths=self.extras.get("conf_paths"),
             extras=extras,
+            obj=obj,
         )
 
         # VALIDATE: check the data that reading should not empty.
@@ -218,6 +220,7 @@ class YamlParser:
         *,
         path: Optional[Path] = None,
         paths: Optional[list[Path]] = None,
+        obj: Optional[Union[object, str]] = None,
         extras: Optional[DictData] = None,
     ) -> DictData:
         """Find data with specific key and return the latest modify date data if
@@ -226,6 +229,7 @@ class YamlParser:
         :param name: (str) A name of data that want to find.
         :param path: (Path) A config path object.
         :param paths: (list[Path]) A list of config path object.
+        :param obj:
         :param extras: (DictData)  An extra parameter that use to override core
             config values.
 
@@ -243,6 +247,15 @@ class YamlParser:
             paths.append(path)
 
         all_data: list[tuple[float, DictData]] = []
+        if not obj:
+            obj_type: str = ""
+        elif isinstance(obj, str):
+            obj_type: str = obj
+        elif isclass(obj):
+            obj_type: str = obj.__name__
+        else:
+            obj_type: str = obj.__class__.__name__
+
         for path in paths:
             for file in glob_files(path):
 
@@ -250,14 +263,19 @@ class YamlParser:
                     continue
 
                 if data := cls.filter_yaml(file, name=name):
-                    all_data.append((file.lstat().st_mtime, data))
+                    if not obj_type:
+                        all_data.append((file.lstat().st_mtime, data))
+                    elif data.get("type", "") == obj_type:
+                        all_data.append((file.lstat().st_mtime, data))
+                    else:
+                        continue
 
         return {} if not all_data else max(all_data, key=lambda x: x[0])[1]
 
     @classmethod
     def finds(
         cls,
-        obj: object,
+        obj: Union[object, str],
         *,
         path: Optional[Path] = None,
         paths: Optional[list[Path]] = None,
@@ -268,8 +286,8 @@ class YamlParser:
         method can use include and exclude list of identity name for filter and
         adds-on.
 
-        :param obj: (object) An object that want to validate matching before
-            return.
+        :param obj: (object | str) An object that want to validate matching
+            before return.
         :param path: (Path) A config path object.
         :param paths: (list[Path]) A list of config path object.
         :param excluded: An included list of data key that want to filter from
@@ -292,6 +310,13 @@ class YamlParser:
             paths.append(path)
 
         all_data: dict[str, list[tuple[float, DictData]]] = {}
+        if isinstance(obj, str):
+            obj_type: str = obj
+        elif isclass(obj):
+            obj_type: str = obj.__name__
+        else:
+            obj_type: str = obj.__class__.__name__
+
         for path in paths:
             for file in glob_files(path):
 
@@ -303,10 +328,7 @@ class YamlParser:
                     if key in excluded:
                         continue
 
-                    if (
-                        data.get("type", "")
-                        == (obj if isclass(obj) else obj.__class__).__name__
-                    ):
+                    if data.get("type", "") == obj_type:
                         marking: tuple[float, DictData] = (
                             file.lstat().st_mtime,
                             data,

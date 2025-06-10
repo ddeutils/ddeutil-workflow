@@ -76,13 +76,22 @@ def test_load_file(target_path: Path):
         "env": "Asia/Bangkok",
     }
 
+    load = YamlParser(
+        "test_load_file", extras={"conf_paths": [target_path]}, obj="Workflow"
+    )
+    assert load.data == {
+        "type": "Workflow",
+        "desc": "Test multi config path",
+        "env": "${WORKFLOW_CORE_TIMEZONE}",
+    }
+
     # NOTE: Raise because passing `conf_paths` invalid type.
     with pytest.raises(TypeError):
         YamlParser("test_load_file", extras={"conf_paths": target_path})
 
 
 def test_load_file_finds(target_path: Path):
-    dummy_file: Path = target_path / "test_simple_file.yaml"
+    dummy_file: Path = target_path / "01_test_simple_file.yaml"
     with dummy_file.open(mode="w") as f:
         yaml.dump(
             {
@@ -90,7 +99,7 @@ def test_load_file_finds(target_path: Path):
                     "type": "Config",
                     "foo": "bar",
                 },
-                "test_load_file": {"type": "Workflow"},
+                "test_load_file": {"type": "Workflow", "data": "foo"},
             },
             f,
         )
@@ -102,6 +111,7 @@ def test_load_file_finds(target_path: Path):
                 {"type": "Config", "foo": "bar"},
             )
         ] == list(YamlParser.finds(Config, path=config.conf_path))
+
         assert [] == list(
             YamlParser.finds(
                 Config,
@@ -110,6 +120,48 @@ def test_load_file_finds(target_path: Path):
             )
         )
 
+    # NOTE: Create duplicate data with the first order by filename.
+    dummy_file_dup: Path = target_path / "00_test_simple_file_duplicate.yaml"
+    with dummy_file_dup.open(mode="w") as f:
+        yaml.dump(
+            {"test_load_file": {"type": "Workflow", "data": "bar"}},
+            f,
+        )
+
+    assert [
+        (
+            "test_load_file",
+            {"type": "Workflow", "data": "bar"},
+        ),
+    ] == list(YamlParser.finds("Workflow", path=target_path))
+
+    dummy_file_dup.unlink()
+
+    # NOTE: Create duplicate data with the first order by filename.
+    dummy_file_dup: Path = target_path / "00_test_simple_file_duplicate.yaml"
+    with dummy_file_dup.open(mode="w") as f:
+        yaml.dump(
+            {"test_load_file": {"type": "Config", "data": "bar"}},
+            f,
+        )
+
+    assert [
+        (
+            "test_load_file",
+            {"type": "Workflow", "data": "foo"},
+        ),
+    ] == list(YamlParser.finds("Workflow", path=target_path))
+
+    load = YamlParser.find("test_load_file", path=target_path, obj="Workflow")
+    assert load == {"type": "Workflow", "data": "foo"}
+
+    # NOTE: Load with the same name, but it set different type.
+    load = YamlParser.find("test_load_file", path=target_path, obj="Config")
+    assert load == {"type": "Config", "data": "bar"}
+
+    load = YamlParser.find("test_load_file", path=target_path, obj="Crontab")
+    assert load == {}
+
     dummy_file.unlink()
 
 
@@ -117,12 +169,7 @@ def test_load_file_finds_raise(target_path: Path):
     dummy_file: Path = target_path / "test_simple_file_raise.yaml"
     with dummy_file.open(mode="w") as f:
         yaml.dump(
-            {
-                "test_load_file_config": {
-                    "foo": "bar",
-                },
-                "test_load_file": {"type": "Workflow"},
-            },
+            {"test_load_file": {"type": "Workflow"}},
             f,
         )
 
@@ -130,26 +177,10 @@ def test_load_file_finds_raise(target_path: Path):
         with pytest.raises(ValueError):
             _ = YamlParser("test_load_file_config", path=config.conf_path).type
 
-
-@pytest.fixture(scope="module")
-def schedule_path(test_path):
-    target_p = test_path / "test_schedule_conf"
-    target_p.mkdir(exist_ok=True)
-
-    with (target_p / "test_schedule_conf.yaml").open(mode="w") as f:
-        yaml.dump(
-            {
-                "schedule-wf": {
-                    "type": "Schedule",
-                    "desc": "Test multi config path",
-                }
-            },
-            f,
+        assert (
+            YamlParser("test_load_file", path=config.conf_path).type
+            == "Workflow"
         )
-
-    yield target_p
-
-    shutil.rmtree(target_p)
 
 
 def test_dynamic():

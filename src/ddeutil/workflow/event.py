@@ -139,7 +139,7 @@ class Crontab(BaseModel):
         :rtype: Self
         """
         extras: DictData = extras or {}
-        loader: YamlParser = YamlParser(name, extras=extras)
+        loader: YamlParser = YamlParser(name, extras=extras, obj=cls)
 
         # NOTE: Validate the config type match with current connection model
         if loader.type != cls.__name__:

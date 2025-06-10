@@ -126,7 +126,7 @@ class Workflow(BaseModel):
 
         :rtype: Self
         """
-        load: YamlParser = YamlParser(name, path=path, extras=extras)
+        load: YamlParser = YamlParser(name, path=path, extras=extras, obj=cls)
 
         # NOTE: Validate the config type match with current connection model
         if load.type != cls.__name__:
