@@ -9,7 +9,6 @@ import copy
 import os
 from collections.abc import Iterator
 from functools import cached_property
-from inspect import isclass
 from pathlib import Path
 from typing import Final, Optional, TypeVar, Union
 from zoneinfo import ZoneInfo
@@ -20,6 +19,7 @@ from ddeutil.io.paths import glob_files, is_ignored, read_ignore
 from pydantic import SecretStr
 
 from .__types import DictData
+from .utils import obj_name
 
 T = TypeVar("T")
 PREFIX: Final[str] = "WORKFLOW"
@@ -247,14 +247,7 @@ class YamlParser:
             paths.append(path)
 
         all_data: list[tuple[float, DictData]] = []
-        if not obj:
-            obj_type: str = ""
-        elif isinstance(obj, str):
-            obj_type: str = obj
-        elif isclass(obj):
-            obj_type: str = obj.__name__
-        else:
-            obj_type: str = obj.__class__.__name__
+        obj_type: Optional[str] = obj_name(obj)
 
         for path in paths:
             for file in glob_files(path):
@@ -310,12 +303,7 @@ class YamlParser:
             paths.append(path)
 
         all_data: dict[str, list[tuple[float, DictData]]] = {}
-        if isinstance(obj, str):
-            obj_type: str = obj
-        elif isclass(obj):
-            obj_type: str = obj.__name__
-        else:
-            obj_type: str = obj.__class__.__name__
+        obj_type: str = obj_name(obj)
 
         for path in paths:
             for file in glob_files(path):

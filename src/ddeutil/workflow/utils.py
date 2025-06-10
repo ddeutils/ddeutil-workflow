@@ -11,7 +11,7 @@ import time
 from collections.abc import Iterator
 from datetime import date, datetime, timedelta
 from hashlib import md5
-from inspect import isfunction
+from inspect import isclass, isfunction
 from itertools import product
 from pathlib import Path
 from random import randrange
@@ -303,3 +303,15 @@ def dump_all(
     elif isinstance(value, BaseModel):
         return value.model_dump(by_alias=by_alias)
     return value
+
+
+def obj_name(obj: Optional[Union[str, object]] = None) -> Optional[str]:
+    if not obj:
+        obj_type: Optional[str] = None
+    elif isinstance(obj, str):
+        obj_type: str = obj
+    elif isclass(obj):
+        obj_type: str = obj.__name__
+    else:
+        obj_type: str = obj.__class__.__name__
+    return obj_type
