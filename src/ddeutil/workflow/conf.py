@@ -109,7 +109,7 @@ class Config:  # pragma: no cov
             "LOG_FORMAT",
             (
                 "%(asctime)s.%(msecs)03d (%(process)-5d, "
-                "%(thread)-5d) [%(levelname)-7s] %(message)-120s "
+                "%(thread)-5d) [%(levelname)-7s] (%(cut_id)s) %(message)-120s "
                 "(%(filename)s:%(lineno)s) (%(name)-10s)"
             ),
         )
@@ -119,8 +119,8 @@ class Config:  # pragma: no cov
         return env(
             "LOG_FORMAT_FILE",
             (
-                "{datetime} ({process:5d}, {thread:5d}) {message:120s} "
-                "({filename}:{lineno})"
+                "{datetime} ({process:5d}, {thread:5d}) ({cut_id}) "
+                "{message:120s} ({filename}:{lineno})"
             ),
         )
 

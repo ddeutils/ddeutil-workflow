@@ -76,7 +76,7 @@ PREFIX_LOGS_REGEX: re.Pattern[str] = re.compile(
 )  # pragma: no cov
 
 
-class PrefixMsg(BaseModel):
+class Message(BaseModel):
     """Prefix Message model for receive grouping dict from searching prefix data
     from logging message.
     """
@@ -92,9 +92,9 @@ class PrefixMsg(BaseModel):
             msg (str): A message that want to extract.
 
         Returns:
-            PrefixMsg: the validated model from a string message.
+            Message: the validated model from a string message.
         """
-        return PrefixMsg.model_validate(
+        return Message.model_validate(
             obj=PREFIX_LOGS_REGEX.search(msg).groupdict()
         )
 
@@ -126,6 +126,9 @@ class TraceMeta(BaseModel):  # pragma: no cov
     process: int = Field(description="A process ID.")
     thread: int = Field(description="A thread ID.")
     message: str = Field(description="A message log.")
+    cut_id: Optional[str] = Field(
+        default=None, description="A cutting of running ID."
+    )
     filename: str = Field(description="A filename of this log.")
     lineno: int = Field(description="A line number of this log.")
 
@@ -157,6 +160,7 @@ class TraceMeta(BaseModel):  # pragma: no cov
         mode: Literal["stdout", "stderr"],
         message: str,
         level: str,
+        cutting_id: str,
         *,
         extras: Optional[DictData] = None,
     ) -> Self:
@@ -166,6 +170,7 @@ class TraceMeta(BaseModel):  # pragma: no cov
         :param mode: (Literal["stdout", "stderr"]) A metadata mode.
         :param message: (str) A message.
         :param level: (str) A log level.
+        :param cutting_id: (str)
         :param extras: (DictData) An extra parameter that want to override core
             config values.
 
@@ -185,6 +190,7 @@ class TraceMeta(BaseModel):  # pragma: no cov
             process=os.getpid(),
             thread=get_ident(),
             message=message,
+            cut_id=cutting_id,
             filename=frame_info.filename.split(os.path.sep)[-1],
             lineno=frame_info.lineno,
         )
@@ -529,10 +535,7 @@ class ConsoleTrace(BaseTrace):  # pragma: no cov
 
         :rtype: str
         """
-        return prepare_newline(
-            f"({self.cut_id}) "
-            f"{PrefixMsg.from_str(message).prepare(self.extras)}"
-        )
+        return prepare_newline(Message.from_str(message).prepare(self.extras))
 
     def _logging(
         self, message: str, mode: str, *, is_err: bool = False
@@ -655,7 +658,11 @@ class FileTrace(ConsoleTrace):  # pragma: no cov
 
         mode: Literal["stdout", "stderr"] = "stderr" if is_err else "stdout"
         trace_meta: TraceMeta = TraceMeta.make(
-            mode=mode, level=level, message=message, extras=self.extras
+            mode=mode,
+            level=level,
+            message=message,
+            cutting_id=self.cut_id,
+            extras=self.extras,
         )
 
         with (self.pointer / f"{mode}.txt").open(
@@ -684,7 +691,11 @@ class FileTrace(ConsoleTrace):  # pragma: no cov
 
         mode: Literal["stdout", "stderr"] = "stderr" if is_err else "stdout"
         trace_meta: TraceMeta = TraceMeta.make(
-            mode=mode, level=level, message=message, extras=self.extras
+            mode=mode,
+            level=level,
+            message=message,
+            cutting_id=self.cut_id,
+            extras=self.extras,
         )
 
         async with aiofiles.open(

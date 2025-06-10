@@ -4,7 +4,7 @@ import pytest
 from ddeutil.workflow import Result
 from ddeutil.workflow.traces import (
     FileTrace,
-    PrefixMsg,
+    Message,
     TraceMeta,
 )
 
@@ -25,7 +25,7 @@ def test_trace_regex_message():
         "[STAGE]: Execute Empty-Stage: 'End trigger Priority Group': "
         "( End trigger Priority Group: 2 )"
     )
-    prefix: PrefixMsg = PrefixMsg.from_str(msg)
+    prefix: Message = Message.from_str(msg)
     assert prefix.name == "STAGE"
     assert prefix.message == (
         "Execute Empty-Stage: 'End trigger Priority Group': "
@@ -36,7 +36,7 @@ def test_trace_regex_message():
         "[]: Execute Empty-Stage: 'End trigger Priority Group': "
         "( End trigger Priority Group: 2 )"
     )
-    prefix: PrefixMsg = PrefixMsg.from_str(msg)
+    prefix: Message = Message.from_str(msg)
     assert prefix.name is None
     assert prefix.message == (
         "[]: Execute Empty-Stage: 'End trigger Priority Group': "
@@ -44,7 +44,7 @@ def test_trace_regex_message():
     )
 
     msg: str = ""
-    prefix: PrefixMsg = PrefixMsg.from_str(msg)
+    prefix: Message = Message.from_str(msg)
     assert prefix.name is None
     assert prefix.message == ""
 
@@ -52,7 +52,7 @@ def test_trace_regex_message():
         "[WORKFLOW]: Execute Empty-Stage:\n'End trigger Priority Group':\n"
         "( End trigger Priority Group: 2 )"
     )
-    prefix: PrefixMsg = PrefixMsg.from_str(msg)
+    prefix: Message = Message.from_str(msg)
     assert prefix.name == "WORKFLOW"
     assert prefix.message == (
         "Execute Empty-Stage:\n'End trigger Priority Group':\n"
@@ -69,13 +69,16 @@ def test_trace_regex_message():
 
 
 def test_trace_meta():
-    meta = TraceMeta.make(mode="stderr", message="Foo", level="info")
+    meta = TraceMeta.make(
+        mode="stderr", message="Foo", level="info", cutting_id=""
+    )
     assert meta.message == "Foo"
 
     meta = TraceMeta.make(
         mode="stderr",
         message="Foo",
         level="info",
+        cutting_id="",
         extras={"logs_trace_frame_layer": 1},
     )
     assert meta.filename == "test_traces.py"
@@ -84,6 +87,7 @@ def test_trace_meta():
         mode="stderr",
         message="Foo",
         level="info",
+        cutting_id="",
         extras={"logs_trace_frame_layer": 2},
     )
     assert meta.filename == "python.py"
@@ -94,6 +98,7 @@ def test_trace_meta():
             mode="stderr",
             message="Foo",
             level="info",
+            cutting_id="",
             extras={"logs_trace_frame_layer": 100},
         )
 
