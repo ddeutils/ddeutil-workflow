@@ -1311,6 +1311,17 @@ class CallStage(BaseRetryStage):
         alias="with",
     )
 
+    @field_validator("args", mode="before")
+    def __validate_args_key(cls, value: Any) -> Any:
+        if isinstance(value, dict):
+            if any(k in value for k in ("result", "extras")):
+                raise ValueError(
+                    "The argument on workflow template for the caller stage "
+                    "should not pass `result` and `extras`. They are special "
+                    "arguments."
+                )
+        return value
+
     def execute(
         self,
         params: DictData,

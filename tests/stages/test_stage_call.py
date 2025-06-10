@@ -1,6 +1,7 @@
 import pytest
 from ddeutil.workflow import FAILED, SUCCESS, Result, Workflow
 from ddeutil.workflow.stages import CallStage, Stage
+from pydantic import ValidationError
 
 from ..utils import dump_yaml_context
 
@@ -174,6 +175,16 @@ def test_call_stage_exec_raise():
             "message": "`REGISTERS.tasks.registries` not implement registry: 'abc'.",
         },
     }
+
+    # NOTE: Raise because passing special arguments.
+    with pytest.raises(ValidationError):
+        CallStage.model_validate(
+            {
+                "name": "Type not valid",
+                "uses": "tasks/return-type-not-valid@raise",
+                "with": {"result": "foo"},
+            }
+        )
 
 
 @pytest.mark.asyncio
