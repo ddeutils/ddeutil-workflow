@@ -1381,8 +1381,12 @@ class CallStage(BaseRetryStage):
             (k.removeprefix("_") not in args and k not in args)
             for k in necessary_params
         ):
-            necessary_params.remove("result")
-            necessary_params.remove("extras")
+            if "result" in necessary_params:
+                necessary_params.remove("result")
+
+            if "extras" in necessary_params:
+                necessary_params.remove("extras")
+
             args.pop("result")
             args.pop("extras")
             raise ValueError(
@@ -1482,8 +1486,12 @@ class CallStage(BaseRetryStage):
             (k.removeprefix("_") not in args and k not in args)
             for k in necessary_params
         ):
-            necessary_params.remove("result")
-            necessary_params.remove("extras")
+            if "result" in necessary_params:
+                necessary_params.remove("result")
+
+            if "extras" in necessary_params:
+                necessary_params.remove("extras")
+
             args.pop("result")
             args.pop("extras")
             raise ValueError(
