@@ -1,3 +1,10 @@
+# ------------------------------------------------------------------------------
+# Copyright (c) 2022 Korawich Anuttra. All rights reserved.
+# Licensed under the MIT License. See LICENSE in the project root for
+# license information.
+# ------------------------------------------------------------------------------
+from __future__ import annotations
+
 import json
 from pathlib import Path
 from platform import python_version
@@ -45,7 +52,7 @@ def execute_job(
     """Job execution on the local.
 
     Example:
-        ... workflow-cli job --params "{\"test\": 1}"
+        ... workflow-cli job --params \"{\\\"test\\\": 1}\"
     """
     try:
         params_dict: dict[str, Any] = json.loads(params)
@@ -121,7 +128,7 @@ def make(
 
 
 workflow_app = typer.Typer()
-app.add_typer(workflow_app, name="workflow", help="An Only Workflow CLI.")
+app.add_typer(workflow_app, name="workflows", help="An Only Workflow CLI.")
 
 
 @workflow_app.callback()
@@ -178,6 +185,15 @@ def workflow_json_schema(
     }
     with open(output, mode="w", encoding="utf-8") as f:
         json.dump(template_schema | json_schema, f, indent=2)
+
+
+log_app = typer.Typer()
+app.add_typer(log_app, name="logs", help="An Only Log CLI.")
+
+
+@log_app.callback()
+def log_callback():
+    """Manage Only Log CLI."""
 
 
 if __name__ == "__main__":
