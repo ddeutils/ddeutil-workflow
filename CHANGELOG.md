@@ -2,6 +2,18 @@
 
 ## Latest Changes
 
+## 0.0.73
+
+### :stars: Highlight Features
+
+- :star: hl: allow to pass extras argument to caller function.
+
+### :sparkles: Features
+
+- :dart: feat: add special argument validation on caller stage model.
+- :dart: feat: seperate cutting id from trace metadata.
+- :dart: feat: pass dynamic ignore filename.
+
 ## 0.0.72
 
 ### :stars: Highlight Features
