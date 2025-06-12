@@ -269,9 +269,14 @@ class BaseStage(BaseModel, ABC):
             extras=self.extras,
         )
         try:
+            _id: str = (
+                f" with ID: {param2template(self.id, params=params)!r}"
+                if self.id
+                else ""
+            )
             result.trace.info(
                 f"[STAGE]: Handler {to_train(self.__class__.__name__)}: "
-                f"{self.name!r}."
+                f"{self.name!r}{_id}."
             )
 
             # NOTE: Show the description of this stage before execution.
@@ -542,9 +547,14 @@ class BaseAsyncStage(BaseStage, ABC):
             extras=self.extras,
         )
         try:
+            _id: str = (
+                f" with ID: {param2template(self.id, params=params)!r}"
+                if self.id
+                else ""
+            )
             await result.trace.ainfo(
                 f"[STAGE]: Handler {to_train(self.__class__.__name__)}: "
-                f"{self.name!r}."
+                f"{self.name!r}{_id}."
             )
 
             # NOTE: Show the description of this stage before execution.
