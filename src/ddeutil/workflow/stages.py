@@ -1313,6 +1313,13 @@ class CallStage(BaseRetryStage):
 
     @field_validator("args", mode="before")
     def __validate_args_key(cls, value: Any) -> Any:
+        """Validate argument keys on the ``args`` field should not include the
+        special keys.
+
+        :param value: (Any) A value that want to check the special keys.
+
+        :rtype: Any
+        """
         if isinstance(value, dict):
             if any(k in value for k in ("result", "extras")):
                 raise ValueError(

@@ -329,6 +329,10 @@ class ReleaseEvent(BaseModel):  # pragma: no cov
     )
 
 
+class SensorEvent(BaseModel):  # pragma: no cov
+    """Senser event"""
+
+
 Event = Annotated[
     Union[
         CronJobYear,

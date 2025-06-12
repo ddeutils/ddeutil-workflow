@@ -435,10 +435,12 @@ def pass_env(value: T) -> T:  # pragma: no cov
 
 
 class CallerSecret(SecretStr):  # pragma: no cov
-    """Workflow Secret String model."""
+    """Workflow Secret String model that was inherited from the SecretStr model
+    and override the `get_secret_value` method only.
+    """
 
     def get_secret_value(self) -> str:
-        """Override get_secret_value by adding pass_env before return the
+        """Override the `get_secret_value` by adding pass_env before return the
         real-value.
 
         :rtype: str
