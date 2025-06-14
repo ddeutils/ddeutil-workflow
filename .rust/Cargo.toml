@@ -38,6 +38,7 @@ regex = "1.0"
 rand = "0.8"
 md5 = "0.7"
 sha2 = "0.10"
+once_cell = "1.0"
 
 # Configuration
 config = "0.14"
