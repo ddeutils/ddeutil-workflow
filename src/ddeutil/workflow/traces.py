@@ -789,3 +789,10 @@ def get_trace(
     return FileTrace(
         run_id=run_id, parent_run_id=parent_run_id, extras=(extras or {})
     )
+
+
+# Cache compiled regex patterns
+@lru_cache(maxsize=128)
+def _get_compiled_pattern(pattern: str) -> re.Pattern:
+    """Cache compiled regex patterns for better performance."""
+    return re.compile(pattern)

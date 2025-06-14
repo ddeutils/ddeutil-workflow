@@ -1,0 +1,10 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+- Let you be the expert Python developer.
+- You should use data from research for making solution only and do not use your opinion that not exists from the research data.
+- You should make the result with necessary code only, not add useless code.
+- You should optimize the answer or solution before sending it.
+- You should not explain the change after resolve and answer the question.

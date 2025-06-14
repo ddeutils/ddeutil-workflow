@@ -144,6 +144,27 @@ class Config:  # pragma: no cov
     def stage_default_id(self) -> bool:
         return str2bool(env("CORE_STAGE_DEFAULT_ID", "false"))
 
+    # Performance optimization settings
+    @property
+    def job_backoff_initial(self) -> float:
+        return float(env("CORE_JOB_BACKOFF_INITIAL", "0.01"))
+
+    @property
+    def job_backoff_max(self) -> float:
+        return float(env("CORE_JOB_BACKOFF_MAX", "0.15"))
+
+    @property
+    def job_backoff_multiplier(self) -> float:
+        return float(env("CORE_JOB_BACKOFF_MULTIPLIER", "1.5"))
+
+    @property
+    def stage_sleep_timeout(self) -> float:
+        return float(env("CORE_STAGE_SLEEP_TIMEOUT", "0.01"))
+
+    @property
+    def regex_cache_size(self) -> int:
+        return int(env("CORE_REGEX_CACHE_SIZE", "128"))
+
 
 class APIConfig:
     """API Config object."""

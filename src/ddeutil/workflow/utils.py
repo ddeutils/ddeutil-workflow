@@ -27,6 +27,10 @@ T = TypeVar("T")
 UTC: Final[ZoneInfo] = ZoneInfo("UTC")
 MARK_NEWLINE: Final[str] = "||"
 
+# Cache for random delay values to avoid repeated randrange calls
+_CACHED_DELAYS = [randrange(0, 99, step=10) / 100 for _ in range(100)]
+_DELAY_INDEX = 0
+
 
 def to_train(camel: str) -> str:
     """Convert camel case string to train case.
@@ -151,7 +155,10 @@ def delay(second: float = 0) -> None:  # pragma: no cov
 
     :param second: (float) A second number that want to adds-on random value.
     """
-    time.sleep(second + randrange(0, 99, step=10) / 100)
+    global _DELAY_INDEX
+    cached_random = _CACHED_DELAYS[_DELAY_INDEX % len(_CACHED_DELAYS)]
+    _DELAY_INDEX = (_DELAY_INDEX + 1) % len(_CACHED_DELAYS)
+    time.sleep(second + cached_random)
 
 
 def gen_id(

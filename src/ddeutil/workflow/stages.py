@@ -2208,7 +2208,7 @@ class ForEachStage(BaseNestedStage):
                 for future in not_done:
                     future.cancel()
 
-                time.sleep(0.025)
+                time.sleep(0.01)  # Reduced from 0.025 for better responsiveness
                 nd: str = (
                     (
                         f", {len(not_done)} item"

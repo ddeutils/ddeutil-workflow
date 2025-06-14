@@ -1005,7 +1005,7 @@ def local_execute(
                 for future in not_done:
                     future.cancel()
 
-                time.sleep(0.025)
+                time.sleep(0.01)
                 nd: str = (
                     (
                         f", {len(not_done)} strateg"

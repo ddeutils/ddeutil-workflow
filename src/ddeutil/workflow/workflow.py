@@ -656,6 +656,8 @@ class Workflow(BaseModel):
 
         with ThreadPoolExecutor(max_job_parallel, "wf") as executor:
             futures: list[Future] = []
+            backoff_sleep = 0.01  # Start with smaller sleep time
+            consecutive_waits = 0  # Track consecutive wait states
 
             while not job_queue.empty() and (
                 not_timeout_flag := ((time.monotonic() - ts) < timeout)
@@ -665,9 +667,17 @@ class Workflow(BaseModel):
                 if (check := job.check_needs(context["jobs"])) == WAIT:
                     job_queue.task_done()
                     job_queue.put(job_id)
-                    time.sleep(0.15)
+                    consecutive_waits += 1
+                    # Exponential backoff up to 0.15s max
+                    backoff_sleep = min(backoff_sleep * 1.5, 0.15)
+                    time.sleep(backoff_sleep)
                     continue
-                elif check == FAILED:  # pragma: no cov
+
+                # Reset backoff when we can proceed
+                consecutive_waits = 0
+                backoff_sleep = 0.01
+
+                if check == FAILED:  # pragma: no cov
                     return result.catch(
                         status=FAILED,
                         context={
@@ -870,6 +880,8 @@ class Workflow(BaseModel):
 
         with ThreadPoolExecutor(max_job_parallel, "wf") as executor:
             futures: list[Future] = []
+            backoff_sleep = 0.01  # Start with smaller sleep time
+            consecutive_waits = 0  # Track consecutive wait states
 
             while not job_queue.empty() and (
                 not_timeout_flag := ((time.monotonic() - ts) < timeout)
@@ -879,9 +891,17 @@ class Workflow(BaseModel):
                 if (check := job.check_needs(new_context["jobs"])) == WAIT:
                     job_queue.task_done()
                     job_queue.put(job_id)
-                    time.sleep(0.15)
+                    consecutive_waits += 1
+                    # Exponential backoff up to 0.15s max
+                    backoff_sleep = min(backoff_sleep * 1.5, 0.15)
+                    time.sleep(backoff_sleep)
                     continue
-                elif check == FAILED:  # pragma: no cov
+
+                # Reset backoff when we can proceed
+                consecutive_waits = 0
+                backoff_sleep = 0.01
+
+                if check == FAILED:  # pragma: no cov
                     return result.catch(
                         status=FAILED,
                         context={

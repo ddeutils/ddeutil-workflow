@@ -27,6 +27,47 @@ DictData = dict[str, Any]
 DictStr = dict[str, str]
 Matrix = dict[str, Union[list[str], list[int]]]
 
+# Pre-compile regex patterns for better performance
+_RE_CALLER_PATTERN = r"""
+    \$                                                      # start with $
+    {{                                                      # value open with {{
+        \s*                                                 # whitespace or not
+        (?P<caller>
+            (?P<caller_prefix>(?:[a-zA-Z_-]+\??\.)*)
+            (?P<caller_last>[a-zA-Z0-9_\-.'\"(\)[\]{}]+\??)
+        )
+        \s*                                                 # whitespace or not
+        (?P<post_filters>
+            (?:
+                \|\s*
+                (?:
+                    [a-zA-Z0-9_]{3,}
+                    [a-zA-Z0-9_.,-\\%\s'\"[\]()\{}]*
+                )\s*
+            )*
+        )
+    }}                                                      # value close with }}
+"""
+
+_RE_TASK_FMT_PATTERN = r"""
+    ^                               # start task format
+        (?P<path>[^/@]+)
+        /                           # start get function with /
+        (?P<func>[^@]+)
+        @                           # start tag with @
+        (?P<tag>.+)
+    $                               # end task format
+"""
+
+# Compile patterns at module level for better performance
+RE_CALLER: Pattern = re.compile(
+    _RE_CALLER_PATTERN, MULTILINE | IGNORECASE | UNICODE | VERBOSE
+)
+
+RE_TASK_FMT: Pattern = re.compile(
+    _RE_TASK_FMT_PATTERN, MULTILINE | IGNORECASE | UNICODE | VERBOSE
+)
+
 
 class Context(TypedDict):
     """TypeDict support the Context."""
@@ -79,29 +120,7 @@ class Re:
     #       - ${{ params.datetime | fmt('%Y-%m-%d') }}
     #       - ${{ params.source?.schema }}
     #
-    __re_caller: str = r"""
-        \$                                                      # start with $
-        {{                                                      # value open with {{
-            \s*                                                 # whitespace or not
-            (?P<caller>
-                (?P<caller_prefix>(?:[a-zA-Z_-]+\??\.)*)
-                (?P<caller_last>[a-zA-Z0-9_\-.'\"(\)[\]{}]+\??)
-            )
-            \s*                                                 # whitespace or not
-            (?P<post_filters>
-                (?:
-                    \|\s*
-                    (?:
-                        [a-zA-Z0-9_]{3,}
-                        [a-zA-Z0-9_.,-\\%\s'\"[\]()\{}]*
-                    )\s*
-                )*
-            )
-        }}                                                      # value close with }}
-    """
-    RE_CALLER: Pattern = re.compile(
-        __re_caller, MULTILINE | IGNORECASE | UNICODE | VERBOSE
-    )
+    RE_CALLER: Pattern = RE_CALLER
 
     # NOTE:
     #   Regular expression:
@@ -111,18 +130,7 @@ class Re:
     #   Examples:
     #       - tasks/function@dummy
     #
-    __re_task_fmt: str = r"""
-        ^                               # start task format
-            (?P<path>[^/@]+)
-            /                           # start get function with /
-            (?P<func>[^@]+)
-            @                           # start tag with @
-            (?P<tag>.+)
-        $                               # end task format
-    """
-    RE_TASK_FMT: Pattern = re.compile(
-        __re_task_fmt, MULTILINE | IGNORECASE | UNICODE | VERBOSE
-    )
+    RE_TASK_FMT: Pattern = RE_TASK_FMT
 
     @classmethod
     def finditer_caller(cls, value: str) -> Iterator[CallerRe]:
