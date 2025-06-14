@@ -1,3 +1,30 @@
+"""FastAPI Web Application for Workflow Management.
+
+This module provides a RESTful API interface for workflow orchestration using
+FastAPI. It enables remote workflow management, execution monitoring, and
+provides endpoints for workflow operations.
+
+The API supports:
+    - Workflow execution and management
+    - Job status monitoring
+    - Log streaming and access
+    - Result retrieval and analysis
+
+Example:
+    ```python
+    from ddeutil.workflow.api import app
+
+    # Run the API server
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+    ```
+
+Routes:
+    - /workflows: Workflow management endpoints
+    - /jobs: Job execution and monitoring
+    - /logs: Log access and streaming
+"""
+
 # ------------------------------------------------------------------------------
 # Copyright (c) 2022 Korawich Anuttra. All rights reserved.
 # Licensed under the MIT License. See LICENSE in the project root for
@@ -28,7 +55,17 @@ logger = logging.getLogger("uvicorn.error")
 
 @contextlib.asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[dict[str, list]]:
-    """Lifespan function for the FastAPI application."""
+    """FastAPI application lifespan management.
+
+    Manages the startup and shutdown lifecycle of the FastAPI application.
+    Currently yields an empty dictionary for future extension.
+
+    Args:
+        _: FastAPI application instance (unused)
+
+    Yields:
+        dict: Empty dictionary for future lifespan data
+    """
     yield {}
 
 
@@ -59,7 +96,20 @@ app.add_middleware(
 
 @app.get(path="/", response_class=UJSONResponse)
 async def health() -> UJSONResponse:
-    """Index view that not return any template without json status."""
+    """Health check endpoint for API status monitoring.
+
+    Provides a simple health check endpoint to verify the API is running
+    and responding correctly. Returns a JSON response with health status.
+
+    Returns:
+        UJSONResponse: JSON response confirming healthy API status
+
+    Example:
+        ```bash
+        curl http://localhost:8000/
+        # Returns: {"message": "Workflow already start up with healthy status."}
+        ```
+    """
     logger.info("[API]: Workflow API Application already running ...")
     return UJSONResponse(
         content={"message": "Workflow already start up with healthy status."},
@@ -78,7 +128,28 @@ async def validation_exception_handler(
     request: Request,
     exc: RequestValidationError,
 ) -> UJSONResponse:
-    """Error Handler for model validate does not valid."""
+    """Handle request validation errors from Pydantic models.
+
+    Provides standardized error responses for request validation failures,
+    including detailed error information for debugging and client feedback.
+
+    Args:
+        request: The FastAPI request object (unused)
+        exc: The validation exception containing error details
+
+    Returns:
+        UJSONResponse: Standardized error response with validation details
+
+    Example:
+        When a request fails validation:
+        ```json
+        {
+            "message": "Body does not parsing with model.",
+            "detail": [...],
+            "body": {...}
+        }
+        ```
+    """
     _ = request
     return UJSONResponse(
         status_code=st.HTTP_422_UNPROCESSABLE_ENTITY,

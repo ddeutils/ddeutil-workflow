@@ -3,9 +3,20 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-"""A Result module. It is the data context transfer objects that use by all
-object in this package. This module provide Status enum object and Result
-dataclass.
+"""Result and Status Management Module.
+
+This module provides the core result and status management functionality for
+workflow execution tracking. It includes the Status enumeration for execution
+states and the Result dataclass for context transfer between workflow components.
+
+Classes:
+    Status: Enumeration for execution status tracking
+    Result: Dataclass for execution context and result management
+
+Functions:
+    validate_statuses: Determine final status from multiple status values
+    get_status_from_error: Convert exception types to appropriate status
+    get_dt_tznow: Get current datetime with timezone configuration
 """
 from __future__ import annotations
 
@@ -38,16 +49,33 @@ from .utils import default_gen_id, gen_id, get_dt_now
 
 
 def get_dt_tznow(tz: Optional[ZoneInfo] = None) -> datetime:  # pragma: no cov
-    """Return the current datetime object that passing the config timezone.
+    """Get current datetime with timezone configuration.
 
-    :rtype: datetime
+    Returns the current datetime object using the specified timezone
+    or the configured default timezone from dynamic configuration.
+
+    Args:
+        tz: Optional timezone override. If None, uses configured timezone
+
+    Returns:
+        datetime: Current datetime with appropriate timezone
     """
     return get_dt_now(tz=dynamic("tz", f=tz))
 
 
 class Status(str, Enum):
-    """Status Int Enum object that use for tracking execution status to the
-    Result dataclass object.
+    """Execution status enumeration for workflow components.
+
+    Status enum provides standardized status values for tracking the execution
+    state of workflows, jobs, and stages. Each status includes an emoji
+    representation for visual feedback.
+
+    Attributes:
+        SUCCESS: Successful execution completion
+        FAILED: Execution failed with errors
+        WAIT: Waiting for execution or dependencies
+        SKIP: Execution was skipped due to conditions
+        CANCEL: Execution was cancelled
     """
 
     SUCCESS = "SUCCESS"
@@ -58,9 +86,10 @@ class Status(str, Enum):
 
     @property
     def emoji(self) -> str:  # pragma: no cov
-        """Return the emoji value of this status.
+        """Get emoji representation of the status.
 
-        :rtype: str
+        Returns:
+            str: Unicode emoji character representing the status
         """
         return {
             "SUCCESS": "✅",
@@ -90,12 +119,28 @@ ResultStatuses: list[Status] = [SUCCESS, FAILED, CANCEL, SKIP]
 
 
 def validate_statuses(statuses: list[Status]) -> Status:
-    """Validate the final status from list of Status object.
+    """Determine final status from multiple status values.
 
-    :param statuses: (list[Status]) A list of status that want to validate the
-        final status.
+    Applies workflow logic to determine the overall status based on a collection
+    of individual status values. Follows priority order: CANCEL > FAILED > WAIT >
+    individual status consistency.
 
-    :rtype: Status
+    Args:
+        statuses: List of status values to evaluate
+
+    Returns:
+        Status: Final consolidated status based on workflow logic
+
+    Example:
+        ```python
+        # Mixed statuses - FAILED takes priority
+        result = validate_statuses([SUCCESS, FAILED, SUCCESS])
+        # Returns: FAILED
+
+        # All same status
+        result = validate_statuses([SUCCESS, SUCCESS, SUCCESS])
+        # Returns: SUCCESS
+        ```
     """
     if any(s == CANCEL for s in statuses):
         return CANCEL

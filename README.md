@@ -97,6 +97,23 @@ If you want to install this package with application add-ons, you should add
 | Python         | `ddeutil-workflow`      |    ✅    |
 | FastAPI Server | `ddeutil-workflow[all]` |    ✅    |
 
+## 📖 Documentation
+
+For comprehensive API documentation, examples, and best practices:
+
+- **[Full Documentation](https://ddeutils.github.io/ddeutil-workflow/)** - Complete user guide and API reference
+- **[Getting Started](https://ddeutils.github.io/ddeutil-workflow/getting-started/)** - Quick start guide
+- **[API Reference](https://ddeutils.github.io/ddeutil-workflow/api/workflow/)** - Detailed API documentation
+- **[Examples](https://ddeutils.github.io/ddeutil-workflow/examples/)** - Real-world usage examples
+
+### Key Documentation Highlights
+
+- **Google-style docstrings** throughout the codebase for better IDE support
+- **Comprehensive API documentation** with detailed parameter descriptions
+- **Extensive usage examples** for all major features
+- **Best practices guides** for workflow design and optimization
+- **Type hints and validation** for improved development experience
+
 ## 🎯 Usage
 
 This is examples that use workflow file for running common Data Engineering

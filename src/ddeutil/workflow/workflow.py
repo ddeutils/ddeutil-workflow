@@ -3,11 +3,24 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-"""Workflow module is the core module of this package. It keeps Release,
-ReleaseQueue, and Workflow models.
+"""Workflow Core Module.
 
-    This package implement timeout strategy on the workflow execution layer only
-because the main propose of this package is using Workflow to be orchestrator.
+This module contains the core workflow orchestration functionality, including
+the Workflow model, release management, and workflow execution strategies.
+
+The workflow system implements timeout strategy at the workflow execution layer
+because the main purpose is to use Workflow as an orchestrator for complex
+job execution scenarios.
+
+Classes:
+    Workflow: Main workflow orchestration class
+    ReleaseType: Enumeration for different release types
+
+Constants:
+    NORMAL: Normal release execution
+    RERUN: Re-execution of failed workflows
+    EVENT: Event-triggered execution
+    FORCE: Force execution regardless of conditions
 """
 from __future__ import annotations
 
@@ -57,7 +70,17 @@ from .utils import (
 
 
 class ReleaseType(str, Enum):
-    """Release Type Enum."""
+    """Release type enumeration for workflow execution modes.
+
+    This enum defines the different types of workflow releases that can be
+    triggered, each with specific behavior and use cases.
+
+    Attributes:
+        NORMAL: Standard workflow release execution
+        RERUN: Re-execution of previously failed workflow
+        EVENT: Event-triggered workflow execution
+        FORCE: Forced execution bypassing normal conditions
+    """
 
     NORMAL = "normal"
     RERUN = "rerun"
@@ -72,12 +95,37 @@ FORCE = ReleaseType.FORCE
 
 
 class Workflow(BaseModel):
-    """Workflow model that use to keep the `Job` and `Crontab` models.
+    """Main workflow orchestration model for job and schedule management.
 
-        This is the main future of this project because it uses to be workflow
-    data for running everywhere that you want or using it to scheduler task in
-    background. It uses lightweight coding line from Pydantic Model and enhance
-    execute method on it.
+    The Workflow class is the core component of the workflow orchestration system.
+    It manages job execution, scheduling via cron expressions, parameter handling,
+    and provides comprehensive execution capabilities for complex workflows.
+
+    This class extends Pydantic BaseModel to provide robust data validation and
+    serialization while maintaining lightweight performance characteristics.
+
+    Attributes:
+        extras (dict): Extra parameters for overriding configuration values
+        name (str): Unique workflow identifier
+        desc (str, optional): Workflow description supporting markdown content
+        params (dict[str, Param]): Parameter definitions for the workflow
+        on (list[Crontab]): Schedule definitions using cron expressions
+        jobs (dict[str, Job]): Collection of jobs within this workflow
+
+    Example:
+        Create and execute a workflow:
+
+        ```python
+        workflow = Workflow.from_conf('my-workflow')
+        result = workflow.execute({
+            'param1': 'value1',
+            'param2': 'value2'
+        })
+        ```
+
+    Note:
+        Workflows can be executed immediately or scheduled for background
+        execution using the cron-like scheduling system.
     """
 
     extras: DictData = Field(
@@ -113,18 +161,36 @@ class Workflow(BaseModel):
         path: Optional[Path] = None,
         extras: DictData | None = None,
     ) -> Self:
-        """Create Workflow instance from the Loader object that only receive
-        an input workflow name. The loader object will use this workflow name to
-        searching configuration data of this workflow model in conf path.
+        """Create Workflow instance from configuration file.
 
-        :param name: (str) A workflow name that want to pass to Loader object.
-        :param path: (Path) An override config path.
-        :param extras: (DictData) An extra parameters that want to override core
-            config values.
+        Loads workflow configuration from YAML files and creates a validated
+        Workflow instance. The configuration loader searches for workflow
+        definitions in the specified path or default configuration directories.
 
-        :raise ValueError: If the type does not match with current object.
+        Args:
+            name: Workflow name to load from configuration
+            path: Optional custom configuration path to search
+            extras: Additional parameters to override configuration values
 
-        :rtype: Self
+        Returns:
+            Self: Validated Workflow instance loaded from configuration
+
+        Raises:
+            ValueError: If workflow type doesn't match or configuration invalid
+            FileNotFoundError: If workflow configuration file not found
+
+        Example:
+            ```python
+            # Load from default config path
+            workflow = Workflow.from_conf('data-pipeline')
+
+            # Load with custom path and extras
+            workflow = Workflow.from_conf(
+                'data-pipeline',
+                path=Path('./custom-configs'),
+                extras={'environment': 'production'}
+            )
+            ```
         """
         load: YamlParser = YamlParser(name, path=path, extras=extras, obj=cls)
 

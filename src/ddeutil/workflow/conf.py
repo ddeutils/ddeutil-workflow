@@ -3,6 +3,42 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
+"""Configuration Management for Workflow System.
+
+This module provides comprehensive configuration management for the workflow
+system, including YAML parsing, dynamic configuration loading, environment
+variable handling, and configuration validation.
+
+The configuration system supports hierarchical configuration files, environment
+variable substitution, and dynamic parameter resolution for flexible workflow
+deployment across different environments.
+
+Classes:
+    Config: Main configuration class with validation
+    YamlParser: YAML configuration file parser and loader
+
+Functions:
+    dynamic: Get dynamic configuration values with fallbacks
+    pass_env: Process environment variable substitution
+    api_config: Get API-specific configuration settings
+
+Example:
+    ```python
+    from ddeutil.workflow.conf import Config, YamlParser
+
+    # Load workflow configuration
+    parser = YamlParser("my-workflow")
+    workflow_config = parser.data
+
+    # Access dynamic configuration
+    from ddeutil.workflow.conf import dynamic
+    log_level = dynamic("log_level", default="INFO")
+    ```
+
+Note:
+    Configuration files support environment variable substitution using
+    ${VAR_NAME} syntax and provide extensive validation capabilities.
+"""
 from __future__ import annotations
 
 import copy

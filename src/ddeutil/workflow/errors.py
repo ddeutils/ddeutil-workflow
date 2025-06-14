@@ -3,9 +3,22 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-"""Exception objects for this package do not do anything because I want to
-create the lightweight workflow package. So, this module do just an exception
-annotate for handle error only.
+"""Exception Classes for Workflow Orchestration.
+
+This module provides a comprehensive exception hierarchy for the workflow system.
+The exceptions are designed to be lightweight while providing sufficient context
+for error handling and debugging.
+
+Classes:
+    BaseError: Base exception class with context support
+    StageError: Exceptions related to stage execution
+    JobError: Exceptions related to job execution
+    WorkflowError: Exceptions related to workflow execution
+    ParamError: Exceptions related to parameter validation
+    ResultError: Exceptions related to result processing
+
+Functions:
+    to_dict: Convert exception instances to dictionary format
 """
 from __future__ import annotations
 
@@ -15,8 +28,14 @@ from .__types import DictData, StrOrInt
 
 
 class ErrorData(TypedDict):
-    """Error data type dict for typing necessary keys of return of to_dict func
-    and method.
+    """Error data structure for exception serialization.
+
+    This TypedDict defines the standard structure for converting exceptions
+    to dictionary format for consistent error handling across the system.
+
+    Attributes:
+        name: Exception class name
+        message: Exception message content
     """
 
     name: str
@@ -24,11 +43,26 @@ class ErrorData(TypedDict):
 
 
 def to_dict(exception: Exception, **kwargs) -> ErrorData:  # pragma: no cov
-    """Create dict data from exception instance.
+    """Create dictionary data from exception instance.
 
-    :param exception: An exception object.
+    Converts an exception object to a standardized dictionary format
+    for consistent error handling and serialization.
 
-    :rtype: ErrorData
+    Args:
+        exception: Exception object to convert
+        **kwargs: Additional key-value pairs to include in result
+
+    Returns:
+        ErrorData: Dictionary containing exception name and message
+
+    Example:
+        ```python
+        try:
+            raise ValueError("Something went wrong")
+        except Exception as e:
+            error_data = to_dict(e, context="workflow_execution")
+            # Returns: {"name": "ValueError", "message": "Something went wrong", "context": "workflow_execution"}
+        ```
     """
     return {
         "name": exception.__class__.__name__,
@@ -38,14 +72,27 @@ def to_dict(exception: Exception, **kwargs) -> ErrorData:  # pragma: no cov
 
 
 class BaseError(Exception):
-    """Base Workflow exception class will implement the ``refs`` argument for
-    making an error context to the result context.
+    """Base exception class for all workflow-related errors.
+
+    BaseError provides the foundation for all workflow exceptions, offering
+    enhanced context management and error tracking capabilities. It supports
+    reference IDs for error correlation and maintains context information
+    for debugging purposes.
 
     Attributes:
-        refs: (:obj:str, optional)
-        context: (:obj:DictData)
-        params: (:obj:DictData)
+        refs: Optional reference identifier for error correlation
+        context: Additional context data related to the error
+        params: Parameter data that was being processed when error occurred
 
+    Example:
+        ```python
+        try:
+            # Some workflow operation
+            pass
+        except BaseError as e:
+            error_dict = e.to_dict(with_refs=True)
+            print(f"Error in {e.refs}: {error_dict}")
+        ```
     """
 
     def __init__(
@@ -76,10 +123,30 @@ class BaseError(Exception):
         with_refs: bool = False,
         **kwargs,
     ) -> Union[ErrorData, dict[str, ErrorData]]:
-        """Return ErrorData data from the current exception object. If with_refs
-        flag was set, it will return mapping of refs and itself data.
+        """Convert exception to dictionary format.
 
-        :rtype: ErrorData
+        Serializes the exception to a standardized dictionary format.
+        Optionally includes reference mapping for error correlation.
+
+        Args:
+            with_refs: Include reference ID mapping in result
+            **kwargs: Additional key-value pairs to include
+
+        Returns:
+            ErrorData or dict: Exception data, optionally mapped by reference ID
+
+        Example:
+            ```python
+            error = BaseError("Something failed", refs="stage-1")
+
+            # Simple format
+            data = error.to_dict()
+            # Returns: {"name": "BaseError", "message": "Something failed"}
+
+            # With reference mapping
+            ref_data = error.to_dict(with_refs=True)
+            # Returns: {"stage-1": {"name": "BaseError", "message": "Something failed"}}
+            ```
         """
         data: ErrorData = to_dict(self)
         if with_refs and (self.refs is not None and self.refs != "EMPTY"):

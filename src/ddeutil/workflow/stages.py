@@ -119,13 +119,40 @@ DictOrModel = Union[DictData, BaseModel]
 
 
 class BaseStage(BaseModel, ABC):
-    """Base Stage Model that keep only necessary fields like `id`, `name` or
-    `condition` for the stage metadata. If you want to implement any custom
-    stage, you can inherit this class and implement `self.execute()` method
-    only.
+    """Abstract base class for all stage implementations.
 
-        This class is the abstraction class for any inherit stage model that
-    want to implement on this workflow package.
+    BaseStage provides the foundation for all stage types in the workflow system.
+    It defines the common interface and metadata fields that all stages must
+    implement, ensuring consistent behavior across different stage types.
+
+    This abstract class handles core stage functionality including:
+    - Stage identification and naming
+    - Conditional execution logic
+    - Output management and templating
+    - Execution lifecycle management
+
+    Custom stages should inherit from this class and implement the abstract
+    `execute()` method to define their specific execution behavior.
+
+    Attributes:
+        extras (dict): Additional configuration parameters
+        id (str, optional): Unique stage identifier for output reference
+        name (str): Human-readable stage name for logging
+        desc (str, optional): Stage description for documentation
+        condition (str, optional): Conditional expression for execution
+
+    Abstract Methods:
+        execute: Main execution logic that must be implemented by subclasses
+
+    Example:
+        ```python
+        class CustomStage(BaseStage):
+            custom_param: str = Field(description="Custom parameter")
+
+            def execute(self, params: dict, **kwargs) -> Result:
+                # Custom execution logic
+                return Result(status=SUCCESS)
+        ```
     """
 
     extras: DictData = Field(
@@ -762,19 +789,41 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
 
 
 class EmptyStage(BaseAsyncStage):
-    """Empty stage executor that do nothing and log the `message` field to
-    stdout only. It can use for tracking a template parameter on the workflow or
-    debug step.
+    """Empty stage for logging and debugging workflows.
 
-        You can pass a sleep value in second unit to this stage for waiting
-    after log message.
+    EmptyStage is a utility stage that performs no actual work but provides
+    logging output and optional delays. It's commonly used for:
+    - Debugging workflow execution flow
+    - Adding informational messages to workflows
+    - Creating delays between stages
+    - Testing template parameter resolution
 
-    Data Validate:
-        >>> stage = {
-        ...     "name": "Empty stage execution",
-        ...     "echo": "Hello World",
-        ...     "sleep": 1,
-        ... }
+    The stage outputs the echo message to stdout and can optionally sleep
+    for a specified duration, making it useful for workflow timing control
+    and debugging scenarios.
+
+    Attributes:
+        echo (str, optional): Message to display during execution
+        sleep (float): Duration to sleep after logging (0-1800 seconds)
+
+    Example:
+        ```yaml
+        stages:
+          - name: "Workflow Started"
+            echo: "Beginning data processing workflow"
+            sleep: 2
+
+          - name: "Debug Parameters"
+            echo: "Processing file: ${{ params.filename }}"
+        ```
+
+        ```python
+        stage = EmptyStage(
+            name="Status Update",
+            echo="Processing completed successfully",
+            sleep=1.0
+        )
+        ```
     """
 
     echo: StrOrNone = Field(

@@ -3,6 +3,37 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
+"""Audit and Execution Tracking Module.
+
+This module provides comprehensive audit capabilities for workflow execution
+tracking and monitoring. It supports multiple audit backends for capturing
+execution metadata, status information, and detailed logging.
+
+The audit system tracks workflow, job, and stage executions with configurable
+storage backends including file-based JSON storage and database persistence.
+
+Classes:
+    Audit: Abstract base class for audit implementations
+    AuditModel: Pydantic model for audit data validation
+    FileAudit: File-based audit storage implementation
+
+Functions:
+    get_audit: Factory function for creating audit instances
+
+Example:
+    ```python
+    from ddeutil.workflow.audits import get_audit
+
+    # Create file-based audit
+    audit = get_audit(run_id="run-123")
+    audit.info("Workflow execution started")
+    audit.success("Workflow completed successfully")
+    ```
+
+Note:
+    Audit instances are automatically configured based on the workflow
+    configuration and provide detailed execution tracking capabilities.
+"""
 from __future__ import annotations
 
 import json

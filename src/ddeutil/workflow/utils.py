@@ -3,7 +3,35 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-"""Utility function model."""
+"""Utility Functions for Workflow Operations.
+
+This module provides essential utility functions used throughout the workflow
+system for ID generation, datetime handling, string processing, template
+operations, and other common tasks.
+
+Functions:
+    gen_id: Generate unique identifiers for workflow components
+    make_exec: Create executable strings for shell commands
+    filter_func: Filter functions based on criteria
+    dump_all: Serialize data to various formats
+    delay: Create delays in execution
+    to_train: Convert strings to train-case format
+    get_dt_now: Get current datetime with timezone
+    get_d_now: Get current date
+    cross_product: Generate cross product of matrix values
+    replace_sec: Replace template variables in strings
+
+Example:
+    ```python
+    from ddeutil.workflow.utils import gen_id, get_dt_now
+
+    # Generate unique ID
+    run_id = gen_id("workflow")
+
+    # Get current datetime
+    now = get_dt_now()
+    ```
+"""
 from __future__ import annotations
 
 import stat

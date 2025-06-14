@@ -3,17 +3,33 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-"""Job model that use for store Stage models and node parameter that use for
-running these stages. The job model handle the lineage of stages and location of
-execution that mean you can define `runs-on` field with the Self-Hosted mode
-for execute on target machine instead of the current local machine.
+"""Job Execution Module.
 
-    This module include Strategy model that use on the job `strategy` field for
-making matrix values before execution parallelism stage execution.
+This module contains the Job model and related components for managing stage
+execution, execution strategies, and job orchestration within workflows.
 
-    The Job model does not implement `handler_execute` same as Stage model
-because the job should raise only `JobError` class from the execution
-method.
+The Job model serves as a container for Stage models and handles the execution
+lifecycle, dependency management, and output coordination. It supports various
+execution environments through the runs-on configuration.
+
+Key Features:
+    - Stage execution orchestration
+    - Matrix strategy for parameterized execution
+    - Multi-environment support (local, self-hosted, Docker, Azure Batch)
+    - Dependency management via job needs
+    - Conditional execution support
+    - Parallel execution capabilities
+
+Classes:
+    Job: Main job execution container
+    Strategy: Matrix strategy for parameterized execution
+    Rule: Trigger rules for job execution
+    RunsOn: Execution environment enumeration
+    BaseRunsOn: Base class for execution environments
+
+Note:
+    Jobs raise JobError on execution failures, providing consistent error
+    handling across the workflow system.
 """
 from __future__ import annotations
 
@@ -123,27 +139,41 @@ def make(
 
 
 class Strategy(BaseModel):
-    """Strategy model that will combine a matrix together for running the
-    special job with combination of matrix data.
+    """Matrix strategy model for parameterized job execution.
 
-        This model does not be the part of job only because you can use it to
-    any model object. The objective of this model is generating metrix result
-    that comming from combination logic with any matrix values for running it
-    with parallelism.
+    The Strategy model generates combinations of matrix values to enable
+    parallel execution of jobs with different parameter sets. It supports
+    cross-product generation, inclusion of specific combinations, and
+    exclusion of unwanted combinations.
 
-        [1, 2, 3] x [a, b] --> [1a], [1b], [2a], [2b], [3a], [3b]
+    This model can be used independently or as part of job configuration
+    to create multiple execution contexts from a single job definition.
 
-    Data Validate:
-        >>> strategy = {
-        ...     'max-parallel': 1,
-        ...     'fail-fast': False,
-        ...     'matrix': {
-        ...         'first': [1, 2, 3],
-        ...         'second': ['foo', 'bar'],
-        ...     },
-        ...     'include': [{'first': 4, 'second': 'foo'}],
-        ...     'exclude': [{'first': 1, 'second': 'bar'}],
-        ... }
+    Matrix Combination Logic:
+        [1, 2, 3] × [a, b] → [1a], [1b], [2a], [2b], [3a], [3b]
+
+    Attributes:
+        fail_fast (bool): Cancel remaining executions on first failure
+        max_parallel (int): Maximum concurrent executions (1-9)
+        matrix (dict): Base matrix values for cross-product generation
+        include (list): Additional specific combinations to include
+        exclude (list): Specific combinations to exclude from results
+
+    Example:
+        ```python
+        strategy = Strategy(
+            max_parallel=2,
+            fail_fast=True,
+            matrix={
+                'python_version': ['3.9', '3.10', '3.11'],
+                'os': ['ubuntu', 'windows']
+            },
+            include=[{'python_version': '3.12', 'os': 'ubuntu'}],
+            exclude=[{'python_version': '3.9', 'os': 'windows'}]
+        )
+
+        combinations = strategy.make()  # Returns list of parameter dicts
+        ```
     """
 
     fail_fast: bool = Field(
@@ -312,30 +342,48 @@ RunsOnModel = Annotated[
 
 
 class Job(BaseModel):
-    """Job Pydantic model object (short descripte: a group of stages).
+    """Job execution container for stage orchestration.
 
-        This job model allow you to use for-loop that call matrix strategy. If
-    you pass matrix mapping, and it is able to generate, you will see it running
-    with loop of matrix values.
+    The Job model represents a logical unit of work containing multiple stages
+    that execute sequentially. Jobs support matrix strategies for parameterized
+    execution, dependency management, conditional execution, and multi-environment
+    deployment.
 
-    Data Validate:
-        >>> job = {
-        ...     "runs-on": {"type": "local"},
-        ...     "strategy": {
-        ...         "max-parallel": 1,
-        ...         "matrix": {
-        ...             "first": [1, 2, 3],
-        ...             "second": ['foo', 'bar'],
-        ...         },
-        ...     },
-        ...     "needs": [],
-        ...     "stages": [
-        ...         {
-        ...             "name": "Some stage",
-        ...             "run": "print('Hello World')",
-        ...         },
-        ...     ],
-        ... }
+    Jobs are the primary execution units within workflows, providing:
+    - Stage lifecycle management
+    - Execution environment abstraction
+    - Matrix strategy support for parallel execution
+    - Dependency resolution via job needs
+    - Output coordination between stages
+
+    Attributes:
+        id (str, optional): Unique job identifier within workflow
+        desc (str, optional): Job description in markdown format
+        runs_on (RunsOnModel): Execution environment configuration
+        condition (str, optional): Conditional execution expression
+        stages (list[Stage]): Ordered list of stages to execute
+        trigger_rule (Rule): Rule for handling job dependencies
+        needs (list[str]): List of prerequisite job IDs
+        strategy (Strategy): Matrix strategy for parameterized execution
+        extras (dict): Additional configuration parameters
+
+    Example:
+        ```python
+        job = Job(
+            id="data-processing",
+            desc="Process daily data files",
+            runs_on=OnLocal(),
+            stages=[
+                EmptyStage(name="Start", echo="Processing started"),
+                PyStage(name="Process", run="process_data()"),
+                EmptyStage(name="Complete", echo="Processing finished")
+            ],
+            strategy=Strategy(
+                matrix={'env': ['dev', 'prod']},
+                max_parallel=2
+            )
+        )
+        ```
     """
 
     id: StrOrNone = Field(

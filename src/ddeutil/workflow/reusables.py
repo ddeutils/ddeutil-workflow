@@ -3,8 +3,49 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-# [x] Use dynamic config
-"""Reusables module that keep any template and template filter functions."""
+"""Reusable Components and Registry System.
+
+This module provides a registry system for reusable workflow components including
+tagged functions, template operations, and utility functions for parameter
+processing and template rendering.
+
+The registry system allows developers to create custom callable functions that
+can be invoked from workflows using the CallStage, enabling extensible and
+modular workflow design.
+
+Classes:
+    TagFunc: Tagged function wrapper for registry storage
+
+Functions:
+    tag: Decorator for registering callable functions
+    param2template: Convert parameters to template format
+    has_template: Check if string contains template variables
+    not_in_template: Validate template restrictions
+    extract_call: Extract callable information from registry
+    create_model_from_caller: Generate Pydantic models from function signatures
+
+Example:
+    ```python
+    from ddeutil.workflow.reusables import tag
+
+    @tag("data-processing", alias="process-csv")
+    def process_csv_file(input_path: str, output_path: str) -> dict:
+        # Custom processing logic
+        return {"status": "completed", "rows_processed": 1000}
+
+    # Use in workflow YAML:
+    # stages:
+    #   - name: "Process data"
+    #     uses: "data-processing/process-csv@latest"
+    #     args:
+    #       input_path: "/data/input.csv"
+    #       output_path: "/data/output.csv"
+    ```
+
+Note:
+    The registry system supports versioning and aliasing for better function
+    management and backward compatibility.
+"""
 from __future__ import annotations
 
 import copy

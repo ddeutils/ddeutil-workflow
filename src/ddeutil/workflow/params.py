@@ -3,13 +3,43 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-"""This module include all Param Pydantic Models that use for parsing an
-incoming parameters that was passed to the Workflow and Schedule objects before
-execution or release methods.
+"""Parameter Models for Workflow Validation and Processing.
 
-    The Param model allow you to handle validation and preparation steps before
-passing an input value to target execution method.
+This module provides comprehensive parameter models for handling validation and
+preparation of input values passed to workflows and scheduled executions. The
+parameter system ensures type safety and provides default value management.
+
+The parameter models support various data types including strings, numbers,
+dates, choices, and complex types like maps and arrays. Each parameter type
+provides validation and transformation capabilities.
+
+Classes:
+    BaseParam: Abstract base class for all parameter types
+    DefaultParam: Base class for parameters with default values
+    DateParam: Date parameter with validation
+    DatetimeParam: Datetime parameter with validation
+    StrParam: String parameter type
+    IntParam: Integer parameter type
+    FloatParam: Float parameter with precision control
+    DecimalParam: Decimal parameter for financial calculations
+    ChoiceParam: Parameter with predefined choices
+    MapParam: Dictionary/mapping parameter type
+    ArrayParam: List/array parameter type
+
+Example:
+    ```python
+    from ddeutil.workflow.params import StrParam, IntParam
+
+    # Define parameters
+    name_param = StrParam(desc="User name", required=True)
+    age_param = IntParam(desc="User age", default=18, required=False)
+
+    # Process values
+    name = name_param.receive("John")
+    age = age_param.receive(None)  # Uses default value
+    ```
 """
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

@@ -3,7 +3,39 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-# [x] Use fix config for `set_logging`, and Model initialize step.
+"""Tracing and Logging Module for Workflow Execution.
+
+This module provides comprehensive tracing and logging capabilities for workflow
+execution monitoring. It supports multiple trace backends including console output,
+file-based logging, and SQLite database storage.
+
+The tracing system captures detailed execution metadata including process IDs,
+thread identifiers, timestamps, and contextual information for debugging and
+monitoring workflow executions.
+
+Classes:
+    Message: Log message model with prefix parsing
+    TraceMeta: Metadata model for execution context
+    TraceData: Container for trace information
+    BaseTrace: Abstract base class for trace implementations
+    ConsoleTrace: Console-based trace output
+    FileTrace: File-based trace storage
+    SQLiteTrace: Database-based trace storage
+
+Functions:
+    set_logging: Configure logger with custom formatting
+    get_trace: Factory function for trace instances
+
+Example:
+    ```python
+    from ddeutil.workflow.traces import get_trace
+
+    # Create file-based trace
+    trace = get_trace("run-123", parent_run_id="workflow-456")
+    trace.info("Workflow execution started")
+    trace.debug("Processing stage 1")
+    ```
+"""
 from __future__ import annotations
 
 import json
@@ -32,12 +64,23 @@ logger = logging.getLogger("ddeutil.workflow")
 
 @lru_cache
 def set_logging(name: str) -> logging.Logger:
-    """Return logger object with an input module name that already implement the
-    custom handler and formatter from this package config.
+    """Configure logger with custom formatting and handlers.
 
-    :param name: (str) A module name that want to log.
+    Creates and configures a logger instance with the custom formatter and
+    handlers defined in the package configuration. The logger includes both
+    console output and proper formatting for workflow execution tracking.
 
-    :rtype: logging.Logger
+    Args:
+        name: Module name to create logger for
+
+    Returns:
+        logging.Logger: Configured logger instance with custom formatting
+
+    Example:
+        ```python
+        logger = set_logging("ddeutil.workflow.stages")
+        logger.info("Stage execution started")
+        ```
     """
     _logger = logging.getLogger(name)
 

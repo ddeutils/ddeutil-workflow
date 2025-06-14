@@ -3,11 +3,40 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-"""An Event module keep all triggerable object to the Workflow model. The simple
-event trigger that use to run workflow is `Crontab` model.
-Now, it has only `Crontab` and `CrontabYear` event models in this module because
-I think it is the core event for workflow orchestration.
+"""Event Scheduling Module for Workflow Orchestration.
+
+This module provides event-driven scheduling capabilities for workflows, with
+a primary focus on cron-based scheduling. It includes models for defining
+when workflows should be triggered and executed.
+
+The core event trigger is the Crontab model, which wraps cron functionality
+in a Pydantic model for validation and easy integration with the workflow system.
+
+Classes:
+    Crontab: Main cron-based event scheduler
+    CrontabYear: Enhanced cron scheduler with year constraints
+    ReleaseEvent: Release-based event triggers
+    SensorEvent: Sensor-based event monitoring
+
+Functions:
+    interval2crontab: Convert interval specifications to cron expressions
+
+Example:
+    ```python
+    from ddeutil.workflow.event import Crontab
+
+    # Create daily schedule at 9 AM
+    schedule = Crontab(
+        cronjob="0 9 * * *",
+        timezone="America/New_York"
+    )
+
+    # Generate next run times
+    runner = schedule.generate(datetime.now())
+    next_run = next(runner)
+    ```
 """
+
 from __future__ import annotations
 
 from dataclasses import fields
