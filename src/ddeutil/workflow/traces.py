@@ -144,10 +144,12 @@ class Message(BaseModel):
     def prepare(self, extras: Optional[DictData] = None) -> str:
         """Prepare message with force add prefix before writing trace log.
 
-        :param extras: (DictData) An extra parameter that want to get the
-            `log_add_emoji` flag.
+        Args:
+            extras: An extra parameter that want to get the
+                `log_add_emoji` flag.
 
-        :rtype: str
+        Returns:
+            str: The prepared message with prefix and optional emoji.
         """
         name: str = self.name or PREFIX_DEFAULT
         emoji: str = (
@@ -182,9 +184,13 @@ class TraceMeta(BaseModel):  # pragma: no cov
         """Dynamic Frame information base on the `logs_trace_frame_layer` config
         value that was set from the extra parameter.
 
-        :param frame: (FrameType) The current frame that want to dynamic.
-        :param extras: (DictData) An extra parameter that want to get the
-            `logs_trace_frame_layer` config value.
+        Args:
+            frame: The current frame that want to dynamic.
+            extras: An extra parameter that want to get the
+                `logs_trace_frame_layer` config value.
+
+        Returns:
+            Traceback: The frame information at the specified layer.
         """
         extras: DictData = extras or {}
         layer: int = extras.get("logs_trace_frame_layer", 4)
@@ -210,14 +216,16 @@ class TraceMeta(BaseModel):  # pragma: no cov
         """Make the current metric for contract this TraceMeta model instance
         that will catch local states like PID, thread identity.
 
-        :param mode: (Literal["stdout", "stderr"]) A metadata mode.
-        :param message: (str) A message.
-        :param level: (str) A log level.
-        :param cutting_id: (str)
-        :param extras: (DictData) An extra parameter that want to override core
-            config values.
+        Args:
+            mode: A metadata mode.
+            message: A message.
+            level: A log level.
+            cutting_id: A cutting ID string.
+            extras: An extra parameter that want to override core
+                config values.
 
-        :rtype: Self
+        Returns:
+            Self: The constructed TraceMeta instance.
         """
         frame: FrameType = currentframe()
         frame_info: Traceback = cls.dynamic_frame(frame, extras=extras)

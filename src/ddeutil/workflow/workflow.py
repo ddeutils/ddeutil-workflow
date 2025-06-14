@@ -216,12 +216,14 @@ class Workflow(BaseModel):
     ) -> DictData:
         """Bypass the on data to loaded config data.
 
-        :param data: (DictData) A data to construct to this Workflow model.
-        :param path: (Path) A config path.
-        :param extras: (DictData) An extra parameters that want to override core
-            config values.
+        Args:
+            data: A data to construct to this Workflow model.
+            path: A config path.
+            extras: An extra parameters that want to override core
+                config values.
 
-        :rtype: DictData
+        Returns:
+            DictData: The processed data with on field populated.
         """
         if on := data.pop("on", []):
             if isinstance(on, str):
@@ -259,8 +261,11 @@ class Workflow(BaseModel):
     def __dedent_desc__(cls, value: str) -> str:
         """Prepare description string that was created on a template.
 
-        :param value: A description string value that want to dedent.
-        :rtype: str
+        Args:
+            value: A description string value that want to dedent.
+
+        Returns:
+            str: The dedented description string.
         """
         return dedent(value.lstrip("\n"))
 
@@ -273,11 +278,14 @@ class Workflow(BaseModel):
         contains the every minute value more than one value, it will remove to
         only one value.
 
-        :raise ValueError: If it has some duplicate value.
+        Args:
+            value: A list of on object.
 
-        :param value: A list of on object.
+        Returns:
+            list[Crontab]: The validated list of Crontab objects.
 
-        :rtype: list[Crontab]
+        Raises:
+            ValueError: If it has some duplicate value.
         """
         set_ons: set[str] = {str(on.cronjob) for on in value}
         if len(set_ons) != len(value):
@@ -343,13 +351,15 @@ class Workflow(BaseModel):
         or job's ID. This method will pass an extra parameter from this model
         to the returned Job model.
 
-        :param name: (str) A job name or ID that want to get from a mapping of
-            job models.
+        Args:
+            name: A job name or ID that want to get from a mapping of
+                job models.
 
-        :raise ValueError: If a name or ID does not exist on the jobs field.
+        Returns:
+            Job: A job model that exists on this workflow by input name.
 
-        :rtype: Job
-        :return: A job model that exists on this workflow by input name.
+        Raises:
+            ValueError: If a name or ID does not exist on the jobs field.
         """
         if name not in self.jobs:
             raise ValueError(
@@ -372,15 +382,17 @@ class Workflow(BaseModel):
             ...     "jobs": {}
             ... }
 
-        :param params: (DictData) A parameter data that receive from workflow
-            execute method.
+        Args:
+            params: A parameter data that receive from workflow
+                execute method.
 
-        :raise WorkflowError: If parameter value that want to validate does
-            not include the necessary parameter that had required flag.
+        Returns:
+            DictData: The parameter value that validate with its parameter fields and
+                adding jobs key to this parameter.
 
-        :rtype: DictData
-        :return: The parameter value that validate with its parameter fields and
-            adding jobs key to this parameter.
+        Raises:
+            WorkflowError: If parameter value that want to validate does
+                not include the necessary parameter that had required flag.
         """
         # VALIDATE: Incoming params should have keys that set on this workflow.
         check_key: list[str] = [
@@ -412,9 +424,11 @@ class Workflow(BaseModel):
         millisecond to 0 and replaced timezone to None before checking it match
         with the set `on` field.
 
-        :param dt: (datetime) A datetime object that want to validate.
+        Args:
+            dt: A datetime object that want to validate.
 
-        :rtype: datetime
+        Returns:
+            datetime: The validated release datetime.
         """
         release: datetime = replace_sec(dt.replace(tzinfo=None))
         if not self.on:

@@ -63,9 +63,11 @@ _DELAY_INDEX = 0
 def to_train(camel: str) -> str:
     """Convert camel case string to train case.
 
-    :param camel: (str) A camel case string that want to convert.
+    Args:
+        camel: A camel case string that want to convert.
 
-    :rtype: str
+    Returns:
+        str: The converted train-case string.
     """
     return "".join("-" + i if i.isupper() else i for i in camel).lstrip("-")
 
@@ -73,9 +75,11 @@ def to_train(camel: str) -> str:
 def prepare_newline(msg: str) -> str:
     """Prepare message that has multiple newline char.
 
-    :param msg: (str) A message that want to prepare.
+    Args:
+        msg: A message that want to prepare.
 
-    :rtype: str
+    Returns:
+        str: The prepared message with formatted newlines.
     """
     # NOTE: Remove ending with "\n" and replace "\n" with the "||" value.
     msg: str = msg.strip("\n").replace("\n", MARK_NEWLINE)
@@ -95,9 +99,11 @@ def prepare_newline(msg: str) -> str:
 def replace_sec(dt: datetime) -> datetime:
     """Replace second and microsecond values to 0.
 
-    :param dt: A datetime object that want to replace.
+    Args:
+        dt: A datetime object that want to replace.
 
-    :rtype: datetime
+    Returns:
+        datetime: The datetime with seconds and microseconds set to 0.
     """
     return dt.replace(second=0, microsecond=0)
 

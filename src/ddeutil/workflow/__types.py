@@ -92,10 +92,12 @@ class CallerRe:
     def from_regex(cls, match: Match[str]) -> Self:
         """Class construct from matching result.
 
-        :param match: A match string object for contract this Caller regex data
-            class.
+        Args:
+            match: A match string object for contract this Caller regex data
+                class.
 
-        :rtype: Self
+        Returns:
+            Self: The constructed CallerRe instance from regex match.
         """
         return cls(full=match.group(0), **match.groupdict())
 
@@ -137,10 +139,12 @@ class Re:
         """Generate CallerRe object that create from matching object that
         extract with re.finditer function.
 
-        :param value: (str) A string value that want to finditer with the caller
-            regular expression.
+        Args:
+            value: A string value that want to finditer with the caller
+                regular expression.
 
-        :rtype: Iterator[CallerRe]
+        Yields:
+            CallerRe: CallerRe objects created from regex matches.
         """
         for found in cls.RE_CALLER.finditer(value):
             yield CallerRe.from_regex(found)

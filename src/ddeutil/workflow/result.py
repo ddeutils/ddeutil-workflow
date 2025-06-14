@@ -220,13 +220,15 @@ class Result:
         """Create the Result object or set parent running id if passing Result
         object.
 
-        :param result: A Result instance.
-        :param run_id: A running ID.
-        :param parent_run_id: A parent running ID.
-        :param id_logic: A logic function that use to generate a running ID.
-        :param extras: An extra parameter that want to override the core config.
+        Args:
+            result: A Result instance.
+            run_id: A running ID.
+            parent_run_id: A parent running ID.
+            id_logic: A logic function that use to generate a running ID.
+            extras: An extra parameter that want to override the core config.
 
-        :rtype: Self
+        Returns:
+            Self: The constructed or updated Result instance.
         """
         if result is None:
             return cls(

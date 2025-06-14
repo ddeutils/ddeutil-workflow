@@ -64,10 +64,12 @@ PREFIX: Final[str] = "WORKFLOW"
 def env(var: str, default: Optional[str] = None) -> Optional[str]:
     """Get environment variable with uppercase and adding prefix string.
 
-    :param var: (str) A env variable name.
-    :param default: (Optional[str]) A default value if an env var does not set.
+    Args:
+        var: A env variable name.
+        default: A default value if an env var does not set.
 
-    :rtype: Optional[str]
+    Returns:
+        Optional[str]: The environment variable value or default.
     """
     return os.getenv(f"{PREFIX}_{var.upper().replace(' ', '_')}", default)
 
@@ -83,7 +85,8 @@ class Config:  # pragma: no cov
     def conf_path(self) -> Path:
         """Config path that keep all workflow template YAML files.
 
-        :rtype: Path
+        Returns:
+            Path: The configuration path for workflow templates.
         """
         return Path(env("CORE_CONF_PATH", "./conf"))
 
@@ -92,7 +95,8 @@ class Config:  # pragma: no cov
         """Timezone value that return with the `ZoneInfo` object and use for all
         datetime object in this workflow engine.
 
-        :rtype: ZoneInfo
+        Returns:
+            ZoneInfo: The timezone configuration for the workflow engine.
         """
         return ZoneInfo(env("CORE_TIMEZONE", "UTC"))
 
@@ -101,7 +105,8 @@ class Config:  # pragma: no cov
         """Flag for generate running ID with simple mode. That does not use
         `md5` function after generate simple mode.
 
-        :rtype: bool
+        Returns:
+            bool: True if simple mode ID generation is enabled.
         """
         return str2bool(env("CORE_GENERATE_ID_SIMPLE_MODE", "true"))
 

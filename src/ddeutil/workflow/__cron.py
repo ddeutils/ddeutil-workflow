@@ -38,8 +38,11 @@ class YearReachLimit(Exception):
 def str2cron(value: str) -> str:  # pragma: no cov
     """Convert Special String with the @ prefix to Crontab value.
 
-    :param value: (str) A string value that want to convert to cron value.
-    :rtype: str
+    Args:
+        value: A string value that want to convert to cron value.
+
+    Returns:
+        str: The converted cron expression.
 
     Table:
 
@@ -165,9 +168,10 @@ CRON_UNITS_YEAR: Units = CRON_UNITS + (
 class CronPart:
     """Part of Cron object that represent a collection of positive integers.
 
-    :param unit: A Unit dataclass object.
-    :param values: A crontab values that want to validate
-    :param options: A Options dataclass object.
+    Args:
+        unit: A Unit dataclass object.
+        values: A crontab values that want to validate
+        options: A Options dataclass object.
     """
 
     __slots__: tuple[str, ...] = (
@@ -288,7 +292,11 @@ class CronPart:
         """Parses a string as a range of positive integers. The string should
         include only `-` and `,` special strings.
 
-        :param value: (str) A string value that want to parse
+        Args:
+            value: A string value that want to parse
+
+        Returns:
+            tuple[int, ...]: Parsed range of integers.
 
         TODO: support for `L`, `W`, and `#`
         ---
@@ -334,8 +342,6 @@ class CronPart:
             -   15 10 ? * 6L 2002-2005
                 Run at 10:15am UTC on the last Friday of each month during the
                 years 2002 to 2005
-
-        :rtype: tuple[int, ...]
         """
         interval_list: list[list[int]] = []
         # NOTE: Start replace alternative like JAN to FEB or MON to SUN.

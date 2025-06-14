@@ -81,7 +81,8 @@ def interval2crontab(
         >>> interval2crontab(interval='monthly', day='tuesday', time='12:00')
         '12 0 1 * 2'
 
-    :rtype: str
+    Returns:
+        str: The generated crontab expression.
     """
     d: str = "*"
     if interval == "weekly":

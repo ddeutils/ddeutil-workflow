@@ -212,7 +212,8 @@ class Strategy(BaseModel):
     def is_set(self) -> bool:
         """Return True if this strategy was set from yaml template.
 
-        :rtype: bool
+        Returns:
+            bool: True if matrix has been configured, False otherwise.
         """
         return len(self.matrix) > 0
 
@@ -220,7 +221,8 @@ class Strategy(BaseModel):
         """Return List of product of matrix values that already filter with
         exclude and add include.
 
-        :rtype: list[DictStr]
+        Returns:
+            list[DictStr]: List of parameter combinations from matrix strategy.
         """
         return make(self.matrix, self.include, self.exclude)
 

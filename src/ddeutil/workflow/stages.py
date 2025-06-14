@@ -231,14 +231,16 @@ class BaseStage(BaseModel, ABC):
         """Execute abstraction method that action something by sub-model class.
         This is important method that make this class is able to be the stage.
 
-        :param params: (DictData) A parameter data that want to use in this
-            execution.
-        :param result: (Result) A result object for keeping context and status
-            data.
-        :param event: (Event) An event manager that use to track parent execute
-            was not force stopped.
+        Args:
+            params: A parameter data that want to use in this
+                execution.
+            result: A result object for keeping context and status
+                data.
+            event: An event manager that use to track parent execute
+                was not force stopped.
 
-        :rtype: Result
+        Returns:
+            Result: The execution result with status and context data.
         """
         raise NotImplementedError("Stage should implement `execute` method.")
 
@@ -277,16 +279,17 @@ class BaseStage(BaseModel, ABC):
             On the last step, it will set the running ID on a return result
         object from the current stage ID before release the final result.
 
-        :param params: (DictData) A parameter data.
-        :param run_id: (str) A running stage ID. (Default is None)
-        :param parent_run_id: (str) A parent running ID. (Default is None)
-        :param result: (Result) A result object for keeping context and status
-            data before execution.
-            (Default is None)
-        :param event: (Event) An event manager that pass to the stage execution.
-            (Default is None)
+        Args:
+            params: A parameter data.
+            run_id: A running stage ID. (Default is None)
+            parent_run_id: A parent running ID. (Default is None)
+            result: A result object for keeping context and status
+                data before execution. (Default is None)
+            event: An event manager that pass to the stage execution.
+                (Default is None)
 
-        :rtype: Result
+        Returns:
+            Result: The execution result with updated status and context.
         """
         result: Result = Result.construct_with_rs_or_id(
             result,
@@ -358,14 +361,16 @@ class BaseStage(BaseModel, ABC):
     ) -> Result:
         """Wrapped the execute method before returning to handler execution.
 
-        :param params: (DictData) A parameter data that want to use in this
-            execution.
-        :param result: (Result) A result object for keeping context and status
-            data.
-        :param event: (Event) An event manager that use to track parent execute
-            was not force stopped.
+        Args:
+            params: A parameter data that want to use in this
+                execution.
+            result: A result object for keeping context and status
+                data.
+            event: An event manager that use to track parent execute
+                was not force stopped.
 
-        :rtype: Result
+        Returns:
+            Result: The wrapped execution result.
         """
         result.catch(status=WAIT)
         return self.execute(params, result=result, event=event)
