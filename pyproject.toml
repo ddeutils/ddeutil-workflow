@@ -130,6 +130,7 @@ exclude = """
         | \\.__pycache__
         | \\.idea
         | \\.ruff_cache
+        | \\.rust
         | \\.mypy_cache
         | \\.pytest_cache
         | \\.venv
@@ -147,6 +148,7 @@ exclude = [
     ".git",
     ".mypy_cache",
     ".ruff_cache",
+    ".rust",
     ".venv",
     "build",
     "dist",
