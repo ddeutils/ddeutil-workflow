@@ -344,24 +344,25 @@ class BaseStage(BaseModel, ABC):
                 f"[STAGE]: Handler:||{e.__class__.__name__}: {e}||"
                 f"{traceback.format_exc()}"
             )
-            return result.make_info(
-                {"execution_time": time.monotonic() - ts}
-            ).catch(
+            return result.catch(
                 status=get_status_from_error(e),
                 context=(
                     None
                     if isinstance(e, StageSkipError)
                     else {"errors": e.to_dict()}
                 ),
+                info={"execution_time": time.monotonic() - ts},
             )
         except Exception as e:
             result.trace.error(
                 f"[STAGE]: Error Handler:||{e.__class__.__name__}: {e}||"
                 f"{traceback.format_exc()}"
             )
-            return result.make_info(
-                {"execution_time": time.monotonic() - ts}
-            ).catch(status=FAILED, context={"errors": to_dict(e)})
+            return result.catch(
+                status=FAILED,
+                context={"errors": to_dict(e)},
+                info={"execution_time": time.monotonic() - ts},
+            )
 
     def _execute(
         self, params: DictData, result: Result, event: Optional[Event]

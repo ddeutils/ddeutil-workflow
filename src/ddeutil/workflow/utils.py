@@ -125,6 +125,17 @@ def get_dt_now(tz: Optional[ZoneInfo] = None, offset: float = 0.0) -> datetime:
     return datetime.now(tz=tz) - timedelta(seconds=offset)
 
 
+def get_dt_ntz_now() -> datetime:  # pragma: no cov
+    """Get current datetime with no timezone.
+
+    Returns the current datetime object using the None timezone.
+
+    Returns:
+        datetime: Current datetime with no timezone
+    """
+    return get_dt_now(tz=None)
+
+
 def get_d_now(
     tz: Optional[ZoneInfo] = None, offset: float = 0.0
 ) -> date:  # pragma: no cov

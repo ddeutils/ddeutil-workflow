@@ -23,8 +23,7 @@ from __future__ import annotations
 from dataclasses import field
 from datetime import datetime
 from enum import Enum
-from typing import Optional, TypedDict, Union
-from zoneinfo import ZoneInfo
+from typing import Optional, Union
 
 from pydantic import ConfigDict
 from pydantic.dataclasses import dataclass
@@ -43,24 +42,8 @@ from . import (
 )
 from .__types import DictData
 from .audits import TraceModel, get_trace
-from .conf import dynamic
 from .errors import ResultError
-from .utils import default_gen_id, gen_id, get_dt_now
-
-
-def get_dt_tznow(tz: Optional[ZoneInfo] = None) -> datetime:  # pragma: no cov
-    """Get current datetime with timezone configuration.
-
-    Returns the current datetime object using the specified timezone
-    or the configured default timezone from dynamic configuration.
-
-    Args:
-        tz: Optional timezone override. If None, uses configured timezone
-
-    Returns:
-        datetime: Current datetime with appropriate timezone
-    """
-    return get_dt_now(tz=dynamic("tz", f=tz))
+from .utils import default_gen_id, gen_id, get_dt_ntz_now
 
 
 class Status(str, Enum):
@@ -168,7 +151,11 @@ def get_status_from_error(
         BaseException,
     ]
 ) -> Status:
-    """Get the Status from the error object."""
+    """Get the Status from the error object.
+
+    Returns:
+        Status: The status from the specific exception class.
+    """
     if isinstance(error, (StageSkipError, JobSkipError)):
         return SKIP
     elif isinstance(
@@ -203,8 +190,7 @@ class Result:
     info: DictData = field(default_factory=dict)
     run_id: Optional[str] = field(default_factory=default_gen_id)
     parent_run_id: Optional[str] = field(default=None, compare=False)
-    ts: datetime = field(default_factory=get_dt_tznow, compare=False)
-
+    ts: datetime = field(default_factory=get_dt_ntz_now, compare=False)
     trace: Optional[TraceModel] = field(default=None, compare=False, repr=False)
     extras: DictData = field(default_factory=dict, compare=False, repr=False)
 
@@ -235,7 +221,7 @@ class Result:
             return cls(
                 run_id=(run_id or gen_id(id_logic or "", unique=True)),
                 parent_run_id=parent_run_id,
-                ts=get_dt_now(dynamic("tz", extras=extras)),
+                ts=get_dt_ntz_now(),
                 extras=(extras or {}),
             )
         elif parent_run_id:
@@ -288,18 +274,20 @@ class Result:
 
         :rtype: Self
         """
+        self.__dict__["context"].update(context or {})
         self.__dict__["status"] = (
             Status(status) if isinstance(status, int) else status
         )
-        self.__dict__["context"].update(context or {})
         self.__dict__["context"]["status"] = self.status
+
+        # NOTE: Update other context data.
         if kwargs:
             for k in kwargs:
                 if k in self.__dict__["context"]:
                     self.__dict__["context"][k].update(kwargs[k])
                 # NOTE: Exclude the `info` key for update information data.
                 elif k == "info":
-                    self.__dict__["context"][k].update(kwargs[k])
+                    self.__dict__["info"].update(kwargs["info"])
                 else:
                     raise ResultError(
                         f"The key {k!r} does not exists on context data."
@@ -307,7 +295,8 @@ class Result:
         return self
 
     def make_info(self, data: DictData) -> Self:
-        self.info.update(data)
+        """Making information."""
+        self.__dict__["info"].update(data)
         return self
 
     def alive_time(self) -> float:  # pragma: no cov
@@ -315,19 +304,4 @@ class Result:
 
         :rtype: float
         """
-        return (
-            get_dt_now(tz=dynamic("tz", extras=self.extras)) - self.ts
-        ).total_seconds()
-
-
-class Context(TypedDict):
-    """Context dict typed."""
-
-    status: Status
-
-    run_id: str
-    parent_run_id: Optional[str]
-
-    data: DictData
-
-    info: DictData
+        return (get_dt_ntz_now() - self.ts).total_seconds()
