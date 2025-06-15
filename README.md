@@ -26,6 +26,7 @@ by a `.yaml` template.
 3. All parallel tasks inside workflow core engine use **Multi-Threading** pool
    (Python 3.13 unlock GIL 🐍🔓)
 4. Recommend to pass a **Secret Value** with environment variable in YAML template 🔐
+5. Any datatime value convert to **No Timezone**
 
 ---
 
@@ -105,14 +106,6 @@ For comprehensive API documentation, examples, and best practices:
 - **[Getting Started](https://ddeutils.github.io/ddeutil-workflow/getting-started/)** - Quick start guide
 - **[API Reference](https://ddeutils.github.io/ddeutil-workflow/api/workflow/)** - Detailed API documentation
 - **[Examples](https://ddeutils.github.io/ddeutil-workflow/examples/)** - Real-world usage examples
-
-### Key Documentation Highlights
-
-- **Google-style docstrings** throughout the codebase for better IDE support
-- **Comprehensive API documentation** with detailed parameter descriptions
-- **Extensive usage examples** for all major features
-- **Best practices guides** for workflow design and optimization
-- **Type hints and validation** for improved development experience
 
 ## 🎯 Usage
 

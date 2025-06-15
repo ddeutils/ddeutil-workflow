@@ -23,7 +23,7 @@ from __future__ import annotations
 from dataclasses import field
 from datetime import datetime
 from enum import Enum
-from typing import Optional, Union
+from typing import Optional, TypedDict, Union
 from zoneinfo import ZoneInfo
 
 from pydantic import ConfigDict
@@ -318,3 +318,16 @@ class Result:
         return (
             get_dt_now(tz=dynamic("tz", extras=self.extras)) - self.ts
         ).total_seconds()
+
+
+class Context(TypedDict):
+    """Context dict typed."""
+
+    status: Status
+
+    run_id: str
+    parent_run_id: Optional[str]
+
+    data: DictData
+
+    info: DictData
