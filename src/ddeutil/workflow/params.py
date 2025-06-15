@@ -82,7 +82,7 @@ class BaseParam(BaseModel, ABC):
         )
 
 
-class DefaultParam(BaseParam):
+class DefaultParam(BaseParam, ABC):
     """Default Parameter that will check default if it required. This model do
     not implement the `receive` method.
     """
