@@ -36,9 +36,6 @@ Example:
     next_run = next(runner)
     ```
 """
-
-from __future__ import annotations
-
 from dataclasses import fields
 from datetime import datetime
 from typing import Annotated, Any, Literal, Optional, Union
@@ -48,11 +45,9 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationInfo
 from pydantic.functional_serializers import field_serializer
 from pydantic.functional_validators import field_validator, model_validator
 from pydantic_extra_types.timezone_name import TimeZoneName
-from typing_extensions import Self
 
 from .__cron import WEEKDAYS, CronJob, CronJobYear, CronRunner, Options
-from .__types import DictData, DictStr
-from .conf import YamlParser
+from .__types import DictData
 
 Interval = Literal["daily", "weekly", "monthly"]
 
@@ -130,75 +125,6 @@ class Crontab(BaseModel):
             alias="timezone",
         ),
     ] = "UTC"
-
-    @classmethod
-    def from_value(cls, value: DictStr, extras: DictData) -> Self:
-        """Constructor from values that will generate crontab by function.
-
-        :param value: (DictStr) A mapping value that will generate crontab
-            before create schedule model.
-        :param extras: (DictData) An extra parameter that use to override core
-            config value.
-        """
-        passing: DictStr = {}
-
-        if "timezone" in value:
-            passing["tz"] = value.pop("timezone")
-        elif "tz" in value:
-            passing["tz"] = value.pop("tz")
-
-        passing["cronjob"] = interval2crontab(
-            **{v: value[v] for v in value if v in ("interval", "day", "time")}
-        )
-        return cls(extras=extras | passing.pop("extras", {}), **passing)
-
-    @classmethod
-    def from_conf(
-        cls,
-        name: str,
-        *,
-        extras: DictData | None = None,
-    ) -> Self:
-        """Constructor from the name of config loader that will use loader
-        object for getting the `Crontab` data.
-
-        :param name: (str) A name of config that will get from loader.
-        :param extras: (DictData) An extra parameter that use to override core
-            config values.
-
-        :rtype: Self
-        """
-        extras: DictData = extras or {}
-        loader: YamlParser = YamlParser(name, extras=extras, obj=cls)
-
-        # NOTE: Validate the config type match with current connection model
-        if loader.type != cls.__name__:
-            raise ValueError(f"Type {loader.type} does not match with {cls}")
-
-        loader_data: DictData = loader.data
-        if "interval" in loader_data:
-            return cls.model_validate(
-                obj=dict(
-                    cronjob=interval2crontab(
-                        **{
-                            v: loader_data[v]
-                            for v in loader_data
-                            if v in ("interval", "day", "time")
-                        }
-                    ),
-                    extras=extras | loader_data.pop("extras", {}),
-                    **loader_data,
-                )
-            )
-        if "cronjob" not in loader_data:
-            raise ValueError("Config does not set `cronjob` or `interval` keys")
-        return cls.model_validate(
-            obj=dict(
-                cronjob=loader_data.pop("cronjob"),
-                extras=extras | loader_data.pop("extras", {}),
-                **loader_data,
-            )
-        )
 
     @model_validator(mode="before")
     def __prepare_values(cls, data: Any) -> Any:

@@ -31,7 +31,7 @@ Example:
     from ddeutil.workflow.params import StrParam, IntParam
 
     # Define parameters
-    name_param = StrParam(desc="User name", required=True)
+    name_param = StrParam(desc="Username", required=True)
     age_param = IntParam(desc="User age", default=18, required=False)
 
     # Process values
@@ -82,7 +82,7 @@ class BaseParam(BaseModel, ABC):
         )
 
 
-class DefaultParam(BaseParam):
+class DefaultParam(BaseParam, ABC):
     """Default Parameter that will check default if it required. This model do
     not implement the `receive` method.
     """

@@ -22,8 +22,6 @@ Constants:
     EVENT: Event-triggered execution
     FORCE: Force execution regardless of conditions
 """
-from __future__ import annotations
-
 import copy
 import time
 from concurrent.futures import (
@@ -37,7 +35,7 @@ from pathlib import Path
 from queue import Queue
 from textwrap import dedent
 from threading import Event
-from typing import Any, Optional
+from typing import Any, Optional, Union
 from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, Field
@@ -159,7 +157,7 @@ class Workflow(BaseModel):
         name: str,
         *,
         path: Optional[Path] = None,
-        extras: DictData | None = None,
+        extras: Optional[DictData] = None,
     ) -> Self:
         """Create Workflow instance from configuration file.
 
@@ -204,70 +202,33 @@ class Workflow(BaseModel):
         if extras:
             data["extras"] = extras
 
-        cls.__bypass_on__(data, path=load.path, extras=extras)
         return cls.model_validate(obj=data)
 
-    @classmethod
-    def __bypass_on__(
-        cls,
-        data: DictData,
-        path: Path,
-        extras: DictData | None = None,
-    ) -> DictData:
-        """Bypass the on data to loaded config data.
-
-        Args:
-            data: A data to construct to this Workflow model.
-            path: A config path.
-            extras: An extra parameters that want to override core
-                config values.
-
-        Returns:
-            DictData: The processed data with on field populated.
-        """
-        if on := data.pop("on", []):
-            if isinstance(on, str):
-                on: list[str] = [on]
-            if any(not isinstance(i, (dict, str)) for i in on):
-                raise TypeError("The `on` key should be list of str or dict")
-
-            # NOTE: Pass on value to SimLoad and keep on model object to the on
-            #   field.
-            data["on"] = [
-                (
-                    YamlParser(n, path=path, extras=extras).data
-                    if isinstance(n, str)
-                    else n
-                )
-                for n in on
-            ]
-        return data
-
-    @model_validator(mode="before")
-    def __prepare_model_before__(cls, data: Any) -> Any:
+    @field_validator(
+        "params",
+        mode="before",
+        json_schema_input_type=Union[dict[str, Param], dict[str, str]],
+    )
+    def __prepare_params(cls, data: Any) -> Any:
         """Prepare the params key in the data model before validating."""
-        if isinstance(data, dict) and (params := data.pop("params", {})):
-            data["params"] = {
-                p: (
-                    {"type": params[p]}
-                    if isinstance(params[p], str)
-                    else params[p]
-                )
-                for p in params
+        if isinstance(data, dict):
+            data = {
+                k: ({"type": v} if isinstance(v, str) else v)
+                for k, v in data.items()
             }
         return data
 
     @field_validator("desc", mode="after")
-    def __dedent_desc__(cls, value: str) -> str:
+    def __dedent_desc__(cls, data: str) -> str:
         """Prepare description string that was created on a template.
 
         Args:
-            value: A description string value that want to dedent.
+            data: A description string value that want to dedent.
 
         Returns:
-            str: The dedented description string.
+            str: The de-dented description string.
         """
-        return dedent(value.lstrip("\n"))
+        return dedent(data.lstrip("\n"))
 
     @field_validator("on", mode="after")
     def __on_no_dup_and_reach_limit__(

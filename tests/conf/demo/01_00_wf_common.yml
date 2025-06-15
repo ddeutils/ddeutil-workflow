@@ -5,7 +5,9 @@ wf-run-common:
 
     This is a running python workflow
 
-  on: every_5_minute_bkk
+  on:
+    - cronjob: "*/5 * * * *"
+      timezone: "Asia/Bangkok"
   params:
     name: str
   jobs:
@@ -328,7 +330,9 @@ wf-run-depends-condition:
 
 wf-trigger:
   type: Workflow
-  on: 'every_5_minute_bkk'
+  on:
+    - cronjob: "*/5 * * * *"
+      timezone: "Asia/Bangkok"
   jobs:
     trigger-job:
       stages:

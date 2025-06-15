@@ -1,6 +1,8 @@
 wf-ignore-inside:
   type: Workflow
-  on: ['every_3_minute_bkk']
+  on:
+    - cronjob: "*/3 * * * *"
+      timezone: "Asia/Bangkok"
   params:
     asat-dt: datetime
   jobs:
