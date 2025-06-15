@@ -204,44 +204,7 @@ class Workflow(BaseModel):
         if extras:
             data["extras"] = extras
 
-        cls.__bypass_on__(data, path=load.path, extras=extras)
         return cls.model_validate(obj=data)
-
-    @classmethod
-    def __bypass_on__(
-        cls,
-        data: DictData,
-        path: Path,
-        extras: DictData | None = None,
-    ) -> DictData:
-        """Bypass the on data to loaded config data.
-
-        Args:
-            data: A data to construct to this Workflow model.
-            path: A config path.
-            extras: An extra parameters that want to override core
-                config values.
-
-        Returns:
-            DictData: The processed data with on field populated.
-        """
-        if on := data.pop("on", []):
-            if isinstance(on, str):
-                on: list[str] = [on]
-            if any(not isinstance(i, (dict, str)) for i in on):
-                raise TypeError("The `on` key should be list of str or dict")
-
-            # NOTE: Pass on value to SimLoad and keep on model object to the on
-            #   field.
-            data["on"] = [
-                (
-                    YamlParser(n, path=path, extras=extras).data
-                    if isinstance(n, str)
-                    else n
-                )
-                for n in on
-            ]
-        return data
 
     @model_validator(mode="before")
     def __prepare_model_before__(cls, data: Any) -> Any:
@@ -265,7 +228,7 @@ class Workflow(BaseModel):
             value: A description string value that want to dedent.
 
         Returns:
-            str: The dedented description string.
+            str: The de-dented description string.
         """
         return dedent(value.lstrip("\n"))
 
