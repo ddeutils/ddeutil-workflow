@@ -37,7 +37,7 @@ from pathlib import Path
 from queue import Queue
 from textwrap import dedent
 from threading import Event
-from typing import Any, Optional
+from typing import Any, Optional, Union
 from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, Field
@@ -206,31 +206,31 @@ class Workflow(BaseModel):
 
         return cls.model_validate(obj=data)
 
-    @model_validator(mode="before")
-    def __prepare_model_before__(cls, data: Any) -> Any:
+    @field_validator(
+        "params",
+        mode="before",
+        json_schema_input_type=Union[dict[str, Param], dict[str, str]],
+    )
+    def __prepare_params(cls, data: Any) -> Any:
         """Prepare the params key in the data model before validating."""
-        if isinstance(data, dict) and (params := data.pop("params", {})):
-            data["params"] = {
-                p: (
-                    {"type": params[p]}
-                    if isinstance(params[p], str)
-                    else params[p]
-                )
-                for p in params
+        if isinstance(data, dict):
+            data = {
+                k: ({"type": v} if isinstance(v, str) else v)
+                for k, v in data.items()
             }
         return data
 
     @field_validator("desc", mode="after")
-    def __dedent_desc__(cls, value: str) -> str:
+    def __dedent_desc__(cls, data: str) -> str:
         """Prepare description string that was created on a template.
 
         Args:
-            value: A description string value that want to dedent.
+            data: A description string value that want to dedent.
 
         Returns:
             str: The de-dented description string.
         """
-        return dedent(value.lstrip("\n"))
+        return dedent(data.lstrip("\n"))
 
     @field_validator("on", mode="after")
     def __on_no_dup_and_reach_limit__(
