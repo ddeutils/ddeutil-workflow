@@ -22,8 +22,6 @@ Constants:
     EVENT: Event-triggered execution
     FORCE: Force execution regardless of conditions
 """
-from __future__ import annotations
-
 import copy
 import time
 from concurrent.futures import (
@@ -159,7 +157,7 @@ class Workflow(BaseModel):
         name: str,
         *,
         path: Optional[Path] = None,
-        extras: DictData | None = None,
+        extras: Optional[DictData] = None,
     ) -> Self:
         """Create Workflow instance from configuration file.
 
