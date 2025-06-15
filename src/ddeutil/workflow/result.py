@@ -200,6 +200,7 @@ class Result:
 
     status: Status = field(default=WAIT)
     context: DictData = field(default_factory=default_context)
+    info: DictData = field(default_factory=dict)
     run_id: Optional[str] = field(default_factory=default_gen_id)
     parent_run_id: Optional[str] = field(default=None, compare=False)
     ts: datetime = field(default_factory=get_dt_tznow, compare=False)
@@ -303,6 +304,10 @@ class Result:
                     raise ResultError(
                         f"The key {k!r} does not exists on context data."
                     )
+        return self
+
+    def make_info(self, data: DictData) -> Self:
+        self.info.update(data)
         return self
 
     def alive_time(self) -> float:  # pragma: no cov

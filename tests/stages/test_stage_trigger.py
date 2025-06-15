@@ -65,6 +65,7 @@ def test_trigger_stage_exec():
             },
         },
     }
+    print(rs.info)
 
 
 def test_trigger_stage_exec_raise(test_path):

@@ -291,6 +291,7 @@ class BaseStage(BaseModel, ABC):
         Returns:
             Result: The execution result with updated status and context.
         """
+        ts: float = time.monotonic()
         result: Result = Result.construct_with_rs_or_id(
             result,
             run_id=run_id,
@@ -328,7 +329,9 @@ class BaseStage(BaseModel, ABC):
                 raise StageError(
                     "Status from execution should not return waiting status."
                 )
-            return result_caught
+            return result_caught.make_info(
+                {"execution_time": time.monotonic() - ts}
+            )
 
         # NOTE: Catch this error in this line because the execution can raise
         #   this exception class at other location.
@@ -341,7 +344,9 @@ class BaseStage(BaseModel, ABC):
                 f"[STAGE]: Handler:||{e.__class__.__name__}: {e}||"
                 f"{traceback.format_exc()}"
             )
-            return result.catch(
+            return result.make_info(
+                {"execution_time": time.monotonic() - ts}
+            ).catch(
                 status=get_status_from_error(e),
                 context=(
                     None
@@ -354,7 +359,9 @@ class BaseStage(BaseModel, ABC):
                 f"[STAGE]: Error Handler:||{e.__class__.__name__}: {e}||"
                 f"{traceback.format_exc()}"
             )
-            return result.catch(status=FAILED, context={"errors": to_dict(e)})
+            return result.make_info(
+                {"execution_time": time.monotonic() - ts}
+            ).catch(status=FAILED, context={"errors": to_dict(e)})
 
     def _execute(
         self, params: DictData, result: Result, event: Optional[Event]
@@ -375,7 +382,12 @@ class BaseStage(BaseModel, ABC):
         result.catch(status=WAIT)
         return self.execute(params, result=result, event=event)
 
-    def set_outputs(self, output: DictData, to: DictData) -> DictData:
+    def set_outputs(
+        self,
+        output: DictData,
+        to: DictData,
+        info: Optional[DictData] = None,
+    ) -> DictData:
         """Set an outputs from execution result context to the received context
         with a `to` input parameter. The result context from stage execution
         will be set with `outputs` key in this stage ID key.
@@ -411,6 +423,7 @@ class BaseStage(BaseModel, ABC):
         :param output: (DictData) A result data context that want to extract
             and transfer to the `outputs` key in receive context.
         :param to: (DictData) A received context data.
+        :param info: (DictData)
 
         :rtype: DictData
         """
@@ -430,7 +443,8 @@ class BaseStage(BaseModel, ABC):
         status: dict[str, Status] = (
             {"status": output.pop("status")} if "status" in output else {}
         )
-        to["stages"][_id] = {"outputs": output} | errors | status
+        info: DictData = {"info": info} if info else {}
+        to["stages"][_id] = {"outputs": output} | errors | status | info
         return to
 
     def get_outputs(self, output: DictData) -> DictData:
@@ -1199,13 +1213,16 @@ class PyStage(BaseRetryStage):
 
             yield value
 
-    def set_outputs(self, output: DictData, to: DictData) -> DictData:
+    def set_outputs(
+        self, output: DictData, to: DictData, info: Optional[DictData] = None
+    ) -> DictData:
         """Override set an outputs method for the Python execution process that
         extract output from all the locals values.
 
         :param output: (DictData) An output data that want to extract to an
             output key.
         :param to: (DictData) A context data that want to add output result.
+        :param info: (DictData)
 
         :rtype: DictData
         """
@@ -1646,7 +1663,9 @@ class BaseNestedStage(BaseRetryStage, ABC):
     is the nested stage or not.
     """
 
-    def set_outputs(self, output: DictData, to: DictData) -> DictData:
+    def set_outputs(
+        self, output: DictData, to: DictData, info: Optional[DictData] = None
+    ) -> DictData:
         """Override the set outputs method that support for nested-stage."""
         return super().set_outputs(output, to=to)
 
