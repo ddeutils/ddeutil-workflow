@@ -12,29 +12,27 @@ when workflows should be triggered and executed.
 The core event trigger is the Crontab model, which wraps cron functionality
 in a Pydantic model for validation and easy integration with the workflow system.
 
-Classes:
-    Crontab: Main cron-based event scheduler
-    CrontabYear: Enhanced cron scheduler with year constraints
-    ReleaseEvent: Release-based event triggers
-    SensorEvent: Sensor-based event monitoring
+Attributes:
+    Interval: Type alias for scheduling intervals ('daily', 'weekly', 'monthly')
 
-Functions:
-    interval2crontab: Convert interval specifications to cron expressions
+Classes:
+    Crontab: Main cron-based event scheduler.
+    CrontabYear: Enhanced cron scheduler with year constraints.
+    ReleaseEvent: Release-based event triggers.
+    SensorEvent: Sensor-based event monitoring.
 
 Example:
-    ```python
-    from ddeutil.workflow.event import Crontab
-
-    # Create daily schedule at 9 AM
-    schedule = Crontab(
-        cronjob="0 9 * * *",
-        timezone="America/New_York"
-    )
-
-    # Generate next run times
-    runner = schedule.generate(datetime.now())
-    next_run = next(runner)
-    ```
+    >>> from ddeutil.workflow.event import Crontab
+    >>> # NOTE: Create daily schedule at 9 AM
+    >>> schedule = Crontab.model_validate(
+    ...     {
+    ...         "cronjob": "0 9 * * *",
+    ...         "timezone": "America/New_York",
+    ...     }
+    ... )
+    >>> # NOTE: Generate next run times
+    >>> runner = schedule.generate(datetime.now())
+    >>> next_run = runner.next
 """
 from __future__ import annotations
 
@@ -60,13 +58,16 @@ def interval2crontab(
     day: Optional[str] = None,
     time: str = "00:00",
 ) -> str:
-    """Return the crontab string that was generated from specific values.
+    """Convert interval specification to cron expression.
 
-    :param interval: An interval value that is one of 'daily', 'weekly', or
-        'monthly'.
-    :param day: A day value that will be day of week. The default value is
-        monday if it is weekly interval.
-    :param time: A time value that passing with format '%H:%M'.
+    Args:
+        interval: Scheduling interval ('daily', 'weekly', or 'monthly').
+        day: Day of week for weekly intervals or monthly schedules. Defaults to
+            Monday for weekly intervals.
+        time: Time of day in 'HH:MM' format. Defaults to '00:00'.
+
+    Returns:
+        Generated crontab expression string.
 
     Examples:
         >>> interval2crontab(interval='daily', time='01:30')
@@ -77,9 +78,6 @@ def interval2crontab(
         '0 0 1 * *'
         >>> interval2crontab(interval='monthly', day='tuesday', time='12:00')
         '12 0 1 * 2'
-
-    Returns:
-        str: The generated crontab expression.
     """
     d: str = "*"
     if interval == "weekly":
@@ -94,6 +92,13 @@ def interval2crontab(
 
 
 class BaseCrontab(BaseModel):
+    """Base class for crontab-based scheduling models.
+
+    Attributes:
+        extras: Additional parameters to pass to the CronJob field.
+        tz: Timezone string value (alias: timezone).
+    """
+
     extras: DictData = Field(
         default_factory=dict,
         description=(
@@ -108,13 +113,13 @@ class BaseCrontab(BaseModel):
 
     @model_validator(mode="before")
     def __prepare_values(cls, data: Any) -> Any:
-        """Extract a `tz` key from data and change the key name from `tz` to
-        `timezone`.
+        """Extract and rename timezone key in input data.
 
-        :param data: (DictData) A data that want to pass for create a Crontab
-            model.
+        Args:
+            data: Input data dictionary for creating Crontab model.
 
-        :rtype: DictData
+        Returns:
+            Modified data dictionary with standardized timezone key.
         """
         if isinstance(data, dict) and (tz := data.pop("tz", None)):
             data["timezone"] = tz
@@ -122,10 +127,16 @@ class BaseCrontab(BaseModel):
 
     @field_validator("tz")
     def __validate_tz(cls, value: str) -> str:
-        """Validate timezone value that able to initialize with ZoneInfo after
-        it passing to this model in before mode.
+        """Validate timezone value.
 
-        :rtype: str
+        Args:
+            value: Timezone string to validate.
+
+        Returns:
+            Validated timezone string.
+
+        Raises:
+            ValueError: If timezone is invalid.
         """
         try:
             _ = ZoneInfo(value)
@@ -135,24 +146,40 @@ class BaseCrontab(BaseModel):
 
 
 class CrontabValue(BaseCrontab):
+    """Crontab model using interval-based specification.
+
+    Attributes:
+        interval: Scheduling interval ('daily', 'weekly', 'monthly').
+        day: Day specification for weekly/monthly schedules.
+        time: Time of day in 'HH:MM' format.
+    """
+
     interval: Interval
     day: Optional[str] = Field(default=None)
     time: str = Field(default="00:00")
 
     @property
     def cronjob(self) -> CronJob:
-        """Return the CronJob object that was built from interval format."""
+        """Get CronJob object built from interval format.
+
+        Returns:
+            CronJob instance configured with interval-based schedule.
+        """
         return CronJob(
             value=interval2crontab(self.interval, day=self.day, time=self.time)
         )
 
     def generate(self, start: Union[str, datetime]) -> CronRunner:
-        """Return CronRunner object from an initial datetime.
+        """Generate CronRunner from initial datetime.
 
-        :param start: (str | datetime) A string or datetime for generate the
-            CronRunner object.
+        Args:
+            start: Starting datetime (string or datetime object).
 
-        :rtype: CronRunner
+        Returns:
+            CronRunner instance for schedule generation.
+
+        Raises:
+            TypeError: If start parameter is neither string nor datetime.
         """
         if isinstance(start, str):
             start: datetime = datetime.fromisoformat(start)
@@ -161,13 +188,13 @@ class CrontabValue(BaseCrontab):
         return self.cronjob.schedule(date=start, tz=self.tz)
 
     def next(self, start: Union[str, datetime]) -> CronRunner:
-        """Return a next datetime from Cron runner object that start with any
-        date that given from input.
+        """Get next scheduled datetime after given start time.
 
-        :param start: (str | datetime) A start datetime that use to generate
-            the CronRunner object.
+        Args:
+            start: Starting datetime for schedule generation.
 
-        :rtype: CronRunner
+        Returns:
+            CronRunner instance positioned at next scheduled time.
         """
         runner: CronRunner = self.generate(start=start)
 
@@ -178,11 +205,14 @@ class CrontabValue(BaseCrontab):
 
 
 class Crontab(BaseCrontab):
-    """Cron event model (Warped the CronJob object by Pydantic model) to keep
-    crontab value and generate CronRunner object from this crontab value.
+    """Cron event model wrapping CronJob functionality.
 
-    Methods:
-        - generate: is the main use-case of this schedule object.
+    A Pydantic model that encapsulates crontab scheduling functionality with
+    validation and datetime generation capabilities.
+
+    Attributes:
+        cronjob: CronJob instance for schedule validation and datetime generation.
+        tz: Timezone string value (alias: timezone).
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -200,13 +230,13 @@ class Crontab(BaseCrontab):
 
     @model_validator(mode="before")
     def __prepare_values(cls, data: Any) -> Any:
-        """Extract a `tz` key from data and change the key name from `tz` to
-        `timezone`.
+        """Prepare input data by standardizing timezone key.
 
-        :param data: (DictData) A data that want to pass for create a Crontab
-            model.
+        Args:
+            data: Input dictionary for model creation.
 
-        :rtype: DictData
+        Returns:
+            Modified dictionary with standardized timezone key.
         """
         if isinstance(data, dict) and (tz := data.pop("tz", None)):
             data["timezone"] = tz
@@ -218,15 +248,14 @@ class Crontab(BaseCrontab):
     def __prepare_cronjob(
         cls, value: Union[str, CronJob], info: ValidationInfo
     ) -> CronJob:
-        """Prepare crontab value that able to receive with string type.
-        This step will get options kwargs from extras field and pass to the
-        CronJob object.
+        """Prepare and validate cronjob input.
 
-        :param value: (str | CronJobYear) A cronjob value that want to create.
-        :param info: (ValidationInfo) A validation info object that use to get
-            the extra parameters for create cronjob.
+        Args:
+            value: Raw cronjob value (string or CronJob instance).
+            info: Validation context containing extra parameters.
 
-        :rtype: CronJob
+        Returns:
+            Configured CronJob instance.
         """
         extras: DictData = info.data.get("extras", {})
         return (
@@ -244,21 +273,27 @@ class Crontab(BaseCrontab):
 
     @field_serializer("cronjob")
     def __serialize_cronjob(self, value: CronJob) -> str:
-        """Serialize the cronjob field that store with CronJob object.
+        """Serialize CronJob instance to string representation.
 
-        :param value: (CronJob) The CronJob field.
+        Args:
+            value: CronJob instance to serialize.
 
-        :rtype: str
+        Returns:
+            String representation of the CronJob.
         """
         return str(value)
 
     def generate(self, start: Union[str, datetime]) -> CronRunner:
-        """Return CronRunner object from an initial datetime.
+        """Generate schedule runner from start time.
 
-        :param start: (str | datetime) A string or datetime for generate the
-            CronRunner object.
+        Args:
+            start: Starting datetime (string or datetime object).
 
-        :rtype: CronRunner
+        Returns:
+            CronRunner instance for schedule generation.
+
+        Raises:
+            TypeError: If start parameter is neither string nor datetime.
         """
         if isinstance(start, str):
             start: datetime = datetime.fromisoformat(start)
@@ -267,13 +302,13 @@ class Crontab(BaseCrontab):
         return self.cronjob.schedule(date=start, tz=self.tz)
 
     def next(self, start: Union[str, datetime]) -> CronRunner:
-        """Return a next datetime from Cron runner object that start with any
-        date that given from input.
+        """Get runner positioned at next scheduled time.
 
-        :param start: (str | datetime) A start datetime that use to generate
-            the CronRunner object.
+        Args:
+            start: Starting datetime for schedule generation.
 
-        :rtype: CronRunner
+        Returns:
+            CronRunner instance positioned at next scheduled time.
         """
         runner: CronRunner = self.generate(start=start)
 
@@ -284,8 +319,13 @@ class Crontab(BaseCrontab):
 
 
 class CrontabYear(Crontab):
-    """Cron event with enhance Year Pydantic model for limit year matrix that
-    use by some data schedule tools like AWS Glue.
+    """Cron event model with enhanced year-based scheduling.
+
+    Extends the base Crontab model to support year-specific scheduling,
+    particularly useful for tools like AWS Glue.
+
+    Attributes:
+        cronjob: CronJobYear instance for year-aware schedule validation and generation.
     """
 
     cronjob: CronJobYear = (
@@ -304,15 +344,14 @@ class CrontabYear(Crontab):
     def __prepare_cronjob(
         cls, value: Union[CronJobYear, str], info: ValidationInfo
     ) -> CronJobYear:
-        """Prepare crontab value that able to receive with string type.
-        This step will get options kwargs from extras field and pass to the
-        CronJobYear object.
+        """Prepare and validate year-aware cronjob input.
 
-        :param value: (str | CronJobYear) A cronjob value that want to create.
-        :param info: (ValidationInfo) A validation info object that use to get
-            the extra parameters for create cronjob.
+        Args:
+            value: Raw cronjob value (string or CronJobYear instance).
+            info: Validation context containing extra parameters.
 
-        :rtype: CronJobYear
+        Returns:
+            Configured CronJobYear instance with applied options.
         """
         extras: DictData = info.data.get("extras", {})
         return (
@@ -337,7 +376,7 @@ Cron = Annotated[
     ],
     Field(
         union_mode="smart",
-        description="An event models.",
+        description="Event model type supporting year-based, standard, and interval-based cron scheduling.",
     ),
 ]  # pragma: no cov
 
