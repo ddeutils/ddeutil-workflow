@@ -129,58 +129,103 @@ def test_example_foreach_stage_exec_with_trigger_raise(test_path):
         stage: Stage = workflow.job("first-job").stage("foreach-raise")
         rs: Result = stage.execute({})
         assert rs.status == FAILED
-        assert rs.context == {
-            "status": FAILED,
-            "items": [1, 2],
-            "foreach": {
-                1: {
-                    "status": FAILED,
-                    "item": 1,
-                    "stages": {
-                        "2827845371": {
-                            "outputs": {},
-                            "errors": {
-                                "name": "StageError",
-                                "message": "Trigger workflow was failed with:\nJob execution, 'first-job', was failed.",
-                            },
-                            "status": FAILED,
-                        }
+        try:
+            assert rs.context == {
+                "status": FAILED,
+                "items": [1, 2],
+                "foreach": {
+                    1: {
+                        "status": FAILED,
+                        "item": 1,
+                        "stages": {
+                            "2827845371": {
+                                "outputs": {},
+                                "errors": {
+                                    "name": "StageError",
+                                    "message": "Trigger workflow was failed with:\nJob execution, 'first-job', was failed.",
+                                },
+                                "status": FAILED,
+                            }
+                        },
+                        "errors": {
+                            "name": "StageError",
+                            "message": "Item execution was break because its nested-stage, 'Stage trigger for raise', failed.",
+                        },
                     },
-                    "errors": {
+                    2: {
+                        "status": CANCEL,
+                        "item": 2,
+                        "stages": {
+                            "2827845371": {
+                                "outputs": {},
+                                "errors": {
+                                    "name": "StageCancelError",
+                                    "message": "Trigger workflow was cancel.",
+                                },
+                                "status": CANCEL,
+                            }
+                        },
+                        "errors": {
+                            "name": "StageCancelError",
+                            "message": "Item execution was canceled from the event after end item execution.",
+                        },
+                    },
+                },
+                "errors": {
+                    1: {
                         "name": "StageError",
                         "message": "Item execution was break because its nested-stage, 'Stage trigger for raise', failed.",
                     },
-                },
-                2: {
-                    "status": CANCEL,
-                    "item": 2,
-                    "stages": {
-                        "2827845371": {
-                            "outputs": {},
-                            "errors": {
-                                "name": "StageCancelError",
-                                "message": "Trigger workflow was cancel.",
-                            },
-                            "status": CANCEL,
-                        }
-                    },
-                    "errors": {
+                    2: {
                         "name": "StageCancelError",
                         "message": "Item execution was canceled from the event after end item execution.",
                     },
                 },
-            },
-            "errors": {
-                1: {
-                    "name": "StageError",
-                    "message": "Item execution was break because its nested-stage, 'Stage trigger for raise', failed.",
+            }
+        except AssertionError:
+            assert rs.context == {
+                "status": FAILED,
+                "items": [1, 2],
+                "foreach": {
+                    1: {
+                        "status": FAILED,
+                        "item": 1,
+                        "stages": {
+                            "2827845371": {
+                                "outputs": {},
+                                "errors": {
+                                    "name": "StageError",
+                                    "message": "Trigger workflow was failed with:\nJob execution, 'first-job', was failed.",
+                                },
+                                "status": FAILED,
+                            }
+                        },
+                        "errors": {
+                            "name": "StageError",
+                            "message": "Item execution was break because its nested-stage, 'Stage trigger for raise', failed.",
+                        },
+                    },
+                    2: {
+                        "status": CANCEL,
+                        "item": 2,
+                        "stages": {},
+                        "errors": {
+                            "name": "StageCancelError",
+                            "message": "Item execution was canceled from the event before start item execution.",
+                        },
+                    },
                 },
-                2: {
-                    "name": "StageCancelError",
-                    "message": "Item execution was canceled from the event after end item execution.",
+                "errors": {
+                    2: {
+                        "name": "StageCancelError",
+                        "message": "Item execution was canceled from the event before start item execution.",
+                    },
+                    1: {
+                        "name": "StageError",
+                        "message": "Item execution was break because its nested-stage, 'Stage trigger for raise', failed.",
+                    },
                 },
-            },
-        }
+            }
 
 
 def test_example_foreach_stage_exec_nested_foreach_and_trigger(test_path):

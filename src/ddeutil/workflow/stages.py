@@ -95,6 +95,7 @@ from .result import (
     WAIT,
     Result,
     Status,
+    catch,
     get_status_from_error,
     validate_statuses,
 )
@@ -105,6 +106,7 @@ from .reusables import (
     not_in_template,
     param2template,
 )
+from .traces import TraceModel, get_trace
 from .utils import (
     delay,
     dump_all,
@@ -2066,10 +2068,12 @@ class ForEachStage(BaseNestedStage):
         index: int,
         item: StrOrInt,
         params: DictData,
-        result: Result,
+        run_id: str,
+        context: DictData,
         *,
+        parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
-    ) -> tuple[Status, Result]:
+    ) -> tuple[Status, DictData]:
         """Execute item that will execute all nested-stage that was set in this
         stage with specific foreach item.
 
@@ -2079,7 +2083,9 @@ class ForEachStage(BaseNestedStage):
         :param index: (int) An index value of foreach loop.
         :param item: (str | int) An item that want to execution.
         :param params: (DictData) A parameter data.
-        :param result: (Result) A Result instance for return context and status.
+        :param run_id: (str)
+        :param context: (DictData)
+        :param parent_run_id: (str | None)
         :param event: (Event) An Event manager instance that use to cancel this
             execution if it forces stopped by parent execution.
             (Default is None)
@@ -2093,12 +2099,15 @@ class ForEachStage(BaseNestedStage):
 
         :rtype: tuple[Status, Result]
         """
-        result.trace.debug(f"[STAGE]: Execute Item: {item!r}")
+        trace: TraceModel = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
+        )
+        trace.debug(f"[STAGE]: Execute Item: {item!r}")
         key: StrOrInt = index if self.use_index_as_key else item
 
         # NOTE: Create nested-context data from the passing context.
-        context: DictData = copy.deepcopy(params)
-        context.update({"item": item, "loop": index})
+        current_context: DictData = copy.deepcopy(params)
+        current_context.update({"item": item, "loop": index})
         nestet_context: DictData = {"item": item, "stages": {}}
 
         total_stage: int = len(self.stages)
@@ -2113,7 +2122,8 @@ class ForEachStage(BaseNestedStage):
                     "Item execution was canceled from the event before start "
                     "item execution."
                 )
-                result.catch(
+                catch(
+                    context=context,
                     status=CANCEL,
                     foreach={
                         key: {
@@ -2129,13 +2139,15 @@ class ForEachStage(BaseNestedStage):
                 raise StageCancelError(error_msg, refs=key)
 
             rs: Result = stage.execute(
-                params=context,
-                run_id=result.run_id,
-                parent_run_id=result.parent_run_id,
+                params=current_context,
+                run_id=run_id,
+                parent_run_id=parent_run_id,
                 event=event,
             )
             stage.set_outputs(rs.context, to=nestet_context)
-            stage.set_outputs(stage.get_outputs(nestet_context), to=context)
+            stage.set_outputs(
+                stage.get_outputs(nestet_context), to=current_context
+            )
 
             if rs.status == SKIP:
                 skips[i] = True
@@ -2146,8 +2158,9 @@ class ForEachStage(BaseNestedStage):
                     f"Item execution was break because its nested-stage, "
                     f"{stage.iden!r}, failed."
                 )
-                result.trace.warning(f"[STAGE]: {error_msg}")
-                result.catch(
+                trace.warning(f"[STAGE]: {error_msg}")
+                catch(
+                    context=context,
                     status=FAILED,
                     foreach={
                         key: {
@@ -2167,7 +2180,8 @@ class ForEachStage(BaseNestedStage):
                     "Item execution was canceled from the event after "
                     "end item execution."
                 )
-                result.catch(
+                catch(
+                    context=context,
                     status=CANCEL,
                     foreach={
                         key: {
@@ -2183,7 +2197,8 @@ class ForEachStage(BaseNestedStage):
                 raise StageCancelError(error_msg, refs=key)
 
         status: Status = SKIP if sum(skips) == total_stage else SUCCESS
-        return status, result.catch(
+        return status, catch(
+            context=context,
             status=status,
             foreach={
                 key: {
@@ -2263,7 +2278,9 @@ class ForEachStage(BaseNestedStage):
                     index=i,
                     item=item,
                     params=params,
-                    result=result,
+                    run_id=result.run_id,
+                    context=result.context,
+                    parent_run_id=result.parent_run_id,
                     event=event,
                 )
                 for i, item in enumerate(foreach, start=0)

@@ -305,3 +305,28 @@ class Result:
         :rtype: float
         """
         return (get_dt_ntz_now() - self.ts).total_seconds()
+
+
+def catch(
+    context: DictData,
+    status: Union[int, Status],
+    updated: DictData | None = None,
+    **kwargs,
+) -> DictData:
+    """Catch updated context to the current context."""
+    context.update(updated or {})
+    context["status"] = Status(status) if isinstance(status, int) else status
+
+    # NOTE: Update other context data.
+    if kwargs:
+        for k in kwargs:
+            if k in context:
+                context[k].update(kwargs[k])
+            # NOTE: Exclude the `info` key for update information data.
+            elif k == "info":
+                context["info"].update(kwargs["info"])
+            else:
+                raise ResultError(
+                    f"The key {k!r} does not exists on context data."
+                )
+    return context
