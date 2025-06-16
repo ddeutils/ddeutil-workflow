@@ -34,7 +34,7 @@ def test_example_foreach_stage_exec_with_trigger(test_path):
     ):
         workflow = Workflow.from_conf(name="tmp-wf-foreach-trigger")
         stage: Stage = workflow.job("first-job").stage("foreach-stage")
-        rs = stage.set_outputs(stage.handler_execute({}).context, to={})
+        rs = stage.set_outputs(stage.execute({}).context, to={})
         assert rs == {
             "stages": {
                 "foreach-stage": {
@@ -127,7 +127,7 @@ def test_example_foreach_stage_exec_with_trigger_raise(test_path):
     ):
         workflow = Workflow.from_conf(name="tmp-wf-foreach-trigger-raise")
         stage: Stage = workflow.job("first-job").stage("foreach-raise")
-        rs: Result = stage.handler_execute({})
+        rs: Result = stage.execute({})
         assert rs.status == FAILED
         assert rs.context == {
             "status": FAILED,
@@ -226,7 +226,7 @@ def test_example_foreach_stage_exec_nested_foreach_and_trigger(test_path):
             extras={"stage_default_id": False},
         )
         stage: Stage = workflow.job("first-job").stage("foreach-stage")
-        rs: Result = stage.handler_execute({})
+        rs: Result = stage.execute({})
         assert rs.status == SUCCESS
         assert rs.context == {
             "status": SUCCESS,

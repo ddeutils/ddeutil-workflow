@@ -9,7 +9,7 @@ The output of stage execution only return SUCCESS or CANCEL status because
 I do not want to handle stage error on this stage execution. I think stage model
 have a lot of use-case, and it should does not worry about it error output.
 
-So, I will create `handler_execute` for any exception class that raise from
+So, I will create `execute` for any exception class that raise from
 the stage execution method.
 
 ```text

@@ -12,7 +12,7 @@ you can track logs.
 I do not want to handle stage error on this stage execution. I think stage model
 have a lot of use-case, and it should does not worry about it error output.
 
-    So, I will create `handler_execute` for any exception class that raise from
+    So, I will create `execute` for any exception class that raise from
 the stage execution method.
 
     Handler     --> Ok      --> Result
@@ -32,7 +32,7 @@ the stage execution method.
                                     |-name: ...
                                     ╰-message: ...
 
-    On the context I/O that pass to a stage object at execute process. The
+    On the context I/O that pass to a stage object at execute step. The
 execute method receives a `params={"params": {...}}` value for passing template
 searching.
 
@@ -132,7 +132,7 @@ class BaseStage(BaseModel, ABC):
     - Execution lifecycle management
 
     Custom stages should inherit from this class and implement the abstract
-    `execute()` method to define their specific execution behavior.
+    `process()` method to define their specific execution behavior.
 
     Attributes:
         extras (dict): Additional configuration parameters
@@ -142,14 +142,14 @@ class BaseStage(BaseModel, ABC):
         condition (str, optional): Conditional expression for execution
 
     Abstract Methods:
-        execute: Main execution logic that must be implemented by subclasses
+        process: Main execution logic that must be implemented by subclasses
 
     Example:
         ```python
         class CustomStage(BaseStage):
             custom_param: str = Field(description="Custom parameter")
 
-            def execute(self, params: dict, **kwargs) -> Result:
+            def process(self, params: dict, **kwargs) -> Result:
                 # Custom execution logic
                 return Result(status=SUCCESS)
         ```
@@ -221,14 +221,14 @@ class BaseStage(BaseModel, ABC):
         return self
 
     @abstractmethod
-    def execute(
+    def process(
         self,
         params: DictData,
         *,
         result: Optional[Result] = None,
         event: Optional[Event] = None,
     ) -> Result:
-        """Execute abstraction method that action something by sub-model class.
+        """Process abstraction method that action something by sub-model class.
         This is important method that make this class is able to be the stage.
 
         Args:
@@ -236,15 +236,15 @@ class BaseStage(BaseModel, ABC):
                 execution.
             result: A result object for keeping context and status
                 data.
-            event: An event manager that use to track parent execute
+            event: An event manager that use to track parent process
                 was not force stopped.
 
         Returns:
             Result: The execution result with status and context data.
         """
-        raise NotImplementedError("Stage should implement `execute` method.")
+        raise NotImplementedError("Stage should implement `process` method.")
 
-    def handler_execute(
+    def execute(
         self,
         params: DictData,
         *,
@@ -253,7 +253,7 @@ class BaseStage(BaseModel, ABC):
         result: Optional[Result] = None,
         event: Optional[Event] = None,
     ) -> Union[Result, DictData]:
-        """Handler stage execution result from the stage `execute` method.
+        """Handler stage execution result from the stage `process` method.
 
             This handler strategy will catch and mapping message to the result
         context data before returning. All possible status that will return from
@@ -367,21 +367,21 @@ class BaseStage(BaseModel, ABC):
     def _execute(
         self, params: DictData, result: Result, event: Optional[Event]
     ) -> Result:
-        """Wrapped the execute method before returning to handler execution.
+        """Wrapped the process method before returning to handler execution.
 
         Args:
             params: A parameter data that want to use in this
                 execution.
             result: A result object for keeping context and status
                 data.
-            event: An event manager that use to track parent execute
+            event: An event manager that use to track parent process
                 was not force stopped.
 
         Returns:
             Result: The wrapped execution result.
         """
         result.catch(status=WAIT)
-        return self.execute(params, result=result, event=event)
+        return self.process(params, result=result, event=event)
 
     def set_outputs(
         self,
@@ -393,7 +393,7 @@ class BaseStage(BaseModel, ABC):
         with a `to` input parameter. The result context from stage execution
         will be set with `outputs` key in this stage ID key.
 
-            For example of setting output method, If you receive execute output
+            For example of setting output method, If you receive process output
         and want to set on the `to` like;
 
             ... (i)   output: {'foo': 'bar', 'skipped': True}
@@ -543,7 +543,7 @@ class BaseAsyncStage(BaseStage, ABC):
     """
 
     @abstractmethod
-    async def axecute(
+    async def async_process(
         self,
         params: DictData,
         *,
@@ -566,7 +566,7 @@ class BaseAsyncStage(BaseStage, ABC):
             "Async Stage should implement `axecute` method."
         )
 
-    async def handler_axecute(
+    async def axecute(
         self,
         params: DictData,
         *,
@@ -668,7 +668,7 @@ class BaseAsyncStage(BaseStage, ABC):
         :rtype: Result
         """
         result.catch(status=WAIT)
-        return await self.axecute(params, result=result, event=event)
+        return await self.async_process(params, result=result, event=event)
 
 
 class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
@@ -707,7 +707,7 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
         # NOTE: First execution for not pass to retry step if it passes.
         try:
             result.catch(status=WAIT)
-            return self.execute(
+            return self.process(
                 params | {"retry": current_retry},
                 result=result,
                 event=event,
@@ -727,7 +727,7 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
         while current_retry < (self.retry + 1):
             try:
                 result.catch(status=WAIT, context={"retry": current_retry})
-                return self.execute(
+                return self.process(
                     params | {"retry": current_retry},
                     result=result,
                     event=event,
@@ -769,7 +769,7 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
         # NOTE: First execution for not pass to retry step if it passes.
         try:
             result.catch(status=WAIT)
-            return await self.axecute(
+            return await self.async_process(
                 params | {"retry": current_retry},
                 result=result,
                 event=event,
@@ -789,7 +789,7 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
         while current_retry < (self.retry + 1):
             try:
                 result.catch(status=WAIT, context={"retry": current_retry})
-                return await self.axecute(
+                return await self.async_process(
                     params | {"retry": current_retry},
                     result=result,
                     event=event,
@@ -860,7 +860,7 @@ class EmptyStage(BaseAsyncStage):
         lt=1800,
     )
 
-    def execute(
+    def process(
         self,
         params: DictData,
         *,
@@ -904,7 +904,7 @@ class EmptyStage(BaseAsyncStage):
             time.sleep(self.sleep)
         return result.catch(status=SUCCESS)
 
-    async def axecute(
+    async def async_process(
         self,
         params: DictData,
         *,
@@ -1054,7 +1054,7 @@ class BashStage(BaseRetryStage):
         # Note: Remove .sh file that use to run bash.
         Path(f"./{f_name}").unlink()
 
-    def execute(
+    def process(
         self,
         params: DictData,
         *,
@@ -1106,7 +1106,7 @@ class BashStage(BaseRetryStage):
             },
         )
 
-    async def axecute(
+    async def async_process(
         self,
         params: DictData,
         *,
@@ -1234,7 +1234,7 @@ class PyStage(BaseRetryStage):
         to.update({k: gb[k] for k in to if k in gb})
         return to
 
-    def execute(
+    def process(
         self,
         params: DictData,
         *,
@@ -1292,7 +1292,7 @@ class PyStage(BaseRetryStage):
             },
         )
 
-    async def axecute(
+    async def async_process(
         self,
         params: DictData,
         *,
@@ -1411,7 +1411,7 @@ class CallStage(BaseRetryStage):
                 )
         return value
 
-    def execute(
+    def process(
         self,
         params: DictData,
         *,
@@ -1517,7 +1517,7 @@ class CallStage(BaseRetryStage):
             )
         return result.catch(status=SUCCESS, context=rs)
 
-    async def axecute(
+    async def async_process(
         self,
         params: DictData,
         *,
@@ -1695,7 +1695,7 @@ class BaseNestedStage(BaseRetryStage, ABC):
         else:
             context["errors"] = error.to_dict(with_refs=True)
 
-    async def axecute(
+    async def async_process(
         self,
         params: DictData,
         *,
@@ -1731,7 +1731,7 @@ class TriggerStage(BaseNestedStage):
         description="A parameter that will pass to workflow execution method.",
     )
 
-    def execute(
+    def process(
         self,
         params: DictData,
         *,
@@ -1830,7 +1830,7 @@ class ParallelStage(BaseNestedStage):
         alias="max-workers",
     )
 
-    def execute_branch(
+    def process_branch(
         self,
         branch: str,
         params: DictData,
@@ -1889,7 +1889,7 @@ class ParallelStage(BaseNestedStage):
                 )
                 raise StageCancelError(error_msg, refs=branch)
 
-            rs: Result = stage.handler_execute(
+            rs: Result = stage.execute(
                 params=context,
                 run_id=result.run_id,
                 parent_run_id=result.parent_run_id,
@@ -1954,7 +1954,7 @@ class ParallelStage(BaseNestedStage):
             },
         )
 
-    def execute(
+    def process(
         self,
         params: DictData,
         *,
@@ -1990,7 +1990,7 @@ class ParallelStage(BaseNestedStage):
         with ThreadPoolExecutor(self.max_workers, "stp") as executor:
             futures: list[Future] = [
                 executor.submit(
-                    self.execute_branch,
+                    self.process_branch,
                     branch=branch,
                     params=params,
                     result=result,
@@ -2061,7 +2061,7 @@ class ForEachStage(BaseNestedStage):
         ),
     )
 
-    def execute_item(
+    def process_item(
         self,
         index: int,
         item: StrOrInt,
@@ -2128,7 +2128,7 @@ class ForEachStage(BaseNestedStage):
                 )
                 raise StageCancelError(error_msg, refs=key)
 
-            rs: Result = stage.handler_execute(
+            rs: Result = stage.execute(
                 params=context,
                 run_id=result.run_id,
                 parent_run_id=result.parent_run_id,
@@ -2194,7 +2194,7 @@ class ForEachStage(BaseNestedStage):
             },
         )
 
-    def execute(
+    def process(
         self,
         params: DictData,
         *,
@@ -2259,7 +2259,7 @@ class ForEachStage(BaseNestedStage):
         with ThreadPoolExecutor(self.concurrent, "stf") as executor:
             futures: list[Future] = [
                 executor.submit(
-                    self.execute_item,
+                    self.process_item,
                     index=i,
                     item=item,
                     params=params,
@@ -2364,7 +2364,7 @@ class UntilStage(BaseNestedStage):
         alias="max-loop",
     )
 
-    def execute_loop(
+    def process_loop(
         self,
         item: T,
         loop: int,
@@ -2421,7 +2421,7 @@ class UntilStage(BaseNestedStage):
                 )
                 raise StageCancelError(error_msg, refs=loop)
 
-            rs: Result = stage.handler_execute(
+            rs: Result = stage.execute(
                 params=context,
                 run_id=result.run_id,
                 parent_run_id=result.parent_run_id,
@@ -2497,7 +2497,7 @@ class UntilStage(BaseNestedStage):
             next_item,
         )
 
-    def execute(
+    def process(
         self,
         params: DictData,
         *,
@@ -2536,7 +2536,7 @@ class UntilStage(BaseNestedStage):
                     "Execution was canceled from the event before start loop."
                 )
 
-            status, result, item = self.execute_loop(
+            status, result, item = self.process_loop(
                 item=item,
                 loop=loop,
                 params=params,
@@ -2634,7 +2634,7 @@ class CaseStage(BaseNestedStage):
         alias="skip-not-match",
     )
 
-    def execute_case(
+    def process_case(
         self,
         case: str,
         stages: list[Stage],
@@ -2676,7 +2676,7 @@ class CaseStage(BaseNestedStage):
                     },
                 )
 
-            rs: Result = stage.handler_execute(
+            rs: Result = stage.execute(
                 params=context,
                 run_id=result.run_id,
                 parent_run_id=result.parent_run_id,
@@ -2706,7 +2706,7 @@ class CaseStage(BaseNestedStage):
             },
         )
 
-    def execute(
+    def process(
         self,
         params: DictData,
         *,
@@ -2762,7 +2762,7 @@ class CaseStage(BaseNestedStage):
                 "case execution."
             )
 
-        return self.execute_case(
+        return self.process_case(
             case=_case, stages=stages, params=params, result=result, event=event
         )
 
@@ -2786,7 +2786,7 @@ class RaiseStage(BaseAsyncStage):
         alias="raise",
     )
 
-    def execute(
+    def process(
         self,
         params: DictData,
         *,
@@ -2808,7 +2808,7 @@ class RaiseStage(BaseAsyncStage):
         result.trace.info(f"[STAGE]: Message: ( {message} )")
         raise StageError(message)
 
-    async def axecute(
+    async def async_process(
         self,
         params: DictData,
         *,
@@ -2880,7 +2880,7 @@ class DockerStage(BaseStage):  # pragma: no cov
         ),
     )
 
-    def execute_task(
+    def process_task(
         self,
         params: DictData,
         result: Result,
@@ -2976,7 +2976,7 @@ class DockerStage(BaseStage):  # pragma: no cov
             data = json.load(f)
         return result.catch(status=SUCCESS, context=data)
 
-    def execute(
+    def process(
         self,
         params: DictData,
         *,
@@ -3072,7 +3072,7 @@ class VirtualPyStage(PyStage):  # pragma: no cov
         # Note: Remove .py file that use to run Python.
         Path(f"./{f_name}").unlink()
 
-    def execute(
+    def process(
         self,
         params: DictData,
         *,

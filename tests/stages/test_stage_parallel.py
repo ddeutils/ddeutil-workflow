@@ -37,7 +37,7 @@ def test_parallel_stage_exec():
             },
         }
     )
-    rs: Result = stage.handler_execute(params={})
+    rs: Result = stage.execute(params={})
     assert rs.status == SUCCESS
     assert rs.context == {
         "status": SUCCESS,
@@ -83,7 +83,7 @@ def test_parallel_stage_exec_cancel_from_stage():
         }
     )
     event = MockEvent(n=3)
-    rs: Result = stage.handler_execute({}, event=event)
+    rs: Result = stage.execute({}, event=event)
     assert rs.context == {
         "status": CANCEL,
         "workers": 1,
@@ -135,7 +135,7 @@ def test_parallel_stage_exec_cancel():
         }
     )
     event = MockEvent(n=0)
-    rs: Result = stage.handler_execute({}, event=event)
+    rs: Result = stage.execute({}, event=event)
     assert rs.status == CANCEL
     assert rs.context == {
         "status": CANCEL,
@@ -148,7 +148,7 @@ def test_parallel_stage_exec_cancel():
     }
 
     event = MockEvent(n=2)
-    rs: Result = stage.handler_execute({}, event=event)
+    rs: Result = stage.execute({}, event=event)
     assert rs.status == CANCEL
     assert rs.context == {
         "status": CANCEL,
@@ -207,7 +207,7 @@ def test_parallel_stage_exec_raise():
             ]
         },
     )
-    rs: Result = stage.handler_execute({})
+    rs: Result = stage.execute({})
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,

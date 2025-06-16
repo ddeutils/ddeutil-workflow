@@ -895,7 +895,7 @@ def local_execute_strategy(
             raise JobCancelError(error_msg, refs=strategy_id)
 
         result.trace.info(f"[JOB]: Execute Stage: {stage.iden!r}")
-        rs: Result = stage.handler_execute(
+        rs: Result = stage.execute(
             params=context,
             run_id=result.run_id,
             parent_run_id=result.parent_run_id,

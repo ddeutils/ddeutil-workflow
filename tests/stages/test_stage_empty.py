@@ -33,31 +33,31 @@ def test_empty_stage():
 
 def test_empty_stage_execute():
     stage: EmptyStage = EmptyStage(name="Empty Stage", echo="hello world")
-    rs: Result = stage.handler_execute(params={})
+    rs: Result = stage.execute(params={})
     assert rs.status == SUCCESS
     assert rs.context == {"status": SUCCESS}
 
     stage: EmptyStage = EmptyStage(
         name="Empty Stage", echo="hello world\nand this is newline to echo"
     )
-    rs: Result = stage.handler_execute(params={})
+    rs: Result = stage.execute(params={})
     assert rs.status == SUCCESS
     assert rs.context == {"status": SUCCESS}
 
     stage: EmptyStage = EmptyStage(name="Empty Stage")
-    rs: Result = stage.handler_execute(params={})
+    rs: Result = stage.execute(params={})
     assert rs.status == SUCCESS
     assert rs.context == {"status": SUCCESS}
 
     stage: EmptyStage = EmptyStage(name="Empty Stage", sleep=5.1)
-    rs: Result = stage.handler_execute(params={})
+    rs: Result = stage.execute(params={})
     assert rs.status == SUCCESS
     assert rs.context == {"status": SUCCESS}
 
     stage: Stage = EmptyStage.model_validate(
         {"name": "Empty Stage", "desc": "\nThis is a test stage\n\tnewline"},
     )
-    rs: Result = stage.handler_execute(params={})
+    rs: Result = stage.execute(params={})
     assert rs.status == SUCCESS
     assert rs.context == {"status": SUCCESS}
 
@@ -133,19 +133,19 @@ def test_empty_stage_get_outputs():
 @pytest.mark.asyncio
 async def test_empty_stage_axec():
     stage: EmptyStage = EmptyStage(name="Empty Stage")
-    rs: Result = await stage.handler_axecute(params={})
+    rs: Result = await stage.axecute(params={})
     assert rs.status == SUCCESS
     assert rs.context == {"status": SUCCESS}
 
     stage: EmptyStage = EmptyStage(name="Empty Stage", echo="hello world")
-    rs: Result = await stage.handler_axecute(params={})
+    rs: Result = await stage.axecute(params={})
     assert rs.status == SUCCESS
     assert rs.context == {"status": SUCCESS}
 
     stage: EmptyStage = EmptyStage(
         name="Empty Stage", echo="hello world", sleep=5.01
     )
-    rs: Result = await stage.handler_axecute(params={})
+    rs: Result = await stage.axecute(params={})
     assert rs.status == SUCCESS
     assert rs.context == {"status": SUCCESS}
 
@@ -157,6 +157,6 @@ async def test_empty_stage_axec():
         ),
         sleep=0.01,
     )
-    rs: Result = await stage.handler_axecute(params={})
+    rs: Result = await stage.axecute(params={})
     assert rs.status == SUCCESS
     assert rs.context == {"status": SUCCESS}

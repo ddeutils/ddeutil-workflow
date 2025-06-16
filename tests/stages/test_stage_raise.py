@@ -13,7 +13,7 @@ def test_raise_stage_exec():
             ),
         },
     )
-    rs: Result = stage.handler_execute(params={})
+    rs: Result = stage.execute(params={})
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,
@@ -32,7 +32,7 @@ async def test_raise_stage_axec():
     stage: RaiseStage = RaiseStage.model_validate(
         {"name": "Raise Stage", "raise": "This is test message error"}
     )
-    rs: Result = await stage.handler_axecute(params={})
+    rs: Result = await stage.axecute(params={})
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,

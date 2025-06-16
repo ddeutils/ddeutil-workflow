@@ -17,7 +17,7 @@ from ..utils import MockEvent
 def test_trigger_stage_exec():
     workflow = Workflow.from_conf(name="wf-trigger", extras={})
     stage: Stage = workflow.job("trigger-job").stage(stage_id="trigger-stage")
-    rs: Result = stage.handler_execute(params={})
+    rs: Result = stage.execute(params={})
     assert rs.status == SUCCESS
     assert rs.context == {
         "status": SUCCESS,
@@ -77,7 +77,7 @@ def test_trigger_stage_exec_raise(test_path):
             "params": {},
         }
     )
-    rs: Result = stage.handler_execute(params={})
+    rs: Result = stage.execute(params={})
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,
@@ -98,7 +98,7 @@ def test_trigger_stage_exec_raise(test_path):
             "params": {},
         }
     )
-    rs: Result = stage.handler_execute(params={})
+    rs: Result = stage.execute(params={})
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,
@@ -121,7 +121,7 @@ def test_trigger_stage_exec_cancel():
         }
     )
     event = MockEvent(n=0)
-    rs: Result = stage.handler_execute(params={}, event=event)
+    rs: Result = stage.execute(params={}, event=event)
     assert rs.status == CANCEL
     assert rs.context == {
         "status": CANCEL,
