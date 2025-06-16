@@ -1,4 +1,5 @@
 import shutil
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -131,6 +132,8 @@ def test_workflow_desc():
     assert workflow.desc == (
         "## Run Python Workflow\n\nThis is a running python workflow\n"
     )
+    print(workflow.created_at.tzinfo)
+    assert workflow.created_at < datetime.now()
 
 
 def test_workflow_from_conf_without_job():

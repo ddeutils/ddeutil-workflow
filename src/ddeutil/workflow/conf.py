@@ -39,8 +39,6 @@ Note:
     Configuration files support environment variable substitution using
     ${VAR_NAME} syntax and provide extensive validation capabilities.
 """
-from __future__ import annotations
-
 import copy
 import os
 from collections.abc import Iterator
@@ -252,8 +250,8 @@ class YamlParser:
         name: str,
         *,
         path: Optional[Union[str, Path]] = None,
-        externals: DictData | None = None,
-        extras: DictData | None = None,
+        externals: Optional[DictData] = None,
+        extras: Optional[DictData] = None,
         obj: Optional[Union[object, str]] = None,
     ) -> None:
         self.path: Path = Path(dynamic("conf_path", f=path, extras=extras))
@@ -322,10 +320,13 @@ class YamlParser:
                     continue
 
                 if data := cls.filter_yaml(file, name=name):
+                    file_stat: os.stat_result = file.lstat()
+                    data["created_at"] = file_stat.st_ctime
+                    data["updated_at"] = file_stat.st_mtime
                     if not obj_type:
-                        all_data.append((file.lstat().st_mtime, data))
+                        all_data.append((file_stat.st_mtime, data))
                     elif (t := data.get("type")) and t == obj_type:
-                        all_data.append((file.lstat().st_mtime, data))
+                        all_data.append((file_stat.st_mtime, data))
                     else:
                         continue
 
