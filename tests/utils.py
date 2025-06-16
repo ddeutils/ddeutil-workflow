@@ -136,8 +136,14 @@ def exclude_keys(value: dict[str, Any], keys: list[str]) -> dict[str, Any]:
     """Exclude keys for assert the specific keys only."""
     if isinstance(value, dict):
         return {
-            k: exclude_keys(v, keys=keys) for k, v in value if k not in keys
+            k: exclude_keys(v, keys=keys)
+            for k, v in value.items()
+            if k not in keys
         }
     elif isinstance(value, (list, tuple, set)):
         return type(value)(exclude_keys(i, keys=keys) for i in value)
     return value
+
+
+def exclude_created_and_updated(value: dict[str, Any]):
+    return exclude_keys(value, keys=["created_at", "updated_at"])

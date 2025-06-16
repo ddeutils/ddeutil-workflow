@@ -22,12 +22,11 @@ def test_workflow_validate_release():
     workflow: Workflow = Workflow.model_validate(
         {
             "name": "wf-common-validate",
-            "on": [
-                {
-                    "cronjob": "*/3 * * * *",
-                    "timezone": "Asia/Bangkok",
-                }
-            ],
+            "on": {
+                "schedule": [
+                    {"cronjob": "*/3 * * * *", "timezone": "Asia/Bangkok"},
+                ],
+            },
         }
     )
     assert workflow.validate_release(datetime(2025, 5, 1, 1, 9))
@@ -44,12 +43,11 @@ def test_workflow_validate_release():
     workflow: Workflow = Workflow.model_validate(
         {
             "name": "wf-common-validate",
-            "on": [
-                {
-                    "cronjob": "* * * * *",
-                    "timezone": "Asia/Bangkok",
-                }
-            ],
+            "on": {
+                "schedule": [
+                    {"cronjob": "* * * * *", "timezone": "Asia/Bangkok"},
+                ],
+            },
         }
     )
 

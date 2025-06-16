@@ -16,6 +16,8 @@ from ddeutil.workflow.conf import (
     pass_env,
 )
 
+from .utils import exclude_created_and_updated
+
 
 def test_config():
     conf = Config()
@@ -64,13 +66,13 @@ def test_load_file(target_path: Path):
         )
 
     load = YamlParser("test_load_file", extras={"conf_paths": [target_path]})
-    assert load.data == {
+    assert exclude_created_and_updated(load.data) == {
         "type": "Workflow",
         "desc": "Test multi config path",
         "env": "${WORKFLOW_CORE_TIMEZONE}",
     }
     assert pass_env(load.data["env"]) == "Asia/Bangkok"
-    assert pass_env(load.data) == {
+    assert exclude_created_and_updated(pass_env(load.data)) == {
         "type": "Workflow",
         "desc": "Test multi config path",
         "env": "Asia/Bangkok",
@@ -79,7 +81,7 @@ def test_load_file(target_path: Path):
     load = YamlParser(
         "test_load_file", extras={"conf_paths": [target_path]}, obj="Workflow"
     )
-    assert load.data == {
+    assert exclude_created_and_updated(load.data) == {
         "type": "Workflow",
         "desc": "Test multi config path",
         "env": "${WORKFLOW_CORE_TIMEZONE}",
@@ -153,11 +155,17 @@ def test_load_file_finds(target_path: Path):
     ] == list(YamlParser.finds("Workflow", path=target_path))
 
     load = YamlParser.find("test_load_file", path=target_path, obj="Workflow")
-    assert load == {"type": "Workflow", "data": "foo"}
+    assert exclude_created_and_updated(load) == {
+        "type": "Workflow",
+        "data": "foo",
+    }
 
     # NOTE: Load with the same name, but it set different type.
     load = YamlParser.find("test_load_file", path=target_path, obj="Config")
-    assert load == {"type": "Config", "data": "bar"}
+    assert exclude_created_and_updated(load) == {
+        "type": "Config",
+        "data": "bar",
+    }
 
     load = YamlParser.find("test_load_file", path=target_path, obj="Crontab")
     assert load == {}

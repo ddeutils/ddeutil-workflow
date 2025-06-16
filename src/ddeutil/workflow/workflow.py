@@ -34,7 +34,7 @@ from enum import Enum
 from pathlib import Path
 from queue import Queue
 from textwrap import dedent
-from threading import Event
+from threading import Event as ThreadEvent
 from typing import Any, Optional, Union
 from zoneinfo import ZoneInfo
 
@@ -42,12 +42,11 @@ from pydantic import BaseModel, Field
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
-from . import get_status_from_error
 from .__types import DictData
 from .audits import Audit, get_audit
 from .conf import YamlParser, dynamic
 from .errors import WorkflowCancelError, WorkflowError, WorkflowTimeoutError
-from .event import Crontab
+from .event import Event
 from .job import Job
 from .params import Param
 from .result import (
@@ -58,6 +57,7 @@ from .result import (
     WAIT,
     Result,
     Status,
+    get_status_from_error,
     validate_statuses,
 )
 from .reusables import has_template, param2template
@@ -142,9 +142,9 @@ class Workflow(BaseModel):
         default_factory=dict,
         description="A parameters that need to use on this workflow.",
     )
-    on: list[Crontab] = Field(
+    on: Event = Field(
         default_factory=list,
-        description="A list of Crontab instance for this workflow schedule.",
+        description="An events for this workflow.",
     )
     jobs: dict[str, Job] = Field(
         default_factory=dict,
@@ -243,49 +243,6 @@ class Workflow(BaseModel):
             str: The de-dented description string.
         """
         return dedent(data.lstrip("\n"))
-
-    @field_validator("on", mode="after")
-    def __on_no_dup_and_reach_limit__(
-        cls,
-        value: list[Crontab],
-    ) -> list[Crontab]:
-        """Validate the on fields should not contain duplicate values and if it
-        contains the every minute value more than one value, it will remove to
-        only one value.
-
-        Args:
-            value: A list of on object.
-
-        Returns:
-            list[Crontab]: The validated list of Crontab objects.
-
-        Raises:
-            ValueError: If it has some duplicate value.
-        """
-        set_ons: set[str] = {str(on.cronjob) for on in value}
-        if len(set_ons) != len(value):
-            raise ValueError(
-                "The on fields should not contain duplicate on value."
-            )
-
-        # WARNING:
-        # if '* * * * *' in set_ons and len(set_ons) > 1:
-        #     raise ValueError(
-        #         "If it has every minute cronjob on value, it should have "
-        #         "only one value in the on field."
-        #     )
-        set_tz: set[str] = {on.tz for on in value}
-        if len(set_tz) > 1:
-            raise ValueError(
-                f"The on fields should not contain multiple timezone, "
-                f"{list(set_tz)}."
-            )
-
-        if len(set_ons) > 10:
-            raise ValueError(
-                "The number of the on should not more than 10 crontabs."
-            )
-        return value
 
     @field_validator("created_at", "updated_dt", mode="after")
     def __convert_tz__(cls, dt: datetime) -> datetime:
@@ -414,7 +371,7 @@ class Workflow(BaseModel):
         if not self.on:
             return release
 
-        for on in self.on:
+        for on in self.on.schedule:
             if release == on.cronjob.schedule(release).next:
                 return release
         raise WorkflowError(
@@ -535,7 +492,7 @@ class Workflow(BaseModel):
         params: DictData,
         *,
         result: Optional[Result] = None,
-        event: Optional[Event] = None,
+        event: Optional[ThreadEvent] = None,
     ) -> tuple[Status, Result]:
         """Job execution with passing dynamic parameters from the main workflow
         execution to the target job object via job's ID.
@@ -609,7 +566,7 @@ class Workflow(BaseModel):
         *,
         run_id: Optional[str] = None,
         parent_run_id: Optional[str] = None,
-        event: Optional[Event] = None,
+        event: Optional[ThreadEvent] = None,
         timeout: float = 3600,
         max_job_parallel: int = 2,
     ) -> Result:
@@ -678,7 +635,7 @@ class Workflow(BaseModel):
             extras=self.extras,
         )
         context: DictData = self.parameterize(params)
-        event: Event = event or Event()
+        event: ThreadEvent = event or ThreadEvent()
         max_job_parallel: int = dynamic(
             "max_job_parallel", f=max_job_parallel, extras=self.extras
         )
@@ -849,7 +806,7 @@ class Workflow(BaseModel):
         context: DictData,
         *,
         parent_run_id: Optional[str] = None,
-        event: Optional[Event] = None,
+        event: Optional[ThreadEvent] = None,
         timeout: float = 3600,
         max_job_parallel: int = 2,
     ) -> Result:
@@ -885,7 +842,7 @@ class Workflow(BaseModel):
         err = context["errors"]
         result.trace.info(f"[WORKFLOW]: Previous error: {err}")
 
-        event: Event = event or Event()
+        event: ThreadEvent = event or ThreadEvent()
         max_job_parallel: int = dynamic(
             "max_job_parallel", f=max_job_parallel, extras=self.extras
         )

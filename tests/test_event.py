@@ -1,10 +1,14 @@
+# ------------------------------------------------------------------------------
+# Copyright (c) 2022 Korawich Anuttra. All rights reserved.
+# Licensed under the MIT License. See LICENSE in the project root for
+# license information.
+# ------------------------------------------------------------------------------
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import pytest
-import yaml
-from ddeutil.workflow import Crontab, CrontabYear, interval2crontab
-from pydantic import ValidationError
+from ddeutil.workflow import Crontab, CrontabYear
+from ddeutil.workflow.event import CrontabValue, Event, interval2crontab
 
 
 def test_localize_timezone():
@@ -53,7 +57,11 @@ def test_event_crontab():
         == "0,3,5-6,10,15,20,25,30,35,40,45,50,55 H(9-17)/2 H 1-3 1-5"
     )
 
-    schedule = Crontab.from_conf(name="every_5_minute_bkk", extras={})
+    schedule = Crontab(
+        cronjob="*/5 * * * *",
+        timezone="Asia/Bangkok",
+        extras={},
+    )
     assert "Asia/Bangkok" == schedule.tz
     assert "*/5 * * * *" == str(schedule.cronjob)
 
@@ -81,112 +89,57 @@ def test_event_crontab():
 
 
 def test_event_crontab_from_value():
-    schedule = Crontab.from_value(
-        value={
+    schedule = CrontabValue.model_validate(
+        {
             "interval": "monthly",
             "day": "monday",
             "time": "12:00",
-        },
-        extras={},
+            "extras": {},
+        }
     )
     assert "UTC" == schedule.tz
     assert "12 0 1 * 1" == str(schedule.cronjob)
 
-    schedule = Crontab.from_value(
-        value={
+    schedule = CrontabValue.model_validate(
+        {
             "interval": "monthly",
             "day": "monday",
             "time": "12:00",
             "timezone": "Etc/UTC",
-        },
-        extras={},
+            "extras": {},
+        }
     )
     assert schedule.tz == "Etc/UTC"
     assert str(schedule.cronjob) == "12 0 1 * 1"
 
-    schedule = Crontab.from_value(
-        value={
+    schedule = CrontabValue.model_validate(
+        {
             "interval": "monthly",
             "day": "monday",
             "time": "12:00",
             "tz": "Etc/UTC",
-        },
-        extras={},
+            "extras": {},
+        }
     )
     assert schedule.tz == "Etc/UTC"
     assert str(schedule.cronjob) == "12 0 1 * 1"
 
 
 def test_event_crontab_from_conf():
-    schedule = Crontab.from_conf(
-        name="every_day_noon",
-        extras={},
+    schedule = CrontabValue(
+        interval="monthly",
+        day="monthly",
+        time="12:00",
+        timezone="Etc/UTC",
     )
-    assert "Etc/UTC" == schedule.tz
-    assert "12 0 1 * 1" == str(schedule.cronjob)
-
-
-def test_event_crontab_from_conf_raise(test_path):
-    test_file = test_path / "conf/demo/02_on_raise.yml"
-    with test_file.open(mode="w") as f:
-        yaml.dump(
-            {
-                "every_day_no_cron_raise": {
-                    "type": "Workflow",
-                    "interval": "monthly",
-                    "day": "monday",
-                    "time": "12:00",
-                }
-            },
-            f,
-        )
-
-    with pytest.raises(ValueError):
-        Crontab.from_conf(
-            name="every_day_no_cron_raise",
-            extras={},
-        )
-
-    with test_file.open(mode="w") as f:
-        yaml.dump(
-            {
-                "every_day_no_cron_raise": {
-                    "type": "Crontab",
-                }
-            },
-            f,
-        )
-
-    with pytest.raises(ValueError):
-        Crontab.from_conf(
-            name="every_day_no_cron_raise",
-            extras={},
-        )
-
-    with test_file.open(mode="w") as f:
-        yaml.dump(
-            {
-                "every_day_no_cron_raise": {
-                    "type": "Crontab",
-                    "cronjob": "* * * * *",
-                    "timezone": "NotExists",
-                }
-            },
-            f,
-        )
-
-    with pytest.raises(ValidationError):
-        Crontab.from_conf(
-            name="every_day_no_cron_raise",
-            extras={},
-        )
-
-    test_file.unlink()
+    assert schedule.tz == "Etc/UTC"
+    assert str(schedule.cronjob) == "12 0 1 * 1"
 
 
 def test_event_crontab_aws():
-    schedule = CrontabYear.from_conf(
-        name="aws_every_5_minute_bkk",
+    schedule = CrontabYear(
+        cronjob="*/5 * * * * 2024",
+        timezone="Asia/Bangkok",
         extras={},
     )
     assert schedule.tz == "Asia/Bangkok"
@@ -194,7 +147,9 @@ def test_event_crontab_aws():
 
 
 def test_event_crontab_every_minute():
-    schedule = Crontab.from_conf(name="every_minute_bkk", extras={})
+    schedule = Crontab.model_validate(
+        {"cronjob": "* * * * *", "timezone": "Asia/Bangkok"}
+    )
     current: datetime = datetime(2024, 8, 1, 12, 5, 45)
     adjust: datetime = current.replace(second=0, microsecond=0).astimezone(
         tz=ZoneInfo(schedule.tz)
@@ -206,14 +161,18 @@ def test_event_crontab_every_minute():
 
 
 def test_event_crontab_every_minute_with_second():
-    schedule = Crontab.from_conf(name="every_minute_bkk")
+    schedule = Crontab.model_validate(
+        {"cronjob": "* * * * *", "timezone": "Asia/Bangkok"}
+    )
     gen = schedule.next(datetime(2024, 1, 1, 0, 0, 12))
     assert f"{gen.date:%Y-%m-%d %H:%M:%S}" == "2024-01-01 00:01:00"
     assert f"{gen.next:%Y-%m-%d %H:%M:%S}" == "2024-01-01 00:02:00"
 
 
 def test_event_crontab_every_5_minute_bkk():
-    schedule = Crontab.from_conf(name="every_5_minute_bkk")
+    schedule = Crontab.model_validate(
+        {"cronjob": "*/5 * * * *", "timezone": "Asia/Bangkok"}
+    )
     schedule.generate("2024-01-01 01:12:00")
     schedule.next("2024-01-01 01:12:00")
 
@@ -242,3 +201,15 @@ def test_event_crontab_serialize():
         "timezone": "Asia/Bangkok",
         "extras": {},
     }
+
+
+def test_event():
+    event = Event.model_validate(
+        obj={
+            "schedule": [
+                {"cronjob": "* * * * *", "timezone": "Asia/Bangkok"},
+                {"cronjob": "* * * * * 2025", "timezone": "Asia/Bangkok"},
+            ],
+        },
+    )
+    assert len(event.schedule) == 2

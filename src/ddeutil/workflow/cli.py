@@ -16,7 +16,6 @@ from pydantic import Field, TypeAdapter
 from .__about__ import __version__
 from .__types import DictData
 from .errors import JobError
-from .event import Crontab
 from .job import Job
 from .params import Param
 from .result import Result
@@ -153,19 +152,6 @@ class WorkflowSchema(Workflow):
         default_factory=dict,
         description="A parameters that need to use on this workflow.",
     )
-    on: Union[list[Union[Crontab, str]], str] = Field(
-        default_factory=list,
-        description="A list of Crontab instance for this workflow schedule.",
-    )
-
-
-CRONTAB_TYPE = Literal["Crontab"]
-
-
-class CrontabSchema(Crontab):
-    """Override crontab model fields for generate JSON schema file."""
-
-    type: CRONTAB_TYPE = Field(description="A type of crontab template.")
 
 
 @workflow_app.command(name="json-schema")
@@ -176,7 +162,7 @@ def workflow_json_schema(
     ] = Path("./json-schema.json"),
 ) -> None:
     """Generate JSON schema file from the Workflow model."""
-    template = dict[str, Union[WorkflowSchema, CrontabSchema]]
+    template = dict[str, WorkflowSchema]
     json_schema = TypeAdapter(template).json_schema(by_alias=True)
     template_schema: dict[str, str] = {
         "$schema": "http://json-schema.org/draft-07/schema#",

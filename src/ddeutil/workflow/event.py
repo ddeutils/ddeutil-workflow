@@ -36,6 +36,8 @@ Example:
     next_run = next(runner)
     ```
 """
+from __future__ import annotations
+
 from dataclasses import fields
 from datetime import datetime
 from typing import Annotated, Any, Literal, Optional, Union
@@ -91,40 +93,18 @@ def interval2crontab(
     return f"{h} {m} {'1' if interval == 'monthly' else '*'} * {d}"
 
 
-class Crontab(BaseModel):
-    """Cron event model (Warped the CronJob object by Pydantic model) to keep
-    crontab value and generate CronRunner object from this crontab value.
-
-    Methods:
-        - generate: is the main use-case of this schedule object.
-    """
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    extras: Annotated[
-        DictData,
-        Field(
-            default_factory=dict,
-            description=(
-                "An extras parameters that want to pass to the CronJob field."
-            ),
+class BaseCrontab(BaseModel):
+    extras: DictData = Field(
+        default_factory=dict,
+        description=(
+            "An extras parameters that want to pass to the CronJob field."
         ),
-    ]
-    cronjob: Annotated[
-        CronJob,
-        Field(
-            description=(
-                "A Cronjob object that use for validate and generate datetime."
-            ),
-        ),
-    ]
-    tz: Annotated[
-        TimeZoneName,
-        Field(
-            description="A timezone string value.",
-            alias="timezone",
-        ),
-    ] = "UTC"
+    )
+    tz: TimeZoneName = Field(
+        default="UTC",
+        description="A timezone string value.",
+        alias="timezone",
+    )
 
     @model_validator(mode="before")
     def __prepare_values(cls, data: Any) -> Any:
@@ -152,6 +132,85 @@ class Crontab(BaseModel):
             return value
         except ZoneInfoNotFoundError as e:
             raise ValueError(f"Invalid timezone: {value}") from e
+
+
+class CrontabValue(BaseCrontab):
+    interval: Interval
+    day: Optional[str] = Field(default=None)
+    time: str = Field(default="00:00")
+
+    @property
+    def cronjob(self) -> CronJob:
+        """Return the CronJob object that was built from interval format."""
+        return CronJob(
+            value=interval2crontab(self.interval, day=self.day, time=self.time)
+        )
+
+    def generate(self, start: Union[str, datetime]) -> CronRunner:
+        """Return CronRunner object from an initial datetime.
+
+        :param start: (str | datetime) A string or datetime for generate the
+            CronRunner object.
+
+        :rtype: CronRunner
+        """
+        if isinstance(start, str):
+            start: datetime = datetime.fromisoformat(start)
+        elif not isinstance(start, datetime):
+            raise TypeError("start value should be str or datetime type.")
+        return self.cronjob.schedule(date=start, tz=self.tz)
+
+    def next(self, start: Union[str, datetime]) -> CronRunner:
+        """Return a next datetime from Cron runner object that start with any
+        date that given from input.
+
+        :param start: (str | datetime) A start datetime that use to generate
+            the CronRunner object.
+
+        :rtype: CronRunner
+        """
+        runner: CronRunner = self.generate(start=start)
+
+        # NOTE: ship the next date of runner object that create from start.
+        _ = runner.next
+
+        return runner
+
+
+class Crontab(BaseCrontab):
+    """Cron event model (Warped the CronJob object by Pydantic model) to keep
+    crontab value and generate CronRunner object from this crontab value.
+
+    Methods:
+        - generate: is the main use-case of this schedule object.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    cronjob: CronJob = Field(
+        description=(
+            "A Cronjob object that use for validate and generate datetime."
+        ),
+    )
+    tz: TimeZoneName = Field(
+        default="UTC",
+        description="A timezone string value.",
+        alias="timezone",
+    )
+
+    @model_validator(mode="before")
+    def __prepare_values(cls, data: Any) -> Any:
+        """Extract a `tz` key from data and change the key name from `tz` to
+        `timezone`.
+
+        :param data: (DictData) A data that want to pass for create a Crontab
+            model.
+
+        :rtype: DictData
+        """
+        if isinstance(data, dict) and (tz := data.pop("tz", None)):
+            data["timezone"] = tz
+        return data
 
     @field_validator(
         "cronjob", mode="before", json_schema_input_type=Union[CronJob, str]
@@ -229,17 +288,13 @@ class CrontabYear(Crontab):
     use by some data schedule tools like AWS Glue.
     """
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    # NOTE: This is fields of the base schedule.
-    cronjob: Annotated[
-        CronJobYear,
+    cronjob: CronJobYear = (
         Field(
             description=(
                 "A Cronjob object that use for validate and generate datetime."
             ),
         ),
-    ]
+    )
 
     @field_validator(
         "cronjob",
@@ -274,28 +329,73 @@ class CrontabYear(Crontab):
         )
 
 
-class ReleaseEvent(BaseModel):  # pragma: no cov
-    """Release trigger event."""
-
-    release: list[str] = Field(
-        description=(
-            "A list of workflow name that want to receive event from release"
-            "trigger."
-        )
-    )
-
-
-class SensorEvent(BaseModel):  # pragma: no cov
-    """Senser event"""
-
-
-Event = Annotated[
+Cron = Annotated[
     Union[
-        CronJobYear,
-        CronJob,
+        CrontabYear,
+        Crontab,
+        CrontabValue,
     ],
     Field(
         union_mode="smart",
         description="An event models.",
     ),
 ]  # pragma: no cov
+
+
+class Event(BaseModel):
+    """Event model."""
+
+    schedule: list[Cron] = Field(
+        default_factory=list,
+        description="A list of Cron schedule.",
+    )
+    release: list[str] = Field(
+        default_factory=list,
+        description=(
+            "A list of workflow name that want to receive event from release"
+            "trigger."
+        ),
+    )
+
+    @field_validator("schedule", mode="after")
+    def __on_no_dup_and_reach_limit__(
+        cls,
+        value: list[Crontab],
+    ) -> list[Crontab]:
+        """Validate the on fields should not contain duplicate values and if it
+        contains the every minute value more than one value, it will remove to
+        only one value.
+
+        Args:
+            value: A list of on object.
+
+        Returns:
+            list[CronJobYear | Crontab]: The validated list of Crontab objects.
+
+        Raises:
+            ValueError: If it has some duplicate value.
+        """
+        set_ons: set[str] = {str(on.cronjob) for on in value}
+        if len(set_ons) != len(value):
+            raise ValueError(
+                "The on fields should not contain duplicate on value."
+            )
+
+        # WARNING:
+        # if '* * * * *' in set_ons and len(set_ons) > 1:
+        #     raise ValueError(
+        #         "If it has every minute cronjob on value, it should have "
+        #         "only one value in the on field."
+        #     )
+        set_tz: set[str] = {on.tz for on in value}
+        if len(set_tz) > 1:
+            raise ValueError(
+                f"The on fields should not contain multiple timezone, "
+                f"{list(set_tz)}."
+            )
+
+        if len(set_ons) > 10:
+            raise ValueError(
+                "The number of the on should not more than 10 crontabs."
+            )
+        return value

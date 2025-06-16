@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from ddeutil.workflow import SKIP, SUCCESS, Job, Result, Workflow
 from ddeutil.workflow.errors import WorkflowError
+from ddeutil.workflow.event import Event
 from pydantic import ValidationError
 
 from .utils import dump_yaml, dump_yaml_context
@@ -64,10 +65,25 @@ def test_workflow_bypass_extras():
     job: Job = Job(
         stages=[{"name": "Echo", "id": "echo", "echo": "Hello World"}]
     )
+    event = Event.model_validate(
+        obj={
+            "schedule": [
+                {
+                    "cronjob": "* * * * *",
+                    "timezone": "Asia/Bangkok",
+                },
+                {
+                    "cronjob": "* * * * * 2025",
+                    "timezone": "Asia/Bangkok",
+                },
+            ]
+        }
+    )
 
     # NOTE: Test passing extra value from workflow is work.
     workflow: Workflow = Workflow(
         name="manual-workflow",
+        on=event,
         jobs={"first-job": job, "second-job": job},
         extras={"registries": ["foo", "bar"]},
     )
@@ -89,41 +105,49 @@ def test_workflow_on():
 
     # NOTE: Raise when the on field receive duplicate values.
     with pytest.raises(ValidationError):
-        Workflow(
-            name="tmp-wf-scheduling-raise",
-            on=[
-                {"cronjob": "2 * * * *"},
-                {"cronjob": "2 * * * *"},
-            ],
+        Workflow.model_validate(
+            {
+                "name": "tmp-wf-scheduling-raise",
+                "on": {
+                    "schedule": [
+                        {"cronjob": "2 * * * *"},
+                        {"cronjob": "2 * * * *"},
+                    ],
+                },
+            }
         )
 
     # NOTE: Raise if values on the on field reach the maximum value.
     with pytest.raises(ValidationError):
         Workflow(
             name="tmp-wf-on-reach-max-value",
-            on=[
-                {"cronjob": "2 * * * *"},
-                {"cronjob": "3 * * * *"},
-                {"cronjob": "4 * * * *"},
-                {"cronjob": "5 * * * *"},
-                {"cronjob": "6 * * * *"},
-                {"cronjob": "7 * * * *"},
-                {"cronjob": "8 * * * *"},
-                {"cronjob": "9 * * * *"},
-                {"cronjob": "10 * * * *"},
-                {"cronjob": "11 * * * *"},
-                {"cronjob": "12 * * * *"},
-            ],
+            on={
+                "schedule": [
+                    {"cronjob": "2 * * * *"},
+                    {"cronjob": "3 * * * *"},
+                    {"cronjob": "4 * * * *"},
+                    {"cronjob": "5 * * * *"},
+                    {"cronjob": "6 * * * *"},
+                    {"cronjob": "7 * * * *"},
+                    {"cronjob": "8 * * * *"},
+                    {"cronjob": "9 * * * *"},
+                    {"cronjob": "10 * * * *"},
+                    {"cronjob": "11 * * * *"},
+                    {"cronjob": "12 * * * *"},
+                ],
+            },
         )
 
     # NOTE: Raise if values on the on field have multiple timezone.
     with pytest.raises(ValidationError):
         Workflow(
             name="tmp-wf-on-multiple-tz",
-            on=[
-                {"cronjob": "2 * * * *", "timezone": "UTC"},
-                {"cronjob": "3 * * * *", "timezone": "Asia/Bangkok"},
-            ],
+            on={
+                "schedule": [
+                    {"cronjob": "2 * * * *", "timezone": "UTC"},
+                    {"cronjob": "3 * * * *", "timezone": "Asia/Bangkok"},
+                ],
+            },
         )
 
 
@@ -259,10 +283,12 @@ def test_workflow_from_conf_raise(test_path):
         data={
             "wf-run-from-loader-raise": {
                 "type": "Workflow",
-                "on": [
-                    ["* * * * *"],
-                    ["* * 1 0 0"],
-                ],
+                "on": {
+                    "schedule": [
+                        ["* * * * *"],
+                        ["* * 1 0 0"],
+                    ],
+                },
                 "jobs": {
                     "first-job": {
                         "stages": [{"name": "Echo next", "echo": "Hello World"}]
@@ -272,10 +298,10 @@ def test_workflow_from_conf_raise(test_path):
         },
     )
 
-    with pytest.raises(TypeError):
+    with pytest.raises(ValidationError):
         Workflow.from_conf(name="wf-run-from-loader-raise")
 
-    with pytest.raises(TypeError):
+    with pytest.raises(ValidationError):
         Workflow.from_conf(
             name="wf-run-from-loader-raise",
             path=test_path / "conf",
