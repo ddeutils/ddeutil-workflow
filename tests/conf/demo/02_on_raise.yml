@@ -1,0 +1,5 @@
+every_day_no_cron_raise:
+  day: monday
+  interval: monthly
+  time: '12:00'
+  type: Workflow

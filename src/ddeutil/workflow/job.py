@@ -348,7 +348,7 @@ class Job(BaseModel):
 
     The Job model represents a logical unit of work containing multiple stages
     that execute sequentially. Jobs support matrix strategies for parameterized
-    execution, dependency management, conditional execution, and multi-environment
+    execution, dependency management, conditional execution, and multienvironment
     deployment.
 
     Jobs are the primary execution units within workflows, providing:
@@ -360,7 +360,7 @@ class Job(BaseModel):
 
     Attributes:
         id (str, optional): Unique job identifier within workflow
-        desc (str, optional): Job description in markdown format
+        desc (str, optional): Job description in Markdown format
         runs_on (RunsOnModel): Execution environment configuration
         condition (str, optional): Conditional execution expression
         stages (list[Stage]): Ordered list of stages to execute

@@ -1,14 +1,18 @@
 from src.ddeutil.workflow.conf import api_config
 
+from ..utils import exclude_created_and_updated
+
 
 def test_workflows_get_by_name(client):
     response = client.get(f"{api_config.prefix_path}/workflows/wf-run-common")
     assert response.status_code == 200
-    assert response.json() == {
+    assert exclude_created_and_updated(response.json()) == {
         "name": "wf-run-common",
         "desc": "## Run Python Workflow\n\nThis is a running python workflow\n",
         "params": {"name": {"type": "str"}},
-        "on": [{"cronjob": "*/5 * * * *", "timezone": "Asia/Bangkok"}],
+        "on": {
+            "schedule": [{"cronjob": "*/5 * * * *", "timezone": "Asia/Bangkok"}]
+        },
         "jobs": {
             "demo-run": {
                 "id": "demo-run",
