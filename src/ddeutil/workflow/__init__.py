@@ -72,11 +72,14 @@ from .errors import (
     to_dict,
 )
 from .event import (
+    Cron,
     CronJob,
     CronJobYear,
     Crontab,
+    CrontabValue,
     CrontabYear,
     Event,
+    Interval,
 )
 from .job import (
     Job,
