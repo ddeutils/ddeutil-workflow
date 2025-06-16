@@ -2138,6 +2138,7 @@ class ForEachStage(BaseNestedStage):
                 )
                 raise StageCancelError(error_msg, refs=key)
 
+            # NOTE: Nested-stage execute will pass only params and context only.
             rs: Result = stage.execute(
                 params=current_context,
                 run_id=run_id,
@@ -2316,6 +2317,7 @@ class ForEachStage(BaseNestedStage):
 
             for i, future in enumerate(done, start=0):
                 try:
+                    # NOTE: Ignore returned context because it already updated.
                     statuses[i], _ = future.result()
                 except StageError as e:
                     statuses[i] = get_status_from_error(e)

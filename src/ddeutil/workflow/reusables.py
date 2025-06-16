@@ -318,6 +318,7 @@ def str2template(
     value: str,
     params: DictData,
     *,
+    context: Optional[DictData] = None,
     filters: Optional[dict[str, FilterRegistry]] = None,
     registers: Optional[list[str]] = None,
 ) -> Optional[str]:
@@ -331,6 +332,7 @@ def str2template(
     :param value: (str) A string value that want to map with params.
     :param params: (DictData) A parameter value that getting with matched
         regular expression.
+    :param context: (DictData)
     :param filters: (dict[str, FilterRegistry]) A mapping of filter registry.
     :param registers: (Optional[list[str]]) Override list of register.
 
@@ -359,7 +361,7 @@ def str2template(
         #   I recommend to avoid logging params context on this case because it
         #   can include secret value.
         try:
-            getter: Any = getdot(caller, params)
+            getter: Any = getdot(caller, params | (context or {}))
         except ValueError:
             raise UtilError(
                 f"Parameters does not get dot with caller: {caller!r}."
@@ -388,6 +390,7 @@ def str2template(
 def param2template(
     value: T,
     params: DictData,
+    context: Optional[DictData] = None,
     filters: Optional[dict[str, FilterRegistry]] = None,
     *,
     extras: Optional[DictData] = None,
@@ -398,6 +401,7 @@ def param2template(
     :param value: (Any) A value that want to map with params.
     :param params: (DictData) A parameter value that getting with matched
         regular expression.
+    :param context: (DictData)
     :param filters: (dict[str, FilterRegistry]) A filter mapping for mapping
         with `map_post_filter` func.
     :param extras: (Optional[list[str]]) An Override extras.
@@ -413,16 +417,21 @@ def param2template(
     )
     if isinstance(value, dict):
         return {
-            k: param2template(value[k], params, filters, extras=extras)
+            k: param2template(value[k], params, context, filters, extras=extras)
             for k in value
         }
     elif isinstance(value, (list, tuple, set)):
         return type(value)(
-            [param2template(i, params, filters, extras=extras) for i in value]
+            [
+                param2template(i, params, context, filters, extras=extras)
+                for i in value
+            ]
         )
     elif not isinstance(value, str):
         return value
-    return str2template(value, params, filters=filters, registers=registers)
+    return str2template(
+        value, params, context=context, filters=filters, registers=registers
+    )
 
 
 @custom_filter("fmt")  # pragma: no cov
