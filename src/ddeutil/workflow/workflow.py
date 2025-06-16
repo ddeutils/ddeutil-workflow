@@ -63,6 +63,7 @@ from .result import (
 from .reusables import has_template, param2template
 from .utils import (
     gen_id,
+    get_dt_ntz_now,
     replace_sec,
 )
 
@@ -130,7 +131,6 @@ class Workflow(BaseModel):
         default_factory=dict,
         description="An extra parameters that want to override config values.",
     )
-
     name: str = Field(description="A workflow name.")
     desc: Optional[str] = Field(
         default=None,
@@ -149,6 +149,20 @@ class Workflow(BaseModel):
     jobs: dict[str, Job] = Field(
         default_factory=dict,
         description="A mapping of job ID and job model that already loaded.",
+    )
+    created_at: datetime = Field(
+        default_factory=get_dt_ntz_now,
+        description=(
+            "A created datetime of this workflow template when loading from "
+            "file."
+        ),
+    )
+    updated_dt: datetime = Field(
+        default_factory=get_dt_ntz_now,
+        description=(
+            "A updated datetime of this workflow template when loading from "
+            "file."
+        ),
     )
 
     @classmethod
@@ -272,6 +286,11 @@ class Workflow(BaseModel):
                 "The number of the on should not more than 10 crontabs."
             )
         return value
+
+    @field_validator("created_at", "updated_dt", mode="after")
+    def __convert_tz__(cls, dt: datetime) -> datetime:
+        """Replace timezone of datetime type to no timezone."""
+        return dt.replace(tzinfo=None)
 
     @model_validator(mode="after")
     def __validate_jobs_need__(self) -> Self:
