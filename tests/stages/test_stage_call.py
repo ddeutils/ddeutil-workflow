@@ -16,7 +16,7 @@ def test_call_stage_exec_necessary_args():
         }
     )
     # NOTE: Raise because necessary args do not pass.
-    rs: Result = stage.handler_execute({})
+    rs: Result = stage.execute({})
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,
@@ -71,17 +71,17 @@ def test_call_stage_exec(test_path):
         workflow = Workflow.from_conf(name="tmp-wf-call-return-type")
 
         stage: Stage = workflow.job("second-job").stage("extract-load")
-        rs: Result = stage.handler_execute({})
+        rs: Result = stage.execute({})
         assert rs.status == SUCCESS
         assert rs.context == {"records": 1, "status": SUCCESS}
 
         stage: Stage = workflow.job("second-job").stage("async-extract-load")
-        rs: Result = stage.handler_execute({})
+        rs: Result = stage.execute({})
         assert rs.status == SUCCESS
         assert rs.context == {"records": 1, "status": SUCCESS}
 
         stage: Stage = workflow.job("first-job").stage("args-private")
-        rs: Result = stage.handler_execute({})
+        rs: Result = stage.execute({})
         assert rs.status == SUCCESS
         assert rs.context == {
             "exec": "Test this arge should pass",
@@ -93,7 +93,7 @@ def test_call_stage_exec(test_path):
         stage: Stage = workflow.job("second-job").stage(
             "extract-load-raise-type"
         )
-        rs = stage.handler_execute({})
+        rs = stage.execute({})
         assert rs.status == FAILED
         assert rs.context == {
             "status": FAILED,
@@ -118,7 +118,7 @@ def test_call_stage_exec(test_path):
                 },
             }
         )
-        rs: Result = stage.handler_execute({})
+        rs: Result = stage.execute({})
         assert rs.status == SUCCESS
         assert rs.context == {
             "status": SUCCESS,
@@ -133,7 +133,7 @@ def test_call_stage_exec_raise():
         name="Type not valid",
         uses="tasks/return-type-not-valid@raise",
     )
-    rs: Result = stage.handler_execute({})
+    rs: Result = stage.execute({})
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,
@@ -149,7 +149,7 @@ def test_call_stage_exec_raise():
 
     # NOTE: Raise because call does not valid.
     stage: Stage = CallStage(name="Not valid", uses="tasks-foo-bar")
-    rs: Result = stage.handler_execute({})
+    rs: Result = stage.execute({})
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,
@@ -166,7 +166,7 @@ def test_call_stage_exec_raise():
         name="Not register",
         uses="tasks/abc@foo",
     )
-    rs: Result = stage.handler_execute({})
+    rs: Result = stage.execute({})
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,
@@ -222,12 +222,12 @@ async def test_call_stage_axec(test_path):
         workflow = Workflow.from_conf(name="tmp-wf-call-return-type")
 
         stage: Stage = workflow.job("second-job").stage("extract-load")
-        rs: Result = await stage.handler_axecute({})
+        rs: Result = await stage.axecute({})
         assert rs.status == SUCCESS
         assert rs.context == {"records": 1, "status": SUCCESS}
 
         stage: Stage = workflow.job("second-job").stage("async-extract-load")
-        rs: Result = await stage.handler_axecute({})
+        rs: Result = await stage.axecute({})
         assert rs.status == SUCCESS
         assert rs.context == {"records": 1, "status": SUCCESS}
 
@@ -235,7 +235,7 @@ async def test_call_stage_axec(test_path):
         stage: Stage = CallStage(
             name="Type not valid", uses="tasks/return-type-not-valid@raise"
         )
-        rs: Result = await stage.handler_axecute({})
+        rs: Result = await stage.axecute({})
         assert rs.status == FAILED
         assert rs.context == {
             "status": FAILED,
@@ -247,7 +247,7 @@ async def test_call_stage_axec(test_path):
 
         # NOTE: Raise because necessary args do not pass.
         stage: Stage = workflow.job("first-job").stage("args-necessary")
-        rs: Result = await stage.handler_axecute({})
+        rs: Result = await stage.axecute({})
         assert rs.status == FAILED
         assert rs.context == {
             "status": FAILED,
@@ -258,7 +258,7 @@ async def test_call_stage_axec(test_path):
         }
 
         stage: Stage = workflow.job("first-job").stage("args-necessary")
-        rs: Result = await stage.handler_axecute({})
+        rs: Result = await stage.axecute({})
         assert rs.status == FAILED
         assert rs.context == {
             "status": FAILED,
@@ -273,7 +273,7 @@ async def test_call_stage_axec(test_path):
 
         # NOTE: Raise because call does not valid.
         stage: Stage = CallStage(name="Not valid", uses="tasks-foo-bar")
-        rs: Result = await stage.handler_axecute({})
+        rs: Result = await stage.axecute({})
         assert rs.status == FAILED
         assert rs.context == {
             "status": FAILED,
@@ -284,7 +284,7 @@ async def test_call_stage_axec(test_path):
         }
 
         stage: Stage = CallStage(name="Not valid", uses="tasks-foo-bar")
-        rs: Result = await stage.handler_axecute({})
+        rs: Result = await stage.axecute({})
         assert rs.status == FAILED
         assert rs.context == {
             "status": FAILED,
@@ -296,7 +296,7 @@ async def test_call_stage_axec(test_path):
 
         # NOTE: Raise because call does not register.
         stage: Stage = CallStage(name="Not register", uses="tasks/abc@foo")
-        rs: Result = await stage.handler_axecute({})
+        rs: Result = await stage.axecute({})
         assert rs.status == FAILED
         assert rs.context == {
             "status": FAILED,
@@ -318,7 +318,7 @@ async def test_call_stage_axec(test_path):
                 },
             }
         )
-        rs: Result = await stage.handler_axecute({})
+        rs: Result = await stage.axecute({})
         assert rs.status == SUCCESS
         assert rs.context == {
             "status": SUCCESS,

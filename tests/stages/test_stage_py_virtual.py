@@ -28,7 +28,7 @@ def test_stage_py_virtual(test_path):
         stage: Stage = workflow.job("first-job").stage("py-virtual")
         # TODO: This testcase raise error for uv does not exist on GH action.
         try:
-            rs: Result = stage.handler_execute(params={"params": {}})
+            rs: Result = stage.execute(params={"params": {}})
             print(rs.context)
 
             output = stage.set_outputs(rs.context, to={})

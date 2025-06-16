@@ -8,7 +8,7 @@ def test_bash_stage_exec():
         name="Bash Stage",
         bash='echo "Hello World";\n' "VAR='Foo';\n" 'echo "Variable $VAR";',
     )
-    rs: Result = stage.handler_execute({})
+    rs: Result = stage.execute({})
     assert rs.status == SUCCESS
     assert rs.context == {
         "status": SUCCESS,
@@ -24,7 +24,7 @@ def test_bash_stage_exec_with_env():
         bash='echo "ENV $$FOO";',
         env={"FOO": "Bar"},
     )
-    rs: Result = stage.handler_execute({})
+    rs: Result = stage.execute({})
     assert rs.status == SUCCESS
     assert rs.context == {
         "status": SUCCESS,
@@ -39,7 +39,7 @@ def test_bash_stage_exec_raise():
         name="Bash Stage",
         bash='echo "Test Raise Error case with failed" >&2;\nexit 1;',
     )
-    rs: Result = stage.handler_execute({})
+    rs: Result = stage.execute({})
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,
@@ -69,7 +69,7 @@ def test_bash_stage_exec_retry():
         ),
         retry=1,
     )
-    rs: Result = stage.handler_execute(params={})
+    rs: Result = stage.execute(params={})
     assert rs.status == SUCCESS
     assert rs.context == {
         "status": SUCCESS,
@@ -94,7 +94,7 @@ def test_bash_stage_exec_retry_exceed():
         ),
         retry=1,
     )
-    rs: Result = stage.handler_execute(params={})
+    rs: Result = stage.execute(params={})
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,
@@ -116,7 +116,7 @@ def test_bash_stage_exec_retry_exceed():
 @pytest.mark.asyncio
 async def test_bash_stage_axec():
     stage: BashStage = BashStage(name="Bash Stage", bash='echo "Hello World"')
-    rs: Result = await stage.handler_axecute(params={})
+    rs: Result = await stage.axecute(params={})
     assert rs.status == SUCCESS
     assert rs.context == {
         "status": SUCCESS,
@@ -141,7 +141,7 @@ async def test_bash_stage_axec_retry():
         ),
         retry=1,
     )
-    rs: Result = await stage.handler_axecute(params={})
+    rs: Result = await stage.axecute(params={})
     assert rs.status == SUCCESS
     assert rs.context == {
         "status": SUCCESS,
@@ -160,7 +160,7 @@ async def test_bash_stage_axec_raise():
     )
 
     # NOTE: Raise error from bash that force exit 1.
-    rs: Result = await stage.handler_axecute({})
+    rs: Result = await stage.axecute({})
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,

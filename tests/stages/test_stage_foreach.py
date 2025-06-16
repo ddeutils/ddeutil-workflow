@@ -29,7 +29,7 @@ def test_foreach_stage_exec_all_skipped():
             },
         ],
     )
-    rs: Result = stage.handler_execute({})
+    rs: Result = stage.execute({})
     assert rs.status == SKIP
     assert rs.context == {
         "status": SKIP,
@@ -82,7 +82,7 @@ def test_foreach_stage_exec_other_skipped():
             },
         ],
     )
-    rs: Result = stage.handler_execute(params={})
+    rs: Result = stage.execute(params={})
     assert rs.status == SUCCESS
     assert rs.context == {
         "status": SUCCESS,
@@ -132,7 +132,7 @@ def test_foreach_stage_exec_skipped():
     )
     assert stage.is_nested
 
-    rs: Result = stage.handler_execute({})
+    rs: Result = stage.execute({})
     assert rs.status == SUCCESS
     assert rs.context == {
         "status": SUCCESS,
@@ -182,7 +182,7 @@ def test_foreach_stage_exec():
         stages=[{"name": "Echo stage", "echo": "Start item ${{ item }}"}],
         use_index_as_key=True,
     )
-    rs: Result = stage.handler_execute({})
+    rs: Result = stage.execute({})
     assert rs.status == SUCCESS
     assert rs.context == {
         "status": SUCCESS,
@@ -219,7 +219,7 @@ def test_foreach_stage_exec_raise():
         id="foreach-raise",
         foreach="${{values.items}}",
     )
-    rs: Result = stage.handler_execute({"values": {"items": "test"}})
+    rs: Result = stage.execute({"values": {"items": "test"}})
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,
@@ -237,7 +237,7 @@ def test_foreach_stage_exec_raise():
         name="Foreach item was duplicated",
         foreach=[1, 1, 2, 3],
     )
-    rs: Result = stage.handler_execute({})
+    rs: Result = stage.execute({})
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,
@@ -276,7 +276,7 @@ def test_foreach_stage_exec_raise_full():
             ],
         }
     )
-    rs: Result = stage.handler_execute(params={})
+    rs: Result = stage.execute(params={})
     assert rs.status == FAILED
     try:
         assert rs.context == {
@@ -472,7 +472,7 @@ def test_foreach_stage_exec_concurrent(test_path):
     ):
         workflow = Workflow.from_conf(name="tmp-wf-foreach-concurrent")
         stage: Stage = workflow.job("first-job").stage("foreach-stage")
-        rs: Result = stage.handler_execute(params={})
+        rs: Result = stage.execute(params={})
         assert rs.status == SUCCESS
         assert rs.context == {
             "status": SUCCESS,
@@ -606,7 +606,7 @@ def test_foreach_stage_exec_concurrent_with_raise():
         extras={"stage_default_id": False},
     )
     event = MockEvent(n=4)
-    rs: Result = stage.handler_execute({}, event=event)
+    rs: Result = stage.execute({}, event=event)
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,
@@ -656,7 +656,7 @@ def test_foreach_stage_exec_concurrent_raise():
             ],
         }
     )
-    rs: Result = stage.handler_execute(params={})
+    rs: Result = stage.execute(params={})
     assert rs.status == FAILED
     for context in (
         {

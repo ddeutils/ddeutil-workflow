@@ -45,7 +45,7 @@ Stage       --> {
 ## Stage
 
 A stage context is the minimum standard context for this package. I will explain
-context execution that return from `execute` and `handler_execute`
+context execution that return from `execute` and `process`
 methods can be any custom output with its stage.
 
 ### Input Template Params

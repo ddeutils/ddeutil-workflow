@@ -38,7 +38,7 @@ def test_case_stage_exec(test_path):
             ],
         }
     )
-    rs: Result = stage.handler_execute({"params": {"name": "bar"}})
+    rs: Result = stage.execute({"params": {"name": "bar"}})
     assert rs.status == SUCCESS
     assert rs.context == {
         "status": SUCCESS,
@@ -61,7 +61,7 @@ def test_case_stage_exec(test_path):
         }
     }
 
-    rs: Result = stage.handler_execute({"params": {"name": "foo"}})
+    rs: Result = stage.execute({"params": {"name": "foo"}})
     assert rs.status == SUCCESS
     assert rs.context == {
         "status": SUCCESS,
@@ -84,7 +84,7 @@ def test_case_stage_exec(test_path):
         }
     }
 
-    rs: Result = stage.handler_execute({"params": {"name": "test"}})
+    rs: Result = stage.execute({"params": {"name": "test"}})
     assert rs.status == SUCCESS
     assert rs.context == {
         "status": SUCCESS,
@@ -113,7 +113,7 @@ def test_case_stage_exec_raise():
         }
     )
     # NOTE: Raise because else condition does not set.
-    rs: Result = stage.handler_execute({"params": {"name": "test"}})
+    rs: Result = stage.execute({"params": {"name": "test"}})
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,
@@ -146,7 +146,7 @@ def test_case_stage_exec_cancel():
         }
     )
     event = MockEvent(n=0)
-    rs: Result = stage.handler_execute({"params": {"name": "bar"}}, event=event)
+    rs: Result = stage.execute({"params": {"name": "bar"}}, event=event)
     assert rs.status == CANCEL
     assert rs.context == {
         "status": CANCEL,
@@ -179,6 +179,6 @@ def test_case_stage_exec_skipped():
             ],
         }
     )
-    rs: Result = stage.handler_execute({"params": {"name": "test"}})
+    rs: Result = stage.execute({"params": {"name": "test"}})
     assert rs.status == SKIP
     assert rs.context == {"status": SKIP}

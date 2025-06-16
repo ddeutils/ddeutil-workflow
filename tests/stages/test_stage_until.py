@@ -18,7 +18,7 @@ def test_until_stage():
     )
     assert stage.is_nested
 
-    rs: Result = stage.handler_execute(params={})
+    rs: Result = stage.execute(params={})
     assert rs.status == SUCCESS
     assert rs.context == {
         "status": SUCCESS,
@@ -56,7 +56,7 @@ def test_until_stage_skipped():
             ],
         }
     )
-    rs: Result = stage.handler_execute(params={})
+    rs: Result = stage.execute(params={})
     assert rs.status == SKIP
     assert rs.context == {
         "status": SKIP,
@@ -89,7 +89,7 @@ def test_until_stage_exec_exceed_loop():
             ],
         }
     )
-    rs: Result = stage.handler_execute(params={})
+    rs: Result = stage.execute(params={})
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,
@@ -138,7 +138,7 @@ def test_until_stage_exec_full(test_path):
     ):
         workflow = Workflow.from_conf(name="tmp-wf-until")
         stage: Stage = workflow.job("first-job").stage("until-stage")
-        rs: Result = stage.handler_execute(params={})
+        rs: Result = stage.execute(params={})
         assert rs.status == SUCCESS
         assert rs.context == {
             "status": SUCCESS,

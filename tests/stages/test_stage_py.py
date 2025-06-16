@@ -12,7 +12,7 @@ def test_py_stage_exec_raise():
         run="raise ValueError('Testing raise error inside PyStage!!!')",
     )
 
-    rs = stage.handler_execute(params={"x": "Foo"})
+    rs = stage.execute(params={"x": "Foo"})
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,
@@ -48,7 +48,7 @@ def test_py_stage_exec():
             'result.trace.info("Log from result object inside PyStage!!!")'
         ),
     )
-    rs: Result = stage.handler_execute(
+    rs: Result = stage.execute(
         params={
             "params": {"name": "Author"},
             "stages": {"hello-world": {"outputs": {"x": "Foo"}}},
@@ -73,7 +73,7 @@ def test_py_stage_exec_create_func():
             "echo(var_inside)"
         ),
     )
-    rs: Result = stage.handler_execute(params={})
+    rs: Result = stage.execute(params={})
     assert rs.status == SUCCESS
 
     output = stage.set_outputs(rs.context, {})
@@ -87,7 +87,7 @@ def test_py_stage_exec_create_func():
 def test_py_stage_exec_create_object():
     workflow: Workflow = Workflow.from_conf(name="wf-run-python-filter")
     stage: Stage = workflow.job("create-job").stage(stage_id="create-stage")
-    rs: Result = stage.handler_execute(params={})
+    rs: Result = stage.execute(params={})
     assert rs.status == SUCCESS
 
     output = stage.set_outputs(rs.context, to={})
@@ -99,7 +99,7 @@ async def test_py_stage_axec_not_raise():
     workflow: Workflow = Workflow.from_conf(name="wf-run-common")
     stage: Stage = workflow.job("raise-run").stage(stage_id="raise-error")
 
-    rs: Result = await stage.handler_axecute(params={"x": "Foo"})
+    rs: Result = await stage.axecute(params={"x": "Foo"})
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,
@@ -131,7 +131,7 @@ async def test_py_stage_axec_with_vars():
         .job("demo-run")
         .stage("run-var")
     )
-    rs: Result = await stage.handler_axecute(
+    rs: Result = await stage.axecute(
         params={
             "params": {"name": "Author"},
             "stages": {"hello-world": {"outputs": {"x": "Foo"}}},

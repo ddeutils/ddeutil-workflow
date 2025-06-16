@@ -34,7 +34,7 @@ def test_example_parallel_stage_exec_with_trigger(test_path):
     ):
         workflow = Workflow.from_conf("tmp-wf-parallel-trigger")
         stage: Stage = workflow.job("first-job").stage("parallel-stage")
-        rs = stage.handler_execute(params={})
+        rs = stage.execute(params={})
         assert rs.status == SUCCESS
         assert rs.context == {
             "status": SUCCESS,
@@ -105,7 +105,7 @@ def test_example_parallel_stage_exec_with_trigger_raise(test_path):
     ):
         workflow = Workflow.from_conf("tmp-wf-parallel-trigger-raise")
         stage: Stage = workflow.job("first-job").stage("parallel-stage")
-        rs: Result = stage.handler_execute({})
+        rs: Result = stage.execute({})
         assert rs.status == FAILED
         assert rs.context == {
             "status": FAILED,
@@ -200,7 +200,7 @@ def test_example_parallel_stage_exec_with_trigger_raise_bug(test_path):
     ):
         workflow = Workflow.from_conf("tmp-wf-parallel-trigger-raise")
         stage: Stage = workflow.job("first-job").stage("parallel-stage")
-        rs: Result = stage.handler_execute({})
+        rs: Result = stage.execute({})
         assert rs.status == FAILED
         assert rs.context == {
             "status": FAILED,
