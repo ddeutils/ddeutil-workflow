@@ -789,8 +789,7 @@ class Job(BaseModel):
             return local_execute(
                 self,
                 params,
-                run_id=run_id,
-                parent_run_id=parent_run_id,
+                run_id=parent_run_id,
                 event=event,
             )
         elif self.runs_on.type == SELF_HOSTED:  # pragma: no cov
@@ -987,7 +986,6 @@ def local_execute(
     params: DictData,
     *,
     run_id: StrOrNone = None,
-    parent_run_id: StrOrNone = None,
     event: Optional[Event] = None,
 ) -> Result:
     """Local job execution with passing dynamic parameters from the workflow
@@ -1008,47 +1006,58 @@ def local_execute(
     :param job: (Job) A job model.
     :param params: (DictData) A parameter data.
     :param run_id: (str) A job running ID.
-    :param parent_run_id: (str) A parent workflow running ID.
     :param event: (Event) An Event manager instance that use to cancel this
         execution if it forces stopped by parent execution.
 
     :rtype: Result
     """
-    result: Result = Result.construct_with_rs_or_id(
-        run_id=run_id,
-        parent_run_id=parent_run_id,
-        id_logic=(job.id or "EMPTY"),
-        extras=job.extras,
+    parent_run_id: StrOrNone = run_id
+    run_id: str = gen_id((job.id or "EMPTY"), unique=True)
+    trace: Trace = get_trace(
+        run_id, parent_run_id=parent_run_id, extras=job.extras
     )
-
-    result.trace.info("[JOB]: Start Local executor.")
+    context: DictData = {"status": WAIT}
+    trace.info("[JOB]: Start Local executor.")
 
     if job.desc:
-        result.trace.debug(f"[JOB]: Description:||{job.desc}||")
+        trace.debug(f"[JOB]: Description:||{job.desc}||")
 
     if job.is_skipped(params=params):
-        result.trace.info("[JOB]: Skip because job condition was valid.")
-        return result.catch(status=SKIP)
+        trace.info("[JOB]: Skip because job condition was valid.")
+        return Result(
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            status=SKIP,
+            context=catch(context, status=SKIP),
+            extras=job.extras,
+        )
 
     event: Event = event or Event()
     ls: str = "Fail-Fast" if job.strategy.fail_fast else "All-Completed"
     workers: int = job.strategy.max_parallel
     strategies: list[DictStr] = job.strategy.make()
     len_strategy: int = len(strategies)
-    result.trace.info(
+    trace.info(
         f"[JOB]: ... Mode {ls}: {job.id!r} with {workers} "
         f"worker{'s' if workers > 1 else ''}."
     )
 
     if event and event.is_set():
-        return result.catch(
+        return Result(
+            run_id=run_id,
+            parent_run_id=parent_run_id,
             status=CANCEL,
-            context={
-                "errors": JobCancelError(
-                    "Execution was canceled from the event before start "
-                    "local job execution."
-                ).to_dict()
-            },
+            context=catch(
+                context,
+                status=CANCEL,
+                updated={
+                    "errors": JobCancelError(
+                        "Execution was canceled from the event before start "
+                        "local job execution."
+                    ).to_dict()
+                },
+            ),
+            extras=job.extras,
         )
 
     with ThreadPoolExecutor(workers, "jb_stg") as executor:
@@ -1058,15 +1067,15 @@ def local_execute(
                 job=job,
                 strategy=strategy,
                 params=params,
-                run_id=result.run_id,
-                context=result.context,
-                parent_run_id=result.parent_run_id,
+                run_id=run_id,
+                context=context,
+                parent_run_id=parent_run_id,
                 event=event,
             )
             for strategy in strategies
         ]
 
-        context: DictData = {}
+        errors: DictData = {}
         statuses: list[Status] = [WAIT] * len_strategy
         fail_fast: bool = False
 
@@ -1075,7 +1084,7 @@ def local_execute(
         else:
             done, not_done = wait(futures, return_when=FIRST_EXCEPTION)
             if len(list(done)) != len(futures):
-                result.trace.warning(
+                trace.warning(
                     "[JOB]: Set the event for stop pending job-execution."
                 )
                 event.set()
@@ -1091,7 +1100,7 @@ def local_execute(
                     if not_done
                     else ""
                 )
-                result.trace.debug(f"[JOB]: ... Job was set Fail-Fast{nd}")
+                trace.debug(f"[JOB]: ... Job was set Fail-Fast{nd}")
                 done: Iterator[Future] = as_completed(futures)
                 fail_fast: bool = True
 
@@ -1100,10 +1109,10 @@ def local_execute(
                 statuses[i], _ = future.result()
             except JobError as e:
                 statuses[i] = get_status_from_error(e)
-                result.trace.error(
+                trace.error(
                     f"[JOB]: {ls} Handler:||{e.__class__.__name__}: {e}"
                 )
-                mark_errors(context, e)
+                mark_errors(errors, e)
             except CancelledError:
                 pass
 
@@ -1114,7 +1123,13 @@ def local_execute(
     if fail_fast and status == CANCEL:
         status = FAILED
 
-    return result.catch(status=status, context=context)
+    return Result(
+        run_id=run_id,
+        parent_run_id=parent_run_id,
+        status=status,
+        context=catch(context, status=status, updated=errors),
+        extras=job.extras,
+    )
 
 
 def self_hosted_execute(
