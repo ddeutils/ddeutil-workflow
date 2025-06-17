@@ -920,8 +920,7 @@ def local_execute_strategy(
         trace.info(f"[JOB]: Execute Stage: {stage.iden!r}")
         rs: Result = stage.execute(
             params=current_context,
-            run_id=run_id,
-            parent_run_id=parent_run_id,
+            run_id=parent_run_id,
             event=event,
         )
         stage.set_outputs(rs.context, to=current_context)

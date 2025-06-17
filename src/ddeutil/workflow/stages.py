@@ -255,7 +255,6 @@ class BaseStage(BaseModel, ABC):
         params: DictData,
         *,
         run_id: StrOrNone = None,
-        parent_run_id: StrOrNone = None,
         event: Optional[Event] = None,
     ) -> Union[Result, DictData]:
         """Handler stage execution result from the stage `process` method.
@@ -287,7 +286,6 @@ class BaseStage(BaseModel, ABC):
         Args:
             params: A parameter data.
             run_id: A running stage ID. (Default is None)
-            parent_run_id: A parent running ID. (Default is None)
             event: An event manager that pass to the stage execution.
                 (Default is None)
 
@@ -295,6 +293,7 @@ class BaseStage(BaseModel, ABC):
             Result: The execution result with updated status and context.
         """
         ts: float = time.monotonic()
+        parent_run_id: str = run_id
         run_id: str = run_id or gen_id(self.iden, unique=True)
         context: DictData = {}
         trace: Trace = get_trace(
@@ -604,7 +603,6 @@ class BaseAsyncStage(BaseStage, ABC):
         params: DictData,
         *,
         run_id: StrOrNone = None,
-        parent_run_id: StrOrNone = None,
         event: Optional[Event] = None,
     ) -> Result:
         """Async Handler stage execution result from the stage `execute` method.
@@ -613,7 +611,6 @@ class BaseAsyncStage(BaseStage, ABC):
             params: A parameter data that want to use in this
                 execution.
             run_id: A running stage ID. (Default is None)
-            parent_run_id: A parent running ID. (Default is None)
             event: An event manager that use to track parent process
                 was not force stopped.
 
@@ -621,6 +618,7 @@ class BaseAsyncStage(BaseStage, ABC):
             Result: The execution result with status and context data.
         """
         ts: float = time.monotonic()
+        parent_run_id: StrOrNone = run_id
         run_id: str = run_id or gen_id(self.iden, unique=True)
         context: DictData = {}
         trace: Trace = get_trace(
@@ -2137,8 +2135,7 @@ class ParallelStage(BaseNestedStage):
 
             rs: Result = stage.execute(
                 params=current_context,
-                run_id=run_id,
-                parent_run_id=parent_run_id,
+                run_id=parent_run_id,
                 event=event,
             )
             stage.set_outputs(rs.context, to=nestet_context)
@@ -2403,8 +2400,7 @@ class ForEachStage(BaseNestedStage):
             # NOTE: Nested-stage execute will pass only params and context only.
             rs: Result = stage.execute(
                 params=current_context,
-                run_id=run_id,
-                parent_run_id=parent_run_id,
+                run_id=parent_run_id,
                 event=event,
             )
             stage.set_outputs(rs.context, to=nestet_context)
@@ -2725,8 +2721,7 @@ class UntilStage(BaseNestedStage):
 
             rs: Result = stage.execute(
                 params=current_context,
-                run_id=run_id,
-                parent_run_id=parent_run_id,
+                run_id=parent_run_id,
                 event=event,
             )
             stage.set_outputs(rs.context, to=nestet_context)
@@ -3007,8 +3002,7 @@ class CaseStage(BaseNestedStage):
 
             rs: Result = stage.execute(
                 params=current_context,
-                run_id=run_id,
-                parent_run_id=parent_run_id,
+                run_id=parent_run_id,
                 event=event,
             )
             stage.set_outputs(rs.context, to=output)
