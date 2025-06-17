@@ -47,9 +47,11 @@ from pathlib import Path
 from threading import get_ident
 from types import FrameType
 from typing import ClassVar, Final, Literal, Optional, Union
-from urllib.parse import ParseResult, unquote_plus
+from urllib.parse import ParseResult, unquote_plus, urlparse
 
 from pydantic import BaseModel, ConfigDict, Field
+from pydantic.functional_serializers import field_serializer
+from pydantic.functional_validators import field_validator
 from typing_extensions import Self
 
 from .__types import DictData
@@ -566,6 +568,18 @@ class OutsideTrace(ConsoleTrace, ABC):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     url: ParseResult = Field(description="An URL for create pointer.")
+
+    @field_validator(
+        "url", mode="before", json_schema_input_type=Union[ParseResult, str]
+    )
+    def __parse_url(cls, value: Union[ParseResult, str]) -> ParseResult:
+        if isinstance(value, str):
+            return urlparse(value)
+        return value
+
+    @field_serializer("url")
+    def __serialize_url(self, value: ParseResult) -> str:
+        return value.geturl()
 
     @classmethod
     @abstractmethod

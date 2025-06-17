@@ -43,8 +43,10 @@ from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
 from typing import ClassVar, Optional, Union
+from urllib.parse import ParseResult
 
 from pydantic import BaseModel, Field
+from pydantic.functional_serializers import field_serializer
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
@@ -183,6 +185,13 @@ class FileAudit(BaseAudit):
     filename_fmt: ClassVar[str] = (
         "workflow={name}/release={release:%Y%m%d%H%M%S}"
     )
+
+    @field_serializer("extras")
+    def __serialize_extras(self, value: DictData) -> DictData:
+        return {
+            k: (v.geturl() if isinstance(v, ParseResult) else v)
+            for k, v in value.items()
+        }
 
     def do_before(self) -> None:
         """Create directory of release before saving log file."""
