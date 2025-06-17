@@ -1,7 +1,7 @@
 import pytest
 from ddeutil.workflow.errors import JobError
 from ddeutil.workflow.job import Job, local_execute_strategy
-from ddeutil.workflow.result import CANCEL, FAILED, SKIP, SUCCESS, Result
+from ddeutil.workflow.result import CANCEL, FAILED, SKIP, SUCCESS
 from ddeutil.workflow.workflow import Workflow
 
 from .utils import MockEvent
@@ -11,10 +11,11 @@ def test_job_exec_strategy():
     job: Job = Workflow.from_conf(name="wf-run-python-raise-for-job").job(
         "job-complete"
     )
-    st, rs = local_execute_strategy(job, {"sleep": "0.1"}, {})
+    st, ctx = local_execute_strategy(
+        job, {"sleep": "0.1"}, {}, run_id="001", context={}
+    )
     assert st == SUCCESS
-    assert rs.status == SUCCESS
-    assert rs.context == {
+    assert ctx == {
         "status": SUCCESS,
         "9873503202": {
             "status": SUCCESS,
@@ -30,10 +31,11 @@ def test_job_exec_strategy_skipped_stage():
     job: Job = Workflow.from_conf(name="wf-run-python-raise-for-job").job(
         "job-stage-condition"
     )
-    st, rs = local_execute_strategy(job, {"sleep": "1"}, {})
+    st, ctx = local_execute_strategy(
+        job, {"sleep": "1"}, {}, run_id="001", context={}
+    )
     assert st == SUCCESS
-    assert rs.status == SUCCESS
-    assert rs.context == {
+    assert ctx == {
         "status": SUCCESS,
         "2150810470": {
             "status": SUCCESS,
@@ -54,12 +56,13 @@ def test_job_exec_strategy_catch_stage_error():
         "final-job"
     )
 
-    rs = Result()
+    context = {}
     with pytest.raises(JobError):
-        local_execute_strategy(job, {"name": "foo"}, {}, result=rs)
+        local_execute_strategy(
+            job, {"name": "foo"}, {}, run_id="001", context=context
+        )
 
-    assert rs.status == FAILED
-    assert rs.context == {
+    assert context == {
         "status": FAILED,
         "5027535057": {
             "status": FAILED,
@@ -90,12 +93,13 @@ def test_job_exec_strategy_catch_job_error():
     job: Job = Workflow.from_conf("wf-run-python-raise-for-job").job(
         "final-job"
     )
-    rs = Result()
+    context = {}
     with pytest.raises(JobError):
-        local_execute_strategy(job, {"name": "foo"}, {}, result=rs)
+        local_execute_strategy(
+            job, {"name": "foo"}, {}, run_id="001", context=context
+        )
 
-    assert rs.status == FAILED
-    assert rs.context == {
+    assert context == {
         "status": FAILED,
         "5027535057": {
             "status": FAILED,
@@ -127,12 +131,13 @@ def test_job_exec_strategy_event_set():
         "second-job"
     )
     event = MockEvent(n=0)
-    rs = Result()
+    context = {}
     with pytest.raises(JobError):
-        local_execute_strategy(job, {}, {}, result=rs, event=event)
+        local_execute_strategy(
+            job, {}, {}, run_id="001", context=context, event=event
+        )
 
-    assert rs.status == CANCEL
-    assert rs.context == {
+    assert context == {
         "status": CANCEL,
         "EMPTY": {
             "status": CANCEL,
@@ -153,12 +158,12 @@ def test_job_exec_strategy_raise():
     job: Job = Workflow.from_conf(name="wf-run-python-raise-for-job").job(
         "first-job"
     )
-    rs = Result()
+    context = {}
     with pytest.raises(JobError):
-        local_execute_strategy(job, {}, {}, result=rs)
+        local_execute_strategy(job, {}, {}, run_id="001", context=context)
 
-    assert rs.status == FAILED
-    assert rs.context == {
+    assert context["status"] == FAILED
+    assert context == {
         "status": FAILED,
         "EMPTY": {
             "status": FAILED,

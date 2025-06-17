@@ -104,6 +104,7 @@ class MockEvent(Event):  # pragma: no cov
     """
 
     def __init__(self, n: int = 1):
+        super().__init__()
         self.n: int = n
         self.counter: int = 0
         self.lock: RLock = RLock()
