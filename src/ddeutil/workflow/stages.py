@@ -106,7 +106,7 @@ from .reusables import (
     not_in_template,
     param2template,
 )
-from .traces import TraceModel, get_trace
+from .traces import Trace, get_trace
 from .utils import (
     delay,
     dump_all,
@@ -191,7 +191,8 @@ class BaseStage(BaseModel, ABC):
         """Return this stage identity that return the `id` field first and if
         this `id` field does not set, it will use the `name` field instead.
 
-        :rtype: str
+        Returns:
+            str: Return an identity of this stage for making output.
         """
         return self.id or self.name
 
@@ -514,6 +515,7 @@ class BaseStage(BaseModel, ABC):
             param2template(self.id, params=params, extras=self.extras)
             if self.id
             else gen_id(
+                # NOTE: The name should be non-sensitive case for uniqueness.
                 param2template(self.name, params=params, extras=self.extras)
             )
         )
@@ -1832,20 +1834,24 @@ class ParallelStage(BaseNestedStage):
         alias="max-workers",
     )
 
-    def process_branch(
+    def _process_branch(
         self,
         branch: str,
         params: DictData,
-        result: Result,
+        run_id: str,
+        context: DictData,
         *,
+        parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
-    ) -> tuple[Status, Result]:
+    ) -> tuple[Status, DictData]:
         """Execute branch that will execute all nested-stage that was set in
         this stage with specific branch ID.
 
         :param branch: (str) A branch ID.
         :param params: (DictData) A parameter data.
-        :param result: (Result) A Result instance for return context and status.
+        :param run_id: (str)
+        :param context: (DictData)
+        :param parent_run_id: (str | None)
         :param event: (Event) An Event manager instance that use to cancel this
             execution if it forces stopped by parent execution.
             (Default is None)
@@ -1855,13 +1861,16 @@ class ParallelStage(BaseNestedStage):
             status.
         :raise StageError: If result from a nested-stage return failed status.
 
-        :rtype: tuple[Status, Result]
+        :rtype: tuple[Status, DictData]
         """
-        result.trace.debug(f"[STAGE]: Execute Branch: {branch!r}")
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
+        )
+        trace.debug(f"[STAGE]: Execute Branch: {branch!r}")
 
         # NOTE: Create nested-context
-        context: DictData = copy.deepcopy(params)
-        context.update({"branch": branch})
+        current_context: DictData = copy.deepcopy(params)
+        current_context.update({"branch": branch})
         nestet_context: DictData = {"branch": branch, "stages": {}}
 
         total_stage: int = len(self.parallel[branch])
@@ -1876,7 +1885,8 @@ class ParallelStage(BaseNestedStage):
                     "Branch execution was canceled from the event before "
                     "start branch execution."
                 )
-                result.catch(
+                catch(
+                    context=context,
                     status=CANCEL,
                     parallel={
                         branch: {
@@ -1892,13 +1902,15 @@ class ParallelStage(BaseNestedStage):
                 raise StageCancelError(error_msg, refs=branch)
 
             rs: Result = stage.execute(
-                params=context,
-                run_id=result.run_id,
-                parent_run_id=result.parent_run_id,
+                params=current_context,
+                run_id=run_id,
+                parent_run_id=parent_run_id,
                 event=event,
             )
             stage.set_outputs(rs.context, to=nestet_context)
-            stage.set_outputs(stage.get_outputs(nestet_context), to=context)
+            stage.set_outputs(
+                stage.get_outputs(nestet_context), to=current_context
+            )
 
             if rs.status == SKIP:
                 skips[i] = True
@@ -1909,7 +1921,8 @@ class ParallelStage(BaseNestedStage):
                     f"Branch execution was break because its nested-stage, "
                     f"{stage.iden!r}, failed."
                 )
-                result.catch(
+                catch(
+                    context=context,
                     status=FAILED,
                     parallel={
                         branch: {
@@ -1929,7 +1942,8 @@ class ParallelStage(BaseNestedStage):
                     "Branch execution was canceled from the event after "
                     "end branch execution."
                 )
-                result.catch(
+                catch(
+                    context=context,
                     status=CANCEL,
                     parallel={
                         branch: {
@@ -1945,7 +1959,8 @@ class ParallelStage(BaseNestedStage):
                 raise StageCancelError(error_msg, refs=branch)
 
         status: Status = SKIP if sum(skips) == total_stage else SUCCESS
-        return status, result.catch(
+        return status, catch(
+            context=context,
             status=status,
             parallel={
                 branch: {
@@ -1992,10 +2007,12 @@ class ParallelStage(BaseNestedStage):
         with ThreadPoolExecutor(self.max_workers, "stp") as executor:
             futures: list[Future] = [
                 executor.submit(
-                    self.process_branch,
+                    self._process_branch,
                     branch=branch,
                     params=params,
-                    result=result,
+                    run_id=result.run_id,
+                    context=result.context,
+                    parent_run_id=result.parent_run_id,
                     event=event,
                 )
                 for branch in self.parallel
@@ -2063,7 +2080,7 @@ class ForEachStage(BaseNestedStage):
         ),
     )
 
-    def process_item(
+    def _process_item(
         self,
         index: int,
         item: StrOrInt,
@@ -2099,7 +2116,7 @@ class ForEachStage(BaseNestedStage):
 
         :rtype: tuple[Status, Result]
         """
-        trace: TraceModel = get_trace(
+        trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         trace.debug(f"[STAGE]: Execute Item: {item!r}")
@@ -2275,7 +2292,7 @@ class ForEachStage(BaseNestedStage):
         with ThreadPoolExecutor(self.concurrent, "stf") as executor:
             futures: list[Future] = [
                 executor.submit(
-                    self.process_item,
+                    self._process_item,
                     index=i,
                     item=item,
                     params=params,
