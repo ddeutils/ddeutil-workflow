@@ -195,6 +195,22 @@ class Result:
     extras: DictData = field(default_factory=dict, compare=False, repr=False)
 
     @classmethod
+    def construct_with_id(
+        cls,
+        run_id: Optional[str] = None,
+        parent_run_id: Optional[str] = None,
+        id_logic: Optional[str] = None,
+        *,
+        extras: DictData | None = None,
+    ):
+        return cls(
+            run_id=(run_id or gen_id(id_logic or "", unique=True)),
+            parent_run_id=parent_run_id,
+            ts=get_dt_ntz_now(),
+            extras=(extras or {}),
+        )
+
+    @classmethod
     def construct_with_rs_or_id(
         cls,
         result: Optional[Result] = None,
@@ -317,16 +333,16 @@ def catch(
     context.update(updated or {})
     context["status"] = Status(status) if isinstance(status, int) else status
 
+    if not kwargs:
+        return context
+
     # NOTE: Update other context data.
-    if kwargs:
-        for k in kwargs:
-            if k in context:
-                context[k].update(kwargs[k])
-            # NOTE: Exclude the `info` key for update information data.
-            elif k == "info":
-                context["info"].update(kwargs["info"])
-            else:
-                raise ResultError(
-                    f"The key {k!r} does not exists on context data."
-                )
+    for k in kwargs:
+        if k in context:
+            context[k].update(kwargs[k])
+        # NOTE: Exclude the `info` key for update information data.
+        elif k == "info":
+            context["info"].update(kwargs["info"])
+        else:
+            raise ResultError(f"The key {k!r} does not exists on context data.")
     return context
