@@ -29,7 +29,7 @@ Functions:
 Example:
     >>> from ddeutil.workflow.traces import get_trace
     >>> # Create file-based trace
-    >>> trace = get_trace("run-123", parent_run_id="workflow-456")
+    >>> trace = get_trace("running-id-101", parent_run_id="workflow-001")
     >>> trace.info("Workflow execution started")
     >>> trace.debug("Processing stage 1")
 """
@@ -806,7 +806,7 @@ class SQLiteTrace(ConsoleTrace):  # pragma: no cov
     ) -> None: ...
 
 
-Trace = TypeVar("Trace", bound=BaseTrace)
+Trace = TypeVar("Trace", bound=ConsoleTrace)
 TraceModel = Union[
     ConsoleTrace,
     FileTrace,
@@ -819,7 +819,7 @@ def get_trace(
     *,
     parent_run_id: Optional[str] = None,
     extras: Optional[DictData] = None,
-) -> TraceModel:  # pragma: no cov
+) -> Trace:  # pragma: no cov
     """Get dynamic Trace instance from the core config (it can override by an
     extras argument) that passing running ID and parent running ID.
 
@@ -828,7 +828,7 @@ def get_trace(
     :param extras: (DictData) An extra parameter that want to override the core
         config values.
 
-    :rtype: TraceLog
+    :rtype: Trace
     """
     if dynamic("trace_path", extras=extras).is_file():
         return SQLiteTrace(
