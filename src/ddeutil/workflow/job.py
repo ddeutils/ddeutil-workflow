@@ -765,9 +765,10 @@ class Job(BaseModel):
         with specific target `runs-on` value.
 
         Args
-            params: (DictData) A parameter data.
-            run_id: (str) A job running ID.
-            parent_run_id: (str) A parent running ID.
+            params: (DictData) A parameter context that also pass from the
+                workflow execute method.
+            run_id: (str) An execution running ID.
+            parent_run_id: (str) An execution parent running ID.
             event: (Event) An Event manager instance that use to cancel this
                 execution if it forces stopped by parent execution.
 

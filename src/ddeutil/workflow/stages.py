@@ -227,8 +227,10 @@ class BaseStage(BaseModel, ABC):
     def process(
         self,
         params: DictData,
+        run_id: str,
+        context: DictData,
         *,
-        result: Optional[Result] = None,
+        parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> Result:
         """Process abstraction method that action something by sub-model class.
@@ -237,8 +239,9 @@ class BaseStage(BaseModel, ABC):
         Args:
             params: A parameter data that want to use in this
                 execution.
-            result: A result object for keeping context and status
-                data.
+            run_id: A running stage ID.
+            context: A context data.
+            parent_run_id: A parent running ID. (Default is None)
             event: An event manager that use to track parent process
                 was not force stopped.
 
@@ -292,11 +295,10 @@ class BaseStage(BaseModel, ABC):
             Result: The execution result with updated status and context.
         """
         ts: float = time.monotonic()
-        result: Result = Result.construct_with_id(
-            run_id=run_id,
-            parent_run_id=parent_run_id,
-            id_logic=self.iden,
-            extras=self.extras,
+        run_id: str = run_id or gen_id(self.iden, unique=True)
+        context: DictData = {}
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         try:
             _id: str = (
@@ -304,14 +306,14 @@ class BaseStage(BaseModel, ABC):
                 if self.id
                 else ""
             )
-            result.trace.info(
+            trace.info(
                 f"[STAGE]: Handler {to_train(self.__class__.__name__)}: "
                 f"{self.name!r}{_id}."
             )
 
             # NOTE: Show the description of this stage before execution.
             if self.desc:
-                result.trace.debug(f"[STAGE]: Description:||{self.desc}||")
+                trace.debug(f"[STAGE]: Description:||{self.desc}||")
 
             # VALIDATE: Checking stage condition before execution.
             if self.is_skipped(params):
@@ -323,7 +325,9 @@ class BaseStage(BaseModel, ABC):
             #   execution before the real execution from inherit stage model.
             result_caught: Result = self._execute(
                 params,
-                result=result,
+                run_id=run_id,
+                context=context,
+                parent_run_id=parent_run_id,
                 event=event,
             )
             if result_caught.status == WAIT:
@@ -341,48 +345,70 @@ class BaseStage(BaseModel, ABC):
             StageCancelError,
             StageError,
         ) as e:  # pragma: no cov
-            result.trace.info(
+            trace.info(
                 f"[STAGE]: Handler:||{e.__class__.__name__}: {e}||"
                 f"{traceback.format_exc()}"
             )
-            return result.catch(
-                status=get_status_from_error(e),
-                context=(
-                    None
-                    if isinstance(e, StageSkipError)
-                    else {"errors": e.to_dict()}
+            st: Status = get_status_from_error(e)
+            return Result(
+                run_id=run_id,
+                parent_run_id=parent_run_id,
+                status=st,
+                context=catch(
+                    context,
+                    status=st,
+                    updated=(
+                        None
+                        if isinstance(e, StageSkipError)
+                        else {"errors": e.to_dict()}
+                    ),
                 ),
                 info={"execution_time": time.monotonic() - ts},
+                extras=self.extras,
             )
         except Exception as e:
-            result.trace.error(
+            trace.error(
                 f"[STAGE]: Error Handler:||{e.__class__.__name__}: {e}||"
                 f"{traceback.format_exc()}"
             )
-            return result.catch(
+            return Result(
+                run_id=run_id,
+                parent_run_id=parent_run_id,
                 status=FAILED,
-                context={"errors": to_dict(e)},
+                context=catch(
+                    context, status=FAILED, updated={"errors": to_dict(e)}
+                ),
                 info={"execution_time": time.monotonic() - ts},
+                extras=self.extras,
             )
 
     def _execute(
-        self, params: DictData, result: Result, event: Optional[Event]
+        self,
+        params: DictData,
+        run_id: str,
+        context: DictData,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
     ) -> Result:
         """Wrapped the process method before returning to handler execution.
 
         Args:
             params: A parameter data that want to use in this
                 execution.
-            result: A result object for keeping context and status
-                data.
             event: An event manager that use to track parent process
                 was not force stopped.
 
         Returns:
             Result: The wrapped execution result.
         """
-        result.catch(status=WAIT)
-        return self.process(params, result=result, event=event)
+        catch(context, status=WAIT)
+        return self.process(
+            params,
+            run_id=run_id,
+            context=context,
+            parent_run_id=parent_run_id,
+            event=event,
+        )
 
     def set_outputs(
         self,
@@ -548,21 +574,26 @@ class BaseAsyncStage(BaseStage, ABC):
     async def async_process(
         self,
         params: DictData,
+        run_id: str,
+        context: DictData,
         *,
-        result: Optional[Result] = None,
+        parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> Result:
         """Async execution method for this Empty stage that only logging out to
         stdout.
 
-        :param params: (DictData) A context data that want to add output result.
-            But this stage does not pass any output.
-        :param result: (Result) A result object for keeping context and status
-            data.
-        :param event: (Event) An event manager that use to track parent execute
-            was not force stopped.
+        Args:
+            params: A parameter data that want to use in this
+                execution.
+            run_id: A running stage ID.
+            context: A context data.
+            parent_run_id: A parent running ID. (Default is None)
+            event: An event manager that use to track parent process
+                was not force stopped.
 
-        :rtype: Result
+        Returns:
+            Result: The execution result with status and context data.
         """
         raise NotImplementedError(
             "Async Stage should implement `axecute` method."
@@ -578,19 +609,22 @@ class BaseAsyncStage(BaseStage, ABC):
     ) -> Result:
         """Async Handler stage execution result from the stage `execute` method.
 
-        :param params: (DictData) A parameter data.
-        :param run_id: (str) A stage running ID.
-        :param parent_run_id: (str) A parent job running ID.
-        :param event: (Event) An Event manager instance that use to cancel this
-            execution if it forces stopped by parent execution.
+        Args:
+            params: A parameter data that want to use in this
+                execution.
+            run_id: A running stage ID. (Default is None)
+            parent_run_id: A parent running ID. (Default is None)
+            event: An event manager that use to track parent process
+                was not force stopped.
 
-        :rtype: Result
+        Returns:
+            Result: The execution result with status and context data.
         """
-        result: Result = Result.construct_with_id(
-            run_id=run_id,
-            parent_run_id=parent_run_id,
-            id_logic=self.iden,
-            extras=self.extras,
+        ts: float = time.monotonic()
+        run_id: str = run_id or gen_id(self.iden, unique=True)
+        context: DictData = {}
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         try:
             _id: str = (
@@ -598,16 +632,14 @@ class BaseAsyncStage(BaseStage, ABC):
                 if self.id
                 else ""
             )
-            await result.trace.ainfo(
+            await trace.ainfo(
                 f"[STAGE]: Handler {to_train(self.__class__.__name__)}: "
                 f"{self.name!r}{_id}."
             )
 
             # NOTE: Show the description of this stage before execution.
             if self.desc:
-                await result.trace.adebug(
-                    f"[STAGE]: Description:||{self.desc}||"
-                )
+                await trace.adebug(f"[STAGE]: Description:||{self.desc}||")
 
             # VALIDATE: Checking stage condition before execution.
             if self.is_skipped(params=params):
@@ -618,7 +650,11 @@ class BaseAsyncStage(BaseStage, ABC):
             # NOTE: Start call wrapped execution method that will use custom
             #   execution before the real execution from inherit stage model.
             result_caught: Result = await self._axecute(
-                params, result=result, event=event
+                params,
+                run_id=run_id,
+                context=context,
+                parent_run_id=parent_run_id,
+                event=event,
             )
             if result_caught.status == WAIT:
                 raise StageError(
@@ -633,41 +669,68 @@ class BaseAsyncStage(BaseStage, ABC):
             StageCancelError,
             StageError,
         ) as e:  # pragma: no cov
-            await result.trace.ainfo(
+            await trace.ainfo(
                 f"[STAGE]: Skip Handler:||{e.__class__.__name__}: {e}||"
                 f"{traceback.format_exc()}"
             )
-            return result.catch(
-                status=get_status_from_error(e),
-                context=(
-                    {"errors": e.to_dict()}
-                    if isinstance(e, StageError)
-                    else None
+            st: Status = get_status_from_error(e)
+            return Result(
+                run_id=run_id,
+                parent_run_id=parent_run_id,
+                status=st,
+                context=catch(
+                    context,
+                    status=st,
+                    updated=(
+                        None
+                        if isinstance(e, StageSkipError)
+                        else {"status": st, "errors": e.to_dict()}
+                    ),
                 ),
+                info={"execution_time": time.monotonic() - ts},
+                extras=self.extras,
             )
         except Exception as e:
-            await result.trace.aerror(
+            await trace.aerror(
                 f"[STAGE]: Error Handler:||{e.__class__.__name__}: {e}||"
                 f"{traceback.format_exc()}"
             )
-            return result.catch(status=FAILED, context={"errors": to_dict(e)})
+            return Result(
+                run_id=run_id,
+                parent_run_id=parent_run_id,
+                status=FAILED,
+                context=catch(
+                    context, status=FAILED, updated={"errors": to_dict(e)}
+                ),
+                info={"execution_time": time.monotonic() - ts},
+                extras=self.extras,
+            )
 
     async def _axecute(
-        self, params: DictData, result: Result, event: Optional[Event]
+        self,
+        params: DictData,
+        run_id: str,
+        context: DictData,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
     ) -> Result:
         """Wrapped the axecute method before returning to handler axecute.
 
         :param params: (DictData) A parameter data that want to use in this
             execution.
-        :param result: (Result) A result object for keeping context and status
-            data.
         :param event: (Event) An event manager that use to track parent execute
             was not force stopped.
 
         :rtype: Result
         """
-        result.catch(status=WAIT)
-        return await self.async_process(params, result=result, event=event)
+        catch(context, status=WAIT)
+        return await self.async_process(
+            params,
+            run_id=run_id,
+            context=context,
+            parent_run_id=parent_run_id,
+            event=event,
+        )
 
 
 class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
@@ -685,16 +748,16 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
     def _execute(
         self,
         params: DictData,
-        result: Result,
-        event: Optional[Event],
+        run_id: str,
+        context: DictData,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
     ) -> Result:
         """Wrapped the execute method with retry strategy before returning to
         handler execute.
 
         :param params: (DictData) A parameter data that want to use in this
             execution.
-        :param result: (Result) A result object for keeping context and status
-            data.
         :param event: (Event) An event manager that use to track parent execute
             was not force stopped.
 
@@ -702,13 +765,18 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
         """
         current_retry: int = 0
         exception: Exception
+        catch(context, status=WAIT)
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
+        )
 
         # NOTE: First execution for not pass to retry step if it passes.
         try:
-            result.catch(status=WAIT)
             return self.process(
                 params | {"retry": current_retry},
-                result=result,
+                run_id=run_id,
+                context=context,
+                parent_run_id=parent_run_id,
                 event=event,
             )
         except Exception as e:
@@ -718,28 +786,34 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
         if self.retry == 0:
             raise exception
 
-        result.trace.warning(
+        trace.warning(
             f"[STAGE]: Retry count: {current_retry} ... "
             f"( {exception.__class__.__name__} )"
         )
 
         while current_retry < (self.retry + 1):
             try:
-                result.catch(status=WAIT, context={"retry": current_retry})
+                catch(
+                    context=context,
+                    status=WAIT,
+                    updated={"retry": current_retry},
+                )
                 return self.process(
                     params | {"retry": current_retry},
-                    result=result,
+                    run_id=run_id,
+                    context=context,
+                    parent_run_id=parent_run_id,
                     event=event,
                 )
             except Exception as e:
                 current_retry += 1
-                result.trace.warning(
+                trace.warning(
                     f"[STAGE]: Retry count: {current_retry} ... "
                     f"( {e.__class__.__name__} )"
                 )
                 exception = e
 
-        result.trace.error(
+        trace.error(
             f"[STAGE]: Reach the maximum of retry number: {self.retry}."
         )
         raise exception
@@ -747,16 +821,16 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
     async def _axecute(
         self,
         params: DictData,
-        result: Result,
-        event: Optional[Event],
+        run_id: str,
+        context: DictData,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
     ) -> Result:
         """Wrapped the axecute method with retry strategy before returning to
         handler axecute.
 
         :param params: (DictData) A parameter data that want to use in this
             execution.
-        :param result: (Result) A result object for keeping context and status
-            data.
         :param event: (Event) An event manager that use to track parent execute
             was not force stopped.
 
@@ -764,13 +838,18 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
         """
         current_retry: int = 0
         exception: Exception
+        catch(context, status=WAIT)
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
+        )
 
         # NOTE: First execution for not pass to retry step if it passes.
         try:
-            result.catch(status=WAIT)
             return await self.async_process(
                 params | {"retry": current_retry},
-                result=result,
+                run_id=run_id,
+                context=context,
+                parent_run_id=parent_run_id,
                 event=event,
             )
         except Exception as e:
@@ -780,28 +859,34 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
         if self.retry == 0:
             raise exception
 
-        await result.trace.awarning(
+        await trace.awarning(
             f"[STAGE]: Retry count: {current_retry} ... "
             f"( {exception.__class__.__name__} )"
         )
 
         while current_retry < (self.retry + 1):
             try:
-                result.catch(status=WAIT, context={"retry": current_retry})
+                catch(
+                    context=context,
+                    status=WAIT,
+                    updated={"retry": current_retry},
+                )
                 return await self.async_process(
                     params | {"retry": current_retry},
-                    result=result,
+                    run_id=run_id,
+                    context=context,
+                    parent_run_id=parent_run_id,
                     event=event,
                 )
             except Exception as e:
                 current_retry += 1
-                await result.trace.awarning(
+                await trace.awarning(
                     f"[STAGE]: Retry count: {current_retry} ... "
                     f"( {e.__class__.__name__} )"
                 )
                 exception = e
 
-        await result.trace.aerror(
+        await trace.aerror(
             f"[STAGE]: Reach the maximum of retry number: {self.retry}."
         )
         raise exception
@@ -862,8 +947,10 @@ class EmptyStage(BaseAsyncStage):
     def process(
         self,
         params: DictData,
+        run_id: str,
+        context: DictData,
         *,
-        result: Optional[Result] = None,
+        parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> Result:
         """Execution method for the Empty stage that do only logging out to
@@ -872,16 +959,20 @@ class EmptyStage(BaseAsyncStage):
             The result context should be empty and do not process anything
         without calling logging function.
 
-        :param params: (DictData) A parameter data.
-        :param result: (Result) A Result instance for return context and status.
-        :param event: (Event) An Event manager instance that use to cancel this
-            execution if it forces stopped by parent execution.
+        Args:
+            params: A parameter data that want to use in this
+                execution.
+            run_id: A running stage ID.
+            context: A context data.
+            parent_run_id: A parent running ID. (Default is None)
+            event: An event manager that use to track parent process
+                was not force stopped.
 
-        :rtype: Result
+        Returns:
+            Result: The execution result with status and context data.
         """
-        result: Result = result or Result(
-            run_id=gen_id(self.name + (self.id or ""), unique=True),
-            extras=self.extras,
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         message: str = (
             param2template(
@@ -896,35 +987,46 @@ class EmptyStage(BaseAsyncStage):
                 "Execution was canceled from the event before start parallel."
             )
 
-        result.trace.info(f"[STAGE]: Message: ( {message} )")
+        trace.info(f"[STAGE]: Message: ( {message} )")
         if self.sleep > 0:
             if self.sleep > 5:
-                result.trace.info(f"[STAGE]: Sleep ... ({self.sleep} sec)")
+                trace.info(f"[STAGE]: Sleep ... ({self.sleep} sec)")
             time.sleep(self.sleep)
-        return result.catch(status=SUCCESS)
+        return Result(
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            status=SUCCESS,
+            context=catch(context=context, status=SUCCESS),
+            extras=self.extras,
+        )
 
     async def async_process(
         self,
         params: DictData,
+        run_id: str,
+        context: DictData,
         *,
-        result: Optional[Result] = None,
+        parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> Result:
         """Async execution method for this Empty stage that only logging out to
         stdout.
 
-        :param params: (DictData) A parameter data.
-        :param result: (Result) A Result instance for return context and status.
-        :param event: (Event) An Event manager instance that use to cancel this
-            execution if it forces stopped by parent execution.
+        Args:
+            params: A parameter data that want to use in this
+                execution.
+            run_id: A running stage ID.
+            context: A context data.
+            parent_run_id: A parent running ID. (Default is None)
+            event: An event manager that use to track parent process
+                was not force stopped.
 
-        :rtype: Result
+        Returns:
+            Result: The execution result with status and context data.
         """
-        result: Result = result or Result(
-            run_id=gen_id(self.name + (self.id or ""), unique=True),
-            extras=self.extras,
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
         )
-
         message: str = (
             param2template(
                 dedent(self.echo.strip("\n")), params, extras=self.extras
@@ -938,14 +1040,18 @@ class EmptyStage(BaseAsyncStage):
                 "Execution was canceled from the event before start parallel."
             )
 
-        result.trace.info(f"[STAGE]: Message: ( {message} )")
+        trace.info(f"[STAGE]: Message: ( {message} )")
         if self.sleep > 0:
             if self.sleep > 5:
-                await result.trace.ainfo(
-                    f"[STAGE]: Sleep ... ({self.sleep} sec)"
-                )
+                await trace.ainfo(f"[STAGE]: Sleep ... ({self.sleep} sec)")
             await asyncio.sleep(self.sleep)
-        return result.catch(status=SUCCESS)
+        return Result(
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            status=SUCCESS,
+            context=catch(context=context, status=SUCCESS),
+            extras=self.extras,
+        )
 
 
 class BashStage(BaseRetryStage):
@@ -1053,27 +1159,38 @@ class BashStage(BaseRetryStage):
         # Note: Remove .sh file that use to run bash.
         Path(f"./{f_name}").unlink()
 
+    @staticmethod
+    def prepare_std(value: str) -> Optional[str]:
+        """Prepare returned standard string from subprocess."""
+        return None if (out := value.strip("\n")) == "" else out
+
     def process(
         self,
         params: DictData,
+        run_id: str,
+        context: DictData,
         *,
-        result: Optional[Result] = None,
+        parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> Result:
         """Execute bash statement with the Python build-in `subprocess` package.
         It will catch result from the `subprocess.run` returning output like
         `return_code`, `stdout`, and `stderr`.
 
-        :param params: (DictData) A parameter data.
-        :param result: (Result) A Result instance for return context and status.
-        :param event: (Event) An Event manager instance that use to cancel this
-            execution if it forces stopped by parent execution.
+        Args:
+            params: A parameter data that want to use in this
+                execution.
+            run_id: A running stage ID.
+            context: A context data.
+            parent_run_id: A parent running ID. (Default is None)
+            event: An event manager that use to track parent process
+                was not force stopped.
 
-        :rtype: Result
+        Returns:
+            Result: The execution result with status and context data.
         """
-        result: Result = result or Result(
-            run_id=gen_id(self.name + (self.id or ""), unique=True),
-            extras=self.extras,
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         bash: str = param2template(
             dedent(self.bash.strip("\n")), params, extras=self.extras
@@ -1081,9 +1198,9 @@ class BashStage(BaseRetryStage):
         with self.create_sh_file(
             bash=bash,
             env=param2template(self.env, params, extras=self.extras),
-            run_id=result.run_id,
+            run_id=run_id,
         ) as sh:
-            result.trace.debug(f"[STAGE]: Create `{sh[1]}` file.")
+            trace.debug(f"[STAGE]: Create `{sh[1]}` file.")
             rs: CompletedProcess = subprocess.run(
                 sh,
                 shell=False,
@@ -1096,35 +1213,48 @@ class BashStage(BaseRetryStage):
             e: str = rs.stderr.removesuffix("\n")
             e_bash: str = bash.replace("\n", "\n\t")
             raise StageError(f"Subprocess: {e}\n\t```bash\n\t{e_bash}\n\t```")
-        return result.catch(
+        return Result(
+            run_id=run_id,
+            parent_run_id=parent_run_id,
             status=SUCCESS,
-            context={
-                "return_code": rs.returncode,
-                "stdout": None if (out := rs.stdout.strip("\n")) == "" else out,
-                "stderr": None if (out := rs.stderr.strip("\n")) == "" else out,
-            },
+            context=catch(
+                context=context,
+                status=SUCCESS,
+                updated={
+                    "return_code": rs.returncode,
+                    "stdout": self.prepare_std(rs.stdout),
+                    "stderr": self.prepare_std(rs.stderr),
+                },
+            ),
+            extras=self.extras,
         )
 
     async def async_process(
         self,
         params: DictData,
+        run_id: str,
+        context: DictData,
         *,
-        result: Optional[Result] = None,
+        parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> Result:
         """Async execution method for this Bash stage that only logging out to
         stdout.
 
-        :param params: (DictData) A parameter data.
-        :param result: (Result) A Result instance for return context and status.
-        :param event: (Event) An Event manager instance that use to cancel this
-            execution if it forces stopped by parent execution.
+        Args:
+            params: A parameter data that want to use in this
+                execution.
+            run_id: A running stage ID.
+            context: A context data.
+            parent_run_id: A parent running ID. (Default is None)
+            event: An event manager that use to track parent process
+                was not force stopped.
 
-        :rtype: Result
+        Returns:
+            Result: The execution result with status and context data.
         """
-        result: Result = result or Result(
-            run_id=gen_id(self.name + (self.id or ""), unique=True),
-            extras=self.extras,
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         bash: str = param2template(
             dedent(self.bash.strip("\n")), params, extras=self.extras
@@ -1132,9 +1262,9 @@ class BashStage(BaseRetryStage):
         async with self.async_create_sh_file(
             bash=bash,
             env=param2template(self.env, params, extras=self.extras),
-            run_id=result.run_id,
+            run_id=run_id,
         ) as sh:
-            await result.trace.adebug(f"[STAGE]: Create `{sh[1]}` file.")
+            await trace.adebug(f"[STAGE]: Create `{sh[1]}` file.")
             rs: CompletedProcess = subprocess.run(
                 sh,
                 shell=False,
@@ -1148,13 +1278,20 @@ class BashStage(BaseRetryStage):
             e: str = rs.stderr.removesuffix("\n")
             e_bash: str = bash.replace("\n", "\n\t")
             raise StageError(f"Subprocess: {e}\n\t```bash\n\t{e_bash}\n\t```")
-        return result.catch(
+        return Result(
+            run_id=run_id,
+            parent_run_id=parent_run_id,
             status=SUCCESS,
-            context={
-                "return_code": rs.returncode,
-                "stdout": None if (out := rs.stdout.strip("\n")) == "" else out,
-                "stderr": None if (out := rs.stderr.strip("\n")) == "" else out,
-            },
+            context=catch(
+                context=context,
+                status=SUCCESS,
+                updated={
+                    "return_code": rs.returncode,
+                    "stdout": self.prepare_std(rs.stdout),
+                    "stderr": self.prepare_std(rs.stderr),
+                },
+            ),
+            extras=self.extras,
         )
 
 
@@ -1236,30 +1373,44 @@ class PyStage(BaseRetryStage):
     def process(
         self,
         params: DictData,
+        run_id: str,
+        context: DictData,
         *,
-        result: Optional[Result] = None,
+        parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> Result:
         """Execute the Python statement that pass all globals and input params
         to globals argument on `exec` build-in function.
 
-        :param params: (DictData) A parameter data.
-        :param result: (Result) A result object for keeping context and status
-            data.
-        :param event: (Event) An event manager that use to track parent execute
-            was not force stopped.
+        Args:
+            params: A parameter data that want to use in this
+                execution.
+            run_id: A running stage ID.
+            context: A context data.
+            parent_run_id: A parent running ID. (Default is None)
+            event: An event manager that use to track parent process
+                was not force stopped.
 
-        :rtype: Result
+        Returns:
+            Result: The execution result with status and context data.
         """
-        result: Result = result or Result(
-            run_id=gen_id(self.name + (self.id or ""), unique=True),
-            extras=self.extras,
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
         )
+        trace.info("[STAGE]: Prepare `globals` and `locals` variables.")
         lc: DictData = {}
         gb: DictData = (
             globals()
             | param2template(self.vars, params, extras=self.extras)
-            | {"result": result}
+            | {
+                "result": Result(
+                    run_id=run_id,
+                    parent_run_id=parent_run_id,
+                    status=WAIT,
+                    context=context,
+                    extras=self.extras,
+                )
+            }
         )
 
         # WARNING: The exec build-in function is very dangerous. So, it
@@ -1271,55 +1422,76 @@ class PyStage(BaseRetryStage):
             gb,
             lc,
         )
-
-        return result.catch(
+        return Result(
+            run_id=run_id,
+            parent_run_id=parent_run_id,
             status=SUCCESS,
-            context={
-                "locals": {k: lc[k] for k in self.filter_locals(lc)},
-                "globals": {
-                    k: gb[k]
-                    for k in gb
-                    if (
-                        not k.startswith("__")
-                        and k != "annotations"
-                        and not ismodule(gb[k])
-                        and not isclass(gb[k])
-                        and not isfunction(gb[k])
-                        and k in params
-                    )
+            context=catch(
+                context=context,
+                status=SUCCESS,
+                updated={
+                    "locals": {k: lc[k] for k in self.filter_locals(lc)},
+                    "globals": {
+                        k: gb[k]
+                        for k in gb
+                        if (
+                            not k.startswith("__")
+                            and k != "annotations"
+                            and not ismodule(gb[k])
+                            and not isclass(gb[k])
+                            and not isfunction(gb[k])
+                            and k in params
+                        )
+                    },
                 },
-            },
+            ),
+            extras=self.extras,
         )
 
     async def async_process(
         self,
         params: DictData,
+        run_id: str,
+        context: DictData,
         *,
-        result: Optional[Result] = None,
+        parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> Result:
         """Async execution method for this Bash stage that only logging out to
         stdout.
 
-        :param params: (DictData) A parameter data.
-        :param result: (Result) A Result instance for return context and status.
-        :param event: (Event) An Event manager instance that use to cancel this
-            execution if it forces stopped by parent execution.
-
         References:
             - https://stackoverflow.com/questions/44859165/async-exec-in-python
 
-        :rtype: Result
+        Args:
+            params: A parameter data that want to use in this
+                execution.
+            run_id: A running stage ID.
+            context: A context data.
+            parent_run_id: A parent running ID. (Default is None)
+            event: An event manager that use to track parent process
+                was not force stopped.
+
+        Returns:
+            Result: The execution result with status and context data.
         """
-        result: Result = result or Result(
-            run_id=gen_id(self.name + (self.id or ""), unique=True),
-            extras=self.extras,
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
         )
+        await trace.ainfo("[STAGE]: Prepare `globals` and `locals` variables.")
         lc: DictData = {}
         gb: DictData = (
             globals()
             | param2template(self.vars, params, extras=self.extras)
-            | {"result": result}
+            | {
+                "result": Result(
+                    run_id=run_id,
+                    parent_run_id=parent_run_id,
+                    status=WAIT,
+                    context=context,
+                    extras=self.extras,
+                )
+            }
         )
         # WARNING: The exec build-in function is very dangerous. So, it
         #   should use the re module to validate exec-string before running.
@@ -1328,23 +1500,30 @@ class PyStage(BaseRetryStage):
             gb,
             lc,
         )
-        return result.catch(
+        return Result(
+            run_id=run_id,
+            parent_run_id=parent_run_id,
             status=SUCCESS,
-            context={
-                "locals": {k: lc[k] for k in self.filter_locals(lc)},
-                "globals": {
-                    k: gb[k]
-                    for k in gb
-                    if (
-                        not k.startswith("__")
-                        and k != "annotations"
-                        and not ismodule(gb[k])
-                        and not isclass(gb[k])
-                        and not isfunction(gb[k])
-                        and k in params
-                    )
+            context=catch(
+                context=context,
+                status=SUCCESS,
+                updated={
+                    "locals": {k: lc[k] for k in self.filter_locals(lc)},
+                    "globals": {
+                        k: gb[k]
+                        for k in gb
+                        if (
+                            not k.startswith("__")
+                            and k != "annotations"
+                            and not ismodule(gb[k])
+                            and not isclass(gb[k])
+                            and not isfunction(gb[k])
+                            and k in params
+                        )
+                    },
                 },
-            },
+            ),
+            extras=self.extras,
         )
 
 
@@ -1413,42 +1592,46 @@ class CallStage(BaseRetryStage):
     def process(
         self,
         params: DictData,
+        run_id: str,
+        context: DictData,
         *,
-        result: Optional[Result] = None,
+        parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> Result:
         """Execute this caller function with its argument parameter.
 
-        :param params: (DictData) A parameter data.
-        :param result: (Result) A Result instance for return context and status.
-        :param event: (Event) An Event manager instance that use to cancel this
-            execution if it forces stopped by parent execution.
+        Args:
+            params: A parameter data that want to use in this
+                execution.
+            run_id: A running stage ID.
+            context: A context data.
+            parent_run_id: A parent running ID. (Default is None)
+            event: An event manager that use to track parent process
+                was not force stopped.
 
-        :raise ValueError: If necessary arguments does not pass from the `args`
-            field.
-        :raise TypeError: If the result from the caller function does not match
-            with a `dict` type.
-
-        :rtype: Result
+        Returns:
+            Result: The execution result with status and context data.
         """
-        result: Result = result or Result(
-            run_id=gen_id(self.name + (self.id or ""), unique=True),
-            extras=self.extras,
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
         )
-
         call_func: TagFunc = extract_call(
             param2template(self.uses, params, extras=self.extras),
             registries=self.extras.get("registry_caller"),
         )()
 
-        result.trace.info(
-            f"[STAGE]: Caller Func: '{call_func.name}@{call_func.tag}'"
-        )
+        trace.info(f"[STAGE]: Caller Func: '{call_func.name}@{call_func.tag}'")
 
         # VALIDATE: check input task caller parameters that exists before
         #   calling.
         args: DictData = {
-            "result": result,
+            "result": Result(
+                run_id=run_id,
+                parent_run_id=parent_run_id,
+                status=WAIT,
+                context=context,
+                extras=self.extras,
+            ),
             "extras": self.extras,
         } | param2template(self.args, params, extras=self.extras)
         sig = inspect.signature(call_func)
@@ -1493,7 +1676,9 @@ class CallStage(BaseRetryStage):
                 "Execution was canceled from the event before start parallel."
             )
 
-        args = self.validate_model_args(call_func, args, result)
+        args: DictData = self.validate_model_args(
+            call_func, args, run_id, parent_run_id
+        )
         if inspect.iscoroutinefunction(call_func):
             loop = asyncio.get_event_loop()
             rs: DictData = loop.run_until_complete(
@@ -1514,46 +1699,64 @@ class CallStage(BaseRetryStage):
                 f"serialize, you must set return be `dict` or Pydantic "
                 f"model."
             )
-        return result.catch(status=SUCCESS, context=rs)
+        return Result(
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            status=SUCCESS,
+            context=catch(
+                context=context,
+                status=SUCCESS,
+                updated=dump_all(rs, by_alias=True),
+            ),
+            extras=self.extras,
+        )
 
     async def async_process(
         self,
         params: DictData,
+        run_id: str,
+        context: DictData,
         *,
-        result: Optional[Result] = None,
+        parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> Result:
         """Async execution method for this Bash stage that only logging out to
         stdout.
 
-        :param params: (DictData) A parameter data.
-        :param result: (Result) A Result instance for return context and status.
-        :param event: (Event) An Event manager instance that use to cancel this
-            execution if it forces stopped by parent execution.
+        Args:
+            params: A parameter data that want to use in this
+                execution.
+            run_id: A running stage ID.
+            context: A context data.
+            parent_run_id: A parent running ID. (Default is None)
+            event: An event manager that use to track parent process
+                was not force stopped.
 
-        References:
-            - https://stackoverflow.com/questions/44859165/async-exec-in-python
-
-        :rtype: Result
+        Returns:
+            Result: The execution result with status and context data.
         """
-        result: Result = result or Result(
-            run_id=gen_id(self.name + (self.id or ""), unique=True),
-            extras=self.extras,
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
         )
-
         call_func: TagFunc = extract_call(
             param2template(self.uses, params, extras=self.extras),
             registries=self.extras.get("registry_caller"),
         )()
 
-        await result.trace.ainfo(
+        await trace.ainfo(
             f"[STAGE]: Caller Func: '{call_func.name}@{call_func.tag}'"
         )
 
         # VALIDATE: check input task caller parameters that exists before
         #   calling.
         args: DictData = {
-            "result": result,
+            "result": Result(
+                run_id=run_id,
+                parent_run_id=parent_run_id,
+                status=WAIT,
+                context=context,
+                extras=self.extras,
+            ),
             "extras": self.extras,
         } | param2template(self.args, params, extras=self.extras)
         sig = inspect.signature(call_func)
@@ -1592,7 +1795,9 @@ class CallStage(BaseRetryStage):
         if "extras" not in sig.parameters and not has_keyword:
             args.pop("extras")
 
-        args: DictData = self.validate_model_args(call_func, args, result)
+        args: DictData = self.validate_model_args(
+            call_func, args, run_id, parent_run_id
+        )
         if inspect.iscoroutinefunction(call_func):
             rs: DictOrModel = await call_func(
                 **param2template(args, params, extras=self.extras)
@@ -1612,20 +1817,31 @@ class CallStage(BaseRetryStage):
                 f"serialize, you must set return be `dict` or Pydantic "
                 f"model."
             )
-        return result.catch(status=SUCCESS, context=dump_all(rs, by_alias=True))
+        return Result(
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            status=SUCCESS,
+            context=catch(
+                context=context,
+                status=SUCCESS,
+                updated=dump_all(rs, by_alias=True),
+            ),
+            extras=self.extras,
+        )
 
-    @staticmethod
     def validate_model_args(
+        self,
         func: TagFunc,
         args: DictData,
-        result: Result,
+        run_id: str,
+        parent_run_id: Optional[str] = None,
     ) -> DictData:
         """Validate an input arguments before passing to the caller function.
 
-        :param func: (TagFunc) A tag function that want to get typing.
-        :param args: (DictData) An arguments before passing to this tag func.
-        :param result: (Result) A result object for keeping context and status
-            data.
+        Args:
+            func: (TagFunc) A tag function that want to get typing.
+            args: (DictData) An arguments before passing to this tag func.
+            run_id: A running stage ID.
 
         :rtype: DictData
         """
@@ -1651,7 +1867,10 @@ class CallStage(BaseRetryStage):
                 "Validate argument from the caller function raise invalid type."
             ) from e
         except TypeError as e:
-            result.trace.warning(
+            trace: Trace = get_trace(
+                run_id, parent_run_id=parent_run_id, extras=self.extras
+            )
+            trace.warning(
                 f"[STAGE]: Get type hint raise TypeError: {e}, so, it skip "
                 f"parsing model args process."
             )
@@ -1697,10 +1916,26 @@ class BaseNestedStage(BaseRetryStage, ABC):
     async def async_process(
         self,
         params: DictData,
+        run_id: str,
+        context: DictData,
         *,
-        result: Optional[Result] = None,
+        parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> Result:
+        """Async process for nested-stage do not implement yet.
+
+        Args:
+            params: A parameter data that want to use in this
+                execution.
+            run_id: A running stage ID.
+            context: A context data.
+            parent_run_id: A parent running ID. (Default is None)
+            event: An event manager that use to track parent process
+                was not force stopped.
+
+        Returns:
+            Result: The execution result with status and context data.
+        """
         raise NotImplementedError(
             "The nested-stage does not implement the `axecute` method yet."
         )
@@ -1733,38 +1968,42 @@ class TriggerStage(BaseNestedStage):
     def process(
         self,
         params: DictData,
+        run_id: str,
+        context: DictData,
         *,
-        result: Optional[Result] = None,
+        parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> Result:
         """Trigger another workflow execution. It will wait the trigger
         workflow running complete before catching its result and raise error
         when the result status does not be SUCCESS.
 
-        :param params: (DictData) A parameter data.
-        :param result: (Result) A result object for keeping context and status
-            data. (Default is None)
-        :param event: (Event) An event manager that use to track parent execute
-            was not force stopped. (Default is None)
+        Args:
+            params: A parameter data that want to use in this
+                execution.
+            run_id: A running stage ID.
+            context: A context data.
+            parent_run_id: A parent running ID. (Default is None)
+            event: An event manager that use to track parent process
+                was not force stopped.
 
-        :rtype: Result
+        Returns:
+            Result: The execution result with status and context data.
         """
         from .workflow import Workflow
 
-        result: Result = result or Result(
-            run_id=gen_id(self.name + (self.id or ""), unique=True),
-            extras=self.extras,
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
         )
-
         _trigger: str = param2template(self.trigger, params, extras=self.extras)
+        trace.info(f"[STAGE]: Load workflow: {_trigger!r}")
         result: Result = Workflow.from_conf(
             name=pass_env(_trigger),
             extras=self.extras,
         ).execute(
             # NOTE: Should not use the `pass_env` function on this params parameter.
             params=param2template(self.params, params, extras=self.extras),
-            run_id=None,
-            parent_run_id=result.parent_run_id,
+            parent_run_id=parent_run_id,
             event=event,
         )
         if result.status == FAILED:
@@ -1969,29 +2208,35 @@ class ParallelStage(BaseNestedStage):
     def process(
         self,
         params: DictData,
+        run_id: str,
+        context: DictData,
         *,
-        result: Optional[Result] = None,
+        parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> Result:
         """Execute parallel each branch via multi-threading pool.
 
-        :param params: (DictData) A parameter data.
-        :param result: (Result) A Result instance for return context and status.
-        :param event: (Event) An Event manager instance that use to cancel this
-            execution if it forces stopped by parent execution.
-            (Default is None)
+        Args:
+            params: A parameter data that want to use in this
+                execution.
+            run_id: A running stage ID.
+            context: A context data.
+            parent_run_id: A parent running ID. (Default is None)
+            event: An event manager that use to track parent process
+                was not force stopped.
 
-        :rtype: Result
+        Returns:
+            Result: The execution result with status and context data.
         """
-        result: Result = result or Result(
-            run_id=gen_id(self.name + (self.id or ""), unique=True),
-            extras=self.extras,
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         event: Event = event or Event()
-        result.trace.info(f"[STAGE]: Parallel with {self.max_workers} workers.")
-        result.catch(
+        trace.info(f"[STAGE]: Parallel with {self.max_workers} workers.")
+        catch(
+            context=context,
             status=WAIT,
-            context={"workers": self.max_workers, "parallel": {}},
+            updated={"workers": self.max_workers, "parallel": {}},
         )
         len_parallel: int = len(self.parallel)
         if event and event.is_set():
@@ -2005,24 +2250,29 @@ class ParallelStage(BaseNestedStage):
                     self._process_branch,
                     branch=branch,
                     params=params,
-                    run_id=result.run_id,
-                    context=result.context,
-                    parent_run_id=result.parent_run_id,
+                    run_id=run_id,
+                    context=context,
+                    parent_run_id=parent_run_id,
                     event=event,
                 )
                 for branch in self.parallel
             ]
-            context: DictData = {}
+            errors: DictData = {}
             statuses: list[Status] = [WAIT] * len_parallel
             for i, future in enumerate(as_completed(futures), start=0):
                 try:
                     statuses[i], _ = future.result()
                 except StageError as e:
                     statuses[i] = get_status_from_error(e)
-                    self.mark_errors(context, e)
-        return result.catch(
-            status=validate_statuses(statuses),
-            context=context,
+                    self.mark_errors(errors, e)
+
+        st: Status = validate_statuses(statuses)
+        return Result(
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            status=st,
+            context=catch(context, status=st, updated=errors),
+            extras=self.extras,
         )
 
 
@@ -2225,8 +2475,10 @@ class ForEachStage(BaseNestedStage):
     def process(
         self,
         params: DictData,
+        run_id: str,
+        context: DictData,
         *,
-        result: Optional[Result] = None,
+        parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> Result:
         """Execute the stages that pass each item form the foreach field.
@@ -2235,18 +2487,20 @@ class ForEachStage(BaseNestedStage):
         value more than 1. It will cancel all nested-stage execution when it has
         any item loop raise failed or canceled error.
 
-        :param params: (DictData) A parameter data.
-        :param result: (Result) A Result instance for return context and status.
-        :param event: (Event) An Event manager instance that use to cancel this
-            execution if it forces stopped by parent execution.
+        Args:
+            params: A parameter data that want to use in this
+                execution.
+            run_id: A running stage ID.
+            context: A context data.
+            parent_run_id: A parent running ID. (Default is None)
+            event: An event manager that use to track parent process
+                was not force stopped.
 
-        :raise TypeError: If the foreach does not match with type list.
-
-        :rtype: Result
+        Returns:
+            Result: The execution result with status and context data.
         """
-        result: Result = result or Result(
-            run_id=gen_id(self.name + (self.id or ""), unique=True),
-            extras=self.extras,
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         event: Event = event or Event()
         foreach: Union[list[str], list[int]] = pass_env(
@@ -2276,8 +2530,12 @@ class ForEachStage(BaseNestedStage):
                 "duplicate item, it should set `use_index_as_key: true`."
             )
 
-        result.trace.info(f"[STAGE]: Foreach: {foreach!r}.")
-        result.catch(status=WAIT, context={"items": foreach, "foreach": {}})
+        trace.info(f"[STAGE]: Foreach: {foreach!r}.")
+        catch(
+            context=context,
+            status=WAIT,
+            updated={"items": foreach, "foreach": {}},
+        )
         len_foreach: int = len(foreach)
         if event and event.is_set():
             raise StageCancelError(
@@ -2291,21 +2549,21 @@ class ForEachStage(BaseNestedStage):
                     index=i,
                     item=item,
                     params=params,
-                    run_id=result.run_id,
-                    context=result.context,
-                    parent_run_id=result.parent_run_id,
+                    run_id=run_id,
+                    context=context,
+                    parent_run_id=parent_run_id,
                     event=event,
                 )
                 for i, item in enumerate(foreach, start=0)
             ]
 
-            context: DictData = {}
+            errors: DictData = {}
             statuses: list[Status] = [WAIT] * len_foreach
             fail_fast: bool = False
 
             done, not_done = wait(futures, return_when=FIRST_EXCEPTION)
             if len(list(done)) != len(futures):
-                result.trace.warning(
+                trace.warning(
                     "[STAGE]: Set the event for stop pending for-each stage."
                 )
                 event.set()
@@ -2321,9 +2579,7 @@ class ForEachStage(BaseNestedStage):
                     if not_done
                     else ""
                 )
-                result.trace.debug(
-                    f"[STAGE]: ... Foreach-Stage set failed event{nd}"
-                )
+                trace.debug(f"[STAGE]: ... Foreach-Stage set failed event{nd}")
                 done: Iterator[Future] = as_completed(futures)
                 fail_fast = True
 
@@ -2333,7 +2589,7 @@ class ForEachStage(BaseNestedStage):
                     statuses[i], _ = future.result()
                 except StageError as e:
                     statuses[i] = get_status_from_error(e)
-                    self.mark_errors(context, e)
+                    self.mark_errors(errors, e)
                 except CancelledError:
                     pass
 
@@ -2344,7 +2600,13 @@ class ForEachStage(BaseNestedStage):
         if fail_fast and status == CANCEL:
             status = FAILED
 
-        return result.catch(status=status, context=context)
+        return Result(
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            status=status,
+            context=catch(context, status=status, updated=errors),
+            extras=self.extras,
+        )
 
 
 class UntilStage(BaseNestedStage):
@@ -2543,36 +2805,40 @@ class UntilStage(BaseNestedStage):
     def process(
         self,
         params: DictData,
+        run_id: str,
+        context: DictData,
         *,
-        result: Optional[Result] = None,
+        parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> Result:
         """Execute until loop with checking the until condition before release
         the next loop.
 
-        :param params: (DictData) A parameter data.
-        :param result: (Result) A Result instance for return context and status.
-        :param event: (Event) An Event manager instance that use to cancel this
-            execution if it forces stopped by parent execution.
-            (Default is None)
+        Args:
+            params: A parameter data that want to use in this
+                execution.
+            run_id: A running stage ID.
+            context: A context data.
+            parent_run_id: A parent running ID. (Default is None)
+            event: An event manager that use to track parent process
+                was not force stopped.
 
-        :rtype: Result
+        Returns:
+            Result: The execution result with status and context data.
         """
-        result: Result = result or Result(
-            run_id=gen_id(self.name + (self.id or ""), unique=True),
-            extras=self.extras,
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         event: Event = event or Event()
-        result.trace.info(f"[STAGE]: Until: {self.until!r}")
+        trace.info(f"[STAGE]: Until: {self.until!r}")
         item: Union[str, int, bool] = pass_env(
             param2template(self.item, params, extras=self.extras)
         )
         loop: int = 1
         until_rs: bool = True
         exceed_loop: bool = False
-        result.catch(status=WAIT, context={"until": {}})
+        catch(context=context, status=WAIT, updated={"until": {}})
         statuses: list[Status] = []
-        context: DictData = {}
         while until_rs and not (exceed_loop := (loop > self.max_loop)):
 
             if event and event.is_set():
@@ -2584,16 +2850,16 @@ class UntilStage(BaseNestedStage):
                 item=item,
                 loop=loop,
                 params=params,
-                run_id=result.run_id,
-                context=result.context,
-                parent_run_id=result.parent_run_id,
+                run_id=run_id,
+                context=context,
+                parent_run_id=parent_run_id,
                 event=event,
             )
 
             loop += 1
             if item is None:
                 item: int = loop
-                result.trace.warning(
+                trace.warning(
                     f"[STAGE]: Return loop not set the item. It uses loop: "
                     f"{loop} by default."
                 )
@@ -2624,7 +2890,15 @@ class UntilStage(BaseNestedStage):
                 f"loop{'s' if self.max_loop > 1 else ''}."
             )
             raise StageError(error_msg)
-        return result.catch(status=validate_statuses(statuses), context=context)
+
+        st: Status = validate_statuses(statuses)
+        return Result(
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            status=st,
+            context=catch(context, status=st),
+            extras=self.extras,
+        )
 
 
 class Match(BaseModel):
@@ -2766,27 +3040,33 @@ class CaseStage(BaseNestedStage):
     def process(
         self,
         params: DictData,
+        run_id: str,
+        context: DictData,
         *,
-        result: Optional[Result] = None,
+        parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> Result:
         """Execute case-match condition that pass to the case field.
 
-        :param params: (DictData) A parameter data.
-        :param result: (Result) A Result instance for return context and status.
-        :param event: (Event) An Event manager instance that use to cancel this
-            execution if it forces stopped by parent execution.
+        Args:
+            params: A parameter data that want to use in this
+                execution.
+            run_id: A running stage ID.
+            context: A context data.
+            parent_run_id: A parent running ID. (Default is None)
+            event: An event manager that use to track parent process
+                was not force stopped.
 
-        :rtype: Result
+        Returns:
+            Result: The execution result with status and context data.
         """
-        result: Result = result or Result(
-            run_id=gen_id(self.name + (self.id or ""), unique=True),
-            extras=self.extras,
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
         )
 
         _case: StrOrNone = param2template(self.case, params, extras=self.extras)
 
-        result.trace.info(f"[STAGE]: Case: {_case!r}.")
+        trace.info(f"[STAGE]: Case: {_case!r}.")
         _else: Optional[Match] = None
         stages: Optional[list[Stage]] = None
         for match in self.match:
@@ -2822,12 +3102,18 @@ class CaseStage(BaseNestedStage):
             case=_case,
             stages=stages,
             params=params,
-            run_id=result.run_id,
-            context=result.context,
-            parent_run_id=result.parent_run_id,
+            run_id=run_id,
+            context=context,
+            parent_run_id=parent_run_id,
             event=event,
         )
-        return result.catch(status=status, context=context)
+        return Result(
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            status=status,
+            context=catch(context, status=status),
+            extras=self.extras,
+        )
 
 
 class RaiseStage(BaseAsyncStage):
@@ -2852,50 +3138,62 @@ class RaiseStage(BaseAsyncStage):
     def process(
         self,
         params: DictData,
+        run_id: str,
+        context: DictData,
         *,
-        result: Optional[Result] = None,
+        parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> Result:
         """Raise the StageError object with the message field execution.
 
-        :param params: (DictData) A parameter data.
-        :param result: (Result) A Result instance for return context and status.
-        :param event: (Event) An Event manager instance that use to cancel this
-            execution if it forces stopped by parent execution.
+        Args:
+            params: A parameter data that want to use in this
+                execution.
+            run_id: A running stage ID.
+            context: A context data.
+            parent_run_id: A parent running ID. (Default is None)
+            event: An event manager that use to track parent process
+                was not force stopped.
+
+        Returns:
+            Result: The execution result with status and context data.
         """
-        result: Result = result or Result(
-            run_id=gen_id(self.name + (self.id or ""), unique=True),
-            extras=self.extras,
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         message: str = param2template(self.message, params, extras=self.extras)
-        result.trace.info(f"[STAGE]: Message: ( {message} )")
+        trace.info(f"[STAGE]: Message: ( {message} )")
         raise StageError(message)
 
     async def async_process(
         self,
         params: DictData,
+        run_id: str,
+        context: DictData,
         *,
-        result: Optional[Result] = None,
+        parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> Result:
         """Async execution method for this Empty stage that only logging out to
         stdout.
 
-        :param params: (DictData) A context data that want to add output result.
-            But this stage does not pass any output.
-        :param result: (Result) A result object for keeping context and status
-            data.
-        :param event: (Event) An event manager that use to track parent execute
-            was not force stopped.
+        Args:
+            params: A parameter data that want to use in this
+                execution.
+            run_id: A running stage ID.
+            context: A context data.
+            parent_run_id: A parent running ID. (Default is None)
+            event: An event manager that use to track parent process
+                was not force stopped.
 
-        :rtype: Result
+        Returns:
+            Result: The execution result with status and context data.
         """
-        result: Result = result or Result(
-            run_id=gen_id(self.name + (self.id or ""), unique=True),
-            extras=self.extras,
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         message: str = param2template(self.message, params, extras=self.extras)
-        await result.trace.ainfo(f"[STAGE]: Execute Raise-Stage: ( {message} )")
+        await trace.ainfo(f"[STAGE]: Execute Raise-Stage: ( {message} )")
         raise StageError(message)
 
 
@@ -3052,25 +3350,30 @@ class DockerStage(BaseStage):  # pragma: no cov
     def process(
         self,
         params: DictData,
+        run_id: str,
+        context: DictData,
         *,
-        result: Optional[Result] = None,
+        parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> Result:
         """Execute the Docker image via Python API.
 
-        :param params: (DictData) A parameter data.
-        :param result: (Result) A Result instance for return context and status.
-        :param event: (Event) An Event manager instance that use to cancel this
-            execution if it forces stopped by parent execution.
+        Args:
+            params: A parameter data that want to use in this
+                execution.
+            run_id: A running stage ID.
+            context: A context data.
+            parent_run_id: A parent running ID. (Default is None)
+            event: An event manager that use to track parent process
+                was not force stopped.
 
-        :rtype: Result
+        Returns:
+            Result: The execution result with status and context data.
         """
-        result: Result = result or Result(
-            run_id=gen_id(self.name + (self.id or ""), unique=True),
-            extras=self.extras,
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
         )
-
-        result.trace.info(f"[STAGE]: Docker: {self.image}:{self.tag}")
+        trace.info(f"[STAGE]: Docker: {self.image}:{self.tag}")
         raise NotImplementedError("Docker Stage does not implement yet.")
 
 
@@ -3145,11 +3448,18 @@ class VirtualPyStage(PyStage):  # pragma: no cov
         # Note: Remove .py file that use to run Python.
         Path(f"./{f_name}").unlink()
 
+    @staticmethod
+    def prepare_std(value: str) -> Optional[str]:
+        """Prepare returned standard string from subprocess."""
+        return None if (out := value.strip("\n")) == "" else out
+
     def process(
         self,
         params: DictData,
+        run_id: str,
+        context: DictData,
         *,
-        result: Optional[Result] = None,
+        parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> Result:
         """Execute the Python statement via Python virtual environment.
@@ -3158,25 +3468,29 @@ class VirtualPyStage(PyStage):  # pragma: no cov
             - Create python file with the `uv` syntax.
             - Execution python file with `uv run` via Python subprocess module.
 
-        :param params: (DictData) A parameter data.
-        :param result: (Result) A Result instance for return context and status.
-        :param event: (Event) An Event manager instance that use to cancel this
-            execution if it forces stopped by parent execution.
+        Args:
+            params: A parameter data that want to use in this
+                execution.
+            run_id: A running stage ID.
+            context: A context data.
+            parent_run_id: A parent running ID. (Default is None)
+            event: An event manager that use to track parent process
+                was not force stopped.
 
-        :rtype: Result
+        Returns:
+            Result: The execution result with status and context data.
         """
-        result: Result = result or Result(
-            run_id=gen_id(self.name + (self.id or ""), unique=True),
-            extras=self.extras,
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         run: str = param2template(dedent(self.run), params, extras=self.extras)
         with self.create_py_file(
             py=run,
             values=param2template(self.vars, params, extras=self.extras),
             deps=param2template(self.deps, params, extras=self.extras),
-            run_id=result.run_id,
+            run_id=run_id,
         ) as py:
-            result.trace.debug(f"[STAGE]: Create `{py}` file.")
+            trace.debug(f"[STAGE]: Create `{py}` file.")
             rs: CompletedProcess = subprocess.run(
                 ["python", "-m", "uv", "run", py, "--no-cache"],
                 # ["uv", "run", "--python", "3.9", py],
@@ -3196,13 +3510,20 @@ class VirtualPyStage(PyStage):  # pragma: no cov
                 f"Subprocess: {e}\nRunning Statement:\n---\n"
                 f"```python\n{run}\n```"
             )
-        return result.catch(
+        return Result(
+            run_id=run_id,
+            parent_run_id=parent_run_id,
             status=SUCCESS,
-            context={
-                "return_code": rs.returncode,
-                "stdout": None if (out := rs.stdout.strip("\n")) == "" else out,
-                "stderr": None if (out := rs.stderr.strip("\n")) == "" else out,
-            },
+            context=catch(
+                context=context,
+                status=SUCCESS,
+                updated={
+                    "return_code": rs.returncode,
+                    "stdout": self.prepare_std(rs.stdout),
+                    "stderr": self.prepare_std(rs.stderr),
+                },
+            ),
+            extras=self.extras,
         )
 
 
