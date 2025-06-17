@@ -65,11 +65,13 @@ from .result import (
     WAIT,
     Result,
     Status,
+    catch,
     get_status_from_error,
     validate_statuses,
 )
 from .reusables import has_template, param2template
 from .stages import Stage
+from .traces import Trace, get_trace
 from .utils import cross_product, filter_func, gen_id
 
 MatrixFilter = list[dict[str, Union[str, int]]]
@@ -245,7 +247,15 @@ class RunsOn(str, Enum):
     LOCAL = "local"
     SELF_HOSTED = "self_hosted"
     AZ_BATCH = "azure_batch"
+    AWS_BATCH = "aws_batch"
+    CLOUD_BATCH = "cloud_batch"
     DOCKER = "docker"
+
+
+LOCAL = RunsOn.LOCAL
+SELF_HOSTED = RunsOn.SELF_HOSTED
+AZ_BATCH = RunsOn.AZ_BATCH
+DOCKER = RunsOn.DOCKER
 
 
 class BaseRunsOn(BaseModel):  # pragma: no cov
@@ -329,7 +339,7 @@ class OnDocker(BaseRunsOn):  # pragma: no cov
 
 def get_discriminator_runs_on(model: dict[str, Any]) -> RunsOn:
     """Get discriminator of the RunsOn models."""
-    t = model.get("type")
+    t: str = model.get("type")
     return RunsOn(t) if t else RunsOn.LOCAL
 
 
@@ -754,28 +764,27 @@ class Job(BaseModel):
             This method be execution routing for call dynamic execution function
         with specific target `runs-on` value.
 
-        :param params: (DictData) A parameter data.
-        :param run_id: (str) A job running ID.
-        :param parent_run_id: (str) A parent running ID.
-        :param event: (Event) An Event manager instance that use to cancel this
-            execution if it forces stopped by parent execution.
+        Args
+            params: (DictData) A parameter data.
+            run_id: (str) A job running ID.
+            parent_run_id: (str) A parent running ID.
+            event: (Event) An Event manager instance that use to cancel this
+                execution if it forces stopped by parent execution.
 
-        :rtype: Result
+        Returns
+            Result: Return Result object that create from execution context.
         """
-        result: Result = Result.construct_with_rs_or_id(
-            run_id=run_id,
-            parent_run_id=parent_run_id,
-            id_logic=(self.id or "EMPTY"),
-            extras=self.extras,
+        run_id: str = run_id or gen_id((self.id or "EMPTY"), unique=True)
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
         )
-
-        result.trace.info(
+        trace.info(
             f"[JOB]: Routing for "
             f"{''.join(self.runs_on.type.value.split('_')).title()}: "
             f"{self.id!r}"
         )
 
-        if self.runs_on.type == RunsOn.LOCAL:
+        if self.runs_on.type == LOCAL:
             return local_execute(
                 self,
                 params,
@@ -783,10 +792,12 @@ class Job(BaseModel):
                 parent_run_id=parent_run_id,
                 event=event,
             )
-        elif self.runs_on.type == RunsOn.SELF_HOSTED:  # pragma: no cov
+        elif self.runs_on.type == SELF_HOSTED:  # pragma: no cov
             pass
-        elif self.runs_on.type == RunsOn.DOCKER:  # pragma: no cov
-            docker_execution(
+        elif self.runs_on.type == AZ_BATCH:  # pragma: no cov
+            pass
+        elif self.runs_on.type == DOCKER:  # pragma: no cov
+            return docker_execution(
                 self,
                 params,
                 run_id=run_id,
@@ -794,13 +805,16 @@ class Job(BaseModel):
                 event=event,
             )
 
-        result.trace.error(
+        trace.error(
             f"[JOB]: Execution not support runs-on: {self.runs_on.type.value!r} "
             f"yet."
         )
-        return result.catch(
+        return Result(
             status=FAILED,
+            run_id=run_id,
+            parent_run_id=parent_run_id,
             context={
+                "status": FAILED,
                 "errors": JobError(
                     f"Execute runs-on type: {self.runs_on.type.value!r} does "
                     f"not support yet."
@@ -822,14 +836,20 @@ def mark_errors(context: DictData, error: JobError) -> None:
         context["errors"] = error.to_dict(with_refs=True)
 
 
+def pop_stages(context: DictData) -> DictData:
+    return filter_func(context.pop("stages", {}))
+
+
 def local_execute_strategy(
     job: Job,
     strategy: DictData,
     params: DictData,
+    run_id: str,
+    context: DictData,
     *,
-    result: Optional[Result] = None,
+    parent_run_id: Optional[str] = None,
     event: Optional[Event] = None,
-) -> tuple[Status, Result]:
+) -> tuple[Status, DictData]:
     """Local strategy execution with passing dynamic parameters from the
     job execution and strategy matrix.
 
@@ -846,7 +866,9 @@ def local_execute_strategy(
     :param strategy: (DictData) A strategy metrix value. This value will pass
         to the `matrix` key for templating in context data.
     :param params: (DictData) A parameter data.
-    :param result: (Result) A Result instance for return context and status.
+    :param run_id: (str)
+        :param context: (DictData)
+        :param parent_run_id: (str | None)
     :param event: (Event) An Event manager instance that use to cancel this
         execution if it forces stopped by parent execution.
 
@@ -854,21 +876,20 @@ def local_execute_strategy(
     :raise JobError: If stage execution raise any error as `StageError`.
     :raise JobError: If the result from execution has `FAILED` status.
 
-    :rtype: tuple[Status, Result]
+    :rtype: tuple[Status, DictData]
     """
-    result: Result = result or Result(
-        run_id=gen_id(job.id or "EMPTY", unique=True),
-        extras=job.extras,
+    trace: Trace = get_trace(
+        run_id, parent_run_id=parent_run_id, extras=job.extras
     )
     if strategy:
         strategy_id: str = gen_id(strategy)
-        result.trace.info(f"[JOB]: Execute Strategy: {strategy_id!r}")
-        result.trace.info(f"[JOB]: ... matrix: {strategy!r}")
+        trace.info(f"[JOB]: Execute Strategy: {strategy_id!r}")
+        trace.info(f"[JOB]: ... matrix: {strategy!r}")
     else:
         strategy_id: str = "EMPTY"
 
-    context: DictData = copy.deepcopy(params)
-    context.update({"matrix": strategy, "stages": {}})
+    current_context: DictData = copy.deepcopy(params)
+    current_context.update({"matrix": strategy, "stages": {}})
     total_stage: int = len(job.stages)
     skips: list[bool] = [False] * total_stage
     for i, stage in enumerate(job.stages, start=0):
@@ -881,27 +902,28 @@ def local_execute_strategy(
                 "Strategy execution was canceled from the event before "
                 "start stage execution."
             )
-            result.catch(
+            catch(
+                context=context,
                 status=CANCEL,
-                context={
+                updated={
                     strategy_id: {
                         "status": CANCEL,
                         "matrix": strategy,
-                        "stages": filter_func(context.pop("stages", {})),
+                        "stages": pop_stages(current_context),
                         "errors": JobCancelError(error_msg).to_dict(),
                     },
                 },
             )
             raise JobCancelError(error_msg, refs=strategy_id)
 
-        result.trace.info(f"[JOB]: Execute Stage: {stage.iden!r}")
+        trace.info(f"[JOB]: Execute Stage: {stage.iden!r}")
         rs: Result = stage.execute(
-            params=context,
-            run_id=result.run_id,
-            parent_run_id=result.parent_run_id,
+            params=current_context,
+            run_id=run_id,
+            parent_run_id=parent_run_id,
             event=event,
         )
-        stage.set_outputs(rs.context, to=context)
+        stage.set_outputs(rs.context, to=current_context)
 
         if rs.status == SKIP:
             skips[i] = True
@@ -912,13 +934,14 @@ def local_execute_strategy(
                 f"Strategy execution was break because its nested-stage, "
                 f"{stage.iden!r}, failed."
             )
-            result.catch(
+            catch(
+                context=context,
                 status=FAILED,
-                context={
+                updated={
                     strategy_id: {
                         "status": FAILED,
                         "matrix": strategy,
-                        "stages": filter_func(context.pop("stages", {})),
+                        "stages": pop_stages(current_context),
                         "errors": JobError(error_msg).to_dict(),
                     },
                 },
@@ -930,13 +953,14 @@ def local_execute_strategy(
                 "Strategy execution was canceled from the event after "
                 "end stage execution."
             )
-            result.catch(
+            catch(
+                context=context,
                 status=CANCEL,
-                context={
+                updated={
                     strategy_id: {
                         "status": CANCEL,
                         "matrix": strategy,
-                        "stages": filter_func(context.pop("stages", {})),
+                        "stages": pop_stages(current_context),
                         "errors": JobCancelError(error_msg).to_dict(),
                     },
                 },
@@ -944,17 +968,18 @@ def local_execute_strategy(
             raise JobCancelError(error_msg, refs=strategy_id)
 
     status: Status = SKIP if sum(skips) == total_stage else SUCCESS
-    result.catch(
+    catch(
+        context=context,
         status=status,
-        context={
+        updated={
             strategy_id: {
                 "status": status,
                 "matrix": strategy,
-                "stages": filter_func(context.pop("stages", {})),
+                "stages": pop_stages(current_context),
             },
         },
     )
-    return status, result
+    return status, context
 
 
 def local_execute(
@@ -1033,7 +1058,9 @@ def local_execute(
                 job=job,
                 strategy=strategy,
                 params=params,
-                result=result,
+                run_id=result.run_id,
+                context=result.context,
+                parent_run_id=result.parent_run_id,
                 event=event,
             )
             for strategy in strategies
