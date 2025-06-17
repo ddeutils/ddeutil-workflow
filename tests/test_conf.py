@@ -214,3 +214,22 @@ def test_dynamic():
 
     conf = dynamic("max_job_exec_timeout", f=0, extras={})
     assert conf == 0
+
+
+def test_parse_url():
+    from urllib.parse import ParseResult, urlparse
+
+    url: ParseResult = urlparse("./logs")
+    assert url.scheme == ""
+    assert url.path == "./logs"
+
+    url: ParseResult = urlparse("file:///./logs")
+    print(url)
+    assert url.scheme == "file"
+    assert url.path == "/./logs"
+
+    url: ParseResult = urlparse("sqlite:///home/warehouse/sqlite.db")
+    print(url)
+
+    url: ParseResult = urlparse("file:./data.db")
+    print(url)

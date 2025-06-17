@@ -41,7 +41,7 @@ from . import (
     WorkflowError,
 )
 from .__types import DictData
-from .audits import TraceModel, get_trace
+from .audits import Trace, get_trace
 from .errors import ResultError
 from .utils import default_gen_id, gen_id, get_dt_ntz_now
 
@@ -191,7 +191,7 @@ class Result:
     run_id: Optional[str] = field(default_factory=default_gen_id)
     parent_run_id: Optional[str] = field(default=None, compare=False)
     ts: datetime = field(default_factory=get_dt_ntz_now, compare=False)
-    trace: Optional[TraceModel] = field(default=None, compare=False, repr=False)
+    trace: Optional[Trace] = field(default=None, compare=False, repr=False)
     extras: DictData = field(default_factory=dict, compare=False, repr=False)
 
     @classmethod
@@ -255,7 +255,7 @@ class Result:
         :rtype: Self
         """
         if self.trace is None:  # pragma: no cov
-            self.trace: TraceModel = get_trace(
+            self.trace: Trace = get_trace(
                 self.run_id,
                 parent_run_id=self.parent_run_id,
                 extras=self.extras,
@@ -270,7 +270,7 @@ class Result:
         :rtype: Self
         """
         self.parent_run_id: str = running_id
-        self.trace: TraceModel = get_trace(
+        self.trace: Trace = get_trace(
             self.run_id, parent_run_id=running_id, extras=self.extras
         )
         return self

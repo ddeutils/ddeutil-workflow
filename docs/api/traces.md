@@ -59,7 +59,7 @@ File-based trace implementation that persists logs to the local filesystem.
     trace.warning("Retrying failed operation")
 
     # Messages are automatically saved to:
-    # {trace_path}/run_id=workflow-123/
+    # {trace_url}/run_id=workflow-123/
     ```
 
 #### Finding Traces
@@ -125,22 +125,22 @@ SQLite-based trace implementation for scalable logging.
 
 Metadata information for trace logs.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `run_id` | str | Unique run identifier |
-| `parent_run_id` | str \| None | Parent workflow run ID |
-| `update` | datetime | Last update timestamp |
+| Field           | Type        | Description             |
+|-----------------|-------------|-------------------------|
+| `run_id`        | str         | Unique run identifier   |
+| `parent_run_id` | str \| None | Parent workflow run ID  |
+| `update`        | datetime    | Last update timestamp   |
 
 ### `TraceData`
 
 Complete trace data including stdout, stderr, and metadata.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `run_id` | str | Unique run identifier |
-| `stdout` | str | Standard output content |
-| `stderr` | str | Standard error content |
-| `meta` | TraceMeta | Trace metadata |
+| Field    | Type        | Description             |
+|----------|-------------|-------------------------|
+| `run_id` | str         | Unique run identifier   |
+| `stdout` | str         | Standard output content |
+| `stderr` | str         | Standard error content  |
+| `meta`   | TraceMeta   | Trace metadata          |
 
 !!! example "Trace Data"
 
@@ -175,8 +175,8 @@ Factory function that returns the appropriate trace implementation based on conf
     )
 
     # Configuration determines trace type:
-    # - If trace_path points to file: SQLiteTrace
-    # - If trace_path points to directory: FileTrace
+    # - If trace_url points to file: SQLiteTrace
+    # - If trace_url points to directory: FileTrace
     ```
 
 ## Logging Integration
@@ -229,11 +229,11 @@ Trace implementations support asynchronous logging for non-blocking operations:
 
 Trace behavior is controlled by environment variables:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `WORKFLOW_CORE_TRACE_PATH` | `./logs/traces` | Path for trace file storage |
-| `WORKFLOW_CORE_TRACE_LEVEL` | `INFO` | Minimum logging level |
-| `WORKFLOW_CORE_TRACE_FORMAT` | Custom | Log message format template |
+| Variable                     | Default           | Description                  |
+|------------------------------|-------------------|------------------------------|
+| `WORKFLOW_CORE_TRACE_PATH`   | `./logs/traces`   | Path for trace file storage  |
+| `WORKFLOW_CORE_TRACE_LEVEL`  | `INFO`            | Minimum logging level        |
+| `WORKFLOW_CORE_TRACE_FORMAT` | Custom            | Log message format template  |
 
 !!! tip "Performance Considerations"
 

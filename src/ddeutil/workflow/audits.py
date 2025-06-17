@@ -13,8 +13,7 @@ The audit system tracks workflow, job, and stage executions with configurable
 storage backends including file-based JSON storage and database persistence.
 
 Classes:
-    Audit: Abstract base class for audit implementations
-    AuditModel: Pydantic model for audit data validation
+    Audit: Pydantic model for audit data validation
     FileAudit: File-based audit storage implementation
 
 Functions:
@@ -43,7 +42,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
-from typing import ClassVar, Optional, TypeVar, Union
+from typing import ClassVar, Optional, Union
 
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import model_validator
@@ -51,7 +50,7 @@ from typing_extensions import Self
 
 from .__types import DictData
 from .conf import dynamic
-from .traces import TraceModel, get_trace, set_logging
+from .traces import Trace, get_trace, set_logging
 
 logger = logging.getLogger("ddeutil.workflow")
 
@@ -297,7 +296,7 @@ class FileAudit(BaseAudit):
 
         :rtype: Self
         """
-        trace: TraceModel = get_trace(
+        trace: Trace = get_trace(
             self.run_id,
             parent_run_id=self.parent_run_id,
             extras=self.extras,
@@ -369,7 +368,7 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
         """Save logging data that receive a context data from a workflow
         execution result.
         """
-        trace: TraceModel = get_trace(
+        trace: Trace = get_trace(
             self.run_id,
             parent_run_id=self.parent_run_id,
             extras=self.extras,
@@ -383,8 +382,7 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
         raise NotImplementedError("SQLiteAudit does not implement yet.")
 
 
-Audit = TypeVar("Audit", bound=BaseAudit)
-AuditModel = Union[
+Audit = Union[
     NullAudit,
     FileAudit,
     SQLiteAudit,
@@ -393,7 +391,7 @@ AuditModel = Union[
 
 def get_audit(
     extras: Optional[DictData] = None,
-) -> type[AuditModel]:  # pragma: no cov
+) -> type[Audit]:  # pragma: no cov
     """Get an audit class that dynamic base on the config audit path value.
 
     :param extras: An extra parameter that want to override the core config.

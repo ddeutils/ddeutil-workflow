@@ -51,7 +51,6 @@ from .__cron import CronRunner
 from .__types import DictData, DictStr, Matrix, Re, TupleStr
 from .audits import (
     Audit,
-    AuditModel,
     FileAudit,
     get_audit,
 )
@@ -137,7 +136,6 @@ from .traces import (
     Trace,
     TraceData,
     TraceMeta,
-    TraceModel,
     get_trace,
 )
 from .utils import *
