@@ -1,6 +1,7 @@
 import os
 import shutil
 from datetime import datetime
+from urllib.parse import urlparse
 
 from ddeutil.workflow import SUCCESS, Result, Workflow
 
@@ -12,7 +13,7 @@ def test_example_stage_exec_nested_trigger(test_path):
     workflow = Workflow.from_conf(
         "stream-workflow",
         extras={
-            "trace_path": test_path / "example/logs/trace",
+            "trace_url": urlparse(str(test_path / "example/logs/trace")),
             "audit_path": test_path / "example/logs/audit",
             "enable_write_log": True,
             "enable_write_audit": True,

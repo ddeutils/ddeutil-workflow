@@ -46,7 +46,8 @@ from inspect import Traceback, currentframe, getframeinfo
 from pathlib import Path
 from threading import get_ident
 from types import FrameType
-from typing import ClassVar, Final, Literal, Optional, TypeVar, Union
+from typing import ClassVar, Final, Literal, Optional, Union
+from urllib.parse import ParseResult, unquote_plus
 
 from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import Self
@@ -300,43 +301,6 @@ class BaseTrace(BaseModel, ABC):  # pragma: no cov
         description="A parent running ID",
     )
 
-    @classmethod
-    @abstractmethod
-    def find_traces(
-        cls,
-        path: Optional[Path] = None,
-        extras: Optional[DictData] = None,
-    ) -> Iterator[TraceData]:  # pragma: no cov
-        """Return iterator of TraceData models from the target pointer.
-
-        Args:
-            path (:obj:`Path`, optional): A pointer path that want to override.
-            extras (:obj:`DictData`, optional): An extras parameter that want to
-                override default engine config.
-
-        Returns:
-            Iterator[TracData]: An iterator object that generate a TracData
-                model.
-        """
-        raise NotImplementedError(
-            "Trace dataclass should implement `find_traces` class-method."
-        )
-
-    @classmethod
-    @abstractmethod
-    def find_trace_with_id(
-        cls,
-        run_id: str,
-        force_raise: bool = True,
-        *,
-        path: Optional[Path] = None,
-        extras: Optional[DictData] = None,
-    ) -> TraceData:
-        raise NotImplementedError(
-            "Trace dataclass should implement `find_trace_with_id` "
-            "class-method."
-        )
-
     @abstractmethod
     def writer(
         self,
@@ -388,7 +352,7 @@ class BaseTrace(BaseModel, ABC):  # pragma: no cov
         )
 
     @abstractmethod
-    def _logging(
+    def emit(
         self,
         message: str,
         mode: str,
@@ -412,7 +376,7 @@ class BaseTrace(BaseModel, ABC):  # pragma: no cov
 
         :param message: (str) A message that want to log.
         """
-        self._logging(message, mode="debug")
+        self.emit(message, mode="debug")
 
     def info(self, message: str) -> None:
         """Write trace log with append mode and logging this message with the
@@ -420,7 +384,7 @@ class BaseTrace(BaseModel, ABC):  # pragma: no cov
 
         :param message: (str) A message that want to log.
         """
-        self._logging(message, mode="info")
+        self.emit(message, mode="info")
 
     def warning(self, message: str) -> None:
         """Write trace log with append mode and logging this message with the
@@ -428,7 +392,7 @@ class BaseTrace(BaseModel, ABC):  # pragma: no cov
 
         :param message: (str) A message that want to log.
         """
-        self._logging(message, mode="warning")
+        self.emit(message, mode="warning")
 
     def error(self, message: str) -> None:
         """Write trace log with append mode and logging this message with the
@@ -436,7 +400,7 @@ class BaseTrace(BaseModel, ABC):  # pragma: no cov
 
         :param message: (str) A message that want to log.
         """
-        self._logging(message, mode="error", is_err=True)
+        self.emit(message, mode="error", is_err=True)
 
     def exception(self, message: str) -> None:
         """Write trace log with append mode and logging this message with the
@@ -444,10 +408,10 @@ class BaseTrace(BaseModel, ABC):  # pragma: no cov
 
         :param message: (str) A message that want to log.
         """
-        self._logging(message, mode="exception", is_err=True)
+        self.emit(message, mode="exception", is_err=True)
 
     @abstractmethod
-    async def _alogging(
+    async def amit(
         self,
         message: str,
         mode: str,
@@ -471,7 +435,7 @@ class BaseTrace(BaseModel, ABC):  # pragma: no cov
 
         :param message: (str) A message that want to log.
         """
-        await self._alogging(message, mode="debug")
+        await self.amit(message, mode="debug")
 
     async def ainfo(self, message: str) -> None:  # pragma: no cov
         """Async write trace log with append mode and logging this message with
@@ -479,7 +443,7 @@ class BaseTrace(BaseModel, ABC):  # pragma: no cov
 
         :param message: (str) A message that want to log.
         """
-        await self._alogging(message, mode="info")
+        await self.amit(message, mode="info")
 
     async def awarning(self, message: str) -> None:  # pragma: no cov
         """Async write trace log with append mode and logging this message with
@@ -487,7 +451,7 @@ class BaseTrace(BaseModel, ABC):  # pragma: no cov
 
         :param message: (str) A message that want to log.
         """
-        await self._alogging(message, mode="warning")
+        await self.amit(message, mode="warning")
 
     async def aerror(self, message: str) -> None:  # pragma: no cov
         """Async write trace log with append mode and logging this message with
@@ -495,7 +459,7 @@ class BaseTrace(BaseModel, ABC):  # pragma: no cov
 
         :param message: (str) A message that want to log.
         """
-        await self._alogging(message, mode="error", is_err=True)
+        await self.amit(message, mode="error", is_err=True)
 
     async def aexception(self, message: str) -> None:  # pragma: no cov
         """Async write trace log with append mode and logging this message with
@@ -503,35 +467,11 @@ class BaseTrace(BaseModel, ABC):  # pragma: no cov
 
         :param message: (str) A message that want to log.
         """
-        await self._alogging(message, mode="exception", is_err=True)
+        await self.amit(message, mode="exception", is_err=True)
 
 
 class ConsoleTrace(BaseTrace):  # pragma: no cov
     """Console Trace log model."""
-
-    @classmethod
-    def find_traces(
-        cls,
-        path: Optional[Path] = None,
-        extras: Optional[DictData] = None,
-    ) -> Iterator[TraceData]:  # pragma: no cov
-        raise NotImplementedError(
-            "Console Trace does not support to find history traces data."
-        )
-
-    @classmethod
-    def find_trace_with_id(
-        cls,
-        run_id: str,
-        force_raise: bool = True,
-        *,
-        path: Optional[Path] = None,
-        extras: Optional[DictData] = None,
-    ) -> TraceData:
-        raise NotImplementedError(
-            "Console Trace does not support to find history traces data with "
-            "the specific running ID."
-        )
 
     def writer(
         self,
@@ -585,13 +525,13 @@ class ConsoleTrace(BaseTrace):  # pragma: no cov
         """
         return prepare_newline(Message.from_str(message).prepare(self.extras))
 
-    def _logging(
-        self, message: str, mode: str, *, is_err: bool = False
-    ) -> None:
+    def emit(self, message: str, mode: str, *, is_err: bool = False) -> None:
         """Write trace log with append mode and logging this message with any
         logging level.
 
         :param message: (str) A message that want to log.
+        :param mode: (str)
+        :param is_err: (bool)
         """
         msg: str = self.make_message(message)
 
@@ -602,13 +542,15 @@ class ConsoleTrace(BaseTrace):  # pragma: no cov
 
         getattr(logger, mode)(msg, stacklevel=3, extra={"cut_id": self.cut_id})
 
-    async def _alogging(
+    async def amit(
         self, message: str, mode: str, *, is_err: bool = False
     ) -> None:
         """Write trace log with append mode and logging this message with any
         logging level.
 
         :param message: (str) A message that want to log.
+        :param mode: (str)
+        :param is_err: (bool)
         """
         msg: str = self.make_message(message)
 
@@ -620,7 +562,50 @@ class ConsoleTrace(BaseTrace):  # pragma: no cov
         getattr(logger, mode)(msg, stacklevel=3, extra={"cut_id": self.cut_id})
 
 
-class FileTrace(ConsoleTrace):  # pragma: no cov
+class OutsideTrace(ConsoleTrace, ABC):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    url: ParseResult = Field(description="An URL for create pointer.")
+
+    @classmethod
+    @abstractmethod
+    def find_traces(
+        cls,
+        path: Optional[Path] = None,
+        extras: Optional[DictData] = None,
+    ) -> Iterator[TraceData]:  # pragma: no cov
+        """Return iterator of TraceData models from the target pointer.
+
+        Args:
+            path (:obj:`Path`, optional): A pointer path that want to override.
+            extras (:obj:`DictData`, optional): An extras parameter that want to
+                override default engine config.
+
+        Returns:
+            Iterator[TracData]: An iterator object that generate a TracData
+                model.
+        """
+        raise NotImplementedError(
+            "Trace dataclass should implement `find_traces` class-method."
+        )
+
+    @classmethod
+    @abstractmethod
+    def find_trace_with_id(
+        cls,
+        run_id: str,
+        force_raise: bool = True,
+        *,
+        path: Optional[Path] = None,
+        extras: Optional[DictData] = None,
+    ) -> TraceData:
+        raise NotImplementedError(
+            "Trace dataclass should implement `find_trace_with_id` "
+            "class-method."
+        )
+
+
+class FileTrace(OutsideTrace):  # pragma: no cov
     """File Trace dataclass that write file to the local storage."""
 
     @classmethod
@@ -635,7 +620,9 @@ class FileTrace(ConsoleTrace):  # pragma: no cov
         :param extras: An extra parameter that want to override core config.
         """
         for file in sorted(
-            (path or dynamic("trace_path", extras=extras)).glob("./run_id=*"),
+            (path or Path(dynamic("trace_url", extras=extras).path)).glob(
+                "./run_id=*"
+            ),
             key=lambda f: f.lstat().st_mtime,
         ):
             yield TraceData.from_path(file)
@@ -656,7 +643,7 @@ class FileTrace(ConsoleTrace):  # pragma: no cov
         :param path: (Path)
         :param extras: An extra parameter that want to override core config.
         """
-        base_path: Path = path or dynamic("trace_path", extras=extras)
+        base_path: Path = path or Path(dynamic("trace_url", extras=extras).path)
         file: Path = base_path / f"run_id={run_id}"
         if file.exists():
             return TraceData.from_path(file)
@@ -679,7 +666,7 @@ class FileTrace(ConsoleTrace):  # pragma: no cov
         :rtype: Path
         """
         log_file: Path = (
-            dynamic("trace_path", extras=self.extras)
+            Path(unquote_plus(self.url.path))
             / f"run_id={self.parent_run_id or self.run_id}"
         )
         if not log_file.exists():
@@ -762,17 +749,20 @@ class FileTrace(ConsoleTrace):  # pragma: no cov
             await f.write(trace_meta.model_dump_json() + "\n")
 
 
-class SQLiteTrace(ConsoleTrace):  # pragma: no cov
+class SQLiteTrace(OutsideTrace):  # pragma: no cov
     """SQLite Trace dataclass that write trace log to the SQLite database file."""
 
     table_name: ClassVar[str] = "audits"
     schemas: ClassVar[
         str
     ] = """
-        run_id          int,
-        stdout          str,
-        stderr          str,
-        update          datetime
+        run_id              str
+        , parent_run_id     str
+        , type              str
+        , text              str
+        , metadata          JSON
+        , created_at        datetime
+        , updated_at        datetime
         primary key ( run_id )
         """
 
@@ -781,7 +771,8 @@ class SQLiteTrace(ConsoleTrace):  # pragma: no cov
         cls,
         path: Optional[Path] = None,
         extras: Optional[DictData] = None,
-    ) -> Iterator[TraceData]: ...
+    ) -> Iterator[TraceData]:
+        raise NotImplementedError("SQLiteTrace does not implement yet.")
 
     @classmethod
     def find_trace_with_id(
@@ -791,30 +782,33 @@ class SQLiteTrace(ConsoleTrace):  # pragma: no cov
         *,
         path: Optional[Path] = None,
         extras: Optional[DictData] = None,
-    ) -> TraceData: ...
+    ) -> TraceData:
+        raise NotImplementedError("SQLiteTrace does not implement yet.")
 
-    def make_message(self, message: str) -> str: ...
+    def make_message(self, message: str) -> str:
+        raise NotImplementedError("SQLiteTrace does not implement yet.")
 
     def writer(
         self,
         message: str,
         level: str,
         is_err: bool = False,
-    ) -> None: ...
+    ) -> None:
+        raise NotImplementedError("SQLiteTrace does not implement yet.")
 
     def awriter(
         self,
         message: str,
         level: str,
         is_err: bool = False,
-    ) -> None: ...
+    ) -> None:
+        raise NotImplementedError("SQLiteTrace does not implement yet.")
 
 
-Trace = TypeVar("Trace", bound=ConsoleTrace)
-TraceModel = Union[
-    ConsoleTrace,
+Trace = Union[
     FileTrace,
     SQLiteTrace,
+    OutsideTrace,
 ]
 
 
@@ -834,10 +828,29 @@ def get_trace(
 
     :rtype: Trace
     """
-    if dynamic("trace_path", extras=extras).is_file():
-        return SQLiteTrace(
-            run_id=run_id, parent_run_id=parent_run_id, extras=(extras or {})
+    # NOTE: Allow you to override trace model by the extra parameter.
+    map_trace_models: dict[str, type[Trace]] = extras.get(
+        "trace_outside_mapping", {}
+    )
+    url: ParseResult
+    if (url := dynamic("trace_url", extras=extras)).scheme and (
+        url.scheme == "sqlite"
+        or (url.scheme == "file" and Path(url.path).is_file())
+    ):
+        return map_trace_models.get("sqlite", SQLiteTrace)(
+            url=url,
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            extras=(extras or {}),
         )
-    return FileTrace(
-        run_id=run_id, parent_run_id=parent_run_id, extras=(extras or {})
+    elif url.scheme and url.scheme != "file":
+        raise NotImplementedError(
+            f"Does not implement the outside trace model support for URL: {url}"
+        )
+
+    return map_trace_models.get("file", FileTrace)(
+        url=url,
+        run_id=run_id,
+        parent_run_id=parent_run_id,
+        extras=(extras or {}),
     )
