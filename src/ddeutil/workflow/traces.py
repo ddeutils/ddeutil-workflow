@@ -672,6 +672,10 @@ class FileTrace(ConsoleTrace):  # pragma: no cov
         """Pointer of the target path that use to writing trace log or searching
         trace log.
 
+            This running ID folder that use to keeping trace log data will use
+        a parent running ID first. If it does not set, it will use running ID
+        instead.
+
         :rtype: Path
         """
         log_file: Path = (
