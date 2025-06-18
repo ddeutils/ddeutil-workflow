@@ -346,7 +346,7 @@
       "type": "object"
     },
     "Crontab": {
-      "description": "Cron event model (Warped the CronJob object by Pydantic model) to keep\ncrontab value and generate CronRunner object from this crontab value.\n\nMethods:\n    - generate: is the main use-case of this schedule object.",
+      "description": "Cron event model wrapping CronJob functionality.\n\nA Pydantic model that encapsulates crontab scheduling functionality with\nvalidation and datetime generation capabilities.\n\nAttributes:\n    cronjob: CronJob instance for schedule validation and datetime generation.\n    tz: Timezone string value (alias: timezone).",
       "properties": {
         "extras": {
           "additionalProperties": true,
@@ -974,6 +974,7 @@
       "type": "object"
     },
     "CrontabValue": {
+      "description": "Crontab model using interval-based specification.\n\nAttributes:\n    interval: Scheduling interval ('daily', 'weekly', 'monthly').\n    day: Day specification for weekly/monthly schedules.\n    time: Time of day in 'HH:MM' format.",
       "properties": {
         "extras": {
           "additionalProperties": true,
@@ -1622,7 +1623,7 @@
       "type": "object"
     },
     "CrontabYear": {
-      "description": "Cron event with enhance Year Pydantic model for limit year matrix that\nuse by some data schedule tools like AWS Glue.",
+      "description": "Cron event model with enhanced year-based scheduling.\n\nExtends the base Crontab model to support year-specific scheduling,\nparticularly useful for tools like AWS Glue.\n\nAttributes:\n    cronjob: CronJobYear instance for year-aware schedule validation and generation.",
       "properties": {
         "extras": {
           "additionalProperties": true,
@@ -2579,7 +2580,7 @@
                 "$ref": "#/$defs/CrontabValue"
               }
             ],
-            "description": "An event models."
+            "description": "Event model type supporting year-based, standard, and interval-based cron scheduling."
           },
           "title": "Schedule",
           "type": "array"
