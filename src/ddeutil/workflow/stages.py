@@ -2001,7 +2001,7 @@ class TriggerStage(BaseNestedStage):
         ).execute(
             # NOTE: Should not use the `pass_env` function on this params parameter.
             params=param2template(self.params, params, extras=self.extras),
-            parent_run_id=parent_run_id,
+            run_id=parent_run_id,
             event=event,
         )
         if result.status == FAILED:
