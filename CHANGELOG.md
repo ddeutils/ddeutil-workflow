@@ -2,6 +2,61 @@
 
 ## Latest Changes
 
+## 0.0.74
+
+### :stars: Highlight Features
+
+- :star: hl: change audit path config to audit url.
+- :star: hl: remove passing result on workflow execute method.
+- :star: hl: change trace_path to trace_url for scale trace type.
+- :star: hl: remove result passing on stage models.
+- :star: hl: rename handler_execute to execute method.
+- :star: hl: migrate event object instead crontab object.
+- :star: hl: add info field for keeping more audit log.
+
+### :sparkles: Features
+
+- :dart: feat: passing execution time info on the result.
+- :dart: feat: remove result transfer from job execute.
+- :dart: feat: remove result receive from nested stage process func.
+- :dart: feat: add context to param2template function.
+- :dart: feat: revise process_item method on foreach.
+- :dart: feat: add created_at and updated_at field on workflow model.
+- :dart: feat: remove timezone on result module.
+- :dart: feat: add more module for rust package.
+- :dart: feat: duplicate this package to rust for the best performance.
+- :dart: feat: add log id before handle execute stage.
+
+### :bug: Bug fixes
+
+- :gear: fixed: add type hint for audit override model.
+- :gear: fixed: serialize urlresult for extras field.
+- :gear: fixed: fix remove if it not exist in caller stage.
+
+### :hourglass_flowing_sand: Performance improvements
+
+- :zap: perf: improve code performance and gen docs by ai.
+
+### :broom: Deprecate & Clean
+
+- :recycle: clean: remove construct method on result object.
+- :recycle: clean: remove result transfer on job exec.
+- :recycle: clean: remove result receive from stage execute method.
+- :recycle: clean: remove not-use code.
+- :recycle: clean: remove from_conf on crontab model.
+- :recycle: clean: remove rust implementation and move to rustflow project.
+- :recycle: clean: validate params field on workflow model.
+- :recycle: clean: remove prepare on value classmethod.
+
+### :book: Documentations
+
+- :page_facing_up: docs: update docs for json-schema.
+- :page_facing_up: docs: update docc on event module.
+- :page_facing_up: docs: update readme file.
+- :page_facing_up: docs: add docs with Google style batch 2.
+- :page_facing_up: docs: add docs with Google style.
+- :page_facing_up: docs: update docs-string.
+
 ## 0.0.73
 
 ### :stars: Highlight Features
