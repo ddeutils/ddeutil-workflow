@@ -14,7 +14,7 @@ def test_example_stage_exec_nested_trigger(test_path):
         "stream-workflow",
         extras={
             "trace_url": urlparse(str(test_path / "example/logs/trace")),
-            "audit_path": test_path / "example/logs/audit",
+            "audit_url": urlparse(str(test_path / "example/logs/audit")),
             "enable_write_log": True,
             "enable_write_audit": True,
         },

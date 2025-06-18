@@ -52,7 +52,7 @@ from .__types import DictData, DictStr, Matrix, Re, TupleStr
 from .audits import (
     Audit,
     FileAudit,
-    get_audit,
+    get_audit_model,
 )
 from .conf import *
 from .errors import (

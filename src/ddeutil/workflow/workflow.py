@@ -43,7 +43,7 @@ from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
 from .__types import DictData
-from .audits import Audit, get_audit
+from .audits import Audit, get_audit_model
 from .conf import YamlParser, dynamic
 from .errors import WorkflowCancelError, WorkflowError, WorkflowTimeoutError
 from .event import Event
@@ -419,7 +419,6 @@ class Workflow(BaseModel):
 
         :rtype: Result
         """
-        audit: type[Audit] = audit or get_audit(extras=self.extras)
         name: str = override_log_name or self.name
         if run_id:
             parent_run_id: str = run_id
@@ -454,7 +453,7 @@ class Workflow(BaseModel):
         trace.info(f"[RELEASE]: End {name!r} : {release:%Y-%m-%d %H:%M:%S}")
         trace.debug(f"[RELEASE]: Writing audit: {name!r}.")
         (
-            audit(
+            (audit or get_audit_model(extras=self.extras))(
                 name=name,
                 release=release,
                 type=release_type,

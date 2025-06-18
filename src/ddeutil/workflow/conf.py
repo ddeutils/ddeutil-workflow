@@ -169,8 +169,8 @@ class Config:  # pragma: no cov
         return str2bool(env("LOG_TRACE_ENABLE_WRITE", "false"))
 
     @property
-    def audit_path(self) -> Path:
-        return Path(env("LOG_AUDIT_PATH", "./audits"))
+    def audit_url(self) -> ParseResult:
+        return urlparse(env("LOG_AUDIT_URL", "file:./audits"))
 
     @property
     def enable_write_audit(self) -> bool:

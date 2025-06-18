@@ -54,7 +54,7 @@ File-based audit implementation that persists audit logs to the local filesystem
     audit.save()
 
     # Log is saved to:
-    # {audit_path}/workflow=data-pipeline/release=20240115103000/workflow-123.log
+    # {audit_url.path}/workflow=data-pipeline/release=20240115103000/workflow-123.log
     ```
 
 #### Audit File Structure
@@ -183,17 +183,17 @@ The `context` field contains comprehensive execution information:
 
 ## Audit Factory
 
-### `get_audit`
+### `get_audit_model`
 
 Factory function that returns the appropriate audit implementation based on configuration.
 
 !!! example "Dynamic Audit Creation"
 
     ```python
-    from ddeutil.workflow.audits import get_audit
+    from ddeutil.workflow.audits import get_audit_model
 
     # Automatically selects appropriate audit implementation
-    audit = get_audit(
+    audit = get_audit_model(
         name="data-pipeline",
         type="scheduled",
         release=datetime.now(),
@@ -240,11 +240,11 @@ Audits are automatically created and managed during workflow execution:
 
 Audit behavior is controlled by environment variables:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `WORKFLOW_CORE_AUDIT_PATH` | `./logs/audits` | Path for audit file storage |
-| `WORKFLOW_CORE_ENABLE_WRITE_AUDIT` | `false` | Enable/disable audit logging |
-| `WORKFLOW_CORE_AUDIT_EXCLUDED` | `[]` | Fields to exclude from audit logs |
+| Variable                           | Default         | Description                       |
+|------------------------------------|-----------------|-----------------------------------|
+| `WORKFLOW_CORE_AUDIT_URL`          | `./logs/audits` | Path for audit file storage       |
+| `WORKFLOW_CORE_ENABLE_WRITE_AUDIT` | `false`         | Enable/disable audit logging      |
+| `WORKFLOW_CORE_AUDIT_EXCLUDED`     | `[]`            | Fields to exclude from audit logs |
 
 !!! example "Configuration"
 
@@ -253,7 +253,7 @@ Audit behavior is controlled by environment variables:
     export WORKFLOW_CORE_ENABLE_WRITE_AUDIT=true
 
     # Set custom audit path
-    export WORKFLOW_CORE_AUDIT_PATH=/var/log/workflow/audits
+    export WORKFLOW_CORE_AUDIT_URL=/var/log/workflow/audits
 
     # Exclude sensitive fields
     export WORKFLOW_CORE_AUDIT_EXCLUDED='["params.password", "context.secrets"]'

@@ -17,14 +17,14 @@ Classes:
     FileAudit: File-based audit storage implementation
 
 Functions:
-    get_audit: Factory function for creating audit instances
+    get_audit_model: Factory function for creating audit instances
 
 Example:
     ```python
-    from ddeutil.workflow.audits import get_audit
+    from ddeutil.workflow.audits import get_audit_model
 
     # Create file-based audit
-    audit = get_audit(run_id="run-123")
+    audit = get_audit_model(run_id="run-123")
     audit.info("Workflow execution started")
     audit.success("Workflow completed successfully")
     ```
@@ -140,42 +140,6 @@ class BaseAudit(BaseModel, ABC):
         raise NotImplementedError("Audit should implement `save` method.")
 
 
-class NullAudit(BaseAudit):
-
-    @classmethod
-    def is_pointed(
-        cls,
-        name: str,
-        release: datetime,
-        *,
-        extras: Optional[DictData] = None,
-    ) -> bool:
-        return False
-
-    @classmethod
-    def find_audits(
-        cls,
-        name: str,
-        *,
-        extras: Optional[DictData] = None,
-    ) -> Iterator[Self]:
-        raise NotImplementedError()
-
-    @classmethod
-    def find_audit_with_release(
-        cls,
-        name: str,
-        release: Optional[datetime] = None,
-        *,
-        extras: Optional[DictData] = None,
-    ) -> Self:
-        raise NotImplementedError()
-
-    def save(self, excluded: Optional[list[str]]) -> None:
-        """Do nothing when do not set audit."""
-        return
-
-
 class FileAudit(BaseAudit):
     """File Audit Pydantic Model that use to saving log data from result of
     workflow execution. It inherits from BaseAudit model that implement the
@@ -210,7 +174,7 @@ class FileAudit(BaseAudit):
         :rtype: Iterator[Self]
         """
         pointer: Path = (
-            dynamic("audit_path", extras=extras) / f"workflow={name}"
+            Path(dynamic("audit_url", extras=extras).path) / f"workflow={name}"
         )
         if not pointer.exists():
             raise FileNotFoundError(f"Pointer: {pointer.absolute()}.")
@@ -245,7 +209,7 @@ class FileAudit(BaseAudit):
             raise NotImplementedError("Find latest log does not implement yet.")
 
         pointer: Path = (
-            dynamic("audit_path", extras=extras)
+            Path(dynamic("audit_url", extras=extras).path)
             / f"workflow={name}/release={release:%Y%m%d%H%M%S}"
         )
         if not pointer.exists():
@@ -281,8 +245,8 @@ class FileAudit(BaseAudit):
             return False
 
         # NOTE: create pointer path that use the same logic of pointer method.
-        pointer: Path = dynamic(
-            "audit_path", extras=extras
+        pointer: Path = Path(
+            dynamic("audit_url", extras=extras).path
         ) / cls.filename_fmt.format(name=name, release=release)
 
         return pointer.exists()
@@ -292,8 +256,8 @@ class FileAudit(BaseAudit):
 
         :rtype: Path
         """
-        return dynamic(
-            "audit_path", extras=self.extras
+        return Path(
+            dynamic("audit_url", extras=self.extras).path
         ) / self.filename_fmt.format(name=self.name, release=self.release)
 
     def save(self, excluded: Optional[list[str]] = None) -> Self:
@@ -392,21 +356,32 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
 
 
 Audit = Union[
-    NullAudit,
     FileAudit,
     SQLiteAudit,
 ]
 
 
-def get_audit(
+def get_audit_model(
     extras: Optional[DictData] = None,
 ) -> type[Audit]:  # pragma: no cov
-    """Get an audit class that dynamic base on the config audit path value.
+    """Get an audit model that dynamic base on the config audit path value.
 
     :param extras: An extra parameter that want to override the core config.
 
     :rtype: type[Audit]
     """
-    if dynamic("audit_path", extras=extras).is_file():
-        return SQLiteAudit
-    return FileAudit
+    # NOTE: Allow you to override trace model by the extra parameter.
+    map_audit_models: dict[str, type[Trace]] = extras.get(
+        "audit_model_mapping", {}
+    )
+    url: ParseResult
+    if (url := dynamic("audit_url", extras=extras)).scheme and (
+        url.scheme == "sqlite"
+        or (url.scheme == "file" and Path(url.path).is_file())
+    ):
+        return map_audit_models.get("sqlite", FileAudit)
+    elif url.scheme and url.scheme != "file":
+        raise NotImplementedError(
+            f"Does not implement the audit model support for URL: {url}"
+        )
+    return map_audit_models.get("file", FileAudit)

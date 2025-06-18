@@ -844,7 +844,7 @@ def get_trace(
     """
     # NOTE: Allow you to override trace model by the extra parameter.
     map_trace_models: dict[str, type[Trace]] = extras.get(
-        "trace_outside_mapping", {}
+        "trace_model_mapping", {}
     )
     url: ParseResult
     if (url := dynamic("trace_url", extras=extras)).scheme and (
