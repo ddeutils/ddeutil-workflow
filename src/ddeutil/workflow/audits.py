@@ -358,6 +358,7 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
 Audit = Union[
     FileAudit,
     SQLiteAudit,
+    BaseAudit,
 ]
 
 
