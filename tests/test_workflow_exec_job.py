@@ -17,10 +17,11 @@ def test_workflow_execute_job():
         ],
     )
     workflow: Workflow = Workflow(name="workflow", jobs={"demo-run": job})
-    st, rs = workflow.execute_job(job=workflow.job("demo-run"), params={})
+    st, ctx = workflow.execute_job(
+        job=workflow.job("demo-run"), params={}, run_id="1234", context={}
+    )
     assert st == SUCCESS
-    assert rs.status == SUCCESS
-    assert rs.context == {
+    assert ctx == {
         "status": SUCCESS,
         "jobs": {
             "demo-run": {
@@ -44,10 +45,11 @@ def test_workflow_execute_job_raise_inside():
         ],
     )
     workflow: Workflow = Workflow(name="workflow", jobs={"demo-run": job})
-    st, rs = workflow.execute_job(job=workflow.job("demo-run"), params={})
+    st, ctx = workflow.execute_job(
+        job=workflow.job("demo-run"), params={}, run_id="1234", context={}
+    )
     assert st == FAILED
-    assert rs.status == FAILED
-    assert rs.context == {
+    assert ctx == {
         "status": FAILED,
         "errors": {
             "name": "WorkflowError",

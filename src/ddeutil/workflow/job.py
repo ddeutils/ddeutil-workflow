@@ -754,7 +754,6 @@ class Job(BaseModel):
         params: DictData,
         *,
         run_id: StrOrNone = None,
-        parent_run_id: StrOrNone = None,
         event: Optional[Event] = None,
     ) -> Result:
         """Job execution with passing dynamic parameters from the workflow
@@ -768,14 +767,14 @@ class Job(BaseModel):
             params: (DictData) A parameter context that also pass from the
                 workflow execute method.
             run_id: (str) An execution running ID.
-            parent_run_id: (str) An execution parent running ID.
             event: (Event) An Event manager instance that use to cancel this
                 execution if it forces stopped by parent execution.
 
         Returns
             Result: Return Result object that create from execution context.
         """
-        run_id: str = run_id or gen_id((self.id or "EMPTY"), unique=True)
+        parent_run_id: str = run_id
+        run_id: str = gen_id((self.id or "EMPTY"), unique=True)
         trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )

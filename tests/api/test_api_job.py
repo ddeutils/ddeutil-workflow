@@ -5,7 +5,7 @@ def tests_route_job_execute(client):
     response = client.post(
         f"{api_config.prefix_path}/job/execute/",
         json={
-            "result": {"run_id": "1234", "parent_run_id": "4567"},
+            "run_id": "1234",
             "job": {
                 "id": "first-job",
                 "stages": [
@@ -19,7 +19,7 @@ def tests_route_job_execute(client):
     assert response.status_code == 200
     assert response.json() == {
         "message": "Execute job via RestAPI successful.",
-        "result": {"run_id": "1234", "parent_run_id": "4567"},
+        "run_id": "1234",
         "job": {
             "id": "first-job",
             "stages": [
@@ -46,7 +46,7 @@ def tests_route_job_execute_not_pass_job_id(client):
     response = client.post(
         f"{api_config.prefix_path}/job/execute/",
         json={
-            "result": {"run_id": "1234", "parent_run_id": "4567"},
+            "run_id": "1234",
             "job": {
                 "stages": [
                     {"name": "Empty first", "echo": "hello world"},
@@ -59,7 +59,7 @@ def tests_route_job_execute_not_pass_job_id(client):
     assert response.status_code == 500
     assert response.json() == {
         "message": "This job do not set the ID before setting execution output.",
-        "result": {"run_id": "1234", "parent_run_id": "4567"},
+        "run_id": "1234",
         "job": {
             "stages": [
                 {"name": "Empty first", "echo": "hello world"},
