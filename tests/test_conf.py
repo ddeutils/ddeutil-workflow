@@ -3,6 +3,7 @@ import os
 import shutil
 from pathlib import Path
 from unittest import mock
+from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -192,8 +193,10 @@ def test_load_file_finds_raise(target_path: Path):
 
 
 def test_dynamic():
-    conf = dynamic("audit_path", extras={"audit_path": Path("/extras-audits")})
-    assert conf == Path("/extras-audits")
+    conf = dynamic(
+        "audit_url", extras={"audit_url": urlparse("/extras-audits")}
+    )
+    assert conf == urlparse("/extras-audits")
 
     conf = dynamic("log_datetime_format", f="%Y%m%d", extras={})
     assert conf == "%Y%m%d"
@@ -207,7 +210,7 @@ def test_dynamic():
     assert conf == "%Y"
 
     with pytest.raises(TypeError):
-        dynamic("audit_path", extras={"audit_path": "audits"})
+        dynamic("audit_url", extras={"audit_url": "./audits"})
 
     conf = dynamic("max_job_exec_timeout", f=500, extras={})
     assert conf == 500

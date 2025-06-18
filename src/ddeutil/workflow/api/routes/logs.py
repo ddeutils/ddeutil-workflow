@@ -10,7 +10,7 @@ from fastapi import APIRouter, Path, Query
 from fastapi import status as st
 from fastapi.responses import UJSONResponse
 
-from ...audits import get_audit
+from ...audits import get_audit_model
 from ...result import Result
 
 router = APIRouter(
@@ -86,11 +86,11 @@ async def get_trace_with_id(run_id: str):
 )
 async def get_audits():
     """Return all audit logs from the current audit log path that config with
-    `WORKFLOW_AUDIT_PATH` environment variable name.
+    `WORKFLOW_AUDIT_URL` environment variable name.
     """
     return {
         "message": "Getting audit logs",
-        "audits": list(get_audit().find_audits(name="demo")),
+        "audits": list(get_audit_model().find_audits(name="demo")),
     }
 
 
@@ -103,13 +103,13 @@ async def get_audits():
 )
 async def get_audit_with_workflow(workflow: str):
     """Return all audit logs with specific workflow name from the current audit
-    log path that config with `WORKFLOW_AUDIT_PATH` environment variable name.
+    log path that config with `WORKFLOW_AUDIT_URL` environment variable name.
 
     - **workflow**: A specific workflow name that want to find audit logs.
     """
     return {
         "message": f"Getting audit logs with workflow name {workflow}",
-        "audits": list(get_audit().find_audits(name="demo")),
+        "audits": list(get_audit_model().find_audits(name="demo")),
     }
 
 
@@ -125,7 +125,7 @@ async def get_audit_with_workflow_release(
     release: str = Path(...),
 ):
     """Return all audit logs with specific workflow name and release date from
-    the current audit log path that config with `WORKFLOW_AUDIT_PATH`
+    the current audit log path that config with `WORKFLOW_AUDIT_URL`
     environment variable name.
 
     - **workflow**: A specific workflow name that want to find audit logs.
@@ -136,7 +136,7 @@ async def get_audit_with_workflow_release(
             f"Getting audit logs with workflow name {workflow} and release "
             f"{release}"
         ),
-        "audits": list(get_audit().find_audits(name="demo")),
+        "audits": list(get_audit_model().find_audits(name="demo")),
     }
 
 
@@ -154,7 +154,7 @@ async def get_audit_with_workflow_release_run_id(
     workflow: str, release: str, run_id: str
 ):
     """Return all audit logs with specific workflow name and release date from
-    the current audit log path that config with `WORKFLOW_AUDIT_PATH`
+    the current audit log path that config with `WORKFLOW_AUDIT_URL`
     environment variable name.
 
     - **workflow**: A specific workflow name that want to find audit logs.
@@ -167,5 +167,5 @@ async def get_audit_with_workflow_release_run_id(
             f"Getting audit logs with workflow name {workflow}, release "
             f"{release}, and running ID {run_id}"
         ),
-        "audits": list(get_audit().find_audits(name="demo")),
+        "audits": list(get_audit_model().find_audits(name="demo")),
     }
