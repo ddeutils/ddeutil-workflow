@@ -2,6 +2,16 @@
 
 ## Latest Changes
 
+## 0.0.75
+
+### :stars: Highlight Features
+
+- :star: hl: convert datetime to UTC before release workflow.
+
+### :book: Documentations
+
+- :page_facing_up: docs: update index mkdocs.
+
 ## 0.0.74
 
 ### :stars: Highlight Features
