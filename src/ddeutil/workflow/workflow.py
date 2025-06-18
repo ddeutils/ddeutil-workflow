@@ -460,7 +460,7 @@ class Workflow(BaseModel):
                 context=context,
                 parent_run_id=parent_run_id,
                 run_id=run_id,
-                execution_time=99,
+                execution_time=rs.info.get("execution_time", 0),
                 extras=self.extras,
             ).save(excluded=excluded)
         )
@@ -656,6 +656,7 @@ class Workflow(BaseModel):
                 parent_run_id=parent_run_id,
                 status=SUCCESS,
                 context=catch(context, status=SUCCESS),
+                info={"execution_time": time.monotonic() - ts},
                 extras=self.extras,
             )
 
@@ -687,6 +688,7 @@ class Workflow(BaseModel):
                         ).to_dict(),
                     },
                 ),
+                info={"execution_time": time.monotonic() - ts},
                 extras=self.extras,
             )
 
@@ -729,6 +731,7 @@ class Workflow(BaseModel):
                                 ).to_dict(),
                             },
                         ),
+                        info={"execution_time": time.monotonic() - ts},
                         extras=self.extras,
                     )
                 elif check == SKIP:  # pragma: no cov
@@ -812,6 +815,7 @@ class Workflow(BaseModel):
                     parent_run_id=parent_run_id,
                     status=st,
                     context=catch(context, status=st),
+                    info={"execution_time": time.monotonic() - ts},
                     extras=self.extras,
                 )
 
@@ -840,6 +844,7 @@ class Workflow(BaseModel):
                     ).to_dict(),
                 },
             ),
+            info={"execution_time": time.monotonic() - ts},
             extras=self.extras,
         )
 

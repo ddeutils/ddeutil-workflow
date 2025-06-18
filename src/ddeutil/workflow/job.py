@@ -773,6 +773,7 @@ class Job(BaseModel):
         Returns
             Result: Return Result object that create from execution context.
         """
+        ts: float = time.monotonic()
         parent_run_id: str = run_id
         run_id: str = gen_id((self.id or "EMPTY"), unique=True)
         trace: Trace = get_trace(
@@ -790,7 +791,7 @@ class Job(BaseModel):
                 params,
                 run_id=parent_run_id,
                 event=event,
-            )
+            ).make_info({"execution_time": time.monotonic() - ts})
         elif self.runs_on.type == SELF_HOSTED:  # pragma: no cov
             pass
         elif self.runs_on.type == AZ_BATCH:  # pragma: no cov
@@ -802,7 +803,7 @@ class Job(BaseModel):
                 run_id=run_id,
                 parent_run_id=parent_run_id,
                 event=event,
-            )
+            ).make_info({"execution_time": time.monotonic() - ts})
 
         trace.error(
             f"[JOB]: Execution not support runs-on: {self.runs_on.type.value!r} "
@@ -819,6 +820,8 @@ class Job(BaseModel):
                     f"not support yet."
                 ).to_dict(),
             },
+            info={"execution_time": time.monotonic() - ts},
+            extras=self.extras,
         )
 
 
@@ -1010,6 +1013,7 @@ def local_execute(
 
     :rtype: Result
     """
+    ts: float = time.monotonic()
     parent_run_id: StrOrNone = run_id
     run_id: str = gen_id((job.id or "EMPTY"), unique=True)
     trace: Trace = get_trace(
@@ -1028,6 +1032,7 @@ def local_execute(
             parent_run_id=parent_run_id,
             status=SKIP,
             context=catch(context, status=SKIP),
+            info={"execution_time": time.monotonic() - ts},
             extras=job.extras,
         )
 
@@ -1056,6 +1061,7 @@ def local_execute(
                     ).to_dict()
                 },
             ),
+            info={"execution_time": time.monotonic() - ts},
             extras=job.extras,
         )
 
@@ -1127,6 +1133,7 @@ def local_execute(
         parent_run_id=parent_run_id,
         status=status,
         context=catch(context, status=status, updated=errors),
+        info={"execution_time": time.monotonic() - ts},
         extras=job.extras,
     )
 

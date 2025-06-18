@@ -20,10 +20,11 @@ Functions:
     get_audit_model: Factory function for creating audit instances
 
 Example:
+
     ```python
     from ddeutil.workflow.audits import get_audit_model
 
-    # Create file-based audit
+    # NOTE: Create file-based Audit.
     audit = get_audit_model(run_id="run-123")
     audit.info("Workflow execution started")
     audit.success("Workflow completed successfully")
