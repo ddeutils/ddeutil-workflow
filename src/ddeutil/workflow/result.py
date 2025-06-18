@@ -43,7 +43,7 @@ from . import (
 from .__types import DictData
 from .audits import Trace, get_trace
 from .errors import ResultError
-from .utils import default_gen_id, get_dt_ntz_now
+from .utils import default_gen_id, get_dt_now
 
 
 class Status(str, Enum):
@@ -190,7 +190,7 @@ class Result:
     info: DictData = field(default_factory=dict)
     run_id: Optional[str] = field(default_factory=default_gen_id)
     parent_run_id: Optional[str] = field(default=None, compare=False)
-    ts: datetime = field(default_factory=get_dt_ntz_now, compare=False)
+    ts: datetime = field(default_factory=get_dt_now, compare=False)
     trace: Optional[Trace] = field(default=None, compare=False, repr=False)
     extras: DictData = field(default_factory=dict, compare=False, repr=False)
 
@@ -266,7 +266,7 @@ class Result:
 
         :rtype: float
         """
-        return (get_dt_ntz_now() - self.ts).total_seconds()
+        return (get_dt_now() - self.ts).total_seconds()
 
 
 def catch(

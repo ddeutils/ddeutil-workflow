@@ -22,8 +22,8 @@ from .utils import exclude_created_and_updated
 
 def test_config():
     conf = Config()
-    os.environ["WORKFLOW_CORE_TIMEZONE"] = "Asia/Bangkok"
-    assert conf.tz == ZoneInfo("Asia/Bangkok")
+    os.environ["WORKFLOW_LOG_TIMEZONE"] = "Asia/Bangkok"
+    assert conf.log_tz == ZoneInfo("Asia/Bangkok")
 
 
 @pytest.fixture(scope="module")
@@ -35,7 +35,7 @@ def target_path(test_path):
         json.dump({"foo": "bar"}, f)
 
     with (target_p / "test_simple_file.toml").open(mode="w") as f:
-        rtoml.dump({"foo": "bar", "env": "${ WORKFLOW_CORE_TIMEZONE }"}, f)
+        rtoml.dump({"foo": "bar", "env": "${ WORKFLOW_LOG_TIMEZONE }"}, f)
 
     yield target_p
 
@@ -60,7 +60,7 @@ def test_load_file(target_path: Path):
                 "test_load_file": {
                     "type": "Workflow",
                     "desc": "Test multi config path",
-                    "env": "${WORKFLOW_CORE_TIMEZONE}",
+                    "env": "${WORKFLOW_LOG_TIMEZONE}",
                 }
             },
             f,
@@ -70,7 +70,7 @@ def test_load_file(target_path: Path):
     assert exclude_created_and_updated(load.data) == {
         "type": "Workflow",
         "desc": "Test multi config path",
-        "env": "${WORKFLOW_CORE_TIMEZONE}",
+        "env": "${WORKFLOW_LOG_TIMEZONE}",
     }
     assert pass_env(load.data["env"]) == "Asia/Bangkok"
     assert exclude_created_and_updated(pass_env(load.data)) == {
@@ -85,7 +85,7 @@ def test_load_file(target_path: Path):
     assert exclude_created_and_updated(load.data) == {
         "type": "Workflow",
         "desc": "Test multi config path",
-        "env": "${WORKFLOW_CORE_TIMEZONE}",
+        "env": "${WORKFLOW_LOG_TIMEZONE}",
     }
 
     # NOTE: Raise because passing `conf_paths` invalid type.

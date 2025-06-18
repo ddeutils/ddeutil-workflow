@@ -2,6 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 import pytest
+from ddeutil.workflow import UTC
 from ddeutil.workflow.errors import ParamError
 from ddeutil.workflow.params import (
     ArrayParam,
@@ -64,9 +65,15 @@ def test_param_date_default():
 
 
 def test_param_datetime():
-    assert DatetimeParam().receive("2024-01-01") == datetime(2024, 1, 1)
-    assert DatetimeParam().receive(date(2024, 1, 1)) == datetime(2024, 1, 1)
-    assert DatetimeParam().receive(datetime(2024, 1, 1)) == datetime(2024, 1, 1)
+    assert DatetimeParam().receive("2024-01-01") == datetime(
+        2024, 1, 1, tzinfo=UTC
+    )
+    assert DatetimeParam().receive(date(2024, 1, 1)) == datetime(
+        2024, 1, 1, tzinfo=UTC
+    )
+    assert DatetimeParam().receive(datetime(2024, 1, 1)) == datetime(
+        2024, 1, 1, tzinfo=UTC
+    )
 
     with pytest.raises(ParamError):
         DatetimeParam().receive(2024)
@@ -77,7 +84,7 @@ def test_param_datetime():
 
 @freeze_time("2024-01-01 00:00:00")
 def test_param_datetime_default():
-    assert DatetimeParam().receive() == datetime(2024, 1, 1)
+    assert DatetimeParam().receive() == datetime(2024, 1, 1, tzinfo=UTC)
 
 
 def test_param_int():

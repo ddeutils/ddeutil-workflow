@@ -26,7 +26,7 @@ by a `.yaml` template.
 3. All parallel tasks inside workflow core engine use **Multi-Threading** pool
    (Python 3.13 unlock GIL 🐍🔓)
 4. Recommend to pass a **Secret Value** with environment variable in YAML template 🔐
-5. Any datatime value convert to **No Timezone**
+5. Any datatime value convert to **UTC Timezone** 🌐
 
 ---
 
@@ -246,10 +246,10 @@ it will use default value and do not raise any error to you.
 | **REGISTRY_CALLER**         |   CORE    | `.`                                                                                                                             | List of importable string for the call stage.                                          |
 | **REGISTRY_FILTER**         |   CORE    | `ddeutil.workflow.templates`                                                                                                    | List of importable string for the filter template.                                     |
 | **CONF_PATH**               |   CORE    | `./conf`                                                                                                                        | The config path that keep all template `.yaml` files.                                  |
-| **TIMEZONE**                |   CORE    | `Asia/Bangkok`                                                                                                                  | A Timezone string value that will pass to `ZoneInfo` object.                           |
 | **STAGE_DEFAULT_ID**        |   CORE    | `false`                                                                                                                         | A flag that enable default stage ID that use for catch an execution output.            |
 | **GENERATE_ID_SIMPLE_MODE** |   CORE    | `true`                                                                                                                          | A flog that enable generating ID with `md5` algorithm.                                 |
 | **DEBUG_MODE**              |    LOG    | `true`                                                                                                                          | A flag that enable logging with debug level mode.                                      |
+| **TIMEZONE**                |    LOG    | `Asia/Bangkok`                                                                                                                  | A Timezone string value that will pass to `ZoneInfo` object.                           |
 | **FORMAT**                  |    LOG    | `%(asctime)s.%(msecs)03d (%(name)-10s, %(process)-5d,%(thread)-5d) [%(levelname)-7s] %(message)-120s (%(filename)s:%(lineno)s)` | A trace message console format.                                                        |
 | **FORMAT_FILE**             |    LOG    | `{datetime} ({process:5d}, {thread:5d}) {message:120s} ({filename}:{lineno})`                                                   | A trace message format that use to write to target pointer.                            |
 | **DATETIME_FORMAT**         |    LOG    | `%Y-%m-%d %H:%M:%S`                                                                                                             | A datetime format of the trace log.                                                    |

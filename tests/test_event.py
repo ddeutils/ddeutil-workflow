@@ -34,6 +34,16 @@ def test_localize_timezone():
     assert bkk_dt.replace(tzinfo=None) == datetime(2024, 1, 1, 19)
 
 
+def test_convert_timezone():
+    ntz_dt = datetime(2025, 6, 18)
+    print(ntz_dt)
+    print(ntz_dt.astimezone(ZoneInfo("UTC")))
+
+    utc_dt = ntz_dt.replace(tzinfo=ZoneInfo("UTC"))
+    print(utc_dt)
+    print(utc_dt.astimezone(ZoneInfo("UTC")))
+
+
 def test_interval2crontab():
     assert interval2crontab(interval="daily", time="01:30") == "1 30 * * *"
     assert (

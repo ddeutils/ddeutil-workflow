@@ -35,10 +35,10 @@ def dotenv_setting() -> None:
             WORKFLOW_CORE_REGISTRY_CALLER=tests
             WORKFLOW_CORE_REGISTRY_FILTER=src.ddeutil.workflow.reusables
             WORKFLOW_CORE_CONF_PATH={(OUTSIDE_PATH / "tests/conf").absolute()}
-            WORKFLOW_CORE_TIMEZONE=Asia/Bangkok
             WORKFLOW_CORE_DEBUG_MODE=true
             WORKFLOW_CORE_STAGE_DEFAULT_ID=true
             WORKFLOW_CORE_GENERATE_ID_SIMPLE_MODE=true
+            WORKFLOW_LOG_TIMEZONE=Asia/Bangkok
             WORKFLOW_LOG_TRACE_ENABLE_WRITE=false
             WORKFLOW_LOG_AUDIT_ENABLE_WRITE=true
             """

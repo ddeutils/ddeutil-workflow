@@ -52,7 +52,7 @@ from pydantic import BaseModel, Field
 
 from .__types import StrOrInt
 from .errors import ParamError
-from .utils import get_d_now, get_dt_now
+from .utils import UTC, get_d_now, get_dt_now
 
 T = TypeVar("T")
 
@@ -169,16 +169,18 @@ class DatetimeParam(DefaultParam):
             return self.default
 
         if isinstance(value, datetime):
-            return value
+            if value.tzinfo is None:
+                return value.replace(tzinfo=UTC)
+            return value.astimezone(UTC)
         elif isinstance(value, date):
-            return datetime(value.year, value.month, value.day)
+            return datetime(value.year, value.month, value.day, tzinfo=UTC)
         elif not isinstance(value, str):
             raise ParamError(
                 f"Value that want to convert to datetime does not support for "
                 f"type: {type(value)}"
             )
         try:
-            return datetime.fromisoformat(value)
+            return datetime.fromisoformat(value).replace(tzinfo=UTC)
         except ValueError:
             raise ParamError(
                 f"Invalid the ISO format string for datetime: {value!r}"

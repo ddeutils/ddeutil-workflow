@@ -36,7 +36,6 @@ from queue import Queue
 from textwrap import dedent
 from threading import Event as ThreadEvent
 from typing import Any, Optional, Union
-from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import field_validator, model_validator
@@ -64,8 +63,9 @@ from .result import (
 from .reusables import has_template, param2template
 from .traces import Trace, get_trace
 from .utils import (
+    UTC,
     gen_id,
-    get_dt_ntz_now,
+    get_dt_now,
     replace_sec,
 )
 
@@ -153,14 +153,14 @@ class Workflow(BaseModel):
         description="A mapping of job ID and job model that already loaded.",
     )
     created_at: datetime = Field(
-        default_factory=get_dt_ntz_now,
+        default_factory=get_dt_now,
         description=(
             "A created datetime of this workflow template when loading from "
             "file."
         ),
     )
     updated_dt: datetime = Field(
-        default_factory=get_dt_ntz_now,
+        default_factory=get_dt_now,
         description=(
             "A updated datetime of this workflow template when loading from "
             "file."
@@ -369,12 +369,15 @@ class Workflow(BaseModel):
         Returns:
             datetime: The validated release datetime.
         """
-        release: datetime = replace_sec(dt.replace(tzinfo=None))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+
+        release: datetime = replace_sec(dt.astimezone(UTC))
         if not self.on:
             return release
 
         for on in self.on.schedule:
-            if release == on.cronjob.schedule(release).next:
+            if release == on.cronjob.schedule(release, tz=UTC).next:
                 return release
         raise WorkflowError(
             "Release datetime does not support for this workflow"
@@ -385,8 +388,8 @@ class Workflow(BaseModel):
         release: datetime,
         params: DictData,
         *,
-        release_type: ReleaseType = NORMAL,
         run_id: Optional[str] = None,
+        release_type: ReleaseType = NORMAL,
         audit: type[Audit] = None,
         override_log_name: Optional[str] = None,
         timeout: int = 600,
@@ -420,25 +423,27 @@ class Workflow(BaseModel):
         :rtype: Result
         """
         name: str = override_log_name or self.name
+
+        # NOTE: Generate the parent running ID with not None value.
         if run_id:
             parent_run_id: str = run_id
             run_id: str = gen_id(name, unique=True)
         else:
             run_id: str = gen_id(name, unique=True)
             parent_run_id: str = run_id
+
         context: DictData = {}
         trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         release: datetime = self.validate_release(dt=release)
         trace.info(f"[RELEASE]: Start {name!r} : {release:%Y-%m-%d %H:%M:%S}")
-        tz: ZoneInfo = dynamic("tz", extras=self.extras)
         values: DictData = param2template(
             params,
             params={
                 "release": {
                     "logical_date": release,
-                    "execute_date": datetime.now(tz=tz),
+                    "execute_date": get_dt_now(),
                     "run_id": run_id,
                 }
             },

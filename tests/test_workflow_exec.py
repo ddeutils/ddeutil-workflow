@@ -8,6 +8,7 @@ from ddeutil.workflow import (
     FAILED,
     SKIP,
     SUCCESS,
+    UTC,
     Job,
     Result,
     Workflow,
@@ -124,7 +125,7 @@ def test_workflow_exec_py():
         "status": SUCCESS,
         "params": {
             "author-run": "Local Workflow",
-            "run-date": datetime(2024, 1, 1, 0, 0),
+            "run-date": datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
         },
         "jobs": {
             "first-job": {
@@ -259,7 +260,7 @@ def test_workflow_exec_py_with_parallel():
         "status": SUCCESS,
         "params": {
             "author-run": "Local Workflow",
-            "run-date": datetime(2024, 1, 1, 0, 0),
+            "run-date": datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
         },
         "jobs": {
             "first-job": {
@@ -586,7 +587,7 @@ def test_workflow_exec_call(test_path):
         assert rs.context == {
             "status": SUCCESS,
             "params": {
-                "run-date": datetime(2024, 1, 1, 0, 0),
+                "run-date": datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
                 "source": "ds_csv_local_file",
                 "sink": "ds_parquet_local_file_dir",
             },
@@ -705,7 +706,7 @@ def test_workflow_exec_call_with_prefix(test_path):
         assert rs.context == {
             "status": SUCCESS,
             "params": {
-                "run_date": datetime(2024, 1, 1, 0, 0),
+                "run_date": datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
                 "sp_name": "proc-name",
                 "source_name": "src",
                 "target_name": "tgt",
@@ -719,7 +720,9 @@ def test_workflow_exec_call_with_prefix(test_path):
                                 "exec": "proc-name",
                                 "params": {
                                     "run_mode": "T",
-                                    "run_date": datetime(2024, 1, 1, 0, 0),
+                                    "run_date": datetime(
+                                        2024, 1, 1, 0, 0, tzinfo=UTC
+                                    ),
                                     "source": "src",
                                     "target": "tgt",
                                 },
@@ -738,7 +741,7 @@ def test_workflow_exec_trigger():
     rs = job.set_outputs(job.execute(params={}).context, to={})
     assert {
         "author-run": "Trigger Runner",
-        "run-date": datetime(2024, 8, 1),
+        "run-date": datetime(2024, 8, 1, tzinfo=UTC),
     } == getdot("jobs.trigger-job.stages.trigger-stage.outputs.params", rs)
 
 

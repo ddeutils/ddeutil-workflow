@@ -34,13 +34,10 @@ def adjust_config_gen_id():
 @freeze_time("2024-01-01 01:13:30")
 def test_get_dt_now():
     rs = get_dt_now()
-    assert rs == datetime(2024, 1, 1, 1, 13, 30)
-
-    rs = get_dt_now(tz=ZoneInfo("UTC"))
     assert rs == datetime(2024, 1, 1, 1, 13, 30, tzinfo=ZoneInfo("UTC"))
 
     rs = get_dt_now(offset=30)
-    assert rs == datetime(2024, 1, 1, 1, 13, 00)
+    assert rs == datetime(2024, 1, 1, 1, 13, 00, tzinfo=ZoneInfo("UTC"))
 
     rs = get_d_now()
     assert rs == date(2024, 1, 1)
@@ -53,8 +50,8 @@ def test_gen_id():
 
 @freeze_time("2024-01-01 01:13:30")
 def test_gen_id_unique():
-    assert "20240101081330000000T1354680202" == gen_id("{}", unique=True)
-    assert "20240101081330000000T1354680202" == gen_id(
+    assert "20240101011330000000T1354680202" == gen_id("{}", unique=True)
+    assert "20240101011330000000T1354680202" == gen_id(
         "{}", unique=True, sensitive=False
     )
 

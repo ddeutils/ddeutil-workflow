@@ -4,12 +4,12 @@ from ddeutil.workflow import (
     CANCEL,
     FAILED,
     SUCCESS,
+    UTC,
     Result,
+    Stage,
+    TriggerStage,
     Workflow,
 )
-from ddeutil.workflow.stages import Stage
-
-from src.ddeutil.workflow import TriggerStage
 
 from ..utils import MockEvent
 
@@ -23,7 +23,7 @@ def test_trigger_stage_exec():
         "status": SUCCESS,
         "params": {
             "author-run": "Trigger Runner",
-            "run-date": datetime(2024, 8, 1, 0, 0),
+            "run-date": datetime(2024, 8, 1, 0, 0, tzinfo=UTC),
         },
         "jobs": {
             "first-job": {

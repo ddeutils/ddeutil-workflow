@@ -109,45 +109,32 @@ def replace_sec(dt: datetime) -> datetime:
 
 
 def clear_tz(dt: datetime) -> datetime:
-    """Replace timezone info on an input datetime object to None."""
-    return dt.replace(tzinfo=None)
+    """Replace timezone info on an input datetime object to UTC."""
+    return dt.replace(tzinfo=UTC)
 
 
-def get_dt_now(tz: Optional[ZoneInfo] = None, offset: float = 0.0) -> datetime:
+def get_dt_now(offset: float = 0.0) -> datetime:
     """Return the current datetime object.
 
-    :param tz: A ZoneInfo object for replace timezone of return datetime object.
     :param offset: An offset second value.
 
     :rtype: datetime
     :return: The current datetime object that use an input timezone or UTC.
     """
-    return datetime.now(tz=tz) - timedelta(seconds=offset)
+    return datetime.now().replace(tzinfo=UTC) - timedelta(seconds=offset)
 
 
-def get_dt_ntz_now() -> datetime:  # pragma: no cov
-    """Get current datetime with no timezone.
-
-    Returns the current datetime object using the None timezone.
-
-    Returns:
-        datetime: Current datetime with no timezone
-    """
-    return get_dt_now(tz=None)
-
-
-def get_d_now(
-    tz: Optional[ZoneInfo] = None, offset: float = 0.0
-) -> date:  # pragma: no cov
+def get_d_now(offset: float = 0.0) -> date:  # pragma: no cov
     """Return the current date object.
 
-    :param tz: A ZoneInfo object for replace timezone of return date object.
     :param offset: An offset second value.
 
     :rtype: date
     :return: The current date object that use an input timezone or UTC.
     """
-    return (datetime.now(tz=tz) - timedelta(seconds=offset)).date()
+    return (
+        datetime.now().replace(tzinfo=UTC) - timedelta(seconds=offset)
+    ).date()
 
 
 def get_diff_sec(dt: datetime, offset: float = 0.0) -> int:
@@ -240,7 +227,7 @@ def gen_id(
     if not isinstance(value, str):
         value: str = str(value)
 
-    dt: datetime = datetime.now(tz=dynamic("tz", extras=extras))
+    dt: datetime = datetime.now(tz=UTC)
     if dynamic("generate_id_simple_mode", f=simple_mode, extras=extras):
         return (f"{dt:%Y%m%d%H%M%S%f}T" if unique else "") + hash_str(
             f"{(value if sensitive else value.lower())}", n=10

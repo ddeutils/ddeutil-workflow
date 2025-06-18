@@ -1,12 +1,14 @@
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import pytest
-from ddeutil.workflow import WorkflowError
-from ddeutil.workflow.conf import config
-from ddeutil.workflow.result import SUCCESS, Result
-from ddeutil.workflow.workflow import (
+from ddeutil.workflow import (
     NORMAL,
+    SUCCESS,
+    UTC,
+    Result,
     Workflow,
+    WorkflowError,
 )
 
 
@@ -84,7 +86,7 @@ def test_workflow_release():
         "params": {"asat-dt": datetime(2024, 10, 1, 0, 0)},
         "release": {
             "type": NORMAL,
-            "logical_date": release,
+            "logical_date": release.replace(tzinfo=UTC),
         },
         "jobs": {
             "first-job": {
@@ -119,18 +121,20 @@ def test_workflow_release_with_datetime():
             "extra": {"enable_write_audit": False},
         }
     )
-    dt: datetime = datetime.now(tz=config.tz).replace(second=0, microsecond=0)
+    dt: datetime = datetime(2025, 1, 18, tzinfo=ZoneInfo("Asia/Bangkok"))
     rs: Result = workflow.release(
         release=dt,
         params={"asat-dt": datetime(2024, 10, 1)},
     )
+    assert dt == datetime(2025, 1, 18, tzinfo=ZoneInfo("Asia/Bangkok"))
     assert rs.status == SUCCESS
     assert rs.context == {
         "status": SUCCESS,
         "params": {"asat-dt": datetime(2024, 10, 1, 0, 0)},
         "release": {
             "type": NORMAL,
-            "logical_date": dt.replace(tzinfo=None),
+            # NOTE: The date that pass to release method will convert to UTC.
+            "logical_date": datetime(2025, 1, 17, 17, tzinfo=UTC),
         },
         "jobs": {
             "first-job": {

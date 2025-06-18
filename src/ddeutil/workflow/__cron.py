@@ -793,10 +793,11 @@ class CronRunner:
                     "Invalid type of `tz` parameter, it should be str or "
                     "ZoneInfo instance."
                 )
-            try:
-                self.tz = ZoneInfo(tz)
-            except ZoneInfoNotFoundError as err:
-                raise ValueError(f"Invalid timezone: {tz}") from err
+            else:
+                try:
+                    self.tz = ZoneInfo(tz)
+                except ZoneInfoNotFoundError as err:
+                    raise ValueError(f"Invalid timezone: {tz}") from err
 
         # NOTE: Prepare date
         if date:
@@ -807,6 +808,7 @@ class CronRunner:
             if tz is not None:
                 self.date: datetime = date.astimezone(self.tz)
             else:
+                self.tz = date.tzinfo
                 self.date: datetime = date
         else:
             self.date: datetime = datetime.now(tz=self.tz)

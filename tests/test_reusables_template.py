@@ -32,7 +32,7 @@ def test_param2template():
             "int_but_str": "value is ${{ params.value | abs}}",
             "list": ["${{ params.src }}", "${{ params.value }}"],
             "str_env": (
-                "${{ params.src }}-${WORKFLOW_CORE_TIMEZONE:-}"
+                "${{ params.src }}-${WORKFLOW_LOG_TIMEZONE:-}"
                 "${WORKFLOW_DUMMY:-}"
             ),
         },

@@ -90,16 +90,6 @@ class Config:  # pragma: no cov
         return Path(env("CORE_CONF_PATH", "./conf"))
 
     @property
-    def tz(self) -> ZoneInfo:
-        """Timezone value that return with the `ZoneInfo` object and use for all
-        datetime object in this workflow engine.
-
-        Returns:
-            ZoneInfo: The timezone configuration for the workflow engine.
-        """
-        return ZoneInfo(env("CORE_TIMEZONE", "UTC"))
-
-    @property
     def generate_id_simple_mode(self) -> bool:
         """Flag for generate running ID with simple mode. That does not use
         `md5` function after generate simple mode.
@@ -142,6 +132,16 @@ class Config:  # pragma: no cov
         :rtype: bool
         """
         return str2bool(env("LOG_DEBUG_MODE", "true"))
+
+    @property
+    def log_tz(self) -> ZoneInfo:
+        """Timezone value that return with the `ZoneInfo` object and use for all
+        datetime object in this workflow engine.
+
+        Returns:
+            ZoneInfo: The timezone configuration for the workflow engine.
+        """
+        return ZoneInfo(env("LOG_TIMEZONE", "UTC"))
 
     @property
     def log_format(self) -> str:

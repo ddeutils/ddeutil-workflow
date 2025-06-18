@@ -167,7 +167,9 @@ class TraceMeta(BaseModel):  # pragma: no cov
 
     mode: Literal["stdout", "stderr"] = Field(description="A meta mode.")
     level: str = Field(description="A log level.")
-    datetime: str = Field(description="A datetime in string format.")
+    datetime: str = Field(
+        description="A datetime string with the specific config format."
+    )
     process: int = Field(description="A process ID.")
     thread: int = Field(description="A thread ID.")
     message: str = Field(description="A message log.")
@@ -234,9 +236,9 @@ class TraceMeta(BaseModel):  # pragma: no cov
             mode=mode,
             level=level,
             datetime=(
-                get_dt_now(tz=dynamic("tz", extras=extras)).strftime(
-                    dynamic("log_datetime_format", extras=extras)
-                )
+                get_dt_now()
+                .astimezone(dynamic("log_tz", extras=extras))
+                .strftime(dynamic("log_datetime_format", extras=extras))
             ),
             process=os.getpid(),
             thread=get_ident(),
