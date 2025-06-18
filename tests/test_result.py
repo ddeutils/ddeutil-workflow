@@ -38,23 +38,6 @@ def test_result_default():
     assert rs.alive_time() > 0
 
 
-def test_result_construct_with_rs_or_id():
-    rs = Result.construct_with_rs_or_id(run_id="foo", extras={"test": "value"})
-    assert rs.run_id == "foo"
-    assert rs.parent_run_id is None
-    assert rs.extras == {"test": "value"}
-
-    rs = Result.construct_with_rs_or_id(
-        run_id="foo",
-        parent_run_id="baz",
-        result=Result(run_id="bar"),
-    )
-
-    assert rs.run_id != "foo"
-    assert rs.run_id == "bar"
-    assert rs.parent_run_id == "baz"
-
-
 def test_result_context():
     rs: Result = Result(context={"params": {"source": "src", "target": "tgt"}})
     rs.context.update({"additional-key": "new-value-to-add"})

@@ -1136,7 +1136,6 @@ def self_hosted_execute(
     params: DictData,
     *,
     run_id: StrOrNone = None,
-    parent_run_id: StrOrNone = None,
     event: Optional[Event] = None,
 ) -> Result:  # pragma: no cov
     """Self-Hosted job execution with passing dynamic parameters from the
@@ -1146,30 +1145,35 @@ def self_hosted_execute(
     :param job: (Job) A job model that want to execute.
     :param params: (DictData) A parameter data.
     :param run_id: (str) A job running ID.
-    :param parent_run_id: (str) A parent workflow running ID.
     :param event: (Event) An Event manager instance that use to cancel this
         execution if it forces stopped by parent execution.
 
     :rtype: Result
     """
-    result: Result = Result.construct_with_rs_or_id(
-        run_id=run_id,
-        parent_run_id=parent_run_id,
-        id_logic=(job.id or "EMPTY"),
-        extras=job.extras,
+    parent_run_id: StrOrNone = run_id
+    run_id: str = gen_id((job.id or "EMPTY"), unique=True)
+    trace: Trace = get_trace(
+        run_id, parent_run_id=parent_run_id, extras=job.extras
     )
-
-    result.trace.info("[JOB]: Start self-hosted executor.")
+    context: DictData = {"status": WAIT}
+    trace.info("[JOB]: Start self-hosted executor.")
 
     if event and event.is_set():
-        return result.catch(
+        return Result(
+            run_id=run_id,
+            parent_run_id=parent_run_id,
             status=CANCEL,
-            context={
-                "errors": JobCancelError(
-                    "Execution was canceled from the event before start "
-                    "self-hosted execution."
-                ).to_dict()
-            },
+            context=catch(
+                context,
+                status=CANCEL,
+                updated={
+                    "errors": JobCancelError(
+                        "Execution was canceled from the event before start "
+                        "self-hosted execution."
+                    ).to_dict()
+                },
+            ),
+            extras=job.extras,
         )
 
     import requests
@@ -1181,11 +1185,20 @@ def self_hosted_execute(
             data={
                 "job": job.model_dump(),
                 "params": params,
-                "result": result.__dict__,
+                "run_id": parent_run_id,
+                "extras": job.extras,
             },
         )
     except requests.exceptions.RequestException as e:
-        return result.catch(status=FAILED, context={"errors": to_dict(e)})
+        return Result(
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            status=FAILED,
+            context=catch(
+                context, status=FAILED, updated={"errors": to_dict(e)}
+            ),
+            extras=job.extras,
+        )
 
     if resp.status_code != 200:
         raise JobError(
@@ -1193,7 +1206,13 @@ def self_hosted_execute(
             f"{job.runs_on.args.host!r}"
         )
 
-    return result.catch(status=SUCCESS)
+    return Result(
+        run_id=run_id,
+        parent_run_id=parent_run_id,
+        status=SUCCESS,
+        context=catch(context, status=SUCCESS),
+        extras=job.extras,
+    )
 
 
 def azure_batch_execute(
@@ -1201,7 +1220,6 @@ def azure_batch_execute(
     params: DictData,
     *,
     run_id: StrOrNone = None,
-    parent_run_id: StrOrNone = None,
     event: Optional[Event] = None,
 ) -> Result:  # pragma: no cov
     """Azure Batch job execution that will run all job's stages on the Azure
@@ -1225,32 +1243,43 @@ def azure_batch_execute(
     :param job:
     :param params:
     :param run_id:
-    :param parent_run_id:
     :param event:
 
     :rtype: Result
     """
-    result: Result = Result.construct_with_rs_or_id(
-        run_id=run_id,
-        parent_run_id=parent_run_id,
-        id_logic=(job.id or "EMPTY"),
-        extras=job.extras,
+    parent_run_id: StrOrNone = run_id
+    run_id: str = gen_id((job.id or "EMPTY"), unique=True)
+    trace: Trace = get_trace(
+        run_id, parent_run_id=parent_run_id, extras=job.extras
     )
-
-    result.trace.info("[JOB]: Start Azure Batch executor.")
+    context: DictData = {"status": WAIT}
+    trace.info("[JOB]: Start Azure Batch executor.")
 
     if event and event.is_set():
-        return result.catch(
+        return Result(
+            run_id=run_id,
+            parent_run_id=parent_run_id,
             status=CANCEL,
-            context={
-                "errors": JobCancelError(
-                    "Execution was canceled from the event before start "
-                    "azure-batch execution."
-                ).to_dict()
-            },
+            context=catch(
+                context,
+                status=CANCEL,
+                updated={
+                    "errors": JobCancelError(
+                        "Execution was canceled from the event before start "
+                        "self-hosted execution."
+                    ).to_dict()
+                },
+            ),
+            extras=job.extras,
         )
     print(params)
-    return result.catch(status=SUCCESS)
+    return Result(
+        run_id=run_id,
+        parent_run_id=parent_run_id,
+        status=SUCCESS,
+        context=catch(context, status=SUCCESS),
+        extras=job.extras,
+    )
 
 
 def docker_execution(
@@ -1268,24 +1297,36 @@ def docker_execution(
         - Install this workflow package
         - Start push job to run to target Docker container.
     """
-    result: Result = Result.construct_with_rs_or_id(
-        run_id=run_id,
-        parent_run_id=parent_run_id,
-        id_logic=(job.id or "EMPTY"),
-        extras=job.extras,
+    parent_run_id: StrOrNone = run_id
+    run_id: str = gen_id((job.id or "EMPTY"), unique=True)
+    trace: Trace = get_trace(
+        run_id, parent_run_id=parent_run_id, extras=job.extras
     )
-
-    result.trace.info("[JOB]: Start Docker executor.")
+    context: DictData = {"status": WAIT}
+    trace.info("[JOB]: Start Docker executor.")
 
     if event and event.is_set():
-        return result.catch(
+        return Result(
+            run_id=run_id,
+            parent_run_id=parent_run_id,
             status=CANCEL,
-            context={
-                "errors": JobCancelError(
-                    "Execution was canceled from the event before start "
-                    "start docker execution."
-                ).to_dict()
-            },
+            context=catch(
+                context,
+                status=CANCEL,
+                updated={
+                    "errors": JobCancelError(
+                        "Execution was canceled from the event before start "
+                        "self-hosted execution."
+                    ).to_dict()
+                },
+            ),
+            extras=job.extras,
         )
     print(params)
-    return result.catch(status=SUCCESS)
+    return Result(
+        run_id=run_id,
+        parent_run_id=parent_run_id,
+        status=SUCCESS,
+        context=catch(context, status=SUCCESS),
+        extras=job.extras,
+    )

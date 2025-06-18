@@ -43,7 +43,7 @@ from . import (
 from .__types import DictData
 from .audits import Trace, get_trace
 from .errors import ResultError
-from .utils import default_gen_id, gen_id, get_dt_ntz_now
+from .utils import default_gen_id, get_dt_ntz_now
 
 
 class Status(str, Enum):
@@ -193,60 +193,6 @@ class Result:
     ts: datetime = field(default_factory=get_dt_ntz_now, compare=False)
     trace: Optional[Trace] = field(default=None, compare=False, repr=False)
     extras: DictData = field(default_factory=dict, compare=False, repr=False)
-
-    @classmethod
-    def construct_with_id(
-        cls,
-        run_id: Optional[str] = None,
-        parent_run_id: Optional[str] = None,
-        id_logic: Optional[str] = None,
-        *,
-        extras: DictData | None = None,
-    ):
-        return cls(
-            run_id=(run_id or gen_id(id_logic or "", unique=True)),
-            parent_run_id=parent_run_id,
-            ts=get_dt_ntz_now(),
-            extras=(extras or {}),
-        )
-
-    @classmethod
-    def construct_with_rs_or_id(
-        cls,
-        result: Optional[Result] = None,
-        run_id: Optional[str] = None,
-        parent_run_id: Optional[str] = None,
-        id_logic: Optional[str] = None,
-        *,
-        extras: DictData | None = None,
-    ) -> Self:
-        """Create the Result object or set parent running id if passing Result
-        object.
-
-        Args:
-            result: A Result instance.
-            run_id: A running ID.
-            parent_run_id: A parent running ID.
-            id_logic: A logic function that use to generate a running ID.
-            extras: An extra parameter that want to override the core config.
-
-        Returns:
-            Self: The constructed or updated Result instance.
-        """
-        if result is None:
-            return cls(
-                run_id=(run_id or gen_id(id_logic or "", unique=True)),
-                parent_run_id=parent_run_id,
-                ts=get_dt_ntz_now(),
-                extras=(extras or {}),
-            )
-        elif parent_run_id:
-            result.set_parent_run_id(parent_run_id)
-
-        if extras is not None:
-            result.extras.update(extras)
-
-        return result
 
     @model_validator(mode="after")
     def __prepare_trace(self) -> Self:
