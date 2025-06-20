@@ -287,7 +287,7 @@ class TraceData(BaseModel):  # pragma: no cov
         return cls.model_validate(data)
 
 
-class BaseTrace(BaseModel, ABC):  # pragma: no cov
+class BaseEmitTrace(BaseModel, ABC):  # pragma: no cov
     """Base Trace model with abstraction class property."""
 
     model_config = ConfigDict(frozen=True)
@@ -474,7 +474,7 @@ class BaseTrace(BaseModel, ABC):  # pragma: no cov
         await self.amit(message, mode="exception", is_err=True)
 
 
-class ConsoleTrace(BaseTrace):  # pragma: no cov
+class ConsoleTrace(BaseEmitTrace):  # pragma: no cov
     """Console Trace log model."""
 
     def writer(
@@ -566,7 +566,11 @@ class ConsoleTrace(BaseTrace):  # pragma: no cov
         getattr(logger, mode)(msg, stacklevel=3, extra={"cut_id": self.cut_id})
 
 
-class OutsideTrace(ConsoleTrace, ABC):
+class BaseTrace(ConsoleTrace, ABC):
+    """A Base Trace model that will use for override writing or sending trace
+    log to any service type.
+    """
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     url: ParseResult = Field(description="An URL for create pointer.")
@@ -575,9 +579,8 @@ class OutsideTrace(ConsoleTrace, ABC):
         "url", mode="before", json_schema_input_type=Union[ParseResult, str]
     )
     def __parse_url(cls, value: Union[ParseResult, str]) -> ParseResult:
-        if isinstance(value, str):
-            return urlparse(value)
-        return value
+        """Parsing an URL value."""
+        return urlparse(value) if isinstance(value, str) else value
 
     @field_serializer("url")
     def __serialize_url(self, value: ParseResult) -> str:
@@ -621,7 +624,7 @@ class OutsideTrace(ConsoleTrace, ABC):
         )
 
 
-class FileTrace(OutsideTrace):  # pragma: no cov
+class FileTrace(BaseTrace):  # pragma: no cov
     """File Trace dataclass that write file to the local storage."""
 
     @classmethod
@@ -765,7 +768,7 @@ class FileTrace(OutsideTrace):  # pragma: no cov
             await f.write(trace_meta.model_dump_json() + "\n")
 
 
-class SQLiteTrace(OutsideTrace):  # pragma: no cov
+class SQLiteTrace(BaseTrace):  # pragma: no cov
     """SQLite Trace dataclass that write trace log to the SQLite database file."""
 
     table_name: ClassVar[str] = "audits"
@@ -779,7 +782,7 @@ class SQLiteTrace(OutsideTrace):  # pragma: no cov
         , metadata          JSON
         , created_at        datetime
         , updated_at        datetime
-        primary key ( run_id )
+        primary key ( parent_run_id )
         """
 
     @classmethod
@@ -824,7 +827,7 @@ class SQLiteTrace(OutsideTrace):  # pragma: no cov
 Trace = Union[
     FileTrace,
     SQLiteTrace,
-    OutsideTrace,
+    BaseTrace,
 ]
 
 

@@ -113,6 +113,7 @@ from .result import (
     WAIT,
     Result,
     Status,
+    get_status_from_error,
 )
 from .reusables import *
 from .stages import (
@@ -131,7 +132,7 @@ from .stages import (
     VirtualPyStage,
 )
 from .traces import (
-    ConsoleTrace,
+    BaseTrace,
     FileTrace,
     Trace,
     TraceData,

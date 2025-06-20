@@ -389,7 +389,7 @@ class Workflow(BaseModel):
         params: DictData,
         *,
         run_id: Optional[str] = None,
-        runs_by: Optional[str] = None,
+        runs_metadata: Optional[DictData] = None,
         release_type: ReleaseType = NORMAL,
         override_log_name: Optional[str] = None,
         timeout: int = 600,
@@ -410,19 +410,22 @@ class Workflow(BaseModel):
             - Execute this workflow with mapping release data to its parameters.
             - Writing result audit
 
-        :param release: (datetime) A release datetime.
-        :param params: A workflow parameter that pass to execute method.
-        :param release_type:
-        :param run_id: (str) A workflow running ID.
-        :param runs_by:
-        :param audit: An audit class that want to save the execution result.
-        :param override_log_name: (str) An override logging name that use
-            instead the workflow name.
-        :param timeout: (int) A workflow execution time out in second unit.
-        :param audit_excluded: (list[str]) A list of key that want to exclude
-            from the audit data.
+        Args:
+            release: (datetime) A release datetime.
+            params: A workflow parameter that pass to execute method.
+            release_type:
+            run_id: (str) A workflow running ID.
+            runs_metadata: (DictData)
+            audit: An audit class that want to save the execution result.
+            override_log_name: (str) An override logging name that use
+                instead the workflow name.
+            timeout: (int) A workflow execution time out in second unit.
+            audit_excluded: (list[str]) A list of key that want to exclude
+                from the audit data.
 
-        :rtype: Result
+        Returns:
+            Result: return result object that pass context data from the execute
+                method.
         """
         name: str = override_log_name or self.name
 
@@ -447,7 +450,7 @@ class Workflow(BaseModel):
                     "logical_date": release,
                     "execute_date": get_dt_now(),
                     "run_id": run_id,
-                    "runs_by": runs_by,
+                    "runs_metadata": runs_metadata or {},
                 }
             },
             extras=self.extras,
@@ -468,8 +471,16 @@ class Workflow(BaseModel):
                 context=context,
                 parent_run_id=parent_run_id,
                 run_id=run_id,
-                execution_time=rs.info.get("execution_time", 0),
                 extras=self.extras,
+                runs_metadata=(
+                    (runs_metadata or {})
+                    | rs.info
+                    | {
+                        "timeout": timeout,
+                        "original_name": self.name,
+                        "audit_excluded": audit_excluded,
+                    }
+                ),
             ).save(excluded=audit_excluded)
         )
         return Result(

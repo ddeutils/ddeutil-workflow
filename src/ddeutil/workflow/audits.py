@@ -79,7 +79,10 @@ class BaseAudit(BaseModel, ABC):
         default=None, description="A parent running ID."
     )
     run_id: str = Field(description="A running ID")
-    execution_time: float = Field(default=0, description="An execution time.")
+    runs_metadata: DictData = Field(
+        default_factory=dict,
+        description="A runs metadata that will use to tracking this audit log.",
+    )
 
     @model_validator(mode="after")
     def __model_action(self) -> Self:
@@ -302,14 +305,16 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
     schemas: ClassVar[
         str
     ] = """
-        workflow        str,
-        release         int,
-        type            str,
-        context         json,
-        parent_run_id   int,
-        run_id          int,
-        update          datetime
-        primary key ( run_id )
+        workflow          str
+        , release         int
+        , type            str
+        , context         JSON
+        , parent_run_id   int
+        , run_id          int
+        , metadata        JSON
+        , created_at      datetime
+        , updated_at      datetime
+        primary key ( workflow, release )
         """
 
     @classmethod
