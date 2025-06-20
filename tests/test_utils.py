@@ -14,6 +14,7 @@ from ddeutil.workflow.utils import (
     get_diff_sec,
     get_dt_now,
     make_exec,
+    obj_name,
     prepare_newline,
     reach_next_minute,
 )
@@ -185,3 +186,10 @@ def test_dump_all():
         {"name": "first", "info": {"field": "foo", "age": 10}},
         {"name": "second", "info": {"field": "foo", "age": 10}},
     ]
+
+
+def test_obj_name():
+    assert obj_name() is None
+    assert obj_name("datetime") == "datetime"
+    assert obj_name(datetime) == "datetime"
+    assert obj_name(datetime(2025, 1, 1, 1)) == "datetime"
