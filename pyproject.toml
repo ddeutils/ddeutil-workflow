@@ -64,6 +64,7 @@ where = ["src"]
 [tool.shelf.version]
 version = "./src/ddeutil/workflow/__about__.py"
 changelog = "CHANGELOG.md"
+files = ["json-schema.json"]
 commit_msg_format = "- {subject}"
 
 [tool.shelf.git]
