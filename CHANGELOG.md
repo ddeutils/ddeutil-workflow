@@ -2,6 +2,30 @@
 
 ## Latest Changes
 
+## 0.0.76
+
+### :sparkles: Features
+
+- :dart: feat: add runs_metadata field on audit model.
+- :dart: feat: update init cli.
+
+### :bug: Bug fixes
+
+- :gear: fixed: remove change params on job exec.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: add testcase for utils.
+
+### :broom: Deprecate & Clean
+
+- :recycle: clean: remove param on workflow execute job.
+
+### :book: Documentations
+
+- :page_facing_up: docs: update json-schema.
+- :page_facing_up: docs: update package docs.
+
 ## 0.0.75
 
 ### :stars: Highlight Features
