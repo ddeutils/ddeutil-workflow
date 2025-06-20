@@ -18,12 +18,9 @@ from .__types import DictData
 from .errors import JobError
 from .job import Job
 from .params import Param
-from .result import Result
 from .workflow import Workflow
 
-app = typer.Typer(
-    pretty_exceptions_enable=True,
-)
+app = typer.Typer(pretty_exceptions_enable=True)
 
 
 @app.callback()
@@ -45,8 +42,7 @@ def version() -> None:
 def execute_job(
     params: Annotated[str, typer.Option(help="A job execute parameters")],
     job: Annotated[str, typer.Option(help="A job model")],
-    parent_run_id: Annotated[str, typer.Option(help="A parent running ID")],
-    run_id: Annotated[Optional[str], typer.Option(help="A running ID")] = None,
+    run_id: Annotated[str, typer.Option(help="A running ID")],
 ) -> None:
     """Job execution on the local.
 
@@ -62,26 +58,19 @@ def execute_job(
         job_dict: dict[str, Any] = json.loads(job)
         _job: Job = Job.model_validate(obj=job_dict)
     except json.JSONDecodeError as e:
-        raise ValueError(f"Params does not support format: {params!r}.") from e
+        raise ValueError(f"Jobs does not support format: {job!r}.") from e
 
     typer.echo(f"Job params: {params_dict}")
-    rs: Result = Result(
-        run_id=run_id,
-        parent_run_id=parent_run_id,
-    )
-
     context: DictData = {}
     try:
         _job.set_outputs(
-            _job.execute(
-                params=params_dict,
-                run_id=rs.run_id,
-                parent_run_id=rs.parent_run_id,
-            ).context,
+            _job.execute(params=params_dict, run_id=run_id).context,
             to=context,
         )
+        typer.echo("[JOB]: Context result:")
+        typer.echo(json.dumps(context, default=str, indent=0))
     except JobError as err:
-        rs.trace.error(f"[JOB]: {err.__class__.__name__}: {err}")
+        typer.echo(f"[JOB]: {err.__class__.__name__}: {err}")
 
 
 @app.command()
@@ -167,7 +156,7 @@ def workflow_json_schema(
     template_schema: dict[str, str] = {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "title": "Workflow Configuration Schema",
-        "version": "1.0.0",
+        "version": __version__,
     }
     with open(output, mode="w", encoding="utf-8") as f:
         json.dump(template_schema | json_schema, f, indent=2)

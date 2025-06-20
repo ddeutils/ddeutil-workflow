@@ -843,7 +843,11 @@ class CronRunner:
 
     @property
     def next(self) -> datetime:
-        """Returns the next time of the schedule."""
+        """Returns the next time of the schedule.
+
+        Returns:
+            datetime: A next datetime from the current with shifting step.
+        """
         self.date = (
             self.date
             if self.reset_flag
@@ -860,7 +864,11 @@ class CronRunner:
     def find_date(self, reverse: bool = False) -> datetime:
         """Returns the time the schedule would run by `next` or `prev` methods.
 
-        :param reverse: A reverse flag.
+        Args:
+            reverse: A reverse flag.
+
+        Returns:
+            datetime: A next datetime from shifting step.
         """
         # NOTE: Set reset flag to false if start any action.
         self.reset_flag: bool = False
@@ -870,7 +878,8 @@ class CronRunner:
             max(self.shift_limit, 100) if self.is_year else self.shift_limit
         ):
 
-            # NOTE: Shift the date
+            # NOTE: Shift the date from year to minute.
+            mode: DatetimeMode  # noqa: F842
             if all(
                 not self.__shift_date(mode, reverse)
                 for mode in ("year", "month", "day", "hour", "minute")

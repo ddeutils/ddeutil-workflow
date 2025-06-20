@@ -656,6 +656,7 @@ class Job(BaseModel):
         to: DictData,
         *,
         job_id: StrOrNone = None,
+        **kwargs,
     ) -> DictData:
         """Set an outputs from execution result context to the received context
         with a `to` input parameter. The result context from job strategy
@@ -693,12 +694,15 @@ class Job(BaseModel):
         :raise JobError: If the job's ID does not set and the setting
             default job ID flag does not set.
 
-        :param output: (DictData) A result data context that want to extract
-            and transfer to the `strategies` key in receive context.
-        :param to: (DictData) A received context data.
-        :param job_id: (StrOrNone) A job ID if the `id` field does not set.
+        Args:
+            output: (DictData) A result data context that want to extract
+                and transfer to the `strategies` key in receive context.
+            to: (DictData) A received context data.
+            job_id: (StrOrNone) A job ID if the `id` field does not set.
+            kwargs: Any values that want to add to the target context.
 
-        :rtype: DictData
+        Returns:
+            DictData: Return updated the target context with a result context.
         """
         if "jobs" not in to:
             to["jobs"] = {}
@@ -716,8 +720,9 @@ class Job(BaseModel):
         status: dict[str, Status] = (
             {"status": output.pop("status")} if "status" in output else {}
         )
+        kwargs: DictData = kwargs or {}
         if self.strategy.is_set():
-            to["jobs"][_id] = {"strategies": output} | errors | status
+            to["jobs"][_id] = {"strategies": output} | errors | status | kwargs
         elif len(k := output.keys()) > 1:  # pragma: no cov
             raise JobError(
                 "Strategy output from execution return more than one ID while "
@@ -726,7 +731,7 @@ class Job(BaseModel):
         else:
             _output: DictData = {} if len(k) == 0 else output[list(k)[0]]
             _output.pop("matrix", {})
-            to["jobs"][_id] = _output | errors | status
+            to["jobs"][_id] = _output | errors | status | kwargs
         return to
 
     def get_outputs(
@@ -800,8 +805,7 @@ class Job(BaseModel):
             return docker_execution(
                 self,
                 params,
-                run_id=run_id,
-                parent_run_id=parent_run_id,
+                run_id=parent_run_id,
                 event=event,
             ).make_info({"execution_time": time.monotonic() - ts})
 
@@ -1294,7 +1298,6 @@ def docker_execution(
     params: DictData,
     *,
     run_id: StrOrNone = None,
-    parent_run_id: StrOrNone = None,
     event: Optional[Event] = None,
 ):  # pragma: no cov
     """Docker job execution.

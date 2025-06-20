@@ -295,7 +295,7 @@ class BaseStage(BaseModel, ABC):
         ts: float = time.monotonic()
         parent_run_id: str = run_id
         run_id: str = run_id or gen_id(self.iden, unique=True)
-        context: DictData = {}
+        context: DictData = {"status": WAIT}
         trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
@@ -413,7 +413,7 @@ class BaseStage(BaseModel, ABC):
         self,
         output: DictData,
         to: DictData,
-        info: Optional[DictData] = None,
+        **kwargs,
     ) -> DictData:
         """Set an outputs from execution result context to the received context
         with a `to` input parameter. The result context from stage execution
@@ -447,12 +447,14 @@ class BaseStage(BaseModel, ABC):
         to the `to` argument. The result context was soft copied before set
         output step.
 
-        :param output: (DictData) A result data context that want to extract
-            and transfer to the `outputs` key in receive context.
-        :param to: (DictData) A received context data.
-        :param info: (DictData)
+        Args:
+            output: (DictData) A result data context that want to extract
+                and transfer to the `outputs` key in receive context.
+            to: (DictData) A received context data.
+            kwargs: Any values that want to add to the target context.
 
-        :rtype: DictData
+        Returns:
+            DictData: Return updated the target context with a result context.
         """
         if "stages" not in to:
             to["stages"] = {}
@@ -470,8 +472,8 @@ class BaseStage(BaseModel, ABC):
         status: dict[str, Status] = (
             {"status": output.pop("status")} if "status" in output else {}
         )
-        info: DictData = {"info": info} if info else {}
-        to["stages"][_id] = {"outputs": output} | errors | status | info
+        kwargs: DictData = kwargs or {}
+        to["stages"][_id] = {"outputs": output} | errors | status | kwargs
         return to
 
     def get_outputs(self, output: DictData) -> DictData:

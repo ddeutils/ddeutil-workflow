@@ -389,11 +389,12 @@ class Workflow(BaseModel):
         params: DictData,
         *,
         run_id: Optional[str] = None,
+        runs_by: Optional[str] = None,
         release_type: ReleaseType = NORMAL,
-        audit: type[Audit] = None,
         override_log_name: Optional[str] = None,
         timeout: int = 600,
-        excluded: Optional[list[str]] = None,
+        audit_excluded: Optional[list[str]] = None,
+        audit: type[Audit] = None,
     ) -> Result:
         """Release the workflow which is executes workflow with writing audit
         log tracking. The method is overriding parameter with the release
@@ -413,12 +414,13 @@ class Workflow(BaseModel):
         :param params: A workflow parameter that pass to execute method.
         :param release_type:
         :param run_id: (str) A workflow running ID.
+        :param runs_by:
         :param audit: An audit class that want to save the execution result.
         :param override_log_name: (str) An override logging name that use
             instead the workflow name.
         :param timeout: (int) A workflow execution time out in second unit.
-        :param excluded: (list[str]) A list of key that want to exclude from
-            audit data.
+        :param audit_excluded: (list[str]) A list of key that want to exclude
+            from the audit data.
 
         :rtype: Result
         """
@@ -432,7 +434,7 @@ class Workflow(BaseModel):
             run_id: str = gen_id(name, unique=True)
             parent_run_id: str = run_id
 
-        context: DictData = {}
+        context: DictData = {"status": WAIT}
         trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
@@ -445,6 +447,7 @@ class Workflow(BaseModel):
                     "logical_date": release,
                     "execute_date": get_dt_now(),
                     "run_id": run_id,
+                    "runs_by": runs_by,
                 }
             },
             extras=self.extras,
@@ -467,7 +470,7 @@ class Workflow(BaseModel):
                 run_id=run_id,
                 execution_time=rs.info.get("execution_time", 0),
                 extras=self.extras,
-            ).save(excluded=excluded)
+            ).save(excluded=audit_excluded)
         )
         return Result(
             run_id=run_id,
