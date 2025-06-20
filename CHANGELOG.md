@@ -2,6 +2,16 @@
 
 ## Latest Changes
 
+## 0.0.77
+
+### :bug: Bug fixes
+
+- :gear: fixed: nested change function should handle type error.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: update testcase for making coverage.
+
 ## 0.0.76
 
 ### :sparkles: Features

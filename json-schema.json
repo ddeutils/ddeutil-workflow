@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Workflow Configuration Schema",
-  "version": "0.0.76",
+  "version": "0.0.77",
   "$defs": {
     "ArrayParam": {
       "description": "Array parameter.",
