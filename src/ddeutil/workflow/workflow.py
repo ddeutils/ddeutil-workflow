@@ -152,6 +152,10 @@ class Workflow(BaseModel):
         default_factory=dict,
         description="A mapping of job ID and job model that already loaded.",
     )
+    tags: list[str] = Field(
+        default_factory=list,
+        description="A list of tag that use for simple grouping workflow.",
+    )
     created_at: datetime = Field(
         default_factory=get_dt_now,
         description=(

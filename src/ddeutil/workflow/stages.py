@@ -329,7 +329,7 @@ class BaseStage(BaseModel, ABC):
                 parent_run_id=parent_run_id,
                 event=event,
             )
-            if result_caught.status == WAIT:
+            if result_caught.status == WAIT:  # pragma: no cov
                 raise StageError(
                     "Status from execution should not return waiting status."
                 )
@@ -656,7 +656,7 @@ class BaseAsyncStage(BaseStage, ABC):
                 parent_run_id=parent_run_id,
                 event=event,
             )
-            if result_caught.status == WAIT:
+            if result_caught.status == WAIT:  # pragma: no cov
                 raise StageError(
                     "Status from execution should not return waiting status."
                 )

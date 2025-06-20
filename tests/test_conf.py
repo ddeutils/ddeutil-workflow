@@ -61,7 +61,10 @@ def test_load_file(target_path: Path):
                     "type": "Workflow",
                     "desc": "Test multi config path",
                     "env": "${WORKFLOW_LOG_TIMEZONE}",
-                }
+                },
+                "test_load_not_set_type": {
+                    "desc": "Test load not set type.",
+                },
             },
             f,
         )
@@ -91,6 +94,12 @@ def test_load_file(target_path: Path):
     # NOTE: Raise because passing `conf_paths` invalid type.
     with pytest.raises(TypeError):
         YamlParser("test_load_file", extras={"conf_paths": target_path})
+
+    load = YamlParser(
+        "test_load_not_set_type", extras={"conf_paths": [target_path]}
+    )
+    with pytest.raises(ValueError):
+        _ = load.type
 
 
 def test_load_file_finds(target_path: Path):
@@ -227,12 +236,13 @@ def test_parse_url():
     assert url.path == "./logs"
 
     url: ParseResult = urlparse("file:///./logs")
-    print(url)
     assert url.scheme == "file"
     assert url.path == "/./logs"
 
     url: ParseResult = urlparse("sqlite:///home/warehouse/sqlite.db")
-    print(url)
+    assert url.scheme == "sqlite"
+    assert url.path == "/home/warehouse/sqlite.db"
 
     url: ParseResult = urlparse("file:./data.db")
-    print(url)
+    assert url.scheme == "file"
+    assert url.path == "./data.db"

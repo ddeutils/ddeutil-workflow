@@ -1,6 +1,9 @@
+from threading import Event
+
 import pytest
+from ddeutil.workflow import CANCEL
 from ddeutil.workflow.errors import StageError
-from ddeutil.workflow.result import SUCCESS, Result
+from ddeutil.workflow.result import FAILED, SKIP, SUCCESS, Result
 from ddeutil.workflow.stages import EmptyStage, Stage
 from pydantic import ValidationError
 
@@ -160,3 +163,57 @@ async def test_empty_stage_axec():
     rs: Result = await stage.axecute(params={})
     assert rs.status == SUCCESS
     assert rs.context == {"status": SUCCESS}
+
+
+@pytest.mark.asyncio
+async def test_empty_stage_axec_cancel():
+    event = Event()
+    event.set()
+
+    stage: EmptyStage = EmptyStage(name="Empty Stage")
+    rs: Result = await stage.axecute(params={}, event=event)
+    assert rs.status == CANCEL
+    assert rs.context == {
+        "status": CANCEL,
+        "errors": {
+            "name": "StageCancelError",
+            "message": "Execution was canceled from the event before start parallel.",
+        },
+    }
+
+
+@pytest.mark.asyncio
+async def test_empty_stage_if_condition_async():
+    stage: EmptyStage = EmptyStage.model_validate(
+        {
+            "name": "If Condition",
+            "if": '"${{ params.name }}" == "foo"',
+            "echo": "Hello world",
+        }
+    )
+    rs: Result = await stage.axecute(params={"params": {"name": "foo"}})
+    assert rs.status == SUCCESS
+
+    rs: Result = await stage.axecute(params={"params": {"name": "bar"}})
+    assert rs.status == SKIP
+    assert rs.context == {"status": SKIP}
+
+    stage: EmptyStage = EmptyStage.model_validate(
+        {
+            "name": "If Condition Raise",
+            "if": '"${{ params.name }}"',
+            "echo": "Hello World",
+        }
+    )
+
+    # NOTE: Raise if the returning type after eval does not match with boolean.
+    # with pytest.raises(StageError):
+    rs: Result = await stage.axecute({"params": {"name": "foo"}})
+    assert rs.status == FAILED
+    assert rs.context == {
+        "status": FAILED,
+        "errors": {
+            "name": "StageError",
+            "message": "TypeError: Return type of condition does not be boolean",
+        },
+    }

@@ -6,6 +6,26 @@ from pydantic import ValidationError
 from ..utils import dump_yaml_context
 
 
+def test_call_stage_validate_args():
+    with pytest.raises(ValidationError):
+        CallStage.model_validate(
+            {
+                "name": "Special argument should not pass",
+                "uses": "tasks/special-args-task@demo",
+                "with": {"result": "${{ params.foo }}"},
+            }
+        )
+
+    with pytest.raises(ValidationError):
+        CallStage.model_validate(
+            {
+                "name": "Necessary argument should not pass",
+                "uses": "tasks/special-args-task@demo",
+                "with": {"extras": "${{ params.foo }}"},
+            }
+        )
+
+
 def test_call_stage_exec_necessary_args():
     stage: Stage = CallStage.model_validate(
         {

@@ -28,6 +28,7 @@ def test_example_stage_exec_nested_trigger(test_path):
             "run-mode": "N",
             "name": "starter-stream-name",
         },
+        runs_metadata={"runs_by": "nobody"},
     )
     assert rs.status == SUCCESS
     print(rs)

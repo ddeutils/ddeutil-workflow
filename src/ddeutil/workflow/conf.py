@@ -322,25 +322,30 @@ class YamlParser:
         excluded: Optional[list[str]] = None,
         extras: Optional[DictData] = None,
         ignore_filename: Optional[str] = None,
+        tags: Optional[list[str]] = None,
     ) -> Iterator[tuple[str, DictData]]:
         """Find all data that match with object type in config path. This class
         method can use include and exclude list of identity name for filter and
         adds-on.
 
-        :param obj: (object | str) An object that want to validate matching
-            before return.
-        :param path: (Path) A config path object.
-        :param paths: (list[Path]) A list of config path object.
-        :param excluded: An included list of data key that want to filter from
-            data.
-        :param extras: (DictData) An extra parameter that use to override core
-            config values.
-        :param ignore_filename: (str) An ignore filename. Default is
+        Args:
+            obj: (object | str) An object that want to validate matching
+                before return.
+            path: (Path) A config path object.
+            paths: (list[Path]) A list of config path object.
+            excluded: An included list of data key that want to filter from
+                data.
+            extras: (DictData) An extra parameter that use to override core
+                config values.
+            ignore_filename: (str) An ignore filename. Default is
             ``.confignore`` filename.
+            tags: (list[str])
+                A list of tag that want to filter.
 
         :rtype: Iterator[tuple[str, DictData]]
         """
         excluded: list[str] = excluded or []
+        tags: list[str] = tags or []
         path: Path = dynamic("conf_path", f=path, extras=extras)
         paths: Optional[list[Path]] = paths or (extras or {}).get("conf_paths")
         if not paths:
@@ -364,6 +369,14 @@ class YamlParser:
                 for key, data in cls.filter_yaml(file).items():
 
                     if key in excluded:
+                        continue
+
+                    if (
+                        tags
+                        and (ts := data[key].get("tags"))
+                        and isinstance(ts, list)
+                        and all(t not in tags for t in ts)
+                    ):  # pragma: no cov
                         continue
 
                     if (t := data.get("type")) and t == obj_type:

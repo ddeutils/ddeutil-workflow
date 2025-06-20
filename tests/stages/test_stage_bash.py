@@ -115,13 +115,17 @@ def test_bash_stage_exec_retry_exceed():
 
 @pytest.mark.asyncio
 async def test_bash_stage_axec():
-    stage: BashStage = BashStage(name="Bash Stage", bash='echo "Hello World"')
+    stage: BashStage = BashStage(
+        name="Bash Stage",
+        desc="Echo runtime variable that create inside subprocess.",
+        bash='echo "Hello World";\n' "VAR='Foo';\n" 'echo "Variable $VAR";',
+    )
     rs: Result = await stage.axecute(params={})
     assert rs.status == SUCCESS
     assert rs.context == {
         "status": SUCCESS,
         "return_code": 0,
-        "stdout": "Hello World",
+        "stdout": "Hello World\nVariable Foo",
         "stderr": None,
     }
 
