@@ -271,7 +271,10 @@ def filter_func(value: T) -> T:
     if isinstance(value, dict):
         return {k: filter_func(value[k]) for k in value}
     elif isinstance(value, (list, tuple, set)):
-        return type(value)([filter_func(i) for i in value])
+        try:
+            return type(value)(filter_func(i) for i in value)
+        except TypeError:
+            return value
 
     if isfunction(value):
         # NOTE: If it wants to improve to get this function, it is able to save
@@ -338,7 +341,10 @@ def dump_all(
     if isinstance(value, dict):
         return {k: dump_all(value[k], by_alias=by_alias) for k in value}
     elif isinstance(value, (list, tuple, set)):
-        return type(value)([dump_all(i, by_alias=by_alias) for i in value])
+        try:
+            return type(value)(dump_all(i, by_alias=by_alias) for i in value)
+        except TypeError:
+            return value
     elif isinstance(value, BaseModel):
         return value.model_dump(by_alias=by_alias)
     return value

@@ -1,6 +1,7 @@
 import os
 from datetime import datetime
 from typing import Any
+from urllib.parse import urlparse
 
 import pytest
 from ddeutil.workflow.errors import UtilError
@@ -35,11 +36,14 @@ def test_param2template():
                 "${{ params.src }}-${WORKFLOW_LOG_TIMEZONE:-}"
                 "${WORKFLOW_DUMMY:-}"
             ),
+            "url": urlparse("file:./conf"),
+            "set": {"${{ params.src }}", "${{ params.value }}"},
         },
         params={
             "params": {
                 "src": "foo",
                 "value": -10,
+                "url": urlparse("file:./conf"),
             },
         },
     )
@@ -49,6 +53,8 @@ def test_param2template():
         "int_but_str": "value is 10",
         "list": ["foo", -10],
         "str_env": "foo-Asia/Bangkok-",
+        "url": urlparse("file:./conf"),
+        "set": {"foo", -10},
     } == value
 
     with pytest.raises(UtilError):

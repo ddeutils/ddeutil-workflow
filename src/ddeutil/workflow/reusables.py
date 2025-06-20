@@ -421,12 +421,13 @@ def param2template(
             for k in value
         }
     elif isinstance(value, (list, tuple, set)):
-        return type(value)(
-            [
+        try:
+            return type(value)(
                 param2template(i, params, context, filters, extras=extras)
                 for i in value
-            ]
-        )
+            )
+        except TypeError:
+            return value
     elif not isinstance(value, str):
         return value
     return str2template(

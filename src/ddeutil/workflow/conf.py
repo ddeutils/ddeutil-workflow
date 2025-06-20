@@ -482,7 +482,10 @@ def pass_env(value: T) -> T:  # pragma: no cov
     if isinstance(value, dict):
         return {k: pass_env(value[k]) for k in value}
     elif isinstance(value, (list, tuple, set)):
-        return type(value)([pass_env(i) for i in value])
+        try:
+            return type(value)(pass_env(i) for i in value)
+        except TypeError:
+            return value
     if not isinstance(value, str):
         return value
 
