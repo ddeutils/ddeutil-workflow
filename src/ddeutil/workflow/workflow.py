@@ -506,7 +506,6 @@ class Workflow(BaseModel):
     def execute_job(
         self,
         job: Job,
-        params: DictData,
         run_id: str,
         context: DictData,
         *,
@@ -525,7 +524,6 @@ class Workflow(BaseModel):
 
         Args:
             job: (Job) A job model that want to execute.
-            params: (DictData) A parameter data.
             run_id: A running stage ID.
             context: A context data.
             parent_run_id: A parent running ID. (Default is None)
@@ -552,25 +550,24 @@ class Workflow(BaseModel):
             )
 
         trace.info(f"[WORKFLOW]: Execute Job: {job.id!r}")
-        rs: Result = job.execute(
-            params=params,
+        result: Result = job.execute(
+            params=context,
             run_id=parent_run_id,
             event=event,
         )
-        job.set_outputs(rs.context, to=params)
+        job.set_outputs(result.context, to=context)
 
-        if rs.status == FAILED:
+        if result.status == FAILED:
             error_msg: str = f"Job execution, {job.id!r}, was failed."
             return FAILED, catch(
                 context=context,
                 status=FAILED,
                 updated={
                     "errors": WorkflowError(error_msg).to_dict(),
-                    **params,
                 },
             )
 
-        elif rs.status == CANCEL:
+        elif result.status == CANCEL:
             error_msg: str = (
                 f"Job execution, {job.id!r}, was canceled from the event after "
                 f"end job execution."
@@ -580,13 +577,10 @@ class Workflow(BaseModel):
                 status=CANCEL,
                 updated={
                     "errors": WorkflowCancelError(error_msg).to_dict(),
-                    **params,
                 },
             )
 
-        return rs.status, catch(
-            context=context, status=rs.status, updated=params
-        )
+        return result.status, catch(context, status=result.status)
 
     def execute(
         self,
@@ -767,7 +761,6 @@ class Workflow(BaseModel):
                         executor.submit(
                             self.execute_job,
                             job=job,
-                            params=context,
                             run_id=run_id,
                             context=context,
                             parent_run_id=parent_run_id,
@@ -782,7 +775,6 @@ class Workflow(BaseModel):
                         executor.submit(
                             self.execute_job,
                             job=job,
-                            params=context,
                             run_id=run_id,
                             context=context,
                             parent_run_id=parent_run_id,
@@ -912,7 +904,7 @@ class Workflow(BaseModel):
                 extras=self.extras,
             )
 
-        err = context["errors"]
+        err: dict[str, str] = context.get("errors", {})
         trace.info(f"[WORKFLOW]: Previous error: {err}")
 
         event: ThreadEvent = event or ThreadEvent()
@@ -933,9 +925,9 @@ class Workflow(BaseModel):
                 extras=self.extras,
             )
 
-        # NOTE: Prepare the new context for rerun process.
+        # NOTE: Prepare the new context variable for rerun process.
         jobs: DictData = context.get("jobs")
-        new_context: DictData = {
+        context: DictData = {
             "params": context["params"].copy(),
             "jobs": {j: jobs[j] for j in jobs if jobs[j]["status"] == SUCCESS},
         }
@@ -944,19 +936,22 @@ class Workflow(BaseModel):
         job_queue: Queue = Queue()
         for job_id in self.jobs:
 
-            if job_id in new_context["jobs"]:
+            if job_id in context["jobs"]:
                 continue
 
             job_queue.put(job_id)
             total_job += 1
 
         if total_job == 0:
-            trace.warning("[WORKFLOW]: It does not have job to rerun.")
+            trace.warning(
+                "[WORKFLOW]: It does not have job to rerun. it will change "
+                "status to skip."
+            )
             return Result(
                 run_id=run_id,
                 parent_run_id=parent_run_id,
-                status=SUCCESS,
-                context=catch(context=context, status=SUCCESS),
+                status=SKIP,
+                context=catch(context=context, status=SKIP),
                 extras=self.extras,
             )
 
@@ -968,14 +963,14 @@ class Workflow(BaseModel):
             "max_job_exec_timeout", f=timeout, extras=self.extras
         )
 
-        catch(new_context, status=WAIT)
+        catch(context, status=WAIT)
         if event and event.is_set():
             return Result(
                 run_id=run_id,
                 parent_run_id=parent_run_id,
                 status=CANCEL,
                 context=catch(
-                    new_context,
+                    context,
                     status=CANCEL,
                     updated={
                         "errors": WorkflowCancelError(
@@ -997,7 +992,7 @@ class Workflow(BaseModel):
             ):
                 job_id: str = job_queue.get()
                 job: Job = self.job(name=job_id)
-                if (check := job.check_needs(new_context["jobs"])) == WAIT:
+                if (check := job.check_needs(context["jobs"])) == WAIT:
                     job_queue.task_done()
                     job_queue.put(job_id)
                     consecutive_waits += 1
@@ -1017,7 +1012,7 @@ class Workflow(BaseModel):
                         parent_run_id=parent_run_id,
                         status=FAILED,
                         context=catch(
-                            new_context,
+                            context,
                             status=FAILED,
                             updated={
                                 "status": FAILED,
@@ -1033,7 +1028,7 @@ class Workflow(BaseModel):
                     trace.info(
                         f"[JOB]: Skip job: {job_id!r} from trigger rule."
                     )
-                    job.set_outputs(output={"status": SKIP}, to=new_context)
+                    job.set_outputs(output={"status": SKIP}, to=context)
                     job_queue.task_done()
                     skip_count += 1
                     continue
@@ -1043,7 +1038,6 @@ class Workflow(BaseModel):
                         executor.submit(
                             self.execute_job,
                             job=job,
-                            params=new_context,
                             run_id=run_id,
                             context=context,
                             parent_run_id=parent_run_id,
@@ -1058,7 +1052,6 @@ class Workflow(BaseModel):
                         executor.submit(
                             self.execute_job,
                             job=job,
-                            params=new_context,
                             run_id=run_id,
                             context=context,
                             parent_run_id=parent_run_id,
@@ -1109,7 +1102,7 @@ class Workflow(BaseModel):
                     run_id=run_id,
                     parent_run_id=parent_run_id,
                     status=st,
-                    context=catch(new_context, status=st),
+                    context=catch(context, status=st),
                     extras=self.extras,
                 )
 
@@ -1129,7 +1122,7 @@ class Workflow(BaseModel):
             parent_run_id=parent_run_id,
             status=FAILED,
             context=catch(
-                new_context,
+                context,
                 status=FAILED,
                 updated={
                     "errors": WorkflowTimeoutError(
