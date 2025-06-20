@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from platform import python_version
+from textwrap import dedent
 from typing import Annotated, Any, Literal, Optional, Union
 
 import typer
@@ -15,6 +16,7 @@ from pydantic import Field, TypeAdapter
 
 from .__about__ import __version__
 from .__types import DictData
+from .conf import config
 from .errors import JobError
 from .job import Job
 from .params import Param
@@ -36,6 +38,65 @@ def version() -> None:
     """Get the ddeutil-workflow package version."""
     typer.echo(f"ddeutil-workflow=={__version__}")
     typer.echo(f"python-version=={python_version()}")
+
+
+@app.command()
+def init() -> None:
+    """Initialize a Workflow structure on the current context."""
+    config.conf_path.mkdir(exist_ok=True)
+    (config.conf_path / ".confignore").touch()
+
+    conf_example_path: Path = config.conf_path / "examples"
+    conf_example_path.mkdir(exist_ok=True)
+
+    example_template: Path = conf_example_path / "wf_examples.yml"
+    example_template.write_text(
+        dedent(
+            """
+        # Example workflow template.
+        wf-example:
+          type: Workflow
+          desc: |
+            An example workflow template.
+          params:
+            name:
+                type: str
+                default: "World"
+          jobs:
+            first-job:
+              stages:
+                - name: "Call tasks"
+                  uses: tasks/say-hello-func@example
+                  with:
+                    name: ${{ params.name }}
+        """
+        ).lstrip("\n")
+    )
+
+    if "." in config.registry_caller:
+        task_path = Path("./tasks")
+        task_path.mkdir(exist_ok=True)
+
+        dummy_tasks_path = task_path / "example.py"
+        dummy_tasks_path.write_text(
+            dedent(
+                """
+            from ddeutil.workflow import Result, tag
+
+            @tag(name="example", alias="say-hello-func")
+            def hello_world_task(name: str, rs: Result) -> dict[str, str]:
+                \"\"\"Logging hello task function\"\"\"
+                rs.trace.info(f"Hello, {name}")
+                return {"name": name}
+            """
+            ).lstrip("\n")
+        )
+
+        init_path = task_path / "__init__.py"
+        init_path.write_text("from .example import hello_world_task\n")
+    typer.echo(
+        "Starter command: `workflow-cli workflows execute --name=wf-example`"
+    )
 
 
 @app.command(name="job")
@@ -125,8 +186,24 @@ def workflow_callback():
 
 
 @workflow_app.command(name="execute")
-def workflow_execute():
-    """"""
+def workflow_execute(
+    name: Annotated[
+        str,
+        typer.Option(help="A name of workflow template."),
+    ],
+    params: Annotated[
+        str,
+        typer.Option(help="A workflow execute parameters"),
+    ] = "{}",
+):
+    """Execute workflow by passing a workflow template name."""
+    try:
+        params_dict: dict[str, Any] = json.loads(params)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Params does not support format: {params!r}.") from e
+
+    typer.echo(f"Start execute workflow template: {name}")
+    typer.echo(f"... with params: {params_dict}")
 
 
 WORKFLOW_TYPE = Literal["Workflow"]
