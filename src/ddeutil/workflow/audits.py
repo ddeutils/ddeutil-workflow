@@ -299,7 +299,7 @@ class FileAudit(BaseAudit):
 
 
 class SQLiteAudit(BaseAudit):  # pragma: no cov
-    """SQLite Audit Pydantic Model."""
+    """SQLite Audit model."""
 
     table_name: ClassVar[str] = "audits"
     schemas: ClassVar[

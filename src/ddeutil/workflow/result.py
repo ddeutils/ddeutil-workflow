@@ -16,7 +16,6 @@ Classes:
 Functions:
     validate_statuses: Determine final status from multiple status values
     get_status_from_error: Convert exception types to appropriate status
-    get_dt_tznow: Get current datetime with timezone configuration
 """
 from __future__ import annotations
 
@@ -89,6 +88,7 @@ class Status(str, Enum):
         return self.name
 
     def is_result(self) -> bool:
+        """Return True if this status is the status for result object."""
         return self in ResultStatuses
 
 
@@ -115,15 +115,13 @@ def validate_statuses(statuses: list[Status]) -> Status:
         Status: Final consolidated status based on workflow logic
 
     Example:
-        ```python
-        # Mixed statuses - FAILED takes priority
-        result = validate_statuses([SUCCESS, FAILED, SUCCESS])
-        # Returns: FAILED
+        >>> # Mixed statuses - FAILED takes priority
+        >>> validate_statuses([SUCCESS, FAILED, SUCCESS])
+        >>> # Returns: FAILED
 
-        # All same status
-        result = validate_statuses([SUCCESS, SUCCESS, SUCCESS])
-        # Returns: SUCCESS
-        ```
+        >>> # All same status
+        >>> validate_statuses([SUCCESS, SUCCESS, SUCCESS])
+        >>> # Returns: SUCCESS
     """
     if any(s == CANCEL for s in statuses):
         return CANCEL
@@ -152,6 +150,9 @@ def get_status_from_error(
     ]
 ) -> Status:
     """Get the Status from the error object.
+
+    Args:
+        error: An error object.
 
     Returns:
         Status: The status from the specific exception class.
@@ -189,7 +190,7 @@ class Result:
     context: DictData = field(default_factory=default_context)
     info: DictData = field(default_factory=dict)
     run_id: Optional[str] = field(default_factory=default_gen_id)
-    parent_run_id: Optional[str] = field(default=None, compare=False)
+    parent_run_id: Optional[str] = field(default=None)
     ts: datetime = field(default_factory=get_dt_now, compare=False)
     trace: Optional[Trace] = field(default=None, compare=False, repr=False)
     extras: DictData = field(default_factory=dict, compare=False, repr=False)

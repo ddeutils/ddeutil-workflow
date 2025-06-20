@@ -136,16 +136,14 @@ class BaseError(Exception):
             ErrorData or dict: Exception data, optionally mapped by reference ID
 
         Example:
-            ```python
-            error = BaseError("Something failed", refs="stage-1")
+            >>> error = BaseError("Something failed", refs="stage-1")
+            >>> # Simple format
+            >>> error.to_dict()
+            >>> # Returns: {"name": "BaseError", "message": "Something failed"}
 
-            # Simple format
-            data = error.to_dict()
-            # Returns: {"name": "BaseError", "message": "Something failed"}
-
-            # With reference mapping
-            ref_data = error.to_dict(with_refs=True)
-            # Returns: {"stage-1": {"name": "BaseError", "message": "Something failed"}}
+            >>> # With reference mapping
+            >>> error.to_dict(with_refs=True)
+            >>> # Returns: {"stage-1": {"name": "BaseError", "message": "Something failed"}}
             ```
         """
         data: ErrorData = to_dict(self)
