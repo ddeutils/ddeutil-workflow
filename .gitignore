@@ -150,3 +150,6 @@ mnt/
 
 # Backup file
 *.bk.py
+
+# MacOS file
+.DS_Store
