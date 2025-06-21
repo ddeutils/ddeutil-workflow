@@ -56,13 +56,13 @@ def to_dict(exception: Exception, **kwargs) -> ErrorData:  # pragma: no cov
         ErrorData: Dictionary containing exception name and message
 
     Example:
-        ```python
-        try:
-            raise ValueError("Something went wrong")
-        except Exception as e:
-            error_data = to_dict(e, context="workflow_execution")
-            # Returns: {"name": "ValueError", "message": "Something went wrong", "context": "workflow_execution"}
-        ```
+        >>> try:
+        >>>     raise ValueError("Something went wrong")
+        >>> except Exception as e:
+        >>>     error_data = to_dict(e, context="workflow_execution")
+        >>>     # Returns: {
+        >>>     #   "name": "ValueError", "message": "Something went wrong", "context": "workflow_execution"
+        >>>     # }
     """
     return {
         "name": exception.__class__.__name__,
@@ -85,14 +85,12 @@ class BaseError(Exception):
         params: Parameter data that was being processed when error occurred
 
     Example:
-        ```python
-        try:
-            # Some workflow operation
-            pass
-        except BaseError as e:
-            error_dict = e.to_dict(with_refs=True)
-            print(f"Error in {e.refs}: {error_dict}")
-        ```
+        >>> try:
+        >>>     # NOTE: Some workflow operation
+        >>>     pass
+        >>> except BaseError as e:
+        >>>     error_dict = e.to_dict(with_refs=True)
+        >>>     print(f\"Error in {e.refs}: {error_dict}\")
     """
 
     def __init__(

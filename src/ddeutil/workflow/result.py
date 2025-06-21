@@ -20,7 +20,6 @@ Functions:
 from __future__ import annotations
 
 from dataclasses import field
-from datetime import datetime
 from enum import Enum
 from typing import Optional, Union
 
@@ -42,7 +41,7 @@ from . import (
 from .__types import DictData
 from .audits import Trace, get_trace
 from .errors import ResultError
-from .utils import default_gen_id, get_dt_now
+from .utils import default_gen_id
 
 
 class Status(str, Enum):
@@ -187,14 +186,13 @@ class Result:
     field that keep dict value change its ID when update new value to it.
     """
 
+    extras: DictData = field(default_factory=dict, compare=False, repr=False)
     status: Status = field(default=WAIT)
     context: DictData = field(default_factory=default_context)
     info: DictData = field(default_factory=dict)
-    run_id: Optional[str] = field(default_factory=default_gen_id)
+    run_id: str = field(default_factory=default_gen_id)
     parent_run_id: Optional[str] = field(default=None)
-    ts: datetime = field(default_factory=get_dt_now, compare=False)
     trace: Optional[Trace] = field(default=None, compare=False, repr=False)
-    extras: DictData = field(default_factory=dict, compare=False, repr=False)
 
     @model_validator(mode="after")
     def __prepare_trace(self) -> Self:
@@ -208,6 +206,10 @@ class Result:
                 parent_run_id=self.parent_run_id,
                 extras=self.extras,
             )
+
+        if self.parent_run_id is None:
+            self.parent_run_id = self.run_id
+
         return self
 
     def catch(
@@ -249,13 +251,6 @@ class Result:
         """Making information."""
         self.__dict__["info"].update(data)
         return self
-
-    def alive_time(self) -> float:  # pragma: no cov
-        """Return total seconds that this object use since it was created.
-
-        :rtype: float
-        """
-        return (get_dt_now() - self.ts).total_seconds()
 
 
 def catch(

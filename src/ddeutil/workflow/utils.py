@@ -247,7 +247,7 @@ def default_gen_id() -> str:
 
     :rtype: str
     """
-    return gen_id("manual", unique=True)
+    return gen_id("MOCK", unique=True)
 
 
 def make_exec(path: Union[Path, str]) -> None:

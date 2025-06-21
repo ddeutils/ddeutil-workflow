@@ -38,8 +38,6 @@ def test_result_default():
     assert rs != rs2
     assert rs.run_id != rs2.run_id
 
-    assert rs.alive_time() > 0
-
 
 def test_result_context():
     rs: Result = Result(context={"params": {"source": "src", "target": "tgt"}})
@@ -53,6 +51,9 @@ def test_result_context():
 
 def test_result_catch():
     rs: Result = Result()
+
+    assert rs.run_id == rs.parent_run_id
+
     data = {"params": {"source": "src", "target": "tgt"}}
     rs.catch(status=SUCCESS, context=data)
     assert rs.status == SUCCESS
@@ -75,6 +76,9 @@ def test_result_catch():
     # NOTE: Raise because kwargs get the key that does not exist on the context.
     with pytest.raises(ResultError):
         rs.catch(status=SUCCESS, not_exists={"foo": "bar"})
+
+    rs: Result = Result(parent_run_id="demo")
+    assert rs.parent_run_id == "demo"
 
 
 def test_result_catch_context_does_not_new():
