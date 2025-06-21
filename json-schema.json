@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Workflow Configuration Schema",
+  "title": "Workflow Configuration JSON Schema",
   "version": "0.0.77",
   "$defs": {
     "ArrayParam": {
@@ -87,6 +87,9 @@
               "type": "string"
             },
             {
+              "type": "boolean"
+            },
+            {
               "type": "null"
             }
           ],
@@ -169,6 +172,9 @@
               "type": "string"
             },
             {
+              "type": "boolean"
+            },
+            {
               "type": "null"
             }
           ],
@@ -247,6 +253,9 @@
           "anyOf": [
             {
               "type": "string"
+            },
+            {
+              "type": "boolean"
             },
             {
               "type": "null"
@@ -356,7 +365,7 @@
         },
         "timezone": {
           "default": "UTC",
-          "description": "A timezone string value.",
+          "description": "A timezone string value that will pass to ZoneInfo.",
           "enum": [
             "Africa/Abidjan",
             "Africa/Accra",
@@ -974,7 +983,7 @@
       "type": "object"
     },
     "CrontabValue": {
-      "description": "Crontab model using interval-based specification.\n\nAttributes:\n    interval: Scheduling interval ('daily', 'weekly', 'monthly').\n    day: Day specification for weekly/monthly schedules.\n    time: Time of day in 'HH:MM' format.",
+      "description": "Crontab model using interval-based specification.\n\nAttributes:\n    interval: (Interval)\n        A scheduling interval string ('daily', 'weekly', 'monthly').\n    day: (str, default None)\n        Day specification for weekly/monthly schedules.\n    time: Time of day in 'HH:MM' format.",
       "properties": {
         "extras": {
           "additionalProperties": true,
@@ -984,7 +993,7 @@
         },
         "timezone": {
           "default": "UTC",
-          "description": "A timezone string value.",
+          "description": "A timezone string value that will pass to ZoneInfo.",
           "enum": [
             "Africa/Abidjan",
             "Africa/Accra",
@@ -1590,6 +1599,7 @@
           "type": "string"
         },
         "interval": {
+          "description": "A scheduling interval string.",
           "enum": [
             "daily",
             "weekly",
@@ -1612,6 +1622,8 @@
         },
         "time": {
           "default": "00:00",
+          "description": "A time of day that pass with format 'HH:MM'.",
+          "pattern": "\\d{2}:\\d{2}",
           "title": "Time",
           "type": "string"
         }
@@ -1633,7 +1645,7 @@
         },
         "timezone": {
           "default": "UTC",
-          "description": "A timezone string value.",
+          "description": "A timezone string value that will pass to ZoneInfo.",
           "enum": [
             "Africa/Abidjan",
             "Africa/Accra",
@@ -2438,6 +2450,9 @@
               "type": "string"
             },
             {
+              "type": "boolean"
+            },
+            {
               "type": "null"
             }
           ],
@@ -2526,6 +2541,9 @@
           "anyOf": [
             {
               "type": "string"
+            },
+            {
+              "type": "boolean"
             },
             {
               "type": "null"
@@ -2691,6 +2709,9 @@
               "type": "string"
             },
             {
+              "type": "boolean"
+            },
+            {
               "type": "null"
             }
           ],
@@ -2722,6 +2743,10 @@
             },
             {
               "type": "string"
+            },
+            {
+              "additionalProperties": true,
+              "type": "object"
             }
           ],
           "description": "A items for passing to stages via ${{ item }} template parameter.",
@@ -3079,10 +3104,8 @@
       "description": "Runs-on Docker container.",
       "properties": {
         "type": {
-          "const": "docker",
-          "default": "docker",
-          "title": "Type",
-          "type": "string"
+          "$ref": "#/$defs/RunsOn",
+          "default": "docker"
         },
         "with": {
           "$ref": "#/$defs/DockerArgs"
@@ -3095,10 +3118,8 @@
       "description": "Runs-on local.",
       "properties": {
         "type": {
-          "const": "local",
-          "default": "local",
-          "title": "Type",
-          "type": "string"
+          "$ref": "#/$defs/RunsOn",
+          "default": "local"
         },
         "with": {
           "additionalProperties": true,
@@ -3114,10 +3135,8 @@
       "description": "Runs-on self-hosted.",
       "properties": {
         "type": {
-          "const": "self_hosted",
-          "default": "self_hosted",
-          "title": "Type",
-          "type": "string"
+          "$ref": "#/$defs/RunsOn",
+          "default": "self_hosted"
         },
         "with": {
           "$ref": "#/$defs/SelfHostedArgs"
@@ -3173,6 +3192,9 @@
           "anyOf": [
             {
               "type": "string"
+            },
+            {
+              "type": "boolean"
             },
             {
               "type": "null"
@@ -3301,6 +3323,9 @@
               "type": "string"
             },
             {
+              "type": "boolean"
+            },
+            {
               "type": "null"
             }
           ],
@@ -3381,6 +3406,9 @@
               "type": "string"
             },
             {
+              "type": "boolean"
+            },
+            {
               "type": "null"
             }
           ],
@@ -3413,6 +3441,19 @@
         "none_skipped"
       ],
       "title": "Rule",
+      "type": "string"
+    },
+    "RunsOn": {
+      "description": "Runs-On enum object.",
+      "enum": [
+        "local",
+        "self_hosted",
+        "azure_batch",
+        "aws_batch",
+        "cloud_batch",
+        "docker"
+      ],
+      "title": "RunsOn",
       "type": "string"
     },
     "SelfHostedArgs": {
@@ -3605,6 +3646,9 @@
               "type": "string"
             },
             {
+              "type": "boolean"
+            },
+            {
               "type": "null"
             }
           ],
@@ -3683,6 +3727,9 @@
           "anyOf": [
             {
               "type": "string"
+            },
+            {
+              "type": "boolean"
             },
             {
               "type": "null"
@@ -3827,6 +3874,9 @@
           "anyOf": [
             {
               "type": "string"
+            },
+            {
+              "type": "boolean"
             },
             {
               "type": "null"
@@ -3985,6 +4035,14 @@
           "description": "A mapping of job ID and job model that already loaded.",
           "title": "Jobs",
           "type": "object"
+        },
+        "tags": {
+          "description": "A list of tag that use for simple grouping workflow.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
         },
         "created_at": {
           "description": "A created datetime of this workflow template when loading from file.",

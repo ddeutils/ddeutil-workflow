@@ -105,7 +105,6 @@ For comprehensive API documentation, examples, and best practices:
 - **[Full Documentation](https://ddeutils.github.io/ddeutil-workflow/)** - Complete user guide and API reference
 - **[Getting Started](https://ddeutils.github.io/ddeutil-workflow/getting-started/)** - Quick start guide
 - **[API Reference](https://ddeutils.github.io/ddeutil-workflow/api/workflow/)** - Detailed API documentation
-- **[Examples](https://ddeutils.github.io/ddeutil-workflow/examples/)** - Real-world usage examples
 
 ## 🎯 Usage
 

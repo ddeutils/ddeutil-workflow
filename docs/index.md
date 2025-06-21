@@ -87,10 +87,10 @@ the base deps.
 If you want to install this package with application add-ons, you should add
 `app` in installation;
 
-| Use-case       | Install Optional                         |       Support       |
-|----------------|------------------------------------------|:-------------------:|
-| Python         | `pip install ddeutil-workflow`           | :heavy_check_mark:  |
-| FastAPI Server | `pip install ddeutil-workflow[api]`      | :heavy_check_mark:  |
+| Use-case       | Install Optional        | Support |
+|----------------|-------------------------|:-------:|
+| Python         | `ddeutil-workflow`      |    ✅    |
+| FastAPI Server | `ddeutil-workflow[all]` |    ✅    |
 
 ## 🎯 Usage
 
