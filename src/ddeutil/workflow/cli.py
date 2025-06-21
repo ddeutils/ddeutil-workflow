@@ -73,6 +73,10 @@ def init() -> None:
                   uses: tasks/say-hello-func@example
                   with:
                     name: ${{ params.name }}
+            second-job:
+
+                - name: "Hello Env"
+                  echo: "Start say hi with ${ WORKFLOW_DEMO_HELLO }"
         """
         ).lstrip("\n")
     )
@@ -98,8 +102,22 @@ def init() -> None:
 
         init_path = task_path / "__init__.py"
         init_path.write_text("from .example import hello_world_task\n")
+
+    dotenv_file = Path(".env")
+    mode: str = "a" if dotenv_file.exists() else "w"
+    with dotenv_file.open(mode=mode) as f:
+        f.write("\n# Workflow env vars\n")
+        f.write(
+            "WORKFLOW_DEMO_HELLO=foo\n"
+            "WORKFLOW_CORE_DEBUG_MODE=true\n"
+            "WORKFLOW_LOG_TIMEZONE=Asia/Bangkok\n"
+            "WORKFLOW_LOG_TRACE_ENABLE_WRITE=false\n"
+            "WORKFLOW_LOG_AUDIT_ENABLE_WRITE=true\n"
+        )
+
+    typer.echo("Starter command:")
     typer.echo(
-        "Starter command: `workflow-cli workflows execute --name=wf-example`"
+        "> `source .env && workflow-cli workflows execute --name=wf-example`"
     )
 
 

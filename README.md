@@ -98,6 +98,19 @@ If you want to install this package with application add-ons, you should add
 | Python         | `ddeutil-workflow`      |    ✅    |
 | FastAPI Server | `ddeutil-workflow[all]` |    ✅    |
 
+Check the version of the current workflow package:
+
+```shell
+$ pip install ddeutil-workflow
+$ workflow-cli version
+```
+
+Initial workflow project:
+
+```shell
+$ workflow-cli init
+```
+
 ## 📖 Documentation
 
 For comprehensive API documentation, examples, and best practices:
