@@ -939,12 +939,9 @@ class Workflow(BaseModel):
                 "[WORKFLOW]: Does not rerun because it already executed with "
                 "success status."
             )
-            return Result(
-                run_id=run_id,
-                parent_run_id=parent_run_id,
+            return Result.from_trace(trace).catch(
                 status=SUCCESS,
                 context=catch(context=context, status=SUCCESS),
-                extras=self.extras,
             )
 
         err: dict[str, str] = context.get("errors", {})
@@ -960,12 +957,9 @@ class Workflow(BaseModel):
         )
         if not self.jobs:
             trace.warning(f"[WORKFLOW]: {self.name!r} does not set jobs")
-            return Result(
-                run_id=run_id,
-                parent_run_id=parent_run_id,
+            return Result.from_trace(trace).catch(
                 status=SUCCESS,
                 context=catch(context=context, status=SUCCESS),
-                extras=self.extras,
             )
 
         # NOTE: Prepare the new context variable for rerun process.
@@ -990,12 +984,9 @@ class Workflow(BaseModel):
                 "[WORKFLOW]: It does not have job to rerun. it will change "
                 "status to skip."
             )
-            return Result(
-                run_id=run_id,
-                parent_run_id=parent_run_id,
+            return Result.from_trace(trace).catch(
                 status=SKIP,
                 context=catch(context=context, status=SKIP),
-                extras=self.extras,
             )
 
         not_timeout_flag: bool = True
@@ -1008,9 +999,7 @@ class Workflow(BaseModel):
 
         catch(context, status=WAIT)
         if event and event.is_set():
-            return Result(
-                run_id=run_id,
-                parent_run_id=parent_run_id,
+            return Result.from_trace(trace).catch(
                 status=CANCEL,
                 context=catch(
                     context,
@@ -1022,7 +1011,6 @@ class Workflow(BaseModel):
                         ).to_dict(),
                     },
                 ),
-                extras=self.extras,
             )
 
         with ThreadPoolExecutor(max_job_parallel, "wf") as executor:
@@ -1050,9 +1038,7 @@ class Workflow(BaseModel):
                 backoff_sleep = 0.01
 
                 if check == FAILED:  # pragma: no cov
-                    return Result(
-                        run_id=run_id,
-                        parent_run_id=parent_run_id,
+                    return Result.from_trace(trace).catch(
                         status=FAILED,
                         context=catch(
                             context,
@@ -1065,7 +1051,6 @@ class Workflow(BaseModel):
                                 ).to_dict(),
                             },
                         ),
-                        extras=self.extras,
                     )
                 elif check == SKIP:  # pragma: no cov
                     trace.info(
@@ -1141,12 +1126,9 @@ class Workflow(BaseModel):
                     statuses[total + 1 + skip_count + i] = s
 
                 st: Status = validate_statuses(statuses)
-                return Result(
-                    run_id=run_id,
-                    parent_run_id=parent_run_id,
+                return Result.from_trace(trace).catch(
                     status=st,
                     context=catch(context, status=st),
-                    extras=self.extras,
                 )
 
             event.set()
@@ -1160,9 +1142,7 @@ class Workflow(BaseModel):
 
             time.sleep(0.0025)
 
-        return Result(
-            run_id=run_id,
-            parent_run_id=parent_run_id,
+        return Result.from_trace(trace).catch(
             status=FAILED,
             context=catch(
                 context,
@@ -1174,5 +1154,4 @@ class Workflow(BaseModel):
                     ).to_dict(),
                 },
             ),
-            extras=self.extras,
         )

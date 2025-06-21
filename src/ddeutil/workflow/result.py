@@ -166,10 +166,6 @@ def get_status_from_error(
     return FAILED
 
 
-def default_context() -> DictData:
-    return {"status": WAIT}
-
-
 @dataclass(
     config=ConfigDict(arbitrary_types_allowed=True, use_enum_values=True),
 )
@@ -188,7 +184,7 @@ class Result:
 
     extras: DictData = field(default_factory=dict, compare=False, repr=False)
     status: Status = field(default=WAIT)
-    context: DictData = field(default_factory=default_context)
+    context: Optional[DictData] = field(default=None)
     info: DictData = field(default_factory=dict)
     run_id: str = field(default_factory=default_gen_id)
     parent_run_id: Optional[str] = field(default=None)
@@ -207,10 +203,17 @@ class Result:
                 extras=self.extras,
             )
 
-        if self.parent_run_id is None:
-            self.parent_run_id = self.run_id
-
         return self
+
+    @classmethod
+    def from_trace(cls, trace: Trace):
+        """Construct the result model from trace for clean code objective."""
+        return cls(
+            run_id=trace.run_id,
+            parent_run_id=trace.parent_run_id,
+            extras=trace.extras,
+            trace=trace,
+        )
 
     def catch(
         self,
@@ -227,7 +230,11 @@ class Result:
 
         :rtype: Self
         """
-        self.__dict__["context"].update(context or {})
+        if self.__dict__["context"] is None:
+            self.__dict__["context"] = context
+        else:
+            self.__dict__["context"].update(context or {})
+
         self.__dict__["status"] = (
             Status(status) if isinstance(status, int) else status
         )

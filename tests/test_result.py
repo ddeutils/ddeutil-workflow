@@ -29,9 +29,9 @@ def test_result_default():
     time.sleep(0.025)
     rs2 = Result()
     assert rs.status == Status.WAIT
-    assert rs.context == {"status": Status.WAIT}
+    assert rs.context is None
     assert rs2.status == Status.WAIT
-    assert rs2.context == {"status": Status.WAIT}
+    assert rs2.context is None
 
     # NOTE: Result objects should not equal because they do not have the same
     #   running ID value.
@@ -51,9 +51,6 @@ def test_result_context():
 
 def test_result_catch():
     rs: Result = Result()
-
-    assert rs.run_id == rs.parent_run_id
-
     data = {"params": {"source": "src", "target": "tgt"}}
     rs.catch(status=SUCCESS, context=data)
     assert rs.status == SUCCESS
