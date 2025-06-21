@@ -57,7 +57,7 @@ def init() -> None:
         wf-example:
           type: Workflow
           desc: |
-            An example workflow template.
+            An example workflow template that provide the demo of workflow.
           params:
             name:
                 type: str
@@ -65,6 +65,10 @@ def init() -> None:
           jobs:
             first-job:
               stages:
+
+                - name: "Hello Stage"
+                  echo: "Start say hi to the console"
+
                 - name: "Call tasks"
                   uses: tasks/say-hello-func@example
                   with:
@@ -232,7 +236,7 @@ def workflow_json_schema(
     json_schema = TypeAdapter(template).json_schema(by_alias=True)
     template_schema: dict[str, str] = {
         "$schema": "http://json-schema.org/draft-07/schema#",
-        "title": "Workflow Configuration Schema",
+        "title": "Workflow Configuration JSON Schema",
         "version": __version__,
     }
     with open(output, mode="w", encoding="utf-8") as f:

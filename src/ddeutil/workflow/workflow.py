@@ -284,6 +284,46 @@ class Workflow(BaseModel):
 
         return self
 
+    def md(self) -> str:  # pragma: no cov
+        """Generate the markdown template."""
+
+        def align_newline(value: str) -> str:
+            return value.rstrip("\n").replace("\n", "\n                ")
+
+        info: str = (
+            f"| Author: nobody "
+            f"| created_at: `{self.created_at:%Y-%m-%d %H:%M:%S}` "
+            f"| updated_at: `{self.updated_dt:%Y-%m-%d %H:%M:%S}` |\n"
+            f"| --- | --- | --- |"
+        )
+        jobs: str = ""
+        for job in self.jobs:
+            job_model: Job = self.jobs[job]
+            jobs += f"### {job}\n{job_model.desc or ''}\n"
+            stags: str = ""
+            for stage_model in job_model.stages:
+                stags += (
+                    f"#### {stage_model.name}\n\n"
+                    f"Stage ID: {stage_model.id or ''}\n"
+                    f"Stage Model: {stage_model.__class__.__name__}\n\n"
+                )
+            jobs += f"{stags}\n"
+        return dedent(
+            f"""
+                # Workflow: {self.name}\n
+                {align_newline(info)}\n
+                {align_newline(self.desc)}\n
+                ## Parameters\n
+                | name | type | default | description |
+                | --- | --- | --- | : --- : |
+
+                ## Jobs\n
+                {align_newline(jobs)}
+                """.lstrip(
+                "\n"
+            )
+        )
+
     def job(self, name: str) -> Job:
         """Return the workflow's Job model that getting by an input job's name
         or job's ID. This method will pass an extra parameter from this model

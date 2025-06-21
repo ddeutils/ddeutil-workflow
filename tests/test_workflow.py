@@ -425,3 +425,14 @@ def test_workflow_parameterize(test_path):
         # NOTE: Raise if passing parameter that does not set on the workflow.
         with pytest.raises(WorkflowError):
             workflow.parameterize({"foo": "bar"})
+
+
+def test_workflow_markdown(test_path):
+    workflow = Workflow.from_conf(
+        "stream-workflow", path=test_path / "conf/example"
+    )
+    md_file: Path = test_path / "stream-workflow.md"
+    with md_file.open(mode="w") as f:
+        f.write(workflow.md())
+
+    md_file.unlink(missing_ok=True)
