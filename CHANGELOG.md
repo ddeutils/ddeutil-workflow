@@ -2,6 +2,26 @@
 
 ## Latest Changes
 
+## 0.0.78
+
+### :sparkles: Features
+
+- :dart: feat: add detail method for model dump with alias.
+- :dart: feat: draft generate markdown method.
+- :dart: feat: update type of result model.
+
+### :bug: Bug fixes
+
+- :gear: fixed: remove default context from result dataclass model.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: update testcase for making coverage.
+
+### :book: Documentations
+
+- :page_facing_up: docs: update readme file.
+
 ## 0.0.77
 
 ### :bug: Bug fixes
