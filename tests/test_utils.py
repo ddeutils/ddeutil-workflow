@@ -1,6 +1,7 @@
 import os
 from datetime import date, datetime
 from pathlib import Path
+from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -80,11 +81,13 @@ def test_filter_func():
             "foo": open,
             "echo": _extract_func,
         },
+        "url": urlparse("file:./test"),
     }
     assert filter_func(raw_rs) == {
         "echo": "echo",
         "list": ["1", 2, "echo"],
         "dict": {"foo": open, "echo": "echo"},
+        "url": urlparse("file:./test"),
     }
 
 
@@ -156,6 +159,7 @@ def test_dump_all():
     assert dump_all({"test": {"foo": "bar"}}) == {"test": {"foo": "bar"}}
     assert dump_all("demo") == "demo"
     assert dump_all(1) == 1
+    assert dump_all(urlparse("file:./test")) == urlparse("file:./test")
 
     assert dump_all(DumpModel(name="model", info=DumpField())) == {
         "name": "model",

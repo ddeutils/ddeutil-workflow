@@ -42,17 +42,69 @@ def target_path(test_path):
     shutil.rmtree(target_p)
 
 
+@pytest.fixture(scope="module")
+def mock_conf(test_path: Path):
+    target_p = test_path / "test_read_file"
+    target_p.mkdir(exist_ok=True)
+
+    with (target_p / "wf_1.yaml").open(mode="w") as f:
+        yaml.dump(
+            {
+                "wf_1": {
+                    "type": "Workflow",
+                    "value": 1,
+                    "tags": [
+                        1,
+                    ],
+                }
+            },
+            f,
+        )
+
+    with (target_p / "wf_2.yaml").open(mode="w") as f:
+        yaml.dump(
+            {
+                "wf_2": {
+                    "type": "Workflow",
+                    "value": 2,
+                    "tags": [
+                        2,
+                    ],
+                }
+            },
+            f,
+        )
+
+    with (target_p / "wf_3.yaml").open(mode="w") as f:
+        yaml.dump(
+            {
+                "wf_3": {
+                    "value": 3,
+                    "tags": [
+                        3,
+                    ],
+                }
+            },
+            f,
+        )
+
+    with (target_p / "wf_4.yaml").open(mode="w") as f:
+        yaml.dump({"wf_4": {"type": "Custom", "value": 4}}, f)
+
+    yield target_p
+
+    shutil.rmtree(target_p)
+
+
 def test_load_file(target_path: Path):
-    with mock.patch.object(Config, "conf_path", target_path):
+    with pytest.raises(ValueError):
+        YamlParser("test_load_file_raise", path=target_path)
 
-        with pytest.raises(ValueError):
-            YamlParser("test_load_file_raise", path=config.conf_path)
+    with pytest.raises(ValueError):
+        YamlParser("wf-ignore-inside", path=target_path)
 
-        with pytest.raises(ValueError):
-            YamlParser("wf-ignore-inside", path=config.conf_path)
-
-        with pytest.raises(ValueError):
-            YamlParser("wf-ignore", path=config.conf_path)
+    with pytest.raises(ValueError):
+        YamlParser("wf-ignore", path=target_path)
 
     with (target_path / "test_simple_file_raise.yaml").open(mode="w") as f:
         yaml.dump(
@@ -102,6 +154,62 @@ def test_load_file(target_path: Path):
         _ = load.type
 
 
+def test_load_file_filter(mock_conf: Path):
+    assert exclude_created_and_updated(
+        list(YamlParser.finds("Workflow", path=mock_conf))
+    ) == [
+        ("wf_1", {"tags": [1], "type": "Workflow", "value": 1}),
+        ("wf_2", {"tags": [2], "type": "Workflow", "value": 2}),
+    ]
+
+    assert exclude_created_and_updated(
+        list(YamlParser.finds("Workflow", path=mock_conf, tags=[1]))
+    ) == [("wf_1", {"tags": [1], "type": "Workflow", "value": 1})]
+
+    assert exclude_created_and_updated(
+        list(YamlParser.finds("Custom", path=mock_conf, tags=[]))
+    ) == [("wf_4", {"type": "Custom", "value": 4})]
+
+    assert (
+        exclude_created_and_updated(
+            list(YamlParser.finds("Custom", path=mock_conf, tags=[1]))
+        )
+        == []
+    )
+
+    assert (
+        exclude_created_and_updated(
+            list(YamlParser.finds("Custom", path=mock_conf, tags=[1]))
+        )
+        == []
+    )
+    assert (
+        exclude_created_and_updated(
+            list(YamlParser.finds("Custom", paths=[mock_conf], tags=[1]))
+        )
+        == []
+    )
+
+    assert exclude_created_and_updated(
+        YamlParser.find("wf_1", path=mock_conf)
+    ) == {"tags": [1], "type": "Workflow", "value": 1}
+    assert exclude_created_and_updated(
+        YamlParser.find("wf_2", path=mock_conf)
+    ) == {"tags": [2], "type": "Workflow", "value": 2}
+    assert (
+        exclude_created_and_updated(
+            YamlParser.find("wf_3", path=mock_conf, obj="Workflow")
+        )
+        == {}
+    )
+    assert exclude_created_and_updated(
+        YamlParser.find("wf_4", path=mock_conf, obj="Custom")
+    ) == {"type": "Custom", "value": 4}
+
+    with pytest.raises(TypeError):
+        list(YamlParser.finds("Custom", paths={"path": mock_conf}, tags=[1]))
+
+
 def test_load_file_finds(target_path: Path):
     dummy_file: Path = target_path / "01_test_simple_file.yaml"
     with dummy_file.open(mode="w") as f:
@@ -122,7 +230,9 @@ def test_load_file_finds(target_path: Path):
                 "test_load_file_config",
                 {"type": "Config", "foo": "bar"},
             )
-        ] == list(YamlParser.finds(Config, path=config.conf_path))
+        ] == exclude_created_and_updated(
+            list(YamlParser.finds(Config, path=config.conf_path))
+        )
 
         assert [] == list(
             YamlParser.finds(
@@ -145,7 +255,9 @@ def test_load_file_finds(target_path: Path):
             "test_load_file",
             {"type": "Workflow", "data": "bar"},
         ),
-    ] == list(YamlParser.finds("Workflow", path=target_path))
+    ] == exclude_created_and_updated(
+        list(YamlParser.finds("Workflow", path=target_path))
+    )
 
     dummy_file_dup.unlink()
 
@@ -162,7 +274,9 @@ def test_load_file_finds(target_path: Path):
             "test_load_file",
             {"type": "Workflow", "data": "foo"},
         ),
-    ] == list(YamlParser.finds("Workflow", path=target_path))
+    ] == exclude_created_and_updated(
+        list(YamlParser.finds("Workflow", path=target_path))
+    )
 
     load = YamlParser.find("test_load_file", path=target_path, obj="Workflow")
     assert exclude_created_and_updated(load) == {
@@ -199,6 +313,12 @@ def test_load_file_finds_raise(target_path: Path):
             YamlParser("test_load_file", path=config.conf_path).type
             == "Workflow"
         )
+
+
+def test_load_ignore_file(test_path: Path):
+    assert YamlParser.find("wf-ignore", path=test_path / "conf") == {}
+
+    assert YamlParser.find("wf-not-exists", path=test_path / "conf") == {}
 
 
 def test_dynamic():

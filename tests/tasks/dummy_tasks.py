@@ -80,6 +80,14 @@ def private_args(
     return {"exec": _exec, "params": params}
 
 
+@tag("demo", alias="private-args-task-not-special")
+def private_args_not_special(
+    _exec: str,
+    params: dict[str, Any],
+) -> dict[str, Any]:
+    return {"exec": _exec, "params": params}
+
+
 @tag("raise", alias="return-type-not-valid")
 def raise_returned_type():
     return True
@@ -87,6 +95,11 @@ def raise_returned_type():
 
 @tag("demo", alias="get-items")
 def get_items():
+    return {"items": [1, 2, 3, 4]}
+
+
+@tag("demo2", alias="get-items")
+def get_items_2():
     return {"items": [1, 2, 3, 4]}
 
 

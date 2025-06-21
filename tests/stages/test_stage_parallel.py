@@ -35,7 +35,8 @@ def test_parallel_stage_exec():
                     }
                 ],
             },
-        }
+            "extras": {"foo": "bar"},
+        },
     )
     rs: Result = stage.execute(params={})
     assert rs.status == SUCCESS

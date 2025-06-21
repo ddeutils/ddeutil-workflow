@@ -307,8 +307,6 @@ class YamlParser:
                         all_data.append((file_stat.st_mtime, data))
                     elif (t := data.get("type")) and t == obj_type:
                         all_data.append((file_stat.st_mtime, data))
-                    else:
-                        continue
 
         return {} if not all_data else max(all_data, key=lambda x: x[0])[1]
 
@@ -322,7 +320,7 @@ class YamlParser:
         excluded: Optional[list[str]] = None,
         extras: Optional[DictData] = None,
         ignore_filename: Optional[str] = None,
-        tags: Optional[list[str]] = None,
+        tags: Optional[list[Union[str, int]]] = None,
     ) -> Iterator[tuple[str, DictData]]:
         """Find all data that match with object type in config path. This class
         method can use include and exclude list of identity name for filter and
@@ -373,13 +371,15 @@ class YamlParser:
 
                     if (
                         tags
-                        and (ts := data[key].get("tags"))
-                        and isinstance(ts, list)
-                        and all(t not in tags for t in ts)
-                    ):  # pragma: no cov
+                        and isinstance((ts := data.get("tags", [])), list)
+                        and any(t not in ts for t in tags)
+                    ):
                         continue
 
                     if (t := data.get("type")) and t == obj_type:
+                        file_stat: os.stat_result = file.lstat()
+                        data["created_at"] = file_stat.st_ctime
+                        data["updated_at"] = file_stat.st_mtime
                         marking: tuple[float, DictData] = (
                             file.lstat().st_mtime,
                             data,

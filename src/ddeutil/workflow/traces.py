@@ -32,6 +32,7 @@ Example:
     >>> trace = get_trace("running-id-101", parent_run_id="workflow-001")
     >>> trace.info("Workflow execution started")
     >>> trace.debug("Processing stage 1")
+
 """
 from __future__ import annotations
 
@@ -848,7 +849,7 @@ def get_trace(
     :rtype: Trace
     """
     # NOTE: Allow you to override trace model by the extra parameter.
-    map_trace_models: dict[str, type[Trace]] = extras.get(
+    map_trace_models: dict[str, type[Trace]] = (extras or {}).get(
         "trace_model_mapping", {}
     )
     url: ParseResult

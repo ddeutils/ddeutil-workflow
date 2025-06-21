@@ -105,8 +105,9 @@ def validate_statuses(statuses: list[Status]) -> Status:
     """Determine final status from multiple status values.
 
     Applies workflow logic to determine the overall status based on a collection
-    of individual status values. Follows priority order: CANCEL > FAILED > WAIT >
-    individual status consistency.
+    of individual status values. Follows priority order:
+
+        CANCEL > FAILED > WAIT > individual status consistency.
 
     Args:
         statuses: List of status values to evaluate
@@ -132,7 +133,7 @@ def validate_statuses(statuses: list[Status]) -> Status:
     for status in (SUCCESS, SKIP):
         if all(s == status for s in statuses):
             return status
-    return FAILED if FAILED in statuses else SUCCESS
+    return SUCCESS
 
 
 def get_status_from_error(
@@ -209,19 +210,6 @@ class Result:
             )
         return self
 
-    def set_parent_run_id(self, running_id: str) -> Self:
-        """Set a parent running ID.
-
-        :param running_id: (str) A running ID that want to update on this model.
-
-        :rtype: Self
-        """
-        self.parent_run_id: str = running_id
-        self.trace: Trace = get_trace(
-            self.run_id, parent_run_id=running_id, extras=self.extras
-        )
-        return self
-
     def catch(
         self,
         status: Union[int, Status],
@@ -276,7 +264,13 @@ def catch(
     updated: DictData | None = None,
     **kwargs,
 ) -> DictData:
-    """Catch updated context to the current context."""
+    """Catch updated context to the current context.
+
+    Args:
+        context: A context data that want to be the current context.
+        status: A status enum object.
+        updated: A updated data that will update to the current context.
+    """
     context.update(updated or {})
     context["status"] = Status(status) if isinstance(status, int) else status
 
@@ -289,7 +283,7 @@ def catch(
             context[k].update(kwargs[k])
         # NOTE: Exclude the `info` key for update information data.
         elif k == "info":
-            context["info"].update(kwargs["info"])
+            context.update({"info": kwargs["info"]})
         else:
             raise ResultError(f"The key {k!r} does not exists on context data.")
     return context

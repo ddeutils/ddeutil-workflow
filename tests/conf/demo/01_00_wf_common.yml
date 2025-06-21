@@ -344,3 +344,12 @@ wf-trigger:
           params:
             author-run: Trigger Runner
             run-date: '2024-08-01'
+
+wf-skip:
+  type: Workflow
+  jobs:
+    first-job:
+      stages:
+        - name: "Skip stage"
+          if: true
+          echo: "Skip stage echo"

@@ -3,6 +3,7 @@ from datetime import datetime
 from ddeutil.workflow import (
     CANCEL,
     FAILED,
+    SKIP,
     SUCCESS,
     UTC,
     Result,
@@ -130,3 +131,16 @@ def test_trigger_stage_exec_cancel():
             "message": "Trigger workflow was cancel.",
         },
     }
+
+
+def test_trigger_stage_exec_skip():
+    stage: Stage = TriggerStage.model_validate(
+        {
+            "name": "Trigger to raise workflow",
+            "trigger": "wf-skip",
+            "params": {},
+        }
+    )
+    rs: Result = stage.execute(params={})
+    assert rs.status == SKIP
+    assert rs.context == {"status": SKIP}

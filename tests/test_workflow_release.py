@@ -79,6 +79,7 @@ def test_workflow_release():
     rs: Result = workflow.release(
         release=release,
         params={"asat-dt": datetime(2024, 10, 1)},
+        run_id="1001",
         runs_metadata={"runs_by": "nobody"},
     )
     assert rs.status == SUCCESS

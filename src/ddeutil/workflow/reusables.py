@@ -599,7 +599,7 @@ def make_registry(
             if not (
                 hasattr(func, "tag")
                 and hasattr(func, "name")
-                and str(getattr(func, "mark", "NOT SET")) == "tag"
+                and str(getattr(func, "mark", "NOTSET")) == "tag"
             ):  # pragma: no cov
                 continue
 
@@ -617,6 +617,7 @@ def make_registry(
                     f"{module}.{submodule}, you should change this tag name or "
                     f"change it func name."
                 )
+
             rs[func.name][func.tag] = lazy(f"{module}.{submodule}.{fstr}")
 
     return rs

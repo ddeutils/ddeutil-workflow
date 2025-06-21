@@ -1,4 +1,6 @@
-from ddeutil.workflow import FAILED, SUCCESS, Workflow
+from threading import Event
+
+from ddeutil.workflow import CANCEL, FAILED, SUCCESS, Workflow
 from ddeutil.workflow.job import Job
 
 
@@ -34,6 +36,20 @@ def test_workflow_execute_job():
                     "3008506540": {"outputs": {}, "status": SUCCESS},
                 },
             },
+        },
+    }
+
+    event = Event()
+    event.set()
+    st, ctx = workflow.execute_job(
+        job=workflow.job("demo-run"), run_id="1234", context={}, event=event
+    )
+    assert st == CANCEL
+    assert ctx == {
+        "status": CANCEL,
+        "errors": {
+            "name": "WorkflowCancelError",
+            "message": "Job execution was canceled because the event was set before start job execution.",
         },
     }
 

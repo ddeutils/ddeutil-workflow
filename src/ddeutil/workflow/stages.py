@@ -77,7 +77,15 @@ from pathlib import Path
 from subprocess import CompletedProcess
 from textwrap import dedent
 from threading import Event
-from typing import Annotated, Any, Optional, TypeVar, Union, get_type_hints
+from typing import (
+    Annotated,
+    Any,
+    Callable,
+    Optional,
+    TypeVar,
+    Union,
+    get_type_hints,
+)
 
 from ddeutil.core import str2list
 from pydantic import BaseModel, Field, ValidationError
@@ -177,7 +185,7 @@ class BaseStage(BaseModel, ABC):
             "A stage description that use to logging when start execution."
         ),
     )
-    condition: StrOrNone = Field(
+    condition: Optional[Union[str, bool]] = Field(
         default=None,
         description=(
             "A stage condition statement to allow stage executable. This field "
@@ -512,6 +520,9 @@ class BaseStage(BaseModel, ABC):
         # NOTE: Support for condition value is empty string.
         if not self.condition:
             return False
+
+        if isinstance(self.condition, bool):
+            return self.condition
 
         try:
             # WARNING: The eval build-in function is very dangerous. So, it
@@ -1580,14 +1591,22 @@ class CallStage(BaseRetryStage):
 
         :rtype: Any
         """
-        if isinstance(value, dict):
-            if any(k in value for k in ("result", "extras")):
-                raise ValueError(
-                    "The argument on workflow template for the caller stage "
-                    "should not pass `result` and `extras`. They are special "
-                    "arguments."
-                )
+        if isinstance(value, dict) and any(
+            k in value for k in ("result", "extras")
+        ):
+            raise ValueError(
+                "The argument on workflow template for the caller stage "
+                "should not pass `result` and `extras`. They are special "
+                "arguments."
+            )
         return value
+
+    def get_caller(self, params: DictData) -> Callable[[], TagFunc]:
+        """Get the lazy TagFuc object from registry."""
+        return extract_call(
+            param2template(self.uses, params, extras=self.extras),
+            registries=self.extras.get("registry_caller"),
+        )
 
     def process(
         self,
@@ -1615,11 +1634,7 @@ class CallStage(BaseRetryStage):
         trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
-        call_func: TagFunc = extract_call(
-            param2template(self.uses, params, extras=self.extras),
-            registries=self.extras.get("registry_caller"),
-        )()
-
+        call_func: TagFunc = self.get_caller(params=params)()
         trace.info(f"[STAGE]: Caller Func: '{call_func.name}@{call_func.tag}'")
 
         # VALIDATE: check input task caller parameters that exists before
@@ -1677,7 +1692,7 @@ class CallStage(BaseRetryStage):
             )
 
         args: DictData = self.validate_model_args(
-            call_func, args, run_id, parent_run_id
+            call_func, args, run_id, parent_run_id, extras=self.extras
         )
         if inspect.iscoroutinefunction(call_func):
             loop = asyncio.get_event_loop()
@@ -1738,11 +1753,7 @@ class CallStage(BaseRetryStage):
         trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
-        call_func: TagFunc = extract_call(
-            param2template(self.uses, params, extras=self.extras),
-            registries=self.extras.get("registry_caller"),
-        )()
-
+        call_func: TagFunc = self.get_caller(params=params)()
         await trace.ainfo(
             f"[STAGE]: Caller Func: '{call_func.name}@{call_func.tag}'"
         )
@@ -1795,8 +1806,13 @@ class CallStage(BaseRetryStage):
         if "extras" not in sig.parameters and not has_keyword:
             args.pop("extras")
 
+        if event and event.is_set():
+            raise StageCancelError(
+                "Execution was canceled from the event before start parallel."
+            )
+
         args: DictData = self.validate_model_args(
-            call_func, args, run_id, parent_run_id
+            call_func, args, run_id, parent_run_id, extras=self.extras
         )
         if inspect.iscoroutinefunction(call_func):
             rs: DictOrModel = await call_func(
@@ -1829,12 +1845,13 @@ class CallStage(BaseRetryStage):
             extras=self.extras,
         )
 
+    @staticmethod
     def validate_model_args(
-        self,
         func: TagFunc,
         args: DictData,
         run_id: str,
         parent_run_id: Optional[str] = None,
+        extras: Optional[DictData] = None,
     ) -> DictData:
         """Validate an input arguments before passing to the caller function.
 
@@ -1846,18 +1863,18 @@ class CallStage(BaseRetryStage):
         :rtype: DictData
         """
         try:
-            model_instance: BaseModel = create_model_from_caller(
-                func
-            ).model_validate(args)
-            override: DictData = dict(model_instance)
+            override: DictData = dict(
+                create_model_from_caller(func).model_validate(args)
+            )
             args.update(override)
+
             type_hints: dict[str, Any] = get_type_hints(func)
             for arg in type_hints:
 
                 if arg == "return":
                     continue
 
-                if arg.removeprefix("_") in args:
+                if arg.startswith("_") and arg.removeprefix("_") in args:
                     args[arg] = args.pop(arg.removeprefix("_"))
                     continue
 
@@ -1868,7 +1885,7 @@ class CallStage(BaseRetryStage):
             ) from e
         except TypeError as e:
             trace: Trace = get_trace(
-                run_id, parent_run_id=parent_run_id, extras=self.extras
+                run_id, parent_run_id=parent_run_id, extras=extras
             )
             trace.warning(
                 f"[STAGE]: Get type hint raise TypeError: {e}, so, it skip "
@@ -2295,7 +2312,13 @@ class ForEachStage(BaseNestedStage):
         ... }
     """
 
-    foreach: Union[list[str], list[int], str] = Field(
+    foreach: Union[
+        list[str],
+        list[int],
+        str,
+        dict[str, Any],
+        dict[int, Any],
+    ] = Field(
         description=(
             "A items for passing to stages via ${{ item }} template parameter."
         ),
@@ -2501,7 +2524,7 @@ class ForEachStage(BaseNestedStage):
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         event: Event = event or Event()
-        foreach: Union[list[str], list[int]] = pass_env(
+        foreach: Union[list[str], list[int], str] = pass_env(
             param2template(self.foreach, params, extras=self.extras)
         )
 
@@ -2516,9 +2539,10 @@ class ForEachStage(BaseNestedStage):
                 ) from e
 
         # [VALIDATE]: Type of the foreach should be `list` type.
-        elif not isinstance(foreach, list):
+        elif isinstance(foreach, dict):
             raise TypeError(
-                f"Does not support foreach: {foreach!r} ({type(foreach)})"
+                f"Does not support dict foreach: {foreach!r} ({type(foreach)}) "
+                f"yet."
             )
         # [Validate]: Value in the foreach item should not be duplicate when the
         #   `use_index_as_key` field did not set.

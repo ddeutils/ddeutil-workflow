@@ -1,3 +1,5 @@
+from threading import Event
+
 from ddeutil.workflow import (
     CANCEL,
     FAILED,
@@ -212,6 +214,27 @@ def test_foreach_stage_exec():
     }
 
 
+def test_foreach_stage_exec_cancel():
+    event = Event()
+    event.set()
+    stage: ForEachStage = ForEachStage(
+        name="Foreach item was duplicated but use index",
+        foreach=[1, 2, 3],
+        stages=[{"name": "Echo stage", "echo": "Start item ${{ item }}"}],
+    )
+    rs: Result = stage.execute({}, event=event)
+    assert rs.status == CANCEL
+    assert rs.context == {
+        "status": CANCEL,
+        "items": [1, 2, 3],
+        "foreach": {},
+        "errors": {
+            "name": "StageCancelError",
+            "message": "Execution was canceled from the event before start foreach.",
+        },
+    }
+
+
 def test_foreach_stage_exec_raise():
     # NOTE: Raise because type of foreach does not match with list of item.
     stage: ForEachStage = ForEachStage(
@@ -243,7 +266,40 @@ def test_foreach_stage_exec_raise():
         "status": FAILED,
         "errors": {
             "name": "ValueError",
-            "message": "Foreach item should not duplicate. If this stage must to pass duplicate item, it should set `use_index_as_key: true`.",
+            "message": (
+                "Foreach item should not duplicate. If this stage must to pass "
+                "duplicate item, it should set `use_index_as_key: true`."
+            ),
+        },
+    }
+
+    stage: Stage = ForEachStage(
+        name="Start run for-each stage", foreach="1, 2, 3"
+    )
+    rs: Result = stage.execute({})
+    assert rs.status == FAILED
+    assert rs.context == {
+        "status": FAILED,
+        "errors": {
+            "name": "TypeError",
+            "message": "Does not support string foreach: '1, 2, 3' that can not convert to list.",
+        },
+    }
+
+    stage: Stage = ForEachStage(
+        name="Start run for-each stage",
+        foreach={1: "foo", 2: "bar"},
+    )
+    rs: Result = stage.execute({})
+    assert rs.status == FAILED
+    assert rs.context == {
+        "status": FAILED,
+        "errors": {
+            "name": "TypeError",
+            "message": (
+                "Does not support dict foreach: {1: 'foo', 2: 'bar'} "
+                "(<class 'dict'>) yet."
+            ),
         },
     }
 

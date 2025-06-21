@@ -211,11 +211,6 @@ class Workflow(BaseModel):
             ```
         """
         load: YamlParser = YamlParser(name, path=path, extras=extras, obj=cls)
-
-        # NOTE: Validate the config type match with current connection model
-        if load.type != cls.__name__:
-            raise ValueError(f"Type {load.type} does not match with {cls}")
-
         data: DictData = copy.deepcopy(load.data)
         data["name"] = name
 
@@ -871,7 +866,7 @@ class Workflow(BaseModel):
         event: Optional[ThreadEvent] = None,
         timeout: float = 3600,
         max_job_parallel: int = 2,
-    ) -> Result:
+    ) -> Result:  # pragma: no cov
         """Re-Execute workflow with passing the error context data.
 
         :param context: A context result that get the failed status.

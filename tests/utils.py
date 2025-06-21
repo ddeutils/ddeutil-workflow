@@ -133,7 +133,7 @@ class MockEvent(Event):  # pragma: no cov
         )
 
 
-def exclude_keys(value: dict[str, Any], keys: list[str]) -> dict[str, Any]:
+def exclude_keys(value: Any, keys: list[str]) -> Any:
     """Exclude keys for assert the specific keys only."""
     if isinstance(value, dict):
         return {
@@ -146,5 +146,5 @@ def exclude_keys(value: dict[str, Any], keys: list[str]) -> dict[str, Any]:
     return value
 
 
-def exclude_created_and_updated(value: dict[str, Any]):
+def exclude_created_and_updated(value: Any):
     return exclude_keys(value, keys=["created_at", "updated_at"])

@@ -39,7 +39,6 @@ from __future__ import annotations
 from dataclasses import fields
 from datetime import datetime
 from typing import Annotated, Any, Literal, Optional, Union
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo
 from pydantic.functional_serializers import field_serializer
@@ -107,7 +106,7 @@ class BaseCrontab(BaseModel):
     )
     tz: TimeZoneName = Field(
         default="UTC",
-        description="A timezone string value.",
+        description="A timezone string value that will pass to ZoneInfo.",
         alias="timezone",
     )
 
@@ -125,38 +124,25 @@ class BaseCrontab(BaseModel):
             data["timezone"] = tz
         return data
 
-    @field_validator("tz")
-    def __validate_tz(cls, value: str) -> str:
-        """Validate timezone value.
-
-        Args:
-            value: Timezone string to validate.
-
-        Returns:
-            Validated timezone string.
-
-        Raises:
-            ValueError: If timezone is invalid.
-        """
-        try:
-            _ = ZoneInfo(value)
-            return value
-        except ZoneInfoNotFoundError as e:
-            raise ValueError(f"Invalid timezone: {value}") from e
-
 
 class CrontabValue(BaseCrontab):
     """Crontab model using interval-based specification.
 
     Attributes:
-        interval: Scheduling interval ('daily', 'weekly', 'monthly').
-        day: Day specification for weekly/monthly schedules.
+        interval: (Interval)
+            A scheduling interval string ('daily', 'weekly', 'monthly').
+        day: (str, default None)
+            Day specification for weekly/monthly schedules.
         time: Time of day in 'HH:MM' format.
     """
 
-    interval: Interval
+    interval: Interval = Field(description="A scheduling interval string.")
     day: Optional[str] = Field(default=None)
-    time: str = Field(default="00:00")
+    time: str = Field(
+        default="00:00",
+        pattern=r"\d{2}:\d{2}",
+        description="A time of day that pass with format 'HH:MM'.",
+    )
 
     @property
     def cronjob(self) -> CronJob:
@@ -182,10 +168,13 @@ class CrontabValue(BaseCrontab):
             TypeError: If start parameter is neither string nor datetime.
         """
         if isinstance(start, str):
-            start: datetime = datetime.fromisoformat(start)
-        elif not isinstance(start, datetime):
-            raise TypeError("start value should be str or datetime type.")
-        return self.cronjob.schedule(date=start, tz=self.tz)
+            return self.cronjob.schedule(
+                date=datetime.fromisoformat(start), tz=self.tz
+            )
+
+        if isinstance(start, datetime):
+            return self.cronjob.schedule(date=start, tz=self.tz)
+        raise TypeError("start value should be str or datetime type.")
 
     def next(self, start: Union[str, datetime]) -> CronRunner:
         """Get next scheduled datetime after given start time.
@@ -221,11 +210,6 @@ class Crontab(BaseCrontab):
         description=(
             "A Cronjob object that use for validate and generate datetime."
         ),
-    )
-    tz: TimeZoneName = Field(
-        default="UTC",
-        description="A timezone string value.",
-        alias="timezone",
     )
 
     @model_validator(mode="before")
@@ -376,7 +360,10 @@ Cron = Annotated[
     ],
     Field(
         union_mode="smart",
-        description="Event model type supporting year-based, standard, and interval-based cron scheduling.",
+        description=(
+            "Event model type supporting year-based, standard, and "
+            "interval-based cron scheduling."
+        ),
     ),
 ]  # pragma: no cov
 

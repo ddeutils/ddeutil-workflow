@@ -103,6 +103,7 @@ def test_make_registry_from_env():
         "get-processes-from-group",
         "get-stream-info",
         "private-args-task",
+        "private-args-task-not-special",
         "return-type-not-valid",
         "routing-01",
         "routing-02",
@@ -113,9 +114,20 @@ def test_make_registry_from_env():
         "start-stream",
     }
 
+    # NOTE: multiple tags
+    assert "demo" in rs["get-items"]
+    assert "demo2" in rs["get-items"]
+
 
 def test_make_registry_not_found():
+    # NOTE: Not found because module does not exist.
     rs: dict[str, Registry] = make_registry("not_found")
+    assert rs == {}
+
+    # NOTE: Not found because module does not implement.
+    rs: dict[str, Registry] = make_registry(
+        "workflow", registries=["ddeutil.workflow"]
+    )
     assert rs == {}
 
 

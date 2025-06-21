@@ -352,7 +352,7 @@ def dump_all(
 
 def obj_name(obj: Optional[Union[str, object]] = None) -> Optional[str]:
     if not obj:
-        obj_type: Optional[str] = None
+        return None
     elif isinstance(obj, str):
         obj_type: str = obj
     elif isclass(obj):

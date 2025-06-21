@@ -60,6 +60,16 @@ def test_workflow():
     with pytest.raises(ValidationError):
         Workflow(name="manual-workflow-${{ matrix.name }}")
 
+    # NOTE: Raise because type of params does not valid.
+    with pytest.raises(ValidationError):
+        Workflow.model_validate(
+            obj={
+                "name": "manual-workflow",
+                "jobs": {"demo-run": job},
+                "params": (1, 2, 3),
+            }
+        )
+
 
 def test_workflow_bypass_extras():
     job: Job = Job(

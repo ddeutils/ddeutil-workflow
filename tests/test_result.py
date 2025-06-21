@@ -3,11 +3,14 @@ import time
 import pytest
 from ddeutil.workflow.errors import ResultError
 from ddeutil.workflow.result import (
+    CANCEL,
     FAILED,
     SUCCESS,
     WAIT,
     Result,
     Status,
+    catch,
+    validate_statuses,
 )
 
 
@@ -66,6 +69,9 @@ def test_result_catch():
     assert rs.status == WAIT
     assert rs.context == {"params": {"new_value": "bar"}, "status": Status.WAIT}
 
+    rs.catch(status=SUCCESS, info={"name": "foo"})
+    assert rs.info == {"name": "foo"}
+
     # NOTE: Raise because kwargs get the key that does not exist on the context.
     with pytest.raises(ResultError):
         rs.catch(status=SUCCESS, not_exists={"foo": "bar"})
@@ -83,3 +89,31 @@ def test_result_catch_context_does_not_new():
 
     assert rs.status == SUCCESS
     assert rs.context == {"foo": "baz!!", "status": Status.SUCCESS}
+
+
+def test_validate_statuses():
+    assert validate_statuses([SUCCESS, SUCCESS]) == SUCCESS
+    assert validate_statuses([CANCEL, SUCCESS]) == CANCEL
+    assert validate_statuses([CANCEL, SUCCESS, FAILED]) == CANCEL
+    assert validate_statuses([FAILED, SUCCESS]) == FAILED
+    assert validate_statuses([FAILED, WAIT]) == FAILED
+    assert validate_statuses([SUCCESS, WAIT]) == WAIT
+    assert validate_statuses([]) == SUCCESS
+
+
+def test_catch():
+    context = {}
+    catch(context, status=SUCCESS, updated={"name": "foo"})
+    assert context["status"] == SUCCESS
+    assert context == {"status": SUCCESS, "name": "foo"}
+
+    context = {}
+    catch(context, status=WAIT, info={"start": 1})
+    assert context == {"status": WAIT, "info": {"start": 1}}
+
+    context = {"info": {"end": 10}}
+    catch(context, status=WAIT, info={"start": 1})
+    assert context == {"status": WAIT, "info": {"start": 1, "end": 10}}
+
+    with pytest.raises(ResultError):
+        catch({}, status=SUCCESS, foo={"key": "bar"})

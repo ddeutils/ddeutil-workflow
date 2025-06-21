@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 import pytest
 from ddeutil.workflow import Crontab, CrontabYear
 from ddeutil.workflow.event import CrontabValue, Event, interval2crontab
+from pydantic import ValidationError
 
 
 def test_localize_timezone():
@@ -32,16 +33,6 @@ def test_localize_timezone():
     assert dt.replace(tzinfo=None) == datetime(2024, 1, 1, 12)
     bkk_dt = dt.astimezone(bkk)
     assert bkk_dt.replace(tzinfo=None) == datetime(2024, 1, 1, 19)
-
-
-def test_convert_timezone():
-    ntz_dt = datetime(2025, 6, 18)
-    print(ntz_dt)
-    print(ntz_dt.astimezone(ZoneInfo("UTC")))
-
-    utc_dt = ntz_dt.replace(tzinfo=ZoneInfo("UTC"))
-    print(utc_dt)
-    print(utc_dt.astimezone(ZoneInfo("UTC")))
 
 
 def test_interval2crontab():
@@ -97,6 +88,14 @@ def test_event_crontab():
     assert cron_runner.date == start_date_bkk
     assert cron_runner.prev == start_date_bkk - timedelta(minutes=5)
 
+    with pytest.raises(ValidationError):
+        Crontab(cronjob="*/5 * * * *", timezone="Not/Exists")
+
+    with pytest.raises(ValidationError):
+        Crontab.model_validate(
+            {"cronjob": "*/5 * * * *", "timezone": "Not/Exists"}
+        )
+
 
 def test_event_crontab_from_value():
     schedule = CrontabValue.model_validate(
@@ -109,6 +108,20 @@ def test_event_crontab_from_value():
     )
     assert "UTC" == schedule.tz
     assert "12 0 1 * 1" == str(schedule.cronjob)
+    gen = schedule.generate("2025-01-01 00:00:00")
+    assert f"{gen.date:%Y-%m-%d %H:%M:%S}" == "2024-12-31 17:00:00"
+    assert f"{gen.next:%Y-%m-%d %H:%M:%S}" == "2025-09-01 00:12:00"
+    assert f"{gen.next:%Y-%m-%d %H:%M:%S}" == "2025-12-01 00:12:00"
+    assert f"{gen.next:%Y-%m-%d %H:%M:%S}" == "2026-06-01 00:12:00"
+
+    gen = schedule.generate(datetime(2025, 1, 1))
+    assert f"{gen.date:%Y-%m-%d %H:%M:%S}" == "2024-12-31 17:00:00"
+    assert f"{gen.next:%Y-%m-%d %H:%M:%S}" == "2025-09-01 00:12:00"
+    assert f"{gen.next:%Y-%m-%d %H:%M:%S}" == "2025-12-01 00:12:00"
+    assert f"{gen.next:%Y-%m-%d %H:%M:%S}" == "2026-06-01 00:12:00"
+
+    n = schedule.next("2025-01-01 00:00:00")
+    assert f"{n.date:%Y-%m-%d %H:%M:%S}" == "2025-09-01 00:12:00"
 
     schedule = CrontabValue.model_validate(
         {
@@ -133,6 +146,9 @@ def test_event_crontab_from_value():
     )
     assert schedule.tz == "Etc/UTC"
     assert str(schedule.cronjob) == "12 0 1 * 1"
+
+    with pytest.raises(TypeError):
+        schedule.generate(1990)
 
 
 def test_event_crontab_from_conf():
