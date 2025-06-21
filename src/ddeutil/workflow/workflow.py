@@ -145,7 +145,7 @@ class Workflow(BaseModel):
         description="A parameters that need to use on this workflow.",
     )
     on: Event = Field(
-        default_factory=list,
+        default_factory=Event,
         description="An events for this workflow.",
     )
     jobs: dict[str, Job] = Field(
@@ -284,14 +284,18 @@ class Workflow(BaseModel):
 
         return self
 
-    def md(self) -> str:  # pragma: no cov
+    def detail(self) -> DictData:  # pragma: no cov
+        """Return the detail of this workflow for generate markdown."""
+        return self.model_dump(by_alias=True)
+
+    def md(self, author: Optional[str] = None) -> str:  # pragma: no cov
         """Generate the markdown template."""
 
         def align_newline(value: str) -> str:
             return value.rstrip("\n").replace("\n", "\n                ")
 
         info: str = (
-            f"| Author: nobody "
+            f"| Author: {author or 'nobody'} "
             f"| created_at: `{self.created_at:%Y-%m-%d %H:%M:%S}` "
             f"| updated_at: `{self.updated_dt:%Y-%m-%d %H:%M:%S}` |\n"
             f"| --- | --- | --- |"
@@ -412,7 +416,7 @@ class Workflow(BaseModel):
             dt = dt.replace(tzinfo=UTC)
 
         release: datetime = replace_sec(dt.astimezone(UTC))
-        if not self.on:
+        if not self.on.schedule:
             return release
 
         for on in self.on.schedule:

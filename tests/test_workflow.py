@@ -427,6 +427,13 @@ def test_workflow_parameterize(test_path):
             workflow.parameterize({"foo": "bar"})
 
 
+def test_workflow_detail(test_path):
+    workflow = Workflow.from_conf(
+        "stream-workflow", path=test_path / "conf/example"
+    )
+    print(workflow.detail())
+
+
 def test_workflow_markdown(test_path):
     workflow = Workflow.from_conf(
         "stream-workflow", path=test_path / "conf/example"

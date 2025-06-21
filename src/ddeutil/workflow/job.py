@@ -48,10 +48,11 @@ from enum import Enum
 from functools import lru_cache
 from textwrap import dedent
 from threading import Event
-from typing import Annotated, Any, Literal, Optional, Union
+from typing import Annotated, Any, Optional, Union
 
 from ddeutil.core import freeze_args
 from pydantic import BaseModel, Discriminator, Field, SecretStr, Tag
+from pydantic.functional_serializers import field_serializer
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
@@ -263,23 +264,19 @@ class BaseRunsOn(BaseModel):  # pragma: no cov
     object and override execute method.
     """
 
-    type: RunsOn = Field(description="A runs-on type.")
+    type: RunsOn = LOCAL
     args: DictData = Field(
         default_factory=dict,
-        alias="with",
         description=(
             "An argument that pass to the runs-on execution function. This "
             "args will override by this child-model with specific args model."
         ),
+        alias="with",
     )
 
 
 class OnLocal(BaseRunsOn):  # pragma: no cov
     """Runs-on local."""
-
-    type: Literal[RunsOn.LOCAL] = Field(
-        default=RunsOn.LOCAL, validate_default=True
-    )
 
 
 class SelfHostedArgs(BaseModel):
@@ -292,9 +289,7 @@ class SelfHostedArgs(BaseModel):
 class OnSelfHosted(BaseRunsOn):  # pragma: no cov
     """Runs-on self-hosted."""
 
-    type: Literal[RunsOn.SELF_HOSTED] = Field(
-        default=RunsOn.SELF_HOSTED, validate_default=True
-    )
+    type: RunsOn = SELF_HOSTED
     args: SelfHostedArgs = Field(alias="with")
 
 
@@ -310,9 +305,7 @@ class AzBatchArgs(BaseModel):
 
 class OnAzBatch(BaseRunsOn):  # pragma: no cov
 
-    type: Literal[RunsOn.AZ_BATCH] = Field(
-        default=RunsOn.AZ_BATCH, validate_default=True
-    )
+    type: RunsOn = AZ_BATCH
     args: AzBatchArgs = Field(alias="with")
 
 
@@ -331,23 +324,21 @@ class DockerArgs(BaseModel):
 class OnDocker(BaseRunsOn):  # pragma: no cov
     """Runs-on Docker container."""
 
-    type: Literal[RunsOn.DOCKER] = Field(
-        default=RunsOn.DOCKER, validate_default=True
-    )
-    args: DockerArgs = Field(alias="with", default_factory=DockerArgs)
+    type: RunsOn = DOCKER
+    args: DockerArgs = Field(default_factory=DockerArgs, alias="with")
 
 
 def get_discriminator_runs_on(model: dict[str, Any]) -> RunsOn:
     """Get discriminator of the RunsOn models."""
     t: str = model.get("type")
-    return RunsOn(t) if t else RunsOn.LOCAL
+    return RunsOn(t) if t else LOCAL
 
 
 RunsOnModel = Annotated[
     Union[
-        Annotated[OnSelfHosted, Tag(RunsOn.SELF_HOSTED)],
-        Annotated[OnDocker, Tag(RunsOn.DOCKER)],
-        Annotated[OnLocal, Tag(RunsOn.LOCAL)],
+        Annotated[OnSelfHosted, Tag(SELF_HOSTED)],
+        Annotated[OnDocker, Tag(DOCKER)],
+        Annotated[OnLocal, Tag(LOCAL)],
     ],
     Discriminator(get_discriminator_runs_on),
 ]
@@ -489,6 +480,10 @@ class Job(BaseModel):
             )
 
         return self
+
+    @field_serializer("runs_on")
+    def __serialize_runs_on(self, value: RunsOnModel):
+        return value.model_dump(by_alias=True)
 
     def stage(self, stage_id: str) -> Stage:
         """Return stage instance that exists in this job via passing an input
