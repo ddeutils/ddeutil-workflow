@@ -119,12 +119,15 @@ FilterRegistry = Union[FilterFunc, Callable[[...], Any]]
 
 
 def custom_filter(name: str) -> Callable[P, FilterFunc]:
-    """Custom filter decorator function that set function attributes, ``filter``
-    for making filter registries variable.
+    """Custom filter decorator function that sets function attributes.
 
-    :param: name: (str) A filter name for make different use-case of a function.
+    This decorator sets the `filter` attribute for making filter registries variable.
 
-    :rtype: Callable[P, FilterFunc]
+    Args:
+        name: A filter name for different use-cases of a function.
+
+    Returns:
+        Callable[P, FilterFunc]: Decorated function with filter attributes.
     """
 
     def func_internal(func: Callable[[...], Any]) -> FilterFunc:
@@ -144,11 +147,13 @@ def custom_filter(name: str) -> Callable[P, FilterFunc]:
 def make_filter_registry(
     registers: Optional[list[str]] = None,
 ) -> dict[str, FilterRegistry]:
-    """Return registries of all functions that able to called with task.
+    """Return registries of all functions that can be called with tasks.
 
-    :param registers: (Optional[list[str]]) Override list of register.
+    Args:
+        registers: Optional override list of registers.
 
-    :rtype: dict[str, FilterRegistry]
+    Returns:
+        dict[str, FilterRegistry]: Dictionary mapping filter names to functions.
     """
     rs: dict[str, FilterRegistry] = {}
     for module in dynamic("registry_filter", f=registers):
@@ -180,9 +185,14 @@ def get_args_const(
 ) -> tuple[str, list[Constant], dict[str, Constant]]:
     """Get arguments and keyword-arguments from function calling string.
 
-    :param expr: (str) An expr string value.
+    Args:
+        expr: A string expression representing a function call.
 
-    :rtype: tuple[str, list[Constant], dict[str, Constant]]
+    Returns:
+        tuple[str, list[Constant], dict[str, Constant]]: Function name, args, and kwargs.
+
+    Raises:
+        UtilError: If the expression has syntax errors or invalid format.
     """
     try:
         mod: Module = parse(expr)
@@ -223,12 +233,18 @@ def get_args_from_filter(
     filters: dict[str, FilterRegistry],
 ) -> tuple[str, FilterRegistry, list[Any], dict[Any, Any]]:  # pragma: no cov
     """Get arguments and keyword-arguments from filter function calling string.
-    and validate it with the filter functions mapping dict.
 
-    :param ft:
-    :param filters: A mapping of filter registry.
+    This function validates the filter function call with the filter functions mapping dict.
 
-    :rtype: tuple[str, FilterRegistry, list[Any], dict[Any, Any]]
+    Args:
+        ft: Filter function calling string.
+        filters: A mapping of filter registry.
+
+    Returns:
+        tuple[str, FilterRegistry, list[Any], dict[Any, Any]]: Function name, function, args, and kwargs.
+
+    Raises:
+        UtilError: If the filter function is not supported or has invalid arguments.
     """
     func_name, _args, _kwargs = get_args_const(ft)
     args: list[Any] = [arg.value for arg in _args]
@@ -250,14 +266,18 @@ def map_post_filter(
     post_filter: list[str],
     filters: dict[str, FilterRegistry],
 ) -> T:
-    """Mapping post-filter to value with sequence list of filter function name
-    that will get from the filter registry.
+    """Map post-filter functions to value with sequence of filter function names.
 
-    :param value: A string value that want to map with filter function.
-    :param post_filter: A list of post-filter function name.
-    :param filters: A mapping of filter registry.
+    Args:
+        value: A value to map with filter functions.
+        post_filter: A list of post-filter function names.
+        filters: A mapping of filter registry.
 
-    :rtype: T
+    Returns:
+        T: The value after applying all post-filter functions.
+
+    Raises:
+        UtilError: If a post-filter function fails or is incompatible with the value.
     """
     for ft in post_filter:
         func_name, f_func, args, kwargs = get_args_from_filter(ft, filters)
@@ -278,13 +298,15 @@ def map_post_filter(
 
 
 def not_in_template(value: Any, *, not_in: str = "matrix.") -> bool:
-    """Check value should not pass template with not_in value prefix.
+    """Check if value should not pass template with not_in value prefix.
 
-    :param value: A value that want to find parameter template prefix.
-    :param not_in: The not-in string that use in the `.startswith` function.
-        (Default is `matrix.`)
+    Args:
+        value: A value to check for parameter template prefix.
+        not_in: The not-in string to use in the `.startswith` function.
+            Default is `matrix.`.
 
-    :rtype: bool
+    Returns:
+        bool: True if value should not pass template, False otherwise.
     """
     if isinstance(value, dict):
         return any(not_in_template(value[k], not_in=not_in) for k in value)
@@ -299,11 +321,13 @@ def not_in_template(value: Any, *, not_in: str = "matrix.") -> bool:
 
 
 def has_template(value: Any) -> bool:
-    """Check value include templating string.
+    """Check if value includes templating string.
 
-    :param value: A value that want to find parameter template.
+    Args:
+        value: A value to check for parameter template.
 
-    :rtype: bool
+    Returns:
+        bool: True if value contains template variables, False otherwise.
     """
     if isinstance(value, dict):
         return any(has_template(value[k]) for k in value)
@@ -322,21 +346,24 @@ def str2template(
     filters: Optional[dict[str, FilterRegistry]] = None,
     registers: Optional[list[str]] = None,
 ) -> Optional[str]:
-    """(Sub-function) Pass param to template string that can search by
-    ``RE_CALLER`` regular expression.
+    """Pass parameters to template string using RE_CALLER regular expression.
 
-        The getter value that map a template should have typing support align
-    with the workflow parameter types that is `str`, `int`, `datetime`, and
-    `list`.
+    This is a sub-function that processes template strings. The getter value
+    that maps a template should have typing support aligned with workflow
+    parameter types: `str`, `int`, `datetime`, and `list`.
 
-    :param value: (str) A string value that want to map with params.
-    :param params: (DictData) A parameter value that getting with matched
-        regular expression.
-    :param context: (DictData)
-    :param filters: (dict[str, FilterRegistry]) A mapping of filter registry.
-    :param registers: (Optional[list[str]]) Override list of register.
+    Args:
+        value: A string value to map with parameters.
+        params: Parameter values to get with matched regular expression.
+        context: Optional context data.
+        filters: Optional mapping of filter registry.
+        registers: Optional override list of registers.
 
-    :rtype: str
+    Returns:
+        Optional[str]: The processed template string or None if value is "None".
+
+    Raises:
+        UtilError: If parameters cannot be retrieved or template processing fails.
     """
     filters: dict[str, FilterRegistry] = filters or make_filter_registry(
         registers=registers
@@ -395,19 +422,17 @@ def param2template(
     *,
     extras: Optional[DictData] = None,
 ) -> Any:
-    """Pass param to template string that can search by ``RE_CALLER`` regular
-    expression.
+    """Pass parameters to template string using RE_CALLER regular expression.
 
-    :param value: (Any) A value that want to map with params.
-    :param params: (DictData) A parameter value that getting with matched
-        regular expression.
-    :param context: (DictData)
-    :param filters: (dict[str, FilterRegistry]) A filter mapping for mapping
-        with `map_post_filter` func.
-    :param extras: (Optional[list[str]]) An Override extras.
+    Args:
+        value: A value to map with parameters.
+        params: Parameter values to get with matched regular expression.
+        context: Optional context data.
+        filters: Optional filter mapping for use with `map_post_filter` function.
+        extras: Optional override extras.
 
-    :rtype: Any
-    :returns: An any getter value from the params input.
+    Returns:
+        Any: The processed value with template variables replaced.
     """
     registers: Optional[list[str]] = (
         extras.get("registry_filter") if extras else None
@@ -437,19 +462,21 @@ def param2template(
 
 @custom_filter("fmt")  # pragma: no cov
 def datetime_format(value: datetime, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
-    """Format datetime object to string with the format.
+    """Format datetime object to string with the specified format.
 
     Examples:
-
         >>> "${{ start-date | fmt('%Y%m%d') }}"
         >>> "${{ start-date | fmt }}"
 
-    :param value: (datetime) A datetime value that want to format to string
-        value.
-    :param fmt: (str) A format string pattern that passing to the `dt.strftime`
-        method.
+    Args:
+        value: A datetime value to format to string.
+        fmt: A format string pattern to pass to the `dt.strftime` method.
 
-    :rtype: str
+    Returns:
+        str: The formatted datetime string.
+
+    Raises:
+        UtilError: If the input value is not a datetime object.
     """
     if isinstance(value, datetime):
         return value.strftime(fmt)
@@ -463,12 +490,14 @@ def coalesce(value: Optional[T], default: Any) -> T:
     """Coalesce with default value if the main value is None.
 
     Examples:
-
         >>> "${{ value | coalesce('foo') }}"
 
-    :param value: A value that want to check nullable.
-    :param default: A default value that use to returned value if an input
-        value was null.
+    Args:
+        value: A value to check for null.
+        default: A default value to return if the input value is null.
+
+    Returns:
+        T: The original value if not None, otherwise the default value.
     """
     return default if value is None else value
 
@@ -477,13 +506,22 @@ def coalesce(value: Optional[T], default: Any) -> T:
 def get_item(
     value: DictData, key: Union[str, int], default: Optional[Any] = None
 ) -> Any:
-    """Get a value with an input specific key.
+    """Get a value with a specific key.
 
     Examples:
-
         >>> "${{ value | getitem('key') }}"
         >>> "${{ value | getitem('key', 'default') }}"
 
+    Args:
+        value: A dictionary to get the value from.
+        key: The key to look up in the dictionary.
+        default: Optional default value if key is not found.
+
+    Returns:
+        Any: The value associated with the key, or the default value.
+
+    Raises:
+        UtilError: If the value is not a dictionary.
     """
     if not isinstance(value, dict):
         raise UtilError(
@@ -495,12 +533,20 @@ def get_item(
 
 @custom_filter("getindex")  # pragma: no cov
 def get_index(value: list[Any], index: int) -> Any:
-    """Get a value with an input specific index.
+    """Get a value with a specific index.
 
     Examples:
-
         >>> "${{ value | getindex(1) }}"
 
+    Args:
+        value: A list to get the value from.
+        index: The index to access in the list.
+
+    Returns:
+        Any: The value at the specified index.
+
+    Raises:
+        UtilError: If the value is not a list or if the index is out of range.
     """
     if not isinstance(value, list):
         raise UtilError(
@@ -534,16 +580,18 @@ def tag(
     name: Optional[str] = None,
     alias: Optional[str] = None,
 ) -> DecoratorTagFunc:  # pragma: no cov
-    """Tag decorator function that set function attributes, ``tag`` and ``name``
-    for making registries variable.
+    """Tag decorator function that sets function attributes for registry.
 
-    :param: name: (str) A tag name for make different use-case of a function.
-        It will use 'latest' if this tag name does not set.
-    :param: alias: (str) A alias function name that keeping in registries.
-        If this value does not supply, it will use original function name
-        from `__name__` argument.
+    This decorator sets the `tag` and `name` attributes for making registries variable.
 
-    :rtype: Callable[P, TagFunc]
+    Args:
+        name: A tag name for different use-cases of a function.
+            Uses 'latest' if not set.
+        alias: An alias function name to keep in registries.
+            Uses original function name from `__name__` if not supplied.
+
+    Returns:
+        DecoratorTagFunc: Decorated function with tag attributes.
     """
 
     def func_internal(func: Callable[[...], Any]) -> ReturnTagFunc:
@@ -574,12 +622,17 @@ def make_registry(
     *,
     registries: Optional[list[str]] = None,
 ) -> dict[str, Registry]:
-    """Return registries of all functions that able to called with task.
+    """Return registries of all functions that can be called with tasks.
 
-    :param submodule: (str) A module prefix that want to import registry.
-    :param registries: (Optional[list[str]]) A list of registry.
+    Args:
+        submodule: A module prefix to import registry from.
+        registries: Optional list of registries.
 
-    :rtype: dict[str, Registry]
+    Returns:
+        dict[str, Registry]: Dictionary mapping function names to their registries.
+
+    Raises:
+        ValueError: If a tag already exists for a function name.
     """
     rs: dict[str, Registry] = {}
     regis_calls: list[str] = copy.deepcopy(
@@ -639,13 +692,9 @@ def extract_call(
     *,
     registries: Optional[list[str]] = None,
 ) -> Callable[[], TagFunc]:
-    """Extract Call function from string value to call partial function that
-    does run it at runtime.
+    """Extract call function from string value to call partial function at runtime.
 
-    :param call: (str) A call value that able to match with Task regex.
-    :param registries: (Optional[list[str]]) A list of registry.
-
-        The format of call value should contain 3 regular expression groups
+    The format of call value should contain 3 regular expression groups
     which match with the below config format:
 
         >>> "^(?P<path>[^/@]+)/(?P<func>[^@]+)@(?P<tag>.+)$"
@@ -656,12 +705,16 @@ def extract_call(
         >>> extract_call("tasks/return-type-not-valid@raise")
         ...
 
-    :raise NotImplementedError: When the searching call's function result does
-        not exist in the registry.
-    :raise NotImplementedError: When the searching call's tag result does not
-        exist in the registry with its function key.
+    Args:
+        call: A call value that matches the Task regex.
+        registries: Optional list of registries.
 
-    :rtype: Callable[[], TagFunc]
+    Returns:
+        Callable[[], TagFunc]: A callable function that can be executed.
+
+    Raises:
+        ValueError: If the call does not match the regex format.
+        NotImplementedError: If the function or tag does not exist in the registry.
     """
     if not (found := Re.RE_TASK_FMT.search(call)):
         raise ValueError(
@@ -697,17 +750,20 @@ class BaseCallerArgs(BaseModel):  # pragma: no cov
 
 
 def create_model_from_caller(func: Callable) -> BaseModel:  # pragma: no cov
-    """Create model from the caller function. This function will use for
-    validate the caller function argument typed-hint that valid with the args
-    field.
+    """Create model from the caller function.
+
+    This function is used to validate the caller function argument type hints
+    that are valid with the args field.
 
     Reference:
         - https://github.com/lmmx/pydantic-function-models
         - https://docs.pydantic.dev/1.10/usage/models/#dynamic-model-creation
 
-    :param func: (Callable) A caller function.
+    Args:
+        func: A caller function to create a model from.
 
-    :rtype: BaseModel
+    Returns:
+        BaseModel: A Pydantic model created from the function signature.
     """
     sig: inspect.Signature = inspect.signature(func)
     type_hints: dict[str, Any] = get_type_hints(func)

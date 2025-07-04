@@ -10,16 +10,24 @@ system for ID generation, datetime handling, string processing, template
 operations, and other common tasks.
 
 Functions:
-    gen_id: Generate unique identifiers for workflow components
-    make_exec: Create executable strings for shell commands
-    filter_func: Filter functions based on criteria
-    dump_all: Serialize data to various formats
-    delay: Create delays in execution
-    to_train: Convert strings to train-case format
+    to_train: Convert camel case strings to train case format
+    prepare_newline: Format messages with multiple newlines
+    replace_sec: Replace seconds and microseconds in datetime objects
+    clear_tz: Clear timezone info from datetime objects
     get_dt_now: Get current datetime with timezone
     get_d_now: Get current date
+    get_diff_sec: Calculate time difference in seconds
+    reach_next_minute: Check if datetime reaches next minute
+    wait_until_next_minute: Wait until next minute
+    delay: Add random delay to execution
+    gen_id: Generate unique identifiers for workflow components
+    default_gen_id: Generate default running ID
+    make_exec: Make files executable
+    filter_func: Filter function objects from data structures
     cross_product: Generate cross product of matrix values
-    replace_sec: Replace template variables in strings
+    cut_id: Cut running ID to specified length
+    dump_all: Serialize nested BaseModel objects to dictionaries
+    obj_name: Get object name or class name
 
 Example:
     ```python
@@ -116,10 +124,11 @@ def clear_tz(dt: datetime) -> datetime:
 def get_dt_now(offset: float = 0.0) -> datetime:
     """Return the current datetime object.
 
-    :param offset: An offset second value.
+    Args:
+        offset: An offset second value to subtract from current time.
 
-    :rtype: datetime
-    :return: The current datetime object that use an input timezone or UTC.
+    Returns:
+        datetime: The current datetime object with UTC timezone.
     """
     return datetime.now().replace(tzinfo=UTC) - timedelta(seconds=offset)
 
@@ -127,10 +136,11 @@ def get_dt_now(offset: float = 0.0) -> datetime:
 def get_d_now(offset: float = 0.0) -> date:  # pragma: no cov
     """Return the current date object.
 
-    :param offset: An offset second value.
+    Args:
+        offset: An offset second value to subtract from current time.
 
-    :rtype: date
-    :return: The current date object that use an input timezone or UTC.
+    Returns:
+        date: The current date object.
     """
     return (
         datetime.now().replace(tzinfo=UTC) - timedelta(seconds=offset)
@@ -138,13 +148,14 @@ def get_d_now(offset: float = 0.0) -> date:  # pragma: no cov
 
 
 def get_diff_sec(dt: datetime, offset: float = 0.0) -> int:
-    """Return second value that come from diff of an input datetime and the
-    current datetime with specific timezone.
+    """Return second value from difference between input datetime and current datetime.
 
-    :param dt: (datetime) A datetime object that want to get different second value.
-    :param offset: (float) An offset second value.
+    Args:
+        dt: A datetime object to calculate difference from.
+        offset: An offset second value to add to the difference.
 
-    :rtype: int
+    Returns:
+        int: The difference in seconds between the input datetime and current time.
     """
     return round(
         (
@@ -154,11 +165,17 @@ def get_diff_sec(dt: datetime, offset: float = 0.0) -> int:
 
 
 def reach_next_minute(dt: datetime, offset: float = 0.0) -> bool:
-    """Check this datetime object is not in range of minute level on the current
-    datetime.
+    """Check if datetime object reaches the next minute level.
 
-    :param dt: (datetime) A datetime object that want to check.
-    :param offset: (float) An offset second value.
+    Args:
+        dt: A datetime object to check.
+        offset: An offset second value.
+
+    Returns:
+        bool: True if datetime reaches next minute, False otherwise.
+
+    Raises:
+        ValueError: If the input datetime is less than current date.
     """
     diff: float = (
         replace_sec(clear_tz(dt)) - replace_sec(get_dt_now(offset=offset))
@@ -176,16 +193,21 @@ def reach_next_minute(dt: datetime, offset: float = 0.0) -> bool:
 def wait_until_next_minute(
     dt: datetime, second: float = 0
 ) -> None:  # pragma: no cov
-    """Wait with sleep to the next minute with an offset second value."""
+    """Wait with sleep to the next minute with an offset second value.
+
+    Args:
+        dt: The datetime to wait until next minute from.
+        second: Additional seconds to wait after reaching next minute.
+    """
     future: datetime = replace_sec(dt) + timedelta(minutes=1)
     time.sleep((future - dt).total_seconds() + second)
 
 
 def delay(second: float = 0) -> None:  # pragma: no cov
-    """Delay time that use time.sleep with random second value between
-    0.00 - 0.99 seconds.
+    """Delay execution with time.sleep and random second value between 0.00-0.99 seconds.
 
-    :param second: (float) A second number that want to adds-on random value.
+    Args:
+        second: Additional seconds to add to the random delay.
     """
     global _DELAY_INDEX
     cached_random = _CACHED_DELAYS[_DELAY_INDEX % len(_CACHED_DELAYS)]
@@ -201,26 +223,24 @@ def gen_id(
     simple_mode: Optional[bool] = None,
     extras: DictData | None = None,
 ) -> str:
-    """Generate running ID for able to tracking. This generates process use
-    ``md5`` algorithm function if ``WORKFLOW_CORE_WORKFLOW_ID_SIMPLE_MODE`` set
-    to false. But it will cut this hashing value length to 10 it the setting
-    value set to true.
+    """Generate running ID for tracking purposes.
 
-    Simple Mode:
+    This function uses MD5 algorithm if simple mode is disabled, or cuts the
+    hashing value length to 10 if simple mode is enabled.
 
-        ... 0000 00    00  00   00     00     000000       T    0000000000
-        ... year month day hour minute second microsecond  sep  simple-id
+    Simple Mode Format:
+        YYYYMMDDHHMMSSffffffTxxxxxxxxxx
+        year month day hour minute second microsecond sep simple-id
 
-    :param value: A value that want to add to prefix before hashing with md5.
-    :param sensitive: (bool) A flag that enable to convert the value to lower
-        case before hashing that value before generate ID.
-    :param unique: (bool) A flag that add timestamp at microsecond level to
-        value before hashing.
-    :param simple_mode: (bool | None) A flag for generate ID by simple mode.
-    :param extras: (DictData) An extra parameter that use for override config
-        value.
+    Args:
+        value: A value to add as prefix before hashing with MD5.
+        sensitive: Flag to convert value to lowercase before hashing.
+        unique: Flag to add timestamp at microsecond level before hashing.
+        simple_mode: Flag to generate ID using simple mode.
+        extras: Extra parameters to override config values.
 
-    :rtype: str
+    Returns:
+        str: Generated unique identifier.
     """
     from .conf import dynamic
 
@@ -242,31 +262,37 @@ def gen_id(
 
 
 def default_gen_id() -> str:
-    """Return running ID which use for making default ID for the Result model if
-    a run_id field initializes at the first time.
+    """Return running ID for making default ID for the Result model.
 
-    :rtype: str
+    This function is used when a run_id field is initialized for the first time.
+
+    Returns:
+        str: Generated default running ID.
     """
     return gen_id("MOCK", unique=True)
 
 
 def make_exec(path: Union[Path, str]) -> None:
-    """Change mode of file to be executable file.
+    """Change file mode to be executable.
 
-    :param path: (Path | str) A file path that want to make executable
-        permission.
+    Args:
+        path: A file path to make executable.
     """
     f: Path = Path(path) if isinstance(path, str) else path
     f.chmod(f.stat().st_mode | stat.S_IEXEC)
 
 
 def filter_func(value: T) -> T:
-    """Filter out an own created function of any value of mapping context by
-    replacing it to its function name. If it is built-in function, it does not
-    have any changing.
+    """Filter out custom functions from mapping context by replacing with function names.
 
-    :param value: A value context data that want to filter out function value.
-    :type: The same type of input ``value``.
+    This function replaces custom functions with their function names in data
+    structures. Built-in functions remain unchanged.
+
+    Args:
+        value: A value or data structure to filter function values from.
+
+    Returns:
+        T: The filtered value with functions replaced by their names.
     """
     if isinstance(value, dict):
         return {k: filter_func(value[k]) for k in value}
@@ -287,11 +313,13 @@ def filter_func(value: T) -> T:
 
 
 def cross_product(matrix: Matrix) -> Iterator[DictData]:
-    """Iterator of products value from matrix.
+    """Generate iterator of product values from matrix.
 
-    :param matrix: (Matrix)
+    Args:
+        matrix: A matrix to generate cross products from.
 
-    :rtype: Iterator[DictData]
+    Returns:
+        Iterator[DictData]: Iterator of dictionary combinations.
     """
     yield from (
         {_k: _v for e in mapped for _k, _v in e.items()}
@@ -302,16 +330,18 @@ def cross_product(matrix: Matrix) -> Iterator[DictData]:
 
 
 def cut_id(run_id: str, *, num: int = 6) -> str:
-    """Cutting running ID with length.
+    """Cut running ID to specified length.
 
     Example:
         >>> cut_id(run_id='20240101081330000000T1354680202')
         '202401010813680202'
 
-    :param run_id: (str) A running ID That want to cut.
-    :param num: (int) A number of cutting length.
+    Args:
+        run_id: A running ID to cut.
+        num: Number of characters to keep from the end.
 
-    :rtype: str
+    Returns:
+        str: The cut running ID.
     """
     if "T" in run_id:
         dt, simple = run_id.split("T", maxsplit=1)
@@ -333,10 +363,14 @@ def dump_all(
     value: Union[T, BaseModel],
     by_alias: bool = False,
 ) -> Union[T, DictData]:
-    """Dump all nested BaseModel object to dict object.
+    """Dump all nested BaseModel objects to dictionary objects.
 
-    :param value: (T | BaseModel)
-    :param by_alias: (bool)
+    Args:
+        value: A value that may contain BaseModel objects.
+        by_alias: Whether to use field aliases when dumping.
+
+    Returns:
+        Union[T, DictData]: The value with BaseModel objects converted to dictionaries.
     """
     if isinstance(value, dict):
         return {k: dump_all(value[k], by_alias=by_alias) for k in value}
@@ -351,6 +385,14 @@ def dump_all(
 
 
 def obj_name(obj: Optional[Union[str, object]] = None) -> Optional[str]:
+    """Get object name or class name.
+
+    Args:
+        obj: An object or string to get the name from.
+
+    Returns:
+        Optional[str]: The object name, class name, or None if obj is None.
+    """
     if not obj:
         return None
     elif isinstance(obj, str):
