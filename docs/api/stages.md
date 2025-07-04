@@ -1,371 +1,752 @@
 # Stages
 
-Stages module include all stage model that implemented to be the minimum execution
-layer of this workflow core engine. The stage handle the minimize task that run
-in a thread (same thread at its job owner) that mean it is the lowest executor that
-you can track logs.
+The Stages module provides the core execution layer for workflow tasks. Stages are the smallest executable units that run within a single thread and handle specific operations like script execution, function calls, data processing, and workflow orchestration.
 
-The output of stage execution only return SUCCESS or CANCEL status because
-I do not want to handle stage error on this stage execution. I think stage model
-have a lot of use-case, and it should does not worry about it error output.
+## Overview
 
-So, I will create `execute` for any exception class that raise from
-the stage execution method.
+Stages are the fundamental building blocks of workflows, providing:
 
-```text
-Handler     ┬-> Ok      --> Result
-            │               |-status: SUCCESS
-            │               ╰-context:
-            │                   ╰-outputs: ...
-            │
-            ├-> Ok      --> Result
-            │               ╰-status: CANCEL
-            │
-            ├-> Ok      --> Result
-            │               ╰-status: SKIP
-            │
-            ╰-> Ok      --> Result
-                            |-status: FAILED
-                            ╰-errors:
-                                |-name: ...
-                                ╰-message: ...
+- **Atomic execution**: Each stage runs as a single unit with clear inputs/outputs
+- **Error isolation**: Stage failures are contained and don't affect other stages
+- **Flexible execution**: Support for various execution environments and languages
+- **Conditional logic**: Dynamic execution based on parameters and context
+- **Retry mechanisms**: Automatic retry on failures with configurable policies
+
+## Quick Start
+
+```python
+from ddeutil.workflow.stages import EmptyStage, BashStage, PyStage
+
+# Simple echo stage
+stage = EmptyStage(
+    name="Hello World",
+    echo="Starting workflow execution"
+)
+
+# Bash script execution
+bash_stage = BashStage(
+    name="Process Data",
+    bash="echo 'Processing...' && ls -la /data"
+)
+
+# Python code execution
+py_stage = PyStage(
+    name="Data Analysis",
+    run="""
+import pandas as pd
+df = pd.read_csv('/data/input.csv')
+result = len(df)
+print(f"Processed {result} rows")
+""",
+    vars={"input_file": "/data/input.csv"}
+)
 ```
 
-On the context I/O that pass to a stage object at execute process. The
-execute method receives a `params={"params": {...}}` value for passing template
-searching.
+## Stage Types Summary
 
-All stages model inherit from `BaseStage` or `AsyncBaseStage` models that has the
-base fields:
+| Stage Type | Purpose | Use Case |
+|------------|---------|----------|
+| `EmptyStage` | Logging and delays | Debugging, notifications, timing |
+| `BashStage` | Shell script execution | File operations, system commands |
+| `PyStage` | Python code execution | Data processing, API calls, analysis |
+| `CallStage` | Function calls | Reusable business logic |
+| `TriggerStage` | Workflow orchestration | Multi-workflow pipelines |
+| `ParallelStage` | Concurrent execution | Performance optimization |
+| `ForEachStage` | Iterative processing | Batch operations |
+| `CaseStage` | Conditional execution | Branching logic |
+| `UntilStage` | Retry loops | Polling, retry logic |
+| `RaiseStage` | Error simulation | Testing, error handling |
 
-| field     | alias | data type   | default  | description                                                           |
-|-----------|-------|-------------|:--------:|-----------------------------------------------------------------------|
-| id        |       | str \| None |  `None`  | A stage ID that use to keep execution output or getting by job owner. |
-| name      |       | str         |          | A stage name that want to log when start execution.                   |
-| condition | if    | str \| None |  `None`  | A stage condition statement to allow stage executable.                |
-| extras    |       | dict        | `dict()` | An extra parameter that override core config values.                  |
+## Base Classes
 
-It has a special base class is `BaseRetryStage` that inherit from `AsyncBaseStage`
-that use to handle retry execution when it got any error with `retry` field.
+### BaseStage
 
-| field | alias | data type | default | description                                      |
-|-------|-------|-----------|:-------:|--------------------------------------------------|
-| retry |       | int       |   `0`   | A retry number if stage execution get the error. |
+Abstract base class for all stage implementations.
 
-## Methods
+!!! info "Key Features"
+    - Common stage lifecycle management
+    - Parameter templating and validation
+    - Error handling and retry logic
+    - Output collection and context management
 
-- `handler_execution`: This method will be exception handler for the `execute` method.
-- `_execution`: Pre-execution method that use to override when that stage want to have pre-execution.
-- `execution`: The main execution.
-- `set_outputs`
-- `get_outputs`
-- `is_skipped`
-- `gen_id`
-- `is_nested`
+#### Attributes
 
-## Implemented Stage
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `id` | str \| None | `None` | Unique stage identifier for output tracking |
+| `name` | str | Required | Human-readable stage name for logging |
+| `condition` | str \| None | `None` | Conditional expression for execution |
+| `extras` | dict | `{}` | Additional configuration parameters |
+
+#### Methods
+
+##### `execute(params, run_id, context, *, parent_run_id=None, event=None)`
+
+Execute the stage with provided parameters.
+
+**Parameters:**
+- `params` (dict): Parameter values for stage execution
+- `run_id` (str): Unique execution identifier
+- `context` (dict): Execution context from previous stages
+- `parent_run_id` (str, optional): Parent workflow run identifier
+- `event` (Event, optional): Threading event for cancellation
+
+**Returns:**
+- `Result`: Stage execution result with status and outputs
+
+##### `is_skipped(params)`
+
+Check if stage should be skipped based on condition.
+
+**Parameters:**
+- `params` (dict): Current parameter context
+
+**Returns:**
+- `bool`: True if stage should be skipped
+
+### BaseRetryStage
+
+Base class for stages with retry capabilities.
+
+#### Attributes
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `retry` | int | `0` | Number of retry attempts on failure |
+
+## Stage Implementations
 
 ### Empty Stage
 
-Empty stage executor that do nothing and log the `message` field to
-stdout only. It can use for tracking a template parameter on the workflow or
-debug step.
+Empty stage executor that logs messages and optionally delays execution.
 
-You can pass a sleep value in second unit to this stage for waiting
-after log message.
+!!! example "Empty Stage Usage"
 
-!!! example "YAML"
-
-    === "Echo"
+    === "Basic Logging"
 
         ```yaml
         stages:
-          - name: Echo hello world
-            echo: "Hello World"
+          - name: "Start Processing"
+            echo: "Beginning data pipeline execution"
         ```
 
-    === "Echo with ID"
+    === "With Delay"
 
         ```yaml
         stages:
-          - name: Echo hello world
-            id: echo-stage
-            echo: "Hello World"
+          - name: "Wait for System"
+            echo: "Waiting for system to be ready..."
+            sleep: 30
         ```
 
-    === "Sleep"
+    === "Conditional Execution"
 
         ```yaml
         stages:
-          - name: Echo hello world
-            id: echo-sleep-stage
-            echo: "Hello World and Sleep 10 seconds"
-            sleep: 10
+          - name: "Debug Info"
+            if: "${{ params.debug_mode == true }}"
+            echo: "Debug mode enabled - showing detailed logs"
         ```
 
-| field | data type   | default | description                                                                                                      |
-|-------|-------------|:-------:|------------------------------------------------------------------------------------------------------------------|
-| echo  | str \| None | `None`  | A message that want to show on the stdout.                                                                       |
-| sleep | float       |   `0`   | A second value to sleep before start execution. This value should gather or equal 0, and less than 1800 seconds. |
+#### Attributes
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `echo` | str \| None | `None` | Message to log to stdout |
+| `sleep` | float | `0` | Seconds to sleep before execution (0-1800) |
+
+#### Use Cases
+
+- **Debugging**: Add logging points to track workflow progress
+- **Timing**: Introduce delays for system synchronization
+- **Notifications**: Log important events or milestones
+- **Conditional Logic**: Execute based on parameter values
 
 ### Bash Stage
 
-Bash stage executor that execute bash script on the current OS.
-If your current OS is Windows, it will run on the bash from the current WSL.
-It will use `bash` for Windows OS and use `sh` for Linux OS.
+Bash stage executor for shell script execution.
 
-!!! warning
+!!! warning "Security Considerations"
+    - Scripts run with system permissions
+    - Validate all inputs to prevent injection attacks
+    - Consider using `PyStage` for complex logic
+    - Avoid executing untrusted scripts
 
-    This stage has some limitation when it runs shell statement with the
-    built-in subprocess package. It does not good enough to use multiline
-    statement. Thus, it will write the `.sh` file before start running bash
-    command for fix this issue.
+!!! example "Bash Stage Usage"
 
-!!! example "YAML"
-
-    === "Bash"
+    === "Simple Command"
 
         ```yaml
         stages:
-            - name: Call echo
-              bash: |
-                echo "Hello Bash Stage";
+          - name: "Check Disk Space"
+            bash: "df -h /data"
         ```
 
-    === "Bash with Env"
+    === "With Environment Variables"
 
         ```yaml
         stages:
-            - name: Call echo with env
-              env:
-                FOO: BAR
-              bash: |
-                echo "Hello Bash $FOO";
+          - name: "Process Files"
+            env:
+              INPUT_DIR: "/data/input"
+              OUTPUT_DIR: "/data/output"
+            bash: |
+              echo "Processing files in $INPUT_DIR"
+              ls -la "$INPUT_DIR"
+              mkdir -p "$OUTPUT_DIR"
         ```
 
-| field   | data type      | default  | description                                                                                             |
-|---------|----------------|:--------:|---------------------------------------------------------------------------------------------------------|
-| bash    | str            |          | A bash statement that want to execute via Python subprocess.                                            |
-| env     | dict[str, Any] | `dict()` | An environment variables that set before run bash command. It will add on the header of the `.sh` file. |
+    === "Error Handling"
+
+        ```yaml
+        stages:
+          - name: "Safe File Operation"
+            bash: |
+              set -e  # Exit on any error
+              if [ ! -f "/data/input.csv" ]; then
+                echo "Input file not found"
+                exit 1
+              fi
+              echo "Processing input file..."
+        ```
+
+#### Attributes
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `bash` | str | Required | Bash script to execute |
+| `env` | dict[str, Any] | `{}` | Environment variables for script |
+
+#### Limitations
+
+- **Multiline scripts**: Complex multiline scripts are written to temporary files
+- **Cross-platform**: Windows requires WSL or bash compatibility
+- **Error handling**: Script errors must be handled explicitly
+- **Output parsing**: Script output is captured as strings
 
 ### Python Stage
 
-Python stage that running the Python statement with the current globals
-and passing an input additional variables via `exec` built-in function.
+Python stage for executing Python code with full access to installed packages.
 
-This stage allow you to use any Python object that exists on the globals
-such as import your installed package.
+!!! warning "Security Warning"
+    - Uses `exec()` function which can be dangerous
+    - Validate all code before execution
+    - Consider using `CallStage` for production code
+    - Avoid executing untrusted code
 
-!!! warning
+!!! example "Python Stage Usage"
 
-    The exec build-in function is very dangerous. So, it should use the `re`
-    module to validate exec-string before running or exclude the `os` package
-    from the current globals variable.
-
-!!! example "YAML"
-
-    === "Python"
+    === "Basic Python"
 
         ```yaml
         stages:
-            - name: Call Python Version
-              run: |
-                import sys
-                print(sys.version_info)
+          - name: "Data Analysis"
+            run: |
+              import pandas as pd
+              import numpy as np
+
+              df = pd.read_csv('/data/input.csv')
+              summary = df.describe()
+              print(f"Dataset shape: {df.shape}")
         ```
 
-| field | data type      | default  | description                                                                   |
-|-------|----------------|:--------:|-------------------------------------------------------------------------------|
-| run   | str            |          | A Python string statement that want to run with `exec`.                       |
-| vars  | dict[str, Any] | `dict()` | A variable mapping that want to pass to globals parameter in the `exec` func. |
+    === "With Variables"
+
+        ```yaml
+        stages:
+          - name: "Process Data"
+            vars:
+              input_file: "/data/input.csv"
+              threshold: 1000
+            run: |
+              import pandas as pd
+
+              df = pd.read_csv(input_file)
+              if len(df) > threshold:
+                  print(f"Large dataset: {len(df)} rows")
+              else:
+                  print(f"Small dataset: {len(df)} rows")
+        ```
+
+    === "Error Handling"
+
+        ```yaml
+        stages:
+          - name: "Safe Processing"
+            run: |
+              try:
+                  import pandas as pd
+                  df = pd.read_csv('/data/input.csv')
+                  result = len(df)
+                  print(f"Successfully processed {result} rows")
+              except Exception as e:
+                  print(f"Error processing data: {e}")
+                  raise
+        ```
+
+#### Attributes
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `run` | str | Required | Python code to execute |
+| `vars` | dict[str, Any] | `{}` | Variables available in execution context |
+
+#### Best Practices
+
+- **Import statements**: Place imports at the top of the code block
+- **Error handling**: Use try-catch blocks for robust execution
+- **Output**: Use `print()` for logging, return values for data
+- **Dependencies**: Ensure required packages are installed
+- **Security**: Validate all inputs and avoid `eval()` or `exec()`
 
 ### Call Stage
 
-Call stage executor that call the Python function from registry with tag
-decorator function in `reusables` module and run it with input arguments.
+Call stage for executing registered functions with arguments.
 
-This stage is different with PyStage because the PyStage is just run
-a Python statement with the `exec` function and pass the current locals and
-globals before exec that statement. This stage will import the caller
-function can call it with an input arguments. So, you can create your
-function complexly that you can for your objective to invoked by this stage
-object.
+!!! example "Call Stage Usage"
 
-This stage is the most powerful stage of this package for run every
-use-case by a custom requirement that you want by creating the Python
-function and adding it to the caller registry value by importer syntax like
-`module.caller.registry` not path style like `module/caller/registry`.
-
-!!! warning
-
-    The caller registry to get a caller function should importable by the
-    current Python execution pointer.
-
-!!! example "YAML"
-
-    === "Call with Args"
+    === "Basic Function Call"
 
         ```yaml
         stages:
-            - name: Call call task
-              uses: tasks/el-csv-to-parquet@polars
-              with:
-                source-path: "./data"
-                target-path: "./warehouse"
+          - name: "Process Data"
+            uses: "tasks/process_csv@latest"
+            with:
+              input_path: "/data/input.csv"
+              output_path: "/data/output.parquet"
         ```
 
-| field  | alias | data type           | default  | description                                                                                                                                                                 |
-|--------|-------|---------------------|:--------:|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| uses   |       | str                 |          | A caller function with registry importer syntax that use to load function before execute step. The caller registry syntax should be `<import.part>/<func-name>@<tag-name>`. |
-| args   | with  | dict[str, Any]      | `dict()` | An argument parameter that will pass to this caller function.                                                                                                               |
+    === "With Complex Arguments"
+
+        ```yaml
+        stages:
+          - name: "API Call"
+            uses: "api/send_notification@v1"
+            with:
+              message: "Workflow completed successfully"
+              recipients: ["admin@example.com"]
+              priority: "high"
+              metadata:
+                workflow_id: "${{ params.workflow_id }}"
+                execution_time: "${{ params.execution_time }}"
+        ```
+
+    === "Conditional Call"
+
+        ```yaml
+        stages:
+          - name: "Send Alert"
+            if: "${{ params.send_alerts == true }}"
+            uses: "notifications/send_alert@production"
+            with:
+              level: "${{ params.alert_level }}"
+              message: "Data processing completed"
+        ```
+
+#### Attributes
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `uses` | str | Required | Function reference in format `module/function@tag` |
+| `args` | dict[str, Any] | `{}` | Arguments passed to the function |
+
+#### Function Registration
+
+Functions must be registered using the `@tag` decorator:
+
+```python
+from ddeutil.workflow import tag
+
+@tag("tasks", alias="process_csv")
+def process_csv_file(input_path: str, output_path: str) -> dict:
+    """Process CSV file and convert to Parquet format."""
+    import pandas as pd
+
+    df = pd.read_csv(input_path)
+    df.to_parquet(output_path)
+
+    return {
+        "rows_processed": len(df),
+        "output_size": output_path
+    }
+```
 
 ### Trigger Stage
 
-Trigger workflow executor stage that run an input trigger Workflow
-execute method. This is the stage that allow you to create the reusable
-Workflow template with dynamic parameters.
+Trigger stage for orchestrating other workflows.
 
-!!! example "YAML"
+!!! example "Trigger Stage Usage"
 
-    === "Trigger with Params"
+    === "Simple Trigger"
 
         ```yaml
         stages:
-            - name: Call trigger
-              trigger: trigger-workflow-name
-              params:
-                name: some-name
+          - name: "Run Data Pipeline"
+            trigger: "data-pipeline"
+            params:
+              date: "${{ params.processing_date }}"
+              environment: "production"
         ```
 
-| field     | data type      | default  | description                                                      |
-|-----------|----------------|:--------:|------------------------------------------------------------------|
-| trigger   | str            |          | A trigger workflow name that should already exist on the config. |
-| params    | dict[str, Any] | `dict()` | A parameter that want to pass to workflow execution.             |
+    === "With Complex Parameters"
 
+        ```yaml
+        stages:
+          - name: "Multi-Environment Deploy"
+            trigger: "deployment-workflow"
+            params:
+              application: "web-app"
+              environments: ["dev", "staging", "prod"]
+              version: "${{ params.app_version }}"
+              rollback_on_failure: true
+        ```
+
+#### Attributes
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `trigger` | str | Required | Name of workflow to trigger |
+| `params` | dict[str, Any] | `{}` | Parameters passed to triggered workflow |
 
 ### Parallel Stage
 
-Parallel stage executor that execute branch stages with multithreading.
-This stage let you set the fix branches for running child stage inside it on
-multithread pool.
+Parallel stage for concurrent execution of multiple stages.
 
-!!! note
+!!! example "Parallel Stage Usage"
 
-    This stage is not the low-level stage model because it runs multi-stages
-    in this stage execution.
-
-!!! example "YAML"
-
-    === "Parallel"
+    === "Basic Parallel Execution"
 
         ```yaml
         stages:
-            - name: Call parallel
-              parallel:
-                branch-a:
-                  - name: Echo in Branch
-                    echo: "This is branch: ${{ branch }}"
-                branch-b:
-                  - name: Echo in Branch
-                    echo: "This is branch: ${{ branch }}"
-                    sleep: 1
+          - name: "Parallel Processing"
+            parallel:
+              - name: "Process Region A"
+                bash: "process_data.sh --region=us-east"
+              - name: "Process Region B"
+                bash: "process_data.sh --region=us-west"
+              - name: "Process Region C"
+                bash: "process_data.sh --region=eu-west"
         ```
 
+    === "With Shared Context"
 
-| field       | alias       | data type              | default | description                                                                                                                      |
-|-------------|-------------|------------------------|:-------:|----------------------------------------------------------------------------------------------------------------------------------|
-| parallel    |             | dict[str, list[Stage]] |         | A mapping of branch name and its stages.                                                                                         |
-| max_workers | max-workers | int                    |   `2`   | The maximum multi-thread pool worker size for execution parallel. This value should be gather or equal than 1, and less than 20. |
+        ```yaml
+        stages:
+          - name: "Multi-Service Health Check"
+            parallel:
+              - name: "Check Database"
+                uses: "health/database_check@latest"
+                with:
+                  host: "${{ params.db_host }}"
+              - name: "Check API"
+                uses: "health/api_check@latest"
+                with:
+                  endpoint: "${{ params.api_url }}"
+              - name: "Check Cache"
+                uses: "health/cache_check@latest"
+                with:
+                  redis_url: "${{ params.redis_url }}"
+        ```
+
+#### Attributes
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `parallel` | list[Stage] | Required | List of stages to execute in parallel |
+| `max_workers` | int | `None` | Maximum number of concurrent workers |
 
 ### ForEach Stage
 
-For-Each stage executor that execute all stages with each item in the
-foreach list.
+ForEach stage for iterative processing of collections.
 
-!!! note
+!!! example "ForEach Stage Usage"
 
-    This stage is not the low-level stage model because it runs
-    multi-stages in this stage execution.
+    === "Process File List"
 
-| field            | alias | data type                        | default | description |
-|------------------|-------|----------------------------------|:-------:|-------------|
-| foreach          |       | Union[list[str], list[int], str] |         |             |
-| stages           |       | list[Stage]                      | `list`  |             |
-| concurrent       |       | int                              |   `1`   |             |
-| use_index_as_key |       | bool                             | `False` |             |
+        ```yaml
+        stages:
+          - name: "Process Files"
+            foreach:
+              items: "${{ params.file_list }}"
+              as: "current_file"
+            stages:
+              - name: "Process ${{ current_file }}"
+                bash: "process_file.sh '${{ current_file }}'"
+        ```
 
+    === "Matrix Processing"
 
-### Until Stage
+        ```yaml
+        stages:
+          - name: "Multi-Environment Deploy"
+            foreach:
+              items: "${{ params.environments }}"
+              as: "env"
+            stages:
+              - name: "Deploy to ${{ env }}"
+                uses: "deploy/application@latest"
+                with:
+                  environment: "${{ env }}"
+                  version: "${{ params.app_version }}"
+        ```
 
-Until stage executor that will run stages in each loop until it valid
-with stop loop condition.
+#### Attributes
 
-
-!!! note
-
-    This stage is not the low-level stage model because it runs
-    multi-stages in this stage execution.
-
-| field    | alias    | data type             | default | description |
-|----------|----------|-----------------------|:-------:|-------------|
-| item     |          | Union[str, int, bool] |   `0`   |             |
-| until    |          | str                   |         |             |
-| stages   |          | list[Stage]           | `list`  |             |
-| max_loop | max-loop | int                   | `False` |             |
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `foreach` | dict | Required | Iteration configuration |
+| `stages` | list[Stage] | Required | Stages to execute for each item |
 
 ### Case Stage
 
-Case stage executor that execute all stages if the condition was matched.
+Case stage for conditional execution based on parameter values.
 
-| field          | alias    | data type   | default | description |
-|----------------|----------|-------------|:-------:|-------------|
-| case           |          | str         |         |             |
-| match          |          | list[Match] |         |             |
-| skip_not_match |          | bool        | `False` |             |
+!!! example "Case Stage Usage"
 
-!!! note
+    === "Environment-Specific Logic"
 
-    When `Match` is the BaseModel for a case.
+        ```yaml
+        stages:
+          - name: "Environment Setup"
+            case:
+              when: "${{ params.environment }}"
+              cases:
+                development:
+                  - name: "Setup Dev Environment"
+                    bash: "setup_dev.sh"
+                staging:
+                  - name: "Setup Staging Environment"
+                    bash: "setup_staging.sh"
+                production:
+                  - name: "Setup Production Environment"
+                    bash: "setup_prod.sh"
+        ```
 
-    | field  | alias    | data type   | default | description |
-    |--------|----------|-------------|:-------:|-------------|
-    | case   |          | str \| None |         |             |
-    | stages |          | list[Stage] |         |             |
+    === "Error Handling Cases"
+
+        ```yaml
+        stages:
+          - name: "Error Recovery"
+            case:
+              when: "${{ params.error_type }}"
+              cases:
+                network:
+                  - name: "Retry Network Operation"
+                    uses: "retry/network@latest"
+                database:
+                  - name: "Database Recovery"
+                    uses: "recovery/database@latest"
+                default:
+                  - name: "Generic Error Handling"
+                    uses: "error/generic@latest"
+        ```
+
+#### Attributes
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `case` | dict | Required | Case configuration with `when` and `cases` |
+
+### Until Stage
+
+Until stage for retry loops and polling operations.
+
+!!! example "Until Stage Usage"
+
+    === "Polling for Completion"
+
+        ```yaml
+        stages:
+          - name: "Wait for Job Completion"
+            until:
+              condition: "${{ result.status == 'completed' }}"
+              max_attempts: 30
+              delay: 60
+            stages:
+              - name: "Check Job Status"
+                uses: "jobs/check_status@latest"
+                with:
+                  job_id: "${{ params.job_id }}"
+        ```
+
+    === "Retry with Backoff"
+
+        ```yaml
+        stages:
+          - name: "Retry API Call"
+            until:
+              condition: "${{ result.success == true }}"
+              max_attempts: 5
+              delay: "${{ attempt * 30 }}"
+            stages:
+              - name: "API Request"
+                uses: "api/make_request@latest"
+                with:
+                  endpoint: "${{ params.api_endpoint }}"
+        ```
+
+#### Attributes
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `until` | dict | Required | Retry configuration with condition and limits |
 
 ### Raise Stage
 
-Raise error stage executor that raise `StageError` that use a message
-field for making error message before raise.
+Raise stage for simulating errors and testing error handling.
 
-| field   | alias | data type   | default | description                                                 |
-|---------|-------|-------------|:-------:|-------------------------------------------------------------|
-| message | raise | str         |         | An error message that want to raise with `StageError` class |
+!!! example "Raise Stage Usage"
 
-### Docker Stage
+    === "Simulate Error"
 
-Docker container stage execution that will pull the specific Docker image
-with custom authentication and run this image by passing environment
-variables and mounting local volume to this Docker container.
+        ```yaml
+        stages:
+          - name: "Test Error Handling"
+            raise:
+              error_type: "ValueError"
+              message: "Simulated error for testing"
+        ```
 
-The volume path that mount to this Docker container will limit. That is
-this stage does not allow you to mount any path to this container.
+    === "Conditional Error"
 
-| field  | alias | data type       | default  | description                                                        |
-|--------|-------|-----------------|:--------:|--------------------------------------------------------------------|
-| image  |       | str             |          | A Docker image url with tag that want to run.                      |
-| tag    |       | str             | `latest` | An Docker image tag.                                               |
-| env    |       | dict[str, Any]  |          | An environment variable that want pass to Docker container.        |
-| volume |       | dict[str, Any]  |          | A mapping of local and target mounting path.                       |
-| auth   |       | dict[str, Any]  |          | An authentication of the Docker registry that use in pulling step. |
+        ```yaml
+        stages:
+          - name: "Conditional Error"
+            if: "${{ params.simulate_failure == true }}"
+            raise:
+              error_type: "RuntimeError"
+              message: "Simulated failure for testing error paths"
+        ```
 
-### Virtual-Python Stage
+#### Attributes
 
-Virtual Python stage executor that run Python statement on the dependent
-Python virtual environment via the `uv` package.
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `raise` | dict | Required | Error configuration with type and message |
 
-| field   | data type      | default  | description                                                                   |
-|---------|----------------|:--------:|-------------------------------------------------------------------------------|
-| run     | str            |          | A Python string statement that want to run with `exec`.                       |
-| vars    | dict[str, Any] | `dict()` | A variable mapping that want to pass to globals parameter in the `exec` func. |
-| version | str            |  `3.9`   | A Python version that want to run.                                            |
-| deps    | list[str]      |          | list of Python dependency that want to install before execution stage.        |
+## Advanced Usage
+
+### Custom Stage Development
+
+Create custom stages by inheriting from `BaseStage`:
+
+```python
+from ddeutil.workflow.stages import BaseStage, Result, SUCCESS
+
+class CustomStage(BaseStage):
+    """Custom stage for specific business logic."""
+
+    def execution(self, params: dict, run_id: str, context: dict) -> Result:
+        """Custom execution logic."""
+        # Your custom logic here
+        result = self.process_data(params)
+
+        return Result(
+            status=SUCCESS,
+            context=context,
+            run_id=run_id,
+            updated={"custom_output": result}
+        )
+
+    def process_data(self, params: dict) -> dict:
+        """Process data according to business requirements."""
+        # Implementation here
+        return {"processed": True}
+```
+
+### Stage Composition
+
+Combine stages for complex workflows:
+
+```yaml
+stages:
+  - name: "Data Pipeline"
+    parallel:
+      - name: "Extract Data"
+        stages:
+          - name: "Download Files"
+            bash: "download_data.sh"
+          - name: "Validate Files"
+            uses: "validation/check_files@latest"
+      - name: "Prepare Environment"
+        stages:
+          - name: "Setup Database"
+            uses: "database/setup@latest"
+          - name: "Configure Services"
+            uses: "config/setup@latest"
+
+  - name: "Process Data"
+    foreach:
+      items: "${{ params.data_sources }}"
+      as: "source"
+    stages:
+      - name: "Process ${{ source }}"
+        uses: "processing/transform@latest"
+        with:
+          source: "${{ source }}"
+```
+
+### Error Handling Patterns
+
+```yaml
+stages:
+  - name: "Robust Processing"
+    stages:
+      - name: "Attempt Operation"
+        try:
+          - name: "Primary Method"
+            uses: "api/primary_method@latest"
+        catch:
+          - name: "Fallback Method"
+            uses: "api/fallback_method@latest"
+        finally:
+          - name: "Cleanup"
+            uses: "utils/cleanup@latest"
+```
+
+## Configuration
+
+Stage behavior can be configured through environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `WORKFLOW_CORE_STAGE_DEFAULT_ID` | `false` | Enable default stage IDs |
+| `WORKFLOW_CORE_STAGE_TIMEOUT` | `3600` | Default stage timeout in seconds |
+| `WORKFLOW_CORE_STAGE_RETRY_DELAY` | `5` | Default retry delay in seconds |
+
+## Best Practices
+
+### 1. Stage Design
+
+- **Single responsibility**: Each stage should do one thing well
+- **Idempotency**: Stages should be safe to retry
+- **Error handling**: Always handle potential failures gracefully
+- **Logging**: Provide clear, actionable log messages
+
+### 2. Performance
+
+- **Parallel execution**: Use `ParallelStage` for independent operations
+- **Resource management**: Clean up resources in finally blocks
+- **Caching**: Cache expensive operations when possible
+- **Batch processing**: Process data in batches for efficiency
+
+### 3. Security
+
+- **Input validation**: Validate all inputs before processing
+- **Code review**: Review all custom code before deployment
+- **Least privilege**: Use minimal required permissions
+- **Secret management**: Use secure methods for sensitive data
+
+### 4. Monitoring
+
+- **Metrics**: Track stage execution times and success rates
+- **Alerts**: Set up alerts for stage failures
+- **Tracing**: Use trace IDs to track execution flow
+- **Auditing**: Log important stage events for compliance
+
+### 5. Testing
+
+- **Unit tests**: Test individual stage logic
+- **Integration tests**: Test stage interactions
+- **Error scenarios**: Test failure modes and recovery
+- **Performance tests**: Validate stage performance under load

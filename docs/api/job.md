@@ -13,6 +13,35 @@ Jobs are the primary execution units within workflows, serving as containers for
 - Conditional execution based on dynamic expressions
 - Output coordination between stages and jobs
 
+## Quick Start
+
+```python
+from ddeutil.workflow import Job, EmptyStage, PyStage, BashStage
+
+# Create a simple job
+job = Job(
+    id="data-processing",
+    desc="Process daily data files",
+    stages=[
+        EmptyStage(name="Start", echo="Processing started"),
+        PyStage(
+            name="Process Data",
+            run="result = process_data(input_file)",
+            vars={"input_file": "/data/input.csv"}
+        ),
+        EmptyStage(name="Complete", echo="Processing finished")
+    ]
+)
+
+# Execute the job
+result = job.execute({
+    'input_file': '/data/input.csv',
+    'output_file': '/data/output.csv'
+})
+
+print(f"Job status: {result.status}")
+```
+
 ## Classes
 
 ### Job
@@ -248,223 +277,805 @@ setup_job = Job(
 )
 
 # Processing job that depends on setup
-process_job = Job(
-    id="process-data",
+processing_job = Job(
+    id="process",
     needs=["setup"],
-    condition="${{ params.enable_processing }} == true",
     trigger_rule=Rule.ALL_SUCCESS,
+    condition="${{ params.enable_processing == true }}",
     stages=[
         PyStage(
-            name="Process data",
-            run="process_data_files()",
-            vars={"workspace": "/tmp/workspace"}
+            name="Process Data",
+            run="process_data()"
         )
     ]
 )
 
-# Cleanup job that runs regardless of processing success
+# Cleanup job that runs regardless of previous job status
 cleanup_job = Job(
     id="cleanup",
-    needs=["process-data"],
-    trigger_rule=Rule.ALL_DONE,  # Run even if process-data fails
+    needs=["setup", "process"],
+    trigger_rule=Rule.ALL_DONE,
     stages=[
         BashStage(name="Cleanup", bash="rm -rf /tmp/workspace")
     ]
 )
 ```
 
-### Docker Execution Environment
+### Advanced Matrix Strategies
+
+#### Complex Matrix with Exclusions
 
 ```python
-from ddeutil.workflow import Job, OnDocker, DockerArgs, PyStage
+from ddeutil.workflow import Job, Strategy
 
 job = Job(
-    id="containerized-job",
-    runs_on=OnDocker(
-        args=DockerArgs(
-            image="python:3.11-slim",
-            env={
-                "PYTHONPATH": "/app",
-                "DATA_PATH": "/data"
-            },
-            volume={
-                "/host/data": "/data",
-                "/host/app": "/app"
+    id="comprehensive-testing",
+    strategy=Strategy(
+        matrix={
+            'python_version': ['3.9', '3.10', '3.11'],
+            'platform': ['linux', 'windows', 'macos'],
+            'database': ['postgresql', 'mysql', 'sqlite']
+        },
+        include=[
+            # Additional specific combinations
+            {
+                'python_version': '3.12',
+                'platform': 'linux',
+                'database': 'postgresql'
             }
-        )
+        ],
+        exclude=[
+            # Exclude incompatible combinations
+            {'platform': 'windows', 'database': 'sqlite'},
+            {'platform': 'macos', 'python_version': '3.9'}
+        ],
+        max_parallel=5,
+        fail_fast=False
     ),
     stages=[
         PyStage(
-            name="Install dependencies",
-            run="subprocess.run(['pip', 'install', '-r', '/app/requirements.txt'])"
-        ),
-        PyStage(
-            name="Run analysis",
-            run="import analysis; analysis.run('/data/input.csv')"
+            name="Test ${{ matrix.python_version }} on ${{ matrix.platform }} with ${{ matrix.database }}",
+            run="""
+import sys
+print(f"Python: {sys.version}")
+print(f"Platform: {sys.platform}")
+print(f"Database: {params.database}")
+run_tests()
+"""
         )
     ]
 )
 ```
 
-## YAML Configuration
+#### Dynamic Matrix Generation
 
-### Basic Job Definition
+```python
+from ddeutil.workflow import Job, Strategy, PyStage
 
-```yaml
-jobs:
-  data-ingestion:
-    desc: "Ingest data from external sources"
-    runs-on:
-      type: local
-    stages:
-      - name: "Download dataset"
-        bash: |
-          curl -o /tmp/data.csv "${{ params.data_url }}"
+job = Job(
+    id="dynamic-matrix",
+    stages=[
+        PyStage(
+            name="Generate Matrix",
+            run="""
+# Generate matrix based on available resources
+available_regions = get_available_regions()
+available_instances = get_available_instances()
 
-      - name: "Validate data"
-        run: |
-          import pandas as pd
-          df = pd.read_csv('/tmp/data.csv')
-          assert len(df) > 0, "Dataset is empty"
-          print(f"Loaded {len(df)} records")
+matrix_data = {
+    'region': available_regions,
+    'instance_type': available_instances
+}
+
+result.outputs = {"matrix": matrix_data}
+"""
+        )
+    ],
+    strategy=Strategy(
+        matrix="${{ fromJson(needs.generate-matrix.outputs.matrix) }}",
+        max_parallel=3
+    )
+)
 ```
 
-### Job with Matrix Strategy
+### Job Orchestration Patterns
 
-```yaml
-jobs:
-  test-matrix:
-    desc: "Run tests across multiple configurations"
-    strategy:
-      fail-fast: false
-      max-parallel: 3
-      matrix:
-        python: ["3.9", "3.10", "3.11"]
-        os: ["ubuntu-latest", "windows-latest"]
-      include:
-        - python: "3.12"
-          os: "ubuntu-latest"
-      exclude:
-        - python: "3.9"
-          os: "windows-latest"
+#### Fan-Out/Fan-In Pattern
 
-    runs-on:
-      type: docker
-      with:
-        image: "python:${{ matrix.python }}-slim"
+```python
+from ddeutil.workflow import Job, Rule
 
-    stages:
-      - name: "Install dependencies"
-        bash: pip install -r requirements.txt
+# Split job
+split_job = Job(
+    id="split-data",
+    stages=[
+        PyStage(
+            name="Split Data",
+            run="""
+partitions = split_large_dataset()
+result.outputs = {"partitions": partitions}
+"""
+        )
+    ]
+)
 
-      - name: "Run tests"
-        bash: pytest tests/ -v
+# Process partitions in parallel
+process_job = Job(
+    id="process-partitions",
+    needs=["split-data"],
+    strategy=Strategy(
+        matrix={
+            'partition': "${{ fromJson(needs.split-data.outputs.partitions) }}"
+        },
+        max_parallel=4
+    ),
+    stages=[
+        PyStage(
+            name="Process Partition ${{ matrix.partition }}",
+            run="process_partition(${{ matrix.partition }})"
+        )
+    ]
+)
+
+# Merge results
+merge_job = Job(
+    id="merge-results",
+    needs=["process-partitions"],
+    trigger_rule=Rule.ALL_SUCCESS,
+    stages=[
+        PyStage(
+            name="Merge Results",
+            run="merge_all_partition_results()"
+        )
+    ]
+)
 ```
 
-### Job Dependencies and Triggers
+#### Circuit Breaker Pattern
 
-```yaml
-jobs:
-  build:
-    stages:
-      - name: "Build application"
-        bash: make build
+```python
+from ddeutil.workflow import Job, Rule
 
-  test:
-    needs: [build]
-    trigger-rule: all_success
-    stages:
-      - name: "Run unit tests"
-        bash: make test
+# Health check job
+health_job = Job(
+    id="health-check",
+    stages=[
+        PyStage(
+            name="Check System Health",
+            run="""
+health_status = check_system_health()
+if not health_status.is_healthy:
+    raise Exception("System unhealthy")
+"""
+        )
+    ]
+)
 
-      - name: "Run integration tests"
-        bash: make integration-test
+# Main processing job
+main_job = Job(
+    id="main-process",
+    needs=["health-check"],
+    trigger_rule=Rule.ALL_SUCCESS,
+    stages=[
+        PyStage(
+            name="Main Processing",
+            run="process_data()"
+        )
+    ]
+)
 
-  deploy:
-    needs: [test]
-    condition: "${{ params.environment }} == 'production'"
-    stages:
-      - name: "Deploy to production"
-        bash: make deploy
-
-  cleanup:
-    needs: [build, test, deploy]
-    trigger-rule: all_done  # Always run cleanup
-    stages:
-      - name: "Clean build artifacts"
-        bash: make clean
+# Fallback job
+fallback_job = Job(
+    id="fallback",
+    needs=["health-check"],
+    trigger_rule=Rule.ALL_FAILED,
+    stages=[
+        PyStage(
+            name="Fallback Processing",
+            run="fallback_processing()"
+        )
+    ]
+)
 ```
 
-### Multi-Environment Execution
+#### Retry with Exponential Backoff
 
-```yaml
-jobs:
-  local-job:
-    runs-on:
-      type: local
-    stages:
-      - name: "Local processing"
-        run: process_locally()
+```python
+from ddeutil.workflow import Job, PyStage
 
-  docker-job:
-    runs-on:
-      type: docker
-      with:
-        image: "python:3.11-alpine"
-        env:
-          ENVIRONMENT: "container"
-        volume:
-          "/host/data": "/app/data"
-    stages:
-      - name: "Container processing"
-        run: process_in_container()
+job = Job(
+    id="retry-with-backoff",
+    stages=[
+        PyStage(
+            name="Retry Operation",
+            retry=5,
+            run="""
+import time
 
-  remote-job:
-    runs-on:
-      type: self_hosted
-      with:
-        host: "https://runner.company.com"
-        token: "${{ secrets.RUNNER_TOKEN }}"
-    stages:
-      - name: "Remote processing"
-        bash: ./remote_script.sh
+attempt = context.get('attempt', 1)
+delay = 2 ** (attempt - 1)  # Exponential backoff: 1, 2, 4, 8, 16 seconds
+time.sleep(delay)
+
+# Attempt the operation
+result = risky_operation()
+if not result.success:
+    raise Exception(f"Operation failed on attempt {attempt}")
+"""
+        )
+    ]
+)
+```
+
+### Multi-Environment Deployment
+
+#### Environment-Specific Jobs
+
+```python
+from ddeutil.workflow import Job, Strategy
+
+deploy_job = Job(
+    id="deploy",
+    strategy=Strategy(
+        matrix={
+            'environment': ['dev', 'staging', 'prod']
+        }
+    ),
+    stages=[
+        PyStage(
+            name="Deploy to ${{ matrix.environment }}",
+            run="""
+env = matrix['environment']
+config = get_environment_config(env)
+
+if env == 'prod':
+    # Additional safety checks for production
+    validate_production_deployment()
+    notify_team("Production deployment starting")
+
+deploy_application(config)
+"""
+        )
+    ]
+)
+```
+
+#### Docker-Based Execution
+
+```python
+from ddeutil.workflow import Job, OnDocker, DockerArgs
+
+docker_job = Job(
+    id="docker-process",
+    runs_on=OnDocker(
+        args=DockerArgs(
+            image="python:3.11-slim",
+            env={
+                "PYTHONPATH": "/app",
+                "DATABASE_URL": "${{ params.database_url }}"
+            },
+            volume={
+                "/local/data": "/app/data",
+                "/local/output": "/app/output"
+            }
+        )
+    ),
+    stages=[
+        PyStage(
+            name="Docker Processing",
+            run="""
+import os
+print(f"Running in container: {os.uname()}")
+print(f"Data directory: {os.listdir('/app/data')}")
+
+# Process data
+process_data('/app/data', '/app/output')
+"""
+        )
+    ]
+)
+```
+
+### Conditional Job Execution
+
+#### Parameter-Based Conditions
+
+```python
+from ddeutil.workflow import Job
+
+job = Job(
+    id="conditional-job",
+    condition="${{ params.environment == 'production' && params.enable_feature == true }}",
+    stages=[
+        PyStage(
+            name="Production Feature",
+            run="enable_production_feature()"
+        )
+    ]
+)
+```
+
+#### Time-Based Conditions
+
+```python
+from ddeutil.workflow import Job
+
+job = Job(
+    id="time-based-job",
+    condition="${{ datetime.now().hour >= 9 && datetime.now().hour <= 17 }}",
+    stages=[
+        PyStage(
+            name="Business Hours Task",
+            run="business_hours_task()"
+        )
+    ]
+)
+```
+
+#### Dependency-Based Conditions
+
+```python
+from ddeutil.workflow import Job
+
+job = Job(
+    id="dependent-job",
+    needs=["predecessor-job"],
+    condition="${{ needs.predecessor-job.result == 'success' }}",
+    stages=[
+        PyStage(
+            name="Dependent Task",
+            run="dependent_task()"
+        )
+    ]
+)
+```
+
+## Job Lifecycle Management
+
+### Job State Transitions
+
+```python
+from ddeutil.workflow import Job, SUCCESS, FAILED, SKIP, WAIT
+
+def monitor_job_lifecycle(job: Job, params: dict):
+    """Monitor job execution lifecycle."""
+
+    # Check if job should be skipped
+    if job.is_skipped(params):
+        print(f"Job {job.id} will be skipped")
+        return SKIP
+
+    # Check dependencies
+    dependency_status = job.check_needs(previous_job_results)
+    if dependency_status == WAIT:
+        print(f"Job {job.id} waiting for dependencies")
+        return WAIT
+
+    # Execute job
+    try:
+        result = job.execute(params)
+        print(f"Job {job.id} completed with status: {result.status}")
+        return result.status
+    except Exception as e:
+        print(f"Job {job.id} failed: {e}")
+        return FAILED
+```
+
+### Job Result Aggregation
+
+```python
+from ddeutil.workflow import Job, Result
+
+def aggregate_job_results(jobs: dict[str, Job], results: dict[str, Result]) -> dict:
+    """Aggregate results from multiple jobs."""
+
+    aggregated = {
+        'total_jobs': len(jobs),
+        'successful_jobs': 0,
+        'failed_jobs': 0,
+        'skipped_jobs': 0,
+        'job_details': {}
+    }
+
+    for job_id, result in results.items():
+        aggregated['job_details'][job_id] = {
+            'status': result.status,
+            'execution_time': result.context.get('execution_time'),
+            'outputs': result.context.get('outputs', {})
+        }
+
+        if result.status == SUCCESS:
+            aggregated['successful_jobs'] += 1
+        elif result.status == FAILED:
+            aggregated['failed_jobs'] += 1
+        elif result.status == SKIP:
+            aggregated['skipped_jobs'] += 1
+
+    return aggregated
+```
+
+## Performance Optimization
+
+### Parallel Execution Strategies
+
+```python
+from ddeutil.workflow import Job, Strategy
+
+# Optimize for CPU-bound tasks
+cpu_intensive_job = Job(
+    id="cpu-intensive",
+    strategy=Strategy(
+        matrix={'task_id': range(100)},
+        max_parallel=os.cpu_count()  # Use all CPU cores
+    )
+)
+
+# Optimize for I/O-bound tasks
+io_intensive_job = Job(
+    id="io-intensive",
+    strategy=Strategy(
+        matrix={'file_id': range(50)},
+        max_parallel=20  # Higher parallelism for I/O
+    )
+)
+
+# Resource-aware execution
+resource_aware_job = Job(
+    id="resource-aware",
+    strategy=Strategy(
+        matrix={'region': ['us-east', 'us-west', 'eu-west']},
+        max_parallel=min(3, available_resources)  # Limit based on resources
+    )
+)
+```
+
+### Caching and Optimization
+
+```python
+from ddeutil.workflow import Job, PyStage
+
+cached_job = Job(
+    id="cached-computation",
+    stages=[
+        PyStage(
+            name="Check Cache",
+            run="""
+cache_key = generate_cache_key(params)
+if cache_exists(cache_key):
+    result = load_from_cache(cache_key)
+    print("Using cached result")
+else:
+    result = expensive_computation()
+    save_to_cache(cache_key, result)
+    print("Computed and cached result")
+"""
+        )
+    ]
+)
+```
+
+## Error Handling and Recovery
+
+### Comprehensive Error Handling
+
+```python
+from ddeutil.workflow import Job, PyStage, Rule
+
+robust_job = Job(
+    id="robust-processing",
+    stages=[
+        PyStage(
+            name="Primary Processing",
+            retry=3,
+            run="""
+try:
+    result = primary_processing()
+except Exception as e:
+    logger.error(f"Primary processing failed: {e}")
+    raise
+"""
+        )
+    ]
+)
+
+# Fallback job
+fallback_job = Job(
+    id="fallback-processing",
+    needs=["robust-processing"],
+    trigger_rule=Rule.ALL_FAILED,
+    stages=[
+        PyStage(
+            name="Fallback Processing",
+            run="fallback_processing()"
+        )
+    ]
+)
+
+# Cleanup job
+cleanup_job = Job(
+    id="cleanup",
+    needs=["robust-processing", "fallback-processing"],
+    trigger_rule=Rule.ALL_DONE,
+    stages=[
+        PyStage(
+            name="Cleanup",
+            run="cleanup_resources()"
+        )
+    ]
+)
+```
+
+### Graceful Degradation
+
+```python
+from ddeutil.workflow import Job, PyStage
+
+degraded_job = Job(
+    id="graceful-degradation",
+    stages=[
+        PyStage(
+            name="Check System Resources",
+            run="""
+resources = check_system_resources()
+if resources.memory < 1024:  # Less than 1GB
+    print("Low memory detected, using degraded mode")
+    params['degraded_mode'] = True
+"""
+        ),
+        PyStage(
+            name="Adaptive Processing",
+            run="""
+if params.get('degraded_mode'):
+    process_with_limited_resources()
+else:
+    process_with_full_resources()
+"""
+        )
+    ]
+)
+```
+
+## Monitoring and Observability
+
+### Job Metrics Collection
+
+```python
+from ddeutil.workflow import Job, PyStage
+import time
+
+monitored_job = Job(
+    id="monitored-job",
+    stages=[
+        PyStage(
+            name="Collect Metrics",
+            run="""
+import time
+import psutil
+
+start_time = time.time()
+start_memory = psutil.virtual_memory().used
+
+# Your processing logic here
+process_data()
+
+end_time = time.time()
+end_memory = psutil.virtual_memory().used
+
+metrics = {
+    'execution_time': end_time - start_time,
+    'memory_usage': end_memory - start_memory,
+    'cpu_usage': psutil.cpu_percent()
+}
+
+result.outputs = {"metrics": metrics}
+"""
+        )
+    ]
+)
+```
+
+### Job Health Checks
+
+```python
+from ddeutil.workflow import Job, PyStage
+
+health_check_job = Job(
+    id="health-check",
+    stages=[
+        PyStage(
+            name="System Health Check",
+            run="""
+health_status = {
+    'database': check_database_health(),
+    'api': check_api_health(),
+    'storage': check_storage_health(),
+    'network': check_network_health()
+}
+
+all_healthy = all(health_status.values())
+if not all_healthy:
+    unhealthy_services = [k for k, v in health_status.items() if not v]
+    raise Exception(f"Unhealthy services: {unhealthy_services}")
+
+result.outputs = {"health_status": health_status}
+"""
+        )
+    ]
+)
 ```
 
 ## Best Practices
 
 ### 1. Job Design
 
-- Keep jobs focused on a single logical unit of work
-- Use meaningful job IDs and descriptions
-- Group related stages within jobs appropriately
+- **Single responsibility**: Each job should have a clear, focused purpose
+- **Idempotency**: Jobs should be safe to retry without side effects
+- **Modularity**: Break complex jobs into smaller, manageable stages
+- **Reusability**: Design jobs to be reusable across different workflows
 
-### 2. Dependency Management
+### 2. Matrix Strategies
 
-- Define clear job dependencies using the `needs` field
-- Choose appropriate trigger rules for different scenarios
-- Consider using `all_done` for cleanup jobs
+- **Resource awareness**: Set `max_parallel` based on available resources
+- **Failure handling**: Use `fail_fast` appropriately for your use case
+- **Exclusion logic**: Carefully design exclusion rules to avoid conflicts
+- **Performance**: Balance parallelism with resource constraints
 
-### 3. Matrix Strategies
+### 3. Dependencies
 
-- Use matrix strategies for testing across multiple configurations
-- Set appropriate `max_parallel` limits based on available resources
-- Use `fail_fast: true` for quick feedback in development
+- **Clear dependencies**: Explicitly define job dependencies
+- **Trigger rules**: Choose appropriate trigger rules for your use case
+- **Circular dependencies**: Avoid circular dependency patterns
+- **Failure propagation**: Understand how failures propagate through dependencies
 
-### 4. Environment Configuration
+### 4. Error Handling
 
-- Choose the right execution environment for each job's requirements
-- Use local execution for simple jobs
-- Containerize jobs that need specific dependencies
-- Use self-hosted runners for specialized hardware requirements
+- **Retry logic**: Implement appropriate retry strategies
+- **Fallback mechanisms**: Provide fallback options for critical jobs
+- **Graceful degradation**: Handle resource constraints gracefully
+- **Monitoring**: Monitor job execution and failure patterns
 
-### 5. Error Handling
+### 5. Performance
 
-- Implement proper error handling within stages
-- Use conditional execution to handle different scenarios
-- Monitor job execution results and implement appropriate alerting
+- **Parallelization**: Use matrix strategies for parallel execution
+- **Resource optimization**: Optimize resource usage based on job type
+- **Caching**: Implement caching for expensive operations
+- **Monitoring**: Track performance metrics and optimize accordingly
 
-### 6. Resource Management
+### 6. Security
 
-- Set reasonable timeouts for long-running jobs
-- Control parallelism to avoid overwhelming systems
-- Clean up resources in dedicated cleanup jobs
+- **Input validation**: Validate all inputs to jobs
+- **Access control**: Implement proper access controls
+- **Secret management**: Handle secrets securely
+- **Audit logging**: Enable audit logging for compliance
+
+## Troubleshooting
+
+### Common Issues
+
+#### Job Dependencies Not Met
+
+```python
+# Problem: Job waiting indefinitely for dependencies
+job_results = {
+    'job-a': Result(status=SUCCESS),
+    'job-b': Result(status=FAILED)
+}
+
+# Check dependency status
+for job_id, job in workflow.jobs.items():
+    if job.needs:
+        status = job.check_needs(job_results)
+        print(f"Job {job_id} dependency status: {status}")
+```
+
+#### Matrix Strategy Issues
+
+```python
+# Problem: Matrix combinations not generating as expected
+strategy = Strategy(
+    matrix={
+        'env': ['dev', 'prod'],
+        'region': ['us-east', 'eu-west']
+    },
+    exclude=[{'env': 'dev', 'region': 'eu-west'}]
+)
+
+# Generate and inspect combinations
+combinations = strategy.make()
+print(f"Generated {len(combinations)} combinations:")
+for combo in combinations:
+    print(f"  {combo}")
+```
+
+#### Resource Exhaustion
+
+```python
+# Problem: Too many parallel executions causing resource issues
+# Solution: Monitor and adjust max_parallel
+import psutil
+
+available_memory = psutil.virtual_memory().available
+available_cpu = psutil.cpu_count()
+
+# Adjust max_parallel based on available resources
+max_parallel = min(
+    available_cpu,
+    available_memory // (1024 * 1024 * 512),  # 512MB per job
+    10  # Maximum limit
+)
+
+job = Job(
+    id="resource-aware",
+    strategy=Strategy(
+        matrix={'task_id': range(100)},
+        max_parallel=max_parallel
+    )
+)
+```
+
+#### Conditional Execution Issues
+
+```python
+# Problem: Job not executing when expected
+# Solution: Debug condition evaluation
+job = Job(
+    id="conditional-job",
+    condition="${{ params.environment == 'production' }}"
+)
+
+# Test condition evaluation
+test_params = {'environment': 'production'}
+is_skipped = job.is_skipped(test_params)
+print(f"Job would be skipped: {is_skipped}")
+
+# Check parameter values
+print(f"Environment parameter: {test_params.get('environment')}")
+```
+
+### Debugging Tips
+
+1. **Enable verbose logging**: Set log level to DEBUG for detailed execution information
+2. **Check job dependencies**: Verify that all required jobs have completed successfully
+3. **Validate matrix combinations**: Inspect generated matrix combinations for correctness
+4. **Monitor resource usage**: Track CPU, memory, and I/O usage during execution
+5. **Test incrementally**: Test individual stages before running full jobs
+6. **Use conditional execution**: Add debug stages that only run in development
+
+## Configuration Reference
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `WORKFLOW_CORE_JOB_TIMEOUT` | `3600` | Default job timeout in seconds |
+| `WORKFLOW_CORE_MAX_PARALLEL` | `2` | Default max parallel executions |
+| `WORKFLOW_CORE_RETRY_DELAY` | `5` | Default retry delay in seconds |
+| `WORKFLOW_CORE_RETRY_ATTEMPTS` | `3` | Default retry attempts |
+
+### Job Configuration Schema
+
+```yaml
+job-name:
+  id: "unique-job-id"
+  desc: "Job description"
+  runs-on:
+    type: "local" | "self-hosted" | "docker" | "az-batch"
+    # Additional environment-specific configuration
+  condition: "${{ expression }}"
+  needs: ["job1", "job2"]
+  trigger-rule: "all_success" | "all_failed" | "all_done" | "one_success" | "one_failed" | "none_failed" | "none_skipped"
+  strategy:
+    matrix:
+      key1: [value1, value2]
+      key2: [value3, value4]
+    include:
+      - key1: value5
+        key2: value6
+    exclude:
+      - key1: value1
+        key2: value3
+    max-parallel: 3
+    fail-fast: false
+  stages:
+    - name: "Stage Name"
+      # Stage-specific configuration
+```

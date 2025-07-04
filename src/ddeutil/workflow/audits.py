@@ -12,6 +12,11 @@ execution metadata, status information, and detailed logging.
 The audit system tracks workflow, job, and stage executions with configurable
 storage backends including file-based JSON storage and database persistence.
 
+That mean if you release the workflow with the same release date with force mode,
+it will overwrite the previous release log. By the way, if you do not pass any
+release mode, it will not overwrite the previous release log and return the skip
+status to you because it already release.
+
 Classes:
     BaseAudit: Abstract base class for audit implementations
     FileAudit: File-based audit storage implementation
@@ -39,16 +44,18 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sqlite3
+import zlib
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import ClassVar, Optional, Union
+from typing import Any, ClassVar, Optional, Union
 from urllib.parse import ParseResult
 
 from pydantic import BaseModel, Field
 from pydantic.functional_serializers import field_serializer
-from pydantic.functional_validators import model_validator
+from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
 from .__types import DictData
@@ -94,6 +101,15 @@ class BaseAudit(BaseModel, ABC):
         default_factory=dict,
         description="A runs metadata that will use to tracking this audit log.",
     )
+
+    @field_validator("extras", mode="before")
+    def validate_extras(cls, v: Any) -> DictData:
+        """Validate extras field to ensure it's a dictionary."""
+        if v is None:
+            return {}
+        if not isinstance(v, dict):
+            raise ValueError("extras must be a dictionary")
+        return v
 
     @model_validator(mode="after")
     def __model_action(self) -> Self:
@@ -196,16 +212,43 @@ class BaseAudit(BaseModel, ABC):
         """
 
     @abstractmethod
-    def save(self, excluded: Optional[list[str]]) -> None:  # pragma: no cov
+    def save(
+        self, excluded: Optional[list[str]] = None
+    ) -> Self:  # pragma: no cov
         """Save this model logging to target logging store.
 
         Args:
             excluded: Optional list of field names to exclude from saving.
 
+        Returns:
+            Self: The audit instance after saving.
+
         Raises:
             NotImplementedError: If the method is not implemented by subclass.
         """
         raise NotImplementedError("Audit should implement `save` method.")
+
+    def compress_data(self, data: str) -> bytes:
+        """Compress audit data for storage efficiency.
+
+        Args:
+            data: JSON string data to compress.
+
+        Returns:
+            bytes: Compressed data.
+        """
+        return zlib.compress(data.encode("utf-8"))
+
+    def decompress_data(self, data: bytes) -> str:
+        """Decompress audit data.
+
+        Args:
+            data: Compressed data to decompress.
+
+        Returns:
+            str: Decompressed JSON string.
+        """
+        return zlib.decompress(data).decode("utf-8")
 
 
 class FileAudit(BaseAudit):
@@ -262,9 +305,11 @@ class FileAudit(BaseAudit):
         Raises:
             FileNotFoundError: If the workflow directory does not exist.
         """
-        pointer: Path = (
-            Path(dynamic("audit_url", extras=extras).path) / f"workflow={name}"
-        )
+        audit_url = dynamic("audit_url", extras=extras)
+        if audit_url is None:
+            raise ValueError("audit_url configuration is not set")
+
+        pointer: Path = Path(audit_url.path) / f"workflow={name}"
         if not pointer.exists():
             raise FileNotFoundError(f"Pointer: {pointer.absolute()}.")
 
@@ -295,22 +340,44 @@ class FileAudit(BaseAudit):
 
         Raises:
             FileNotFoundError: If the specified workflow/release directory does not exist.
-            NotImplementedError: If release is None (latest log not implemented yet).
+            ValueError: If no releases found when release is None.
         """
         if release is None:
-            raise NotImplementedError("Find latest log does not implement yet.")
+            # Find the latest release
+            audit_url = dynamic("audit_url", extras=extras)
+            if audit_url is None:
+                raise ValueError("audit_url configuration is not set")
 
-        pointer: Path = (
-            Path(dynamic("audit_url", extras=extras).path)
+            pointer: Path = Path(audit_url.path) / f"workflow={name}"
+            if not pointer.exists():
+                raise FileNotFoundError(f"Pointer: {pointer.absolute()}.")
+
+            release_dirs = list(pointer.glob("./release=*"))
+            if not release_dirs:
+                raise ValueError(f"No releases found for workflow: {name}")
+
+            # Get the latest release directory
+            latest_release_dir = max(release_dirs, key=os.path.getctime)
+            release_str = latest_release_dir.name.replace("release=", "")
+            release = datetime.strptime(release_str, "%Y%m%d%H%M%S")
+
+        audit_url = dynamic("audit_url", extras=extras)
+        if audit_url is None:
+            raise ValueError("audit_url configuration is not set")
+
+        release_pointer: Path = (
+            Path(audit_url.path)
             / f"workflow={name}/release={release:%Y%m%d%H%M%S}"
         )
-        if not pointer.exists():
+        if not release_pointer.exists():
             raise FileNotFoundError(
                 f"Pointer: ./logs/workflow={name}/"
                 f"release={release:%Y%m%d%H%M%S} does not found."
             )
 
-        latest_file: Path = max(pointer.glob("./*.log"), key=os.path.getctime)
+        latest_file: Path = max(
+            release_pointer.glob("./*.log"), key=os.path.getctime
+        )
         with latest_file.open(mode="r", encoding="utf-8") as f:
             return cls.model_validate(obj=json.load(f))
 
@@ -337,9 +404,13 @@ class FileAudit(BaseAudit):
             return False
 
         # NOTE: create pointer path that use the same logic of pointer method.
-        pointer: Path = Path(
-            dynamic("audit_url", extras=extras).path
-        ) / cls.filename_fmt.format(name=name, release=release)
+        audit_url = dynamic("audit_url", extras=extras)
+        if audit_url is None:
+            return False
+
+        pointer: Path = Path(audit_url.path) / cls.filename_fmt.format(
+            name=name, release=release
+        )
 
         return pointer.exists()
 
@@ -349,9 +420,13 @@ class FileAudit(BaseAudit):
         Returns:
             Path: The directory path for the current workflow and release.
         """
-        return Path(
-            dynamic("audit_url", extras=self.extras).path
-        ) / self.filename_fmt.format(name=self.name, release=self.release)
+        audit_url = dynamic("audit_url", extras=self.extras)
+        if audit_url is None:
+            raise ValueError("audit_url configuration is not set")
+
+        return Path(audit_url.path) / self.filename_fmt.format(
+            name=self.name, release=self.release
+        )
 
     def save(self, excluded: Optional[list[str]] = None) -> Self:
         """Save logging data received from workflow execution result.
@@ -376,9 +451,13 @@ class FileAudit(BaseAudit):
         log_file: Path = (
             self.pointer() / f"{self.parent_run_id or self.run_id}.log"
         )
+
+        # Convert excluded list to set for pydantic compatibility
+        exclude_set = set(excluded) if excluded else None
+
         log_file.write_text(
             json.dumps(
-                self.model_dump(exclude=excluded),
+                self.model_dump(exclude=exclude_set),
                 default=str,
                 indent=2,
             ),
@@ -386,12 +465,39 @@ class FileAudit(BaseAudit):
         )
         return self
 
+    def cleanup_old_audits(self, max_age_days: int = 30) -> int:
+        """Clean up old audit files based on age.
 
-class SQLiteAudit(BaseAudit):  # pragma: no cov
+        Args:
+            max_age_days: Maximum age in days for audit files to keep.
+
+        Returns:
+            int: Number of files cleaned up.
+        """
+        audit_url = dynamic("audit_url", extras=self.extras)
+        if audit_url is None:
+            return 0
+
+        base_path = Path(audit_url.path)
+        cutoff_time = datetime.now().timestamp() - (max_age_days * 24 * 3600)
+        cleaned_count = 0
+
+        for workflow_dir in base_path.glob("workflow=*"):
+            for release_dir in workflow_dir.glob("release=*"):
+                if release_dir.stat().st_mtime < cutoff_time:
+                    import shutil
+
+                    shutil.rmtree(release_dir)
+                    cleaned_count += 1
+
+        return cleaned_count
+
+
+class SQLiteAudit(BaseAudit):
     """SQLite Audit model for database-based audit storage.
 
     This class inherits from BaseAudit and implements SQLite database storage
-    for audit logs. Currently not fully implemented.
+    for audit logs with compression support.
 
     Attributes:
         table_name: Class variable defining the database table name.
@@ -402,17 +508,38 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
     schemas: ClassVar[
         str
     ] = """
-        workflow          str
-        , release         int
-        , type            str
-        , context         JSON
-        , parent_run_id   int
-        , run_id          int
-        , metadata        JSON
-        , created_at      datetime
-        , updated_at      datetime
-        primary key ( workflow, release )
+        CREATE TABLE IF NOT EXISTS audits (
+            workflow TEXT NOT NULL,
+            release TEXT NOT NULL,
+            type TEXT NOT NULL,
+            context BLOB NOT NULL,
+            parent_run_id TEXT,
+            run_id TEXT NOT NULL,
+            metadata BLOB NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (workflow, release)
+        )
         """
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        self._ensure_table_exists()
+
+    def _ensure_table_exists(self) -> None:
+        """Ensure the audit table exists in the database."""
+        audit_url = dynamic("audit_url", extras=self.extras)
+        if audit_url is None or not audit_url.path:
+            raise ValueError(
+                "SQLite audit_url must specify a database file path"
+            )
+
+        db_path = Path(audit_url.path)
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(self.schemas)
+            conn.commit()
 
     @classmethod
     def is_pointed(
@@ -421,7 +548,34 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
         release: datetime,
         *,
         extras: Optional[DictData] = None,
-    ) -> bool: ...
+    ) -> bool:
+        """Check if audit data exists for the given workflow and release.
+
+        Args:
+            name: The workflow name to check.
+            release: The release datetime to check.
+            extras: Optional extra parameters to override core config.
+
+        Returns:
+            bool: True if audit data exists, False otherwise.
+        """
+        if not dynamic("enable_write_audit", extras=extras):
+            return False
+
+        audit_url = dynamic("audit_url", extras=extras)
+        if audit_url is None or not audit_url.path:
+            return False
+
+        db_path = Path(audit_url.path)
+        if not db_path.exists():
+            return False
+
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.execute(
+                "SELECT COUNT(*) FROM audits WHERE workflow = ? AND release = ?",
+                (name, release.isoformat()),
+            )
+            return cursor.fetchone()[0] > 0
 
     @classmethod
     def find_audits(
@@ -429,7 +583,44 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
         name: str,
         *,
         extras: Optional[DictData] = None,
-    ) -> Iterator[Self]: ...
+    ) -> Iterator[Self]:
+        """Find all audit data for a given workflow name.
+
+        Args:
+            name: The workflow name to search for.
+            extras: Optional extra parameters to override core config.
+
+        Returns:
+            Iterator[Self]: Iterator of audit instances.
+        """
+        audit_url = dynamic("audit_url", extras=extras)
+        if audit_url is None or not audit_url.path:
+            return
+
+        db_path = Path(audit_url.path)
+        if not db_path.exists():
+            return
+
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.execute(
+                "SELECT * FROM audits WHERE workflow = ? ORDER BY release DESC",
+                (name,),
+            )
+            for row in cursor.fetchall():
+                # Decompress context and metadata
+                context = json.loads(cls._decompress_data(row[3]))
+                metadata = json.loads(cls._decompress_data(row[6]))
+
+                yield cls(
+                    name=row[0],
+                    release=datetime.fromisoformat(row[1]),
+                    type=row[2],
+                    context=context,
+                    parent_run_id=row[4],
+                    run_id=row[5],
+                    runs_metadata=metadata,
+                    extras=extras or {},
+                )
 
     @classmethod
     def find_audit_with_release(
@@ -438,19 +629,83 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
         release: Optional[datetime] = None,
         *,
         extras: Optional[DictData] = None,
-    ) -> Self: ...
+    ) -> Self:
+        """Find audit data for a specific workflow and release.
 
-    def save(self, excluded: Optional[list[str]]) -> SQLiteAudit:
+        Args:
+            name: The workflow name to search for.
+            release: Optional release datetime. If None, returns latest release.
+            extras: Optional extra parameters to override core config.
+
+        Returns:
+            Self: The audit instance for the specified workflow and release.
+
+        Raises:
+            FileNotFoundError: If the specified workflow/release is not found.
+        """
+        audit_url = dynamic("audit_url", extras=extras)
+        if audit_url is None or not audit_url.path:
+            raise FileNotFoundError("SQLite database not configured")
+
+        db_path = Path(audit_url.path)
+        if not db_path.exists():
+            raise FileNotFoundError(f"Database file not found: {db_path}")
+
+        with sqlite3.connect(db_path) as conn:
+            if release is None:
+                # Get latest release
+                cursor = conn.execute(
+                    "SELECT * FROM audits WHERE workflow = ? ORDER BY release DESC LIMIT 1",
+                    (name,),
+                )
+            else:
+                cursor = conn.execute(
+                    "SELECT * FROM audits WHERE workflow = ? AND release = ?",
+                    (name, release.isoformat()),
+                )
+
+            row = cursor.fetchone()
+            if not row:
+                raise FileNotFoundError(
+                    f"Audit not found for workflow: {name}, release: {release}"
+                )
+
+            # Decompress context and metadata
+            context = json.loads(cls._decompress_data(row[3]))
+            metadata = json.loads(cls._decompress_data(row[6]))
+
+            return cls(
+                name=row[0],
+                release=datetime.fromisoformat(row[1]),
+                type=row[2],
+                context=context,
+                parent_run_id=row[4],
+                run_id=row[5],
+                runs_metadata=metadata,
+                extras=extras or {},
+            )
+
+    @staticmethod
+    def _compress_data(data: str) -> bytes:
+        """Compress data for storage."""
+        return zlib.compress(data.encode("utf-8"))
+
+    @staticmethod
+    def _decompress_data(data: bytes) -> str:
+        """Decompress data from storage."""
+        return zlib.decompress(data).decode("utf-8")
+
+    def save(self, excluded: Optional[list[str]] = None) -> Self:
         """Save logging data received from workflow execution result.
 
         Args:
             excluded: Optional list of field names to exclude from saving.
 
         Returns:
-            SQLiteAudit: The audit instance after saving.
+            Self: The audit instance after saving.
 
         Raises:
-            NotImplementedError: SQLiteAudit is not yet implemented.
+            ValueError: If SQLite database is not properly configured.
         """
         trace: Trace = get_trace(
             self.run_id,
@@ -463,7 +718,75 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
             trace.debug("[AUDIT]: Skip writing log cause config was set")
             return self
 
-        raise NotImplementedError("SQLiteAudit does not implement yet.")
+        audit_url = dynamic("audit_url", extras=self.extras)
+        if audit_url is None or not audit_url.path:
+            raise ValueError(
+                "SQLite audit_url must specify a database file path"
+            )
+
+        db_path = Path(audit_url.path)
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Prepare data for storage
+        exclude_set = set(excluded) if excluded else None
+        model_data = self.model_dump(exclude=exclude_set)
+
+        # Compress context and metadata
+        context_blob = self._compress_data(
+            json.dumps(model_data.get("context", {}))
+        )
+        metadata_blob = self._compress_data(
+            json.dumps(model_data.get("runs_metadata", {}))
+        )
+
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO audits
+                (workflow, release, type, context, parent_run_id, run_id, metadata, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """,
+                (
+                    self.name,
+                    self.release.isoformat(),
+                    self.type,
+                    context_blob,
+                    self.parent_run_id,
+                    self.run_id,
+                    metadata_blob,
+                ),
+            )
+            conn.commit()
+
+        return self
+
+    def cleanup_old_audits(self, max_age_days: int = 30) -> int:
+        """Clean up old audit records based on age.
+
+        Args:
+            max_age_days: Maximum age in days for audit records to keep.
+
+        Returns:
+            int: Number of records cleaned up.
+        """
+        audit_url = dynamic("audit_url", extras=self.extras)
+        if audit_url is None or not audit_url.path:
+            return 0
+
+        db_path = Path(audit_url.path)
+        if not db_path.exists():
+            return 0
+
+        cutoff_date = (
+            datetime.now() - timedelta(days=max_age_days)
+        ).isoformat()
+
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.execute(
+                "DELETE FROM audits WHERE release < ?", (cutoff_date,)
+            )
+            conn.commit()
+            return cursor.rowcount
 
 
 Audit = Union[
@@ -487,18 +810,22 @@ def get_audit_model(
     Raises:
         NotImplementedError: If the audit URL scheme is not supported.
     """
-    # NOTE: Allow you to override trace model by the extra parameter.
-    map_audit_models: dict[str, type[Trace]] = extras.get(
+    # NOTE: Allow you to override audit model by the extra parameter.
+    map_audit_models: dict[str, type[Audit]] = (extras or {}).get(
         "audit_model_mapping", {}
     )
-    url: ParseResult
-    if (url := dynamic("audit_url", extras=extras)).scheme and (
-        url.scheme == "sqlite"
-        or (url.scheme == "file" and Path(url.path).is_file())
+
+    audit_url = dynamic("audit_url", extras=extras)
+    if audit_url is None:
+        return map_audit_models.get("file", FileAudit)
+
+    if audit_url.scheme and (
+        audit_url.scheme == "sqlite"
+        or (audit_url.scheme == "file" and Path(audit_url.path).is_file())
     ):
-        return map_audit_models.get("sqlite", FileAudit)
-    elif url.scheme and url.scheme != "file":
+        return map_audit_models.get("sqlite", SQLiteAudit)
+    elif audit_url.scheme and audit_url.scheme != "file":
         raise NotImplementedError(
-            f"Does not implement the audit model support for URL: {url}"
+            f"Does not implement the audit model support for URL: {audit_url}"
         )
     return map_audit_models.get("file", FileAudit)
