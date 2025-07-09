@@ -47,6 +47,17 @@ all = [
 docker = [
     "docker==7.1.0",
 ]
+azure = [
+    "azure-batch>=13.0.0",
+    "azure-storage-blob>=12.0.0",
+]
+aws = [
+    "boto3>=1.39.0",
+]
+gcp = [
+    "google-cloud-batch>=0.17.0",
+    "google-cloud-storage>=2.10.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/ddeutils/ddeutil-workflow/"
@@ -87,6 +98,7 @@ omit = [
     "src/ddeutil/workflow/api/routes/job.py",
     "src/ddeutil/workflow/api/routes/logs.py",
     "src/ddeutil/workflow/api/routes/workflows.py",
+    "src/ddeutil/workflow/plugins/providers/*",
 ]
 
 [tool.coverage.report]
@@ -107,6 +119,7 @@ console_output_style = "count"
 addopts = [
     "--strict-config",
     "--strict-markers",
+    "--ignore=tests/providers",
 #    "-p no:launch",
 #    "-p no:launch_ros",
 ]

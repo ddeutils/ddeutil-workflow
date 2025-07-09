@@ -1,0 +1,542 @@
+name: "gcp-batch-example"
+description: "Example workflow using Google Cloud Batch execution"
+
+params:
+  data_source:
+    type: str
+    default: "gs://my-bucket/data.csv"
+
+  output_path:
+    type: str
+    default: "gs://my-bucket/output"
+
+  region:
+    type: str
+    default: "us-central1"
+
+jobs:
+  data-processing:
+    id: "data-processing"
+    desc: "Process data using Google Cloud Batch"
+
+    runs-on:
+      type: "gcp_batch"
+      with:
+        project_id: "${GOOGLE_CLOUD_PROJECT}"
+        region: "${GOOGLE_CLOUD_REGION}"
+        gcs_bucket: "${GCS_BUCKET}"
+
+    stages:
+      - name: "start"
+        type: "empty"
+        echo: "Starting Google Cloud Batch data processing job"
+
+      - name: "download-data"
+        type: "py"
+        run: |
+          from google.cloud import storage
+          import os
+
+          # Initialize GCS client
+          storage_client = storage.Client()
+
+          # Download data from GCS
+          data_source = os.environ.get('DATA_SOURCE', 'gs://my-bucket/data.csv')
+          bucket_name = data_source.split('/')[2]
+          blob_name = '/'.join(data_source.split('/')[3:])
+
+          bucket = storage_client.bucket(bucket_name)
+          blob = bucket.blob(blob_name)
+          blob.download_to_filename('/tmp/input_data.csv')
+
+          result.context.update({
+              "data_downloaded": True,
+              "input_file": data_source
+          })
+
+      - name: "process-data"
+        type: "py"
+        run: |
+          import pandas as pd
+          import numpy as np
+          from google.cloud import storage
+          import os
+
+          # Load data
+          data = pd.read_csv('/tmp/input_data.csv')
+
+          # Process data
+          processed_data = data.groupby('category').agg({
+              'value': ['sum', 'mean', 'std', 'count']
+          }).round(2)
+
+          # Add some computed columns
+          processed_data['total_value'] = processed_data[('value', 'sum')]
+          processed_data['avg_value'] = processed_data[('value', 'mean')]
+          processed_data['std_value'] = processed_data[('value', 'std')]
+          processed_data['count'] = processed_data[('value', 'count')]
+
+          # Save processed data
+          processed_data.to_csv('/tmp/processed_data.csv')
+
+          # Upload to GCS
+          storage_client = storage.Client()
+          output_path = os.environ.get('OUTPUT_PATH', 'gs://my-bucket/output')
+          bucket_name = output_path.split('/')[2]
+          blob_name = '/'.join(output_path.split('/')[3:]) + '/processed_data.csv'
+
+          bucket = storage_client.bucket(bucket_name)
+          blob = bucket.blob(blob_name)
+          blob.upload_from_filename('/tmp/processed_data.csv')
+
+          result.context.update({
+              "rows_processed": len(data),
+              "categories_processed": len(processed_data),
+              "output_file": f"{output_path}/processed_data.csv",
+              "processing_completed": True
+          })
+
+      - name: "generate-report"
+        type: "py"
+        run: |
+          import pandas as pd
+          from google.cloud import storage
+          import os
+          from datetime import datetime
+
+          # Load processed data
+          data = pd.read_csv('/tmp/processed_data.csv')
+
+          # Generate report
+          report = f"""
+          Data Processing Report
+          Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+          Summary:
+          - Total categories processed: {len(data)}
+          - Total value: {data['total_value'].sum():,.2f}
+          - Average value per category: {data['avg_value'].mean():,.2f}
+
+          Top 5 categories by total value:
+          {data.nlargest(5, 'total_value')[['category', 'total_value', 'avg_value']].to_string(index=False)}
+          """
+
+          # Save report
+          with open('/tmp/processing_report.txt', 'w') as f:
+              f.write(report)
+
+          # Upload report to GCS
+          storage_client = storage.Client()
+          output_path = os.environ.get('OUTPUT_PATH', 'gs://my-bucket/output')
+          bucket_name = output_path.split('/')[2]
+          blob_name = '/'.join(output_path.split('/')[3:]) + '/processing_report.txt'
+
+          bucket = storage_client.bucket(bucket_name)
+          blob = bucket.blob(blob_name)
+          blob.upload_from_filename('/tmp/processing_report.txt')
+
+          result.context.update({
+              "report_generated": True,
+              "report_file": f"{output_path}/processing_report.txt"
+          })
+
+      - name: "complete"
+        type: "empty"
+        echo: "Google Cloud Batch data processing completed successfully"
+
+  bigquery-processing:
+    id: "bigquery-processing"
+    desc: "Process data using BigQuery and Google Cloud Batch"
+
+    runs-on:
+      type: "gcp_batch"
+      with:
+        project_id: "${GOOGLE_CLOUD_PROJECT}"
+        region: "${GOOGLE_CLOUD_REGION}"
+        gcs_bucket: "${GCS_BUCKET}"
+        machine_type: "n1-standard-4"
+
+    stages:
+      - name: "query-bigquery"
+        type: "py"
+        run: |
+          from google.cloud import bigquery
+          from google.cloud import storage
+          import pandas as pd
+          import os
+
+          # Initialize BigQuery client
+          bq_client = bigquery.Client()
+
+          # Execute BigQuery query
+          query = """
+          SELECT
+            category,
+            COUNT(*) as count,
+            AVG(value) as avg_value,
+            SUM(value) as total_value,
+            STDDEV(value) as std_value
+          FROM `my-project.my-dataset.my-table`
+          WHERE date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+          GROUP BY category
+          ORDER BY total_value DESC
+          LIMIT 100
+          """
+
+          # Run query and get results
+          df = bq_client.query(query).to_dataframe()
+
+          # Save results to GCS
+          df.to_csv('/tmp/bigquery_results.csv', index=False)
+
+          storage_client = storage.Client()
+          bucket = storage_client.bucket('my-bucket')
+          blob = bucket.blob('output/bigquery_results.csv')
+          blob.upload_from_filename('/tmp/bigquery_results.csv')
+
+          result.context.update({
+              "rows_processed": len(df),
+              "output_file": "gs://my-bucket/output/bigquery_results.csv",
+              "query_executed": True
+          })
+
+      - name: "analyze-results"
+        type: "py"
+        run: |
+          import pandas as pd
+          import numpy as np
+          from google.cloud import storage
+          from datetime import datetime
+
+          # Load BigQuery results
+          data = pd.read_csv('/tmp/bigquery_results.csv')
+
+          # Perform analysis
+          analysis = {
+              'total_categories': len(data),
+              'total_value': data['total_value'].sum(),
+              'avg_value_per_category': data['avg_value'].mean(),
+              'top_category': data.loc[data['total_value'].idxmax(), 'category'],
+              'top_category_value': data['total_value'].max(),
+              'analysis_timestamp': datetime.now().isoformat()
+          }
+
+          # Create summary report
+          summary = f"""
+          BigQuery Analysis Report
+          Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+          Summary:
+          - Total categories analyzed: {analysis['total_categories']}
+          - Total value across all categories: {analysis['total_value']:,.2f}
+          - Average value per category: {analysis['avg_value_per_category']:,.2f}
+          - Top performing category: {analysis['top_category']} (${analysis['top_category_value']:,.2f})
+
+          Top 10 categories by total value:
+          {data.head(10)[['category', 'total_value', 'avg_value', 'count']].to_string(index=False)}
+          """
+
+          # Save analysis
+          import json
+          with open('/tmp/analysis_results.json', 'w') as f:
+              json.dump(analysis, f, indent=2)
+
+          with open('/tmp/analysis_summary.txt', 'w') as f:
+              f.write(summary)
+
+          # Upload to GCS
+          storage_client = storage.Client()
+          bucket = storage_client.bucket('my-bucket')
+
+          # Upload analysis results
+          blob = bucket.blob('output/analysis_results.json')
+          blob.upload_from_filename('/tmp/analysis_results.json')
+
+          blob = bucket.blob('output/analysis_summary.txt')
+          blob.upload_from_filename('/tmp/analysis_summary.txt')
+
+          result.context.update({
+              "analysis_completed": True,
+              "analysis_file": "gs://my-bucket/output/analysis_results.json",
+              "summary_file": "gs://my-bucket/output/analysis_summary.txt"
+          })
+
+      - name: "complete"
+        type: "empty"
+        echo: "BigQuery processing completed successfully"
+
+  ml-training:
+    id: "ml-training"
+    desc: "Train machine learning model using Google Cloud Batch"
+
+    runs-on:
+      type: "gcp_batch"
+      with:
+        project_id: "${GOOGLE_CLOUD_PROJECT}"
+        region: "${GOOGLE_CLOUD_REGION}"
+        gcs_bucket: "${GCS_BUCKET}"
+        machine_type: "n1-standard-8"
+
+    stages:
+      - name: "prepare-data"
+        type: "py"
+        run: |
+          import pandas as pd
+          import numpy as np
+          from sklearn.model_selection import train_test_split
+          from google.cloud import storage
+
+          # Generate synthetic data for training
+          np.random.seed(42)
+          n_samples = 15000
+
+          # Create features
+          X = np.random.randn(n_samples, 15)
+
+          # Create target (complex non-linear relationship)
+          y = (np.sin(X[:, 0]) + np.cos(X[:, 1]) +
+               np.random.randn(n_samples) * 0.1)
+
+          # Split data
+          X_train, X_test, y_train, y_test = train_test_split(
+              X, y, test_size=0.2, random_state=42
+          )
+
+          # Save training data
+          train_data = pd.DataFrame(X_train, columns=[f'feature_{i}' for i in range(15)])
+          train_data['target'] = y_train
+          train_data.to_csv('/tmp/train_data.csv', index=False)
+
+          # Save test data
+          test_data = pd.DataFrame(X_test, columns=[f'feature_{i}' for i in range(15)])
+          test_data['target'] = y_test
+          test_data.to_csv('/tmp/test_data.csv', index=False)
+
+          result.context.update({
+              "training_samples": len(X_train),
+              "test_samples": len(X_test),
+              "features": 15
+          })
+
+      - name: "train-model"
+        type: "py"
+        run: |
+          import pandas as pd
+          import numpy as np
+          import pickle
+          from google.cloud import storage
+          from sklearn.ensemble import GradientBoostingRegressor
+          from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
+
+          # Load training data
+          train_data = pd.read_csv('/tmp/train_data.csv')
+          test_data = pd.read_csv('/tmp/test_data.csv')
+
+          X_train = train_data.drop('target', axis=1)
+          y_train = train_data['target']
+          X_test = test_data.drop('target', axis=1)
+          y_test = test_data['target']
+
+          # Train model
+          model = GradientBoostingRegressor(
+              n_estimators=200,
+              learning_rate=0.1,
+              max_depth=6,
+              random_state=42
+          )
+
+          model.fit(X_train, y_train)
+
+          # Make predictions
+          y_pred = model.predict(X_test)
+
+          # Calculate metrics
+          mse = mean_squared_error(y_test, y_pred)
+          mae = mean_absolute_error(y_test, y_pred)
+          r2 = r2_score(y_test, y_pred)
+
+          # Save model
+          with open('/tmp/trained_model.pkl', 'wb') as f:
+              pickle.dump(model, f)
+
+          # Save metrics
+          metrics = {
+              'mse': mse,
+              'rmse': np.sqrt(mse),
+              'mae': mae,
+              'r2': r2,
+              'feature_importance': dict(zip(X_train.columns, model.feature_importances_))
+          }
+
+          import json
+          with open('/tmp/model_metrics.json', 'w') as f:
+              json.dump(metrics, f, indent=2)
+
+          # Upload model and metrics to GCS
+          storage_client = storage.Client()
+          bucket = storage_client.bucket('my-bucket')
+
+          blob = bucket.blob('models/trained_model.pkl')
+          blob.upload_from_filename('/tmp/trained_model.pkl')
+
+          blob = bucket.blob('models/model_metrics.json')
+          blob.upload_from_filename('/tmp/model_metrics.json')
+
+          result.context.update({
+              "model_trained": True,
+              "mse": mse,
+              "rmse": np.sqrt(mse),
+              "mae": mae,
+              "r2": r2,
+              "model_path": "gs://my-bucket/models/trained_model.pkl",
+              "metrics_path": "gs://my-bucket/models/model_metrics.json"
+          })
+
+      - name: "complete"
+        type: "empty"
+        echo: "ML model training completed successfully"
+
+  parallel-processing:
+    id: "parallel-processing"
+    desc: "Parallel data processing using Google Cloud Batch"
+
+    strategy:
+      matrix:
+        dataset: ["sales", "inventory", "users", "transactions", "analytics"]
+      max_parallel: 5
+
+    runs-on:
+      type: "gcp_batch"
+      with:
+        project_id: "${GOOGLE_CLOUD_PROJECT}"
+        region: "${GOOGLE_CLOUD_REGION}"
+        gcs_bucket: "${GCS_BUCKET}"
+        machine_type: "e2-standard-4"
+
+    stages:
+      - name: "process-dataset"
+        type: "py"
+        run: |
+          import pandas as pd
+          import numpy as np
+          from google.cloud import storage
+          import os
+          from datetime import datetime
+
+          # Get dataset name from matrix strategy
+          dataset = os.environ.get('DATASET', 'unknown')
+
+          # Generate synthetic data for the dataset
+          np.random.seed(hash(dataset) % 2**32)
+          n_samples = np.random.randint(2000, 15000)
+
+          # Create dataset-specific data
+          if dataset == "sales":
+              data = pd.DataFrame({
+                  'date': pd.date_range('2023-01-01', periods=n_samples, freq='D'),
+                  'product_id': np.random.randint(1, 200, n_samples),
+                  'quantity': np.random.randint(1, 100, n_samples),
+                  'price': np.random.uniform(5, 2000, n_samples),
+                  'region': np.random.choice(['North', 'South', 'East', 'West', 'Central'], n_samples),
+                  'channel': np.random.choice(['online', 'retail', 'wholesale'], n_samples)
+              })
+              data['total_sales'] = data['quantity'] * data['price']
+
+          elif dataset == "inventory":
+              data = pd.DataFrame({
+                  'product_id': np.random.randint(1, 200, n_samples),
+                  'warehouse': np.random.choice(['A', 'B', 'C', 'D'], n_samples),
+                  'quantity': np.random.randint(0, 2000, n_samples),
+                  'reorder_level': np.random.randint(10, 200, n_samples),
+                  'supplier': np.random.choice(['Supplier_A', 'Supplier_B', 'Supplier_C'], n_samples),
+                  'last_updated': pd.date_range('2023-01-01', periods=n_samples, freq='H')
+              })
+
+          elif dataset == "users":
+              data = pd.DataFrame({
+                  'user_id': range(1, n_samples + 1),
+                  'age': np.random.randint(16, 85, n_samples),
+                  'gender': np.random.choice(['M', 'F', 'Other'], n_samples),
+                  'country': np.random.choice(['US', 'CA', 'UK', 'DE', 'FR', 'JP', 'AU'], n_samples),
+                  'registration_date': pd.date_range('2018-01-01', periods=n_samples, freq='D'),
+                  'subscription_type': np.random.choice(['free', 'basic', 'premium', 'enterprise'], n_samples),
+                  'last_login': pd.date_range('2023-01-01', periods=n_samples, freq='H')
+              })
+
+          elif dataset == "transactions":
+              data = pd.DataFrame({
+                  'transaction_id': range(1, n_samples + 1),
+                  'user_id': np.random.randint(1, 2000, n_samples),
+                  'amount': np.random.uniform(0.01, 50000, n_samples),
+                  'payment_method': np.random.choice(['credit_card', 'debit_card', 'paypal', 'bank_transfer'], n_samples),
+                  'status': np.random.choice(['completed', 'pending', 'failed', 'refunded'], n_samples, p=[0.85, 0.10, 0.03, 0.02]),
+                  'merchant_category': np.random.choice(['retail', 'food', 'travel', 'entertainment', 'utilities'], n_samples),
+                  'timestamp': pd.date_range('2023-01-01', periods=n_samples, freq='min')
+              })
+
+          else:  # analytics
+              data = pd.DataFrame({
+                  'event_id': range(1, n_samples + 1),
+                  'user_id': np.random.randint(1, 1000, n_samples),
+                  'event_type': np.random.choice(['page_view', 'click', 'purchase', 'signup', 'download'], n_samples),
+                  'page_url': np.random.choice(['/home', '/products', '/cart', '/checkout', '/account'], n_samples),
+                  'device_type': np.random.choice(['desktop', 'mobile', 'tablet'], n_samples),
+                  'browser': np.random.choice(['Chrome', 'Safari', 'Firefox', 'Edge'], n_samples),
+                  'timestamp': pd.date_range('2023-01-01', periods=n_samples, freq='s')
+              })
+
+          # Process data based on dataset type
+          if dataset == "sales":
+              processed = data.groupby(['region', 'channel']).agg({
+                  'total_sales': ['sum', 'mean', 'count'],
+                  'quantity': 'sum',
+                  'product_id': 'nunique'
+              }).round(2)
+
+          elif dataset == "inventory":
+              processed = data.groupby(['warehouse', 'supplier']).agg({
+                  'quantity': ['sum', 'mean'],
+                  'product_id': 'nunique',
+                  'reorder_level': 'mean'
+              }).round(2)
+
+          elif dataset == "users":
+              processed = data.groupby(['country', 'subscription_type']).agg({
+                  'user_id': 'count',
+                  'age': ['mean', 'std'],
+                  'gender': lambda x: x.value_counts().index[0]  # Most common gender
+              }).round(2)
+
+          elif dataset == "transactions":
+              processed = data.groupby(['payment_method', 'merchant_category']).agg({
+                  'amount': ['sum', 'mean', 'count'],
+                  'user_id': 'nunique',
+                  'status': lambda x: (x == 'completed').sum() / len(x)  # Success rate
+              }).round(4)
+
+          else:  # analytics
+              processed = data.groupby(['event_type', 'device_type']).agg({
+                  'event_id': 'count',
+                  'user_id': 'nunique',
+                  'page_url': lambda x: x.value_counts().index[0]  # Most common page
+              }).round(2)
+
+          # Save processed data
+          processed.to_csv(f'/tmp/{dataset}_processed.csv')
+
+          # Upload to GCS
+          storage_client = storage.Client()
+          bucket = storage_client.bucket('my-bucket')
+          blob = bucket.blob(f'output/parallel/{dataset}_processed.csv')
+          blob.upload_from_filename(f'/tmp/{dataset}_processed.csv')
+
+          result.context.update({
+              "dataset": dataset,
+              "rows_processed": len(data),
+              "output_file": f"gs://my-bucket/output/parallel/{dataset}_processed.csv",
+              "processing_timestamp": datetime.now().isoformat()
+          })
+
+      - name: "complete"
+        type: "empty"
+        echo: "Parallel processing completed for dataset: ${DATASET}"

@@ -249,8 +249,21 @@ class RunsOn(str, Enum):
     SELF_HOSTED = "self_hosted"
     AZ_BATCH = "azure_batch"
     AWS_BATCH = "aws_batch"
+    GCP_BATCH = "gcp_batch"
     CLOUD_BATCH = "cloud_batch"
     DOCKER = "docker"
+    CONTAINER = "container"
+
+
+# Import constants for backward compatibility
+LOCAL = RunsOn.LOCAL
+SELF_HOSTED = RunsOn.SELF_HOSTED
+AZ_BATCH = RunsOn.AZ_BATCH
+AWS_BATCH = RunsOn.AWS_BATCH
+GCP_BATCH = RunsOn.GCP_BATCH
+CLOUD_BATCH = RunsOn.CLOUD_BATCH
+DOCKER = RunsOn.DOCKER
+CONTAINER = RunsOn.CONTAINER
 
 
 LOCAL = RunsOn.LOCAL
@@ -328,6 +341,98 @@ class OnDocker(BaseRunsOn):  # pragma: no cov
     args: DockerArgs = Field(default_factory=DockerArgs, alias="with")
 
 
+class ContainerArgs(BaseModel):
+    """Container arguments."""
+
+    image: str = Field(description="Docker image to use")
+    container_name: Optional[str] = Field(
+        default=None, description="Container name"
+    )
+    volumes: Optional[list[dict[str, str]]] = Field(
+        default=None, description="Volume mounts"
+    )
+    environment: Optional[dict[str, str]] = Field(
+        default=None, description="Environment variables"
+    )
+    network: Optional[dict[str, Any]] = Field(
+        default=None, description="Network configuration"
+    )
+    resources: Optional[dict[str, Any]] = Field(
+        default=None, description="Resource limits"
+    )
+    working_dir: Optional[str] = Field(
+        default="/app", description="Working directory"
+    )
+    user: Optional[str] = Field(default=None, description="User to run as")
+    command: Optional[str] = Field(
+        default=None, description="Override default command"
+    )
+    timeout: int = Field(
+        default=3600, description="Execution timeout in seconds"
+    )
+    remove: bool = Field(
+        default=True, description="Remove container after execution"
+    )
+    docker_host: Optional[str] = Field(
+        default=None, description="Docker host URL"
+    )
+
+
+class OnContainer(BaseRunsOn):  # pragma: no cov
+    """Runs-on Container."""
+
+    type: RunsOn = CONTAINER
+    args: ContainerArgs = Field(default_factory=ContainerArgs, alias="with")
+
+
+class AWSBatchArgs(BaseModel):
+    """AWS Batch arguments."""
+
+    job_queue_arn: str = Field(description="AWS Batch job queue ARN")
+    s3_bucket: str = Field(description="S3 bucket for file storage")
+    region_name: str = Field(default="us-east-1", description="AWS region")
+    aws_access_key_id: Optional[str] = Field(
+        default=None, description="AWS access key ID"
+    )
+    aws_secret_access_key: Optional[str] = Field(
+        default=None, description="AWS secret access key"
+    )
+    aws_session_token: Optional[str] = Field(
+        default=None, description="AWS session token"
+    )
+
+
+class OnAWSBatch(BaseRunsOn):  # pragma: no cov
+    """Runs-on AWS Batch."""
+
+    type: RunsOn = AWS_BATCH
+    args: AWSBatchArgs = Field(alias="with")
+
+
+class GCPBatchArgs(BaseModel):
+    """Google Cloud Batch arguments."""
+
+    project_id: str = Field(description="Google Cloud project ID")
+    region: str = Field(description="Google Cloud region")
+    gcs_bucket: str = Field(description="Google Cloud Storage bucket")
+    credentials_path: Optional[str] = Field(
+        default=None, description="Path to service account credentials"
+    )
+    machine_type: str = Field(
+        default="e2-standard-4", description="Machine type"
+    )
+    max_parallel_tasks: int = Field(
+        default=1, description="Maximum parallel tasks"
+    )
+
+
+class OnGCPBatch(BaseRunsOn):  # pragma: no cov
+    """Runs-on Google Cloud Batch."""
+
+    type: RunsOn = GCP_BATCH
+    args: GCPBatchArgs = Field(alias="with")
+
+
 def get_discriminator_runs_on(model: dict[str, Any]) -> RunsOn:
     """Get discriminator of the RunsOn models."""
     t: str = model.get("type")
@@ -339,6 +444,9 @@ RunsOnModel = Annotated[
         Annotated[OnSelfHosted, Tag(SELF_HOSTED)],
         Annotated[OnDocker, Tag(DOCKER)],
         Annotated[OnLocal, Tag(LOCAL)],
+        Annotated[OnContainer, Tag(CONTAINER)],
+        Annotated[OnAWSBatch, Tag(AWS_BATCH)],
+        Annotated[OnGCPBatch, Tag(GCP_BATCH)],
     ],
     Discriminator(get_discriminator_runs_on),
 ]
@@ -795,9 +903,43 @@ class Job(BaseModel):
         elif self.runs_on.type == SELF_HOSTED:  # pragma: no cov
             pass
         elif self.runs_on.type == AZ_BATCH:  # pragma: no cov
-            pass
+            from .plugins.providers.az import azure_batch_execute
+
+            return azure_batch_execute(
+                self,
+                params,
+                run_id=parent_run_id,
+                event=event,
+            ).make_info({"execution_time": time.monotonic() - ts})
         elif self.runs_on.type == DOCKER:  # pragma: no cov
             return docker_execution(
+                self,
+                params,
+                run_id=parent_run_id,
+                event=event,
+            ).make_info({"execution_time": time.monotonic() - ts})
+        elif self.runs_on.type == CONTAINER:  # pragma: no cov
+            from .plugins.providers.container import container_execute
+
+            return container_execute(
+                self,
+                params,
+                run_id=parent_run_id,
+                event=event,
+            ).make_info({"execution_time": time.monotonic() - ts})
+        elif self.runs_on.type == AWS_BATCH:  # pragma: no cov
+            from .plugins.providers.aws import aws_batch_execute
+
+            return aws_batch_execute(
+                self,
+                params,
+                run_id=parent_run_id,
+                event=event,
+            ).make_info({"execution_time": time.monotonic() - ts})
+        elif self.runs_on.type == GCP_BATCH:  # pragma: no cov
+            from .plugins.providers.gcs import gcp_batch_execute
+
+            return gcp_batch_execute(
                 self,
                 params,
                 run_id=parent_run_id,
@@ -1221,71 +1363,8 @@ def self_hosted_execute(
     )
 
 
-def azure_batch_execute(
-    job: Job,
-    params: DictData,
-    *,
-    run_id: StrOrNone = None,
-    event: Optional[Event] = None,
-) -> Result:  # pragma: no cov
-    """Azure Batch job execution that will run all job's stages on the Azure
-    Batch Node and extract the result file to be returning context result.
-
-    Steps:
-        - Create a Batch account and a Batch pool.
-        - Create a Batch job and add tasks to the job. Each task represents a
-          command to run on a compute node.
-        - Specify the command to run the Python script in the task. You can use
-          the cmd /c command to run the script with the Python interpreter.
-        - Upload the Python script and any required input files to Azure Storage
-          Account.
-        - Configure the task to download the input files from Azure Storage to
-          the compute node before running the script.
-        - Monitor the job and retrieve the output files from Azure Storage.
-
-    References:
-        - https://docs.azure.cn/en-us/batch/tutorial-parallel-python
-
-    :param job:
-    :param params:
-    :param run_id:
-    :param event:
-
-    :rtype: Result
-    """
-    parent_run_id: StrOrNone = run_id
-    run_id: str = gen_id((job.id or "EMPTY"), unique=True)
-    trace: Trace = get_trace(
-        run_id, parent_run_id=parent_run_id, extras=job.extras
-    )
-    context: DictData = {"status": WAIT}
-    trace.info("[JOB]: Start Azure Batch executor.")
-
-    if event and event.is_set():
-        return Result(
-            run_id=run_id,
-            parent_run_id=parent_run_id,
-            status=CANCEL,
-            context=catch(
-                context,
-                status=CANCEL,
-                updated={
-                    "errors": JobCancelError(
-                        "Execution was canceled from the event before start "
-                        "self-hosted execution."
-                    ).to_dict()
-                },
-            ),
-            extras=job.extras,
-        )
-    print(params)
-    return Result(
-        run_id=run_id,
-        parent_run_id=parent_run_id,
-        status=SUCCESS,
-        context=catch(context, status=SUCCESS),
-        extras=job.extras,
-    )
+# Azure Batch execution is now handled by the Azure Batch provider
+# See src/ddeutil/workflow/plugins/providers/az.py for implementation
 
 
 def docker_execution(
