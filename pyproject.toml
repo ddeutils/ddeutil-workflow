@@ -27,7 +27,7 @@ requires-python = ">=3.9.13"
 dependencies = [
     "ddeutil[checksum]>=0.4.8",
     "ddeutil-io[yaml,toml]>=0.2.14",
-    "pydantic==2.11.7",
+    "pydantic==2.11.7,<3.0.0",
     "pydantic-extra-types>=2.10.4,<3.0.0",
     "python-dotenv>=1.1.0",
     "typer>=0.16.0",
