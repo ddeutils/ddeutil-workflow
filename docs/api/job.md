@@ -8,38 +8,75 @@ Jobs are the primary execution units within workflows, serving as containers for
 
 - Stage execution orchestration and lifecycle management
 - Matrix strategies for parameterized parallel execution
-- Multi-environment deployment (local, self-hosted, Docker, Azure Batch)
+- Multi-environment deployment (local, self-hosted, Docker, Azure Batch, AWS Batch, Cloud Batch)
 - Dependency management through job needs
 - Conditional execution based on dynamic expressions
 - Output coordination between stages and jobs
 
-## Quick Start
+## Job Execution Flow
 
-```python
-from ddeutil.workflow import Job, EmptyStage, PyStage, BashStage
+```mermaid
+flowchart TD
+    A["Job.execute()"] --> B["Generate run_id"]
+    B --> C["Initialize trace and context"]
+    C --> D["Check job condition"]
+    D -->|Skip| E["Return SKIP Result"]
+    D -->|Execute| F["Route to execution environment"]
 
-# Create a simple job
-job = Job(
-    id="data-processing",
-    desc="Process daily data files",
-    stages=[
-        EmptyStage(name="Start", echo="Processing started"),
-        PyStage(
-            name="Process Data",
-            run="result = process_data(input_file)",
-            vars={"input_file": "/data/input.csv"}
-        ),
-        EmptyStage(name="Complete", echo="Processing finished")
-    ]
-)
+    F --> G{"Environment Type"}
+    G -->|LOCAL| H["local_execute()"]
+    G -->|DOCKER| I["docker_execution()"]
+    G -->|SELF_HOSTED| J["self_hosted_execute()"]
+    G -->|AZ_BATCH| K["azure_batch_execute()"]
+    G -->|AWS_BATCH| L["aws_batch_execute()"]
+    G -->|CLOUD_BATCH| M["cloud_batch_execute()"]
 
-# Execute the job
-result = job.execute({
-    'input_file': '/data/input.csv',
-    'output_file': '/data/output.csv'
-})
+    H --> N["Generate matrix strategies"]
+    N --> O["Create ThreadPoolExecutor"]
+    O --> P["Submit strategy executions"]
+    P --> Q["Execute strategies in parallel"]
+    Q --> R["Collect results"]
+    R --> S["Validate final status"]
+    S --> T["Return Result"]
 
-print(f"Job status: {result.status}")
+    I --> T
+    J --> T
+    K --> T
+    L --> T
+    M --> T
+    E --> T
+
+    style A fill:#e1f5fe
+    style T fill:#c8e6c9
+    style E fill:#ffcdd2
+```
+
+## Strategy Execution Flow
+
+```mermaid
+flowchart TD
+    A["local_execute_strategy()"] --> B["Generate strategy_id"]
+    B --> C["Initialize context with matrix"]
+    C --> D["Execute stages sequentially"]
+    D --> E{"Stage Result"}
+    E -->|SUCCESS| F["Continue to next stage"]
+    E -->|FAILED| G["Raise JobError"]
+    E -->|SKIP| H["Mark stage as skipped"]
+    E -->|CANCEL| I["Raise JobCancelError"]
+
+    F --> J{"More stages?"}
+    J -->|Yes| D
+    J -->|No| K["Determine final status"]
+
+    H --> J
+    G --> L["Return FAILED"]
+    I --> M["Return CANCEL"]
+    K --> N["Return SUCCESS/SKIP"]
+
+    style A fill:#e1f5fe
+    style N fill:#c8e6c9
+    style L fill:#ffcdd2
+    style M fill:#ffcdd2
 ```
 
 ## Classes
@@ -155,6 +192,8 @@ Execution environment enumeration.
 - `SELF_HOSTED`: Execute on remote self-hosted runner
 - `DOCKER`: Execute in Docker container
 - `AZ_BATCH`: Execute on Azure Batch
+- `AWS_BATCH`: Execute on AWS Batch
+- `CLOUD_BATCH`: Execute on Cloud Batch
 
 ### Execution Environment Models
 
@@ -1058,7 +1097,7 @@ job-name:
   id: "unique-job-id"
   desc: "Job description"
   runs-on:
-    type: "local" | "self-hosted" | "docker" | "az-batch"
+    type: "local" | "self-hosted" | "docker" | "az-batch" | "aws-batch" | "cloud-batch"
     # Additional environment-specific configuration
   condition: "${{ expression }}"
   needs: ["job1", "job2"]

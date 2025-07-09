@@ -12,6 +12,44 @@ Stages are the fundamental building blocks of workflows, providing:
 - **Conditional logic**: Dynamic execution based on parameters and context
 - **Retry mechanisms**: Automatic retry on failures with configurable policies
 
+## Stage Execution Flow
+
+```mermaid
+flowchart TD
+    A["Stage.execute()"] --> B["Generate run_id"]
+    B --> C["Initialize context"]
+    C --> D["Log stage start"]
+    D --> E{"Check condition"}
+    E -->|Skip| F["Raise StageSkipError"]
+    E -->|Execute| G["Call _execute()"]
+    G --> H["Set context status WAIT"]
+    H --> I["Call stage.process()"]
+    I --> J{"Process result"}
+    J -->|Success| K["Return SUCCESS Result"]
+    J -->|Failure| L["Raise StageError"]
+    J -->|Cancel| M["Raise StageCancelError"]
+    J -->|Skip| N["Raise StageSkipError"]
+
+    F --> O["Return SKIP Result"]
+    L --> P["Return FAILED Result"]
+    M --> Q["Return CANCEL Result"]
+    N --> O
+
+    K --> R["Add execution time"]
+    O --> R
+    P --> R
+    Q --> R
+
+    R --> S["Final Result"]
+
+    style A fill:#e1f5fe
+    style S fill:#c8e6c9
+    style F fill:#ffcdd2
+    style L fill:#ffcdd2
+    style M fill:#ffcdd2
+    style N fill:#ffcdd2
+```
+
 ## Quick Start
 
 ```python
@@ -44,18 +82,65 @@ print(f"Processed {result} rows")
 
 ## Stage Types Summary
 
-| Stage Type | Purpose | Use Case |
-|------------|---------|----------|
-| `EmptyStage` | Logging and delays | Debugging, notifications, timing |
-| `BashStage` | Shell script execution | File operations, system commands |
-| `PyStage` | Python code execution | Data processing, API calls, analysis |
-| `CallStage` | Function calls | Reusable business logic |
-| `TriggerStage` | Workflow orchestration | Multi-workflow pipelines |
-| `ParallelStage` | Concurrent execution | Performance optimization |
-| `ForEachStage` | Iterative processing | Batch operations |
-| `CaseStage` | Conditional execution | Branching logic |
-| `UntilStage` | Retry loops | Polling, retry logic |
-| `RaiseStage` | Error simulation | Testing, error handling |
+| Stage Type | Purpose | Use Case | Inheritance |
+|------------|---------|----------|-------------|
+| `EmptyStage` | Logging and delays | Debugging, notifications, timing | `BaseAsyncStage` |
+| `BashStage` | Shell script execution | File operations, system commands | `BaseRetryStage` |
+| `PyStage` | Python code execution | Data processing, API calls, analysis | `BaseRetryStage` |
+| `VirtualPyStage` | Python in virtual env | Isolated Python execution | `PyStage` |
+| `CallStage` | Function calls | Reusable business logic | `BaseRetryStage` |
+| `TriggerStage` | Workflow orchestration | Multi-workflow pipelines | `BaseNestedStage` |
+| `ParallelStage` | Concurrent execution | Performance optimization | `BaseNestedStage` |
+| `ForEachStage` | Iterative processing | Batch operations | `BaseNestedStage` |
+| `CaseStage` | Conditional execution | Branching logic | `BaseNestedStage` |
+| `UntilStage` | Retry loops | Polling, retry logic | `BaseNestedStage` |
+| `RaiseStage` | Error simulation | Testing, error handling | `BaseAsyncStage` |
+| `DockerStage` | Container execution | Containerized workloads | `BaseStage` |
+
+## Stage Class Hierarchy
+
+```mermaid
+classDiagram
+    BaseStage <|-- BaseAsyncStage
+    BaseStage <|-- DockerStage
+    BaseAsyncStage <|-- BaseRetryStage
+    BaseAsyncStage <|-- EmptyStage
+    BaseAsyncStage <|-- RaiseStage
+    BaseRetryStage <|-- BashStage
+    BaseRetryStage <|-- PyStage
+    BaseRetryStage <|-- CallStage
+    BaseRetryStage <|-- BaseNestedStage
+    PyStage <|-- VirtualPyStage
+    BaseNestedStage <|-- TriggerStage
+    BaseNestedStage <|-- ParallelStage
+    BaseNestedStage <|-- ForEachStage
+    BaseNestedStage <|-- UntilStage
+    BaseNestedStage <|-- CaseStage
+
+    class BaseStage {
+        +extras: dict
+        +id: str
+        +name: str
+        +desc: str
+        +condition: str
+        +process()
+        +execute()
+        +is_skipped()
+    }
+
+    class BaseAsyncStage {
+        +async_process()
+        +axecute()
+    }
+
+    class BaseRetryStage {
+        +retry: int
+    }
+
+    class BaseNestedStage {
+        +is_nested: bool
+    }
+```
 
 ## Base Classes
 
@@ -75,6 +160,7 @@ Abstract base class for all stage implementations.
 |-----------|------|---------|-------------|
 | `id` | str \| None | `None` | Unique stage identifier for output tracking |
 | `name` | str | Required | Human-readable stage name for logging |
+| `desc` | str \| None | `None` | Stage description for documentation |
 | `condition` | str \| None | `None` | Conditional expression for execution |
 | `extras` | dict | `{}` | Additional configuration parameters |
 
@@ -104,6 +190,20 @@ Check if stage should be skipped based on condition.
 **Returns:**
 - `bool`: True if stage should be skipped
 
+### BaseAsyncStage
+
+Base class for stages with async execution capabilities.
+
+#### Methods
+
+##### `async_process(params, run_id, context, *, parent_run_id=None, event=None)`
+
+Async execution method that must be implemented by subclasses.
+
+##### `axecute(params, *, run_id=None, event=None)`
+
+Async handler for stage execution with error handling.
+
 ### BaseRetryStage
 
 Base class for stages with retry capabilities.
@@ -113,6 +213,16 @@ Base class for stages with retry capabilities.
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `retry` | int | `0` | Number of retry attempts on failure |
+
+### BaseNestedStage
+
+Base class for stages that contain other stages.
+
+#### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `is_nested` | bool | Always returns `True` for nested stages |
 
 ## Stage Implementations
 
@@ -216,6 +326,7 @@ Bash stage executor for shell script execution.
 |-----------|------|---------|-------------|
 | `bash` | str | Required | Bash script to execute |
 | `env` | dict[str, Any] | `{}` | Environment variables for script |
+| `retry` | int | `0` | Number of retry attempts on failure |
 
 #### Limitations
 
@@ -290,6 +401,7 @@ Python stage for executing Python code with full access to installed packages.
 |-----------|------|---------|-------------|
 | `run` | str | Required | Python code to execute |
 | `vars` | dict[str, Any] | `{}` | Variables available in execution context |
+| `retry` | int | `0` | Number of retry attempts on failure |
 
 #### Best Practices
 
@@ -298,6 +410,37 @@ Python stage for executing Python code with full access to installed packages.
 - **Output**: Use `print()` for logging, return values for data
 - **Dependencies**: Ensure required packages are installed
 - **Security**: Validate all inputs and avoid `eval()` or `exec()`
+
+### Virtual Python Stage
+
+Virtual Python stage for executing Python code in isolated virtual environments using `uv`.
+
+!!! example "Virtual Python Stage Usage"
+
+    === "Basic Virtual Environment"
+
+        ```yaml
+        stages:
+          - name: "Isolated Analysis"
+            version: "3.11"
+            deps: ["pandas", "numpy", "matplotlib"]
+            run: |
+              import pandas as pd
+              import numpy as np
+
+              df = pd.DataFrame(np.random.randn(100, 4))
+              print(f"Generated dataset: {df.shape}")
+        ```
+
+#### Attributes
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `run` | str | Required | Python code to execute |
+| `vars` | dict[str, Any] | `{}` | Variables available in execution context |
+| `version` | str | `"3.9"` | Python version for virtual environment |
+| `deps` | list[str] | Required | Python dependencies to install |
+| `retry` | int | `0` | Number of retry attempts on failure |
 
 ### Call Stage
 
@@ -349,6 +492,7 @@ Call stage for executing registered functions with arguments.
 |-----------|------|---------|-------------|
 | `uses` | str | Required | Function reference in format `module/function@tag` |
 | `args` | dict[str, Any] | `{}` | Arguments passed to the function |
+| `retry` | int | `0` | Number of retry attempts on failure |
 
 #### Function Registration
 
@@ -420,12 +564,14 @@ Parallel stage for concurrent execution of multiple stages.
         stages:
           - name: "Parallel Processing"
             parallel:
-              - name: "Process Region A"
-                bash: "process_data.sh --region=us-east"
-              - name: "Process Region B"
-                bash: "process_data.sh --region=us-west"
-              - name: "Process Region C"
-                bash: "process_data.sh --region=eu-west"
+              branch01:
+                - name: "Process Region A"
+                  bash: "process_data.sh --region=us-east"
+                - name: "Validate Region A"
+                  uses: "validation/check_data@latest"
+              branch02:
+                - name: "Process Region B"
+                  bash: "process_data.sh --region=us-west"
         ```
 
     === "With Shared Context"
@@ -433,27 +579,31 @@ Parallel stage for concurrent execution of multiple stages.
         ```yaml
         stages:
           - name: "Multi-Service Health Check"
+            max-workers: 3
             parallel:
-              - name: "Check Database"
-                uses: "health/database_check@latest"
-                with:
-                  host: "${{ params.db_host }}"
-              - name: "Check API"
-                uses: "health/api_check@latest"
-                with:
-                  endpoint: "${{ params.api_url }}"
-              - name: "Check Cache"
-                uses: "health/cache_check@latest"
-                with:
-                  redis_url: "${{ params.redis_url }}"
+              database:
+                - name: "Check Database"
+                  uses: "health/database_check@latest"
+                  with:
+                    host: "${{ params.db_host }}"
+              api:
+                - name: "Check API"
+                  uses: "health/api_check@latest"
+                  with:
+                    endpoint: "${{ params.api_url }}"
+              cache:
+                - name: "Check Cache"
+                  uses: "health/cache_check@latest"
+                  with:
+                    redis_url: "${{ params.redis_url }}"
         ```
 
 #### Attributes
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `parallel` | list[Stage] | Required | List of stages to execute in parallel |
-| `max_workers` | int | `None` | Maximum number of concurrent workers |
+| `parallel` | dict[str, list[Stage]] | Required | Mapping of branch names to stage lists |
+| `max_workers` | int | `2` | Maximum number of concurrent workers (1-20) |
 
 ### ForEach Stage
 
@@ -466,12 +616,11 @@ ForEach stage for iterative processing of collections.
         ```yaml
         stages:
           - name: "Process Files"
-            foreach:
-              items: "${{ params.file_list }}"
-              as: "current_file"
+            foreach: "${{ params.file_list }}"
+            concurrent: 2
             stages:
-              - name: "Process ${{ current_file }}"
-                bash: "process_file.sh '${{ current_file }}'"
+              - name: "Process ${{ item }}"
+                bash: "process_file.sh '${{ item }}'"
         ```
 
     === "Matrix Processing"
@@ -479,23 +628,35 @@ ForEach stage for iterative processing of collections.
         ```yaml
         stages:
           - name: "Multi-Environment Deploy"
-            foreach:
-              items: "${{ params.environments }}"
-              as: "env"
+            foreach: "${{ params.environments }}"
             stages:
-              - name: "Deploy to ${{ env }}"
+              - name: "Deploy to ${{ item }}"
                 uses: "deploy/application@latest"
                 with:
-                  environment: "${{ env }}"
+                  environment: "${{ item }}"
                   version: "${{ params.app_version }}"
+        ```
+
+    === "With Index"
+
+        ```yaml
+        stages:
+          - name: "Process with Index"
+            foreach: ["a", "b", "c"]
+            use-index-as-key: true
+            stages:
+              - name: "Process item ${{ item }} at index ${{ loop }}"
+                echo: "Processing item ${{ item }} (index: ${{ loop }})"
         ```
 
 #### Attributes
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `foreach` | dict | Required | Iteration configuration |
+| `foreach` | Union[list, str] | Required | Items to iterate over |
 | `stages` | list[Stage] | Required | Stages to execute for each item |
+| `concurrent` | int | `1` | Number of concurrent executions (1-10) |
+| `use_index_as_key` | bool | `False` | Use loop index as key instead of item value |
 
 ### Case Stage
 
@@ -508,18 +669,24 @@ Case stage for conditional execution based on parameter values.
         ```yaml
         stages:
           - name: "Environment Setup"
-            case:
-              when: "${{ params.environment }}"
-              cases:
-                development:
+            case: "${{ params.environment }}"
+            match:
+              - case: "development"
+                stages:
                   - name: "Setup Dev Environment"
                     bash: "setup_dev.sh"
-                staging:
+              - case: "staging"
+                stages:
                   - name: "Setup Staging Environment"
                     bash: "setup_staging.sh"
-                production:
+              - case: "production"
+                stages:
                   - name: "Setup Production Environment"
                     bash: "setup_prod.sh"
+              - case: "_"
+                stages:
+                  - name: "Default Setup"
+                    bash: "setup_default.sh"
         ```
 
     === "Error Handling Cases"
@@ -527,16 +694,18 @@ Case stage for conditional execution based on parameter values.
         ```yaml
         stages:
           - name: "Error Recovery"
-            case:
-              when: "${{ params.error_type }}"
-              cases:
-                network:
+            case: "${{ params.error_type }}"
+            match:
+              - case: "network"
+                stages:
                   - name: "Retry Network Operation"
                     uses: "retry/network@latest"
-                database:
+              - case: "database"
+                stages:
                   - name: "Database Recovery"
                     uses: "recovery/database@latest"
-                default:
+              - case: "_"
+                stages:
                   - name: "Generic Error Handling"
                     uses: "error/generic@latest"
         ```
@@ -545,7 +714,9 @@ Case stage for conditional execution based on parameter values.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `case` | dict | Required | Case configuration with `when` and `cases` |
+| `case` | str | Required | Case condition to evaluate |
+| `match` | list[Match] | Required | List of case matches with stages |
+| `skip_not_match` | bool | `False` | Skip execution if no case matches |
 
 ### Until Stage
 
@@ -558,15 +729,16 @@ Until stage for retry loops and polling operations.
         ```yaml
         stages:
           - name: "Wait for Job Completion"
-            until:
-              condition: "${{ result.status == 'completed' }}"
-              max_attempts: 30
-              delay: 60
+            item: 0
+            until: "${{ item >= 3 }}"
+            max-loop: 30
             stages:
               - name: "Check Job Status"
                 uses: "jobs/check_status@latest"
                 with:
                   job_id: "${{ params.job_id }}"
+              - name: "Increment Counter"
+                run: "item = ${{ item }} + 1"
         ```
 
     === "Retry with Backoff"
@@ -574,22 +746,26 @@ Until stage for retry loops and polling operations.
         ```yaml
         stages:
           - name: "Retry API Call"
-            until:
-              condition: "${{ result.success == true }}"
-              max_attempts: 5
-              delay: "${{ attempt * 30 }}"
+            item: 0
+            until: "${{ result.success == true }}"
+            max-loop: 5
             stages:
               - name: "API Request"
                 uses: "api/make_request@latest"
                 with:
                   endpoint: "${{ params.api_endpoint }}"
+              - name: "Increment Attempt"
+                run: "item = ${{ item }} + 1"
         ```
 
 #### Attributes
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `until` | dict | Required | Retry configuration with condition and limits |
+| `item` | Union[str, int, bool] | `0` | Initial value for loop iteration |
+| `until` | str | Required | Condition to stop the loop |
+| `stages` | list[Stage] | Required | Stages to execute in each loop |
+| `max_loop` | int | `10` | Maximum number of loop iterations (1-100) |
 
 ### Raise Stage
 
@@ -602,9 +778,7 @@ Raise stage for simulating errors and testing error handling.
         ```yaml
         stages:
           - name: "Test Error Handling"
-            raise:
-              error_type: "ValueError"
-              message: "Simulated error for testing"
+            raise: "Simulated error for testing"
         ```
 
     === "Conditional Error"
@@ -613,16 +787,31 @@ Raise stage for simulating errors and testing error handling.
         stages:
           - name: "Conditional Error"
             if: "${{ params.simulate_failure == true }}"
-            raise:
-              error_type: "RuntimeError"
-              message: "Simulated failure for testing error paths"
+            raise: "Simulated failure for testing error paths"
         ```
 
 #### Attributes
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `raise` | dict | Required | Error configuration with type and message |
+| `message` | str | Required | Error message to raise (aliased as `raise`) |
+
+### Docker Stage
+
+Docker stage for containerized execution (not yet implemented).
+
+!!! warning "Implementation Status"
+    The Docker stage is currently not implemented and will raise `NotImplementedError`.
+
+#### Attributes
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `image` | str | Required | Docker image URL |
+| `tag` | str | `"latest"` | Docker image tag |
+| `env` | dict[str, Any] | `{}` | Environment variables for container |
+| `volume` | dict[str, Any] | `{}` | Volume mappings |
+| `auth` | dict[str, Any] | `{}` | Docker registry authentication |
 
 ## Advanced Usage
 
@@ -636,7 +825,7 @@ from ddeutil.workflow.stages import BaseStage, Result, SUCCESS
 class CustomStage(BaseStage):
     """Custom stage for specific business logic."""
 
-    def execution(self, params: dict, run_id: str, context: dict) -> Result:
+    def process(self, params: dict, run_id: str, context: dict, **kwargs) -> Result:
         """Custom execution logic."""
         # Your custom logic here
         result = self.process_data(params)
@@ -662,28 +851,28 @@ Combine stages for complex workflows:
 stages:
   - name: "Data Pipeline"
     parallel:
-      - name: "Extract Data"
-        stages:
-          - name: "Download Files"
-            bash: "download_data.sh"
-          - name: "Validate Files"
-            uses: "validation/check_files@latest"
-      - name: "Prepare Environment"
-        stages:
-          - name: "Setup Database"
-            uses: "database/setup@latest"
-          - name: "Configure Services"
-            uses: "config/setup@latest"
+      branch01:
+        - name: "Extract Data"
+          stages:
+            - name: "Download Files"
+              bash: "download_data.sh"
+            - name: "Validate Files"
+              uses: "validation/check_files@latest"
+      branch02:
+        - name: "Prepare Environment"
+          stages:
+            - name: "Setup Database"
+              uses: "database/setup@latest"
+            - name: "Configure Services"
+              uses: "config/setup@latest"
 
   - name: "Process Data"
-    foreach:
-      items: "${{ params.data_sources }}"
-      as: "source"
+    foreach: "${{ params.data_sources }}"
     stages:
-      - name: "Process ${{ source }}"
+      - name: "Process ${{ item }}"
         uses: "processing/transform@latest"
         with:
-          source: "${{ source }}"
+          source: "${{ item }}"
 ```
 
 ### Error Handling Patterns

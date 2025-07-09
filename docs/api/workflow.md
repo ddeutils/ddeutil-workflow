@@ -6,6 +6,64 @@ The Workflow module provides the core orchestration functionality for the workfl
 
 The workflow system implements timeout strategy at the workflow execution layer because the main purpose is to use Workflow as an orchestrator for complex job execution scenarios. The system supports both immediate execution and scheduled execution via cron-like expressions.
 
+## Workflow Execution Flow
+
+```mermaid
+flowchart TD
+    A["Workflow.execute()"] --> B["Generate run_id"]
+    B --> C["Initialize trace and context"]
+    C --> D["Parameterize input params"]
+    D --> E["Create job queue"]
+    E --> F["Initialize ThreadPoolExecutor"]
+    F --> G["Process job queue"]
+
+    G --> H{"Job dependency check"}
+    H -->|WAIT| I["Re-queue job with backoff"]
+    H -->|FAILED| J["Return FAILED Result"]
+    H -->|SKIP| K["Mark job as skipped"]
+    H -->|SUCCESS| L["Submit job for execution"]
+
+    I --> M{"Timeout check"}
+    M -->|No timeout| G
+    M -->|Timeout| N["Cancel all futures"]
+    N --> O["Return TIMEOUT Result"]
+
+    L --> P{"Parallel execution?"}
+    P -->|Yes| Q["Execute in thread pool"]
+    P -->|No| R["Execute sequentially"]
+
+    Q --> S["Collect job results"]
+    R --> S
+    S --> T["Validate final status"]
+    T --> U["Return Result"]
+
+    K --> S
+    J --> U
+    O --> U
+
+    style A fill:#e1f5fe
+    style U fill:#c8e6c9
+    style J fill:#ffcdd2
+    style O fill:#ffcdd2
+```
+
+## Workflow Release Flow
+
+```mermaid
+flowchart TD
+    A["Workflow.release()"] --> B["Generate run_id"]
+    B --> C["Validate release datetime"]
+    C --> D["Initialize trace and context"]
+    D --> E["Create release data"]
+    E --> F["Template parameters with release data"]
+    F --> G["Execute workflow"]
+    G --> H["Write audit log"]
+    H --> I["Return Result"]
+
+    style A fill:#e1f5fe
+    style I fill:#c8e6c9
+```
+
 ## Quick Start
 
 ```python
@@ -48,8 +106,11 @@ The Workflow class is the core component of the workflow orchestration system. I
 | `name` | `str` | - | Unique workflow identifier |
 | `desc` | `str \| None` | `None` | Workflow description supporting markdown content |
 | `params` | `dict[str, Param]` | `{}` | Parameter definitions for the workflow |
-| `on` | `list[Crontab]` | `[]` | Schedule definitions using cron expressions |
+| `on` | `Event` | `Event()` | Event definitions for the workflow |
 | `jobs` | `dict[str, Job]` | `{}` | Collection of jobs within this workflow |
+| `tags` | `list[str]` | `[]` | List of tags for grouping workflows |
+| `created_at` | `datetime` | `get_dt_now()` | Workflow creation timestamp |
+| `updated_dt` | `datetime` | `get_dt_now()` | Workflow last update timestamp |
 
 #### Methods
 
@@ -102,6 +163,73 @@ Release workflow execution at specified datetime.
 
 **Returns:**
 - `Result`: Release execution result
+
+##### `rerun(context, *, run_id=None, event=None, timeout=3600, max_job_parallel=2)`
+
+Re-execute workflow with previous context data.
+
+**Parameters:**
+- `context` (dict): Previous execution context
+- `run_id` (str, optional): Unique run identifier
+- `event` (Event, optional): Threading event for cancellation control
+- `timeout` (float): Maximum execution time in seconds
+- `max_job_parallel` (int): Maximum number of concurrent jobs
+
+**Returns:**
+- `Result`: Re-execution result
+
+##### `execute_job(job, run_id, context, *, parent_run_id=None, event=None)`
+
+Execute a single job within the workflow.
+
+**Parameters:**
+- `job` (Job): Job instance to execute
+- `run_id` (str): Execution run identifier
+- `context` (dict): Execution context
+- `parent_run_id` (str, optional): Parent run identifier
+- `event` (Event, optional): Threading event for cancellation control
+
+**Returns:**
+- `tuple[Status, DictData]`: Job execution status and context
+
+##### `job(name)`
+
+Get a job by name or ID.
+
+**Parameters:**
+- `name` (str): Job name or ID
+
+**Returns:**
+- `Job`: Job instance
+
+**Raises:**
+- `ValueError`: If job not found
+
+##### `parameterize(params)`
+
+Prepare and validate parameters for execution.
+
+**Parameters:**
+- `params` (dict): Input parameters
+
+**Returns:**
+- `dict`: Validated and prepared parameters
+
+**Raises:**
+- `WorkflowError`: If required parameters are missing
+
+##### `validate_release(dt)`
+
+Validate release datetime against workflow schedule.
+
+**Parameters:**
+- `dt` (datetime): Release datetime to validate
+
+**Returns:**
+- `datetime`: Validated release datetime
+
+**Raises:**
+- `WorkflowError`: If release datetime not supported
 
 ### ReleaseType
 
@@ -174,6 +302,28 @@ result = workflow.release(
     params={'mode': 'batch'},
     release_type=NORMAL,
     timeout=3600
+)
+```
+
+### Workflow Re-execution
+
+```python
+from ddeutil.workflow import Workflow
+
+workflow = Workflow.from_conf('failed-pipeline')
+
+# Re-execute failed workflow
+previous_context = {
+    'params': {'input_file': '/data/input.csv'},
+    'jobs': {
+        'setup': {'status': 'SUCCESS'},
+        'process': {'status': 'FAILED', 'errors': {...}}
+    }
+}
+
+result = workflow.rerun(
+    context=previous_context,
+    timeout=1800
 )
 ```
 
