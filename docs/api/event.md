@@ -1,819 +1,601 @@
 # Event API Reference
 
-The Event module provides threading event management for workflow execution control, enabling cancellation, timeout handling, and coordination between concurrent operations.
+The Event module provides cron-based scheduling and event-driven triggers for workflow orchestration, enabling time-based execution and release-based triggering.
 
 ## Overview
 
-The Event module implements a threading-based event system that provides:
+The Event module implements a cron-based scheduling system that provides:
 
-- **Cancellation control**: Graceful termination of long-running operations
-- **Timeout management**: Automatic cancellation after specified time limits
-- **Thread coordination**: Synchronization between concurrent workflow operations
-- **Resource cleanup**: Proper cleanup of resources when operations are cancelled
-- **Status monitoring**: Real-time status tracking of event states
+- **Cron scheduling**: Traditional cron expressions for time-based triggers
+- **Interval scheduling**: Simple interval-based scheduling (daily, weekly, monthly)
+- **Year-aware scheduling**: Extended cron with year support for tools like AWS Glue
+- **Release events**: Workflow-to-workflow triggering based on completion events
+- **Timezone support**: Full timezone handling for global deployments
+- **Validation**: Comprehensive validation of cron expressions and schedules
 
 ## Quick Start
 
 ```python
-from ddeutil.workflow.event import Event
-import threading
-import time
+from ddeutil.workflow.event import Crontab, CrontabValue, Event
+from datetime import datetime
 
-# Create an event for cancellation control
-event = Event()
+# Create a daily schedule at 9:30 AM
+daily_schedule = CrontabValue(
+    interval="daily",
+    time="09:30",
+    timezone="America/New_York"
+)
 
-# Start a long-running operation in a separate thread
-def long_operation():
-    for i in range(100):
-        if event.is_set():  # Check if cancelled
-            print("Operation cancelled")
-            return
-        time.sleep(0.1)
-        print(f"Processing step {i}")
-    print("Operation completed")
+# Create a traditional cron schedule
+cron_schedule = Crontab(
+    cronjob="0 9 * * 1-5",  # 9 AM on weekdays
+    timezone="UTC"
+)
 
-# Start the operation
-thread = threading.Thread(target=long_operation)
-thread.start()
+# Create an event with multiple schedules
+event = Event(
+    schedule=[daily_schedule, cron_schedule],
+    release=["upstream-workflow"]
+)
 
-# Cancel after 2 seconds
-time.sleep(2)
-event.set()  # Signal cancellation
-thread.join()
-
-print(f"Event status: {event.is_set()}")
+# Generate next execution time
+runner = cron_schedule.generate(datetime.now())
+next_run = runner.next
+print(f"Next execution: {next_run}")
 ```
 
 ## Classes
 
-### Event
+### BaseCrontab
 
-Threading event wrapper for workflow execution control.
-
-The Event class wraps Python's threading.Event to provide enhanced functionality for workflow execution control. It supports cancellation signals, timeout handling, and status monitoring for concurrent operations.
+Base class for crontab-based scheduling models.
 
 #### Attributes
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `_event` | `threading.Event` | - | Internal threading event object |
-| `_timeout` | `float \| None` | `None` | Timeout duration in seconds |
-| `_start_time` | `float \| None` | `None` | Event start timestamp |
+| `extras` | `DictData` | `{}` | Additional parameters to pass to the CronJob field |
+| `tz` | `TimeZoneName` | `"UTC"` | Timezone string value (alias: timezone) |
+
+### CrontabValue
+
+Crontab model using interval-based specification for simplified scheduling.
+
+#### Attributes
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `interval` | `Interval` | - | Scheduling interval string ('daily', 'weekly', 'monthly') |
+| `day` | `str` | `None` | Day specification for weekly/monthly schedules |
+| `time` | `str` | `"00:00"` | Time of day in 'HH:MM' format |
+| `tz` | `TimeZoneName` | `"UTC"` | Timezone string value |
 
 #### Methods
 
-##### `__init__(timeout=None)`
+##### `cronjob` (property)
 
-Initialize Event with optional timeout.
+Get CronJob object built from interval format.
+
+**Returns:**
+- `CronJob`: CronJob instance configured with interval-based schedule
+
+##### `generate(start)`
+
+Generate CronRunner from initial datetime.
 
 **Parameters:**
-- `timeout` (float, optional): Timeout duration in seconds
-
-##### `set()`
-
-Set the event flag to True, signaling cancellation or completion.
+- `start` (Union[str, datetime]): Starting datetime for schedule generation
 
 **Returns:**
-- `None`
+- `CronRunner`: CronRunner instance for schedule generation
 
-##### `clear()`
+##### `next(start)`
 
-Clear the event flag to False, resetting the event state.
-
-**Returns:**
-- `None`
-
-##### `is_set()`
-
-Check if the event flag is set to True.
-
-**Returns:**
-- `bool`: True if event is set, False otherwise
-
-##### `wait(timeout=None)`
-
-Wait for the event to be set, with optional timeout.
+Get next scheduled datetime after given start time.
 
 **Parameters:**
-- `timeout` (float, optional): Maximum wait time in seconds
+- `start` (Union[str, datetime]): Starting datetime for schedule generation
 
 **Returns:**
-- `bool`: True if event was set, False if timeout occurred
+- `CronRunner`: CronRunner instance positioned at next scheduled time
 
-##### `check_timeout()`
+### Crontab
 
-Check if the event has timed out based on the configured timeout.
+Cron event model wrapping CronJob functionality for traditional cron expressions.
+
+#### Attributes
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `cronjob` | `CronJob` | - | CronJob instance for schedule validation and generation |
+| `tz` | `TimeZoneName` | `"UTC"` | Timezone string value |
+
+#### Methods
+
+##### `generate(start)`
+
+Generate schedule runner from start time.
+
+**Parameters:**
+- `start` (Union[str, datetime]): Starting datetime for schedule generation
 
 **Returns:**
-- `bool`: True if timeout has occurred, False otherwise
+- `CronRunner`: CronRunner instance for schedule generation
+
+##### `next(start)`
+
+Get runner positioned at next scheduled time.
+
+**Parameters:**
+- `start` (Union[str, datetime]): Starting datetime for schedule generation
+
+**Returns:**
+- `CronRunner`: CronRunner instance positioned at next scheduled time
+
+### CrontabYear
+
+Cron event model with enhanced year-based scheduling, particularly useful for tools like AWS Glue.
+
+#### Attributes
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `cronjob` | `CronJobYear` | - | CronJobYear instance for year-aware schedule validation |
+| `tz` | `TimeZoneName` | `"UTC"` | Timezone string value |
+
+### Event
+
+Event model for defining workflow triggers combining scheduled and release-based events.
+
+#### Attributes
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `schedule` | `list[Cron]` | `[]` | List of cron schedules for time-based triggers |
+| `release` | `list[str]` | `[]` | List of workflow names for release-based triggers |
+
+## Functions
+
+### interval2crontab(interval, *, day=None, time="00:00")
+
+Convert interval specification to cron expression.
+
+**Parameters:**
+- `interval` (Interval): Scheduling interval ('daily', 'weekly', or 'monthly')
+- `day` (str, optional): Day of week for weekly intervals or monthly schedules
+- `time` (str): Time of day in 'HH:MM' format
+
+**Returns:**
+- `str`: Generated crontab expression string
 
 ## Usage Examples
 
-### Basic Event Control
+### Basic Cron Scheduling
 
 ```python
-from ddeutil.workflow.event import Event
-import threading
-import time
+from ddeutil.workflow.event import Crontab
+from datetime import datetime
 
-# Create event with 5-second timeout
-event = Event(timeout=5.0)
+# Create a cron schedule for every weekday at 9 AM
+schedule = Crontab(
+    cronjob="0 9 * * 1-5",
+    timezone="America/New_York"
+)
 
-def monitored_operation():
-    """Operation that checks for cancellation."""
-    step = 0
-    while step < 50:
-        if event.is_set():
-            print("Operation cancelled by event")
-            return
-
-        if event.check_timeout():
-            print("Operation timed out")
-            return
-
-        # Simulate work
-        time.sleep(0.1)
-        step += 1
-        print(f"Completed step {step}")
-
-    print("Operation completed successfully")
-
-# Start operation in background thread
-thread = threading.Thread(target=monitored_operation)
-thread.start()
-
-# Let it run for 2 seconds, then cancel
-time.sleep(2.0)
-event.set()
-thread.join()
+# Generate next execution times
+runner = schedule.generate(datetime.now())
+print(f"Next execution: {runner.next}")
+print(f"Following execution: {runner.next}")
 ```
 
-### Workflow Cancellation Control
+### Interval-Based Scheduling
 
 ```python
-from ddeutil.workflow import Workflow
-from ddeutil.workflow.event import Event
-import threading
+from ddeutil.workflow.event import CrontabValue
 
-# Create cancellation event
-cancel_event = Event(timeout=300)  # 5-minute timeout
+# Daily schedule at 2:30 PM
+daily_schedule = CrontabValue(
+    interval="daily",
+    time="14:30",
+    timezone="UTC"
+)
 
-def execute_workflow_with_cancellation():
-    """Execute workflow with cancellation support."""
-    workflow = Workflow.from_conf('long-running-pipeline')
+# Weekly schedule on Friday at 6 PM
+weekly_schedule = CrontabValue(
+    interval="weekly",
+    day="friday",
+    time="18:00",
+    timezone="Europe/London"
+)
 
-    try:
-        result = workflow.execute(
-            params={'batch_size': 10000},
-            event=cancel_event
-        )
-        return result
-    except Exception as e:
-        if cancel_event.is_set():
-            print("Workflow cancelled by user")
-        elif cancel_event.check_timeout():
-            print("Workflow timed out")
-        else:
-            print(f"Workflow failed: {e}")
-        raise
+# Monthly schedule on the 1st at midnight
+monthly_schedule = CrontabValue(
+    interval="monthly",
+    time="00:00",
+    timezone="Asia/Tokyo"
+)
 
-# Start workflow execution
-workflow_thread = threading.Thread(target=execute_workflow_with_cancellation)
-workflow_thread.start()
-
-# Simulate user cancellation after 30 seconds
-import time
-time.sleep(30)
-cancel_event.set()
-workflow_thread.join()
+# Generate next execution
+runner = weekly_schedule.generate(datetime.now())
+next_run = runner.next
+print(f"Next Friday 6 PM: {next_run}")
 ```
 
-### Multi-Thread Coordination
+### Year-Aware Scheduling
 
 ```python
-from ddeutil.workflow.event import Event
-import threading
-import time
+from ddeutil.workflow.event import CrontabYear
 
-# Shared event for coordination
-coordinator_event = Event()
+# AWS Glue compatible schedule with year
+glue_schedule = CrontabYear(
+    cronjob="0 12 1 * ? 2024",  # First day of every month at noon in 2024
+    timezone="UTC"
+)
 
-def worker_thread(worker_id, event):
-    """Worker thread that responds to coordination events."""
-    print(f"Worker {worker_id} started")
+# Generate schedule for specific year
+runner = glue_schedule.generate(datetime(2024, 1, 1))
+executions = []
+for _ in range(12):  # Get all monthly executions
+    executions.append(runner.next)
 
-    while not event.is_set():
-        # Do work
-        time.sleep(0.5)
-        print(f"Worker {worker_id} processing...")
-
-    print(f"Worker {worker_id} stopping")
-
-# Start multiple worker threads
-workers = []
-for i in range(3):
-    worker = threading.Thread(target=worker_thread, args=(i, coordinator_event))
-    workers.append(worker)
-    worker.start()
-
-# Let workers run for 3 seconds
-time.sleep(3)
-
-# Signal all workers to stop
-print("Signaling workers to stop...")
-coordinator_event.set()
-
-# Wait for all workers to complete
-for worker in workers:
-    worker.join()
-
-print("All workers stopped")
+print("Monthly executions in 2024:")
+for execution in executions:
+    print(f"  {execution}")
 ```
 
-### Timeout Management
+### Complex Event Configuration
 
 ```python
-from ddeutil.workflow.event import Event
-import threading
-import time
+from ddeutil.workflow.event import Event, Crontab, CrontabValue
 
-def operation_with_timeout(timeout_seconds):
-    """Execute operation with timeout control."""
-    event = Event(timeout=timeout_seconds)
+# Create multiple schedules
+morning_schedule = CrontabValue(
+    interval="daily",
+    time="09:00",
+    timezone="UTC"
+)
 
-    def timed_operation():
-        start_time = time.time()
-        step = 0
+evening_schedule = Crontab(
+    cronjob="0 18 * * 1-5",  # 6 PM on weekdays
+    timezone="UTC"
+)
 
-        while step < 100:
-            if event.is_set():
-                print("Operation cancelled")
-                return
+weekend_schedule = CrontabValue(
+    interval="weekly",
+    day="saturday",
+    time="10:00",
+    timezone="UTC"
+)
 
-            if event.check_timeout():
-                elapsed = time.time() - start_time
-                print(f"Operation timed out after {elapsed:.2f} seconds")
-                return
+# Create event with multiple triggers
+event = Event(
+    schedule=[morning_schedule, evening_schedule, weekend_schedule],
+    release=["data-ingestion-workflow", "validation-workflow"]
+)
 
-            # Simulate work
-            time.sleep(0.1)
-            step += 1
-
-        print("Operation completed successfully")
-
-    # Start operation
-    thread = threading.Thread(target=timed_operation)
-    thread.start()
-
-    # Wait for completion or timeout
-    thread.join()
-
-    return event.is_set()
-
-# Test with different timeouts
-print("Testing 2-second timeout:")
-operation_with_timeout(2.0)
-
-print("\nTesting 10-second timeout:")
-operation_with_timeout(10.0)
+# This workflow will trigger:
+# 1. Daily at 9 AM
+# 2. Weekdays at 6 PM
+# 3. Saturdays at 10 AM
+# 4. When data-ingestion-workflow completes
+# 5. When validation-workflow completes
 ```
 
-### Resource Cleanup with Events
+### Timezone Handling
 
 ```python
-from ddeutil.workflow.event import Event
-import threading
-import time
-import tempfile
-import os
+from ddeutil.workflow.event import Crontab
+from datetime import datetime
 
-def resource_intensive_operation():
-    """Operation that manages resources with cleanup."""
-    event = Event(timeout=60)  # 1-minute timeout
+# Create schedules in different timezones
+ny_schedule = Crontab(
+    cronjob="0 9 * * *",  # 9 AM Eastern
+    timezone="America/New_York"
+)
 
-    # Create temporary resources
-    temp_file = tempfile.NamedTemporaryFile(delete=False)
-    temp_dir = tempfile.mkdtemp()
+london_schedule = Crontab(
+    cronjob="0 9 * * *",  # 9 AM GMT
+    timezone="Europe/London"
+)
 
-    try:
-        def cleanup_resources():
-            """Clean up resources when cancelled or completed."""
-            print("Cleaning up resources...")
-            try:
-                os.unlink(temp_file.name)
-                os.rmdir(temp_dir)
-                print("Resources cleaned up successfully")
-            except Exception as e:
-                print(f"Error during cleanup: {e}")
+tokyo_schedule = Crontab(
+    cronjob="0 9 * * *",  # 9 AM JST
+    timezone="Asia/Tokyo"
+)
 
-        def main_operation():
-            """Main operation with periodic cancellation checks."""
-            step = 0
-            while step < 1000:
-                if event.is_set():
-                    print("Operation cancelled, cleaning up...")
-                    cleanup_resources()
-                    return
+# Generate next execution times
+now = datetime.now()
+schedules = [
+    ("New York", ny_schedule),
+    ("London", london_schedule),
+    ("Tokyo", tokyo_schedule)
+]
 
-                if event.check_timeout():
-                    print("Operation timed out, cleaning up...")
-                    cleanup_resources()
-                    return
-
-                # Simulate work with resource usage
-                temp_file.write(f"Step {step}\n".encode())
-                temp_file.flush()
-
-                time.sleep(0.1)
-                step += 1
-
-            print("Operation completed, cleaning up...")
-            cleanup_resources()
-
-        # Start operation
-        thread = threading.Thread(target=main_operation)
-        thread.start()
-
-        # Simulate cancellation after 3 seconds
-        time.sleep(3)
-        event.set()
-
-        thread.join()
-
-    except Exception as e:
-        print(f"Error in operation: {e}")
-        cleanup_resources()
-
-# Run resource-intensive operation
-resource_intensive_operation()
+for name, schedule in schedules:
+    runner = schedule.generate(now)
+    next_run = runner.next
+    print(f"{name}: {next_run}")
 ```
 
-### Event-Based Workflow Orchestration
+### Interval Conversion
 
 ```python
-from ddeutil.workflow.event import Event
-import threading
-import time
+from ddeutil.workflow.event import interval2crontab
 
-class WorkflowOrchestrator:
-    """Orchestrator for managing multiple workflows with event control."""
+# Convert various intervals to cron expressions
+examples = [
+    ("daily", None, "01:30"),
+    ("weekly", "friday", "18:30"),
+    ("monthly", None, "00:00"),
+    ("monthly", "tuesday", "12:00"),
+]
 
-    def __init__(self):
-        self.global_cancel_event = Event()
-        self.workflow_events = {}
-        self.workflow_threads = {}
+for interval, day, time in examples:
+    cron_expr = interval2crontab(interval, day=day, time=time)
+    print(f"{interval} {day or ''} at {time}: {cron_expr}")
 
-    def start_workflow(self, workflow_id, workflow_func, timeout=300):
-        """Start a workflow with its own event control."""
-        if workflow_id in self.workflow_events:
-            raise ValueError(f"Workflow {workflow_id} already running")
-
-        # Create workflow-specific event
-        workflow_event = Event(timeout=timeout)
-        self.workflow_events[workflow_id] = workflow_event
-
-        def workflow_wrapper():
-            """Wrapper that handles both global and workflow-specific events."""
-            try:
-                workflow_func(workflow_event)
-            except Exception as e:
-                print(f"Workflow {workflow_id} failed: {e}")
-            finally:
-                # Clean up
-                if workflow_id in self.workflow_events:
-                    del self.workflow_events[workflow_id]
-                if workflow_id in self.workflow_threads:
-                    del self.workflow_threads[workflow_id]
-
-        # Start workflow thread
-        thread = threading.Thread(target=workflow_wrapper)
-        self.workflow_threads[workflow_id] = thread
-        thread.start()
-
-        print(f"Started workflow {workflow_id}")
-
-    def cancel_workflow(self, workflow_id):
-        """Cancel a specific workflow."""
-        if workflow_id in self.workflow_events:
-            self.workflow_events[workflow_id].set()
-            print(f"Cancelled workflow {workflow_id}")
-
-    def cancel_all_workflows(self):
-        """Cancel all running workflows."""
-        self.global_cancel_event.set()
-        for workflow_id in list(self.workflow_events.keys()):
-            self.cancel_workflow(workflow_id)
-        print("Cancelled all workflows")
-
-    def wait_for_workflow(self, workflow_id, timeout=None):
-        """Wait for a specific workflow to complete."""
-        if workflow_id in self.workflow_threads:
-            self.workflow_threads[workflow_id].join(timeout=timeout)
-
-    def wait_for_all_workflows(self):
-        """Wait for all workflows to complete."""
-        for thread in self.workflow_threads.values():
-            thread.join()
-
-# Example usage
-def sample_workflow(event):
-    """Sample workflow that responds to cancellation events."""
-    step = 0
-    while step < 50:
-        if event.is_set():
-            print("Workflow cancelled")
-            return
-        time.sleep(0.2)
-        step += 1
-    print("Workflow completed")
-
-# Create orchestrator
-orchestrator = WorkflowOrchestrator()
-
-# Start multiple workflows
-orchestrator.start_workflow("workflow-1", sample_workflow, timeout=10)
-orchestrator.start_workflow("workflow-2", sample_workflow, timeout=15)
-orchestrator.start_workflow("workflow-3", sample_workflow, timeout=20)
-
-# Let them run for 3 seconds
-time.sleep(3)
-
-# Cancel specific workflow
-orchestrator.cancel_workflow("workflow-1")
-
-# Let remaining workflows run for 2 more seconds
-time.sleep(2)
-
-# Cancel all workflows
-orchestrator.cancel_all_workflows()
-
-# Wait for all to complete
-orchestrator.wait_for_all_workflows()
+# Output:
+# daily  at 01:30: 1 30 * * *
+# weekly friday at 18:30: 18 30 * * 5
+# monthly  at 00:00: 0 0 1 * *
+# monthly tuesday at 12:00: 12 0 1 * 2
 ```
 
-### Event-Based Monitoring
+### Release-Based Triggering
 
 ```python
 from ddeutil.workflow.event import Event
-import threading
-import time
-import psutil
 
-class SystemMonitor:
-    """Monitor system resources with event-based control."""
+# Create event that triggers on workflow completion
+downstream_event = Event(
+    release=[
+        "etl-pipeline",
+        "data-validation",
+        "quality-check"
+    ]
+)
 
-    def __init__(self, threshold_cpu=80, threshold_memory=80):
-        self.threshold_cpu = threshold_cpu
-        self.threshold_memory = threshold_memory
-        self.stop_event = Event()
-        self.alert_event = Event()
-
-    def start_monitoring(self):
-        """Start system monitoring in background thread."""
-        def monitor_loop():
-            while not self.stop_event.is_set():
-                # Check CPU usage
-                cpu_percent = psutil.cpu_percent(interval=1)
-                memory_percent = psutil.virtual_memory().percent
-
-                print(f"CPU: {cpu_percent:.1f}%, Memory: {memory_percent:.1f}%")
-
-                # Trigger alert if thresholds exceeded
-                if cpu_percent > self.threshold_cpu or memory_percent > self.threshold_memory:
-                    self.alert_event.set()
-                    print("System resource threshold exceeded!")
-
-                time.sleep(2)
-
-        thread = threading.Thread(target=monitor_loop)
-        thread.start()
-        return thread
-
-    def stop_monitoring(self):
-        """Stop system monitoring."""
-        self.stop_event.set()
-
-    def wait_for_alert(self, timeout=None):
-        """Wait for system alert."""
-        return self.alert_event.wait(timeout=timeout)
-
-# Example usage
-monitor = SystemMonitor(threshold_cpu=50, threshold_memory=70)
-monitor_thread = monitor.start_monitoring()
-
-# Simulate high CPU usage
-def cpu_intensive_task():
-    """Simulate CPU-intensive work."""
-    while True:
-        # Busy loop to consume CPU
-        pass
-
-# Start CPU-intensive task
-cpu_thread = threading.Thread(target=cpu_intensive_task)
-cpu_thread.start()
-
-# Wait for alert
-if monitor.wait_for_alert(timeout=10):
-    print("Received system alert!")
-
-    # Stop CPU-intensive task
-    cpu_thread.join(timeout=1)
-    if cpu_thread.is_alive():
-        print("Force stopping CPU task...")
-
-# Stop monitoring
-monitor.stop_monitoring()
-monitor_thread.join()
+# This event will trigger when any of the specified workflows complete
+# Useful for creating dependent workflow chains
 ```
 
-## Event Patterns
-
-### Producer-Consumer Pattern
+### Advanced Scheduling Patterns
 
 ```python
-from ddeutil.workflow.event import Event
-import threading
-import queue
-import time
+from ddeutil.workflow.event import Crontab, CrontabValue, Event
 
-class ProducerConsumer:
-    """Producer-consumer pattern with event-based control."""
+# Business hours schedule (9 AM - 5 PM, weekdays)
+business_hours_schedules = [
+    Crontab(cronjob=f"0 {hour} * * 1-5", timezone="UTC")
+    for hour in range(9, 18)
+]
 
-    def __init__(self, max_queue_size=10):
-        self.queue = queue.Queue(maxsize=max_queue_size)
-        self.stop_event = Event()
-        self.producer_thread = None
-        self.consumer_thread = None
+# Quarter-end schedule (last day of quarter)
+quarter_end_schedule = Crontab(
+    cronjob="0 23 31 3,6,9,12 *",  # Last day of quarters at 11 PM
+    timezone="UTC"
+)
 
-    def producer(self):
-        """Producer that generates items."""
-        item = 0
-        while not self.stop_event.is_set():
-            try:
-                self.queue.put(item, timeout=1)
-                print(f"Produced item {item}")
-                item += 1
-                time.sleep(0.5)
-            except queue.Full:
-                print("Queue full, waiting...")
+# Monthly reporting schedule (first Monday of each month)
+monthly_reporting = Crontab(
+    cronjob="0 8 1-7 * 1",  # 8 AM on first Monday
+    timezone="UTC"
+)
 
-    def consumer(self):
-        """Consumer that processes items."""
-        while not self.stop_event.is_set():
-            try:
-                item = self.queue.get(timeout=1)
-                print(f"Consumed item {item}")
-                self.queue.task_done()
-                time.sleep(0.2)
-            except queue.Empty:
-                print("Queue empty, waiting...")
-
-    def start(self):
-        """Start producer and consumer threads."""
-        self.producer_thread = threading.Thread(target=self.producer)
-        self.consumer_thread = threading.Thread(target=self.consumer)
-
-        self.producer_thread.start()
-        self.consumer_thread.start()
-
-    def stop(self):
-        """Stop producer and consumer threads."""
-        self.stop_event.set()
-
-        if self.producer_thread:
-            self.producer_thread.join()
-        if self.consumer_thread:
-            self.consumer_thread.join()
-
-# Example usage
-pc = ProducerConsumer(max_queue_size=5)
-pc.start()
-
-# Let it run for 5 seconds
-time.sleep(5)
-
-# Stop the system
-pc.stop()
+# Combine all schedules
+comprehensive_event = Event(
+    schedule=business_hours_schedules + [
+        quarter_end_schedule,
+        monthly_reporting
+    ],
+    release=["upstream-data-pipeline"]
+)
 ```
 
-### Barrier Pattern
+### Schedule Validation and Debugging
 
 ```python
-from ddeutil.workflow.event import Event
-import threading
-import time
+from ddeutil.workflow.event import Crontab, CrontabValue
+from datetime import datetime, timedelta
 
-class EventBarrier:
-    """Barrier pattern using events for synchronization."""
+def validate_schedule(schedule, hours_ahead=24):
+    """Validate and debug schedule generation."""
+    now = datetime.now()
+    future = now + timedelta(hours=hours_ahead)
 
-    def __init__(self, parties):
-        self.parties = parties
-        self.count = parties
-        self.event = Event()
-        self.lock = threading.Lock()
+    print(f"Schedule: {schedule}")
+    print(f"Timezone: {schedule.tz}")
 
-    def wait(self):
-        """Wait for all parties to reach the barrier."""
-        with self.lock:
-            self.count -= 1
-            if self.count == 0:
-                # Last party to arrive, release all
-                self.event.set()
+    runner = schedule.generate(now)
+    executions = []
 
-        # Wait for release
-        self.event.wait()
+    current = runner.next
+    while current <= future:
+        executions.append(current)
+        current = runner.next
 
-        # Reset for next use
-        with self.lock:
-            self.count += 1
-            if self.count == self.parties:
-                self.event.clear()
+    print(f"Next {len(executions)} executions:")
+    for i, execution in enumerate(executions):
+        print(f"  {i+1}. {execution}")
 
-def worker(worker_id, barrier):
-    """Worker that waits at barrier."""
-    print(f"Worker {worker_id} starting")
-    time.sleep(worker_id * 0.5)  # Simulate different start times
+    return executions
 
-    print(f"Worker {worker_id} waiting at barrier")
-    barrier.wait()
+# Test different schedules
+schedules = [
+    Crontab(cronjob="0 */4 * * *", timezone="UTC"),  # Every 4 hours
+    CrontabValue(interval="daily", time="12:00", timezone="UTC"),
+    Crontab(cronjob="0 9 * * 1-5", timezone="America/New_York"),
+]
 
-    print(f"Worker {worker_id} passed barrier")
-
-# Create barrier for 3 workers
-barrier = EventBarrier(3)
-
-# Start workers
-threads = []
-for i in range(3):
-    thread = threading.Thread(target=worker, args=(i, barrier))
-    threads.append(thread)
-    thread.start()
-
-# Wait for all workers to complete
-for thread in threads:
-    thread.join()
-
-print("All workers completed")
+for schedule in schedules:
+    validate_schedule(schedule)
+    print("-" * 50)
 ```
 
 ## Best Practices
 
-### 1. Event Design
+### 1. Schedule Design
 
-- **Clear purpose**: Use events for specific control purposes (cancellation, coordination, etc.)
-- **Timeout handling**: Always set appropriate timeouts for long-running operations
-- **Resource cleanup**: Ensure proper cleanup when events are triggered
-- **Status checking**: Regularly check event status in long-running loops
+- **Clear expressions**: Use readable cron expressions or interval formats
+- **Timezone awareness**: Always specify appropriate timezones
+- **Validation**: Test schedule generation before deployment
+- **Documentation**: Document complex cron expressions
 
-### 2. Thread Safety
+### 2. Performance Considerations
 
-- **Atomic operations**: Use events for thread-safe signaling
-- **Race conditions**: Avoid race conditions by checking event status before operations
-- **Memory barriers**: Events provide implicit memory barriers for thread coordination
-- **Deadlock prevention**: Design event usage to prevent deadlocks
+- **Limit schedules**: Keep the number of schedules per event reasonable (≤10)
+- **Efficient expressions**: Use efficient cron expressions to minimize CPU usage
+- **Timezone caching**: Timezone objects are cached for performance
+- **Memory usage**: Large numbers of schedules can impact memory
 
-### 3. Performance
+### 3. Error Handling
 
-- **Efficient checking**: Check event status at appropriate intervals
-- **Minimal overhead**: Events have minimal performance impact
-- **Resource management**: Clean up event-related resources promptly
-- **Monitoring**: Monitor event usage for performance bottlenecks
+- **Invalid expressions**: Handle cron expression validation errors
+- **Timezone errors**: Validate timezone strings
+- **Schedule conflicts**: Avoid overlapping schedules that might cause issues
+- **Resource limits**: Monitor resource usage with frequent schedules
 
-### 4. Error Handling
+### 4. Debugging
 
-- **Exception safety**: Handle exceptions properly in event-driven code
-- **Timeout handling**: Implement proper timeout handling for all operations
-- **Graceful shutdown**: Ensure graceful shutdown when events are triggered
-- **Error propagation**: Propagate errors appropriately in event handlers
+- **Schedule testing**: Test schedules with different start times
+- **Timezone verification**: Verify timezone behavior with daylight saving time
+- **Expression validation**: Validate cron expressions before deployment
+- **Execution tracking**: Monitor actual execution times vs. scheduled times
+- **Use logging**: Enable debug logging for schedule processing
 
-### 5. Debugging
+## Validation Rules
 
-- **Event logging**: Log event state changes for debugging
-- **Timeout debugging**: Track timeout occurrences and durations
-- **Thread monitoring**: Monitor thread states during event operations
-- **Resource tracking**: Track resource usage in event-driven operations
+### Schedule Validation
 
-## Troubleshooting
+The Event model enforces several validation rules:
 
-### Common Issues
+1. **No duplicate schedules**: Each cron expression must be unique
+2. **Timezone consistency**: All schedules in an event must use the same timezone
+3. **Schedule limit**: Maximum of 10 schedules per event
+4. **Valid expressions**: All cron expressions must be syntactically valid
 
-#### Event Not Triggering
+### Interval Validation
 
-```python
-# Problem: Event not triggering as expected
-event = Event()
-
-def check_event_status():
-    """Debug event status."""
-    print(f"Event is set: {event.is_set()}")
-    print(f"Event timeout check: {event.check_timeout()}")
-
-# Check event status before and after setting
-check_event_status()
-event.set()
-check_event_status()
-```
-
-#### Timeout Issues
-
-```python
-# Problem: Timeout not working as expected
-import time
-
-event = Event(timeout=5.0)
-start_time = time.time()
-
-def monitor_timeout():
-    """Monitor timeout behavior."""
-    while not event.is_set():
-        elapsed = time.time() - start_time
-        print(f"Elapsed time: {elapsed:.2f}s")
-
-        if event.check_timeout():
-            print("Timeout detected")
-            break
-
-        time.sleep(0.5)
-
-monitor_timeout()
-```
-
-#### Thread Coordination Issues
-
-```python
-# Problem: Threads not coordinating properly
-from ddeutil.workflow.event import Event
-import threading
-
-coordinator = Event()
-threads = []
-
-def worker(worker_id):
-    """Worker that coordinates with others."""
-    print(f"Worker {worker_id} starting")
-    coordinator.wait()  # Wait for coordination signal
-    print(f"Worker {worker_id} continuing")
-
-# Start multiple workers
-for i in range(3):
-    thread = threading.Thread(target=worker, args=(i,))
-    threads.append(thread)
-    thread.start()
-
-# Let workers start, then coordinate
-time.sleep(1)
-print("Coordinating workers...")
-coordinator.set()
-
-# Wait for all workers
-for thread in threads:
-    thread.join()
-```
-
-### Debugging Tips
-
-1. **Enable event logging**: Log event state changes for debugging
-2. **Monitor thread states**: Check thread states during event operations
-3. **Use timeouts**: Always set timeouts to prevent indefinite waiting
-4. **Check event status**: Regularly check event status in long-running operations
-5. **Resource cleanup**: Ensure proper cleanup when events are triggered
+- **Time format**: Time must be in 'HH:MM' format
+- **Day validation**: Day names must be valid (Monday, Tuesday, etc.)
+- **Interval types**: Only 'daily', 'weekly', 'monthly' are supported
 
 ## Configuration Reference
+
+### Supported Cron Formats
+
+| Format | Example | Description |
+|--------|---------|-------------|
+| Standard | `0 9 * * 1-5` | Minute Hour Day Month DayOfWeek |
+| Year-aware | `0 9 * * ? 2024` | Minute Hour Day Month DayOfWeek Year |
+
+### Timezone Support
+
+The module uses `TimeZoneName` validation from `pydantic_extra_types`, supporting:
+- IANA timezone names (e.g., 'America/New_York')
+- UTC and GMT
+- Common timezone abbreviations
 
 ### Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `WORKFLOW_CORE_EVENT_DEFAULT_TIMEOUT` | `300` | Default event timeout in seconds |
-| `WORKFLOW_CORE_EVENT_CHECK_INTERVAL` | `0.1` | Default event check interval in seconds |
+| `WORKFLOW_EVENT_DEFAULT_TIMEZONE` | `UTC` | Default timezone for schedules |
+| `WORKFLOW_EVENT_MAX_SCHEDULES` | `10` | Maximum schedules per event |
 
-### Event Usage Patterns
+## Common Patterns
+
+### Data Pipeline Scheduling
 
 ```python
-# Basic cancellation pattern
-event = Event(timeout=60)
-try:
-    long_running_operation(event)
-except Exception as e:
-    if event.is_set():
-        print("Operation cancelled")
-    elif event.check_timeout():
-        print("Operation timed out")
-    else:
-        print(f"Operation failed: {e}")
-
-# Coordination pattern
-coordinator = Event()
-threads = [threading.Thread(target=worker, args=(coordinator,)) for _ in range(3)]
-for thread in threads:
-    thread.start()
-coordinator.set()  # Release all threads
-for thread in threads:
-    thread.join()
-
-# Timeout pattern
-event = Event(timeout=30)
-thread = threading.Thread(target=timed_operation, args=(event,))
-thread.start()
-thread.join()
+# ETL pipeline with multiple triggers
+etl_event = Event(
+    schedule=[
+        CrontabValue(interval="daily", time="02:00", timezone="UTC"),  # Daily at 2 AM
+        Crontab(cronjob="0 */6 * * *", timezone="UTC"),  # Every 6 hours
+    ],
+    release=["data-source-updated"]
+)
 ```
+
+### Reporting Schedules
+
+```python
+# Business reporting schedule
+reporting_event = Event(
+    schedule=[
+        CrontabValue(interval="weekly", day="monday", time="08:00"),  # Weekly reports
+        Crontab(cronjob="0 9 1 * *", timezone="UTC"),  # Monthly reports
+        Crontab(cronjob="0 10 1 1,4,7,10 *", timezone="UTC"),  # Quarterly reports
+    ]
+)
+```
+
+### Maintenance Windows
+
+```python
+# Maintenance and cleanup schedules
+maintenance_event = Event(
+    schedule=[
+        Crontab(cronjob="0 3 * * 0", timezone="UTC"),  # Weekly maintenance (Sunday 3 AM)
+        Crontab(cronjob="0 2 1 * *", timezone="UTC"),  # Monthly cleanup
+    ]
+)
+```
+
+## Troubleshooting
+
+### Common Issues
+
+#### Invalid Cron Expression
+
+```python
+# Problem: Invalid cron expression
+try:
+    schedule = Crontab(cronjob="invalid expression")
+except ValueError as e:
+    print(f"Invalid cron expression: {e}")
+
+# Solution: Use valid cron format
+schedule = Crontab(cronjob="0 9 * * 1-5")  # 9 AM weekdays
+```
+
+#### Timezone Issues
+
+```python
+# Problem: Incorrect timezone
+try:
+    schedule = Crontab(cronjob="0 9 * * *", timezone="Invalid/Timezone")
+except ValueError as e:
+    print(f"Invalid timezone: {e}")
+
+# Solution: Use valid IANA timezone
+schedule = Crontab(cronjob="0 9 * * *", timezone="America/New_York")
+```
+
+#### Schedule Conflicts
+
+```python
+# Problem: Duplicate schedules
+try:
+    event = Event(schedule=[
+        Crontab(cronjob="0 9 * * *"),
+        Crontab(cronjob="0 9 * * *"),  # Duplicate
+    ])
+except ValueError as e:
+    print(f"Duplicate schedule: {e}")
+
+# Solution: Use unique schedules
+event = Event(schedule=[
+    Crontab(cronjob="0 9 * * *"),
+    Crontab(cronjob="0 18 * * *"),  # Different time
+])
+```
+
+### Debugging Tips
+
+1. **Test expressions**: Use online cron expression testers
+2. **Validate timezones**: Verify timezone strings with `zoneinfo`
+3. **Check generation**: Test schedule generation with different start times
+4. **Monitor execution**: Track actual vs. scheduled execution times
+5. **Use logging**: Enable debug logging for schedule processing
