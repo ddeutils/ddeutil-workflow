@@ -28,19 +28,19 @@ from pydantic.dataclasses import dataclass
 from pydantic.functional_validators import model_validator
 from typing_extensions import Self
 
-from . import (
+from .__types import DictData
+from .audits import Trace, get_trace
+from .errors import (
     JobCancelError,
     JobError,
     JobSkipError,
+    ResultError,
     StageCancelError,
     StageError,
     StageSkipError,
     WorkflowCancelError,
     WorkflowError,
 )
-from .__types import DictData
-from .audits import Trace, get_trace
-from .errors import ResultError
 from .utils import default_gen_id
 
 

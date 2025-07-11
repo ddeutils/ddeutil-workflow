@@ -205,6 +205,7 @@ class BaseStage(BaseModel, ABC):
         return self.id or self.name
 
     @field_validator("desc", mode="after")
+    @classmethod
     def ___prepare_desc__(cls, value: str) -> str:
         """Prepare description string that was created on a template.
 
@@ -1583,6 +1584,7 @@ class CallStage(BaseRetryStage):
     )
 
     @field_validator("args", mode="before")
+    @classmethod
     def __validate_args_key(cls, value: Any) -> Any:
         """Validate argument keys on the ``args`` field should not include the
         special keys.
@@ -3547,6 +3549,1496 @@ class VirtualPyStage(PyStage):  # pragma: no cov
         )
 
 
+class TryCatchFinallyStage(BaseNestedStage):
+    """Try-Catch-Finally stage executor that provides robust error handling
+    with try, catch, and finally blocks.
+
+    This stage allows for structured error handling where:
+    - `try` stages are executed normally
+    - `catch` stages are executed if any try stage fails
+    - `finally` stages are always executed regardless of success/failure
+
+    Data Validate:
+        >>> stage = {
+        ...     "name": "Robust Operation",
+        ...     "try": [
+        ...         {
+        ...             "name": "Primary Operation",
+        ...             "uses": "api/primary_method@latest"
+        ...         }
+        ...     ],
+        ...     "catch": [
+        ...         {
+        ...             "name": "Fallback Operation",
+        ...             "uses": "api/fallback_method@latest"
+        ...         }
+        ...     ],
+        ...     "finally": [
+        ...         {
+        ...             "name": "Cleanup",
+        ...             "uses": "utils/cleanup@latest"
+        ...         }
+        ...     ]
+        ... }
+    """
+
+    try_stages: list[Stage] = Field(
+        default_factory=list,
+        description="Stages to execute in the try block.",
+        alias="try",
+    )
+    catch_stages: list[Stage] = Field(
+        default_factory=list,
+        description="Stages to execute if try block fails.",
+        alias="catch",
+    )
+    finally_stages: list[Stage] = Field(
+        default_factory=list,
+        description="Stages to execute regardless of try/catch outcome.",
+        alias="finally",
+    )
+    catch_all: bool = Field(
+        default=True,
+        description="Whether to catch all exceptions or only specific ones.",
+        alias="catch-all",
+    )
+    error_types: list[str] = Field(
+        default_factory=list,
+        description="Specific exception types to catch (if catch_all is False).",
+        alias="error-types",
+    )
+
+    def _execute_stages(
+        self,
+        stages: list[Stage],
+        params: DictData,
+        run_id: str,
+        context: DictData,
+        *,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
+        block_name: str = "unknown",
+    ) -> tuple[Status, DictData]:
+        """Execute a list of stages and return the result.
+
+        Args:
+            stages: List of stages to execute
+            params: Parameter data
+            run_id: Running stage ID
+            context: Context data
+            parent_run_id: Parent running ID
+            event: Event manager
+            block_name: Name of the block for logging
+
+        Returns:
+            Tuple of (status, updated_context)
+        """
+        if not stages:
+            return SUCCESS, context
+
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
+        )
+        trace.debug(
+            f"[STAGE]: Executing {block_name} block with {len(stages)} stages"
+        )
+
+        current_context: DictData = copy.deepcopy(params)
+        nested_context: DictData = {"block": block_name, "stages": {}}
+
+        total_stages: int = len(stages)
+        skips: list[bool] = [False] * total_stages
+
+        for i, stage in enumerate(stages, start=0):
+            if self.extras:
+                stage.extras = self.extras
+
+            if event and event.is_set():
+                error_msg: str = (
+                    f"{block_name.capitalize()} block execution was canceled"
+                )
+                catch(
+                    context=context,
+                    status=CANCEL,
+                    try_catch_finally={
+                        block_name: {
+                            "status": CANCEL,
+                            "block": block_name,
+                            "stages": filter_func(
+                                nested_context.pop("stages", {})
+                            ),
+                            "errors": StageCancelError(error_msg).to_dict(),
+                        }
+                    },
+                )
+                raise StageCancelError(error_msg, refs=block_name)
+
+            rs: Result = stage.execute(
+                params=current_context,
+                run_id=parent_run_id,
+                event=event,
+            )
+            stage.set_outputs(rs.context, to=nested_context)
+            stage.set_outputs(
+                stage.get_outputs(nested_context), to=current_context
+            )
+
+            if rs.status == SKIP:
+                skips[i] = True
+                continue
+            elif rs.status == FAILED:
+                error_msg: str = (
+                    f"{block_name.capitalize()} block failed at stage {stage.iden}"
+                )
+                catch(
+                    context=context,
+                    status=FAILED,
+                    try_catch_finally={
+                        block_name: {
+                            "status": FAILED,
+                            "block": block_name,
+                            "stages": filter_func(
+                                nested_context.pop("stages", {})
+                            ),
+                            "errors": StageError(error_msg).to_dict(),
+                        }
+                    },
+                )
+                raise StageError(error_msg, refs=block_name)
+            elif rs.status == CANCEL:
+                error_msg: str = f"{block_name.capitalize()} block was canceled"
+                catch(
+                    context=context,
+                    status=CANCEL,
+                    try_catch_finally={
+                        block_name: {
+                            "status": CANCEL,
+                            "block": block_name,
+                            "stages": filter_func(
+                                nested_context.pop("stages", {})
+                            ),
+                            "errors": StageCancelError(error_msg).to_dict(),
+                        }
+                    },
+                )
+                raise StageCancelError(error_msg, refs=block_name)
+
+        status: Status = SKIP if sum(skips) == total_stages else SUCCESS
+        return status, catch(
+            context=context,
+            status=status,
+            try_catch_finally={
+                block_name: {
+                    "status": status,
+                    "block": block_name,
+                    "stages": filter_func(nested_context.pop("stages", {})),
+                }
+            },
+        )
+
+    def _should_catch_error(self, error: Exception) -> bool:
+        """Determine if the error should be caught based on configuration.
+
+        Args:
+            error: The exception that occurred
+
+        Returns:
+            True if the error should be caught
+        """
+        if self.catch_all:
+            return True
+
+        if not self.error_types:
+            return True
+
+        error_type_name = error.__class__.__name__
+        return error_type_name in self.error_types
+
+    def process(
+        self,
+        params: DictData,
+        run_id: str,
+        context: DictData,
+        *,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
+    ) -> Result:
+        """Execute try-catch-finally blocks with proper error handling.
+
+        Args:
+            params: Parameter data
+            run_id: Running stage ID
+            context: Context data
+            parent_run_id: Parent running ID
+            event: Event manager
+
+        Returns:
+            Result with execution status and context
+        """
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
+        )
+        trace.info("[STAGE]: Executing Try-Catch-Finally stage")
+
+        catch(context=context, status=WAIT, updated={"try_catch_finally": {}})
+
+        if event and event.is_set():
+            raise StageCancelError(
+                "Execution was canceled from the event before start try-catch-finally."
+            )
+
+        try_status: Status = SUCCESS
+        catch_status: Status = SUCCESS
+        finally_status: Status = SUCCESS
+        error_occurred: bool = False
+        caught_error: Optional[Exception] = None
+
+        # Execute try block
+        try:
+            try_status, context = self._execute_stages(
+                self.try_stages,
+                params,
+                run_id,
+                context,
+                parent_run_id=parent_run_id,
+                event=event,
+                block_name="try",
+            )
+        except Exception as e:
+            error_occurred = True
+            caught_error = e
+            try_status = get_status_from_error(e)
+            trace.warning(f"[STAGE]: Try block failed: {e}")
+
+        # Execute catch block if error occurred and should be caught
+        if error_occurred and self._should_catch_error(caught_error):
+            try:
+                catch_status, context = self._execute_stages(
+                    self.catch_stages,
+                    params,
+                    run_id,
+                    context,
+                    parent_run_id=parent_run_id,
+                    event=event,
+                    block_name="catch",
+                )
+            except Exception as e:
+                catch_status = get_status_from_error(e)
+                trace.error(f"[STAGE]: Catch block failed: {e}")
+                # Don't re-raise here, let finally block execute
+
+        # Execute finally block (always)
+        try:
+            finally_status, context = self._execute_stages(
+                self.finally_stages,
+                params,
+                run_id,
+                context,
+                parent_run_id=parent_run_id,
+                event=event,
+                block_name="finally",
+            )
+        except Exception as e:
+            finally_status = get_status_from_error(e)
+            trace.error(f"[STAGE]: Finally block failed: {e}")
+            # Re-raise finally block errors as they are critical
+            raise
+
+        # Determine overall status
+        if finally_status == FAILED:
+            overall_status = FAILED
+        elif error_occurred and not self._should_catch_error(caught_error):
+            # Re-raise the original error if it shouldn't be caught
+            raise caught_error
+        elif error_occurred and catch_status == FAILED:
+            overall_status = FAILED
+        elif error_occurred and catch_status == SUCCESS:
+            overall_status = SUCCESS  # Error was handled successfully
+        else:
+            overall_status = try_status
+
+        return Result(
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            status=overall_status,
+            context=catch(context, status=overall_status),
+            extras=self.extras,
+        )
+
+
+class WaitStage(BaseAsyncStage):
+    """Wait stage executor that provides timing control and delays.
+
+    This stage can wait for a specified duration, until a specific time,
+    or until a condition is met.
+
+    Data Validate:
+        >>> stage = {
+        ...     "name": "Wait for Resource",
+        ...     "wait": {
+        ...         "seconds": 30,
+        ...         "until": "2024-01-01T00:00:00Z",
+        ...         "for": "${{ params.resource_ready }}"
+        ...     }
+        ... }
+    """
+
+    seconds: Optional[float] = Field(
+        default=None,
+        ge=0,
+        lt=86400,  # Max 24 hours
+        description="Duration to wait in seconds.",
+    )
+    until: Optional[str] = Field(
+        default=None,
+        description="Wait until a specific datetime (ISO format).",
+    )
+    for_condition: Optional[str] = Field(
+        default=None,
+        description="Wait until a condition becomes true.",
+        alias="for",
+    )
+    check_interval: float = Field(
+        default=1.0,
+        ge=0.1,
+        lt=60,
+        description="Interval in seconds to check condition.",
+        alias="check-interval",
+    )
+    max_wait: float = Field(
+        default=3600,  # 1 hour
+        ge=1,
+        lt=86400,
+        description="Maximum time to wait for condition.",
+        alias="max-wait",
+    )
+
+    def _wait_until_datetime(self, until_dt: datetime, trace: Trace) -> None:
+        """Wait until a specific datetime.
+
+        Args:
+            until_dt: Target datetime
+            trace: Trace object for logging
+        """
+        now = datetime.now()
+        if until_dt <= now:
+            trace.info("[STAGE]: Target time already reached")
+            return
+
+        wait_seconds = (until_dt - now).total_seconds()
+        trace.info(
+            f"[STAGE]: Waiting until {until_dt} ({wait_seconds:.1f} seconds)"
+        )
+        time.sleep(wait_seconds)
+
+    def _wait_for_condition(
+        self,
+        condition: str,
+        params: DictData,
+        trace: Trace,
+        event: Optional[Event] = None,
+    ) -> None:
+        """Wait until a condition becomes true.
+
+        Args:
+            condition: Condition expression to evaluate
+            params: Parameter data
+            trace: Trace object for logging
+            event: Event manager for cancellation
+        """
+        start_time = time.monotonic()
+        check_count = 0
+
+        while True:
+            if event and event.is_set():
+                raise StageCancelError("Wait was canceled from event")
+
+            if (time.monotonic() - start_time) > self.max_wait:
+                raise StageError(f"Wait timeout after {self.max_wait} seconds")
+
+            try:
+                result = eval(
+                    param2template(condition, params, extras=self.extras),
+                    globals() | params,
+                    {},
+                )
+                if isinstance(result, bool) and result:
+                    trace.info(
+                        f"[STAGE]: Condition met after {check_count} checks"
+                    )
+                    return
+            except Exception as e:
+                trace.warning(f"[STAGE]: Error evaluating condition: {e}")
+
+            check_count += 1
+            time.sleep(self.check_interval)
+
+    def process(
+        self,
+        params: DictData,
+        run_id: str,
+        context: DictData,
+        *,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
+    ) -> Result:
+        """Execute wait stage with specified timing control.
+
+        Args:
+            params: Parameter data
+            run_id: Running stage ID
+            context: Context data
+            parent_run_id: Parent running ID
+            event: Event manager
+
+        Returns:
+            Result with execution status and context
+        """
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
+        )
+
+        if event and event.is_set():
+            raise StageCancelError("Wait was canceled from event before start")
+
+        # Determine wait type and execute
+        if self.until:
+            try:
+                until_dt = datetime.fromisoformat(
+                    param2template(
+                        self.until, params, extras=self.extras
+                    ).replace("Z", "+00:00")
+                )
+                self._wait_until_datetime(until_dt, trace)
+            except ValueError as e:
+                raise StageError(f"Invalid datetime format: {e}")
+        elif self.for_condition:
+            self._wait_for_condition(self.for_condition, params, trace, event)
+        elif self.seconds:
+            seconds = param2template(self.seconds, params, extras=self.extras)
+            trace.info(f"[STAGE]: Waiting for {seconds} seconds")
+            time.sleep(seconds)
+        else:
+            raise StageError("No wait condition specified")
+
+        return Result(
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            status=SUCCESS,
+            context=catch(context, status=SUCCESS),
+            extras=self.extras,
+        )
+
+    async def async_process(
+        self,
+        params: DictData,
+        run_id: str,
+        context: DictData,
+        *,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
+    ) -> Result:
+        """Async execution of wait stage.
+
+        Args:
+            params: Parameter data
+            run_id: Running stage ID
+            context: Context data
+            parent_run_id: Parent running ID
+            event: Event manager
+
+        Returns:
+            Result with execution status and context
+        """
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
+        )
+
+        if event and event.is_set():
+            raise StageCancelError("Wait was canceled from event before start")
+
+        # Determine wait type and execute
+        if self.until:
+            try:
+                until_dt = datetime.fromisoformat(
+                    param2template(
+                        self.until, params, extras=self.extras
+                    ).replace("Z", "+00:00")
+                )
+                now = datetime.now()
+                if until_dt > now:
+                    wait_seconds = (until_dt - now).total_seconds()
+                    await trace.ainfo(
+                        f"[STAGE]: Waiting until {until_dt} ({wait_seconds:.1f} seconds)"
+                    )
+                    await asyncio.sleep(wait_seconds)
+                else:
+                    await trace.ainfo("[STAGE]: Target time already reached")
+            except ValueError as e:
+                raise StageError(f"Invalid datetime format: {e}")
+        elif self.for_condition:
+            start_time = time.monotonic()
+            check_count = 0
+
+            while True:
+                if event and event.is_set():
+                    raise StageCancelError("Wait was canceled from event")
+
+                if (time.monotonic() - start_time) > self.max_wait:
+                    raise StageError(
+                        f"Wait timeout after {self.max_wait} seconds"
+                    )
+
+                try:
+                    result = eval(
+                        param2template(
+                            self.for_condition, params, extras=self.extras
+                        ),
+                        globals() | params,
+                        {},
+                    )
+                    if isinstance(result, bool) and result:
+                        await trace.ainfo(
+                            f"[STAGE]: Condition met after {check_count} checks"
+                        )
+                        break
+                except Exception as e:
+                    await trace.awarning(
+                        f"[STAGE]: Error evaluating condition: {e}"
+                    )
+
+                check_count += 1
+                await asyncio.sleep(self.check_interval)
+        elif self.seconds:
+            seconds = param2template(self.seconds, params, extras=self.extras)
+            await trace.ainfo(f"[STAGE]: Waiting for {seconds} seconds")
+            await asyncio.sleep(seconds)
+        else:
+            raise StageError("No wait condition specified")
+
+        return Result(
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            status=SUCCESS,
+            context=catch(context, status=SUCCESS),
+            extras=self.extras,
+        )
+
+
+class HttpStage(BaseRetryStage):
+    """HTTP stage executor that makes HTTP requests to external APIs.
+
+    This stage supports various HTTP methods, headers, body content,
+    and provides retry capabilities with exponential backoff.
+
+    Data Validate:
+        >>> stage = {
+        ...     "name": "API Call",
+        ...     "http": {
+        ...         "method": "POST",
+        ...         "url": "https://api.example.com/data",
+        ...         "headers": {
+        ...             "Authorization": "Bearer ${{ params.token }}",
+        ...             "Content-Type": "application/json"
+        ...         },
+        ...         "body": "${{ params.data }}",
+        ...         "timeout": 30
+        ...     }
+        ... }
+    """
+
+    method: str = Field(
+        default="GET",
+        description="HTTP method to use.",
+    )
+    url: str = Field(
+        description="URL to make the request to.",
+    )
+    headers: DictStr = Field(
+        default_factory=dict,
+        description="HTTP headers to include in the request.",
+    )
+    body: Optional[str] = Field(
+        default=None,
+        description="Request body content.",
+    )
+    timeout: float = Field(
+        default=30,
+        ge=1,
+        lt=300,
+        description="Request timeout in seconds.",
+    )
+    verify_ssl: bool = Field(
+        default=True,
+        description="Whether to verify SSL certificates.",
+        alias="verify-ssl",
+    )
+    allow_redirects: bool = Field(
+        default=True,
+        description="Whether to follow redirects.",
+        alias="allow-redirects",
+    )
+
+    def process(
+        self,
+        params: DictData,
+        run_id: str,
+        context: DictData,
+        *,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
+    ) -> Result:
+        """Execute HTTP request with retry capabilities.
+
+        Args:
+            params: Parameter data
+            run_id: Running stage ID
+            context: Context data
+            parent_run_id: Parent running ID
+            event: Event manager
+
+        Returns:
+            Result with HTTP response data
+        """
+        import requests
+        from requests.exceptions import RequestException
+
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
+        )
+
+        # Prepare request parameters
+        method = param2template(self.method, params, extras=self.extras).upper()
+        url = param2template(self.url, params, extras=self.extras)
+        headers = param2template(self.headers, params, extras=self.extras)
+        body = (
+            param2template(self.body, params, extras=self.extras)
+            if self.body
+            else None
+        )
+        timeout = param2template(self.timeout, params, extras=self.extras)
+
+        trace.info(f"[STAGE]: Making {method} request to {url}")
+
+        if event and event.is_set():
+            raise StageCancelError("HTTP request was canceled from event")
+
+        try:
+            response = requests.request(
+                method=method,
+                url=url,
+                headers=headers,
+                data=body,
+                timeout=timeout,
+                verify=self.verify_ssl,
+                allow_redirects=self.allow_redirects,
+            )
+
+            # Check if response indicates success
+            response.raise_for_status()
+
+            # Parse response content
+            try:
+                response_data = response.json()
+            except ValueError:
+                response_data = response.text
+
+            return Result(
+                run_id=run_id,
+                parent_run_id=parent_run_id,
+                status=SUCCESS,
+                context=catch(
+                    context,
+                    status=SUCCESS,
+                    updated={
+                        "status_code": response.status_code,
+                        "headers": dict(response.headers),
+                        "data": response_data,
+                        "url": response.url,
+                    },
+                ),
+                extras=self.extras,
+            )
+
+        except RequestException as e:
+            raise StageError(f"HTTP request failed: {e}")
+
+    async def async_process(
+        self,
+        params: DictData,
+        run_id: str,
+        context: DictData,
+        *,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
+    ) -> Result:
+        """Async execution of HTTP request.
+
+        Args:
+            params: Parameter data
+            run_id: Running stage ID
+            context: Context data
+            parent_run_id: Parent running ID
+            event: Event manager
+
+        Returns:
+            Result with HTTP response data
+        """
+        import json
+
+        import aiohttp
+
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
+        )
+
+        # Prepare request parameters
+        method = param2template(self.method, params, extras=self.extras).upper()
+        url = param2template(self.url, params, extras=self.extras)
+        headers = param2template(self.headers, params, extras=self.extras)
+        body = (
+            param2template(self.body, params, extras=self.extras)
+            if self.body
+            else None
+        )
+        timeout = aiohttp.ClientTimeout(
+            total=param2template(self.timeout, params, extras=self.extras)
+        )
+
+        await trace.ainfo(f"[STAGE]: Making {method} request to {url}")
+
+        if event and event.is_set():
+            raise StageCancelError("HTTP request was canceled from event")
+
+        try:
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.request(
+                    method=method,
+                    url=url,
+                    headers=headers,
+                    data=body,
+                    ssl=self.verify_ssl,
+                    allow_redirects=self.allow_redirects,
+                ) as response:
+                    # Check if response indicates success
+                    response.raise_for_status()
+
+                    # Parse response content
+                    try:
+                        response_data = await response.json()
+                    except (ValueError, json.JSONDecodeError):
+                        response_data = await response.text()
+
+                    return Result(
+                        run_id=run_id,
+                        parent_run_id=parent_run_id,
+                        status=SUCCESS,
+                        context=catch(
+                            context,
+                            status=SUCCESS,
+                            updated={
+                                "status_code": response.status,
+                                "headers": dict(response.headers),
+                                "data": response_data,
+                                "url": str(response.url),
+                            },
+                        ),
+                        extras=self.extras,
+                    )
+
+        except aiohttp.ClientError as e:
+            raise StageError(f"HTTP request failed: {e}") from None
+
+
+class SetVariableStage(BaseStage):
+    """Set Variable stage executor that manages workflow state.
+
+    This stage allows setting variables in the workflow context
+    that can be accessed by subsequent stages.
+
+    Data Validate:
+        >>> stage = {
+        ...     "name": "Set Context Variables",
+        ...     "set": {
+        ...         "processed_count": "${{ params.count }}",
+        ...         "last_processed": "${{ params.item }}",
+        ...         "status": "completed"
+        ...     }
+        ... }
+    """
+
+    variables: DictData = Field(
+        description="Variables to set in the workflow context.",
+        alias="set",
+    )
+
+    def process(
+        self,
+        params: DictData,
+        run_id: str,
+        context: DictData,
+        *,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
+    ) -> Result:
+        """Set variables in the workflow context.
+
+        Args:
+            params: Parameter data
+            run_id: Running stage ID
+            context: Context data
+            parent_run_id: Parent running ID
+            event: Event manager
+
+        Returns:
+            Result with updated context containing new variables
+        """
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
+        )
+
+        # Process variables with template resolution
+        processed_vars = param2template(
+            self.variables, params, extras=self.extras
+        )
+
+        trace.info(f"[STAGE]: Setting variables: {list(processed_vars.keys())}")
+
+        if event and event.is_set():
+            raise StageCancelError("Set variable was canceled from event")
+
+        return Result(
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            status=SUCCESS,
+            context=catch(
+                context,
+                status=SUCCESS,
+                updated={"variables": processed_vars},
+            ),
+            extras=self.extras,
+        )
+
+
+class GetVariableStage(BaseStage):
+    """Get Variable stage executor that retrieves workflow state.
+
+    This stage allows retrieving variables from the workflow context
+    and making them available to subsequent stages.
+
+    Data Validate:
+        >>> stage = {
+        ...     "name": "Get Context Variables",
+        ...     "get": {
+        ...         "variables": ["processed_count", "last_processed"],
+        ...         "default": "0"
+        ...     }
+        ... }
+    """
+
+    variables: list[str] = Field(
+        description="Variable names to retrieve from context.",
+        alias="get",
+    )
+    default: Any = Field(
+        default=None,
+        description="Default value if variable is not found.",
+    )
+
+    def process(
+        self,
+        params: DictData,
+        run_id: str,
+        context: DictData,
+        *,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
+    ) -> Result:
+        """Get variables from the workflow context.
+
+        Args:
+            params: Parameter data
+            run_id: Running stage ID
+            context: Context data
+            parent_run_id: Parent running ID
+            event: Event manager
+
+        Returns:
+            Result with retrieved variables
+        """
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
+        )
+
+        trace.info(f"[STAGE]: Getting variables: {self.variables}")
+
+        if event and event.is_set():
+            raise StageCancelError("Get variable was canceled from event")
+
+        # Extract variables from context
+        workflow_vars = context.get("variables", {})
+        retrieved_vars = {}
+
+        for var_name in self.variables:
+            if var_name in workflow_vars:
+                retrieved_vars[var_name] = workflow_vars[var_name]
+            else:
+                retrieved_vars[var_name] = self.default
+
+        return Result(
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            status=SUCCESS,
+            context=catch(
+                context,
+                status=SUCCESS,
+                updated={"retrieved_variables": retrieved_vars},
+            ),
+            extras=self.extras,
+        )
+
+
+class PassStage(BaseStage):
+    """Pass stage executor that transforms data without performing work.
+
+    This stage is equivalent to AWS States Language Pass state, providing
+    data transformation capabilities through input/output path processing
+    and parameter transformation.
+
+    Data Validate:
+        >>> stage = {
+        ...     "name": "Transform Data",
+        ...     "pass": {
+        ...         "input_path": "${{ params.raw_data }}",
+        ...         "output_path": "${{ result.processed_data }}",
+        ...         "parameters": {
+        ...             "processed_count": "${{ States.ArrayLength($.items) }}",
+        ...             "timestamp": "${{ States.Format('{}', States.TimestampToSeconds('2024-01-01T00:00:00Z')) }}"
+        ...         }
+        ...     }
+        ... }
+    """
+
+    input_path: Optional[str] = Field(
+        default=None,
+        description="JSONPath expression to filter input data.",
+        alias="input-path",
+    )
+    output_path: Optional[str] = Field(
+        default=None,
+        description="JSONPath expression to filter output data.",
+        alias="output-path",
+    )
+    result_path: Optional[str] = Field(
+        default="$",
+        description="JSONPath expression to control result merging.",
+        alias="result-path",
+    )
+    parameters: Optional[DictData] = Field(
+        default=None,
+        description="Parameters to transform input data.",
+    )
+
+    def _apply_jsonpath(self, data: Any, path: str) -> Any:
+        """Apply JSONPath expression to data.
+
+        Args:
+            data: Input data
+            path: JSONPath expression
+
+        Returns:
+            Filtered data
+        """
+        if not path or path == "$":
+            return data
+
+        try:
+            import jsonpath_ng as jsonpath
+
+            jsonpath_expr = jsonpath.parse(path)
+            matches = [match.value for match in jsonpath_expr.find(data)]
+            return matches[0] if len(matches) == 1 else matches
+        except ImportError:
+            # Fallback to simple path processing
+            if path.startswith("$."):
+                path = path[2:]
+            if "." in path:
+                parts = path.split(".")
+                result = data
+                for part in parts:
+                    if isinstance(result, dict) and part in result:
+                        result = result[part]
+                    else:
+                        return None
+                return result
+            return data.get(path, data) if isinstance(data, dict) else data
+
+    def _merge_result(
+        self, input_data: Any, result_data: Any, result_path: str
+    ) -> Any:
+        """Merge result data with input data based on result path.
+
+        Args:
+            input_data: Original input data
+            result_data: Result data to merge
+            result_path: JSONPath expression for merging
+
+        Returns:
+            Merged data
+        """
+        if result_path == "$":
+            return result_data
+        elif result_path == "null":
+            return input_data
+
+        # Simple implementation - in practice, this would need more sophisticated JSONPath support
+        if isinstance(input_data, dict):
+            merged = input_data.copy()
+            if result_path.startswith("$."):
+                key = result_path[2:]
+                merged[key] = result_data
+            else:
+                merged[result_path] = result_data
+            return merged
+        else:
+            return {result_path: result_data}
+
+    def process(
+        self,
+        params: DictData,
+        run_id: str,
+        context: DictData,
+        *,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
+    ) -> Result:
+        """Execute pass stage with data transformation.
+
+        Args:
+            params: Parameter data
+            run_id: Running stage ID
+            context: Context data
+            parent_run_id: Parent running ID
+            event: Event manager
+
+        Returns:
+            Result with transformed data
+        """
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
+        )
+
+        if event and event.is_set():
+            raise StageCancelError("Pass stage was canceled from event")
+
+        # Apply input path filtering
+        input_data = params
+        if self.input_path:
+            input_data = self._apply_jsonpath(params, self.input_path)
+            trace.debug(f"[STAGE]: Applied input path '{self.input_path}'")
+
+        # Apply parameter transformation
+        result_data = input_data
+        if self.parameters:
+            result_data = param2template(
+                self.parameters, input_data, extras=self.extras
+            )
+            trace.debug("[STAGE]: Applied parameter transformation")
+
+        # Apply result path merging
+        if self.result_path:
+            result_data = self._merge_result(
+                input_data, result_data, self.result_path
+            )
+            trace.debug(f"[STAGE]: Applied result path '{self.result_path}'")
+
+        # Apply output path filtering
+        output_data = result_data
+        if self.output_path:
+            output_data = self._apply_jsonpath(result_data, self.output_path)
+            trace.debug(f"[STAGE]: Applied output path '{self.output_path}'")
+
+        return Result(
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            status=SUCCESS,
+            context=catch(
+                context,
+                status=SUCCESS,
+                updated={"data": output_data},
+            ),
+            extras=self.extras,
+        )
+
+
+class SucceedStage(BaseStage):
+    """Succeed stage executor that terminates workflow successfully.
+
+    This stage is equivalent to AWS States Language Succeed state,
+    providing a clean termination point for workflows.
+
+    Data Validate:
+        >>> stage = {
+        ...     "name": "Workflow Complete",
+        ...     "succeed": {
+        ...         "output_path": "${{ result.final_data }}"
+        ...     }
+        ... }
+    """
+
+    output_path: Optional[str] = Field(
+        default=None,
+        description="JSONPath expression to filter output data.",
+        alias="output-path",
+    )
+
+    def process(
+        self,
+        params: DictData,
+        run_id: str,
+        context: DictData,
+        *,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
+    ) -> Result:
+        """Execute succeed stage to terminate workflow.
+
+        Args:
+            params: Parameter data
+            run_id: Running stage ID
+            context: Context data
+            parent_run_id: Parent running ID
+            event: Event manager
+
+        Returns:
+            Result with SUCCESS status
+        """
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
+        )
+
+        trace.info("[STAGE]: Workflow completed successfully")
+
+        output_data = params
+        if self.output_path:
+            # Simple path processing - in practice, use proper JSONPath library
+            if self.output_path.startswith("$."):
+                path = self.output_path[2:]
+                if "." in path:
+                    parts = path.split(".")
+                    result = params
+                    for part in parts:
+                        if isinstance(result, dict) and part in result:
+                            result = result[part]
+                        else:
+                            result = None
+                            break
+                    output_data = result
+                else:
+                    output_data = (
+                        params.get(path, params)
+                        if isinstance(params, dict)
+                        else params
+                    )
+
+        return Result(
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            status=SUCCESS,
+            context=catch(
+                context,
+                status=SUCCESS,
+                updated={"data": output_data},
+            ),
+            extras=self.extras,
+        )
+
+
+class FailStage(BaseStage):
+    """Fail stage executor that terminates workflow with error.
+
+    This stage is equivalent to AWS States Language Fail state,
+    providing a clean error termination point for workflows.
+
+    Data Validate:
+        >>> stage = {
+        ...     "name": "Workflow Failed",
+        ...     "fail": {
+        ...         "error": "CustomError",
+        ...         "cause": "Workflow failed due to invalid data"
+        ...     }
+        ... }
+    """
+
+    error: str = Field(
+        description="Error type identifier.",
+    )
+    cause: Optional[str] = Field(
+        default=None,
+        description="Human-readable error description.",
+    )
+
+    def process(
+        self,
+        params: DictData,
+        run_id: str,
+        context: DictData,
+        *,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
+    ) -> Result:
+        """Execute fail stage to terminate workflow with error.
+
+        Args:
+            params: Parameter data
+            run_id: Running stage ID
+            context: Context data
+            parent_run_id: Parent running ID
+            event: Event manager
+
+        Returns:
+            Result with FAILED status
+        """
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
+        )
+
+        error_msg = param2template(self.error, params, extras=self.extras)
+        cause_msg = (
+            param2template(self.cause, params, extras=self.extras)
+            if self.cause
+            else None
+        )
+
+        trace.error(f"[STAGE]: Workflow failed - {error_msg}")
+        if cause_msg:
+            trace.error(f"[STAGE]: Cause: {cause_msg}")
+
+        error_message = f"Workflow terminated with error: {error_msg}"
+        if cause_msg:
+            error_message += f" - Cause: {cause_msg}"
+        raise StageError(error_message)
+
+
+class TransformStage(BaseStage):
+    """Transform stage executor for complex data transformations.
+
+    This stage provides advanced data processing capabilities similar to
+    AWS States Language data processing features.
+
+    Data Validate:
+        >>> stage = {
+        ...     "name": "Transform Data",
+        ...     "transform": {
+        ...         "input": "${{ params.raw_data }}",
+        ...         "operations": [
+        ...             {
+        ...                 "type": "filter",
+        ...                 "condition": "${{ item.status == 'active' }}"
+        ...             },
+        ...             {
+        ...                 "type": "map",
+        ...                 "expression": "${{ { id: item.id, name: States.Format('{} - {}', item.id, item.name) } }}"
+        ...             }
+        ...         ]
+        ...     }
+        ... }
+    """
+
+    input: Optional[str] = Field(
+        default=None,
+        description="Input data expression.",
+    )
+    operations: list[DictData] = Field(
+        description="List of transformation operations.",
+    )
+
+    def _apply_filter(
+        self, data: list, condition: str, params: DictData
+    ) -> list:
+        """Apply filter operation to data.
+
+        Args:
+            data: Input data list
+            condition: Filter condition expression
+            params: Parameter context
+
+        Returns:
+            Filtered data list
+        """
+        if not isinstance(data, list):
+            return data
+
+        filtered = []
+        for item in data:
+            try:
+                # Create context with item
+                context = params.copy()
+                context["item"] = item
+
+                # Evaluate condition
+                result = eval(
+                    param2template(condition, context, extras=self.extras),
+                    globals() | context,
+                    {},
+                )
+                if isinstance(result, bool) and result:
+                    filtered.append(item)
+            except Exception:
+                # Skip items that cause evaluation errors
+                continue
+
+        return filtered
+
+    def _apply_map(self, data: list, expression: str, params: DictData) -> list:
+        """Apply map operation to data.
+
+        Args:
+            data: Input data list
+            expression: Mapping expression
+            params: Parameter context
+
+        Returns:
+            Mapped data list
+        """
+        if not isinstance(data, list):
+            return data
+
+        mapped = []
+        for item in data:
+            try:
+                # Create context with item
+                context = params.copy()
+                context["item"] = item
+
+                # Evaluate expression
+                result = eval(
+                    param2template(expression, context, extras=self.extras),
+                    globals() | context,
+                    {},
+                )
+                mapped.append(result)
+            except Exception:
+                # Skip items that cause evaluation errors
+                continue
+
+        return mapped
+
+    def _apply_reduce(
+        self, data: list, expression: str, params: DictData
+    ) -> Any:
+        """Apply reduce operation to data.
+
+        Args:
+            data: Input data list
+            expression: Reduction expression
+            params: Parameter context
+
+        Returns:
+            Reduced value
+        """
+        if not isinstance(data, list) or not data:
+            return None
+
+        accumulator = data[0]
+        for item in data[1:]:
+            try:
+                # Create context with accumulator and item
+                context = params.copy()
+                context["accumulator"] = accumulator
+                context["item"] = item
+
+                # Evaluate expression
+                accumulator = eval(
+                    param2template(expression, context, extras=self.extras),
+                    globals() | context,
+                    {},
+                )
+            except Exception:
+                # Continue with current accumulator on error
+                continue
+
+        return accumulator
+
+    def process(
+        self,
+        params: DictData,
+        run_id: str,
+        context: DictData,
+        *,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
+    ) -> Result:
+        """Execute transform stage with data processing operations.
+
+        Args:
+            params: Parameter data
+            run_id: Running stage ID
+            context: Context data
+            parent_run_id: Parent running ID
+            event: Event manager
+
+        Returns:
+            Result with transformed data
+        """
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
+        )
+
+        if event and event.is_set():
+            raise StageCancelError("Transform stage was canceled from event")
+
+        # Get input data
+        input_data = params
+        if self.input:
+            input_data = param2template(self.input, params, extras=self.extras)
+
+        trace.info(
+            f"[STAGE]: Applying {len(self.operations)} transformation operations"
+        )
+
+        # Apply operations sequentially
+        result_data = input_data
+        for i, operation in enumerate(self.operations):
+            op_type = operation.get("type", "")
+            condition = operation.get("condition", "")
+            expression = operation.get("expression", "")
+
+            try:
+                if op_type == "filter":
+                    result_data = self._apply_filter(
+                        result_data, condition, params
+                    )
+                    trace.debug(f"[STAGE]: Applied filter operation {i+1}")
+                elif op_type == "map":
+                    result_data = self._apply_map(
+                        result_data, expression, params
+                    )
+                    trace.debug(f"[STAGE]: Applied map operation {i+1}")
+                elif op_type == "reduce":
+                    result_data = self._apply_reduce(
+                        result_data, expression, params
+                    )
+                    trace.debug(f"[STAGE]: Applied reduce operation {i+1}")
+                else:
+                    trace.warning(f"[STAGE]: Unknown operation type: {op_type}")
+            except Exception as err:
+                trace.error(f"[STAGE]: Error in operation {i+1}: {err}")
+                raise StageError(f"Transform operation failed: {err}") from None
+
+        return Result(
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            status=SUCCESS,
+            context=catch(
+                context,
+                status=SUCCESS,
+                updated={"data": result_data},
+            ),
+            extras=self.extras,
+        )
+
+
 # NOTE:
 #   An order of parsing stage model on the Job model with `stages` field.
 #   From the current build-in stages, they do not have stage that have the same
@@ -3566,6 +5058,15 @@ Stage = Annotated[
         PyStage,
         RaiseStage,
         EmptyStage,
+        TryCatchFinallyStage,
+        WaitStage,
+        HttpStage,
+        SetVariableStage,
+        GetVariableStage,
+        PassStage,
+        SucceedStage,
+        FailStage,
+        TransformStage,
     ],
     Field(
         union_mode="smart",
