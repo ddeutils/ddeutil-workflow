@@ -407,7 +407,7 @@ class Workflow(BaseModel):
         with the set `on` field.
 
         Args:
-            dt: A datetime object that want to validate.
+            dt (datetime): A datetime object that want to validate.
 
         Returns:
             datetime: The validated release datetime.
@@ -416,6 +416,8 @@ class Workflow(BaseModel):
             dt = dt.replace(tzinfo=UTC)
 
         release: datetime = replace_sec(dt.astimezone(UTC))
+
+        # NOTE: Return itself if schedule event does not set.
         if not self.on.schedule:
             return release
 
@@ -454,7 +456,7 @@ class Workflow(BaseModel):
             - Writing result audit
 
         Args:
-            release: (datetime) A release datetime.
+            release (datetime): A release datetime.
             params: A workflow parameter that pass to execute method.
             release_type:
             run_id: (str) A workflow running ID.

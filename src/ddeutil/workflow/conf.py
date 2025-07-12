@@ -169,8 +169,8 @@ class Config:  # pragma: no cov
         return str2bool(env("LOG_TRACE_ENABLE_WRITE", "false"))
 
     @property
-    def audit_url(self) -> ParseResult:
-        return urlparse(env("LOG_AUDIT_URL", "file:./audits"))
+    def audit_url(self) -> str:
+        return env("LOG_AUDIT_URL", "file:./audits")
 
     @property
     def enable_write_audit(self) -> bool:
@@ -464,7 +464,9 @@ def dynamic(
     conf: Optional[T] = getattr(config, key, None) if f is None else f
     if extra is None:
         return conf
-    if not isinstance(extra, type(conf)):
+    # NOTE: Fix type checking for boolean value and int type like
+    #   `isinstance(False, int)` which return True.
+    if type(extra) is not type(conf):
         raise TypeError(
             f"Type of config {key!r} from extras: {extra!r} does not valid "
             f"as config {type(conf)}."
