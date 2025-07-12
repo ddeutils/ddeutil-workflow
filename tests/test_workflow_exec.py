@@ -1,6 +1,7 @@
 import shutil
 from datetime import datetime
 from textwrap import dedent
+from unittest.mock import patch
 
 from ddeutil.core import getdot
 from ddeutil.workflow import (
@@ -1034,6 +1035,56 @@ def test_workflow_exec_raise_param(test_path):
                 }
             },
         }
+
+
+def test_workflow_exec_raise_from_job_exec():
+    with patch(
+        "ddeutil.workflow.job.Job.execute",
+        side_effect=Exception("some error on the job execution."),
+    ):
+        workflow = Workflow.model_validate(
+            {
+                "name": "tmp-wf-exec-raise",
+                "jobs": {
+                    "first-job": {
+                        "stages": [
+                            {"name": "Some Stage 1", "echo": "Start stage 1."}
+                        ]
+                    },
+                    "second-job": {
+                        "stages": [
+                            {"name": "Some Stage 2", "echo": "Start stage 2."}
+                        ]
+                    },
+                },
+            }
+        )
+        rs = workflow.execute({})
+        assert rs.status == FAILED
+
+    with patch(
+        "ddeutil.workflow.job.Job.execute",
+        side_effect=Exception("some error on the job execution."),
+    ):
+        workflow = Workflow.model_validate(
+            {
+                "name": "tmp-wf-exec-raise",
+                "jobs": {
+                    "first-job": {
+                        "stages": [
+                            {"name": "Some Stage 1", "echo": "Start stage 1."}
+                        ]
+                    },
+                    "second-job": {
+                        "stages": [
+                            {"name": "Some Stage 2", "echo": "Start stage 2."}
+                        ]
+                    },
+                },
+            }
+        )
+        rs = workflow.execute({}, max_job_parallel=1)
+        assert rs.status == FAILED
 
 
 def test_workflow_exec_raise_job_trigger(test_path):

@@ -266,12 +266,6 @@ DOCKER = RunsOn.DOCKER
 CONTAINER = RunsOn.CONTAINER
 
 
-LOCAL = RunsOn.LOCAL
-SELF_HOSTED = RunsOn.SELF_HOSTED
-AZ_BATCH = RunsOn.AZ_BATCH
-DOCKER = RunsOn.DOCKER
-
-
 class BaseRunsOn(BaseModel):  # pragma: no cov
     """Base Runs-On Model for generate runs-on types via inherit this model
     object and override execute method.
@@ -590,7 +584,8 @@ class Job(BaseModel):
         return self
 
     @field_serializer("runs_on")
-    def __serialize_runs_on(self, value: RunsOnModel):
+    def __serialize_runs_on(self, value: RunsOnModel) -> DictData:
+        """Serialize the runs_on field."""
         return value.model_dump(by_alias=True)
 
     def stage(self, stage_id: str) -> Stage:
