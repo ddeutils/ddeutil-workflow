@@ -3,8 +3,34 @@ from datetime import datetime
 from unittest import mock
 
 import pytest
-from ddeutil.workflow.audits import FileAudit
+from ddeutil.workflow.audits import BaseAudit, FileAudit
 from ddeutil.workflow.conf import Config
+from pydantic import ValidationError
+
+
+@mock.patch.multiple(BaseAudit, __abstractmethods__=set())
+def test_base_audit():
+    audit = BaseAudit.model_validate(
+        {
+            "name": "wf-scheduling",
+            "type": "manual",
+            "release": datetime(2024, 1, 1, 1),
+            "run_id": "558851633820240817184358131811",
+        }
+    )
+    cp_data = audit.compress_data("foo")
+    assert audit.decompress_data(cp_data) == "foo"
+
+    with pytest.raises(ValidationError):
+        BaseAudit.model_validate(
+            {
+                "name": "wf-scheduling",
+                "type": "manual",
+                "release": datetime(2024, 1, 1, 1),
+                "run_id": "558851633820240817184358131811",
+                "extras": "foo",
+            }
+        )
 
 
 @mock.patch.object(Config, "enable_write_audit", False)
@@ -20,6 +46,7 @@ def test_conf_log_file():
             "parent_run_id": None,
             "run_id": "558851633820240817184358131811",
             "update": datetime.now(),
+            "extras": None,
         },
     )
     log.save(excluded=None)

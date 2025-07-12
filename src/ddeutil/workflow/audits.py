@@ -26,14 +26,11 @@ Functions:
     get_audit_model: Factory function for creating audit instances
 
 Example:
-    ```python
-    from ddeutil.workflow.audits import get_audit_model
 
-    # Create file-based Audit
-    audit = get_audit_model(run_id="run-123")
-    audit.info("Workflow execution started")
-    audit.success("Workflow completed successfully")
-    ```
+    >>> from ddeutil.workflow.audits import get_audit_model
+    >>> audit = get_audit_model(run_id="run-123")
+    >>> audit.info("Workflow execution started")
+    >>> audit.success("Workflow completed successfully")
 
 Note:
     Audit instances are automatically configured based on the workflow
@@ -228,7 +225,8 @@ class BaseAudit(BaseModel, ABC):
         """
         raise NotImplementedError("Audit should implement `save` method.")
 
-    def compress_data(self, data: str) -> bytes:
+    @staticmethod
+    def compress_data(data: str) -> bytes:
         """Compress audit data for storage efficiency.
 
         Args:
@@ -239,7 +237,8 @@ class BaseAudit(BaseModel, ABC):
         """
         return zlib.compress(data.encode("utf-8"))
 
-    def decompress_data(self, data: bytes) -> str:
+    @staticmethod
+    def decompress_data(data: bytes) -> str:
         """Decompress audit data.
 
         Args:
@@ -493,7 +492,7 @@ class FileAudit(BaseAudit):
         return cleaned_count
 
 
-class SQLiteAudit(BaseAudit):
+class SQLiteAudit(BaseAudit):  # pragma: no cov
     """SQLite Audit model for database-based audit storage.
 
     This class inherits from BaseAudit and implements SQLite database storage

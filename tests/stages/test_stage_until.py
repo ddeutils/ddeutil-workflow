@@ -9,7 +9,7 @@ from ddeutil.workflow import (
     Stage,
     Workflow,
 )
-from ddeutil.workflow.stages import EmptyStage, UntilStage
+from ddeutil.workflow.stages import EmptyStage, RaiseStage, UntilStage
 
 from ..utils import MockEvent, dump_yaml_context
 
@@ -46,6 +46,81 @@ def test_until_stage():
                 "item": 2,
                 "stages": {"4735427693": {"outputs": {}, "status": SUCCESS}},
             },
+        },
+    }
+
+
+def test_until_stage_raise():
+    stage = UntilStage.model_validate(
+        {
+            "name": "This is until stage",
+            "item": 1,
+            "until": "${{ item }} > 2",
+            "stages": [
+                RaiseStage.model_validate(
+                    {"name": "Raise stage nested", "raise": "Raise some error."}
+                ),
+            ],
+            "extras": {"foo": "bar"},
+        }
+    )
+    rs: Result = stage.execute(params={})
+    assert rs.status == FAILED
+    assert rs.context == {
+        "status": FAILED,
+        "until": {
+            1: {
+                "status": FAILED,
+                "loop": 1,
+                "item": 1,
+                "stages": {
+                    "1426584094": {
+                        "outputs": {},
+                        "errors": {
+                            "name": "StageError",
+                            "message": "Raise some error.",
+                        },
+                        "status": FAILED,
+                    }
+                },
+                "errors": {
+                    "name": "StageError",
+                    "message": "Loop execution was break because its nested-stage, 'Raise stage nested', failed.",
+                },
+            }
+        },
+        "errors": {
+            "name": "StageError",
+            "message": "Loop execution was break because its nested-stage, 'Raise stage nested', failed.",
+        },
+    }
+
+    stage = UntilStage.model_validate(
+        {
+            "name": "This is until stage",
+            "item": 1,
+            "until": "${{ item }} if ${{ item }} == 1 else 'demo'",
+            "stages": [
+                EmptyStage(name="Empty stage nested", echo="1"),
+            ],
+            "extras": {"foo": "bar"},
+        }
+    )
+    rs: Result = stage.execute(params={})
+    assert rs.status == FAILED
+    assert rs.context == {
+        "status": FAILED,
+        "until": {
+            1: {
+                "status": SUCCESS,
+                "loop": 1,
+                "item": 1,
+                "stages": {"4735427693": {"outputs": {}, "status": SUCCESS}},
+            }
+        },
+        "errors": {
+            "name": "TypeError",
+            "message": "Return type of until condition not be `boolean`, getting: 'demo'",
         },
     }
 
@@ -89,8 +164,6 @@ def test_until_stage_skipped():
 
 
 def test_until_stage_cancel():
-    event = Event()
-    event.set()
     stage = UntilStage.model_validate(
         {
             "name": "This is until stage",
@@ -103,6 +176,8 @@ def test_until_stage_cancel():
             "extras": {"foo": "bar"},
         }
     )
+    event = Event()
+    event.set()
     rs: Result = stage.execute(params={}, event=event)
     assert rs.status == CANCEL
     assert rs.context == {
@@ -134,6 +209,38 @@ def test_until_stage_cancel():
         "errors": {
             "name": "StageCancelError",
             "message": "Loop execution was canceled from the event before start loop execution.",
+        },
+    }
+
+    event = MockEvent(n=2)
+    rs: Result = stage.execute(params={}, event=event)
+    assert rs.status == CANCEL
+    assert rs.context == {
+        "status": CANCEL,
+        "until": {
+            1: {
+                "status": CANCEL,
+                "loop": 1,
+                "item": 1,
+                "stages": {
+                    "4735427693": {
+                        "outputs": {},
+                        "errors": {
+                            "name": "StageCancelError",
+                            "message": "Execution was canceled from the event before start parallel.",
+                        },
+                        "status": CANCEL,
+                    }
+                },
+                "errors": {
+                    "name": "StageCancelError",
+                    "message": "Loop execution was canceled from the event after end loop execution.",
+                },
+            }
+        },
+        "errors": {
+            "name": "StageCancelError",
+            "message": "Loop execution was canceled from the event after end loop execution.",
         },
     }
 
