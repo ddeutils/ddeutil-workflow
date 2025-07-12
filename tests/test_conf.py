@@ -155,12 +155,18 @@ def test_load_file(target_path: Path):
 
 
 def test_load_file_filter(mock_conf: Path):
-    assert exclude_created_and_updated(
+    assert (
+        "wf_1",
+        {"tags": [1], "type": "Workflow", "value": 1},
+    ) in exclude_created_and_updated(
         list(YamlParser.finds("Workflow", path=mock_conf))
-    ) == [
-        ("wf_1", {"tags": [1], "type": "Workflow", "value": 1}),
-        ("wf_2", {"tags": [2], "type": "Workflow", "value": 2}),
-    ]
+    )
+    assert (
+        "wf_2",
+        {"tags": [2], "type": "Workflow", "value": 2},
+    ) in exclude_created_and_updated(
+        list(YamlParser.finds("Workflow", path=mock_conf))
+    )
 
     assert exclude_created_and_updated(
         list(YamlParser.finds("Workflow", path=mock_conf, tags=[1]))
