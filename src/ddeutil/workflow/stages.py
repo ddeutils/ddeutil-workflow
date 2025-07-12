@@ -5039,6 +5039,945 @@ class TransformStage(BaseStage):
         )
 
 
+class FileStage(BaseRetryStage):
+    """File stage executor for file system operations.
+
+    This stage provides comprehensive file operations including read, write,
+    copy, move, delete, and file validation.
+
+    Data Validate:
+        >>> stage = {
+        ...     "name": "File Operations",
+        ...     "file": {
+        ...         "operation": "read",
+        ...         "path": "/path/to/file.txt",
+        ...         "encoding": "utf-8"
+        ...     }
+        ... }
+    """
+
+    operation: str = Field(
+        description="File operation to perform (read, write, copy, move, delete, exists, size).",
+    )
+    path: str = Field(
+        description="File path for the operation.",
+    )
+    content: Optional[str] = Field(
+        default=None,
+        description="Content to write (for write operation).",
+    )
+    target_path: Optional[str] = Field(
+        default=None,
+        description="Target path (for copy/move operations).",
+    )
+    encoding: str = Field(
+        default="utf-8",
+        description="File encoding for read/write operations.",
+    )
+    mode: str = Field(
+        default="r",
+        description="File mode for read/write operations.",
+    )
+    create_dirs: bool = Field(
+        default=False,
+        description="Create parent directories if they don't exist.",
+        alias="create-dirs",
+    )
+
+    def process(
+        self,
+        params: DictData,
+        run_id: str,
+        context: DictData,
+        *,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
+    ) -> Result:
+        """Execute file operation.
+
+        Args:
+            params: Parameter data
+            run_id: Running stage ID
+            context: Context data
+            parent_run_id: Parent running ID
+            event: Event manager
+
+        Returns:
+            Result with file operation data
+        """
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
+        )
+
+        if event and event.is_set():
+            raise StageCancelError("File stage was canceled from event")
+
+        # Resolve template parameters
+        operation = param2template(self.operation, params, extras=self.extras)
+        path = param2template(self.path, params, extras=self.extras)
+        target_path = (
+            param2template(self.target_path, params, extras=self.extras)
+            if self.target_path
+            else None
+        )
+        content = (
+            param2template(self.content, params, extras=self.extras)
+            if self.content
+            else None
+        )
+
+        trace.info(f"[STAGE]: File operation: {operation} on {path}")
+
+        try:
+            file_path = Path(path)
+            result_data = {}
+
+            if operation == "read":
+                if not file_path.exists():
+                    raise StageError(f"File does not exist: {path}")
+
+                with open(
+                    file_path, mode=self.mode, encoding=self.encoding
+                ) as f:
+                    result_data["content"] = f.read()
+                    result_data["size"] = file_path.stat().st_size
+
+            elif operation == "write":
+                if self.create_dirs:
+                    file_path.parent.mkdir(parents=True, exist_ok=True)
+
+                with open(file_path, mode="w", encoding=self.encoding) as f:
+                    f.write(content or "")
+
+                result_data["size"] = file_path.stat().st_size
+                result_data["path"] = str(file_path.absolute())
+
+            elif operation == "copy":
+                if not file_path.exists():
+                    raise StageError(f"Source file does not exist: {path}")
+
+                if not target_path:
+                    raise StageError(
+                        "Target path is required for copy operation"
+                    )
+
+                target_file = Path(target_path)
+                if self.create_dirs:
+                    target_file.parent.mkdir(parents=True, exist_ok=True)
+
+                import shutil
+
+                shutil.copy2(file_path, target_file)
+                result_data["source"] = str(file_path.absolute())
+                result_data["target"] = str(target_file.absolute())
+
+            elif operation == "move":
+                if not file_path.exists():
+                    raise StageError(f"Source file does not exist: {path}")
+
+                if not target_path:
+                    raise StageError(
+                        "Target path is required for move operation"
+                    )
+
+                target_file = Path(target_path)
+                if self.create_dirs:
+                    target_file.parent.mkdir(parents=True, exist_ok=True)
+
+                file_path.rename(target_file)
+                result_data["source"] = str(file_path.absolute())
+                result_data["target"] = str(target_file.absolute())
+
+            elif operation == "delete":
+                if not file_path.exists():
+                    trace.warning(
+                        f"[STAGE]: File does not exist for deletion: {path}"
+                    )
+                    result_data["deleted"] = False
+                else:
+                    file_path.unlink()
+                    result_data["deleted"] = True
+                    result_data["path"] = str(file_path.absolute())
+
+            elif operation == "exists":
+                result_data["exists"] = file_path.exists()
+                if file_path.exists():
+                    result_data["size"] = file_path.stat().st_size
+                    result_data["modified"] = file_path.stat().st_mtime
+
+            elif operation == "size":
+                if not file_path.exists():
+                    raise StageError(f"File does not exist: {path}")
+
+                result_data["size"] = file_path.stat().st_size
+                result_data["path"] = str(file_path.absolute())
+
+            else:
+                raise StageError(f"Unsupported file operation: {operation}")
+
+            return Result(
+                run_id=run_id,
+                parent_run_id=parent_run_id,
+                status=SUCCESS,
+                context=catch(
+                    context,
+                    status=SUCCESS,
+                    updated=result_data,
+                ),
+                extras=self.extras,
+            )
+
+        except Exception as e:
+            raise StageError(f"File operation failed: {e}") from None
+
+
+class DatabaseStage(BaseRetryStage):
+    """Database stage executor for database operations.
+
+    This stage provides database connectivity and operations for various
+    database types including SQLite, PostgreSQL, MySQL, and others.
+
+    Data Validate:
+        >>> stage = {
+        ...     "name": "Database Query",
+        ...     "database": {
+        ...         "type": "sqlite",
+        ...         "connection": "/path/to/database.db",
+        ...         "query": "SELECT * FROM users WHERE status = ?",
+        ...         "params": ["active"]
+        ...     }
+        ... }
+    """
+
+    db_type: str = Field(
+        description="Database type (sqlite, postgresql, mysql, etc.).",
+        alias="type",
+    )
+    connection: str = Field(
+        description="Database connection string or path.",
+    )
+    query: str = Field(
+        description="SQL query to execute.",
+    )
+    params: list[Any] = Field(
+        default_factory=list,
+        description="Query parameters.",
+    )
+    operation: str = Field(
+        default="select",
+        description="Operation type (select, insert, update, delete, execute).",
+    )
+    fetch_mode: str = Field(
+        default="all",
+        description="Fetch mode for select operations (all, one, many).",
+        alias="fetch-mode",
+    )
+    fetch_size: int = Field(
+        default=1000,
+        description="Number of rows to fetch for 'many' mode.",
+        alias="fetch-size",
+    )
+
+    def process(
+        self,
+        params: DictData,
+        run_id: str,
+        context: DictData,
+        *,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
+    ) -> Result:
+        """Execute database operation.
+
+        Args:
+            params: Parameter data
+            run_id: Running stage ID
+            context: Context data
+            parent_run_id: Parent running ID
+            event: Event manager
+
+        Returns:
+            Result with database operation data
+        """
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
+        )
+
+        if event and event.is_set():
+            raise StageCancelError("Database stage was canceled from event")
+
+        # Resolve template parameters
+        db_type = param2template(self.db_type, params, extras=self.extras)
+        connection = param2template(self.connection, params, extras=self.extras)
+        query = param2template(self.query, params, extras=self.extras)
+        operation = param2template(self.operation, params, extras=self.extras)
+        db_params = param2template(self.params, params, extras=self.extras)
+
+        trace.info(f"[STAGE]: Database {operation} on {db_type}")
+
+        try:
+            # Import database driver based on type
+            if db_type == "sqlite":
+                import sqlite3
+
+                conn = sqlite3.connect(connection)
+                conn.row_factory = sqlite3.Row
+            elif db_type == "postgresql":
+                try:
+                    import psycopg2
+
+                    conn = psycopg2.connect(connection)
+                except ImportError:
+                    raise StageError(
+                        "psycopg2 package required for PostgreSQL support"
+                    )
+            elif db_type == "mysql":
+                try:
+                    import mysql.connector
+
+                    conn = mysql.connector.connect(**connection)
+                except ImportError:
+                    raise StageError(
+                        "mysql-connector-python package required for MySQL support"
+                    )
+            else:
+                raise StageError(f"Unsupported database type: {db_type}")
+
+            cursor = conn.cursor()
+            result_data = {}
+
+            try:
+                if operation == "select":
+                    cursor.execute(query, db_params)
+
+                    if self.fetch_mode == "one":
+                        row = cursor.fetchone()
+                        result_data["data"] = dict(row) if row else None
+                    elif self.fetch_mode == "many":
+                        rows = cursor.fetchmany(self.fetch_size)
+                        result_data["data"] = [dict(row) for row in rows]
+                    else:  # all
+                        rows = cursor.fetchall()
+                        result_data["data"] = [dict(row) for row in rows]
+
+                    result_data["row_count"] = (
+                        len(result_data["data"]) if result_data["data"] else 0
+                    )
+
+                elif operation in ["insert", "update", "delete"]:
+                    cursor.execute(query, db_params)
+                    result_data["affected_rows"] = cursor.rowcount
+
+                    if operation == "insert":
+                        result_data["last_insert_id"] = cursor.lastrowid
+
+                elif operation == "execute":
+                    cursor.execute(query, db_params)
+                    result_data["affected_rows"] = cursor.rowcount
+
+                else:
+                    raise StageError(f"Unsupported operation: {operation}")
+
+                # Commit for non-select operations
+                if operation != "select":
+                    conn.commit()
+
+            finally:
+                cursor.close()
+                conn.close()
+
+            return Result(
+                run_id=run_id,
+                parent_run_id=parent_run_id,
+                status=SUCCESS,
+                context=catch(
+                    context,
+                    status=SUCCESS,
+                    updated=result_data,
+                ),
+                extras=self.extras,
+            )
+
+        except Exception as e:
+            raise StageError(f"Database operation failed: {e}") from None
+
+
+class WebhookStage(BaseRetryStage):
+    """Webhook stage executor for external trigger support.
+
+    This stage provides webhook functionality for receiving external
+    triggers and integrating with external systems.
+
+    Data Validate:
+        >>> stage = {
+        ...     "name": "Webhook Receiver",
+        ...     "webhook": {
+        ...         "method": "POST",
+        ...         "path": "/webhook/data",
+        ...         "port": 8080,
+        ...         "timeout": 30,
+        ...         "secret": "webhook-secret"
+        ...     }
+        ... }
+    """
+
+    method: str = Field(
+        default="POST",
+        description="HTTP method to accept.",
+    )
+    path: str = Field(
+        description="Webhook path to listen on.",
+    )
+    port: int = Field(
+        default=8080,
+        description="Port to listen on.",
+    )
+    host: str = Field(
+        default="0.0.0.0",
+        description="Host to bind to.",
+    )
+    timeout: float = Field(
+        default=30,
+        description="Timeout in seconds to wait for webhook.",
+    )
+    secret: Optional[str] = Field(
+        default=None,
+        description="Webhook secret for validation.",
+    )
+    validate_signature: bool = Field(
+        default=False,
+        description="Whether to validate webhook signature.",
+        alias="validate-signature",
+    )
+
+    def process(
+        self,
+        params: DictData,
+        run_id: str,
+        context: DictData,
+        *,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
+    ) -> Result:
+        """Execute webhook receiver.
+
+        Args:
+            params: Parameter data
+            run_id: Running stage ID
+            context: Context data
+            parent_run_id: Parent running ID
+            event: Event manager
+
+        Returns:
+            Result with webhook data
+        """
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
+        )
+
+        if event and event.is_set():
+            raise StageCancelError("Webhook stage was canceled from event")
+
+        # Resolve template parameters
+        method = param2template(self.method, params, extras=self.extras).upper()
+        path = param2template(self.path, params, extras=self.extras)
+        port = param2template(self.port, params, extras=self.extras)
+        host = param2template(self.host, params, extras=self.extras)
+        timeout = param2template(self.timeout, params, extras=self.extras)
+        secret = (
+            param2template(self.secret, params, extras=self.extras)
+            if self.secret
+            else None
+        )
+
+        trace.info(f"[STAGE]: Webhook listening on {host}:{port}{path}")
+
+        try:
+            import json
+            import threading
+            from http.server import BaseHTTPRequestHandler, HTTPServer
+            from urllib.parse import parse_qs, urlparse
+
+            webhook_data = {}
+            webhook_received = threading.Event()
+            validate_signature_flag = self.validate_signature
+
+            class WebhookHandler(BaseHTTPRequestHandler):
+                def do_POST(self):
+                    if self.path == path:
+                        content_length = int(
+                            self.headers.get("Content-Length", 0)
+                        )
+                        post_data = self.rfile.read(content_length)
+
+                        # Validate signature if required
+                        if validate_signature_flag and secret:
+                            signature = self.headers.get(
+                                "X-Hub-Signature-256", ""
+                            )
+                            if not self._validate_signature(
+                                post_data, signature, secret
+                            ):
+                                self.send_response(401)
+                                self.end_headers()
+                                return
+
+                        try:
+                            webhook_data["body"] = json.loads(
+                                post_data.decode("utf-8")
+                            )
+                        except json.JSONDecodeError:
+                            webhook_data["body"] = post_data.decode("utf-8")
+
+                        webhook_data["headers"] = dict(self.headers)
+                        webhook_data["method"] = self.command
+                        webhook_data["path"] = self.path
+
+                        self.send_response(200)
+                        self.send_header("Content-type", "application/json")
+                        self.end_headers()
+                        self.wfile.write(
+                            json.dumps({"status": "received"}).encode()
+                        )
+
+                        webhook_received.set()
+                    else:
+                        self.send_response(404)
+                        self.end_headers()
+
+                def do_GET(self):
+                    if self.path == path:
+                        webhook_data["method"] = self.command
+                        webhook_data["path"] = self.path
+                        webhook_data["headers"] = dict(self.headers)
+
+                        # Parse query parameters
+                        parsed_url = urlparse(self.path)
+                        webhook_data["query_params"] = parse_qs(
+                            parsed_url.query
+                        )
+
+                        self.send_response(200)
+                        self.send_header("Content-type", "application/json")
+                        self.end_headers()
+                        self.wfile.write(
+                            json.dumps({"status": "received"}).encode()
+                        )
+
+                        webhook_received.set()
+                    else:
+                        self.send_response(404)
+                        self.end_headers()
+
+                def _validate_signature(self, data, signature, secret):
+                    import hashlib
+                    import hmac
+
+                    expected_signature = f"sha256={hmac.new(secret.encode(), data, hashlib.sha256).hexdigest()}"
+                    return hmac.compare_digest(signature, expected_signature)
+
+                def log_message(self, format, *args):
+                    # Suppress HTTP server logs
+                    pass
+
+            # Start webhook server
+            server = HTTPServer((host, port), WebhookHandler)
+            server_thread = threading.Thread(target=server.serve_forever)
+            server_thread.daemon = True
+            server_thread.start()
+
+            # Wait for webhook or timeout
+            if webhook_received.wait(timeout=timeout):
+                server.shutdown()
+                server.server_close()
+
+                return Result(
+                    run_id=run_id,
+                    parent_run_id=parent_run_id,
+                    status=SUCCESS,
+                    context=catch(
+                        context,
+                        status=SUCCESS,
+                        updated=webhook_data,
+                    ),
+                    extras=self.extras,
+                )
+            else:
+                server.shutdown()
+                server.server_close()
+                raise StageError(f"Webhook timeout after {timeout} seconds")
+
+        except Exception as e:
+            raise StageError(f"Webhook operation failed: {e}") from None
+
+
+class MetricsStage(BaseStage):
+    """Metrics stage executor for performance monitoring and observability.
+
+    This stage provides metrics collection, custom metrics, and performance
+    monitoring capabilities.
+
+    Data Validate:
+        >>> stage = {
+        ...     "name": "Collect Metrics",
+        ...     "metrics": {
+        ...         "operation": "increment",
+        ...         "name": "processed_items",
+        ...         "value": 1,
+        ...         "tags": {"environment": "prod"}
+        ...     }
+        ... }
+    """
+
+    operation: str = Field(
+        description="Metrics operation (increment, gauge, histogram, timing).",
+    )
+    name: str = Field(
+        description="Metric name.",
+    )
+    value: Optional[float] = Field(
+        default=None,
+        description="Metric value.",
+    )
+    tags: DictStr = Field(
+        default_factory=dict,
+        description="Metric tags/labels.",
+    )
+    description: Optional[str] = Field(
+        default=None,
+        description="Metric description.",
+    )
+    unit: Optional[str] = Field(
+        default=None,
+        description="Metric unit (e.g., 'bytes', 'seconds', 'count').",
+    )
+
+    def process(
+        self,
+        params: DictData,
+        run_id: str,
+        context: DictData,
+        *,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
+    ) -> Result:
+        """Execute metrics operation.
+
+        Args:
+            params: Parameter data
+            run_id: Running stage ID
+            context: Context data
+            parent_run_id: Parent running ID
+            event: Event manager
+
+        Returns:
+            Result with metrics data
+        """
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
+        )
+
+        if event and event.is_set():
+            raise StageCancelError("Metrics stage was canceled from event")
+
+        # Resolve template parameters
+        operation = param2template(self.operation, params, extras=self.extras)
+        name = param2template(self.name, params, extras=self.extras)
+        value = (
+            param2template(self.value, params, extras=self.extras)
+            if self.value is not None
+            else None
+        )
+        tags = param2template(self.tags, params, extras=self.extras)
+
+        trace.info(f"[STAGE]: Metrics {operation} for {name}")
+
+        try:
+            # Simple in-memory metrics storage (in production, use proper metrics backend)
+            if not hasattr(self, "_metrics_store"):
+                self._metrics_store = {}
+
+            metric_key = f"{name}_{operation}"
+            if metric_key not in self._metrics_store:
+                self._metrics_store[metric_key] = {
+                    "name": name,
+                    "operation": operation,
+                    "value": 0,
+                    "count": 0,
+                    "min": float("inf"),
+                    "max": float("-inf"),
+                    "tags": tags,
+                    "description": self.description,
+                    "unit": self.unit,
+                    "last_updated": time.time(),
+                }
+
+            metric = self._metrics_store[metric_key]
+            current_time = time.time()
+
+            if operation == "increment":
+                metric["value"] += value or 1
+                metric["count"] += 1
+            elif operation == "gauge":
+                metric["value"] = value or 0
+                metric["count"] += 1
+            elif operation == "histogram":
+                if value is not None:
+                    metric["value"] = value
+                    metric["min"] = min(metric["min"], value)
+                    metric["max"] = max(metric["max"], value)
+                    metric["count"] += 1
+            elif operation == "timing":
+                if value is not None:
+                    metric["value"] = value
+                    metric["min"] = min(metric["min"], value)
+                    metric["max"] = max(metric["max"], value)
+                    metric["count"] += 1
+
+            metric["last_updated"] = current_time
+
+            result_data = {"metric": metric.copy(), "timestamp": current_time}
+
+            return Result(
+                run_id=run_id,
+                parent_run_id=parent_run_id,
+                status=SUCCESS,
+                context=catch(
+                    context,
+                    status=SUCCESS,
+                    updated=result_data,
+                ),
+                extras=self.extras,
+            )
+
+        except Exception as e:
+            raise StageError(f"Metrics operation failed: {e}") from None
+
+
+class HealthCheckStage(BaseStage):
+    """Health check stage executor for system monitoring.
+
+    This stage provides health check capabilities for monitoring system
+    status, service availability, and resource health.
+
+    Data Validate:
+        >>> stage = {
+        ...     "name": "Health Check",
+        ...     "health_check": {
+        ...         "type": "http",
+        ...         "url": "http://localhost:8080/health",
+        ...         "timeout": 5,
+        ...         "expected_status": 200
+        ...     }
+        ... }
+    """
+
+    check_type: str = Field(
+        description="Health check type (http, tcp, file, command).",
+        alias="type",
+    )
+    target: str = Field(
+        description="Target to check (URL, host:port, file path, command).",
+    )
+    timeout: float = Field(
+        default=5,
+        description="Timeout in seconds.",
+    )
+    expected_status: Optional[int] = Field(
+        default=None,
+        description="Expected status code (for HTTP checks).",
+        alias="expected-status",
+    )
+    expected_content: Optional[str] = Field(
+        default=None,
+        description="Expected content in response (for HTTP checks).",
+        alias="expected-content",
+    )
+    retries: int = Field(
+        default=1,
+        description="Number of retries before marking as failed.",
+    )
+
+    def process(
+        self,
+        params: DictData,
+        run_id: str,
+        context: DictData,
+        *,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
+    ) -> Result:
+        """Execute health check.
+
+        Args:
+            params: Parameter data
+            run_id: Running stage ID
+            context: Context data
+            parent_run_id: Parent running ID
+            event: Event manager
+
+        Returns:
+            Result with health check data
+        """
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
+        )
+
+        if event and event.is_set():
+            raise StageCancelError("Health check was canceled from event")
+
+        # Resolve template parameters
+        check_type = param2template(self.check_type, params, extras=self.extras)
+        target = param2template(self.target, params, extras=self.extras)
+        timeout = param2template(self.timeout, params, extras=self.extras)
+        expected_status = (
+            param2template(self.expected_status, params, extras=self.extras)
+            if self.expected_status is not None
+            else None
+        )
+        expected_content = (
+            param2template(self.expected_content, params, extras=self.extras)
+            if self.expected_content
+            else None
+        )
+
+        trace.info(f"[STAGE]: Health check {check_type} on {target}")
+
+        try:
+            result_data = {
+                "type": check_type,
+                "target": target,
+                "status": "unknown",
+                "response_time": None,
+                "details": {},
+            }
+
+            for attempt in range(self.retries + 1):
+                try:
+                    start_time = time.time()
+
+                    if check_type == "http":
+                        import requests
+
+                        response = requests.get(
+                            target, timeout=timeout, allow_redirects=True
+                        )
+                        response_time = time.time() - start_time
+
+                        result_data["response_time"] = response_time
+                        result_data["details"][
+                            "status_code"
+                        ] = response.status_code
+                        result_data["details"]["content_length"] = len(
+                            response.content
+                        )
+
+                        if (
+                            expected_status
+                            and response.status_code != expected_status
+                        ):
+                            raise StageError(
+                                f"Expected status {expected_status}, got {response.status_code}"
+                            )
+
+                        if (
+                            expected_content
+                            and expected_content not in response.text
+                        ):
+                            raise StageError(
+                                "Expected content not found in response"
+                            )
+
+                        result_data["status"] = "healthy"
+
+                    elif check_type == "tcp":
+                        import socket
+
+                        host, port = target.split(":", 1)
+                        port = int(port)
+
+                        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                        sock.settimeout(timeout)
+                        sock.connect((host, port))
+                        sock.close()
+
+                        response_time = time.time() - start_time
+                        result_data["response_time"] = response_time
+                        result_data["status"] = "healthy"
+
+                    elif check_type == "file":
+                        file_path = Path(target)
+                        if not file_path.exists():
+                            raise StageError(f"File does not exist: {target}")
+
+                        response_time = time.time() - start_time
+                        result_data["response_time"] = response_time
+                        result_data["details"][
+                            "file_size"
+                        ] = file_path.stat().st_size
+                        result_data["status"] = "healthy"
+
+                    elif check_type == "command":
+                        process = subprocess.run(
+                            target,
+                            shell=True,
+                            timeout=timeout,
+                            capture_output=True,
+                            text=True,
+                        )
+
+                        response_time = time.time() - start_time
+                        result_data["response_time"] = response_time
+                        result_data["details"][
+                            "return_code"
+                        ] = process.returncode
+                        result_data["details"]["stdout"] = process.stdout
+                        result_data["details"]["stderr"] = process.stderr
+
+                        if process.returncode != 0:
+                            raise StageError(
+                                f"Command failed with return code {process.returncode}"
+                            )
+
+                        result_data["status"] = "healthy"
+
+                    else:
+                        raise StageError(
+                            f"Unsupported health check type: {check_type}"
+                        )
+
+                    # If we get here, the check was successful
+                    break
+
+                except Exception as e:
+                    if attempt == self.retries:
+                        result_data["status"] = "unhealthy"
+                        result_data["details"]["error"] = str(e)
+                        raise StageError(
+                            f"Health check failed after {self.retries + 1} attempts: {e}"
+                        )
+                    else:
+                        trace.warning(
+                            f"[STAGE]: Health check attempt {attempt + 1} failed: {e}"
+                        )
+                        time.sleep(1)  # Brief delay before retry
+
+            return Result(
+                run_id=run_id,
+                parent_run_id=parent_run_id,
+                status=SUCCESS,
+                context=catch(
+                    context,
+                    status=SUCCESS,
+                    updated=result_data,
+                ),
+                extras=self.extras,
+            )
+
+        except Exception as e:
+            raise StageError(f"Health check failed: {e}") from None
+
+
 # NOTE:
 #   An order of parsing stage model on the Job model with `stages` field.
 #   From the current build-in stages, they do not have stage that have the same
@@ -5067,6 +6006,11 @@ Stage = Annotated[
         SucceedStage,
         FailStage,
         TransformStage,
+        FileStage,
+        DatabaseStage,
+        WebhookStage,
+        MetricsStage,
+        HealthCheckStage,
     ],
     Field(
         union_mode="smart",
