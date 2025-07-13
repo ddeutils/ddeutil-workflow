@@ -407,7 +407,7 @@ class Workflow(BaseModel):
         with the set `on` field.
 
         Args:
-            dt: A datetime object that want to validate.
+            dt (datetime): A datetime object that want to validate.
 
         Returns:
             datetime: The validated release datetime.
@@ -416,6 +416,8 @@ class Workflow(BaseModel):
             dt = dt.replace(tzinfo=UTC)
 
         release: datetime = replace_sec(dt.astimezone(UTC))
+
+        # NOTE: Return itself if schedule event does not set.
         if not self.on.schedule:
             return release
 
@@ -454,7 +456,7 @@ class Workflow(BaseModel):
             - Writing result audit
 
         Args:
-            release: (datetime) A release datetime.
+            release (datetime): A release datetime.
             params: A workflow parameter that pass to execute method.
             release_type:
             run_id: (str) A workflow running ID.
@@ -750,8 +752,12 @@ class Workflow(BaseModel):
 
         with ThreadPoolExecutor(max_job_parallel, "wf") as executor:
             futures: list[Future] = []
-            backoff_sleep = 0.01  # Start with smaller sleep time
-            consecutive_waits = 0  # Track consecutive wait states
+
+            # NOTE: Start with smaller sleep time
+            backoff_sleep: float = 0.01
+
+            # NOTE: Track consecutive wait states
+            consecutive_waits: int = 0
 
             while not job_queue.empty() and (
                 not_timeout_flag := ((time.monotonic() - ts) < timeout)
@@ -799,6 +805,7 @@ class Workflow(BaseModel):
                     skip_count += 1
                     continue
 
+                # IMPORTANT: Start execution with parallel mode.
                 if max_job_parallel > 1:
                     futures.append(
                         executor.submit(
@@ -831,7 +838,9 @@ class Workflow(BaseModel):
                         st, _ = future.result()
                         sequence_statuses.append(st)
                     job_queue.put(job_id)
-                elif future.cancelled():
+                # NOTE: The release future can not track a cancelled status
+                #   because it only has one future.
+                elif future.cancelled():  # pragma: no cov
                     sequence_statuses.append(CANCEL)
                     job_queue.put(job_id)
                 elif future.running() or "state=pending" in str(future):
@@ -852,7 +861,7 @@ class Workflow(BaseModel):
                 for total, future in enumerate(as_completed(futures), start=0):
                     try:
                         statuses[total], _ = future.result()
-                    except WorkflowError as e:
+                    except (WorkflowError, Exception) as e:
                         statuses[total] = get_status_from_error(e)
 
                 # NOTE: Update skipped status from the job trigger.

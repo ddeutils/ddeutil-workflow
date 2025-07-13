@@ -361,17 +361,18 @@ def set_logging(name: str) -> logging.Logger:
 
 PREFIX_LOGS: Final[dict[str, dict]] = {
     "CALLER": {
-        "emoji": "📍",
+        "emoji": "⚙️",
         "desc": "logs from any usage from custom caller function.",
     },
-    "STAGE": {"emoji": "⚙️", "desc": "logs from stages module."},
+    "STAGE": {"emoji": "🔗", "desc": "logs from stages module."},
     "JOB": {"emoji": "⛓️", "desc": "logs from job module."},
     "WORKFLOW": {"emoji": "🏃", "desc": "logs from workflow module."},
     "RELEASE": {"emoji": "📅", "desc": "logs from release workflow method."},
     "POKING": {"emoji": "⏰", "desc": "logs from poke workflow method."},
+    "AUDIT": {"emoji": "📌", "desc": "logs from audit model."},
 }  # pragma: no cov
 PREFIX_DEFAULT: Final[str] = "CALLER"
-PREFIX_LOGS_REGEX: re.Pattern[str] = re.compile(
+PREFIX_LOGS_REGEX: Final[re.Pattern[str]] = re.compile(
     rf"(^\[(?P<name>{'|'.join(PREFIX_LOGS)})]:\s?)?(?P<message>.*)",
     re.MULTILINE | re.DOTALL | re.ASCII | re.VERBOSE,
 )  # pragma: no cov

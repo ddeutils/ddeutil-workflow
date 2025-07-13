@@ -51,6 +51,48 @@ def test_job_exec_py():
         },
     }
 
+    event = MockEvent(n=1)
+    rs: Result = job.execute(params={"params": {"name": "Foo"}}, event=event)
+    assert rs.status == CANCEL
+    assert rs.context == {
+        "status": CANCEL,
+        "EMPTY": {
+            "errors": {
+                "message": "Strategy execution was canceled from the event before start stage execution.",
+                "name": "JobCancelError",
+            },
+            "matrix": {},
+            "stages": {},
+            "status": CANCEL,
+        },
+        "errors": {
+            "name": "JobCancelError",
+            "message": "Strategy execution was canceled from the event before start stage execution.",
+        },
+    }
+
+    event = MockEvent(n=2)
+    rs: Result = job.execute(params={"params": {"name": "Foo"}}, event=event)
+    assert rs.status == CANCEL
+    assert rs.context == {
+        "status": CANCEL,
+        "EMPTY": {
+            "errors": {
+                "message": "Strategy execution was canceled from the event before start stage execution.",
+                "name": "JobCancelError",
+            },
+            "matrix": {},
+            "stages": {
+                "hello-world": {"outputs": {"x": "New Name"}, "status": SUCCESS}
+            },
+            "status": CANCEL,
+        },
+        "errors": {
+            "name": "JobCancelError",
+            "message": "Strategy execution was canceled from the event before start stage execution.",
+        },
+    }
+
 
 def test_job_exec_py_raise():
     rs: Result = (
@@ -428,6 +470,7 @@ def test_job_exec_skipped():
     job: Job = Job.model_validate(
         {
             "id": "first-job",
+            "desc": "Job Skip execution!!!",
             "if": "False",
             "stages": [{"name": "Echo empty", "echo": "Hello World"}],
         }
@@ -502,5 +545,42 @@ def test_job_exec_runs_on_not_implement():
         "errors": {
             "message": "Execute runs-on type: 'self_hosted' does not support yet.",
             "name": "JobError",
+        },
+    }
+
+
+def test_job_exec_cancel():
+    job: Job = Job.model_validate(
+        {
+            "id": "first-job",
+            "stages": [{"name": "Echo empty", "echo": "Hello World"}],
+        }
+    )
+    event = MockEvent(n=2)
+    rs = job.execute({}, event=event)
+    assert rs.status == CANCEL
+    assert rs.context == {
+        "status": CANCEL,
+        "EMPTY": {
+            "status": CANCEL,
+            "matrix": {},
+            "stages": {
+                "2419214589": {
+                    "outputs": {},
+                    "errors": {
+                        "name": "StageCancelError",
+                        "message": "Execution was canceled from the event before start parallel.",
+                    },
+                    "status": CANCEL,
+                },
+            },
+            "errors": {
+                "name": "JobCancelError",
+                "message": "Strategy execution was canceled from the event after end stage execution.",
+            },
+        },
+        "errors": {
+            "name": "JobCancelError",
+            "message": "Strategy execution was canceled from the event after end stage execution.",
         },
     }

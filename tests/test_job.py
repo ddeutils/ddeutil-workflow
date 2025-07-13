@@ -8,7 +8,7 @@ from ddeutil.workflow.job import (
     Rule,
     RunsOnModel,
 )
-from ddeutil.workflow.result import FAILED, SKIP, SUCCESS, WAIT
+from ddeutil.workflow.result import CANCEL, FAILED, SKIP, SUCCESS, WAIT
 from pydantic import TypeAdapter, ValidationError
 
 
@@ -61,6 +61,195 @@ def test_job_check_needs():
     assert job.check_needs({"job-before1": {}, "job-before2": {}}) == SUCCESS
     assert job.check_needs({"job-before1": {"stages": "foo"}}) == WAIT
     # assert job.check_needs({"job-before1": {"errors": {}}}) == FAILED
+    assert (
+        job.check_needs({"job-before1": {"status": CANCEL}, "job-before2": {}})
+        == CANCEL
+    )
+
+    job = Job.model_validate(
+        {
+            "id": "final-job",
+            "needs": ["job-before1", "job-before2"],
+            "trigger-rule": Rule.ALL_DONE,
+        }
+    )
+    assert (
+        job.check_needs(
+            {"job-before1": {}, "job-before2": {"status": FAILED, "errors": {}}}
+        )
+        == SUCCESS
+    )
+
+    job = Job.model_validate(
+        {
+            "id": "final-job",
+            "needs": ["job-before1", "job-before2"],
+            "trigger-rule": Rule.ALL_FAILED,
+        }
+    )
+    assert (
+        job.check_needs(
+            {"job-before1": {}, "job-before2": {"status": FAILED, "errors": {}}}
+        )
+        == FAILED
+    )
+    assert (
+        job.check_needs(
+            {
+                "job-before1": {"status": FAILED},
+                "job-before2": {"status": FAILED, "errors": {}},
+            }
+        )
+        == SUCCESS
+    )
+
+    job = Job.model_validate(
+        {
+            "id": "final-job",
+            "needs": ["job-before1", "job-before2", "job-before3"],
+            "trigger-rule": Rule.ONE_SUCCESS,
+        }
+    )
+    assert (
+        job.check_needs(
+            {
+                "job-before1": {},
+                "job-before2": {"status": FAILED},
+                "job-before3": {"status": SKIP},
+            }
+        )
+        == SUCCESS
+    )
+    assert (
+        job.check_needs(
+            {
+                "job-before1": {},
+                "job-before2": {},
+                "job-before3": {"status": FAILED},
+            }
+        )
+        == FAILED
+    )
+    assert (
+        job.check_needs(
+            {
+                "job-before1": {"status": FAILED},
+                "job-before2": {"status": SKIP},
+                "job-before3": {"status": FAILED},
+            }
+        )
+        == FAILED
+    )
+
+    job = Job.model_validate(
+        {
+            "id": "final-job",
+            "needs": ["job-before1", "job-before2", "job-before3"],
+            "trigger-rule": Rule.ONE_FAILED,
+        }
+    )
+    assert (
+        job.check_needs(
+            {
+                "job-before1": {},
+                "job-before2": {"status": FAILED},
+                "job-before3": {"status": FAILED},
+            }
+        )
+        == FAILED
+    )
+    assert (
+        job.check_needs(
+            {
+                "job-before1": {},
+                "job-before2": {"status": SKIP},
+                "job-before3": {"status": FAILED},
+            }
+        )
+        == SUCCESS
+    )
+    assert (
+        job.check_needs(
+            {
+                "job-before1": {"status": FAILED},
+                "job-before2": {"status": FAILED},
+                "job-before3": {"status": FAILED},
+            }
+        )
+        == FAILED
+    )
+
+    job = Job.model_validate(
+        {
+            "id": "final-job",
+            "needs": ["job-before1", "job-before2", "job-before3"],
+            "trigger-rule": Rule.NONE_SKIPPED,
+        }
+    )
+    assert (
+        job.check_needs(
+            {
+                "job-before1": {},
+                "job-before2": {"status": FAILED},
+                "job-before3": {"status": FAILED},
+            }
+        )
+        == SUCCESS
+    )
+    assert (
+        job.check_needs(
+            {
+                "job-before1": {},
+                "job-before2": {"status": SKIP},
+                "job-before3": {"status": FAILED},
+            }
+        )
+        == FAILED
+    )
+    assert (
+        job.check_needs(
+            {
+                "job-before1": {"status": FAILED},
+                "job-before2": {"status": FAILED},
+                "job-before3": {"status": FAILED},
+            }
+        )
+        == SUCCESS
+    )
+
+    job = Job.model_validate(
+        {
+            "id": "final-job",
+            "needs": ["job-before1", "job-before2", "job-before3"],
+            "trigger-rule": Rule.NONE_FAILED,
+        }
+    )
+    assert (
+        job.check_needs(
+            {
+                "job-before1": {},
+                "job-before2": {"status": SKIP},
+                "job-before3": {"status": SKIP},
+            }
+        )
+        == SUCCESS
+    )
+    assert (
+        job.check_needs(
+            {
+                "job-before1": {},
+                "job-before2": {"status": SKIP},
+                "job-before3": {"status": FAILED},
+            }
+        )
+        == FAILED
+    )
+    assert (
+        job.check_needs(
+            {"job-before1": {}, "job-before2": {}, "job-before3": {}}
+        )
+        == SUCCESS
+    )
 
 
 def test_job_raise():
@@ -114,9 +303,23 @@ def test_job_set_outputs():
 
     assert (
         Job(strategy={"matrix": {"table": ["customer"]}}).set_outputs(
-            {}, {"jobs": {}}, job_id="foo"
+            {"status": FAILED}, {"jobs": {}}, job_id="foo"
         )
-    ) == {"jobs": {"foo": {"strategies": {}}}}
+    ) == {"jobs": {"foo": {"status": FAILED, "strategies": {}}}}
+
+
+def test_job_get_outputs():
+    out = Job(strategy={"matrix": {"table": ["customer"]}}).get_outputs(
+        {"jobs": {"foo": {"strategies": {"status": FAILED}}}}, job_id="foo"
+    )
+    assert out == {"status": FAILED}
+
+    job = Job(id="final-job")
+    out = job.get_outputs({"jobs": {"final-job": {"foo": "bar"}}})
+    assert out == {"foo": "bar"}
+
+    out = job.get_outputs({"jobs": {"first-job": {"foo": "bar"}}})
+    assert out == {}
 
 
 def test_job_if_condition():

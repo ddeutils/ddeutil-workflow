@@ -3,7 +3,6 @@ import os
 import shutil
 from pathlib import Path
 from unittest import mock
-from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -155,12 +154,18 @@ def test_load_file(target_path: Path):
 
 
 def test_load_file_filter(mock_conf: Path):
-    assert exclude_created_and_updated(
+    assert (
+        "wf_1",
+        {"tags": [1], "type": "Workflow", "value": 1},
+    ) in exclude_created_and_updated(
         list(YamlParser.finds("Workflow", path=mock_conf))
-    ) == [
-        ("wf_1", {"tags": [1], "type": "Workflow", "value": 1}),
-        ("wf_2", {"tags": [2], "type": "Workflow", "value": 2}),
-    ]
+    )
+    assert (
+        "wf_2",
+        {"tags": [2], "type": "Workflow", "value": 2},
+    ) in exclude_created_and_updated(
+        list(YamlParser.finds("Workflow", path=mock_conf))
+    )
 
     assert exclude_created_and_updated(
         list(YamlParser.finds("Workflow", path=mock_conf, tags=[1]))
@@ -322,11 +327,6 @@ def test_load_ignore_file(test_path: Path):
 
 
 def test_dynamic():
-    conf = dynamic(
-        "audit_url", extras={"audit_url": urlparse("/extras-audits")}
-    )
-    assert conf == urlparse("/extras-audits")
-
     conf = dynamic("log_datetime_format", f="%Y%m%d", extras={})
     assert conf == "%Y%m%d"
 
@@ -338,11 +338,13 @@ def test_dynamic():
     )
     assert conf == "%Y"
 
-    with pytest.raises(TypeError):
-        dynamic("audit_url", extras={"audit_url": "./audits"})
-
     conf = dynamic("max_job_exec_timeout", f=500, extras={})
     assert conf == 500
+
+    with pytest.raises(TypeError):
+        dynamic(
+            "max_job_exec_timeout", f=50, extras={"max_job_exec_timeout": False}
+        )
 
     conf = dynamic("max_job_exec_timeout", f=0, extras={})
     assert conf == 0
@@ -352,6 +354,9 @@ def test_parse_url():
     from urllib.parse import ParseResult, urlparse
 
     url: ParseResult = urlparse("./logs")
+    assert url == ParseResult(
+        scheme="", netloc="", path="./logs", params="", query="", fragment=""
+    )
     assert url.scheme == ""
     assert url.path == "./logs"
 

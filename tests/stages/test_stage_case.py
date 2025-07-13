@@ -36,7 +36,7 @@ def test_case_stage_exec(test_path):
                     ],
                 },
             ],
-        }
+        },
     )
     rs: Result = stage.execute({"params": {"name": "bar"}})
     assert rs.status == SUCCESS
@@ -110,6 +110,7 @@ def test_case_stage_exec_raise():
                     ],
                 },
             ],
+            "extras": {"foo": "bar"},
         }
     )
     # NOTE: Raise because else condition does not set.
@@ -122,6 +123,43 @@ def test_case_stage_exec_raise():
             "message": (
                 "This stage does not set else for support not match any case."
             ),
+        },
+    }
+
+    stage: Stage = CaseStage.model_validate(
+        {
+            "name": "Stage raise not has else condition",
+            "id": "raise-else",
+            "case": "${{ params.name }}",
+            "match": [
+                {
+                    "case": "bar",
+                    "stages": [
+                        {
+                            "name": "Raise stage",
+                            "raise": "Raise with ${{ params.name }}",
+                        }
+                    ],
+                },
+            ],
+            "extras": {"foo": "bar"},
+        }
+    )
+    rs: Result = stage.execute({"params": {"name": "bar"}})
+    assert rs.status == FAILED
+    assert rs.context == {
+        "status": FAILED,
+        "case": "bar",
+        "stages": {
+            "4045646338": {
+                "outputs": {},
+                "errors": {"name": "StageError", "message": "Raise with bar"},
+                "status": FAILED,
+            }
+        },
+        "errors": {
+            "name": "StageError",
+            "message": "Case-Stage was break because it has a sub stage, Raise stage, failed without raise error.",
         },
     }
 
@@ -155,6 +193,19 @@ def test_case_stage_exec_cancel():
             "message": (
                 "Execution was canceled from the event before start case execution."
             ),
+        },
+    }
+
+    event = MockEvent(n=1)
+    rs: Result = stage.execute({"params": {"name": "bar"}}, event=event)
+    assert rs.status == CANCEL
+    assert rs.context == {
+        "status": CANCEL,
+        "case": "bar",
+        "stages": {},
+        "errors": {
+            "name": "StageError",
+            "message": "Case-Stage was canceled from event that had set before stage case execution.",
         },
     }
 
