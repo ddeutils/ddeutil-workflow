@@ -2,6 +2,45 @@
 
 ## Latest Changes
 
+## 0.0.79
+
+### :sparkles: Features
+
+- :dart: feat: add tracing implement from ai
+- :dart: feat: add providers code for draft feature trigger job execution.
+- :dart: feat: enhance audits module.
+
+### :bug: Bug fixes
+
+- :gear: fixed: add new traces for migration.
+- :gear: fixed: fix test conf reorder.
+
+### :black_nib: Code Changes
+
+- :art: format: change format of audit module.
+- :test_tube: tests: update testcase for make coverage on stages module.
+- :test_tube: tests: update testcase for make coverage on job and workflow modules.
+- :construction: refactored: ⬆ deps: bump sigstore/gh-action-sigstore-python from 3.0.0 to 3.0.1
+
+### :broom: Deprecate & Clean
+
+- :recycle: clean: remove generated event that does not use.
+
+### :package: Build & Workflow
+
+- :package: build: update pydantic requirement from <3.0.0,==2.11.5 to ==2.11.7 (#57)
+- :package: build: bump requests from 2.32.3 to 2.32.4
+- :toolbox: build: update Dockerfile and add uv.
+
+### :book: Documentations
+
+- :page_facing_up: docs: update docs of job and workflow api.
+- :page_facing_up: docs: update event api docs.
+- :page_facing_up: docs: update docs-string for utils, reusables, and audits modules.
+- :page_facing_up: docs: update docs-string for params and traces modules.
+- :page_facing_up: docs: update init cli.
+- :page_facing_up: docs: remove mac os file from remote.
+
 ## 0.0.78
 
 ### :sparkles: Features
