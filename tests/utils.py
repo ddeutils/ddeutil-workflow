@@ -39,8 +39,8 @@ def dotenv_setting() -> None:
             WORKFLOW_CORE_STAGE_DEFAULT_ID=true
             WORKFLOW_CORE_GENERATE_ID_SIMPLE_MODE=true
             WORKFLOW_LOG_TIMEZONE=Asia/Bangkok
-            WORKFLOW_LOG_TRACE_ENABLE_WRITE=false
             WORKFLOW_LOG_AUDIT_ENABLE_WRITE=true
+            WORKFLOW_LOG_TRACE_HANDLERS='[{{"type": "console"}}]'
             """
         ).strip()
         env_path.write_text(env_str)

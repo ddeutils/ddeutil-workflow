@@ -39,7 +39,7 @@ from . import (
     WorkflowError,
 )
 from .__types import DictData
-from .audits import Trace, get_trace
+from .audits import TraceManager, get_trace
 from .errors import ResultError
 from .utils import default_gen_id
 
@@ -188,7 +188,9 @@ class Result:
     info: DictData = field(default_factory=dict)
     run_id: str = field(default_factory=default_gen_id)
     parent_run_id: Optional[str] = field(default=None)
-    trace: Optional[Trace] = field(default=None, compare=False, repr=False)
+    trace: Optional[TraceManager] = field(
+        default=None, compare=False, repr=False
+    )
 
     @model_validator(mode="after")
     def __prepare_trace(self) -> Self:
@@ -197,7 +199,7 @@ class Result:
         :rtype: Self
         """
         if self.trace is None:  # pragma: no cov
-            self.trace: Trace = get_trace(
+            self.trace: TraceManager = get_trace(
                 self.run_id,
                 parent_run_id=self.parent_run_id,
                 extras=self.extras,
@@ -206,7 +208,7 @@ class Result:
         return self
 
     @classmethod
-    def from_trace(cls, trace: Trace):
+    def from_trace(cls, trace: TraceManager):
         """Construct the result model from trace for clean code objective."""
         return cls(
             run_id=trace.run_id,

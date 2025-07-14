@@ -1,11 +1,17 @@
+import shutil
 import traceback
+from pathlib import Path
+from unittest import mock
 
 import pytest
 from ddeutil.workflow import Result
 from ddeutil.workflow.traces import (
-    FileTrace,
+    BaseHandler,
+    ConsoleHandler,
+    FileHandler,
     Message,
-    TraceMeta,
+    Metadata,
+    TraceManager,
 )
 
 
@@ -69,13 +75,20 @@ def test_trace_regex_message():
 
 
 def test_trace_meta():
-    meta = TraceMeta.make(
-        mode="stderr", message="Foo", level="info", cutting_id=""
+    meta = Metadata.make(
+        run_id="100",
+        parent_run_id="01",
+        error_flag=True,
+        message="Foo",
+        level="info",
+        cutting_id="",
     )
     assert meta.message == "Foo"
 
-    meta = TraceMeta.make(
-        mode="stderr",
+    meta = Metadata.make(
+        run_id="100",
+        parent_run_id="01",
+        error_flag=True,
         message="Foo",
         level="info",
         cutting_id="",
@@ -83,8 +96,10 @@ def test_trace_meta():
     )
     assert meta.filename == "test_traces.py"
 
-    meta = TraceMeta.make(
-        mode="stderr",
+    meta = Metadata.make(
+        run_id="100",
+        parent_run_id="01",
+        error_flag=True,
         message="Foo",
         level="info",
         cutting_id="",
@@ -94,8 +109,10 @@ def test_trace_meta():
 
     # NOTE: Raise because the maximum frame does not back to the set value.
     with pytest.raises(ValueError):
-        TraceMeta.make(
-            mode="stderr",
+        Metadata.make(
+            run_id="100",
+            parent_run_id="01",
+            error_flag=True,
             message="Foo",
             level="info",
             cutting_id="",
@@ -117,6 +134,85 @@ def test_result_trace():
     print(rs.parent_run_id)
 
 
-def test_file_trace_find_traces():
-    for log in FileTrace.find_traces():
+def test_file_trace_find_traces(test_path):
+    for log in FileHandler(path=str(test_path.parent / "logs")).find_traces():
         print(log.meta)
+
+
+@pytest.mark.asyncio
+@mock.patch.multiple(BaseHandler, __abstractmethods__=set())
+async def test_trace_handler_base():
+    meta = Metadata.make(
+        run_id="100",
+        parent_run_id="01",
+        error_flag=True,
+        message="Foo",
+        level="info",
+        cutting_id="",
+    )
+
+    handler = BaseHandler()
+    assert handler.emit(meta) is None
+    assert await handler.amit(meta) is None
+    assert handler.flush([meta]) is None
+
+
+@pytest.mark.asyncio
+async def test_trace_handler_console():
+    meta = Metadata.make(
+        run_id="100",
+        parent_run_id="01",
+        error_flag=True,
+        message="Foo",
+        level="info",
+        cutting_id="",
+    )
+    handler = ConsoleHandler()
+    assert handler.emit(meta) is None
+    assert await handler.amit(meta) is None
+    assert handler.flush([meta]) is None
+
+
+@pytest.mark.asyncio
+async def test_trace_handler_file():
+    meta = Metadata.make(
+        run_id="100",
+        parent_run_id="01",
+        error_flag=True,
+        message="Foo",
+        level="info",
+        cutting_id="",
+    )
+    handler = FileHandler(path="./logs")
+    assert handler.emit(meta) is None
+    assert await handler.amit(meta) is None
+    assert handler.flush([meta]) is None
+    assert handler.pre() is None
+
+    meta = Metadata.make(
+        run_id="100",
+        parent_run_id="01",
+        error_flag=False,
+        message="Bar",
+        level="info",
+        cutting_id="",
+    )
+    handler = FileHandler(path="./logs")
+    assert handler.emit(meta) is None
+    assert handler.flush([meta]) is None
+
+    if Path("./logs/run_id=01").exists():
+        shutil.rmtree(Path("./logs/run_id=01"))
+
+
+def test_trace_manager():
+    trace = TraceManager(
+        run_id="01",
+        parent_run_id="1001",
+        handlers=[{"type": "console"}],
+    )
+    trace.debug("This is debug message from test_trace")
+    trace.info("This is info message from test_trace")
+    trace.warning("This is warning message from test_trace")
+    trace.error("This is error message from test_trace")
+    trace.exception("This is exception message from test_trace")

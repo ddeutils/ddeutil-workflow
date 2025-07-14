@@ -61,7 +61,7 @@ from .result import (
     validate_statuses,
 )
 from .reusables import has_template, param2template
-from .traces import Trace, get_trace
+from .traces import TraceManager, get_trace
 from .utils import (
     UTC,
     gen_id,
@@ -483,7 +483,7 @@ class Workflow(BaseModel):
             parent_run_id: str = run_id
 
         context: DictData = {"status": WAIT}
-        trace: Trace = get_trace(
+        trace: TraceManager = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         release: datetime = self.validate_release(dt=release)
@@ -578,7 +578,7 @@ class Workflow(BaseModel):
         Returns:
             tuple[Status, DictData]: The pair of status and result context data.
         """
-        trace: Trace = get_trace(
+        trace: TraceManager = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         if event and event.is_set():
@@ -695,7 +695,7 @@ class Workflow(BaseModel):
         ts: float = time.monotonic()
         parent_run_id: Optional[str] = run_id
         run_id: str = gen_id(self.name, extras=self.extras)
-        trace: Trace = get_trace(
+        trace: TraceManager = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         context: DictData = self.parameterize(params)
@@ -940,7 +940,7 @@ class Workflow(BaseModel):
         ts: float = time.monotonic()
         parent_run_id: str = run_id
         run_id: str = gen_id(self.name, extras=self.extras)
-        trace: Trace = get_trace(
+        trace: TraceManager = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         if context["status"] == SUCCESS:
