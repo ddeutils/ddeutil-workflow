@@ -40,12 +40,12 @@ Note:
     ${VAR_NAME} syntax and provide extensive validation capabilities.
 """
 import copy
+import json
 import os
 from collections.abc import Iterator
 from functools import cached_property
 from pathlib import Path
-from typing import Final, Optional, TypeVar, Union
-from urllib.parse import ParseResult, urlparse
+from typing import Any, Final, Optional, TypeVar, Union
 from zoneinfo import ZoneInfo
 
 from ddeutil.core import str2bool
@@ -122,8 +122,8 @@ class Config:  # pragma: no cov
         return [r.strip() for r in regis_filter_str.split(",")]
 
     @property
-    def trace_url(self) -> ParseResult:
-        return urlparse(env("LOG_TRACE_URL", "file:./logs"))
+    def trace_handlers(self) -> list[dict[str, Any]]:
+        return json.loads(env("LOG_TRACE_HANDLERS", '[{"type": "console"}]'))
 
     @property
     def debug(self) -> bool:
@@ -153,20 +153,6 @@ class Config:  # pragma: no cov
                 "(%(filename)s:%(lineno)s) (%(name)-10s)"
             ),
         )
-
-    @property
-    def log_format_file(self) -> str:
-        return env(
-            "LOG_FORMAT_FILE",
-            (
-                "{datetime} ({process:5d}, {thread:5d}) ({cut_id}) "
-                "{message:120s} ({filename}:{lineno})"
-            ),
-        )
-
-    @property
-    def enable_write_log(self) -> bool:
-        return str2bool(env("LOG_TRACE_ENABLE_WRITE", "false"))
 
     @property
     def audit_url(self) -> str:

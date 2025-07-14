@@ -349,6 +349,9 @@ def test_dynamic():
     conf = dynamic("max_job_exec_timeout", f=0, extras={})
     assert conf == 0
 
+    conf = dynamic("trace_handlers", extras={})
+    assert conf == [{"type": "console"}]
+
 
 def test_parse_url():
     from urllib.parse import ParseResult, urlparse

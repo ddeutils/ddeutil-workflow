@@ -15,7 +15,7 @@ from fastapi.responses import UJSONResponse
 from ...__types import DictData
 from ...errors import JobError
 from ...job import Job
-from ...traces import Trace, get_trace
+from ...traces import TraceManager, get_trace
 from ...utils import gen_id
 
 logger = logging.getLogger("uvicorn.error")
@@ -41,7 +41,7 @@ async def job_execute(
     if extras:
         job.extras = extras
 
-    trace: Trace = get_trace(
+    trace: TraceManager = get_trace(
         run_id, parent_run_id=parent_run_id, extras=job.extras
     )
 

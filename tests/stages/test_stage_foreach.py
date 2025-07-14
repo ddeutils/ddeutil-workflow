@@ -10,7 +10,7 @@ from ddeutil.workflow import (
 )
 from ddeutil.workflow.stages import ForEachStage, Stage
 
-from ..utils import dump_yaml_context
+from ..utils import MockEvent, dump_yaml_context
 
 
 def test_foreach_stage_exec_all_skipped():
@@ -231,6 +231,77 @@ def test_foreach_stage_exec_cancel():
         "errors": {
             "name": "StageCancelError",
             "message": "Execution was canceled from the event before start foreach.",
+        },
+    }
+
+    stage: ForEachStage = ForEachStage(
+        name="Foreach item cancel",
+        foreach=[1],
+        stages=[{"name": "Echo stage", "echo": "Start item ${{ item }}"}],
+        concurrent=1,
+    )
+    event = MockEvent(n=1)
+    rs: Result = stage.execute({}, event=event)
+    assert rs.status == CANCEL
+    assert rs.context == {
+        "status": CANCEL,
+        "items": [1],
+        "foreach": {
+            1: {
+                "status": CANCEL,
+                "item": 1,
+                "stages": {},
+                "errors": {
+                    "name": "StageCancelError",
+                    "message": "Item execution was canceled from the event before start item execution.",
+                },
+            }
+        },
+        "errors": {
+            1: {
+                "name": "StageCancelError",
+                "message": "Item execution was canceled from the event before start item execution.",
+            }
+        },
+    }
+
+    stage: ForEachStage = ForEachStage(
+        name="Foreach item cancel",
+        foreach=[1],
+        stages=[{"name": "Echo stage", "echo": "Start item ${{ item }}"}],
+        concurrent=1,
+    )
+    event = MockEvent(n=2)
+    rs: Result = stage.execute({}, event=event)
+    assert rs.status == CANCEL
+    assert rs.context == {
+        "status": CANCEL,
+        "items": [1],
+        "foreach": {
+            1: {
+                "status": CANCEL,
+                "item": 1,
+                "stages": {
+                    "2709471980": {
+                        "outputs": {},
+                        "errors": {
+                            "name": "StageCancelError",
+                            "message": "Execution was canceled from the event before start parallel.",
+                        },
+                        "status": CANCEL,
+                    },
+                },
+                "errors": {
+                    "name": "StageCancelError",
+                    "message": "Item execution was canceled from the event after end item execution.",
+                },
+            }
+        },
+        "errors": {
+            1: {
+                "name": "StageCancelError",
+                "message": "Item execution was canceled from the event after end item execution.",
+            },
         },
     }
 
