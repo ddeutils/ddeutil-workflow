@@ -205,6 +205,17 @@ async def test_trace_handler_file():
         shutil.rmtree(Path("./logs/run_id=01"))
 
 
+def test_trace_manager_raise():
+    trace = TraceManager(
+        run_id="01",
+        parent_run_id="1001",
+        handlers=[{"type": "console"}],
+    )
+    with pytest.raises(ValueError):
+        with trace:
+            raise ValueError("some raise error")
+
+
 def test_trace_manager():
     trace = TraceManager(
         run_id="01",
@@ -215,4 +226,54 @@ def test_trace_manager():
     trace.info("This is info message from test_trace")
     trace.warning("This is warning message from test_trace")
     trace.error("This is error message from test_trace")
-    trace.exception("This is exception message from test_trace")
+    try:
+        _ = 1 / 0
+    except ZeroDivisionError:
+        trace.exception("This is exception message from test_trace")
+
+    with trace:
+        assert trace._enable_buffer
+        trace.debug("This is debug message from open trace")
+        trace.info("This is info message from open trace")
+        trace.warning("This is warning message from open trace")
+        trace.error("This is error message from open trace")
+        try:
+            _ = 1 / 0
+        except ZeroDivisionError:
+            trace.exception("This is exception message from open trace")
+
+        assert len(trace._buffer) == 5
+
+    assert len(trace._buffer) == 0
+
+    trace = TraceManager(
+        run_id="01",
+        parent_run_id="1001",
+        handlers=[],
+    )
+    trace.debug("This is debug message from empty trace")
+    trace.info("This is info message from empty trace")
+    trace.warning("This is warning message from empty trace")
+    trace.error("This is error message from empty trace")
+    try:
+        _ = 1 / 0
+    except ZeroDivisionError:
+        trace.exception("This is exception message from empty trace")
+
+    with trace:
+        assert trace._enable_buffer
+        trace.debug("This is debug message from open empty trace")
+        trace.info("This is info message from open empty trace")
+        trace.warning("This is warning message from open empty trace")
+        trace.error("This is error message from open empty trace")
+        try:
+            _ = 1 / 0
+        except ZeroDivisionError:
+            trace.exception("This is exception message from open empty trace")
+
+        assert len(trace._buffer) == 5
+
+    assert len(trace._buffer) == 0
+
+    with trace:
+        assert 1 == 1

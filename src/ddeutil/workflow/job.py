@@ -1401,7 +1401,6 @@ def docker_execution(
             ),
             extras=job.extras,
         )
-    print(params)
     return Result(
         run_id=run_id,
         parent_run_id=parent_run_id,

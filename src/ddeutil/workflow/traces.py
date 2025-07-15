@@ -107,7 +107,9 @@ class Message(BaseModel):
     with emoji support and categorization.
     """
 
-    name: Optional[str] = Field(default=None, description="A prefix name.")
+    name: Optional[str] = Field(
+        default=None, description="A prefix name of message."
+    )
     message: Optional[str] = Field(default=None, description="A message.")
 
     @classmethod
@@ -1737,7 +1739,9 @@ TraceHandler = Annotated[
     Union[
         ConsoleHandler,
         FileHandler,
-        SQLiteHandler,
+        # SQLiteHandler,
+        # RestAPIHandler,
+        # ElasticHandler
     ],
     Field(discriminator="type"),
 ]
@@ -1874,7 +1878,9 @@ class BaseAsyncEmit(ABC):
 
 
 class TraceManager(BaseModel, BaseEmit, BaseAsyncEmit):
-    """Trace Management that keep all trance handler."""
+    """Trace Manager model that keep all trance handler and emit log to its
+    handler.
+    """
 
     extras: DictData = Field(
         default_factory=dict,
@@ -1892,7 +1898,7 @@ class TraceManager(BaseModel, BaseEmit, BaseAsyncEmit):
         description="A list of Trace handler model."
     )
     buffer_size: int = Field(
-        default=1,
+        default=10,
         description="A buffer size to trigger flush trace log",
     )
 
@@ -1929,8 +1935,8 @@ class TraceManager(BaseModel, BaseEmit, BaseAsyncEmit):
         """Emit a trace log to all handler. This will use synchronise process.
 
         Args:
-            msg: A message.
-            level: A tracing level.
+            msg (str): A message.
+            level (Level): A tracing level.
         """
         _msg: str = self.make_message(msg)
         metadata: Metadata = Metadata.make(
@@ -1942,16 +1948,18 @@ class TraceManager(BaseModel, BaseEmit, BaseAsyncEmit):
             parent_run_id=self.parent_run_id,
             extras=self.extras,
         )
-        if self._enable_buffer:  # pragma: no cov
-            self._buffer.append(metadata)
-
-            if len(self._buffer) >= self.buffer_size:
-                for handler in self.handlers:
-                    handler.flush(self._buffer, extra=self.extras)
-                self._buffer.clear()
-        else:
+        if not self._enable_buffer:
             for handler in self.handlers:
                 handler.emit(metadata, extra=self.extras)
+            return
+
+        # NOTE: Update metadata to the buffer.
+        self._buffer.append(metadata)
+
+        if len(self._buffer) >= self.buffer_size:  # pragma: no cov
+            for handler in self.handlers:
+                handler.flush(self._buffer, extra=self.extras)
+            self._buffer.clear()
 
     async def amit(self, msg: str, level: Level) -> None:
         """Async write trace log with append mode and logging this message with
@@ -1974,14 +1982,35 @@ class TraceManager(BaseModel, BaseEmit, BaseAsyncEmit):
         for handler in self.handlers:
             await handler.amit(metadata, extra=self.extras)
 
-    def __enter__(self):  # pragma: no cov
+    def __enter__(self):
+        """Enter the trace for catching the logs that run so fast. It will use
+        buffer strategy to flush the logs instead emit.
+        """
         self._enable_buffer = True
+        return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):  # pragma: no cov
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Exit the trace that will clear all log in the buffer."""
+        if exc_type:
+            _msg: str = self.make_message(str(exc_val))
+            metadata: Metadata = Metadata.make(
+                error_flag=True,
+                level="error",
+                message=_msg,
+                cutting_id=self.cut_id,
+                run_id=self.run_id,
+                parent_run_id=self.parent_run_id,
+                extras=self.extras,
+            )
+            self._buffer.append(metadata)
+
         if self._buffer:
             for handler in self.handlers:
                 handler.flush(self._buffer, extra=self.extras)
             self._buffer.clear()
+
+        # NOTE: Re-raise the exception if one occurred
+        return False
 
 
 def get_trace(
@@ -1989,7 +2018,7 @@ def get_trace(
     *,
     parent_run_id: Optional[str] = None,
     extras: Optional[DictData] = None,
-) -> TraceManager:  # pragma: no cov
+) -> TraceManager:
     """Get dynamic TraceManager instance from the core config.
 
     This factory function returns the appropriate trace implementation based on
@@ -1997,8 +2026,8 @@ def get_trace(
     and parent running ID.
 
     Args:
-        run_id: A running ID.
-        parent_run_id: A parent running ID.
+        run_id (str): A running ID.
+        parent_run_id (str | None, default None): A parent running ID.
         extras: An extra parameter that want to override the core
             config values.
 
