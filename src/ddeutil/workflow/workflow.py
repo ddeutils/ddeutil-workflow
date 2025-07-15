@@ -42,7 +42,7 @@ from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
 from .__types import DictData
-from .audits import Audit, get_audit_model
+from .audits import Audit, get_audit
 from .conf import YamlParser, dynamic
 from .errors import WorkflowCancelError, WorkflowError, WorkflowTimeoutError
 from .event import Event
@@ -509,24 +509,27 @@ class Workflow(BaseModel):
         trace.info(f"[RELEASE]: End {name!r} : {release:%Y-%m-%d %H:%M:%S}")
         trace.debug(f"[RELEASE]: Writing audit: {name!r}.")
         (
-            (audit or get_audit_model(extras=self.extras))(
-                name=name,
-                release=release,
-                type=release_type,
-                context=context,
-                parent_run_id=parent_run_id,
-                run_id=run_id,
-                extras=self.extras,
-                runs_metadata=(
-                    (runs_metadata or {})
-                    | rs.info
-                    | {
-                        "timeout": timeout,
-                        "original_name": self.name,
-                        "audit_excluded": audit_excluded,
-                    }
-                ),
-            ).save(excluded=audit_excluded)
+            (audit or get_audit(extras=self.extras)).save(
+                data={
+                    "name": name,
+                    "release": release,
+                    "type": release_type,
+                    "context": context,
+                    "parent_run_id": parent_run_id,
+                    "run_id": run_id,
+                    "extras": self.extras,
+                    "runs_metadata": (
+                        (runs_metadata or {})
+                        | rs.info
+                        | {
+                            "timeout": timeout,
+                            "original_name": self.name,
+                            "audit_excluded": audit_excluded,
+                        }
+                    ),
+                },
+                excluded=audit_excluded,
+            )
         )
         return Result(
             run_id=run_id,

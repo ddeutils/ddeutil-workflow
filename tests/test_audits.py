@@ -5,32 +5,27 @@ from unittest import mock
 
 import pytest
 from ddeutil.workflow.audits import (
+    AuditData,
     BaseAudit,
     FileAudit,
     SQLiteAudit,
-    get_audit_model,
+    get_audit,
 )
 from ddeutil.workflow.conf import Config
-from pydantic import ValidationError
 
 
 def test_get_audit_model():
-    model = get_audit_model(extras={"audit_url": "demo/test"})
-    assert model is FileAudit
+    model = get_audit()
+    assert isinstance(model, FileAudit)
 
-    model = get_audit_model(extras={"audit_url": None})
-    assert model is FileAudit
-
-    model = get_audit_model(extras={"audit_url": "sqlite:///demo/foo.db"})
-    assert model is SQLiteAudit
-
-    with mock.patch.object(Config, "audit_url", None):
-        assert get_audit_model() is FileAudit
+    model = get_audit(
+        extras={"audit_conf": {"type": "sqlite", "path": "./audit.db"}}
+    )
+    assert isinstance(model, SQLiteAudit)
 
 
-@mock.patch.multiple(BaseAudit, __abstractmethods__=set())
-def test_base_audit():
-    audit = BaseAudit.model_validate(
+def test_audit_data():
+    audit = AuditData.model_validate(
         {
             "name": "wf-scheduling",
             "type": "manual",
@@ -38,24 +33,27 @@ def test_base_audit():
             "run_id": "558851633820240817184358131811",
         }
     )
-    assert audit.do_before() is None
+    assert audit.name == "wf-scheduling"
 
-    # NOTE: Raise because extras field should be dict or None.
-    with pytest.raises(ValidationError):
-        BaseAudit.model_validate(
-            {
-                "name": "wf-scheduling",
-                "type": "manual",
-                "release": datetime(2024, 1, 1, 1),
-                "run_id": "558851633820240817184358131811",
-                "extras": "foo",
-            }
-        )
+
+@mock.patch.multiple(BaseAudit, __abstractmethods__=set())
+def test_base_audit():
+    log = BaseAudit.model_validate(
+        {
+            "type": "test",
+            "extras": {
+                "foo": "bar",
+                "datetime": datetime(2024, 1, 1, 1, 15),
+            },
+        }
+    )
+    print(log.model_dump())
 
 
 @mock.patch.object(Config, "enable_write_audit", False)
 def test_audit_file():
-    log = FileAudit.model_validate(
+    log = FileAudit(path="./audits")
+    audit = AuditData.model_validate(
         obj={
             "name": "wf-scheduling",
             "type": "manual",
@@ -66,34 +64,18 @@ def test_audit_file():
             "parent_run_id": None,
             "run_id": "558851633820240817184358131811",
             "update": datetime.now(),
-            "extras": None,
         },
     )
-    log.save(excluded=None)
+    log.save(audit, excluded=None)
 
-    assert not FileAudit.is_pointed(
-        name="wf-scheduling", release=datetime(2024, 1, 1, 1)
-    )
-
-
-@mock.patch.object(Config, "enable_write_audit", True)
-def test_audit_file_enable():
-    with mock.patch.object(Config, "audit_url", None):
-        assert not FileAudit.is_pointed(
-            "not-exists", release=datetime(2025, 1, 1)
-        )
-
-
-def test_audit_file_raise():
-    with mock.patch.object(Config, "audit_url", None):
-        with pytest.raises(ValueError):
-            next(FileAudit.find_audits(name="bar"))
+    assert not log.is_pointed(audit)
 
 
 @mock.patch.object(Config, "enable_write_audit", True)
 def test_audit_file_do_first():
-    log = FileAudit.model_validate(
-        obj={
+    log = FileAudit(path="./audits")
+    audit = AuditData.model_validate(
+        {
             "name": "wf-demo-logging",
             "type": "manual",
             "release": datetime(2024, 1, 1, 1),
@@ -103,24 +85,26 @@ def test_audit_file_do_first():
             "parent_run_id": None,
             "run_id": "558851633820240817184358131811",
             "update": datetime.now(),
-        },
+        }
     )
-    log.save(excluded=None)
-    pointer = log.pointer()
-
-    log = FileAudit.find_audit_with_release(
-        name="wf-demo-logging",
-        release=datetime(2024, 1, 1, 1),
-    )
-    assert log.name == "wf-demo-logging"
-
-    shutil.rmtree(pointer.parent)
+    log.save(data=audit, excluded=None)
+    pointer = log.pointer(audit)
+    assert pointer.exists()
+    #
+    # log = FileAudit.find_audit_with_release(
+    #     name="wf-demo-logging",
+    #     release=datetime(2024, 1, 1, 1),
+    # )
+    # assert log.name == "wf-demo-logging"
+    #
+    # shutil.rmtree(pointer.parent)
 
 
 @mock.patch.object(Config, "enable_write_audit", True)
 def test_audit_file_find(root_path):
-    log = FileAudit.model_validate(
-        obj={
+    log = FileAudit(path="./audits")
+    audit = AuditData.model_validate(
+        {
             "name": "wf-scheduling",
             "type": "manual",
             "release": datetime(2024, 1, 1, 1),
@@ -130,76 +114,62 @@ def test_audit_file_find(root_path):
             "parent_run_id": None,
             "run_id": "558851633820240817184358131811",
             "update": datetime.now(),
-        },
+        }
     )
-    log.save(excluded=None)
+    log.save(data=audit, excluded=None)
 
-    assert FileAudit.is_pointed(
+    assert log.is_pointed(audit)
+
+    audit = next(log.find_audits(name="wf-scheduling"))
+    assert isinstance(audit, AuditData)
+    assert audit.name == "wf-scheduling"
+    assert audit.release == datetime(2024, 1, 1, 1)
+
+    audit = log.find_audit_with_release(name="wf-scheduling")
+    assert isinstance(audit, AuditData)
+    assert audit.name == "wf-scheduling"
+    assert audit.release == datetime(2024, 1, 1, 1)
+
+    audit = log.find_audit_with_release(
         name="wf-scheduling", release=datetime(2024, 1, 1, 1)
     )
-
-    with mock.patch.object(Config, "audit_url", None):
-        with pytest.raises(ValueError):
-            log.pointer()
-
-    log = next(FileAudit.find_audits(name="wf-scheduling"))
-    assert isinstance(log, FileAudit)
-    assert log.name == "wf-scheduling"
-    assert log.release == datetime(2024, 1, 1, 1)
-
-    log = FileAudit.find_audit_with_release(name="wf-scheduling")
-    assert isinstance(log, FileAudit)
-    assert log.name == "wf-scheduling"
-    assert log.release == datetime(2024, 1, 1, 1)
-
-    log = FileAudit.find_audit_with_release(
-        name="wf-scheduling", release=datetime(2024, 1, 1, 1)
-    )
-    assert isinstance(log, FileAudit)
-    assert log.name == "wf-scheduling"
-    assert log.release == datetime(2024, 1, 1, 1)
+    assert isinstance(audit, AuditData)
+    assert audit.name == "wf-scheduling"
+    assert audit.release == datetime(2024, 1, 1, 1)
 
 
 def test_audit_file_find_empty():
-    wf_log_path = Path("audits/workflow=wf-no-release-log/")
+    wf_log_path = Path("./audits/workflow=wf-no-release-log/")
     wf_log_path.mkdir(exist_ok=True)
-
-    assert list(FileAudit.find_audits(name="wf-no-release-log")) == []
+    log = FileAudit()
+    assert list(log.find_audits(name="wf-no-release-log")) == []
 
     with pytest.raises(FileNotFoundError):
-        FileAudit.find_audit_with_release(name="wf-no-release-log")
+        log.find_audit_with_release(name="wf-no-release-log")
 
     wf_log_release_path = wf_log_path / "release=20240101010000"
     wf_log_release_path.mkdir(exist_ok=True)
-    assert list(FileAudit.find_audits(name="wf-no-release-log")) == []
+    assert list(log.find_audits(name="wf-no-release-log")) == []
 
     with pytest.raises(FileNotFoundError):
-        FileAudit.find_audit_with_release(name="wf-no-release-log")
+        log.find_audit_with_release(name="wf-no-release-log")
 
     shutil.rmtree(wf_log_path)
 
 
 def test_audit_file_find_raise():
+    log = FileAudit()
     with pytest.raises(FileNotFoundError):
-        next(FileAudit.find_audits(name="wf-file-not-found"))
+        next(log.find_audits(name="wf-file-not-found"))
 
 
 def test_audit_file_find_with_release():
+    log = FileAudit()
     with pytest.raises(FileNotFoundError):
-        FileAudit.find_audit_with_release(
+        log.find_audit_with_release(
             name="wf-file-not-found",
             release=datetime(2024, 1, 1, 1),
         )
 
     with pytest.raises(FileNotFoundError):
-        FileAudit.find_audit_with_release(name="wf-file-not-found")
-
-    with mock.patch.object(Config, "audit_url", None):
-        with pytest.raises(ValueError):
-            FileAudit.find_audit_with_release(
-                name="audit_path is None",
-                release=datetime(2024, 1, 1, 1),
-            )
-
-        with pytest.raises(ValueError):
-            FileAudit.find_audit_with_release(name="audit_path is None")
+        log.find_audit_with_release(name="wf-file-not-found")

@@ -155,8 +155,10 @@ class Config:  # pragma: no cov
         )
 
     @property
-    def audit_url(self) -> str:
-        return env("LOG_AUDIT_URL", "file:./audits")
+    def audit_conf(self) -> str:
+        return json.loads(
+            env("LOG_AUDIT_URL", '{"type": "file", "path": "./audits"}')
+        )
 
     @property
     def enable_write_audit(self) -> bool:

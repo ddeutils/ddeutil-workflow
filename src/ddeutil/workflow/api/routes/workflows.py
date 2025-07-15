@@ -16,7 +16,7 @@ from fastapi.responses import UJSONResponse
 from pydantic import BaseModel
 
 from ...__types import DictData
-from ...audits import Audit, get_audit_model
+from ...audits import Audit, get_audit
 from ...conf import YamlParser
 from ...result import Result
 from ...workflow import Workflow
@@ -100,7 +100,7 @@ async def get_workflow_audits(name: str):
                     exclude_none=False,
                     exclude_unset=True,
                 )
-                for audit in get_audit_model().find_audits(name=name)
+                for audit in get_audit().find_audits(name=name)
             ],
         }
     except FileNotFoundError:
@@ -114,7 +114,7 @@ async def get_workflow_audits(name: str):
 async def get_workflow_release_audit(name: str, release: str):
     """Get Workflow audit log with an input release value."""
     try:
-        audit: Audit = get_audit_model().find_audit_with_release(
+        audit: Audit = get_audit().find_audit_with_release(
             name=name,
             release=datetime.strptime(release, "%Y%m%d%H%M%S"),
         )

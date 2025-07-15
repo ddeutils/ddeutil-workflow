@@ -10,7 +10,7 @@ from fastapi import APIRouter, Path, Query
 from fastapi import status as st
 from fastapi.responses import UJSONResponse
 
-from ...audits import get_audit_model
+from ...audits import get_audit
 from ...result import Result
 
 router = APIRouter(
@@ -90,7 +90,7 @@ async def get_audits():
     """
     return {
         "message": "Getting audit logs",
-        "audits": list(get_audit_model().find_audits(name="demo")),
+        "audits": list(get_audit().find_audits(name="demo")),
     }
 
 
@@ -109,7 +109,7 @@ async def get_audit_with_workflow(workflow: str):
     """
     return {
         "message": f"Getting audit logs with workflow name {workflow}",
-        "audits": list(get_audit_model().find_audits(name="demo")),
+        "audits": list(get_audit().find_audits(name="demo")),
     }
 
 
@@ -136,7 +136,7 @@ async def get_audit_with_workflow_release(
             f"Getting audit logs with workflow name {workflow} and release "
             f"{release}"
         ),
-        "audits": list(get_audit_model().find_audits(name="demo")),
+        "audits": list(get_audit().find_audits(name="demo")),
     }
 
 
@@ -167,5 +167,5 @@ async def get_audit_with_workflow_release_run_id(
             f"Getting audit logs with workflow name {workflow}, release "
             f"{release}, and running ID {run_id}"
         ),
-        "audits": list(get_audit_model().find_audits(name="demo")),
+        "audits": list(get_audit().find_audits(name="demo")),
     }

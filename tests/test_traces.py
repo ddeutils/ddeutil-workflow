@@ -1,3 +1,4 @@
+import os
 import shutil
 import traceback
 from pathlib import Path
@@ -12,6 +13,7 @@ from ddeutil.workflow.traces import (
     Message,
     Metadata,
     TraceManager,
+    get_trace,
 )
 
 
@@ -277,3 +279,45 @@ def test_trace_manager():
 
     with trace:
         assert 1 == 1
+
+
+def test_trace_manager_files(test_path: Path):
+    trace = TraceManager(
+        run_id="01",
+        parent_run_id="1001_test_file",
+        handlers=[
+            {"type": "console"},
+            {"type": "file", "path": str(test_path / "logs")},
+            {"type": "file", "path": str(test_path / "dumps")},
+        ],
+    )
+    trace.debug("This is debug message")
+    trace.info("This is info message")
+    trace.error("This is info message")
+
+    assert (test_path / "logs/run_id=1001_test_file").exists()
+    assert (test_path / "dumps/run_id=1001_test_file").exists()
+
+    shutil.rmtree(test_path / "logs/run_id=1001_test_file")
+    shutil.rmtree(test_path / "dumps")
+
+
+def test_trace_get_trace(test_path: Path):
+    rollback = os.getenv("WORKFLOW_LOG_TRACE_HANDLERS")
+    os.environ["WORKFLOW_LOG_TRACE_HANDLERS"] = (
+        "["
+        '{"type": "console"},'
+        f'{{"type": "file", "path": "{test_path / "logs/trace"}"}}'
+        f"]"
+    )
+    trace = get_trace(
+        run_id="01",
+        parent_run_id="1001_test_get_trace",
+    )
+    trace.debug("This is debug message")
+    trace.info("This is info message")
+    trace.error("This is info message")
+
+    assert (test_path / "logs/trace/run_id=1001_test_get_trace").exists()
+    shutil.rmtree(test_path / "logs/trace")
+    os.environ["WORKFLOW_LOG_TRACE_HANDLERS"] = rollback

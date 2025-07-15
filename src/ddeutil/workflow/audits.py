@@ -32,10 +32,8 @@ Functions:
 
 Example:
 
-    >>> from ddeutil.workflow.audits import get_audit_model
-    >>> audit = get_audit_model(run_id="run-123")
-    >>> audit.info("Workflow execution started")
-    >>> audit.success("Workflow completed successfully")
+    >>> from ddeutil.workflow.audits import get_audit
+    >>> audit = get_audit(run_id="run-123")
 
 Note:
     Audit instances are automatically configured based on the workflow
@@ -52,11 +50,10 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, ClassVar, Optional, TypeVar, Union
+from typing import Annotated, Any, ClassVar, Literal, Optional, Union
 from urllib.parse import ParseResult, urlparse
 
-from pydantic import BaseModel, Field
-from pydantic.functional_serializers import field_serializer
+from pydantic import BaseModel, Field, TypeAdapter
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
@@ -67,17 +64,7 @@ from .traces import TraceManager, get_trace, set_logging
 logger = logging.getLogger("ddeutil.workflow")
 
 
-class BaseAudit(BaseModel, ABC):
-    """Base Audit Pydantic Model with abstraction class property.
-
-    This model implements only model fields and should be used as a base class
-    for logging subclasses like file, sqlite, etc.
-    """
-
-    extras: DictData = Field(
-        default_factory=dict,
-        description="An extras parameter that want to override core config",
-    )
+class AuditData(BaseModel):
     name: str = Field(description="A workflow name.")
     release: datetime = Field(description="A release datetime.")
     type: str = Field(description="A running type before logging.")
@@ -92,6 +79,20 @@ class BaseAudit(BaseModel, ABC):
     runs_metadata: DictData = Field(
         default_factory=dict,
         description="A runs metadata that will use to tracking this audit log.",
+    )
+
+
+class BaseAudit(BaseModel, ABC):
+    """Base Audit Pydantic Model with abstraction class property.
+
+    This model implements only model fields and should be used as a base class
+    for logging subclasses like file, sqlite, etc.
+    """
+
+    type: str
+    extras: DictData = Field(
+        default_factory=dict,
+        description="An extras parameter that want to override core config",
     )
 
     @field_validator("extras", mode="before")
@@ -118,20 +119,17 @@ class BaseAudit(BaseModel, ABC):
         set_logging("ddeutil.workflow")
         return self
 
-    @classmethod
     @abstractmethod
     def is_pointed(
-        cls,
-        name: str,
-        release: datetime,
+        self,
+        data: AuditData,
         *,
         extras: Optional[DictData] = None,
     ) -> bool:
         """Check if audit data exists for the given workflow and release.
 
         Args:
-            name: The workflow name to check.
-            release: The release datetime to check.
+            data:
             extras: Optional extra parameters to override core config.
 
         Returns:
@@ -144,10 +142,9 @@ class BaseAudit(BaseModel, ABC):
             "Audit should implement `is_pointed` class-method"
         )
 
-    @classmethod
     @abstractmethod
     def find_audits(
-        cls,
+        self,
         name: str,
         *,
         extras: Optional[DictData] = None,
@@ -168,10 +165,9 @@ class BaseAudit(BaseModel, ABC):
             "Audit should implement `find_audits` class-method"
         )
 
-    @classmethod
     @abstractmethod
     def find_audit_with_release(
-        cls,
+        self,
         name: str,
         release: Optional[datetime] = None,
         *,
@@ -203,11 +199,12 @@ class BaseAudit(BaseModel, ABC):
 
     @abstractmethod
     def save(
-        self, excluded: Optional[list[str]] = None
+        self, data: Any, excluded: Optional[list[str]] = None
     ) -> Self:  # pragma: no cov
         """Save this model logging to target logging store.
 
         Args:
+            data:
             excluded: Optional list of field names to exclude from saving.
 
         Returns:
@@ -234,20 +231,11 @@ class FileAudit(BaseAudit):
         "workflow={name}/release={release:%Y%m%d%H%M%S}"
     )
 
-    @field_serializer("extras")
-    def __serialize_extras(self, value: DictData) -> DictData:
-        """Serialize extras field, converting ParseResult objects to URLs.
-
-        Args:
-            value: The extras dictionary to serialize.
-
-        Returns:
-            DictData: Serialized extras with ParseResult objects converted to URLs.
-        """
-        return {
-            k: (v.geturl() if isinstance(v, ParseResult) else v)
-            for k, v in value.items()
-        }
+    type: Literal["file"] = "file"
+    path: str = Field(
+        default="./audits",
+        description="A file path that use to manage audit logs.",
+    )
 
     def do_before(self) -> None:
         """Create directory of release before saving log file.
@@ -255,12 +243,11 @@ class FileAudit(BaseAudit):
         This method ensures the target directory exists before attempting
         to save audit log files.
         """
-        self.pointer().mkdir(parents=True, exist_ok=True)
+        Path(self.path).mkdir(parents=True, exist_ok=True)
 
-    @classmethod
     def find_audits(
-        cls, name: str, *, extras: Optional[DictData] = None
-    ) -> Iterator[Self]:
+        self, name: str, *, extras: Optional[DictData] = None
+    ) -> Iterator[AuditData]:
         """Generate audit data found from logs path for a specific workflow name.
 
         Args:
@@ -273,27 +260,21 @@ class FileAudit(BaseAudit):
         Raises:
             FileNotFoundError: If the workflow directory does not exist.
         """
-        audit_url = dynamic("audit_url", extras=extras)
-        if audit_url is None:
-            raise ValueError("audit_url configuration is not set")
-
-        audit_url_parse: ParseResult = urlparse(audit_url)
-        pointer: Path = Path(audit_url_parse.path) / f"workflow={name}"
+        pointer: Path = Path(self.path) / f"workflow={name}"
         if not pointer.exists():
             raise FileNotFoundError(f"Pointer: {pointer.absolute()}.")
 
         for file in pointer.glob("./release=*/*.log"):
             with file.open(mode="r", encoding="utf-8") as f:
-                yield cls.model_validate(obj=json.load(f))
+                yield AuditData.model_validate(obj=json.load(f))
 
-    @classmethod
     def find_audit_with_release(
-        cls,
+        self,
         name: str,
         release: Optional[datetime] = None,
         *,
         extras: Optional[DictData] = None,
-    ) -> Self:
+    ) -> AuditData:
         """Return audit data found from logs path for specific workflow and release.
 
         If a release is not provided, it will return the latest release from
@@ -305,20 +286,14 @@ class FileAudit(BaseAudit):
             extras: Optional extra parameters to override core config.
 
         Returns:
-            Self: The audit instance for the specified workflow and release.
+            AuditData: The audit instance for the specified workflow and release.
 
         Raises:
             FileNotFoundError: If the specified workflow/release directory does not exist.
             ValueError: If no releases found when release is None.
         """
         if release is None:
-            # Find the latest release
-            audit_url = dynamic("audit_url", extras=extras)
-            if audit_url is None:
-                raise ValueError("audit_url configuration is not set")
-
-            audit_url_parse: ParseResult = urlparse(audit_url)
-            pointer: Path = Path(audit_url_parse.path) / f"workflow={name}"
+            pointer: Path = Path(self.path) / f"workflow={name}"
             if not pointer.exists():
                 raise FileNotFoundError(f"Pointer: {pointer.absolute()}.")
 
@@ -332,13 +307,8 @@ class FileAudit(BaseAudit):
                 pointer.glob("./release=*"), key=os.path.getctime
             )
         else:
-            audit_url = dynamic("audit_url", extras=extras)
-            if audit_url is None:
-                raise ValueError("audit_url configuration is not set")
-
-            audit_url_parse: ParseResult = urlparse(audit_url)
             release_pointer: Path = (
-                Path(audit_url_parse.path)
+                Path(self.path)
                 / f"workflow={name}/release={release:%Y%m%d%H%M%S}"
             )
             if not release_pointer.exists():
@@ -355,21 +325,15 @@ class FileAudit(BaseAudit):
             release_pointer.glob("./*.log"), key=os.path.getctime
         )
         with latest_file.open(mode="r", encoding="utf-8") as f:
-            return cls.model_validate(obj=json.load(f))
+            return AuditData.model_validate(obj=json.load(f))
 
-    @classmethod
     def is_pointed(
-        cls,
-        name: str,
-        release: datetime,
-        *,
-        extras: Optional[DictData] = None,
+        self, data: AuditData, *, extras: Optional[DictData] = None
     ) -> bool:
         """Check if the release log already exists at the destination log path.
 
         Args:
-            name: The workflow name.
-            release: The release datetime.
+            data: The workflow name.
             extras: Optional extra parameters to override core config.
 
         Returns:
@@ -378,46 +342,32 @@ class FileAudit(BaseAudit):
         # NOTE: Return False if enable writing log flag does not set.
         if not dynamic("enable_write_audit", extras=extras):
             return False
+        return self.pointer(data).exists()
 
-        # NOTE: create pointer path that use the same logic of pointer method.
-        audit_url: Optional[str] = dynamic("audit_url", extras=extras)
-        if audit_url is None:
-            return False
-
-        audit_url_parse: ParseResult = urlparse(audit_url)
-        pointer: Path = Path(audit_url_parse.path) / cls.filename_fmt.format(
-            name=name, release=release
-        )
-
-        return pointer.exists()
-
-    def pointer(self) -> Path:
+    def pointer(self, data: AuditData) -> Path:
         """Return release directory path generated from model data.
 
         Returns:
             Path: The directory path for the current workflow and release.
         """
-        audit_url = dynamic("audit_url", extras=self.extras)
-        if audit_url is None:
-            raise ValueError("audit_url configuration is not set")
-
-        audit_url_parse: ParseResult = urlparse(audit_url)
-        return Path(audit_url_parse.path) / self.filename_fmt.format(
-            name=self.name, release=self.release
+        return Path(self.path) / self.filename_fmt.format(
+            name=data.name, release=data.release
         )
 
-    def save(self, excluded: Optional[list[str]] = None) -> Self:
+    def save(self, data: Any, excluded: Optional[list[str]] = None) -> Self:
         """Save logging data received from workflow execution result.
 
         Args:
+            data:
             excluded: Optional list of field names to exclude from saving.
 
         Returns:
             Self: The audit instance after saving.
         """
+        audit = AuditData.model_validate(data)
         trace: TraceManager = get_trace(
-            self.run_id,
-            parent_run_id=self.parent_run_id,
+            audit.run_id,
+            parent_run_id=audit.parent_run_id,
             extras=self.extras,
         )
 
@@ -426,19 +376,21 @@ class FileAudit(BaseAudit):
             trace.debug("[AUDIT]: Skip writing audit log cause config was set.")
             return self
 
-        log_file: Path = (
-            self.pointer() / f"{self.parent_run_id or self.run_id}.log"
-        )
+        pointer: Path = self.pointer(data=audit)
+        if not pointer.exists():
+            pointer.mkdir(parents=True)
+
+        log_file: Path = pointer / f"{audit.parent_run_id or audit.run_id}.log"
 
         # NOTE: Convert excluded list to set for pydantic compatibility
         exclude_set = set(excluded) if excluded else None
         trace.info(
             f"[AUDIT]: Start writing audit log with "
-            f"release: {self.release:%Y%m%d%H%M%S}"
+            f"release: {audit.release:%Y%m%d%H%M%S}"
         )
         log_file.write_text(
             json.dumps(
-                self.model_dump(exclude=exclude_set),
+                audit.model_dump(exclude=exclude_set),
                 default=str,
                 indent=2,
             ),
@@ -504,6 +456,9 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
         )
         """
 
+    type: Literal["sqlite"] = "sqlite"
+    path: str
+
     def _ensure_table_exists(self) -> None:
         """Ensure the audit table exists in the database."""
         audit_url = dynamic("audit_url", extras=self.extras)
@@ -520,19 +475,16 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
             conn.execute(self.schemas)
             conn.commit()
 
-    @classmethod
     def is_pointed(
-        cls,
-        name: str,
-        release: datetime,
+        self,
+        data: AuditData,
         *,
         extras: Optional[DictData] = None,
     ) -> bool:
         """Check if audit data exists for the given workflow and release.
 
         Args:
-            name: The workflow name to check.
-            release: The release datetime to check.
+            data:
             extras: Optional extra parameters to override core config.
 
         Returns:
@@ -553,7 +505,7 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
         with sqlite3.connect(db_path) as conn:
             cursor = conn.execute(
                 "SELECT COUNT(*) FROM audits WHERE workflow = ? AND release = ?",
-                (name, release.isoformat()),
+                (data.name, data.release.isoformat()),
             )
             return cursor.fetchone()[0] > 0
 
@@ -592,7 +544,7 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
                 context = json.loads(cls._decompress_data(row[3]))
                 metadata = json.loads(cls._decompress_data(row[6]))
 
-                yield cls(
+                yield AuditData(
                     name=row[0],
                     release=datetime.fromisoformat(row[1]),
                     type=row[2],
@@ -600,7 +552,6 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
                     parent_run_id=row[4],
                     run_id=row[5],
                     runs_metadata=metadata,
-                    extras=extras or {},
                 )
 
     @classmethod
@@ -610,7 +561,7 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
         release: Optional[datetime] = None,
         *,
         extras: Optional[DictData] = None,
-    ) -> Self:
+    ) -> AuditData:
         """Find audit data for a specific workflow and release.
 
         Args:
@@ -656,7 +607,7 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
             context = json.loads(cls._decompress_data(row[3]))
             metadata = json.loads(cls._decompress_data(row[6]))
 
-            return cls(
+            return AuditData(
                 name=row[0],
                 release=datetime.fromisoformat(row[1]),
                 type=row[2],
@@ -664,7 +615,6 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
                 parent_run_id=row[4],
                 run_id=row[5],
                 runs_metadata=metadata,
-                extras=extras or {},
             )
 
     @staticmethod
@@ -691,10 +641,11 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
         """
         return zlib.decompress(data).decode("utf-8")
 
-    def save(self, excluded: Optional[list[str]] = None) -> Self:
+    def save(self, data: Any, excluded: Optional[list[str]] = None) -> Self:
         """Save logging data received from workflow execution result.
 
         Args:
+            data: Any
             excluded: Optional list of field names to exclude from saving.
 
         Returns:
@@ -703,9 +654,10 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
         Raises:
             ValueError: If SQLite database is not properly configured.
         """
+        audit = AuditData.model_validate(data)
         trace: TraceManager = get_trace(
-            self.run_id,
-            parent_run_id=self.parent_run_id,
+            audit.run_id,
+            parent_run_id=audit.parent_run_id,
             extras=self.extras,
         )
 
@@ -726,7 +678,7 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
 
         # Prepare data for storage
         exclude_set = set(excluded) if excluded else None
-        model_data = self.model_dump(exclude=exclude_set)
+        model_data = audit.model_dump(exclude=exclude_set)
 
         # Compress context and metadata
         context_blob = self._compress_data(
@@ -744,12 +696,12 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
                 VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 """,
                 (
-                    self.name,
-                    self.release.isoformat(),
-                    self.type,
+                    audit.name,
+                    audit.release.isoformat(),
+                    audit.type,
                     context_blob,
-                    self.parent_run_id,
-                    self.run_id,
+                    audit.parent_run_id,
+                    audit.run_id,
                     metadata_blob,
                 ),
             )
@@ -787,50 +739,27 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
             return cursor.rowcount
 
 
-Audit = Union[
-    FileAudit,
-    SQLiteAudit,
+Audit = Annotated[
+    Union[
+        FileAudit,
+        SQLiteAudit,
+    ],
+    Field(discriminator="type"),
 ]
-AuditType = TypeVar("AuditType", bound=BaseAudit)
 
 
-def get_audit_model(
+def get_audit(
     *,
     extras: Optional[DictData] = None,
-) -> type[AuditType]:  # pragma: no cov
+) -> Audit:  # pragma: no cov
     """Get an audit model dynamically based on the config audit path value.
 
     Args:
         extras: Optional extra parameters to override the core config.
-            This function allow you to pass `audit_model_mapping` for override
-            the audit model object with your custom model.
 
     Returns:
-        type[Audit]: The appropriate audit model class based on configuration.
-
-    Raises:
-        NotImplementedError: If the audit URL scheme is not supported.
+        Audit: The appropriate audit model class based on configuration.
     """
-    # NOTE: Allow you to override audit model by the extra parameter.
-    map_audit_models: dict[str, type[AuditType]] = (extras or {}).get(
-        "audit_model_mapping", {}
-    )
-
-    audit_url = dynamic("audit_url", extras=extras)
-    if audit_url is None:
-        return map_audit_models.get("file", FileAudit)
-
-    audit_url_parse: ParseResult = urlparse(audit_url)
-    if not audit_url_parse.scheme:
-        return map_audit_models.get("file", FileAudit)
-
-    if audit_url_parse.scheme == "sqlite" or (
-        audit_url_parse.scheme == "file"
-        and Path(audit_url_parse.path).is_file()
-    ):
-        return map_audit_models.get("sqlite", SQLiteAudit)
-    elif audit_url_parse.scheme != "file":
-        raise NotImplementedError(
-            f"Does not implement the audit model support for URL: {audit_url_parse}"
-        )
-    return map_audit_models.get("file", FileAudit)
+    audit_conf = dynamic("audit_conf", extras=extras)
+    model = TypeAdapter(Audit).validate_python(audit_conf | {"extras": extras})
+    return model
