@@ -136,6 +136,9 @@ def test_param_map():
         '{"foo": "bar"}'
     )
     assert {"key": "value"} == MapParam(default={"key": "value"}).receive()
+    assert MapParam().receive('{"foo": {"bar": {"baz": 1}}}') == {
+        "foo": {"bar": {"baz": 1}}
+    }
     assert {} == MapParam().receive()
 
     with pytest.raises(ParamError):

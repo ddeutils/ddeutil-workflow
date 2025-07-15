@@ -401,30 +401,49 @@ def test_workflow_condition():
 
 
 def test_workflow_parameterize(test_path):
-    with dump_yaml_context(
-        test_path / "conf/demo/01_99_wf_test_wf_parameterize.yml",
-        data="""
-        tmp-wf-params-required:
-          type: Workflow
-          params:
-            name: {type: str, required: True}
-          jobs:
-            first-job:
-              stages:
-                - name: Echo
-                  echo: "Hello ${{ params.name }}"
-        """,
-    ):
-        workflow: Workflow = Workflow.from_conf(name="tmp-wf-params-required")
-
-        assert workflow.parameterize({"name": "foo"}) == {
-            "params": {"name": "foo"},
-            "jobs": {},
+    workflow = Workflow.model_validate(
+        {
+            "name": "tmp-wf-params-required",
+            "params": {"name": {"type": "str", "required": True}},
+            "jobs": {
+                "first-job": {
+                    "stages": [
+                        {"name": "Echo", "echo": "Hello ${{ params.name }}"}
+                    ],
+                },
+            },
         }
+    )
+    assert workflow.parameterize({"name": "foo"}) == {
+        "params": {"name": "foo"},
+        "jobs": {},
+    }
 
-        # NOTE: Raise if passing parameter that does not set on the workflow.
-        with pytest.raises(WorkflowError):
-            workflow.parameterize({"foo": "bar"})
+    # NOTE: Raise if passing parameter that does not set on the workflow.
+    with pytest.raises(WorkflowError):
+        workflow.parameterize({"foo": "bar"})
+
+    workflow = Workflow.model_validate(
+        {
+            "name": "tmp-wf-params-required",
+            "params": {"data": {"type": "map", "required": True}},
+            "jobs": {
+                "first-job": {
+                    "stages": [
+                        {"name": "Echo", "echo": "Hello ${{ params.data }}"}
+                    ],
+                },
+            },
+        }
+    )
+    assert workflow.parameterize({"data": {"foo": {"bar": {"baz": 1}}}}) == {
+        "params": {"data": {"foo": {"bar": {"baz": 1}}}},
+        "jobs": {},
+    }
+    assert workflow.parameterize({"data": '{"foo": {"bar": {"baz": 1}}}'}) == {
+        "params": {"data": {"foo": {"bar": {"baz": 1}}}},
+        "jobs": {},
+    }
 
 
 def test_workflow_detail(test_path):
