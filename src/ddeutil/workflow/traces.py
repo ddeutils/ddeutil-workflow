@@ -954,9 +954,8 @@ class SQLiteHandler(BaseHandler):  # pragma: no cov
         except Exception as e:
             logger.error(f"Failed to read from SQLite database: {e}")
 
-    @classmethod
     def find_trace_with_id(
-        cls,
+        self,
         run_id: str,
         force_raise: bool = True,
         *,
@@ -964,17 +963,7 @@ class SQLiteHandler(BaseHandler):  # pragma: no cov
         extras: Optional[DictData] = None,
     ) -> TraceData:
         """Find trace log with specific run ID from SQLite database."""
-        if path is None:
-            url = dynamic("trace_url", extras=extras)
-            if (
-                url is not None
-                and hasattr(url, "path")
-                and getattr(url, "path", None)
-            ):
-                path = Path(url.path)
-            else:
-                path = Path("./logs/workflow_traces.db")
-
+        path = path or Path(self.path)
         if not path.exists():
             if force_raise:
                 raise FileNotFoundError(f"SQLite database not found: {path}")
