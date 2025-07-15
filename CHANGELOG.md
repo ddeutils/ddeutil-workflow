@@ -2,6 +2,22 @@
 
 ## Latest Changes
 
+## 0.0.80
+
+### :sparkles: Features
+
+- :dart: feat: revise audit config from url to full config data.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: update example testcase.
+- :test_tube: tests: add debug line on trace testcase.
+- :test_tube: tests: update testcase for make coverage.
+
+### :book: Documentations
+
+- :page_facing_up: docs: update readme file.
+
 ## 0.0.79
 
 ### :sparkles: Features
