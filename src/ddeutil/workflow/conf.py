@@ -155,7 +155,7 @@ class Config:  # pragma: no cov
         )
 
     @property
-    def audit_conf(self) -> str:
+    def audit_conf(self) -> dict[str, Any]:
         return json.loads(
             env("LOG_AUDIT_URL", '{"type": "file", "path": "./audits"}')
         )
