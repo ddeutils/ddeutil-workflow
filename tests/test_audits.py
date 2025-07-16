@@ -47,7 +47,10 @@ def test_base_audit():
             },
         }
     )
-    print(log.model_dump())
+    assert log.model_dump() == {
+        "type": "test",
+        "extras": {"foo": "bar", "datetime": datetime(2024, 1, 1, 1, 15)},
+    }
 
 
 @mock.patch.object(Config, "enable_write_audit", False)

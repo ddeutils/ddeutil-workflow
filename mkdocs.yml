@@ -65,7 +65,6 @@ nav:
     - index.md
     - Get Started: getting-started.md
     - Configuration: configuration.md
-    - Logs: logs.md
     - Context: context.md
   - API references:
     - Library:

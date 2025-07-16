@@ -1,15 +1,15 @@
 # Traces
 
-The Traces module provides logging and trace management for workflow execution, including stdout, stderr capture, and persistent logging capabilities.
+The Traces module provides logging and trace management for workflow execution,
+including stdout, stderr capture, and persistent logging capabilities.
 
 ## Overview
 
 The traces system provides:
 
-- **Console output capture**: Real-time stdout/stderr logging
-- **File-based traces**: Persistent logging to local filesystem
-- **SQLite traces**: Database-backed logging for scalable deployments
-- **Trace retrieval**: Query and search execution logs
+- **Console output Handler**: Real-time stdout/stderr logging
+- **File-based Handler**: Persistent logging to local filesystem
+- **SQLite Handler**: Database-backed logging for scalable deployments
 
 ## Base Classes
 
@@ -37,7 +37,7 @@ Basic console logging implementation that outputs to stdout/stderr.
     trace.error("Job failed: connection timeout")
     ```
 
-## File-based Traces
+## File-based Handler
 
 ### `FileTrace`
 
