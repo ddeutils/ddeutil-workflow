@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 OUTSIDE_PATH: Path = Path(__file__).parent.parent
 
 
-def dotenv_setting() -> None:
+def dotenv_setting() -> None:  # pragma: no cov
     """Create .env file if this file in the current path does not exist."""
     env_path: Path = OUTSIDE_PATH / ".env"
     if not env_path.exists():
@@ -134,7 +134,7 @@ class MockEvent(Event):  # pragma: no cov
         )
 
 
-def exclude_keys(value: Any, keys: list[str]) -> Any:
+def exclude_keys(value: Any, keys: list[str]) -> Any:  # pragma: no cov
     """Exclude keys for assert the specific keys only."""
     if isinstance(value, dict):
         return {
@@ -147,5 +147,5 @@ def exclude_keys(value: Any, keys: list[str]) -> Any:
     return value
 
 
-def exclude_created_and_updated(value: Any):
+def exclude_created_and_updated(value: Any) -> Any:  # pragma: no cov
     return exclude_keys(value, keys=["created_at", "updated_at"])

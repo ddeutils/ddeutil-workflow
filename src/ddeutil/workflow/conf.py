@@ -22,19 +22,6 @@ Functions:
     pass_env: Process environment variable substitution
     api_config: Get API-specific configuration settings
 
-Example:
-    ```python
-    from ddeutil.workflow.conf import Config, YamlParser
-
-    # Load workflow configuration
-    parser = YamlParser("my-workflow")
-    workflow_config = parser.data
-
-    # Access dynamic configuration
-    from ddeutil.workflow.conf import dynamic
-    log_level = dynamic("log_level", default="INFO")
-    ```
-
 Note:
     Configuration files support environment variable substitution using
     ${VAR_NAME} syntax and provide extensive validation capabilities.

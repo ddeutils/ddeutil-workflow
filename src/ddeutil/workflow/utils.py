@@ -28,17 +28,6 @@ Functions:
     cut_id: Cut running ID to specified length
     dump_all: Serialize nested BaseModel objects to dictionaries
     obj_name: Get object name or class name
-
-Example:
-    ```python
-    from ddeutil.workflow.utils import gen_id, get_dt_now
-
-    # Generate unique ID
-    run_id = gen_id("workflow")
-
-    # Get current datetime
-    now = get_dt_now()
-    ```
 """
 from __future__ import annotations
 

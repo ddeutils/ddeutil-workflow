@@ -25,22 +25,20 @@ Functions:
     create_model_from_caller: Generate Pydantic models from function signatures
 
 Example:
-    ```python
-    from ddeutil.workflow.reusables import tag
 
-    @tag("data-processing", alias="process-csv")
-    def process_csv_file(input_path: str, output_path: str) -> dict:
-        # Custom processing logic
-        return {"status": "completed", "rows_processed": 1000}
+    >>> from ddeutil.workflow.reusables import tag
+    >>>
+    >>> @tag("data-processing", alias="process-csv")
+    >>> def process_csv_file(input_path: str, output_path: str) -> dict:
+    >>>     return {"status": "completed", "rows_processed": 1000}
 
-    # Use in workflow YAML:
-    # stages:
-    #   - name: "Process data"
-    #     uses: "data-processing/process-csv@latest"
-    #     args:
-    #       input_path: "/data/input.csv"
-    #       output_path: "/data/output.csv"
-    ```
+    >>> # Use in workflow YAML:
+    >>> # stages:
+    >>> #   - name: "Process data"
+    >>> #     uses: "data-processing/process-csv@latest"
+    >>> #     args:
+    >>> #       input_path: "/data/input.csv"
+    >>> #       output_path: "/data/output.csv"
 
 Note:
     The registry system supports versioning and aliasing for better function
@@ -64,6 +62,7 @@ from typing import (
     Protocol,
     TypeVar,
     Union,
+    cast,
     get_type_hints,
 )
 
@@ -201,7 +200,7 @@ def get_args_const(
             f"Post-filter: {expr} does not valid because it raise syntax error."
         ) from None
 
-    body: list[Expr] = mod.body
+    body: list[Expr] = cast(list[Expr], mod.body)
     if len(body) > 1:
         raise UtilError(
             "Post-filter function should be only one calling per workflow."
