@@ -198,17 +198,15 @@ class Workflow(BaseModel):
             FileNotFoundError: If workflow configuration file not found
 
         Example:
-            ```python
-            # Load from default config path
-            workflow = Workflow.from_conf('data-pipeline')
+            >>> # Load from default config path
+            >>> workflow = Workflow.from_conf('data-pipeline')
 
-            # Load with custom path and extras
-            workflow = Workflow.from_conf(
-                'data-pipeline',
-                path=Path('./custom-configs'),
-                extras={'environment': 'production'}
-            )
-            ```
+            >>> # Load with custom path and extras
+            >>> workflow = Workflow.from_conf(
+            ...     'data-pipeline',
+            ...     path=Path('./custom-configs'),
+            ...     extras={'env': 'prod'}
+            ... )
         """
         load: YamlParser = YamlParser(name, path=path, extras=extras, obj=cls)
         data: DictData = copy.deepcopy(load.data)

@@ -288,9 +288,12 @@ class YamlParser:
                     continue
 
                 if data := cls.filter_yaml(file, name=name):
+
+                    # NOTE: Start adding file metadata.
                     file_stat: os.stat_result = file.lstat()
                     data["created_at"] = file_stat.st_ctime
                     data["updated_at"] = file_stat.st_mtime
+
                     if not obj_type:
                         all_data.append((file_stat.st_mtime, data))
                     elif (t := data.get("type")) and t == obj_type:
@@ -324,9 +327,8 @@ class YamlParser:
             extras: (DictData) An extra parameter that use to override core
                 config values.
             ignore_filename: (str) An ignore filename. Default is
-            ``.confignore`` filename.
-            tags: (list[str])
-                A list of tag that want to filter.
+                ``.confignore`` filename.
+            tags (list[str]): A list of tag that want to filter.
 
         :rtype: Iterator[tuple[str, DictData]]
         """
@@ -365,6 +367,8 @@ class YamlParser:
                         continue
 
                     if (t := data.get("type")) and t == obj_type:
+
+                        # NOTE: Start adding file metadata.
                         file_stat: os.stat_result = file.lstat()
                         data["created_at"] = file_stat.st_ctime
                         data["updated_at"] = file_stat.st_mtime
@@ -372,6 +376,7 @@ class YamlParser:
                             file.lstat().st_mtime,
                             data,
                         )
+
                         if key in all_data:
                             all_data[key].append(marking)
                         else:
@@ -405,15 +410,23 @@ class YamlParser:
     def filter_yaml(cls, file: Path, name: Optional[str] = None) -> DictData:
         """Read a YAML file context from an input file path and specific name.
 
-        :param file: (Path) A file path that want to extract YAML context.
-        :param name: (str) A key name that search on a YAML context.
+        Args:
+            file (Path): A file path that want to extract YAML context.
+            name (str): A key name that search on a YAML context.
 
-        :rtype: DictData
+        Returns:
+            DictData: A data that read from this file if it is YAML format.
         """
         if any(file.suffix.endswith(s) for s in (".yml", ".yaml")):
             values: DictData = YamlFlResolve(file).read()
             if values is not None:
-                return values.get(name, {}) if name else values
+                if name:
+                    if "name" in values and values.get("name") == name:
+                        return values
+                    return (
+                        values[name] | {"name": name} if name in values else {}
+                    )
+                return values
         return {}
 
     @cached_property

@@ -122,12 +122,14 @@ def test_load_file(target_path: Path):
 
     load = YamlParser("test_load_file", extras={"conf_paths": [target_path]})
     assert exclude_created_and_updated(load.data) == {
+        "name": "test_load_file",
         "type": "Workflow",
         "desc": "Test multi config path",
         "env": "${WORKFLOW_LOG_TIMEZONE}",
     }
     assert pass_env(load.data["env"]) == "Asia/Bangkok"
     assert exclude_created_and_updated(pass_env(load.data)) == {
+        "name": "test_load_file",
         "type": "Workflow",
         "desc": "Test multi config path",
         "env": "Asia/Bangkok",
@@ -137,6 +139,7 @@ def test_load_file(target_path: Path):
         "test_load_file", extras={"conf_paths": [target_path]}, obj="Workflow"
     )
     assert exclude_created_and_updated(load.data) == {
+        "name": "test_load_file",
         "type": "Workflow",
         "desc": "Test multi config path",
         "env": "${WORKFLOW_LOG_TIMEZONE}",
@@ -151,6 +154,56 @@ def test_load_file(target_path: Path):
     )
     with pytest.raises(ValueError):
         _ = load.type
+
+
+@pytest.fixture(scope="function")
+def mock_workflow_with_name_key(test_path):
+    target_p = test_path / "test_read_file_with_name_key"
+    target_p.mkdir(exist_ok=True)
+
+    with (target_p / "wf_1.yaml").open(mode="w") as f:
+        yaml.dump(
+            {
+                "name": "wf_1",
+                "type": "Workflow",
+                "value": 1,
+                "tags": [
+                    1,
+                ],
+            },
+            f,
+        )
+
+    with (target_p / "wf_2.yaml").open(mode="w") as f:
+        yaml.dump(
+            {
+                "name": "wf_2",
+                "type": "Workflow",
+                "value": 1,
+                "tags": [
+                    1,
+                ],
+            },
+            f,
+        )
+
+    yield target_p
+
+    shutil.rmtree(target_p)
+
+
+def test_load_file_with_name_key(mock_workflow_with_name_key):
+    assert exclude_created_and_updated(
+        YamlParser(
+            "wf_1", extras={"conf_paths": [mock_workflow_with_name_key]}
+        ).data
+    ) == {"name": "wf_1", "tags": [1], "type": "Workflow", "value": 1}
+
+    with pytest.raises(ValueError):
+        YamlParser(
+            "wf_not_exists",
+            extras={"conf_paths": [mock_workflow_with_name_key]},
+        )
 
 
 def test_load_file_filter(mock_conf: Path):
@@ -197,10 +250,10 @@ def test_load_file_filter(mock_conf: Path):
 
     assert exclude_created_and_updated(
         YamlParser.find("wf_1", path=mock_conf)
-    ) == {"tags": [1], "type": "Workflow", "value": 1}
+    ) == {"name": "wf_1", "tags": [1], "type": "Workflow", "value": 1}
     assert exclude_created_and_updated(
         YamlParser.find("wf_2", path=mock_conf)
-    ) == {"tags": [2], "type": "Workflow", "value": 2}
+    ) == {"name": "wf_2", "tags": [2], "type": "Workflow", "value": 2}
     assert (
         exclude_created_and_updated(
             YamlParser.find("wf_3", path=mock_conf, obj="Workflow")
@@ -209,7 +262,7 @@ def test_load_file_filter(mock_conf: Path):
     )
     assert exclude_created_and_updated(
         YamlParser.find("wf_4", path=mock_conf, obj="Custom")
-    ) == {"type": "Custom", "value": 4}
+    ) == {"name": "wf_4", "type": "Custom", "value": 4}
 
     with pytest.raises(TypeError):
         list(YamlParser.finds("Custom", paths={"path": mock_conf}, tags=[1]))
@@ -285,6 +338,7 @@ def test_load_file_finds(target_path: Path):
 
     load = YamlParser.find("test_load_file", path=target_path, obj="Workflow")
     assert exclude_created_and_updated(load) == {
+        "name": "test_load_file",
         "type": "Workflow",
         "data": "foo",
     }
@@ -292,6 +346,7 @@ def test_load_file_finds(target_path: Path):
     # NOTE: Load with the same name, but it set different type.
     load = YamlParser.find("test_load_file", path=target_path, obj="Config")
     assert exclude_created_and_updated(load) == {
+        "name": "test_load_file",
         "type": "Config",
         "data": "bar",
     }
@@ -351,26 +406,3 @@ def test_dynamic():
 
     conf = dynamic("trace_handlers", extras={})
     assert conf == [{"type": "console"}]
-
-
-def test_parse_url():
-    from urllib.parse import ParseResult, urlparse
-
-    url: ParseResult = urlparse("./logs")
-    assert url == ParseResult(
-        scheme="", netloc="", path="./logs", params="", query="", fragment=""
-    )
-    assert url.scheme == ""
-    assert url.path == "./logs"
-
-    url: ParseResult = urlparse("file:///./logs")
-    assert url.scheme == "file"
-    assert url.path == "/./logs"
-
-    url: ParseResult = urlparse("sqlite:///home/warehouse/sqlite.db")
-    assert url.scheme == "sqlite"
-    assert url.path == "/home/warehouse/sqlite.db"
-
-    url: ParseResult = urlparse("file:./data.db")
-    assert url.scheme == "file"
-    assert url.path == "./data.db"
