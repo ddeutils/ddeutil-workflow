@@ -157,8 +157,6 @@ def performance_comparison():
     print("\n🚀 Example 4: Performance Comparison")
 
     try:
-        import tempfile
-
         from ddeutil.workflow.traces import get_trace
 
         num_messages = 1000

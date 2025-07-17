@@ -11,6 +11,7 @@ import os
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from urllib.parse import urlparse
 
 # Set environment variables for the examples
 os.environ["WORKFLOW_LOG_TRACE_ENABLE_WRITE"] = "true"

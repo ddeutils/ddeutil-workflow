@@ -3,8 +3,74 @@
   "title": "Workflow Configuration JSON Schema",
   "version": "0.0.80",
   "$defs": {
+    "AWSBatchArgs": {
+      "description": "AWS Batch arguments.",
+      "properties": {
+        "job_queue_arn": {
+          "description": "AWS Batch job queue ARN",
+          "title": "Job Queue Arn",
+          "type": "string"
+        },
+        "s3_bucket": {
+          "description": "S3 bucket for file storage",
+          "title": "S3 Bucket",
+          "type": "string"
+        },
+        "region_name": {
+          "default": "us-east-1",
+          "description": "AWS region",
+          "title": "Region Name",
+          "type": "string"
+        },
+        "aws_access_key_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "AWS access key ID",
+          "title": "Aws Access Key Id"
+        },
+        "aws_secret_access_key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "AWS secret access key",
+          "title": "Aws Secret Access Key"
+        },
+        "aws_session_token": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "AWS session token",
+          "title": "Aws Session Token"
+        }
+      },
+      "required": [
+        "job_queue_arn",
+        "s3_bucket"
+      ],
+      "title": "AWSBatchArgs",
+      "type": "object"
+    },
     "ArrayParam": {
-      "description": "Array parameter.",
+      "description": "Array parameter.\n\nThis class provides list/array parameter validation and processing with support\nfor converting various sequence types to lists.",
       "properties": {
         "desc": {
           "anyOf": [
@@ -302,7 +368,7 @@
       "type": "object"
     },
     "ChoiceParam": {
-      "description": "Choice parameter.",
+      "description": "Choice parameter.\n\nThis class provides choice parameter validation and processing with support\nfor predefined options. If no value is provided, it returns the first option.",
       "properties": {
         "desc": {
           "anyOf": [
@@ -352,6 +418,161 @@
         "options"
       ],
       "title": "ChoiceParam",
+      "type": "object"
+    },
+    "ContainerArgs": {
+      "description": "Container arguments.",
+      "properties": {
+        "image": {
+          "description": "Docker image to use",
+          "title": "Image",
+          "type": "string"
+        },
+        "container_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Container name",
+          "title": "Container Name"
+        },
+        "volumes": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Volume mounts",
+          "title": "Volumes"
+        },
+        "environment": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Environment variables",
+          "title": "Environment"
+        },
+        "network": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Network configuration",
+          "title": "Network"
+        },
+        "resources": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Resource limits",
+          "title": "Resources"
+        },
+        "working_dir": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "/app",
+          "description": "Working directory",
+          "title": "Working Dir"
+        },
+        "user": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User to run as",
+          "title": "User"
+        },
+        "command": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Override default command",
+          "title": "Command"
+        },
+        "timeout": {
+          "default": 3600,
+          "description": "Execution timeout in seconds",
+          "title": "Timeout",
+          "type": "integer"
+        },
+        "remove": {
+          "default": true,
+          "description": "Remove container after execution",
+          "title": "Remove",
+          "type": "boolean"
+        },
+        "docker_host": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Docker host URL",
+          "title": "Docker Host"
+        }
+      },
+      "required": [
+        "image"
+      ],
+      "title": "ContainerArgs",
       "type": "object"
     },
     "Crontab": {
@@ -2251,15 +2472,19 @@
           "type": "string"
         },
         "cronjob": {
+          "description": "A Cronjob object that use for validate and generate datetime.",
           "title": "Cronjob",
           "type": "string"
         }
       },
+      "required": [
+        "cronjob"
+      ],
       "title": "CrontabYear",
       "type": "object"
     },
     "DateParam": {
-      "description": "Date parameter model.",
+      "description": "Date parameter model.\n\nThis class provides date parameter validation and processing with support\nfor various input formats including ISO date strings, datetime objects,\nand date objects.",
       "properties": {
         "desc": {
           "anyOf": [
@@ -2297,7 +2522,7 @@
       "type": "object"
     },
     "DatetimeParam": {
-      "description": "Datetime parameter model.",
+      "description": "Datetime parameter model.\n\nThis class provides datetime parameter validation and processing with support\nfor various input formats including ISO datetime strings, datetime objects,\nand date objects. All datetime values are normalized to UTC timezone.",
       "properties": {
         "desc": {
           "anyOf": [
@@ -2335,7 +2560,7 @@
       "type": "object"
     },
     "DecimalParam": {
-      "description": "Decimal parameter.",
+      "description": "Decimal parameter.\n\nThis class provides decimal parameter validation and processing with precision\ncontrol for financial calculations and exact decimal arithmetic.",
       "properties": {
         "desc": {
           "anyOf": [
@@ -2582,7 +2807,7 @@
       "type": "object"
     },
     "Event": {
-      "description": "Event model.",
+      "description": "Event model with comprehensive trigger support.\n\nSupports multiple types of event triggers including cron scheduling,\nfile monitoring, webhooks, database changes, sensor-based triggers,\npolling-based triggers, message queue events, stream processing events,\nbatch processing events, data quality events, API rate limiting events,\ndata lineage events, ML pipeline events, data catalog events,\ninfrastructure events, compliance events, and business events.",
       "properties": {
         "schedule": {
           "description": "A list of Cron schedule.",
@@ -2616,7 +2841,7 @@
       "type": "object"
     },
     "FloatParam": {
-      "description": "Float parameter.",
+      "description": "Float parameter.\n\nThis class provides float parameter validation and processing with precision\ncontrol for rounding float values to a specified number of decimal places.",
       "properties": {
         "desc": {
           "anyOf": [
@@ -2820,8 +3045,60 @@
       "title": "ForEachStage",
       "type": "object"
     },
+    "GCPBatchArgs": {
+      "description": "Google Cloud Batch arguments.",
+      "properties": {
+        "project_id": {
+          "description": "Google Cloud project ID",
+          "title": "Project Id",
+          "type": "string"
+        },
+        "region": {
+          "description": "Google Cloud region",
+          "title": "Region",
+          "type": "string"
+        },
+        "gcs_bucket": {
+          "description": "Google Cloud Storage bucket",
+          "title": "Gcs Bucket",
+          "type": "string"
+        },
+        "credentials_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Path to service account credentials",
+          "title": "Credentials Path"
+        },
+        "machine_type": {
+          "default": "e2-standard-4",
+          "description": "Machine type",
+          "title": "Machine Type",
+          "type": "string"
+        },
+        "max_parallel_tasks": {
+          "default": 1,
+          "description": "Maximum parallel tasks",
+          "title": "Max Parallel Tasks",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "project_id",
+        "region",
+        "gcs_bucket"
+      ],
+      "title": "GCPBatchArgs",
+      "type": "object"
+    },
     "IntParam": {
-      "description": "Integer parameter.",
+      "description": "Integer parameter.\n\nThis class provides integer parameter validation and processing with support\nfor converting various numeric types to integers.",
       "properties": {
         "desc": {
           "anyOf": [
@@ -2903,6 +3180,15 @@
             },
             {
               "$ref": "#/$defs/OnLocal"
+            },
+            {
+              "$ref": "#/$defs/OnContainer"
+            },
+            {
+              "$ref": "#/$defs/OnAWSBatch"
+            },
+            {
+              "$ref": "#/$defs/OnGCPBatch"
             }
           ],
           "title": "Runs-On"
@@ -2994,7 +3280,7 @@
       "type": "object"
     },
     "MapParam": {
-      "description": "Map parameter.",
+      "description": "Map parameter.\n\nThis class provides dictionary/mapping parameter validation and processing\nwith support for converting string representations to dictionaries.",
       "properties": {
         "desc": {
           "anyOf": [
@@ -3100,6 +3386,37 @@
       "title": "Match",
       "type": "object"
     },
+    "OnAWSBatch": {
+      "description": "Runs-on AWS Batch.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/RunsOn",
+          "default": "aws_batch"
+        },
+        "with": {
+          "$ref": "#/$defs/AWSBatchArgs"
+        }
+      },
+      "required": [
+        "with"
+      ],
+      "title": "OnAWSBatch",
+      "type": "object"
+    },
+    "OnContainer": {
+      "description": "Runs-on Container.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/RunsOn",
+          "default": "container"
+        },
+        "with": {
+          "$ref": "#/$defs/ContainerArgs"
+        }
+      },
+      "title": "OnContainer",
+      "type": "object"
+    },
     "OnDocker": {
       "description": "Runs-on Docker container.",
       "properties": {
@@ -3112,6 +3429,23 @@
         }
       },
       "title": "OnDocker",
+      "type": "object"
+    },
+    "OnGCPBatch": {
+      "description": "Runs-on Google Cloud Batch.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/RunsOn",
+          "default": "gcp_batch"
+        },
+        "with": {
+          "$ref": "#/$defs/GCPBatchArgs"
+        }
+      },
+      "required": [
+        "with"
+      ],
+      "title": "OnGCPBatch",
       "type": "object"
     },
     "OnLocal": {
@@ -3450,8 +3784,10 @@
         "self_hosted",
         "azure_batch",
         "aws_batch",
+        "gcp_batch",
         "cloud_batch",
-        "docker"
+        "docker",
+        "container"
       ],
       "title": "RunsOn",
       "type": "string"
@@ -3480,7 +3816,7 @@
       "type": "object"
     },
     "StrParam": {
-      "description": "String parameter.",
+      "description": "String parameter.\n\nThis class provides string parameter validation and processing with support\nfor converting various input types to strings.",
       "properties": {
         "desc": {
           "anyOf": [
