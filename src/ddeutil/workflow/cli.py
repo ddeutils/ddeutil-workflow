@@ -54,29 +54,30 @@ def init() -> None:
         dedent(
             """
         # Example workflow template.
-        wf-example:
-          type: Workflow
-          desc: |
-            An example workflow template that provide the demo of workflow.
-          params:
-            name:
-                type: str
-                default: "World"
-          jobs:
-            first-job:
-              stages:
+        name: wf-example:
+        type: Workflow
+        desc: |
+          An example workflow template that provide the demo of workflow.
+        params:
+          name:
+              type: str
+              default: "World"
+        jobs:
+          first-job:
+            stages:
 
-                - name: "Hello Stage"
-                  echo: "Start say hi to the console"
+              - name: "Hello Stage"
+                echo: "Start say hi to the console"
 
-                - name: "Call tasks"
-                  uses: tasks/say-hello-func@example
-                  with:
-                    name: ${{ params.name }}
-            second-job:
+              - name: "Call tasks"
+                uses: tasks/say-hello-func@example
+                with:
+                  name: ${{ params.name }}
 
-                - name: "Hello Env"
-                  echo: "Start say hi with ${ WORKFLOW_DEMO_HELLO }"
+          second-job:
+
+              - name: "Hello Env"
+                echo: "Start say hi with ${ WORKFLOW_DEMO_HELLO }"
         """
         ).lstrip("\n")
     )
@@ -89,12 +90,20 @@ def init() -> None:
         dummy_tasks_path.write_text(
             dedent(
                 """
+            from typing import Any, Optional
+
             from ddeutil.workflow import Result, tag
 
             @tag(name="example", alias="say-hello-func")
-            def hello_world_task(name: str, rs: Result) -> dict[str, str]:
+            def hello_world_task(name: str, rs: Result, extras: Optional[dict[str, Any]] = None) -> dict[str, str]:
                 \"\"\"Logging hello task function\"\"\"
-                rs.trace.info(f"Hello, {name}")
+                _extras = extras or {}
+                # NOTE: I will use custom newline logging if you pass `||`.
+                rs.trace.info(
+                    f"Hello, {name}||"
+                    f"> running ID: {rs.run_id}"
+                    f"> extras: {_extras}"
+                )
                 return {"name": name}
             """
             ).lstrip("\n")
@@ -106,18 +115,19 @@ def init() -> None:
     dotenv_file = Path(".env")
     mode: str = "a" if dotenv_file.exists() else "w"
     with dotenv_file.open(mode=mode) as f:
-        f.write("\n# Workflow env vars\n")
+        f.write("\n# Workflow Environment Variables\n")
         f.write(
             "WORKFLOW_DEMO_HELLO=foo\n"
             "WORKFLOW_CORE_DEBUG_MODE=true\n"
             "WORKFLOW_LOG_TIMEZONE=Asia/Bangkok\n"
-            "WORKFLOW_LOG_TRACE_ENABLE_WRITE=false\n"
+            'WORKFLOW_LOG_TRACE_HANDLERS=\'[{"type": "console"}]\'\n'
+            'WORKFLOW_LOG_AUDIT_CONF=\'{"type": "file", "path": "./audits"}\''
             "WORKFLOW_LOG_AUDIT_ENABLE_WRITE=true\n"
         )
 
     typer.echo("Starter command:")
     typer.echo(
-        "> `source .env && workflow-cli workflows execute --name=wf-example`"
+        ">>> `source .env && workflow-cli workflows execute --name=wf-example`"
     )
 
 
@@ -163,7 +173,7 @@ def api(
     debug: Annotated[bool, typer.Option(help="A debug mode flag")] = True,
     workers: Annotated[int, typer.Option(help="A worker number")] = None,
     reload: Annotated[bool, typer.Option(help="A reload flag")] = False,
-):
+) -> None:
     """
     Provision API application from the FastAPI.
     """

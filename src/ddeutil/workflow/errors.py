@@ -135,11 +135,12 @@ class BaseError(Exception):
 
         Example:
             >>> error = BaseError("Something failed", refs="stage-1")
-            >>> # Simple format
+
+            Simple format
             >>> error.to_dict()
             >>> # Returns: {"name": "BaseError", "message": "Something failed"}
 
-            >>> # With reference mapping
+            With reference mapping
             >>> error.to_dict(with_refs=True)
             >>> # Returns: {"stage-1": {"name": "BaseError", "message": "Something failed"}}
             ```
