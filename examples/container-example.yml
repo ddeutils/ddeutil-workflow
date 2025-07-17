@@ -1,0 +1,231 @@
+name: "container-example"
+description: "Example workflow using container execution"
+
+params:
+  data_source:
+    type: str
+    default: "/host/data"
+
+  output_path:
+    type: str
+    default: "/container/output"
+
+jobs:
+  data-processing:
+    id: "data-processing"
+    desc: "Process data using container execution"
+
+    runs-on:
+      type: "container"
+      with:
+        image: "ubuntu:20.04"
+        container_name: "workflow-{run_id}"
+        volumes:
+          - source: "/host/data"
+            target: "/container/data"
+            mode: "rw"
+        environment:
+          PYTHONPATH: "/app"
+        resources:
+          memory: "2g"
+          cpu: "2"
+
+    stages:
+      - name: "start"
+        type: "empty"
+        echo: "Starting container job"
+
+      - name: "process-data"
+        type: "py"
+        run: |
+          import pandas as pd
+          import os
+
+          # Load and process data
+          data = pd.read_csv('/container/data/input.csv')
+          result = data.groupby('category').sum()
+
+          # Save results
+          os.makedirs('/container/output', exist_ok=True)
+          result.to_csv('/container/output/result.csv')
+
+          # Update context
+          result.context.update({
+              "processed_rows": len(data),
+              "output_file": "/container/output/result.csv"
+          })
+
+      - name: "complete"
+        type: "empty"
+        echo: "Container job completed"
+
+  multi-platform-test:
+    id: "multi-platform-test"
+    desc: "Test across multiple platforms"
+
+    strategy:
+      matrix:
+        platform: ["ubuntu:20.04", "ubuntu:22.04", "python:3.9", "python:3.11"]
+      max_parallel: 2
+
+    runs-on:
+      type: "container"
+      with:
+        image: "{{ matrix.platform }}"
+        volumes:
+          - source: "/test/code"
+            target: "/container/code"
+            mode: "ro"
+        environment:
+          PLATFORM: "{{ matrix.platform }}"
+
+    stages:
+      - name: "test"
+        type: "py"
+        run: |
+          import sys
+          import platform
+
+          print(f"Testing on {platform.platform()}")
+          print(f"Python version: {sys.version}")
+
+          # Run tests
+          import subprocess
+          result = subprocess.run(['python', '-m', 'pytest', '/container/code'])
+
+          result.context.update({
+              "platform": platform.platform(),
+              "python_version": sys.version,
+              "test_exit_code": result.returncode
+          })
+
+  ml-training:
+    id: "ml-training"
+    desc: "Machine learning training in container"
+
+    runs-on:
+      type: "container"
+      with:
+        image: "tensorflow/tensorflow:2.13.0-gpu"
+        volumes:
+          - source: "/ml/data"
+            target: "/container/data"
+            mode: "ro"
+          - source: "/ml/models"
+            target: "/container/models"
+            mode: "rw"
+        resources:
+          memory: "8g"
+          cpu: "4"
+        environment:
+          CUDA_VISIBLE_DEVICES: "0"
+
+    stages:
+      - name: "train"
+        type: "py"
+        run: |
+          import tensorflow as tf
+          import numpy as np
+
+          # Load data
+          data = np.load('/container/data/training.npy')
+          labels = np.load('/container/data/labels.npy')
+
+          # Create model
+          model = tf.keras.Sequential([
+              tf.keras.layers.Dense(128, activation='relu'),
+              tf.keras.layers.Dropout(0.2),
+              tf.keras.layers.Dense(64, activation='relu'),
+              tf.keras.layers.Dense(10, activation='softmax')
+          ])
+
+          model.compile(
+              optimizer='adam',
+              loss='sparse_categorical_crossentropy',
+              metrics=['accuracy']
+          )
+
+          # Train model
+          history = model.fit(
+              data, labels,
+              epochs=10,
+              validation_split=0.2,
+              batch_size=32
+          )
+
+          # Save model
+          model.save('/container/models/trained_model.h5')
+
+          result.context.update({
+              "final_accuracy": history.history['accuracy'][-1],
+              "model_path": "/container/models/trained_model.h5"
+          })
+
+  web-testing:
+    id: "web-testing"
+    desc: "Web application testing in container"
+
+    runs-on:
+      type: "container"
+      with:
+        image: "node:18-alpine"
+        volumes:
+          - source: "/app"
+            target: "/container/app"
+            mode: "rw"
+        network:
+          network_mode: "bridge"
+          ports:
+            "3000": "3000"
+        environment:
+          NODE_ENV: "test"
+
+    stages:
+      - name: "install"
+        type: "bash"
+        run: |
+          cd /container/app
+          npm install
+
+      - name: "test"
+        type: "bash"
+        run: |
+          cd /container/app
+          npm test
+
+      - name: "build"
+        type: "bash"
+        run: |
+          cd /container/app
+          npm run build
+
+  database-migration:
+    id: "database-migration"
+    desc: "Database migration using container"
+
+    runs-on:
+      type: "container"
+      with:
+        image: "postgres:15"
+        volumes:
+          - source: "/db/migrations"
+            target: "/container/migrations"
+            mode: "ro"
+        network:
+          network_mode: "host"
+        environment:
+          POSTGRES_PASSWORD: "${DB_PASSWORD}"
+          POSTGRES_DB: "myapp"
+
+    stages:
+      - name: "migrate"
+        type: "bash"
+        run: |
+          # Wait for database to be ready
+          until pg_isready -h localhost -p 5432; do
+            sleep 1
+          done
+
+          # Run migrations
+          psql -h localhost -U postgres -d myapp -f /container/migrations/001_initial.sql
+          psql -h localhost -U postgres -d myapp -f /container/migrations/002_add_users.sql
