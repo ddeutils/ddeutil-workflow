@@ -2,6 +2,24 @@
 
 ## Latest Changes
 
+## 0.0.81
+
+### :sparkles: Features
+
+- :dart: feat: update init cli for make config change.
+- :dart: feat: add read yaml support unnested data.
+
+### :bug: Bug fixes
+
+- :gear: fixed: typo of config audit_conf value.
+
+### :book: Documentations
+
+- :page_facing_up: docs: move example docs and update json schema.
+- :page_facing_up: docs: remove docs-string on module for example content.
+- :page_facing_up: docs: sync docs for audits and trancs.
+- :page_facing_up: docs: remove log docs.
+
 ## 0.0.80
 
 ### :sparkles: Features
