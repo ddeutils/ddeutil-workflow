@@ -238,14 +238,11 @@ def workflow_execute(
     typer.echo(f"... with params: {params_dict}")
 
 
-WORKFLOW_TYPE = Literal["Workflow"]
-
-
 class WorkflowSchema(Workflow):
     """Override workflow model fields for generate JSON schema file."""
 
-    type: WORKFLOW_TYPE = Field(
-        default="workflow", description="A type of workflow template."
+    type: Literal["Workflow"] = Field(
+        description="A type of workflow template that should be `Workflow`."
     )
     name: Optional[str] = Field(default=None, description="A workflow name.")
     params: dict[str, Union[Param, str]] = Field(

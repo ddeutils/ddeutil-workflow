@@ -176,17 +176,6 @@ class YamlParser:
     """Base Load object that use to search config data by given some identity
     value like name of `Workflow` or `Crontab` templates.
 
-    :param name: (str) A name of key of config data that read with YAML
-        Environment object.
-    :param path: (Path) A config path object.
-    :param externals: (DictData) An external config data that want to add to
-        loaded config data.
-    :param extras: (DictDdata) An extra parameters that use to override core
-        config values.
-
-    :raise ValueError: If the data does not find on the config path with the
-        name parameter.
-
     Noted:
         The config data should have `type` key for modeling validation that
     make this loader know what is config should to do pass to.
@@ -209,6 +198,23 @@ class YamlParser:
         extras: Optional[DictData] = None,
         obj: Optional[Union[object, str]] = None,
     ) -> None:
+        """Main constructure function.
+
+        Args:
+            name (str): A name of key of config data that read with YAML
+                Environment object.
+            path (Path): A config path object.
+            externals (DictData): An external config data that want to add to
+                loaded config data.
+            extras (DictDdata): An extra parameters that use to override core
+                config values.
+            obj (object | str): An object that want to validate from the `type`
+                key before keeping the config data.
+
+        Raises:
+            ValueError: If the data does not find on the config path with the
+                name parameter.
+        """
         self.path: Path = Path(dynamic("conf_path", f=path, extras=extras))
         self.externals: DictData = externals or {}
         self.extras: DictData = extras or {}
@@ -301,7 +307,6 @@ class YamlParser:
         extras: Optional[DictData] = None,
         ignore_filename: Optional[str] = None,
         tags: Optional[list[Union[str, int]]] = None,
-        include_conf_path: bool = True,
     ) -> Iterator[tuple[str, DictData]]:
         """Find all data that match with object type in config path. This class
         method can use include and exclude list of identity name for filter and
@@ -319,8 +324,6 @@ class YamlParser:
             ignore_filename: (str) An ignore filename. Default is
                 ``.confignore`` filename.
             tags (list[str]): A list of tag that want to filter.
-            include_conf_path (bool): A flag that allow to add config path
-                before searching.
 
         Returns:
             Iterator[tuple[str, DictData]]: An iterator of config data that was
@@ -336,7 +339,7 @@ class YamlParser:
             raise TypeError(
                 f"Multi-config paths does not support for type: {type(paths)}"
             )
-        elif include_conf_path:
+        else:
             paths.append(path)
 
         all_data: dict[str, list[tuple[float, DictData]]] = {}

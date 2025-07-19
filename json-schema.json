@@ -3170,27 +3170,35 @@
           "title": "Desc"
         },
         "runs-on": {
-          "description": "A target node for this job to use for execution.",
-          "oneOf": [
+          "anyOf": [
             {
-              "$ref": "#/$defs/OnSelfHosted"
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/OnSelfHosted"
+                },
+                {
+                  "$ref": "#/$defs/OnDocker"
+                },
+                {
+                  "$ref": "#/$defs/OnLocal"
+                },
+                {
+                  "$ref": "#/$defs/OnContainer"
+                },
+                {
+                  "$ref": "#/$defs/OnAWSBatch"
+                },
+                {
+                  "$ref": "#/$defs/OnGCPBatch"
+                }
+              ]
             },
             {
-              "$ref": "#/$defs/OnDocker"
-            },
-            {
-              "$ref": "#/$defs/OnLocal"
-            },
-            {
-              "$ref": "#/$defs/OnContainer"
-            },
-            {
-              "$ref": "#/$defs/OnAWSBatch"
-            },
-            {
-              "$ref": "#/$defs/OnGCPBatch"
+              "const": "local",
+              "type": "string"
             }
           ],
+          "description": "A target node for this job to use for execution.",
           "title": "Runs-On"
         },
         "if": {
@@ -3868,12 +3876,17 @@
           "type": "boolean"
         },
         "max-parallel": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            }
+          ],
           "default": 1,
           "description": "The maximum number of executor thread pool that want to run parallel. This value should gather than 0 and less than 10.",
-          "exclusiveMaximum": 10,
-          "exclusiveMinimum": 0,
-          "title": "Max-Parallel",
-          "type": "integer"
+          "title": "Max-Parallel"
         },
         "matrix": {
           "additionalProperties": {
@@ -4399,9 +4412,6 @@
           "type": "string"
         }
       },
-      "required": [
-        "type"
-      ],
       "title": "WorkflowSchema",
       "type": "object"
     }

@@ -8,6 +8,7 @@ def test_workflows_get_by_name(client):
     assert response.status_code == 200
     assert exclude_created_and_updated(response.json()) == {
         "name": "wf-run-common",
+        "type": "Workflow",
         "desc": "## Run Python Workflow\n\nThis is a running python workflow\n",
         "params": {"name": {"type": "str"}},
         "on": {

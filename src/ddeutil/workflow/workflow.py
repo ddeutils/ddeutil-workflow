@@ -35,7 +35,7 @@ from pathlib import Path
 from queue import Queue
 from textwrap import dedent
 from threading import Event as ThreadEvent
-from typing import Any, Optional, Union
+from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import field_validator, model_validator
@@ -123,6 +123,7 @@ class Workflow(BaseModel):
         description="An extra parameters that want to override config values.",
     )
     name: str = Field(description="A workflow name.")
+    type: Literal["Workflow"] = Field(default="workflow")
     desc: Optional[str] = Field(
         default=None,
         description=(
@@ -200,7 +201,6 @@ class Workflow(BaseModel):
         load: YamlParser = YamlParser(name, path=path, extras=extras, obj=cls)
         data: DictData = copy.deepcopy(load.data)
         data["name"] = name
-
         if extras:
             data["extras"] = extras
 
@@ -426,7 +426,7 @@ class Workflow(BaseModel):
         override_log_name: Optional[str] = None,
         timeout: int = 600,
         audit_excluded: Optional[list[str]] = None,
-        audit: type[Audit] = None,
+        audit: Audit = None,
     ) -> Result:
         """Release the workflow which is executes workflow with writing audit
         log tracking. The method is overriding parameter with the release

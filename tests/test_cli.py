@@ -1,5 +1,5 @@
 import pytest
-from ddeutil.workflow.cli import app
+from ddeutil.workflow.__main__ import app
 from typer.testing import CliRunner
 
 

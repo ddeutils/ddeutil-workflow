@@ -387,9 +387,7 @@ def test_test_yaml_parser_finds_example(test_path: Path):
         len(
             list(
                 YamlParser.finds(
-                    Workflow,
-                    paths=[test_path.parent / "docs/examples/conf"],
-                    include_conf_path=False,
+                    Workflow, path=test_path.parent / "docs/examples/conf"
                 )
             )
         )
