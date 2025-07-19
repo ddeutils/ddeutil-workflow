@@ -8,11 +8,11 @@ RUN apt-get -y update  \
     && apt-get install -y sqlite3 curl \
     && apt-get clean
 
-COPY --from=ghcr.io/astral-sh/uv:0.6.14 /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.8.0 /uv /uvx /bin/
 
 COPY . .
 
-RUN uv pip install --no-cache-dir -U ddeutil-workflow[all]
+RUN uv pip install -e ".[all]" --no-cache-dir
 
 EXPOSE 8888
 
