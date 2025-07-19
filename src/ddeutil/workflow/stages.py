@@ -823,6 +823,7 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
                     f"( {e.__class__.__name__} )"
                 )
                 exception = e
+                time.sleep(1.2**current_retry)
 
         trace.error(
             f"[STAGE]: Reach the maximum of retry number: {self.retry}."
@@ -896,6 +897,7 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
                     f"( {e.__class__.__name__} )"
                 )
                 exception = e
+                await asyncio.sleep(1.2**current_retry)
 
         await trace.aerror(
             f"[STAGE]: Reach the maximum of retry number: {self.retry}."
