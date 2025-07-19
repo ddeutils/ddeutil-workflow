@@ -1,4 +1,5 @@
 name: "monitoring-alerting"
+type: "Workflow"
 description: "System monitoring and alerting workflow with health checks and incident response"
 
 params:

@@ -113,17 +113,6 @@ class Workflow(BaseModel):
         on (list[Crontab]): Schedule definitions using cron expressions
         jobs (dict[str, Job]): Collection of jobs within this workflow
 
-    Example:
-        Create and execute a workflow:
-
-        ```python
-        workflow = Workflow.from_conf('my-workflow')
-        result = workflow.execute({
-            'param1': 'value1',
-            'param2': 'value2'
-        })
-        ```
-
     Note:
         Workflows can be executed immediately or scheduled for background
         execution using the cron-like scheduling system.
@@ -198,10 +187,10 @@ class Workflow(BaseModel):
             FileNotFoundError: If workflow configuration file not found
 
         Example:
-            >>> # Load from default config path
+            >>> # NOTE: Load from default config path
             >>> workflow = Workflow.from_conf('data-pipeline')
 
-            >>> # Load with custom path and extras
+            >>> # NOTE: Load with custom path and extras
             >>> workflow = Workflow.from_conf(
             ...     'data-pipeline',
             ...     path=Path('./custom-configs'),

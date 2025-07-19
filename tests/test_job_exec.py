@@ -584,3 +584,62 @@ def test_job_exec_cancel():
             "message": "Strategy execution was canceled from the event after end stage execution.",
         },
     }
+
+
+def test_job_exec_max_parallel():
+    job: Job = Job.model_validate(
+        {
+            "id": "first-job",
+            "strategy": {"matrix": {"number": [1, 2]}, "max-parallel": 100},
+            "stages": [{"name": "Echo empty", "echo": "Hello World"}],
+        }
+    )
+    rs = job.execute({})
+    assert rs.status == FAILED
+    assert rs.context == {
+        "status": FAILED,
+        "errors": {
+            "name": "JobError",
+            "message": "The max-parallel value should not more than 10, the current value was set: 100.",
+        },
+    }
+
+    job: Job = Job.model_validate(
+        {
+            "id": "first-job",
+            "strategy": {
+                "matrix": {"number": [1, 2]},
+                "max-parallel": "${{ params.value }}",
+            },
+            "stages": [{"name": "Echo empty", "echo": "Hello World"}],
+        }
+    )
+    rs = job.execute({"params": {"value": 100}})
+    assert rs.status == FAILED
+    assert rs.context == {
+        "status": FAILED,
+        "errors": {
+            "name": "JobError",
+            "message": "The max-parallel value should not more than 10, the current value was set: 100.",
+        },
+    }
+
+    job: Job = Job.model_validate(
+        {
+            "id": "first-job",
+            "strategy": {
+                "matrix": {"number": [1, 2]},
+                "max-parallel": "{{ params.value }}",
+            },
+            "stages": [{"name": "Echo empty", "echo": "Hello World"}],
+        }
+    )
+    rs = job.execute({"params": {"value": 100}})
+    assert rs.status == FAILED
+    assert rs.context == {
+        "status": FAILED,
+        "errors": {
+            "name": "ValueError",
+            "message": "invalid literal for int() with base 10: '{{ params.value }}'",
+        },
+    }

@@ -1,4 +1,5 @@
 name: "database-migration"
+type: "Workflow"
 description: "Database migration workflow with backup, validation, and rollback capabilities"
 
 params:

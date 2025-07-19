@@ -242,17 +242,19 @@ class YamlParser:
         """Find data with specific key and return the latest modify date data if
         this key exists multiple files.
 
-        :param name: (str) A name of data that want to find.
-        :param path: (Path) A config path object.
-        :param paths: (list[Path]) A list of config path object.
-        :param obj: (object | str) An object that want to validate matching
-            before return.
-        :param extras: (DictData)  An extra parameter that use to override core
-            config values.
-        :param ignore_filename: (str) An ignore filename. Default is
-            ``.confignore`` filename.
+        Args:
+            name (str): A name of data that want to find.
+            path (Path): A config path object.
+            paths (list[Path]): A list of config path object.
+            obj (object | str): An object that want to validate matching
+                before return.
+            extras (DictData):  An extra parameter that use to override core
+                config values.
+            ignore_filename (str): An ignore filename. Default is
+                ``.confignore`` filename.
 
-        :rtype: DictData
+        Returns:
+            DictData: A config data that was found on the searching paths.
         """
         path: Path = dynamic("conf_path", f=path, extras=extras)
         if not paths:
@@ -299,6 +301,7 @@ class YamlParser:
         extras: Optional[DictData] = None,
         ignore_filename: Optional[str] = None,
         tags: Optional[list[Union[str, int]]] = None,
+        include_conf_path: bool = True,
     ) -> Iterator[tuple[str, DictData]]:
         """Find all data that match with object type in config path. This class
         method can use include and exclude list of identity name for filter and
@@ -316,8 +319,12 @@ class YamlParser:
             ignore_filename: (str) An ignore filename. Default is
                 ``.confignore`` filename.
             tags (list[str]): A list of tag that want to filter.
+            include_conf_path (bool): A flag that allow to add config path
+                before searching.
 
-        :rtype: Iterator[tuple[str, DictData]]
+        Returns:
+            Iterator[tuple[str, DictData]]: An iterator of config data that was
+                found on the searching paths.
         """
         excluded: list[str] = excluded or []
         tags: list[str] = tags or []
@@ -329,7 +336,7 @@ class YamlParser:
             raise TypeError(
                 f"Multi-config paths does not support for type: {type(paths)}"
             )
-        else:
+        elif include_conf_path:
             paths.append(path)
 
         all_data: dict[str, list[tuple[float, DictData]]] = {}
@@ -353,8 +360,11 @@ class YamlParser:
                     ):
                         continue
 
-                    if (t := data.get("type")) and t == obj_type:
-
+                    if (
+                        # isinstance(data, dict) and
+                        (t := data.get("type"))
+                        and t == obj_type
+                    ):
                         # NOTE: Start adding file metadata.
                         file_stat: os.stat_result = file.lstat()
                         data["created_at"] = file_stat.st_ctime
@@ -397,6 +407,13 @@ class YamlParser:
     def filter_yaml(cls, file: Path, name: Optional[str] = None) -> DictData:
         """Read a YAML file context from an input file path and specific name.
 
+        Notes:
+            The data that will return from reading context will map with config
+            name if an input searching name does not pass to this function.
+
+                input: {"name": "foo", "type": "Some"}
+                output: {"foo": {"name": "foo", "type": "Some"}}
+
         Args:
             file (Path): A file path that want to extract YAML context.
             name (str): A key name that search on a YAML context.
@@ -413,7 +430,7 @@ class YamlParser:
                     return (
                         values[name] | {"name": name} if name in values else {}
                     )
-                return values
+                return {values["name"]: values} if "name" in values else values
         return {}
 
     @cached_property

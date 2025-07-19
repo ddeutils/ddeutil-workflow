@@ -1,4 +1,5 @@
 name: "performance-testing"
+type: "Workflow"
 description: "Comprehensive performance testing workflow with load testing and monitoring"
 
 params:
@@ -147,8 +148,8 @@ jobs:
           TARGET_URL: "${{ params.target_url }}"
           TEST_SCENARIO: "${{ params.test_scenario }}"
         volumes:
-          "/tmp/test-results": "/app/results"
-          "/tmp/test_data.json": "/app/test_data.json"
+          - "/tmp/test-results": "/app/results"
+          - "/tmp/test_data.json": "/app/test_data.json"
         working_dir: "/app"
 
     stages:

@@ -1,4 +1,5 @@
 name: "ml-model-training"
+type: "Workflow"
 description: "Machine learning model training pipeline with hyperparameter optimization and model evaluation"
 
 params:
@@ -35,8 +36,8 @@ jobs:
           DATASET_PATH: "${{ params.dataset_path }}"
           EXPERIMENT_NAME: "${{ params.experiment_name }}"
         volumes:
-          "/tmp/data": "/app/data"
-          "/tmp/models": "/app/models"
+          - "/tmp/data": "/app/data"
+          - "/tmp/models": "/app/models"
         working_dir: "/app"
 
     stages:
@@ -214,8 +215,8 @@ jobs:
         environment:
           EXPERIMENT_NAME: "${{ params.experiment_name }}"
         volumes:
-          "/tmp/data": "/app/data"
-          "/tmp/models": "/app/models"
+          - "/tmp/data": "/app/data"
+          - "/tmp/models": "/app/models"
         working_dir: "/app"
 
     stages:

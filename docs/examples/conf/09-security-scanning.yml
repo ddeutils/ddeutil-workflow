@@ -1,4 +1,5 @@
 name: "security-scanning"
+type: "Workflow"
 description: "Comprehensive security scanning workflow for vulnerability assessment and compliance"
 
 params:
@@ -30,7 +31,7 @@ jobs:
           SCAN_TYPE: "${{ params.scan_type }}"
           TARGET_ENV: "${{ params.target_environment }}"
         volumes:
-          "/tmp/scan-results": "/zap/wrk"
+          - "/tmp/scan-results": "/zap/wrk"
         working_dir: "/zap/wrk"
 
     stages:
@@ -163,7 +164,7 @@ jobs:
         environment:
           SCAN_TYPE: "${{ params.scan_type }}"
         volumes:
-          "/tmp/container-results": "/results"
+          - "/tmp/container-results": "/results"
         working_dir: "/results"
 
     stages:

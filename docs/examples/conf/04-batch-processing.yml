@@ -1,4 +1,5 @@
 name: "batch-processing"
+type: "Workflow"
 description: "Large-scale batch processing workflow with parallel execution and error handling"
 
 params:

@@ -1,4 +1,5 @@
 name: "Data Synchronization Pipeline"
+type: "Workflow"
 description: "Synchronize data across multiple systems, databases, and cloud services with conflict resolution and monitoring"
 
 parameters:
@@ -28,7 +29,8 @@ jobs:
   data-sync-preparation:
     description: "Prepare data synchronization environment and validate connections"
     needs: []
-    runs-on: "local"
+    runs-on:
+      type: "local"
     stages:
       - name: "validate-connections"
         run: |
@@ -248,7 +250,8 @@ jobs:
   data-synchronization:
     description: "Synchronize data to target systems with conflict resolution"
     needs: ["data-transformation"]
-    runs-on: "local"
+    runs-on:
+      type: "local"
     matrix:
       target: ${{ parameters.target_systems }}
     stages:
@@ -386,7 +389,8 @@ jobs:
   sync-monitoring:
     description: "Monitor synchronization status and generate reports"
     needs: ["data-synchronization"]
-    runs-on: "local"
+    runs-on:
+      type: "local"
     stages:
       - name: "generate-sync-report"
         run: |
@@ -448,7 +452,8 @@ jobs:
   sync-cleanup:
     description: "Clean up temporary files and optimize target systems"
     needs: ["sync-monitoring"]
-    runs-on: "local"
+    runs-on:
+      type: "local"
     stages:
       - name: "cleanup-temp-files"
         run: |

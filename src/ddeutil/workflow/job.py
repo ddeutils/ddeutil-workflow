@@ -48,7 +48,7 @@ from enum import Enum
 from functools import lru_cache
 from textwrap import dedent
 from threading import Event
-from typing import Annotated, Any, Optional, Union
+from typing import Annotated, Any, Literal, Optional, Union
 
 from ddeutil.core import freeze_args
 from pydantic import BaseModel, Discriminator, Field, SecretStr, Tag
@@ -187,10 +187,8 @@ class Strategy(BaseModel):
         ),
         alias="fail-fast",
     )
-    max_parallel: int = Field(
+    max_parallel: Union[int, str] = Field(
         default=1,
-        gt=0,
-        lt=10,
         description=(
             "The maximum number of executor thread pool that want to run "
             "parallel. This value should gather than 0 and less than 10."
@@ -427,9 +425,9 @@ class OnGCPBatch(BaseRunsOn):  # pragma: no cov
     args: GCPBatchArgs = Field(alias="with")
 
 
-def get_discriminator_runs_on(model: dict[str, Any]) -> RunsOn:
+def get_discriminator_runs_on(data: dict[str, Any]) -> RunsOn:
     """Get discriminator of the RunsOn models."""
-    t: str = model.get("type")
+    t: str = data.get("type")
     return RunsOn(t) if t else LOCAL
 
 
@@ -538,13 +536,28 @@ class Job(BaseModel):
         description="An extra override config values.",
     )
 
+    @field_validator(
+        "runs_on",
+        mode="before",
+        json_schema_input_type=Union[RunsOnModel, Literal["local"]],
+    )
+    def __prepare_runs_on(cls, data: Any) -> Any:
+        """Prepare runs on value that was passed with string type."""
+        if isinstance(data, str):
+            if data != "local":
+                raise ValueError(
+                    "runs-on that pass with str type should be `local` only"
+                )
+            return {"type": data}
+        return data
+
     @field_validator("desc", mode="after")
-    def ___prepare_desc__(cls, value: str) -> str:
+    def ___prepare_desc__(cls, data: str) -> str:
         """Prepare description string that was created on a template.
 
         :rtype: str
         """
-        return dedent(value.lstrip("\n"))
+        return dedent(data.lstrip("\n"))
 
     @field_validator("stages", mode="after")
     def __validate_stage_id__(cls, value: list[Stage]) -> list[Stage]:
@@ -1174,7 +1187,48 @@ def local_execute(
 
     event: Event = event or Event()
     ls: str = "Fail-Fast" if job.strategy.fail_fast else "All-Completed"
-    workers: int = job.strategy.max_parallel
+    workers: Union[int, str] = job.strategy.max_parallel
+    if isinstance(workers, str):
+        try:
+            workers: int = int(
+                param2template(workers, params=params, extras=job.extras)
+            )
+        except Exception as err:
+            trace.exception(
+                "[JOB]: Got the error on call param2template to "
+                f"max-parallel value: {workers}"
+            )
+            return Result(
+                run_id=run_id,
+                parent_run_id=parent_run_id,
+                status=FAILED,
+                context=catch(
+                    context,
+                    status=FAILED,
+                    updated={"errors": to_dict(err)},
+                ),
+                info={"execution_time": time.monotonic() - ts},
+                extras=job.extras,
+            )
+    if workers >= 10:
+        err_msg: str = (
+            f"The max-parallel value should not more than 10, the current value "
+            f"was set: {workers}."
+        )
+        trace.error(f"[JOB]: {err_msg}")
+        return Result(
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            status=FAILED,
+            context=catch(
+                context,
+                status=FAILED,
+                updated={"errors": JobError(err_msg).to_dict()},
+            ),
+            info={"execution_time": time.monotonic() - ts},
+            extras=job.extras,
+        )
+
     strategies: list[DictStr] = job.strategy.make()
     len_strategy: int = len(strategies)
     trace.info(

@@ -1,4 +1,5 @@
 name: "api-testing"
+type: "Workflow"
 description: "Comprehensive API testing workflow with functional, load, and performance testing"
 
 params:
@@ -110,7 +111,7 @@ jobs:
           API_BASE_URL: "${{ params.api_base_url }}"
           TEST_ENVIRONMENT: "${{ params.test_environment }}"
         volumes:
-          "/tmp/test-results": "/app/results"
+          - "/tmp/test-results": "/app/results"
         working_dir: "/app"
 
     stages:
@@ -354,7 +355,7 @@ jobs:
           TEST_DURATION: "${{ params.load_test_duration }}"
           CONCURRENT_USERS: "${{ params.concurrent_users }}"
         volumes:
-          "/tmp/load-test-results": "/app/results"
+          - "/tmp/load-test-results": "/app/results"
         working_dir: "/app"
 
     stages:
@@ -495,7 +496,7 @@ jobs:
         environment:
           API_BASE_URL: "${{ params.api_base_url }}"
         volumes:
-          "/tmp/security-results": "/app/results"
+          - "/tmp/security-results": "/app/results"
         working_dir: "/app"
 
     stages:

@@ -1,4 +1,5 @@
 name: "microservice-deployment"
+type: "Workflow"
 description: "Microservice deployment pipeline with blue-green deployment, health checks, and rollback capabilities"
 
 params:
@@ -106,7 +107,7 @@ jobs:
         environment:
           KUBECONFIG: "/root/.kube/config"
         volumes:
-          "/root/.kube": "/root/.kube"
+          - "/root/.kube": "/root/.kube"
 
     stages:
       - name: "Deploy to staging"
@@ -161,7 +162,7 @@ jobs:
         environment:
           KUBECONFIG: "/root/.kube/config"
         volumes:
-          "/root/.kube": "/root/.kube"
+          - "/root/.kube": "/root/.kube"
 
     stages:
       - name: "Determine current environment"
@@ -301,7 +302,7 @@ jobs:
         environment:
           KUBECONFIG: "/root/.kube/config"
         volumes:
-          "/root/.kube": "/root/.kube"
+          - "/root/.kube": "/root/.kube"
 
     stages:
       - name: "Deploy with rolling update"
@@ -355,7 +356,7 @@ jobs:
         environment:
           KUBECONFIG: "/root/.kube/config"
         volumes:
-          "/root/.kube": "/root/.kube"
+          - "/root/.kube": "/root/.kube"
 
     stages:
       - name: "Check for rollback conditions"

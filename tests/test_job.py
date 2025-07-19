@@ -38,8 +38,15 @@ def test_job():
     job = Job(desc="\n\t# Desc\n\tThis is a demo job.")
     assert job.desc == "# Desc\nThis is a demo job."
 
+    job = Job.model_validate({"runs-on": "local"})
+    assert isinstance(job.runs_on, OnLocal)
+
     job = Job.model_validate({"runs-on": {"type": "docker"}})
     assert isinstance(job.runs_on, OnDocker)
+
+    # NOTE: pass string allow only local
+    with pytest.raises(ValidationError):
+        Job.model_validate({"runs-on": "docker"})
 
 
 def test_job_check_needs():

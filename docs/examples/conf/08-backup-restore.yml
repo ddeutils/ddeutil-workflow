@@ -1,4 +1,5 @@
 name: "backup-restore"
+type: "Workflow"
 description: "Automated backup and restore workflow for data protection and disaster recovery"
 
 params:

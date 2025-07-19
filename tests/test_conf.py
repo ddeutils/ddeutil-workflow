@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 import pytest
 import rtoml
 import yaml
+from ddeutil.workflow import Workflow
 from ddeutil.workflow.conf import (
     Config,
     YamlParser,
@@ -95,7 +96,7 @@ def mock_conf(test_path: Path):
     shutil.rmtree(target_p)
 
 
-def test_load_file(target_path: Path):
+def test_yaml_parser(target_path: Path):
     with pytest.raises(ValueError):
         YamlParser("test_load_file_raise", path=target_path)
 
@@ -192,7 +193,7 @@ def mock_workflow_with_name_key(test_path):
     shutil.rmtree(target_p)
 
 
-def test_load_file_with_name_key(mock_workflow_with_name_key):
+def test_yaml_parser_with_name_key(mock_workflow_with_name_key):
     assert exclude_created_and_updated(
         YamlParser(
             "wf_1", extras={"conf_paths": [mock_workflow_with_name_key]}
@@ -206,7 +207,7 @@ def test_load_file_with_name_key(mock_workflow_with_name_key):
         )
 
 
-def test_load_file_filter(mock_conf: Path):
+def test_yaml_parser_find_with_filter(mock_conf: Path):
     assert (
         "wf_1",
         {"tags": [1], "type": "Workflow", "value": 1},
@@ -268,7 +269,7 @@ def test_load_file_filter(mock_conf: Path):
         list(YamlParser.finds("Custom", paths={"path": mock_conf}, tags=[1]))
 
 
-def test_load_file_finds(target_path: Path):
+def test_yaml_parser_finds(target_path: Path):
     dummy_file: Path = target_path / "01_test_simple_file.yaml"
     with dummy_file.open(mode="w") as f:
         yaml.dump(
@@ -373,6 +374,27 @@ def test_load_file_finds_raise(target_path: Path):
             YamlParser("test_load_file", path=config.conf_path).type
             == "Workflow"
         )
+
+
+def test_test_yaml_parser_finds_example(test_path: Path):
+    for data in YamlParser.finds(
+        Workflow, path=test_path.parent / "docs/examples/conf"
+    ):
+        print(data[0])
+        Workflow.model_validate(data[1])
+
+    assert (
+        len(
+            list(
+                YamlParser.finds(
+                    Workflow,
+                    paths=[test_path.parent / "docs/examples/conf"],
+                    include_conf_path=False,
+                )
+            )
+        )
+        == 11
+    )
 
 
 def test_load_ignore_file(test_path: Path):
