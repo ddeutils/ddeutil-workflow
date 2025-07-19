@@ -722,6 +722,11 @@ class Workflow(BaseModel):
         )
         catch(context, status=WAIT)
         if event and event.is_set():
+            err_msg: str = (
+                "Execution was canceled from the event was set "
+                "before workflow execution."
+            )
+            trace.error(f"[WORKFLOW]: {err_msg}")
             return Result(
                 run_id=run_id,
                 parent_run_id=parent_run_id,
@@ -729,12 +734,7 @@ class Workflow(BaseModel):
                 context=catch(
                     context,
                     status=CANCEL,
-                    updated={
-                        "errors": WorkflowCancelError(
-                            "Execution was canceled from the event was set "
-                            "before workflow execution."
-                        ).to_dict(),
-                    },
+                    updated={"errors": WorkflowCancelError(err_msg).to_dict()},
                 ),
                 info={"execution_time": time.monotonic() - ts},
                 extras=self.extras,
