@@ -1,0 +1,597 @@
+name: "monitoring-alerting"
+description: "System monitoring and alerting workflow with health checks and incident response"
+
+params:
+  monitoring_interval:
+    type: int
+    default: 300
+    desc: "Monitoring interval in seconds"
+
+  alert_threshold:
+    type: float
+    default: 0.9
+    desc: "Alert threshold for system health"
+
+  escalation_timeout:
+    type: int
+    default: 1800
+    desc: "Escalation timeout in seconds"
+
+jobs:
+  system-health-check:
+    id: "system-health-check"
+    desc: "Comprehensive system health monitoring"
+
+    runs-on:
+      type: "local"
+
+    stages:
+      - name: "Check system resources"
+        run: |
+          import psutil
+          import json
+
+          # CPU usage
+          cpu_percent = psutil.cpu_percent(interval=1)
+          cpu_count = psutil.cpu_count()
+
+          # Memory usage
+          memory = psutil.virtual_memory()
+          memory_percent = memory.percent
+          memory_available = memory.available / (1024**3)  # GB
+
+          # Disk usage
+          disk = psutil.disk_usage('/')
+          disk_percent = disk.percent
+          disk_free = disk.free / (1024**3)  # GB
+
+          # Network I/O
+          network = psutil.net_io_counters()
+          network_bytes_sent = network.bytes_sent
+          network_bytes_recv = network.bytes_recv
+
+          system_metrics = {
+              'cpu_percent': cpu_percent,
+              'cpu_count': cpu_count,
+              'memory_percent': memory_percent,
+              'memory_available_gb': memory_available,
+              'disk_percent': disk_percent,
+              'disk_free_gb': disk_free,
+              'network_bytes_sent': network_bytes_sent,
+              'network_bytes_recv': network_bytes_recv,
+              'timestamp': datetime.now().isoformat()
+          }
+
+          # Check thresholds
+          alerts = []
+          if cpu_percent > 80:
+              alerts.append(f"High CPU usage: {cpu_percent}%")
+          if memory_percent > 85:
+              alerts.append(f"High memory usage: {memory_percent}%")
+          if disk_percent > 90:
+              alerts.append(f"High disk usage: {disk_percent}%")
+
+          system_metrics['alerts'] = alerts
+          system_metrics['healthy'] = len(alerts) == 0
+
+          with open('/tmp/system_metrics.json', 'w') as f:
+              json.dump(system_metrics, f, indent=2)
+
+          print(f"System health check completed:")
+          print(f"  CPU: {cpu_percent}%")
+          print(f"  Memory: {memory_percent}%")
+          print(f"  Disk: {disk_percent}%")
+          print(f"  Status: {'HEALTHY' if system_metrics['healthy'] else 'ALERTS'}")
+
+      - name: "Check application services"
+        run: |
+          import requests
+          import json
+          import subprocess
+
+          services = [
+              {'name': 'web_server', 'url': 'http://localhost:8080/health', 'port': 8080},
+              {'name': 'api_server', 'url': 'http://localhost:3000/health', 'port': 3000},
+              {'name': 'database', 'url': 'http://localhost:5432', 'port': 5432},
+              {'name': 'redis', 'url': 'http://localhost:6379', 'port': 6379}
+          ]
+
+          service_status = {}
+
+          for service in services:
+              try:
+                  # Check if port is open
+                  result = subprocess.run(['nc', '-z', 'localhost', str(service['port'])],
+                                        capture_output=True, timeout=5)
+                  port_open = result.returncode == 0
+
+                  # Try HTTP health check if applicable
+                  http_healthy = False
+                  if service['name'] in ['web_server', 'api_server']:
+                      try:
+                          response = requests.get(service['url'], timeout=5)
+                          http_healthy = response.status_code == 200
+                      except:
+                          pass
+
+                  service_status[service['name']] = {
+                      'port_open': port_open,
+                      'http_healthy': http_healthy,
+                      'overall_healthy': port_open and (http_healthy if service['name'] in ['web_server', 'api_server'] else True)
+                  }
+
+              except Exception as e:
+                  service_status[service['name']] = {
+                      'port_open': False,
+                      'http_healthy': False,
+                      'overall_healthy': False,
+                      'error': str(e)
+                  }
+
+          # Calculate overall service health
+          healthy_services = sum(1 for s in service_status.values() if s['overall_healthy'])
+          total_services = len(service_status)
+          service_health_percent = (healthy_services / total_services) * 100
+
+          service_metrics = {
+              'services': service_status,
+              'healthy_services': healthy_services,
+              'total_services': total_services,
+              'health_percent': service_health_percent,
+              'timestamp': datetime.now().isoformat()
+          }
+
+          with open('/tmp/service_metrics.json', 'w') as f:
+              json.dump(service_metrics, f, indent=2)
+
+          print(f"Service health check completed:")
+          print(f"  Healthy services: {healthy_services}/{total_services}")
+          print(f"  Health percentage: {service_health_percent:.1f}%")
+
+      - name: "Check database performance"
+        run: |
+          import psycopg2
+          import json
+          import time
+
+          try:
+              conn = psycopg2.connect(
+                  host="${{ params.db_host }}",
+                  database="${{ params.db_name }}",
+                  user="${{ params.db_user }}",
+                  password="${{ params.db_password }}",
+                  port="${{ params.db_port }}"
+              )
+
+              cursor = conn.cursor()
+
+              # Check active connections
+              cursor.execute("SELECT count(*) FROM pg_stat_activity WHERE state = 'active';")
+              active_connections = cursor.fetchone()[0]
+
+              # Check slow queries
+              cursor.execute("""
+                  SELECT query, mean_time, calls
+                  FROM pg_stat_statements
+                  ORDER BY mean_time DESC
+                  LIMIT 5;
+              """)
+              slow_queries = cursor.fetchall()
+
+              # Test query performance
+              start_time = time.time()
+              cursor.execute("SELECT COUNT(*) FROM users;")
+              test_query_time = time.time() - start_time
+
+              # Check database size
+              cursor.execute("SELECT pg_size_pretty(pg_database_size(current_database()));")
+              db_size = cursor.fetchone()[0]
+
+              db_metrics = {
+                  'active_connections': active_connections,
+                  'slow_queries': [{'query': q[0][:100], 'mean_time': q[1], 'calls': q[2]} for q in slow_queries],
+                  'test_query_time': test_query_time,
+                  'database_size': db_size,
+                  'healthy': test_query_time < 1.0 and active_connections < 100,
+                  'timestamp': datetime.now().isoformat()
+              }
+
+              cursor.close()
+              conn.close()
+
+          except Exception as e:
+              db_metrics = {
+                  'error': str(e),
+                  'healthy': False,
+                  'timestamp': datetime.now().isoformat()
+              }
+
+          with open('/tmp/database_metrics.json', 'w') as f:
+              json.dump(db_metrics, f, indent=2)
+
+          print(f"Database health check completed:")
+          print(f"  Active connections: {db_metrics.get('active_connections', 'N/A')}")
+          print(f"  Test query time: {db_metrics.get('test_query_time', 'N/A'):.3f}s")
+          print(f"  Status: {'HEALTHY' if db_metrics.get('healthy', False) else 'ISSUES'}")
+
+  alert-processing:
+    id: "alert-processing"
+    desc: "Process alerts and determine escalation"
+    needs: ["system-health-check"]
+
+    runs-on:
+      type: "local"
+
+    stages:
+      - name: "Analyze system alerts"
+        run: |
+          import json
+
+          # Load all metrics
+          with open('/tmp/system_metrics.json', 'r') as f:
+              system_metrics = json.load(f)
+
+          with open('/tmp/service_metrics.json', 'r') as f:
+              service_metrics = json.load(f)
+
+          with open('/tmp/database_metrics.json', 'r') as f:
+              database_metrics = json.load(f)
+
+          # Collect all alerts
+          all_alerts = []
+
+          # System alerts
+          if not system_metrics['healthy']:
+              all_alerts.extend(system_metrics['alerts'])
+
+          # Service alerts
+          if service_metrics['health_percent'] < 75:
+              all_alerts.append(f"Service health below threshold: {service_metrics['health_percent']:.1f}%")
+
+          # Database alerts
+          if not database_metrics.get('healthy', False):
+              all_alerts.append("Database performance issues detected")
+
+          # Determine alert severity
+          alert_severity = 'LOW'
+          if len(all_alerts) > 5:
+              alert_severity = 'HIGH'
+          elif len(all_alerts) > 2:
+              alert_severity = 'MEDIUM'
+
+          # Check if escalation is needed
+          escalation_needed = alert_severity in ['HIGH', 'MEDIUM']
+
+          alert_summary = {
+              'alerts': all_alerts,
+              'alert_count': len(all_alerts),
+              'severity': alert_severity,
+              'escalation_needed': escalation_needed,
+              'timestamp': datetime.now().isoformat()
+          }
+
+          with open('/tmp/alert_summary.json', 'w') as f:
+              json.dump(alert_summary, f, indent=2)
+
+          print(f"Alert analysis completed:")
+          print(f"  Alert count: {len(all_alerts)}")
+          print(f"  Severity: {alert_severity}")
+          print(f"  Escalation needed: {escalation_needed}")
+
+      - name: "Send alerts"
+        run: |
+          import json
+
+          with open('/tmp/alert_summary.json', 'r') as f:
+              alert_summary = json.load(f)
+
+          if alert_summary['alert_count'] > 0:
+              # Send Slack alert
+              alert_message = f"System Alert ({alert_summary['severity']}): {alert_summary['alert_count']} issues detected"
+
+              uses: "notifications/send_slack@v1.0"
+              with:
+                channel: "#system-alerts"
+                message: alert_message
+                color: "danger" if alert_summary['severity'] == 'HIGH' else "warning"
+
+              # Send email for high severity
+              if alert_summary['severity'] == 'HIGH':
+                  uses: "notifications/send_email@v1.0"
+                  with:
+                    to: "oncall@company.com"
+                    subject: f"URGENT: System Alert - {alert_summary['severity']}"
+                    template: "system_alert_urgent"
+                    data:
+                      alert_count: ${{ alert_summary.alert_count }}
+                      severity: "${{ alert_summary.severity }}"
+                      alerts: ${{ alert_summary.alerts }}
+          else:
+              print("No alerts to send")
+
+  incident-response:
+    id: "incident-response"
+    desc: "Automated incident response and recovery"
+    needs: ["alert-processing"]
+
+    runs-on:
+      type: "local"
+
+    stages:
+      - name: "Check if incident response needed"
+        run: |
+          import json
+
+          with open('/tmp/alert_summary.json', 'r') as f:
+              alert_summary = json.load(f)
+
+          if not alert_summary['escalation_needed']:
+              print("No incident response needed")
+              return
+
+          # Create incident ticket
+          incident_data = {
+              'incident_id': f"INC-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
+              'severity': alert_summary['severity'],
+              'alerts': alert_summary['alerts'],
+              'created_at': datetime.now().isoformat(),
+              'status': 'OPEN'
+          }
+
+          with open('/tmp/incident_data.json', 'w') as f:
+              json.dump(incident_data, f, indent=2)
+
+          print(f"Incident created: {incident_data['incident_id']}")
+
+      - name: "Execute automated recovery"
+        run: |
+          import json
+          import subprocess
+
+          with open('/tmp/alert_summary.json', 'r') as f:
+              alert_summary = json.load(f)
+
+          recovery_actions = []
+
+          # Restart services if needed
+          if "Service health below threshold" in str(alert_summary['alerts']):
+              try:
+                  subprocess.run(['systemctl', 'restart', 'web-server'], check=True)
+                  recovery_actions.append("Restarted web server")
+              except:
+                  recovery_actions.append("Failed to restart web server")
+
+              try:
+                  subprocess.run(['systemctl', 'restart', 'api-server'], check=True)
+                  recovery_actions.append("Restarted API server")
+              except:
+                  recovery_actions.append("Failed to restart API server")
+
+          # Clear cache if memory issues
+          if "High memory usage" in str(alert_summary['alerts']):
+              try:
+                  subprocess.run(['redis-cli', 'flushall'], check=True)
+                  recovery_actions.append("Cleared Redis cache")
+              except:
+                  recovery_actions.append("Failed to clear Redis cache")
+
+          # Restart database connections if needed
+          if "Database performance issues" in str(alert_summary['alerts']):
+              try:
+                  subprocess.run(['systemctl', 'restart', 'postgresql'], check=True)
+                  recovery_actions.append("Restarted PostgreSQL")
+              except:
+                  recovery_actions.append("Failed to restart PostgreSQL")
+
+          recovery_summary = {
+              'actions_taken': recovery_actions,
+              'timestamp': datetime.now().isoformat()
+          }
+
+          with open('/tmp/recovery_summary.json', 'w') as f:
+              json.dump(recovery_summary, f, indent=2)
+
+          print(f"Recovery actions completed: {len(recovery_actions)} actions taken")
+
+      - name: "Verify recovery"
+        run: |
+          import json
+          import time
+
+          # Wait for services to stabilize
+          time.sleep(30)
+
+          # Re-run health checks
+          with open('/tmp/system_metrics.json', 'r') as f:
+              system_metrics = json.load(f)
+
+          with open('/tmp/service_metrics.json', 'r') as f:
+              service_metrics = json.load(f)
+
+          # Check if issues are resolved
+          issues_resolved = (
+              system_metrics['healthy'] and
+              service_metrics['health_percent'] > 75
+          )
+
+          recovery_verification = {
+              'issues_resolved': issues_resolved,
+              'system_healthy': system_metrics['healthy'],
+              'service_health_percent': service_metrics['health_percent'],
+              'timestamp': datetime.now().isoformat()
+          }
+
+          with open('/tmp/recovery_verification.json', 'w') as f:
+              json.dump(recovery_verification, f, indent=2)
+
+          if issues_resolved:
+              print("Recovery verification: SUCCESS")
+          else:
+              print("Recovery verification: FAILED - Manual intervention may be needed")
+
+  escalation-handling:
+    id: "escalation-handling"
+    desc: "Handle escalation for unresolved incidents"
+    needs: ["incident-response"]
+
+    runs-on:
+      type: "local"
+
+    stages:
+      - name: "Check escalation timeout"
+        run: |
+          import json
+          from datetime import datetime, timedelta
+
+          with open('/tmp/incident_data.json', 'r') as f:
+              incident_data = json.load(f)
+
+          with open('/tmp/recovery_verification.json', 'r') as f:
+              recovery_verification = json.load(f)
+
+          # Check if escalation timeout has been reached
+          incident_time = datetime.fromisoformat(incident_data['created_at'])
+          current_time = datetime.now()
+          time_since_incident = (current_time - incident_time).total_seconds()
+
+          escalation_timeout = ${{ params.escalation_timeout }}
+          escalation_needed = (
+              time_since_incident > escalation_timeout and
+              not recovery_verification['issues_resolved']
+          )
+
+          escalation_decision = {
+              'time_since_incident': time_since_incident,
+              'escalation_timeout': escalation_timeout,
+              'escalation_needed': escalation_needed,
+              'incident_id': incident_data['incident_id']
+          }
+
+          with open('/tmp/escalation_decision.json', 'w') as f:
+              json.dump(escalation_decision, f, indent=2)
+
+          if escalation_needed:
+              print(f"Escalation needed for incident {incident_data['incident_id']}")
+          else:
+              print("No escalation needed")
+
+      - name: "Execute escalation"
+        run: |
+          import json
+
+          with open('/tmp/escalation_decision.json', 'r') as f:
+              escalation_decision = json.load(f)
+
+          if escalation_decision['escalation_needed']:
+              # Send urgent notification to on-call team
+              uses: "notifications/send_slack@v1.0"
+              with:
+                channel: "#oncall-urgent"
+                message: f"URGENT ESCALATION: Incident {escalation_decision['incident_id']} requires immediate attention"
+                color: "danger"
+
+              # Send SMS to on-call engineer
+              uses: "notifications/send_sms@v1.0"
+              with:
+                to: "${{ params.oncall_phone }}"
+                message: f"URGENT: System incident {escalation_decision['incident_id']} requires immediate attention"
+
+              # Create high-priority ticket
+              uses: "ticketing/create_ticket@v1.0"
+              with:
+                priority: "P1"
+                title: f"System Incident - {escalation_decision['incident_id']}"
+                description: "Automated escalation for unresolved system incident"
+                assignee: "${{ params.oncall_engineer }}"
+
+              print("Escalation executed successfully")
+          else:
+              print("No escalation executed")
+
+  monitoring-reporting:
+    id: "monitoring-reporting"
+    desc: "Generate monitoring and incident reports"
+    needs: ["escalation-handling"]
+
+    runs-on:
+      type: "local"
+
+    stages:
+      - name: "Generate monitoring report"
+        run: |
+          import json
+          import os
+
+          # Collect all monitoring data
+          report_data = {}
+
+          data_files = [
+              'system_metrics.json',
+              'service_metrics.json',
+              'database_metrics.json',
+              'alert_summary.json',
+              'incident_data.json',
+              'recovery_summary.json',
+              'recovery_verification.json',
+              'escalation_decision.json'
+          ]
+
+          for file_name in data_files:
+              file_path = f'/tmp/{file_name}'
+              if os.path.exists(file_path):
+                  with open(file_path, 'r') as f:
+                      key = file_name.replace('.json', '')
+                      report_data[key] = json.load(f)
+
+          # Generate summary
+          summary = {
+              'monitoring_interval': ${{ params.monitoring_interval }},
+              'system_healthy': report_data.get('system_metrics', {}).get('healthy', False),
+              'service_health_percent': report_data.get('service_metrics', {}).get('health_percent', 0),
+              'database_healthy': report_data.get('database_metrics', {}).get('healthy', False),
+              'alerts_generated': report_data.get('alert_summary', {}).get('alert_count', 0),
+              'incident_created': 'incident_data' in report_data,
+              'recovery_successful': report_data.get('recovery_verification', {}).get('issues_resolved', False),
+              'escalation_executed': report_data.get('escalation_decision', {}).get('escalation_needed', False),
+              'timestamp': datetime.now().isoformat()
+          }
+
+          report_data['summary'] = summary
+
+          # Save comprehensive report
+          with open('/tmp/monitoring_report.json', 'w') as f:
+              json.dump(report_data, f, indent=2)
+
+          print(f"Monitoring report generated:")
+          print(f"  System health: {'OK' if summary['system_healthy'] else 'ISSUES'}")
+          print(f"  Service health: {summary['service_health_percent']:.1f}%")
+          print(f"  Alerts: {summary['alerts_generated']}")
+          print(f"  Incidents: {'Yes' if summary['incident_created'] else 'No'}")
+          print(f"  Recovery: {'Success' if summary['recovery_successful'] else 'Failed'}")
+
+      - name: "Send monitoring summary"
+        uses: "notifications/send_slack@v1.0"
+        with:
+          channel: "#monitoring-daily"
+          message: "Daily monitoring summary: System ${{ summary.system_healthy ? 'healthy' : 'issues' }}, ${{ summary.alerts_generated }} alerts, ${{ summary.incident_created ? '1' : '0' }} incidents"
+          color: |
+            "good" if "${{ summary.system_healthy }}" else "warning"
+
+      - name: "Send email report"
+        uses: "notifications/send_email@v1.0"
+        with:
+          to: "ops-team@company.com"
+          subject: "Daily Monitoring Report - ${{ datetime.now().strftime('%Y-%m-%d') }}"
+          template: "monitoring_daily_report"
+          data:
+            system_healthy: ${{ summary.system_healthy }}
+            service_health_percent: ${{ summary.service_health_percent }}
+            alerts_generated: ${{ summary.alerts_generated }}
+            incident_created: ${{ summary.incident_created }}
+            recovery_successful: ${{ summary.recovery_successful }}
+            escalation_executed: ${{ summary.escalation_executed }}
+
+on:
+  schedule:
+    - cronjob: "*/5 * * * *"  # Every 5 minutes
+      timezone: "UTC"

@@ -1,0 +1,503 @@
+name: "Data Synchronization Pipeline"
+description: "Synchronize data across multiple systems, databases, and cloud services with conflict resolution and monitoring"
+
+parameters:
+  source_system:
+    type: "string"
+    default: "postgresql"
+    description: "Source system for data synchronization"
+  target_systems:
+    type: "array"
+    default: ["mysql", "mongodb", "elasticsearch"]
+    description: "Target systems for data synchronization"
+  sync_interval:
+    type: "int"
+    default: 300
+    description: "Synchronization interval in seconds"
+  batch_size:
+    type: "int"
+    default: 1000
+    description: "Number of records to process in each batch"
+  conflict_resolution:
+    type: "choice"
+    default: "source_wins"
+    choices: ["source_wins", "target_wins", "manual_review"]
+    description: "Strategy for resolving data conflicts"
+
+jobs:
+  data-sync-preparation:
+    description: "Prepare data synchronization environment and validate connections"
+    needs: []
+    runs-on: "local"
+    stages:
+      - name: "validate-connections"
+        run: |
+          import psycopg2
+          import pymongo
+          import mysql.connector
+          from elasticsearch import Elasticsearch
+
+          # Validate source connection
+          try:
+              conn = psycopg2.connect(
+                  host=os.environ.get('SOURCE_DB_HOST'),
+                  database=os.environ.get('SOURCE_DB_NAME'),
+                  user=os.environ.get('SOURCE_DB_USER'),
+                  password=os.environ.get('SOURCE_DB_PASSWORD')
+              )
+              print(f"✓ Source {os.environ.get('SOURCE_SYSTEM')} connection validated")
+              conn.close()
+          except Exception as e:
+              raise Exception(f"Source connection failed: {e}")
+
+          # Validate target connections
+          target_systems = os.environ.get('TARGET_SYSTEMS', '').split(',')
+          for target in target_systems:
+              if target == 'mysql':
+                  try:
+                      conn = mysql.connector.connect(
+                          host=os.environ.get('MYSQL_HOST'),
+                          database=os.environ.get('MYSQL_DB'),
+                          user=os.environ.get('MYSQL_USER'),
+                          password=os.environ.get('MYSQL_PASSWORD')
+                      )
+                      print(f"✓ Target {target} connection validated")
+                      conn.close()
+                  except Exception as e:
+                      raise Exception(f"Target {target} connection failed: {e}")
+              elif target == 'mongodb':
+                  try:
+                      client = pymongo.MongoClient(os.environ.get('MONGO_URI'))
+                      client.admin.command('ping')
+                      print(f"✓ Target {target} connection validated")
+                      client.close()
+                  except Exception as e:
+                      raise Exception(f"Target {target} connection failed: {e}")
+              elif target == 'elasticsearch':
+                  try:
+                      es = Elasticsearch([os.environ.get('ES_HOST')])
+                      es.ping()
+                      print(f"✓ Target {target} connection validated")
+                  except Exception as e:
+                      raise Exception(f"Target {target} connection failed: {e}")
+
+      - name: "setup-sync-metadata"
+        run: |
+          import sqlite3
+          import json
+
+          # Create sync metadata table
+          conn = sqlite3.connect('/tmp/sync_metadata.db')
+          cursor = conn.cursor()
+
+          cursor.execute('''
+              CREATE TABLE IF NOT EXISTS sync_metadata (
+                  id INTEGER PRIMARY KEY,
+                  source_system TEXT,
+                  target_system TEXT,
+                  last_sync_time TIMESTAMP,
+                  records_processed INTEGER,
+                  records_failed INTEGER,
+                  sync_status TEXT,
+                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+              )
+          ''')
+
+          # Initialize metadata for each target
+          target_systems = os.environ.get('TARGET_SYSTEMS', '').split(',')
+          for target in target_systems:
+              cursor.execute('''
+                  INSERT OR IGNORE INTO sync_metadata
+                  (source_system, target_system, last_sync_time, records_processed, records_failed, sync_status)
+                  VALUES (?, ?, NULL, 0, 0, 'pending')
+              ''', (os.environ.get('SOURCE_SYSTEM'), target))
+
+          conn.commit()
+          conn.close()
+          print("✓ Sync metadata initialized")
+
+  data-extraction:
+    description: "Extract data from source system with change detection"
+    needs: ["data-sync-preparation"]
+    runs-on: "local"
+    stages:
+      - name: "extract-changed-data"
+        run: |
+          import psycopg2
+          import json
+          from datetime import datetime, timedelta
+
+          # Get last sync time
+          conn = sqlite3.connect('/tmp/sync_metadata.db')
+          cursor = conn.cursor()
+          cursor.execute('''
+              SELECT MAX(last_sync_time) FROM sync_metadata
+              WHERE source_system = ? AND sync_status = 'completed'
+          ''', (os.environ.get('SOURCE_SYSTEM'),))
+          last_sync = cursor.fetchone()[0]
+
+          if last_sync:
+              last_sync_dt = datetime.fromisoformat(last_sync)
+          else:
+              last_sync_dt = datetime.now() - timedelta(days=1)
+
+          # Connect to source database
+          source_conn = psycopg2.connect(
+              host=os.environ.get('SOURCE_DB_HOST'),
+              database=os.environ.get('SOURCE_DB_NAME'),
+              user=os.environ.get('SOURCE_DB_USER'),
+              password=os.environ.get('SOURCE_DB_PASSWORD')
+          )
+
+          # Extract changed records
+          query = '''
+              SELECT id, name, email, updated_at, data
+              FROM users
+              WHERE updated_at > %s
+              ORDER BY updated_at
+              LIMIT %s
+          '''
+
+          cursor = source_conn.cursor()
+          cursor.execute(query, (last_sync_dt, int(os.environ.get('BATCH_SIZE', 1000))))
+          records = cursor.fetchall()
+
+          # Save extracted data
+          with open('/tmp/extracted_data.json', 'w') as f:
+              json.dump({
+                  'extraction_time': datetime.now().isoformat(),
+                  'last_sync_time': last_sync_dt.isoformat(),
+                  'records_count': len(records),
+                  'records': [
+                      {
+                          'id': record[0],
+                          'name': record[1],
+                          'email': record[2],
+                          'updated_at': record[3].isoformat(),
+                          'data': record[4]
+                      } for record in records
+                  ]
+              }, f, indent=2)
+
+          source_conn.close()
+          print(f"✓ Extracted {len(records)} changed records")
+
+  data-transformation:
+    description: "Transform data for target systems and detect conflicts"
+    needs: ["data-extraction"]
+    runs-on: "local"
+    stages:
+      - name: "transform-data"
+        run: |
+          import json
+          import hashlib
+
+          # Load extracted data
+          with open('/tmp/extracted_data.json', 'r') as f:
+              extracted_data = json.load(f)
+
+          target_systems = os.environ.get('TARGET_SYSTEMS', '').split(',')
+          transformed_data = {}
+
+          for target in target_systems:
+              transformed_records = []
+
+              for record in extracted_data['records']:
+                  # Transform data for each target system
+                  if target == 'mysql':
+                      transformed_record = {
+                          'user_id': record['id'],
+                          'full_name': record['name'],
+                          'email_address': record['email'],
+                          'last_modified': record['updated_at'],
+                          'user_data': json.dumps(record['data'])
+                      }
+                  elif target == 'mongodb':
+                      transformed_record = {
+                          '_id': record['id'],
+                          'name': record['name'],
+                          'email': record['email'],
+                          'updatedAt': record['updated_at'],
+                          'data': record['data'],
+                          'sync_hash': hashlib.md5(json.dumps(record, sort_keys=True).encode()).hexdigest()
+                      }
+                  elif target == 'elasticsearch':
+                      transformed_record = {
+                          'id': record['id'],
+                          'name': record['name'],
+                          'email': record['email'],
+                          'updated_at': record['updated_at'],
+                          'data': record['data'],
+                          'search_text': f"{record['name']} {record['email']}"
+                      }
+
+                  transformed_records.append(transformed_record)
+
+              transformed_data[target] = {
+                  'target_system': target,
+                  'records_count': len(transformed_records),
+                  'records': transformed_records
+              }
+
+          # Save transformed data
+          with open('/tmp/transformed_data.json', 'w') as f:
+              json.dump(transformed_data, f, indent=2)
+
+          print(f"✓ Transformed data for {len(target_systems)} target systems")
+
+  data-synchronization:
+    description: "Synchronize data to target systems with conflict resolution"
+    needs: ["data-transformation"]
+    runs-on: "local"
+    matrix:
+      target: ${{ parameters.target_systems }}
+    stages:
+      - name: "sync-to-target"
+        run: |
+          import json
+          import sqlite3
+          from datetime import datetime
+
+          target_system = os.environ.get('TARGET')
+
+          # Load transformed data for this target
+          with open('/tmp/transformed_data.json', 'r') as f:
+              transformed_data = json.load(f)
+
+          target_data = transformed_data[target_system]
+          records_processed = 0
+          records_failed = 0
+
+          try:
+              if target_system == 'mysql':
+                  import mysql.connector
+
+                  conn = mysql.connector.connect(
+                      host=os.environ.get('MYSQL_HOST'),
+                      database=os.environ.get('MYSQL_DB'),
+                      user=os.environ.get('MYSQL_USER'),
+                      password=os.environ.get('MYSQL_PASSWORD')
+                  )
+
+                  cursor = conn.cursor()
+
+                  for record in target_data['records']:
+                      try:
+                          cursor.execute('''
+                              INSERT INTO users (user_id, full_name, email_address, last_modified, user_data)
+                              VALUES (%s, %s, %s, %s, %s)
+                              ON DUPLICATE KEY UPDATE
+                              full_name = VALUES(full_name),
+                              email_address = VALUES(email_address),
+                              last_modified = VALUES(last_modified),
+                              user_data = VALUES(user_data)
+                          ''', (
+                              record['user_id'],
+                              record['full_name'],
+                              record['email_address'],
+                              record['last_modified'],
+                              record['user_data']
+                          ))
+                          records_processed += 1
+                      except Exception as e:
+                          records_failed += 1
+                          print(f"Failed to sync record {record['user_id']}: {e}")
+
+                  conn.commit()
+                  conn.close()
+
+              elif target_system == 'mongodb':
+                  import pymongo
+
+                  client = pymongo.MongoClient(os.environ.get('MONGO_URI'))
+                  db = client[os.environ.get('MONGO_DB')]
+                  collection = db.users
+
+                  for record in target_data['records']:
+                      try:
+                          collection.replace_one(
+                              {'_id': record['_id']},
+                              record,
+                              upsert=True
+                          )
+                          records_processed += 1
+                      except Exception as e:
+                          records_failed += 1
+                          print(f"Failed to sync record {record['_id']}: {e}")
+
+                  client.close()
+
+              elif target_system == 'elasticsearch':
+                  from elasticsearch import Elasticsearch
+
+                  es = Elasticsearch([os.environ.get('ES_HOST')])
+
+                  for record in target_data['records']:
+                      try:
+                          es.index(
+                              index='users',
+                              id=record['id'],
+                              body=record
+                          )
+                          records_processed += 1
+                      except Exception as e:
+                          records_failed += 1
+                          print(f"Failed to sync record {record['id']}: {e}")
+
+              # Update sync metadata
+              conn = sqlite3.connect('/tmp/sync_metadata.db')
+              cursor = conn.cursor()
+              cursor.execute('''
+                  UPDATE sync_metadata
+                  SET last_sync_time = ?, records_processed = ?, records_failed = ?, sync_status = ?
+                  WHERE source_system = ? AND target_system = ?
+              ''', (
+                  datetime.now().isoformat(),
+                  records_processed,
+                  records_failed,
+                  'completed' if records_failed == 0 else 'partial',
+                  os.environ.get('SOURCE_SYSTEM'),
+                  target_system
+              ))
+              conn.commit()
+              conn.close()
+
+              print(f"✓ Synced {records_processed} records to {target_system} ({records_failed} failed)")
+
+          except Exception as e:
+              # Update sync metadata with error
+              conn = sqlite3.connect('/tmp/sync_metadata.db')
+              cursor = conn.cursor()
+              cursor.execute('''
+                  UPDATE sync_metadata
+                  SET records_failed = ?, sync_status = ?
+                  WHERE source_system = ? AND target_system = ?
+              ''', (
+                  len(target_data['records']),
+                  'failed',
+                  os.environ.get('SOURCE_SYSTEM'),
+                  target_system
+              ))
+              conn.commit()
+              conn.close()
+
+              raise Exception(f"Sync to {target_system} failed: {e}")
+
+  sync-monitoring:
+    description: "Monitor synchronization status and generate reports"
+    needs: ["data-synchronization"]
+    runs-on: "local"
+    stages:
+      - name: "generate-sync-report"
+        run: |
+          import sqlite3
+          import json
+          from datetime import datetime
+
+          # Get sync statistics
+          conn = sqlite3.connect('/tmp/sync_metadata.db')
+          cursor = conn.cursor()
+
+          cursor.execute('''
+              SELECT target_system, last_sync_time, records_processed, records_failed, sync_status
+              FROM sync_metadata
+              WHERE source_system = ?
+          ''', (os.environ.get('SOURCE_SYSTEM'),))
+
+          sync_stats = cursor.fetchall()
+
+          total_processed = sum(stat[2] for stat in sync_stats)
+          total_failed = sum(stat[3] for stat in sync_stats)
+          success_rate = (total_processed / (total_processed + total_failed)) * 100 if (total_processed + total_failed) > 0 else 0
+
+          report = {
+              'sync_report': {
+                  'generated_at': datetime.now().isoformat(),
+                  'source_system': os.environ.get('SOURCE_SYSTEM'),
+                  'target_systems': os.environ.get('TARGET_SYSTEMS', '').split(','),
+                  'summary': {
+                      'total_records_processed': total_processed,
+                      'total_records_failed': total_failed,
+                      'success_rate_percent': round(success_rate, 2)
+                  },
+                  'target_details': [
+                      {
+                          'target_system': stat[0],
+                          'last_sync_time': stat[1],
+                          'records_processed': stat[2],
+                          'records_failed': stat[3],
+                          'sync_status': stat[4]
+                      } for stat in sync_stats
+                  ]
+              }
+          }
+
+          # Save report
+          with open('/tmp/sync_report.json', 'w') as f:
+              json.dump(report, f, indent=2)
+
+          # Send notification if there are failures
+          if total_failed > 0:
+              print(f"⚠️  Sync completed with {total_failed} failures")
+              # Here you would send notification to monitoring system
+          else:
+              print(f"✓ Sync completed successfully - {total_processed} records processed")
+
+          conn.close()
+
+  sync-cleanup:
+    description: "Clean up temporary files and optimize target systems"
+    needs: ["sync-monitoring"]
+    runs-on: "local"
+    stages:
+      - name: "cleanup-temp-files"
+        run: |
+          import os
+
+          # Clean up temporary files
+          temp_files = [
+              '/tmp/extracted_data.json',
+              '/tmp/transformed_data.json',
+              '/tmp/sync_metadata.db'
+          ]
+
+          for file_path in temp_files:
+              if os.path.exists(file_path):
+                  os.remove(file_path)
+                  print(f"✓ Cleaned up {file_path}")
+
+          print("✓ Cleanup completed")
+
+      - name: "optimize-target-systems"
+        run: |
+          target_systems = os.environ.get('TARGET_SYSTEMS', '').split(',')
+
+          for target in target_systems:
+              try:
+                  if target == 'mysql':
+                      import mysql.connector
+
+                      conn = mysql.connector.connect(
+                          host=os.environ.get('MYSQL_HOST'),
+                          database=os.environ.get('MYSQL_DB'),
+                          user=os.environ.get('MYSQL_USER'),
+                          password=os.environ.get('MYSQL_PASSWORD')
+                      )
+
+                      cursor = conn.cursor()
+                      cursor.execute('OPTIMIZE TABLE users')
+                      conn.close()
+                      print(f"✓ Optimized MySQL table")
+
+                  elif target == 'elasticsearch':
+                      from elasticsearch import Elasticsearch
+
+                      es = Elasticsearch([os.environ.get('ES_HOST')])
+                      es.indices.forcemerge(index='users')
+                      print(f"✓ Optimized Elasticsearch index")
+
+              except Exception as e:
+                  print(f"⚠️  Optimization for {target} failed: {e}")
+
+events:
+  - cron: "*/5 * * * *"  # Run every 5 minutes

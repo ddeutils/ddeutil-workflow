@@ -1,0 +1,759 @@
+name: "api-testing"
+description: "Comprehensive API testing workflow with functional, load, and performance testing"
+
+params:
+  api_base_url:
+    type: str
+    default: "https://api.example.com"
+    desc: "Base URL for API testing"
+
+  test_environment:
+    type: choice
+    options: ["staging", "production"]
+    desc: "Environment to test"
+
+  load_test_duration:
+    type: int
+    default: 300
+    desc: "Duration of load test in seconds"
+
+  concurrent_users:
+    type: int
+    default: 50
+    desc: "Number of concurrent users for load test"
+
+jobs:
+  api-health-check:
+    id: "api-health-check"
+    desc: "Basic health check and API availability test"
+
+    runs-on:
+      type: "local"
+
+    stages:
+      - name: "Check API availability"
+        run: |
+          import requests
+          import time
+
+          base_url = "${{ params.api_base_url }}"
+
+          # Test basic connectivity
+          try:
+              response = requests.get(f"{base_url}/health", timeout=10)
+              if response.status_code == 200:
+                  print(f"API health check passed: {response.status_code}")
+              else:
+                  raise Exception(f"Health check failed: {response.status_code}")
+          except Exception as e:
+              print(f"API health check failed: {e}")
+              raise e
+
+          # Test API version endpoint
+          try:
+              response = requests.get(f"{base_url}/api/v1/version", timeout=10)
+              if response.status_code == 200:
+                  version_info = response.json()
+                  print(f"API version: {version_info.get('version', 'unknown')}")
+              else:
+                  print(f"Version endpoint failed: {response.status_code}")
+          except Exception as e:
+              print(f"Version check failed: {e}")
+
+      - name: "Check database connectivity"
+        run: |
+          import requests
+
+          base_url = "${{ params.api_base_url }}"
+
+          # Test database connectivity through API
+          try:
+              response = requests.get(f"{base_url}/api/v1/status/db", timeout=10)
+              if response.status_code == 200:
+                  db_status = response.json()
+                  print(f"Database status: {db_status.get('status', 'unknown')}")
+              else:
+                  print(f"Database status check failed: {response.status_code}")
+          except Exception as e:
+              print(f"Database connectivity check failed: {e}")
+
+      - name: "Check external dependencies"
+        run: |
+          import requests
+
+          base_url = "${{ params.api_base_url }}"
+
+          # Test external service dependencies
+          dependencies = ['redis', 'elasticsearch', 's3']
+
+          for dep in dependencies:
+              try:
+                  response = requests.get(f"{base_url}/api/v1/status/{dep}", timeout=10)
+                  if response.status_code == 200:
+                      dep_status = response.json()
+                      print(f"{dep} status: {dep_status.get('status', 'unknown')}")
+                  else:
+                      print(f"{dep} status check failed: {response.status_code}")
+              except Exception as e:
+                  print(f"{dep} connectivity check failed: {e}")
+
+  functional-testing:
+    id: "functional-testing"
+    desc: "Comprehensive functional testing of API endpoints"
+    needs: ["api-health-check"]
+
+    runs-on:
+      type: "container"
+      with:
+        image: "python:3.11-slim"
+        environment:
+          API_BASE_URL: "${{ params.api_base_url }}"
+          TEST_ENVIRONMENT: "${{ params.test_environment }}"
+        volumes:
+          "/tmp/test-results": "/app/results"
+        working_dir: "/app"
+
+    stages:
+      - name: "Install testing dependencies"
+        bash: |
+          pip install pytest requests pytest-html allure-pytest
+
+      - name: "Run authentication tests"
+        run: |
+          import requests
+          import json
+
+          base_url = "${{ params.api_base_url }}"
+
+          # Test user authentication
+          auth_tests = [
+              {
+                  'name': 'valid_login',
+                  'method': 'POST',
+                  'url': f'{base_url}/api/v1/auth/login',
+                  'data': {'username': 'testuser', 'password': 'testpass'},
+                  'expected_status': 200
+              },
+              {
+                  'name': 'invalid_login',
+                  'method': 'POST',
+                  'url': f'{base_url}/api/v1/auth/login',
+                  'data': {'username': 'testuser', 'password': 'wrongpass'},
+                  'expected_status': 401
+              },
+              {
+                  'name': 'missing_credentials',
+                  'method': 'POST',
+                  'url': f'{base_url}/api/v1/auth/login',
+                  'data': {},
+                  'expected_status': 400
+              }
+          ]
+
+          auth_results = []
+          for test in auth_tests:
+              try:
+                  response = requests.request(
+                      test['method'],
+                      test['url'],
+                      json=test['data'],
+                      timeout=10
+                  )
+
+                  result = {
+                      'test_name': test['name'],
+                      'expected_status': test['expected_status'],
+                      'actual_status': response.status_code,
+                      'passed': response.status_code == test['expected_status'],
+                      'response_time': response.elapsed.total_seconds()
+                  }
+
+                  auth_results.append(result)
+                  print(f"{test['name']}: {'PASS' if result['passed'] else 'FAIL'}")
+
+              except Exception as e:
+                  auth_results.append({
+                      'test_name': test['name'],
+                      'error': str(e),
+                      'passed': False
+                  })
+                  print(f"{test['name']}: ERROR - {e}")
+
+          # Save results
+          with open('/app/results/auth_test_results.json', 'w') as f:
+              json.dump(auth_results, f, indent=2)
+
+      - name: "Run CRUD operation tests"
+        run: |
+          import requests
+          import json
+
+          base_url = "${{ params.api_base_url }}"
+
+          # Get authentication token
+          auth_response = requests.post(
+              f'{base_url}/api/v1/auth/login',
+              json={'username': 'testuser', 'password': 'testpass'},
+              timeout=10
+          )
+
+          if auth_response.status_code != 200:
+              raise Exception("Authentication failed for CRUD tests")
+
+          token = auth_response.json().get('token')
+          headers = {'Authorization': f'Bearer {token}'}
+
+          # CRUD tests for users endpoint
+          crud_tests = []
+
+          # Create user
+          create_data = {
+              'name': 'Test User',
+              'email': 'test@example.com',
+              'role': 'user'
+          }
+
+          create_response = requests.post(
+              f'{base_url}/api/v1/users',
+              json=create_data,
+              headers=headers,
+              timeout=10
+          )
+
+          crud_tests.append({
+              'operation': 'create',
+              'expected_status': 201,
+              'actual_status': create_response.status_code,
+              'passed': create_response.status_code == 201
+          })
+
+          if create_response.status_code == 201:
+              user_id = create_response.json().get('id')
+
+              # Read user
+              read_response = requests.get(
+                  f'{base_url}/api/v1/users/{user_id}',
+                  headers=headers,
+                  timeout=10
+              )
+
+              crud_tests.append({
+                  'operation': 'read',
+                  'expected_status': 200,
+                  'actual_status': read_response.status_code,
+                  'passed': read_response.status_code == 200
+              })
+
+              # Update user
+              update_data = {'name': 'Updated Test User'}
+              update_response = requests.put(
+                  f'{base_url}/api/v1/users/{user_id}',
+                  json=update_data,
+                  headers=headers,
+                  timeout=10
+              )
+
+              crud_tests.append({
+                  'operation': 'update',
+                  'expected_status': 200,
+                  'actual_status': update_response.status_code,
+                  'passed': update_response.status_code == 200
+              })
+
+              # Delete user
+              delete_response = requests.delete(
+                  f'{base_url}/api/v1/users/{user_id}',
+                  headers=headers,
+                  timeout=10
+              )
+
+              crud_tests.append({
+                  'operation': 'delete',
+                  'expected_status': 204,
+                  'actual_status': delete_response.status_code,
+                  'passed': delete_response.status_code == 204
+              })
+
+          # Save results
+          with open('/app/results/crud_test_results.json', 'w') as f:
+              json.dump(crud_tests, f, indent=2)
+
+          print(f"CRUD tests completed: {sum(1 for t in crud_tests if t['passed'])}/{len(crud_tests)} passed")
+
+      - name: "Run validation tests"
+        run: |
+          import requests
+          import json
+
+          base_url = "${{ params.api_base_url }}"
+
+          # Test input validation
+          validation_tests = [
+              {
+                  'name': 'invalid_email_format',
+                  'endpoint': '/api/v1/users',
+                  'data': {'name': 'Test', 'email': 'invalid-email', 'role': 'user'},
+                  'expected_status': 400
+              },
+              {
+                  'name': 'missing_required_field',
+                  'endpoint': '/api/v1/users',
+                  'data': {'name': 'Test', 'role': 'user'},  # Missing email
+                  'expected_status': 400
+              },
+              {
+                  'name': 'invalid_role',
+                  'endpoint': '/api/v1/users',
+                  'data': {'name': 'Test', 'email': 'test@example.com', 'role': 'invalid_role'},
+                  'expected_status': 400
+              }
+          ]
+
+          validation_results = []
+          for test in validation_tests:
+              try:
+                  response = requests.post(
+                      f'{base_url}{test["endpoint"]}',
+                      json=test['data'],
+                      timeout=10
+                  )
+
+                  result = {
+                      'test_name': test['name'],
+                      'expected_status': test['expected_status'],
+                      'actual_status': response.status_code,
+                      'passed': response.status_code == test['expected_status']
+                  }
+
+                  validation_results.append(result)
+                  print(f"{test['name']}: {'PASS' if result['passed'] else 'FAIL'}")
+
+              except Exception as e:
+                  validation_results.append({
+                      'test_name': test['name'],
+                      'error': str(e),
+                      'passed': False
+                  })
+                  print(f"{test['name']}: ERROR - {e}")
+
+          # Save results
+          with open('/app/results/validation_test_results.json', 'w') as f:
+              json.dump(validation_results, f, indent=2)
+
+  load-testing:
+    id: "load-testing"
+    desc: "Load testing with performance monitoring"
+    needs: ["functional-testing"]
+
+    runs-on:
+      type: "container"
+      with:
+        image: "locustio/locust:latest"
+        environment:
+          API_BASE_URL: "${{ params.api_base_url }}"
+          TEST_DURATION: "${{ params.load_test_duration }}"
+          CONCURRENT_USERS: "${{ params.concurrent_users }}"
+        volumes:
+          "/tmp/load-test-results": "/app/results"
+        working_dir: "/app"
+
+    stages:
+      - name: "Create load test script"
+        run: |
+          import os
+
+          # Create Locust test script
+          locust_script = '''
+          from locust import HttpUser, task, between
+          import json
+
+          class APIUser(HttpUser):
+              wait_time = between(1, 3)
+
+              def on_start(self):
+                  # Login and get token
+                  response = self.client.post("/api/v1/auth/login", json={
+                      "username": "testuser",
+                      "password": "testpass"
+                  })
+                  if response.status_code == 200:
+                      self.token = response.json().get("token")
+                      self.headers = {"Authorization": f"Bearer {self.token}"}
+                  else:
+                      self.token = None
+                      self.headers = {}
+
+              @task(3)
+              def get_users(self):
+                  self.client.get("/api/v1/users", headers=self.headers)
+
+              @task(2)
+              def get_user_profile(self):
+                  self.client.get("/api/v1/users/profile", headers=self.headers)
+
+              @task(1)
+              def create_user(self):
+                  self.client.post("/api/v1/users", json={
+                      "name": "Load Test User",
+                      "email": "loadtest@example.com",
+                      "role": "user"
+                  }, headers=self.headers)
+
+              @task(2)
+              def search_users(self):
+                  self.client.get("/api/v1/users?search=test", headers=self.headers)
+
+              @task(1)
+              def get_health(self):
+                  self.client.get("/health")
+          '''
+
+          with open('/app/locustfile.py', 'w') as f:
+              f.write(locust_script)
+
+      - name: "Run load test"
+        bash: |
+          locust -f locustfile.py \
+            --host=$API_BASE_URL \
+            --users=$CONCURRENT_USERS \
+            --spawn-rate=10 \
+            --run-time=${TEST_DURATION}s \
+            --headless \
+            --html=/app/results/load_test_report.html \
+            --csv=/app/results/load_test_results
+
+      - name: "Analyze load test results"
+        run: |
+          import pandas as pd
+          import json
+
+          # Read CSV results
+          try:
+              df = pd.read_csv('/app/results/load_test_results_stats.csv')
+
+              # Calculate performance metrics
+              performance_metrics = {
+                  'total_requests': int(df['num_requests'].sum()),
+                  'total_failures': int(df['num_failures'].sum()),
+                  'avg_response_time': float(df['avg_response_time'].mean()),
+                  'max_response_time': float(df['max_response_time'].max()),
+                  'min_response_time': float(df['min_response_time'].min()),
+                  'requests_per_sec': float(df['requests_per_sec'].mean()),
+                  'failure_rate': float(df['num_failures'].sum() / df['num_requests'].sum() * 100)
+              }
+
+              # Performance thresholds
+              thresholds = {
+                  'max_response_time': 2000,  # 2 seconds
+                  'failure_rate': 5,  # 5%
+                  'requests_per_sec': 100  # 100 RPS
+              }
+
+              # Check if thresholds are met
+              performance_status = {
+                  'response_time_ok': performance_metrics['max_response_time'] <= thresholds['max_response_time'],
+                  'failure_rate_ok': performance_metrics['failure_rate'] <= thresholds['failure_rate'],
+                  'throughput_ok': performance_metrics['requests_per_sec'] >= thresholds['requests_per_sec']
+              }
+
+              # Overall status
+              overall_passed = all(performance_status.values())
+
+              # Save results
+              results = {
+                  'performance_metrics': performance_metrics,
+                  'thresholds': thresholds,
+                  'performance_status': performance_status,
+                  'overall_passed': overall_passed,
+                  'test_duration': ${{ params.load_test_duration }},
+                  'concurrent_users': ${{ params.concurrent_users }}
+              }
+
+              with open('/app/results/load_test_analysis.json', 'w') as f:
+                  json.dump(results, f, indent=2)
+
+              print(f"Load test analysis completed:")
+              print(f"  Total requests: {performance_metrics['total_requests']}")
+              print(f"  Failure rate: {performance_metrics['failure_rate']:.2f}%")
+              print(f"  Avg response time: {performance_metrics['avg_response_time']:.2f}ms")
+              print(f"  Max response time: {performance_metrics['max_response_time']:.2f}ms")
+              print(f"  Overall status: {'PASS' if overall_passed else 'FAIL'}")
+
+          except Exception as e:
+              print(f"Error analyzing load test results: {e}")
+              raise e
+
+  security-testing:
+    id: "security-testing"
+    desc: "Security testing including authentication and authorization"
+    needs: ["functional-testing"]
+
+    runs-on:
+      type: "container"
+      with:
+        image: "python:3.11-slim"
+        environment:
+          API_BASE_URL: "${{ params.api_base_url }}"
+        volumes:
+          "/tmp/security-results": "/app/results"
+        working_dir: "/app"
+
+    stages:
+      - name: "Install security testing tools"
+        bash: |
+          pip install requests bandit safety
+
+      - name: "Test authentication bypass"
+        run: |
+          import requests
+          import json
+
+          base_url = "${{ params.api_base_url }}"
+
+          # Test protected endpoints without authentication
+          protected_endpoints = [
+              '/api/v1/users',
+              '/api/v1/users/profile',
+              '/api/v1/admin/users',
+              '/api/v1/settings'
+          ]
+
+          auth_bypass_results = []
+          for endpoint in protected_endpoints:
+              try:
+                  response = requests.get(f'{base_url}{endpoint}', timeout=10)
+
+                  result = {
+                      'endpoint': endpoint,
+                      'status_code': response.status_code,
+                      'vulnerable': response.status_code != 401,
+                      'expected_status': 401
+                  }
+
+                  auth_bypass_results.append(result)
+                  print(f"{endpoint}: {'VULNERABLE' if result['vulnerable'] else 'SECURE'}")
+
+              except Exception as e:
+                  auth_bypass_results.append({
+                      'endpoint': endpoint,
+                      'error': str(e),
+                      'vulnerable': False
+                  })
+                  print(f"{endpoint}: ERROR - {e}")
+
+          # Save results
+          with open('/app/results/auth_bypass_results.json', 'w') as f:
+              json.dump(auth_bypass_results, f, indent=2)
+
+      - name: "Test authorization controls"
+        run: |
+          import requests
+          import json
+
+          base_url = "${{ params.api_base_url }}"
+
+          # Login as regular user
+          user_response = requests.post(
+              f'{base_url}/api/v1/auth/login',
+              json={'username': 'testuser', 'password': 'testpass'},
+              timeout=10
+          )
+
+          if user_response.status_code == 200:
+              user_token = user_response.json().get('token')
+              user_headers = {'Authorization': f'Bearer {user_token}'}
+
+              # Test admin endpoints with user token
+              admin_endpoints = [
+                  '/api/v1/admin/users',
+                  '/api/v1/admin/settings',
+                  '/api/v1/admin/logs'
+              ]
+
+              authorization_results = []
+              for endpoint in admin_endpoints:
+                  try:
+                      response = requests.get(f'{base_url}{endpoint}', headers=user_headers, timeout=10)
+
+                      result = {
+                          'endpoint': endpoint,
+                          'status_code': response.status_code,
+                          'vulnerable': response.status_code == 200,
+                          'expected_status': 403
+                      }
+
+                      authorization_results.append(result)
+                      print(f"{endpoint}: {'VULNERABLE' if result['vulnerable'] else 'SECURE'}")
+
+                  except Exception as e:
+                      authorization_results.append({
+                          'endpoint': endpoint,
+                          'error': str(e),
+                          'vulnerable': False
+                      })
+                      print(f"{endpoint}: ERROR - {e}")
+
+              # Save results
+              with open('/app/results/authorization_results.json', 'w') as f:
+                  json.dump(authorization_results, f, indent=2)
+
+      - name: "Test input validation"
+        run: |
+          import requests
+          import json
+
+          base_url = "${{ params.api_base_url }}"
+
+          # Test SQL injection attempts
+          sql_injection_payloads = [
+              "' OR 1=1 --",
+              "'; DROP TABLE users; --",
+              "' UNION SELECT * FROM users --"
+          ]
+
+          injection_results = []
+          for payload in sql_injection_payloads:
+              try:
+                  response = requests.get(
+                      f'{base_url}/api/v1/users?search={payload}',
+                      timeout=10
+                  )
+
+                  result = {
+                      'payload': payload,
+                      'status_code': response.status_code,
+                      'vulnerable': 'error' in response.text.lower() or 'sql' in response.text.lower(),
+                      'response_length': len(response.text)
+                  }
+
+                  injection_results.append(result)
+                  print(f"SQL injection test: {'VULNERABLE' if result['vulnerable'] else 'SECURE'}")
+
+              except Exception as e:
+                  injection_results.append({
+                      'payload': payload,
+                      'error': str(e),
+                      'vulnerable': False
+                  })
+                  print(f"SQL injection test: ERROR - {e}")
+
+          # Save results
+          with open('/app/results/injection_results.json', 'w') as f:
+              json.dump(injection_results, f, indent=2)
+
+  test-reporting:
+    id: "test-reporting"
+    desc: "Generate comprehensive test report"
+    needs: ["load-testing", "security-testing"]
+
+    runs-on:
+      type: "local"
+
+    stages:
+      - name: "Collect test results"
+        run: |
+          import json
+          import glob
+          import os
+
+          # Collect all test results
+          test_results = {
+              'functional_tests': {},
+              'load_tests': {},
+              'security_tests': {},
+              'summary': {}
+          }
+
+          # Load functional test results
+          functional_files = [
+              '/tmp/test-results/auth_test_results.json',
+              '/tmp/test-results/crud_test_results.json',
+              '/tmp/test-results/validation_test_results.json'
+          ]
+
+          for file_path in functional_files:
+              if os.path.exists(file_path):
+                  with open(file_path, 'r') as f:
+                      test_name = os.path.basename(file_path).replace('_test_results.json', '')
+                      test_results['functional_tests'][test_name] = json.load(f)
+
+          # Load load test results
+          load_analysis_file = '/tmp/load-test-results/load_test_analysis.json'
+          if os.path.exists(load_analysis_file):
+              with open(load_analysis_file, 'r') as f:
+                  test_results['load_tests'] = json.load(f)
+
+          # Load security test results
+          security_files = [
+              '/tmp/security-results/auth_bypass_results.json',
+              '/tmp/security-results/authorization_results.json',
+              '/tmp/security-results/injection_results.json'
+          ]
+
+          for file_path in security_files:
+              if os.path.exists(file_path):
+                  with open(file_path, 'r') as f:
+                      test_name = os.path.basename(file_path).replace('_results.json', '')
+                      test_results['security_tests'][test_name] = json.load(f)
+
+          # Calculate summary
+          functional_passed = 0
+          functional_total = 0
+
+          for test_type, results in test_results['functional_tests'].items():
+              if isinstance(results, list):
+                  functional_passed += sum(1 for r in results if r.get('passed', False))
+                  functional_total += len(results)
+
+          security_vulnerabilities = 0
+          for test_type, results in test_results['security_tests'].items():
+              if isinstance(results, list):
+                  security_vulnerabilities += sum(1 for r in results if r.get('vulnerable', False))
+
+          load_test_passed = test_results['load_tests'].get('overall_passed', False)
+
+          test_results['summary'] = {
+              'functional_tests_passed': functional_passed,
+              'functional_tests_total': functional_total,
+              'functional_tests_success_rate': (functional_passed / functional_total * 100) if functional_total > 0 else 0,
+              'load_test_passed': load_test_passed,
+              'security_vulnerabilities_found': security_vulnerabilities,
+              'overall_status': 'PASS' if (functional_passed == functional_total and load_test_passed and security_vulnerabilities == 0) else 'FAIL'
+          }
+
+          # Save comprehensive report
+          with open('/tmp/comprehensive_test_report.json', 'w') as f:
+              json.dump(test_results, f, indent=2)
+
+          print(f"Test reporting completed:")
+          print(f"  Functional tests: {functional_passed}/{functional_total} passed")
+          print(f"  Load test: {'PASS' if load_test_passed else 'FAIL'}")
+          print(f"  Security vulnerabilities: {security_vulnerabilities}")
+          print(f"  Overall status: {test_results['summary']['overall_status']}")
+
+      - name: "Send test report"
+        uses: "notifications/send_email@v1.0"
+        with:
+          to: "qa-team@company.com"
+          subject: "API Testing Report - ${{ params.test_environment }}"
+          template: "api_test_report"
+          data:
+            environment: "${{ params.test_environment }}"
+            functional_passed: ${{ test_results.summary.functional_tests_passed }}
+            functional_total: ${{ test_results.summary.functional_tests_total }}
+            load_test_passed: ${{ test_results.summary.load_test_passed }}
+            security_vulnerabilities: ${{ test_results.summary.security_vulnerabilities_found }}
+            overall_status: "${{ test_results.summary.overall_status }}"
+
+      - name: "Send Slack notification"
+        uses: "notifications/send_slack@v1.0"
+        with:
+          channel: "#qa-testing"
+          message: "API testing completed for ${{ params.test_environment }}: ${{ test_results.summary.overall_status }}"
+          color: |
+            "good" if "${{ test_results.summary.overall_status }}" == "PASS" else "danger"
+
+on:
+  schedule:
+    - cronjob: "0 3 * * *"  # Daily at 3 AM
+      timezone: "UTC"
