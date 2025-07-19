@@ -748,10 +748,7 @@ Audit = Annotated[
 ]
 
 
-def get_audit(
-    *,
-    extras: Optional[DictData] = None,
-) -> Audit:  # pragma: no cov
+def get_audit(extras: Optional[DictData] = None) -> Audit:  # pragma: no cov
     """Get an audit model dynamically based on the config audit path value.
 
     Args:

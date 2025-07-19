@@ -3,7 +3,7 @@
 # Licensed under the MIT License. See LICENSE in the project root for
 # license information.
 # ------------------------------------------------------------------------------
-"""This route include audit and trace log paths."""
+"""This route include audit log path."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Path, Query
@@ -11,7 +11,6 @@ from fastapi import status as st
 from fastapi.responses import UJSONResponse
 
 from ...audits import get_audit
-from ...result import Result
 
 router = APIRouter(
     prefix="/logs",
@@ -21,75 +20,23 @@ router = APIRouter(
 
 
 @router.get(
-    path="/traces/",
-    response_class=UJSONResponse,
-    status_code=st.HTTP_200_OK,
-    summary="Read all trace logs.",
-    tags=["trace"],
-)
-async def get_traces(
-    offset: int = Query(default=0, gt=0),
-    limit: int = Query(default=100, gt=0),
-):
-    """Return all trace logs from the current trace log path that config with
-    `WORKFLOW_LOG_PATH` environment variable name.
-    """
-    result = Result()
-    return {
-        "message": (
-            f"Getting trace logs with offset: {offset} and limit: {limit}"
-        ),
-        "traces": [
-            trace.model_dump(
-                by_alias=True,
-                exclude_none=True,
-                exclude_unset=True,
-            )
-            for trace in result.trace.find_traces()
-        ],
-    }
-
-
-@router.get(
-    path="/traces/{run_id}",
-    response_class=UJSONResponse,
-    status_code=st.HTTP_200_OK,
-    summary="Read trace log with specific running ID.",
-    tags=["trace"],
-)
-async def get_trace_with_id(run_id: str):
-    """Return trace log with specific running ID from the current trace log path
-    that config with `WORKFLOW_LOG_PATH` environment variable name.
-
-    - **run_id**: A running ID that want to search a trace log from the log
-        path.
-    """
-    result = Result()
-    return {
-        "message": f"Getting trace log with specific running ID: {run_id}",
-        "trace": (
-            result.trace.find_trace_with_id(run_id).model_dump(
-                by_alias=True,
-                exclude_none=True,
-                exclude_unset=True,
-            )
-        ),
-    }
-
-
-@router.get(
     path="/audits/",
     response_class=UJSONResponse,
     status_code=st.HTTP_200_OK,
     summary="Read all audit logs.",
     tags=["audit"],
 )
-async def get_audits():
+async def get_audits(
+    offset: int = Query(default=0, gt=0),
+    limit: int = Query(default=100, gt=0),
+):
     """Return all audit logs from the current audit log path that config with
     `WORKFLOW_AUDIT_URL` environment variable name.
     """
     return {
-        "message": "Getting audit logs",
+        "message": (
+            f"Getting audit logs with offset: {offset} and limit: {limit}",
+        ),
         "audits": list(get_audit().find_audits(name="demo")),
     }
 
