@@ -10,6 +10,8 @@ RUN apt-get -y update  \
 
 COPY --from=ghcr.io/astral-sh/uv:0.8.0 /uv /uvx /bin/
 
+ENV UV_SYSTEM_PYTHON=1
+
 COPY . .
 
 RUN uv pip install -e ".[all]" --no-cache-dir
