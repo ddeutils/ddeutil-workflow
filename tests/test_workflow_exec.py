@@ -116,6 +116,7 @@ def test_workflow_exec_raise_event_set():
 def test_workflow_exec_py():
     workflow = Workflow.from_conf(name="wf-run-python")
     rs: Result = workflow.execute(
+        run_id="1001",
         params={
             "author-run": "Local Workflow",
             "run-date": "2024-01-01",

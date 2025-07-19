@@ -335,7 +335,7 @@ def cut_id(run_id: str, *, num: int = 6) -> str:
     if "T" in run_id:
         dt, simple = run_id.split("T", maxsplit=1)
         return dt[:12] + simple[-num:]
-    return run_id[:12] + run_id[-num:]
+    return run_id[-num:]
 
 
 @overload
