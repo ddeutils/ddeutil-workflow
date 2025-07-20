@@ -12,7 +12,7 @@ from ddeutil.workflow.traces import (
     FileHandler,
     Message,
     Metadata,
-    TraceManager,
+    Trace,
     get_trace,
 )
 
@@ -160,6 +160,7 @@ async def test_trace_handler_base():
     assert handler.emit(meta) is None
     assert await handler.amit(meta) is None
     assert handler.flush([meta]) is None
+    assert handler.pre() is None
 
 
 @pytest.mark.asyncio
@@ -211,7 +212,7 @@ async def test_trace_handler_file():
 
 
 def test_trace_manager_raise():
-    trace = TraceManager(
+    trace = Trace(
         run_id="01",
         parent_run_id="1001",
         handlers=[{"type": "console"}],
@@ -222,7 +223,7 @@ def test_trace_manager_raise():
 
 
 def test_trace_manager():
-    trace = TraceManager(
+    trace = Trace(
         run_id="01",
         parent_run_id="1001",
         handlers=[{"type": "console"}],
@@ -251,7 +252,7 @@ def test_trace_manager():
 
     assert len(trace._buffer) == 0
 
-    trace = TraceManager(
+    trace = Trace(
         run_id="01",
         parent_run_id="1001",
         handlers=[],
@@ -285,7 +286,7 @@ def test_trace_manager():
 
 
 def test_trace_manager_files(test_path: Path):
-    trace = TraceManager(
+    trace = Trace(
         run_id="01",
         parent_run_id="1001_test_file",
         handlers=[
@@ -308,13 +309,15 @@ def test_trace_manager_files(test_path: Path):
 def test_trace_get_trace(test_path: Path):
     rollback = os.getenv("WORKFLOW_LOG_TRACE_HANDLERS")
     os.environ["WORKFLOW_LOG_TRACE_HANDLERS"] = (
-        "["
-        '{"type": "console"},'
-        f'{{"type": "file", "path": "{(test_path / "logs/trace").absolute()}"}}'
-        f"]"
+        '[{"type": "console"},'
+        f'{{"type": "file", "path": "{(test_path / "logs/trace").absolute()}"}}]'
     )
     print(os.getenv("WORKFLOW_LOG_TRACE_HANDLERS"))
-    trace = get_trace(run_id="01", parent_run_id="1001_test_get_trace")
+    trace = get_trace(
+        run_id="01",
+        parent_run_id="1001_test_get_trace",
+        auto_pre_process=True,
+    )
     trace.debug("This is debug message")
     trace.info("This is info message")
     trace.error("This is info message")

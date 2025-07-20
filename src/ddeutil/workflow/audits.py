@@ -59,7 +59,7 @@ from typing_extensions import Self
 
 from .__types import DictData
 from .conf import dynamic
-from .traces import TraceManager, get_trace, set_logging
+from .traces import Trace, get_trace, set_logging
 
 logger = logging.getLogger("ddeutil.workflow")
 
@@ -365,7 +365,7 @@ class FileAudit(BaseAudit):
             Self: The audit instance after saving.
         """
         audit = AuditData.model_validate(data)
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             audit.run_id,
             parent_run_id=audit.parent_run_id,
             extras=self.extras,
@@ -655,7 +655,7 @@ class SQLiteAudit(BaseAudit):  # pragma: no cov
             ValueError: If SQLite database is not properly configured.
         """
         audit = AuditData.model_validate(data)
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             audit.run_id,
             parent_run_id=audit.parent_run_id,
             extras=self.extras,
