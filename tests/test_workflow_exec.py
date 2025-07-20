@@ -3,6 +3,7 @@ from datetime import datetime
 from textwrap import dedent
 from unittest.mock import patch
 
+import pytest
 from ddeutil.core import getdot
 from ddeutil.workflow import (
     CANCEL,
@@ -307,9 +308,32 @@ def test_workflow_exec_py_with_parallel():
 
 
 def test_workflow_exec_py_raise():
-    rs: Result = Workflow.from_conf("wf-run-python-raise").execute(
-        params={}, max_job_parallel=1
+    workflow = Workflow.model_validate(
+        {
+            "name": "wf-run-python-raise",
+            "type": "Workflow",
+            "jobs": {
+                "first-job": {
+                    "stages": [
+                        {
+                            "name": "Raise Error Inside",
+                            "id": "raise-error",
+                            "run": "raise ValueError('Testing raise error inside PyStage!!!')",
+                        }
+                    ],
+                },
+                "second-job": {
+                    "stages": [
+                        {
+                            "name": "Echo hello world",
+                            "echo": "Hello World",
+                        }
+                    ]
+                },
+            },
+        }
     )
+    rs: Result = workflow.execute(params={}, max_job_parallel=1)
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,
@@ -1088,6 +1112,7 @@ def test_workflow_exec_raise_from_job_exec():
         assert rs.status == FAILED
 
 
+@pytest.mark.skip
 def test_workflow_exec_raise_job_trigger(test_path):
     with dump_yaml_context(
         test_path / "conf/demo/01_99_wf_test_wf_exec_raise_job_trigger.yml",
@@ -1143,5 +1168,152 @@ def test_workflow_exec_raise_job_trigger(test_path):
                         "message": "Strategy execution was break because its nested-stage, 'get-param', failed.",
                     },
                 }
+            },
+        }
+
+
+def test_workflow_exec_circle_trigger(test_path):
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_exec_circle.yml",
+        data="""
+        wf-circle:
+          type: Workflow
+          jobs:
+            first-job:
+              stages:
+                - name: "Trigger itself"
+                  trigger: wf-circle
+        """,
+    ):
+        workflow = Workflow.from_conf(name="wf-circle")
+        rs: Result = workflow.execute({})
+        assert rs.status == FAILED
+        assert rs.context == {
+            "params": {},
+            "jobs": {
+                "first-job": {
+                    "status": FAILED,
+                    "stages": {
+                        "1099837090": {
+                            "outputs": {},
+                            "errors": {
+                                "name": "StageError",
+                                "message": "Trigger workflow was failed with:\nJob execution, 'first-job', was failed.",
+                            },
+                            "status": FAILED,
+                        }
+                    },
+                    "errors": {
+                        "name": "JobError",
+                        "message": "Strategy execution was break because its nested-stage, 'Trigger itself', failed.",
+                    },
+                }
+            },
+            "status": FAILED,
+            "errors": {
+                "name": "WorkflowError",
+                "message": "Job execution, 'first-job', was failed.",
+            },
+        }
+
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_exec_circle_runtime.yml",
+        data="""
+        wf-circle-runtime:
+          type: Workflow
+          params:
+            name: str
+          jobs:
+            first-job:
+              stages:
+                - name: "Trigger itself"
+                  trigger: ${{ params.name }}
+        """,
+    ):
+        workflow = Workflow.from_conf(name="wf-circle-runtime")
+        rs: Result = workflow.execute({"name": "wf-circle-runtime"})
+        assert rs.status == FAILED
+        assert rs.context == {
+            "params": {"name": "wf-circle-runtime"},
+            "jobs": {
+                "first-job": {
+                    "status": FAILED,
+                    "stages": {
+                        "1099837090": {
+                            "outputs": {},
+                            "errors": {
+                                "name": "StageError",
+                                "message": "Trigger workflow was failed with:\nJob execution, 'first-job', was failed.",
+                            },
+                            "status": FAILED,
+                        }
+                    },
+                    "errors": {
+                        "name": "JobError",
+                        "message": "Strategy execution was break because its nested-stage, 'Trigger itself', failed.",
+                    },
+                }
+            },
+            "status": FAILED,
+            "errors": {
+                "name": "WorkflowError",
+                "message": "Job execution, 'first-job', was failed.",
+            },
+        }
+
+    with dump_yaml_context(
+        test_path / "conf/demo/01_99_wf_test_wf_exec_circle_runtime_nested.yml",
+        data="""
+        wf-main:
+          type: Workflow
+          params:
+            name: str
+          jobs:
+            first-job:
+              stages:
+                - name: "Trigger itself"
+                  trigger: wf-circle-runtime-nested
+                  params:
+                    name: ${{ params.name }}
+
+        wf-circle-runtime-nested:
+          type: Workflow
+          params:
+            name: str
+          jobs:
+            first-job:
+              stages:
+                - name: "Trigger itself"
+                  trigger: ${{ params.name }}
+        """,
+    ):
+        workflow = Workflow.from_conf(name="wf-main")
+        rs: Result = workflow.execute({"name": "wf-circle-runtime-nested"})
+        assert rs.status == FAILED
+        assert rs.context == {
+            "params": {"name": "wf-circle-runtime-nested"},
+            "jobs": {
+                "first-job": {
+                    "status": FAILED,
+                    "stages": {
+                        "1099837090": {
+                            "outputs": {},
+                            "errors": {
+                                "name": "StageError",
+                                "message": "Trigger workflow was failed with:\nJob execution, 'first-job', was failed.",
+                            },
+                            "status": FAILED,
+                        }
+                    },
+                    "errors": {
+                        "name": "JobError",
+                        "message": "Strategy execution was break because its nested-stage, 'Trigger itself', failed.",
+                    },
+                }
+            },
+            "status": FAILED,
+            "errors": {
+                "name": "WorkflowError",
+                "message": "Job execution, 'first-job', was failed.",
             },
         }

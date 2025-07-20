@@ -36,16 +36,6 @@ the stage execution method.
 execute method receives a `params={"params": {...}}` value for passing template
 searching.
 
-    All stages model inherit from `BaseStage` or `AsyncBaseStage` models that has the
-base fields:
-
-| field     | alias | data type   | default  | description                                                           |
-|-----------|-------|-------------|:--------:|-----------------------------------------------------------------------|
-| id        |       | str \| None |  `None`  | A stage ID that use to keep execution output or getting by job owner. |
-| name      |       | str         |          | A stage name that want to log when start execution.               |
-| condition | if    | str \| None |  `None`  | A stage condition statement to allow stage executable.                |
-| extras    |       | dict        | `dict()` | An extra parameter that override core config values.                  |
-
     It has a special base class is `BaseRetryStage` that inherit from `AsyncBaseStage`
 that use to handle retry execution when it got any error with `retry` field.
 """
@@ -155,13 +145,11 @@ class BaseStage(BaseModel, ABC):
         process: Main execution logic that must be implemented by subclasses
 
     Example:
-        ```python
-        class CustomStage(BaseStage):
-            custom_param: str = Field(description="Custom parameter")
-
-            def process(self, params: dict, **kwargs) -> Result:
-                # Custom execution logic
-                return Result(status=SUCCESS)
+        >>> class CustomStage(BaseStage):
+        ...     custom_param: str = Field(description="Custom parameter")
+        ...
+        ...     def process(self, params: DictData, **kwargs) -> Result:
+        ...         return Result(status=SUCCESS)
         ```
     """
 
@@ -208,7 +196,8 @@ class BaseStage(BaseModel, ABC):
     def ___prepare_desc__(cls, value: str) -> str:
         """Prepare description string that was created on a template.
 
-        :rtype: str
+        Returns:
+            str: A dedent and left strip newline of description string.
         """
         return dedent(value.lstrip("\n"))
 
@@ -218,16 +207,17 @@ class BaseStage(BaseModel, ABC):
         method will validate name and id fields should not contain any template
         parameter (exclude matrix template).
 
-        :raise ValueError: When the ID and name fields include matrix parameter
-            template with the 'matrix.' string value.
+        Raises:
+            ValueError: When the ID and name fields include matrix parameter
+                template with the 'matrix.' string value.
 
-        :rtype: Self
+        Returns: Self
         """
         # VALIDATE: Validate stage id and name should not dynamic with params
         #   template. (allow only matrix)
         if not_in_template(self.id) or not_in_template(self.name):
             raise ValueError(
-                "Stage name and ID should only template with 'matrix.'"
+                "Stage name and ID should only template with 'matrix.?'."
             )
         return self
 
@@ -352,10 +342,7 @@ class BaseStage(BaseModel, ABC):
             StageCancelError,
             StageError,
         ) as e:  # pragma: no cov
-            trace.info(
-                f"[STAGE]: Handler:||{e.__class__.__name__}: {e}||"
-                f"{traceback.format_exc()}"
-            )
+            trace.info(f"[STAGE]: Handler:||{traceback.format_exc()}")
             st: Status = get_status_from_error(e)
             return Result(
                 run_id=run_id,
@@ -374,10 +361,7 @@ class BaseStage(BaseModel, ABC):
                 extras=self.extras,
             )
         except Exception as e:
-            trace.error(
-                f"[STAGE]: Error Handler:||{e.__class__.__name__}: {e}||"
-                f"{traceback.format_exc()}"
-            )
+            trace.error(f"[STAGE]: Error Handler:||{traceback.format_exc()}")
             return Result(
                 run_id=run_id,
                 parent_run_id=parent_run_id,
@@ -681,8 +665,7 @@ class BaseAsyncStage(BaseStage, ABC):
             StageError,
         ) as e:  # pragma: no cov
             await trace.ainfo(
-                f"[STAGE]: Skip Handler:||{e.__class__.__name__}: {e}||"
-                f"{traceback.format_exc()}"
+                f"[STAGE]: Skip Handler:||{traceback.format_exc()}"
             )
             st: Status = get_status_from_error(e)
             return Result(
@@ -703,8 +686,7 @@ class BaseAsyncStage(BaseStage, ABC):
             )
         except Exception as e:
             await trace.aerror(
-                f"[STAGE]: Error Handler:||{e.__class__.__name__}: {e}||"
-                f"{traceback.format_exc()}"
+                f"[STAGE]: Error Handler:||{traceback.format_exc()}"
             )
             return Result(
                 run_id=run_id,
@@ -910,18 +892,14 @@ class EmptyStage(BaseAsyncStage):
 
     EmptyStage is a utility stage that performs no actual work but provides
     logging output and optional delays. It's commonly used for:
-    - Debugging workflow execution flow
-    - Adding informational messages to workflows
-    - Creating delays between stages
-    - Testing template parameter resolution
+        - Debugging workflow execution flow
+        - Adding informational messages to workflows
+        - Creating delays between stages
+        - Testing template parameter resolution
 
     The stage outputs the echo message to stdout and can optionally sleep
     for a specified duration, making it useful for workflow timing control
     and debugging scenarios.
-
-    Attributes:
-        echo (str, optional): Message to display during execution
-        sleep (float): Duration to sleep after logging (0-1800 seconds)
 
     Example:
         ```yaml
@@ -934,24 +912,25 @@ class EmptyStage(BaseAsyncStage):
             echo: "Processing file: ${{ params.filename }}"
         ```
 
-        ```python
-        stage = EmptyStage(
-            name="Status Update",
-            echo="Processing completed successfully",
-            sleep=1.0
-        )
-        ```
+        >>> stage = EmptyStage(
+        ...     name="Status Update",
+        ...     echo="Processing completed successfully",
+        ...     sleep=1.0
+        ... )
     """
 
     echo: StrOrNone = Field(
         default=None,
-        description="A message that want to show on the stdout.",
+        description=(
+            "A message that want to display on the stdout during execution. "
+            "By default, it do not show any message."
+        ),
     )
     sleep: float = Field(
         default=0,
         description=(
-            "A second value to sleep before start execution. This value should "
-            "gather or equal 0, and less than 1800 seconds."
+            "A duration in second value to sleep after logging. This value "
+            "should between 0 - 1800 seconds."
         ),
         ge=0,
         lt=1800,
@@ -1396,11 +1375,11 @@ class PyStage(BaseRetryStage):
         to globals argument on `exec` build-in function.
 
         Args:
-            params: A parameter data that want to use in this
+            params (DictData): A parameter data that want to use in this
                 execution.
-            run_id: A running stage ID.
+            run_id (str): A running stage ID.
             context: A context data.
-            parent_run_id: A parent running ID. (Default is None)
+            parent_run_id (str | None, default None): A parent running ID.
             event: An event manager that use to track parent process
                 was not force stopped.
 
@@ -1410,7 +1389,7 @@ class PyStage(BaseRetryStage):
         trace: TraceManager = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
-        trace.info("[STAGE]: Prepare `globals` and `locals` variables.")
+        trace.debug("[STAGE]: Prepare `globals` and `locals` variables.")
         lc: DictData = {}
         gb: DictData = (
             globals()
@@ -1965,6 +1944,9 @@ class TriggerStage(BaseNestedStage):
     execute method. This is the stage that allow you to create the reusable
     Workflow template with dynamic parameters.
 
+        This stage does not allow to pass the workflow model directly to the
+    trigger field. A trigger workflow name should exist on the config path only.
+
     Data Validate:
         >>> stage = {
         ...     "name": "Trigger workflow stage execution",
@@ -2015,7 +1997,18 @@ class TriggerStage(BaseNestedStage):
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         _trigger: str = param2template(self.trigger, params, extras=self.extras)
+        # if _trigger in self.extras.get("stop_circle_workflow_name", []):
+        #     raise StageError(
+        #         "[STAGE]: Circle execution via trigger itself workflow name."
+        #     )
         trace.info(f"[STAGE]: Load workflow: {_trigger!r}")
+
+        # # NOTE: add noted key for cancel circle execution.
+        # if "stop_circle_workflow_name" in self.extras:
+        #     self.extras["stop_circle_workflow_name"].append(_trigger)
+        # else:
+        #     self.extras.update({"stop_circle_workflow_name": [_trigger]})
+
         result: Result = Workflow.from_conf(
             name=pass_env(_trigger),
             extras=self.extras,
@@ -2026,7 +2019,7 @@ class TriggerStage(BaseNestedStage):
             event=event,
         )
         if result.status == FAILED:
-            err_msg: StrOrNone = (
+            err_msg: str = (
                 f" with:\n{msg}"
                 if (msg := result.context.get("errors", {}).get("message"))
                 else "."
@@ -2100,21 +2093,24 @@ class ParallelStage(BaseNestedStage):
         """Execute branch that will execute all nested-stage that was set in
         this stage with specific branch ID.
 
-        :param branch: (str) A branch ID.
-        :param params: (DictData) A parameter data.
-        :param run_id: (str)
-        :param context: (DictData)
-        :param parent_run_id: (str | None)
-        :param event: (Event) An Event manager instance that use to cancel this
-            execution if it forces stopped by parent execution.
-            (Default is None)
+        Args:
+            branch (str): A branch ID.
+            params (DictData): A parameter data.
+            run_id (str): A running ID.
+            context (DictData):
+            parent_run_id (str | None, default None): A parent running ID.
+            event: (Event) An Event manager instance that use to cancel this
+                execution if it forces stopped by parent execution.
+                (Default is None)
 
-        :raise StageCancelError: If event was set.
-        :raise StageCancelError: If result from a nested-stage return canceled
-            status.
-        :raise StageError: If result from a nested-stage return failed status.
+        Raises:
+            StageCancelError: If event was set.
+            StageCancelError: If result from a nested-stage return canceled
+                status.
+            StageError: If result from a nested-stage return failed status.
 
-        :rtype: tuple[Status, DictData]
+        Returns:
+            tuple[Status, DictData]: A pair of status and result context data.
         """
         trace: TraceManager = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras

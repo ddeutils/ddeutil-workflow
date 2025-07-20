@@ -684,7 +684,7 @@ class Workflow(BaseModel):
         """
         ts: float = time.monotonic()
         parent_run_id: Optional[str] = run_id
-        run_id: str = gen_id(self.name, extras=self.extras)
+        run_id: str = gen_id(self.name, unique=True, extras=self.extras)
         trace: TraceManager = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )

@@ -21,12 +21,12 @@ from __future__ import annotations
 
 from dataclasses import field
 from enum import Enum
-from typing import Optional, Union
+from typing import Optional, TypedDict, Union
 
 from pydantic import ConfigDict
 from pydantic.dataclasses import dataclass
 from pydantic.functional_validators import model_validator
-from typing_extensions import Self
+from typing_extensions import NotRequired, Self
 
 from . import (
     JobCancelError,
@@ -40,7 +40,7 @@ from . import (
 )
 from .__types import DictData
 from .audits import TraceManager, get_trace
-from .errors import ResultError
+from .errors import ErrorData, ResultError
 from .utils import default_gen_id
 
 
@@ -274,6 +274,9 @@ def catch(
         context: A context data that want to be the current context.
         status: A status enum object.
         updated: A updated data that will update to the current context.
+
+    Returns:
+        DictData: A catch context data.
     """
     context.update(updated or {})
     context["status"] = Status(status) if isinstance(status, int) else status
@@ -291,3 +294,12 @@ def catch(
         else:
             raise ResultError(f"The key {k!r} does not exists on context data.")
     return context
+
+
+class Context(TypedDict):
+    """Context dict typed."""
+
+    status: Status
+    context: NotRequired[DictData]
+    errors: NotRequired[Union[list[ErrorData], ErrorData]]
+    info: NotRequired[DictData]
