@@ -1,0 +1,777 @@
+name: "database-migration"
+type: "Workflow"
+description: "Database migration workflow with backup, validation, and rollback capabilities"
+
+params:
+  database_name:
+    type: str
+    default: "production_db"
+    desc: "Name of the database to migrate"
+
+  migration_version:
+    type: str
+    default: "v2.1.0"
+    desc: "Version of the migration to apply"
+
+  environment:
+    type: choice
+    options: ["staging", "production"]
+    desc: "Target environment for migration"
+
+  backup_required:
+    type: choice
+    options: ["true", "false"]
+    desc: "Whether to create backup before migration"
+
+jobs:
+  pre-migration-validation:
+    id: "pre-migration-validation"
+    desc: "Validate database state before migration"
+
+    runs-on:
+      type: "local"
+
+    stages:
+      - name: "Check database connectivity"
+        run: |
+          import psycopg2
+          import sys
+
+          try:
+              conn = psycopg2.connect(
+                  host="${{ params.db_host }}",
+                  database="${{ params.database_name }}",
+                  user="${{ params.db_user }}",
+                  password="${{ params.db_password }}",
+                  port="${{ params.db_port }}"
+              )
+              print("Database connectivity: OK")
+              conn.close()
+          except Exception as e:
+              print(f"Database connectivity failed: {e}")
+              sys.exit(1)
+
+      - name: "Check database version"
+        run: |
+          import psycopg2
+          import json
+
+          conn = psycopg2.connect(
+              host="${{ params.db_host }}",
+              database="${{ params.database_name }}",
+              user="${{ params.db_user }}",
+              password="${{ params.db_password }}",
+              port="${{ params.db_port }}"
+          )
+
+          cursor = conn.cursor()
+
+          # Check if migration table exists
+          cursor.execute("""
+              SELECT EXISTS (
+                  SELECT FROM information_schema.tables
+                  WHERE table_name = 'schema_migrations'
+              );
+          """)
+
+          migration_table_exists = cursor.fetchone()[0]
+
+          if migration_table_exists:
+              cursor.execute("SELECT version FROM schema_migrations ORDER BY applied_at DESC LIMIT 1;")
+              current_version = cursor.fetchone()
+              current_version = current_version[0] if current_version else "none"
+          else:
+              current_version = "none"
+
+          print(f"Current database version: {current_version}")
+
+          # Store for next stages
+          db_info = {
+              'current_version': current_version,
+              'target_version': '${{ params.migration_version }}',
+              'migration_table_exists': migration_table_exists
+          }
+
+          with open('/tmp/db_info.json', 'w') as f:
+              json.dump(db_info, f)
+
+          cursor.close()
+          conn.close()
+
+      - name: "Validate migration files"
+        run: |
+          import os
+          import json
+
+          migration_dir = f"/migrations/${{ params.migration_version }}"
+
+          if not os.path.exists(migration_dir):
+              raise Exception(f"Migration directory not found: {migration_dir}")
+
+          # Check for required migration files
+          required_files = ['up.sql', 'down.sql', 'validation.sql']
+          missing_files = []
+
+          for file_name in required_files:
+              file_path = os.path.join(migration_dir, file_name)
+              if not os.path.exists(file_path):
+                  missing_files.append(file_name)
+
+          if missing_files:
+              raise Exception(f"Missing migration files: {missing_files}")
+
+          print("Migration files validation: OK")
+
+          # Read migration metadata
+          metadata_file = os.path.join(migration_dir, 'metadata.json')
+          if os.path.exists(metadata_file):
+              with open(metadata_file, 'r') as f:
+                  metadata = json.load(f)
+              print(f"Migration metadata: {metadata.get('description', 'No description')}")
+
+      - name: "Check database size"
+        run: |
+          import psycopg2
+
+          conn = psycopg2.connect(
+              host="${{ params.db_host }}",
+              database="${{ params.database_name }}",
+              user="${{ params.db_user }}",
+              password="${{ params.db_password }}",
+              port="${{ params.db_port }}"
+          )
+
+          cursor = conn.cursor()
+
+          # Get database size
+          cursor.execute("""
+              SELECT pg_size_pretty(pg_database_size('${{ params.database_name }}'));
+          """)
+
+          db_size = cursor.fetchone()[0]
+          print(f"Database size: {db_size}")
+
+          # Get table sizes
+          cursor.execute("""
+              SELECT
+                  schemaname,
+                  tablename,
+                  pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) as size
+              FROM pg_tables
+              WHERE schemaname = 'public'
+              ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC
+              LIMIT 10;
+          """)
+
+          table_sizes = cursor.fetchall()
+          print("Top 10 tables by size:")
+          for table in table_sizes:
+              print(f"  {table[1]}: {table[2]}")
+
+          cursor.close()
+          conn.close()
+
+  database-backup:
+    id: "database-backup"
+    desc: "Create database backup before migration"
+    needs: ["pre-migration-validation"]
+    if: "${{ params.backup_required == 'true' }}"
+
+    runs-on:
+      type: "aws_batch"
+      with:
+        job_queue_arn: "${AWS_BATCH_JOB_QUEUE_ARN}"
+        s3_bucket: "${S3_BUCKET}"
+
+    stages:
+      - name: "Create database backup"
+        bash: |
+          BACKUP_FILE="/tmp/backup_${{ params.database_name }}_$(date +%Y%m%d_%H%M%S).sql"
+
+          pg_dump -h ${{ params.db_host }} \
+                  -U ${{ params.db_user }} \
+                  -d ${{ params.database_name }} \
+                  -p ${{ params.db_port }} \
+                  --verbose \
+                  --clean \
+                  --no-owner \
+                  --no-privileges \
+                  > $BACKUP_FILE
+
+          echo "Backup created: $BACKUP_FILE"
+          echo "Backup size: $(du -h $BACKUP_FILE | cut -f1)"
+        env:
+          PGPASSWORD: "${{ params.db_password }}"
+
+      - name: "Compress backup"
+        bash: |
+          BACKUP_FILE="/tmp/backup_${{ params.database_name }}_$(date +%Y%m%d_%H%M%S).sql"
+          COMPRESSED_BACKUP="${BACKUP_FILE}.gz"
+
+          gzip $BACKUP_FILE
+          echo "Compressed backup: $COMPRESSED_BACKUP"
+          echo "Compressed size: $(du -h $COMPRESSED_BACKUP | cut -f1)"
+
+      - name: "Upload backup to S3"
+        bash: |
+          BACKUP_FILE="/tmp/backup_${{ params.database_name }}_$(date +%Y%m%d_%H%M%S).sql.gz"
+
+          aws s3 cp $BACKUP_FILE s3://${{ params.backup_bucket }}/database-backups/
+
+          echo "Backup uploaded to S3: s3://${{ params.backup_bucket }}/database-backups/$(basename $BACKUP_FILE)"
+        env:
+          AWS_DEFAULT_REGION: "us-east-1"
+
+      - name: "Verify backup integrity"
+        run: |
+          import subprocess
+          import os
+
+          # Find the backup file
+          backup_files = [f for f in os.listdir('/tmp') if f.startswith('backup_') and f.endswith('.sql.gz')]
+          if not backup_files:
+              raise Exception("No backup file found")
+
+          backup_file = os.path.join('/tmp', backup_files[0])
+
+          # Test backup integrity
+          result = subprocess.run(['gunzip', '-t', backup_file], capture_output=True, text=True)
+
+          if result.returncode != 0:
+              raise Exception(f"Backup integrity check failed: {result.stderr}")
+
+          print("Backup integrity check: OK")
+
+          # Store backup info
+          backup_info = {
+              'backup_file': backup_file,
+              'backup_size': os.path.getsize(backup_file),
+              'backup_timestamp': datetime.now().isoformat()
+          }
+
+          with open('/tmp/backup_info.json', 'w') as f:
+              json.dump(backup_info, f)
+
+  apply-migration:
+    id: "apply-migration"
+    desc: "Apply database migration"
+    needs: ["database-backup"]
+
+    runs-on:
+      type: "local"
+
+    stages:
+      - name: "Create migration table if not exists"
+        run: |
+          import psycopg2
+
+          conn = psycopg2.connect(
+              host="${{ params.db_host }}",
+              database="${{ params.database_name }}",
+              user="${{ params.db_user }}",
+              password="${{ params.db_password }}",
+              port="${{ params.db_port }}"
+          )
+
+          cursor = conn.cursor()
+
+          # Create migration tracking table
+          cursor.execute("""
+              CREATE TABLE IF NOT EXISTS schema_migrations (
+                  id SERIAL PRIMARY KEY,
+                  version VARCHAR(255) NOT NULL,
+                  applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  description TEXT,
+                  checksum VARCHAR(64)
+              );
+          """)
+
+          conn.commit()
+          cursor.close()
+          conn.close()
+
+          print("Migration table ready")
+
+      - name: "Apply migration"
+        run: |
+          import psycopg2
+          import os
+          import hashlib
+
+          # Read migration SQL
+          migration_file = f"/migrations/${{ params.migration_version }}/up.sql"
+
+          with open(migration_file, 'r') as f:
+              migration_sql = f.read()
+
+          # Calculate checksum
+          checksum = hashlib.sha256(migration_sql.encode()).hexdigest()
+
+          # Apply migration
+          conn = psycopg2.connect(
+              host="${{ params.db_host }}",
+              database="${{ params.database_name }}",
+              user="${{ params.db_user }}",
+              password="${{ params.db_password }}",
+              port="${{ params.db_port }}"
+          )
+
+          cursor = conn.cursor()
+
+          try:
+              # Execute migration
+              cursor.execute(migration_sql)
+
+              # Record migration
+              cursor.execute("""
+                  INSERT INTO schema_migrations (version, description, checksum)
+                  VALUES (%s, %s, %s)
+              """, ('${{ params.migration_version }}', 'Database migration applied', checksum))
+
+              conn.commit()
+              print("Migration applied successfully")
+
+          except Exception as e:
+              conn.rollback()
+              print(f"Migration failed: {e}")
+              raise e
+
+          finally:
+              cursor.close()
+              conn.close()
+
+      - name: "Verify migration"
+        run: |
+          import psycopg2
+          import json
+
+          conn = psycopg2.connect(
+              host="${{ params.db_host }}",
+              database="${{ params.database_name }}",
+              user="${{ params.db_user }}",
+              password="${{ params.db_password }}",
+              port="${{ params.db_port }}"
+          )
+
+          cursor = conn.cursor()
+
+          # Check current version
+          cursor.execute("SELECT version FROM schema_migrations ORDER BY applied_at DESC LIMIT 1;")
+          current_version = cursor.fetchone()[0]
+
+          if current_version != '${{ params.migration_version }}':
+              raise Exception(f"Migration verification failed: expected ${{ params.migration_version }}, got {current_version}")
+
+          print(f"Migration verification: OK (version {current_version})")
+
+          cursor.close()
+          conn.close()
+
+  post-migration-validation:
+    id: "post-migration-validation"
+    desc: "Validate database after migration"
+    needs: ["apply-migration"]
+
+    runs-on:
+      type: "local"
+
+    stages:
+      - name: "Run validation queries"
+        run: |
+          import psycopg2
+          import json
+
+          conn = psycopg2.connect(
+              host="${{ params.db_host }}",
+              database="${{ params.database_name }}",
+              user="${{ params.db_user }}",
+              password="${{ params.db_password }}",
+              port="${{ params.db_port }}"
+          )
+
+          cursor = conn.cursor()
+
+          # Load validation queries
+          validation_file = f"/migrations/${{ params.migration_version }}/validation.sql"
+
+          with open(validation_file, 'r') as f:
+              validation_queries = f.read().split(';')
+
+          validation_results = []
+
+          for i, query in enumerate(validation_queries):
+              query = query.strip()
+              if not query:
+                  continue
+
+              try:
+                  cursor.execute(query)
+                  result = cursor.fetchone()
+
+                  validation_results.append({
+                      'query_id': i + 1,
+                      'query': query,
+                      'result': result[0] if result else None,
+                      'status': 'PASS'
+                  })
+
+                  print(f"Validation query {i + 1}: PASS")
+
+              except Exception as e:
+                  validation_results.append({
+                      'query_id': i + 1,
+                      'query': query,
+                      'error': str(e),
+                      'status': 'FAIL'
+                  })
+
+                  print(f"Validation query {i + 1}: FAIL - {e}")
+
+          # Save validation results
+          with open('/tmp/validation_results.json', 'w') as f:
+              json.dump(validation_results, f, indent=2)
+
+          cursor.close()
+          conn.close()
+
+      - name: "Check data integrity"
+        run: |
+          import psycopg2
+          import json
+
+          conn = psycopg2.connect(
+              host="${{ params.db_host }}",
+              database="${{ params.database_name }}",
+              user="${{ params.db_user }}",
+              password="${{ params.db_password }}",
+              port="${{ params.db_port }}"
+          )
+
+          cursor = conn.cursor()
+
+          # Check for orphaned records
+          cursor.execute("""
+              SELECT COUNT(*) FROM users u
+              LEFT JOIN user_profiles up ON u.id = up.user_id
+              WHERE up.user_id IS NULL;
+          """)
+
+          orphaned_users = cursor.fetchone()[0]
+
+          # Check for duplicate records
+          cursor.execute("""
+              SELECT COUNT(*) FROM (
+                  SELECT email, COUNT(*)
+                  FROM users
+                  GROUP BY email
+                  HAVING COUNT(*) > 1
+              ) duplicates;
+          """)
+
+          duplicate_emails = cursor.fetchone()[0]
+
+          # Check for null constraints
+          cursor.execute("""
+              SELECT COUNT(*) FROM users WHERE email IS NULL OR name IS NULL;
+          """)
+
+          null_constraint_violations = cursor.fetchone()[0]
+
+          integrity_results = {
+              'orphaned_users': orphaned_users,
+              'duplicate_emails': duplicate_emails,
+              'null_constraint_violations': null_constraint_violations,
+              'overall_integrity': orphaned_users == 0 and duplicate_emails == 0 and null_constraint_violations == 0
+          }
+
+          print(f"Data integrity check:")
+          print(f"  Orphaned users: {orphaned_users}")
+          print(f"  Duplicate emails: {duplicate_emails}")
+          print(f"  Null constraint violations: {null_constraint_violations}")
+          print(f"  Overall integrity: {'OK' if integrity_results['overall_integrity'] else 'ISSUES FOUND'}")
+
+          # Save integrity results
+          with open('/tmp/integrity_results.json', 'w') as f:
+              json.dump(integrity_results, f, indent=2)
+
+          cursor.close()
+          conn.close()
+
+      - name: "Performance check"
+        run: |
+          import psycopg2
+          import time
+          import json
+
+          conn = psycopg2.connect(
+              host="${{ params.db_host }}",
+              database="${{ params.database_name }}",
+              user="${{ params.db_user }}",
+              password="${{ params.db_password }}",
+              port="${{ params.db_port }}"
+          )
+
+          cursor = conn.cursor()
+
+          # Test query performance
+          performance_tests = [
+              "SELECT COUNT(*) FROM users;",
+              "SELECT * FROM users LIMIT 100;",
+              "SELECT u.name, up.bio FROM users u JOIN user_profiles up ON u.id = up.user_id LIMIT 50;"
+          ]
+
+          performance_results = []
+
+          for i, query in enumerate(performance_tests):
+              start_time = time.time()
+              cursor.execute(query)
+              result = cursor.fetchall()
+              execution_time = time.time() - start_time
+
+              performance_results.append({
+                  'query_id': i + 1,
+                  'query': query,
+                  'execution_time': execution_time,
+                  'result_count': len(result),
+                  'acceptable': execution_time < 1.0  # 1 second threshold
+              })
+
+              print(f"Performance test {i + 1}: {execution_time:.3f}s ({'OK' if execution_time < 1.0 else 'SLOW'})")
+
+          # Save performance results
+          with open('/tmp/performance_results.json', 'w') as f:
+              json.dump(performance_results, f, indent=2)
+
+          cursor.close()
+          conn.close()
+
+  rollback-preparation:
+    id: "rollback-preparation"
+    desc: "Prepare rollback if validation fails"
+    needs: ["post-migration-validation"]
+
+    runs-on:
+      type: "local"
+
+    stages:
+      - name: "Check validation results"
+        run: |
+          import json
+
+          # Load validation results
+          with open('/tmp/validation_results.json', 'r') as f:
+              validation_results = json.load(f)
+
+          with open('/tmp/integrity_results.json', 'r') as f:
+              integrity_results = json.load(f)
+
+          with open('/tmp/performance_results.json', 'r') as f:
+              performance_results = json.load(f)
+
+          # Check if any validations failed
+          validation_failures = [r for r in validation_results if r['status'] == 'FAIL']
+          integrity_issues = not integrity_results['overall_integrity']
+          performance_issues = [r for r in performance_results if not r['acceptable']]
+
+          # Determine if rollback is needed
+          rollback_needed = (
+              len(validation_failures) > 0 or
+              integrity_issues or
+              len(performance_issues) > 0
+          )
+
+          rollback_decision = {
+              'validation_failures': len(validation_failures),
+              'integrity_issues': integrity_issues,
+              'performance_issues': len(performance_issues),
+              'rollback_needed': rollback_needed
+          }
+
+          with open('/tmp/rollback_decision.json', 'w') as f:
+              json.dump(rollback_decision, f, indent=2)
+
+          if rollback_needed:
+              print("Rollback decision: ROLLBACK NEEDED")
+              raise Exception("Post-migration validation failed, initiating rollback")
+          else:
+              print("Rollback decision: NO ROLLBACK NEEDED")
+
+  rollback-execution:
+    id: "rollback-execution"
+    desc: "Execute rollback if needed"
+    needs: ["rollback-preparation"]
+
+    runs-on:
+      type: "local"
+
+    stages:
+      - name: "Execute rollback"
+        run: |
+          import psycopg2
+          import os
+
+          # Read rollback SQL
+          rollback_file = f"/migrations/${{ params.migration_version }}/down.sql"
+
+          if not os.path.exists(rollback_file):
+              raise Exception(f"Rollback file not found: {rollback_file}")
+
+          with open(rollback_file, 'r') as f:
+              rollback_sql = f.read()
+
+          # Execute rollback
+          conn = psycopg2.connect(
+              host="${{ params.db_host }}",
+              database="${{ params.database_name }}",
+              user="${{ params.db_user }}",
+              password="${{ params.db_password }}",
+              port="${{ params.db_port }}"
+          )
+
+          cursor = conn.cursor()
+
+          try:
+              # Execute rollback
+              cursor.execute(rollback_sql)
+
+              # Remove migration record
+              cursor.execute("""
+                  DELETE FROM schema_migrations
+                  WHERE version = %s
+              """, ('${{ params.migration_version }}',))
+
+              conn.commit()
+              print("Rollback executed successfully")
+
+          except Exception as e:
+              conn.rollback()
+              print(f"Rollback failed: {e}")
+              raise e
+
+          finally:
+              cursor.close()
+              conn.close()
+
+      - name: "Verify rollback"
+        run: |
+          import psycopg2
+
+          conn = psycopg2.connect(
+              host="${{ params.db_host }}",
+              database="${{ params.database_name }}",
+              user="${{ params.db_user }}",
+              password="${{ params.db_password }}",
+              port="${{ params.db_port }}"
+          )
+
+          cursor = conn.cursor()
+
+          # Check current version
+          cursor.execute("SELECT version FROM schema_migrations ORDER BY applied_at DESC LIMIT 1;")
+          current_version = cursor.fetchone()
+
+          if current_version and current_version[0] == '${{ params.migration_version }}':
+              raise Exception("Rollback verification failed: migration still present")
+
+          print("Rollback verification: OK")
+
+          cursor.close()
+          conn.close()
+
+  migration-reporting:
+    id: "migration-reporting"
+    desc: "Generate migration report"
+    needs: ["post-migration-validation", "rollback-execution"]
+
+    runs-on:
+      type: "local"
+
+    stages:
+      - name: "Generate migration report"
+        run: |
+          import json
+          import os
+
+          # Load all results
+          results = {}
+
+          result_files = [
+              '/tmp/db_info.json',
+              '/tmp/backup_info.json',
+              '/tmp/validation_results.json',
+              '/tmp/integrity_results.json',
+              '/tmp/performance_results.json',
+              '/tmp/rollback_decision.json'
+          ]
+
+          for file_path in result_files:
+              if os.path.exists(file_path):
+                  with open(file_path, 'r') as f:
+                      key = os.path.basename(file_path).replace('.json', '')
+                      results[key] = json.load(f)
+
+          # Generate summary
+          migration_summary = {
+              'database_name': '${{ params.database_name }}',
+              'migration_version': '${{ params.migration_version }}',
+              'environment': '${{ params.environment }}',
+              'backup_created': 'backup_info' in results,
+              'migration_applied': 'validation_results' in results,
+              'validation_passed': all(r['status'] == 'PASS' for r in results.get('validation_results', [])),
+              'integrity_ok': results.get('integrity_results', {}).get('overall_integrity', False),
+              'performance_ok': all(r['acceptable'] for r in results.get('performance_results', [])),
+              'rollback_executed': 'rollback_decision' in results and results['rollback_decision']['rollback_needed']
+          }
+
+          # Overall status
+          if migration_summary['rollback_executed']:
+              migration_summary['overall_status'] = 'ROLLBACK'
+          elif (migration_summary['migration_applied'] and
+                migration_summary['validation_passed'] and
+                migration_summary['integrity_ok'] and
+                migration_summary['performance_ok']):
+              migration_summary['overall_status'] = 'SUCCESS'
+          else:
+              migration_summary['overall_status'] = 'FAILED'
+
+          results['summary'] = migration_summary
+
+          # Save comprehensive report
+          with open('/tmp/migration_report.json', 'w') as f:
+              json.dump(results, f, indent=2)
+
+          print(f"Migration report generated:")
+          print(f"  Status: {migration_summary['overall_status']}")
+          print(f"  Backup: {'Yes' if migration_summary['backup_created'] else 'No'}")
+          print(f"  Validation: {'Pass' if migration_summary['validation_passed'] else 'Fail'}")
+          print(f"  Integrity: {'OK' if migration_summary['integrity_ok'] else 'Issues'}")
+          print(f"  Performance: {'OK' if migration_summary['performance_ok'] else 'Issues'}")
+
+      - name: "Send migration notification"
+        uses: "notifications/send_slack@v1.0"
+        with:
+          channel: "#database-migrations"
+          message: "Database migration ${{ params.migration_version }} for ${{ params.database_name }}: ${{ migration_summary.overall_status }}"
+          color: |
+            "good" if "${{ migration_summary.overall_status }}" == "SUCCESS" else "danger"
+
+      - name: "Send email report"
+        uses: "notifications/send_email@v1.0"
+        with:
+          to: "dba-team@company.com"
+          subject: "Database Migration Report - ${{ params.migration_version }}"
+          template: "database_migration_report"
+          data:
+            database_name: "${{ params.database_name }}"
+            migration_version: "${{ params.migration_version }}"
+            environment: "${{ params.environment }}"
+            overall_status: "${{ migration_summary.overall_status }}"
+            backup_created: ${{ migration_summary.backup_created }}
+            validation_passed: ${{ migration_summary.validation_passed }}
+            integrity_ok: ${{ migration_summary.integrity_ok }}
+            performance_ok: ${{ migration_summary.performance_ok }}
+
+on:
+  schedule:
+    - cronjob: "0 4 * * 0"  # Weekly on Sunday at 4 AM
+      timezone: "UTC"
