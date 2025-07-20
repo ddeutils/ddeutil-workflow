@@ -1,9 +1,12 @@
+import shutil
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import pytest
 from ddeutil.workflow import (
+    FORCE,
     NORMAL,
+    SKIP,
     SUCCESS,
     UTC,
     Result,
@@ -108,7 +111,7 @@ def test_workflow_release():
     }
 
 
-def test_workflow_release_with_datetime():
+def test_workflow_release_with_datetime_force():
     workflow: Workflow = Workflow.model_validate(
         obj={
             "name": "wf-scheduling-common",
@@ -126,6 +129,7 @@ def test_workflow_release_with_datetime():
     dt: datetime = datetime(2025, 1, 18, tzinfo=ZoneInfo("Asia/Bangkok"))
     rs: Result = workflow.release(
         release=dt,
+        release_type=FORCE,
         params={"asat-dt": datetime(2024, 10, 1)},
     )
     assert dt == datetime(2025, 1, 18, tzinfo=ZoneInfo("Asia/Bangkok"))
@@ -134,7 +138,7 @@ def test_workflow_release_with_datetime():
         "status": SUCCESS,
         "params": {"asat-dt": datetime(2024, 10, 1, 0, 0)},
         "release": {
-            "type": NORMAL,
+            "type": FORCE,
             # NOTE: The date that pass to release method will convert to UTC.
             "logical_date": datetime(2025, 1, 17, 17, tzinfo=UTC),
         },
@@ -154,6 +158,45 @@ def test_workflow_release_with_datetime():
             },
         },
     }
+
+
+def test_workflow_release_with_datetime(test_path):
+    test_audit_skip_path = test_path / "tests_workflow_release_audits"
+
+    workflow: Workflow = Workflow.model_validate(
+        obj={
+            "name": "wf-scheduling-common",
+            "jobs": {
+                "first-job": {
+                    "stages": [
+                        {"name": "First Stage", "id": "first-stage"},
+                        {"name": "Second Stage", "id": "second-stage"},
+                    ]
+                }
+            },
+            "extras": {
+                "audit_conf": {
+                    "type": "file",
+                    "path": str(test_audit_skip_path.absolute()),
+                }
+            },
+        }
+    )
+    dt: datetime = datetime(2025, 1, 18, tzinfo=ZoneInfo("Asia/Bangkok"))
+    rs: Result = workflow.release(
+        release=dt,
+        params={"asat-dt": datetime(2024, 10, 1)},
+    )
+    assert rs.status == SUCCESS
+
+    rs: Result = workflow.release(
+        release=dt,
+        params={"asat-dt": datetime(2024, 10, 1)},
+    )
+    assert rs.status == SKIP
+    assert rs.context == {"status": SKIP}
+
+    shutil.rmtree(test_audit_skip_path)
 
 
 def test_workflow_release_with_auto():

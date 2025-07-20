@@ -30,7 +30,6 @@ from concurrent.futures import (
     as_completed,
 )
 from datetime import datetime
-from enum import Enum
 from pathlib import Path
 from queue import Queue
 from textwrap import dedent
@@ -42,7 +41,7 @@ from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
 from .__types import DictData
-from .audits import Audit, get_audit
+from .audits import NORMAL, Audit, ReleaseType, get_audit
 from .conf import YamlParser, dynamic
 from .errors import WorkflowCancelError, WorkflowError, WorkflowTimeoutError
 from .event import Event
@@ -68,31 +67,6 @@ from .utils import (
     get_dt_now,
     replace_sec,
 )
-
-
-class ReleaseType(str, Enum):
-    """Release type enumeration for workflow execution modes.
-
-    This enum defines the different types of workflow releases that can be
-    triggered, each with specific behavior and use cases.
-
-    Attributes:
-        NORMAL: Standard workflow release execution
-        RERUN: Re-execution of previously failed workflow
-        EVENT: Event-triggered workflow execution
-        FORCE: Forced execution bypassing normal conditions
-    """
-
-    NORMAL = "normal"
-    RERUN = "rerun"
-    EVENT = "event"
-    FORCE = "force"
-
-
-NORMAL = ReleaseType.NORMAL
-RERUN = ReleaseType.RERUN
-EVENT = ReleaseType.EVENT
-FORCE = ReleaseType.FORCE
 
 
 class Workflow(BaseModel):
@@ -464,6 +438,7 @@ class Workflow(BaseModel):
                 method.
         """
         name: str = override_log_name or self.name
+        audit: Audit = audit or get_audit(extras=self.extras)
 
         # NOTE: Generate the parent running ID with not None value.
         if run_id:
@@ -474,6 +449,14 @@ class Workflow(BaseModel):
             parent_run_id: str = run_id
 
         context: DictData = {"status": WAIT}
+        audit_data: DictData = {
+            "name": name,
+            "release": release,
+            "type": release_type,
+            "run_id": run_id,
+            "parent_run_id": parent_run_id,
+            "extras": self.extras,
+        }
         trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
@@ -491,6 +474,17 @@ class Workflow(BaseModel):
             },
             extras=self.extras,
         )
+
+        if release_type == NORMAL and audit.is_pointed(data=audit_data):
+            trace.info("[RELEASE]: Skip this release because it already audit.")
+            return Result(
+                run_id=run_id,
+                parent_run_id=parent_run_id,
+                status=SKIP,
+                context=catch(context, status=SKIP),
+                extras=self.extras,
+            )
+
         rs: Result = self.execute(
             params=values,
             run_id=parent_run_id,
@@ -500,15 +494,10 @@ class Workflow(BaseModel):
         trace.info(f"[RELEASE]: End {name!r} : {release:%Y-%m-%d %H:%M:%S}")
         trace.debug(f"[RELEASE]: Writing audit: {name!r}.")
         (
-            (audit or get_audit(extras=self.extras)).save(
-                data={
-                    "name": name,
-                    "release": release,
-                    "type": release_type,
+            audit.save(
+                data=audit_data
+                | {
                     "context": context,
-                    "parent_run_id": parent_run_id,
-                    "run_id": run_id,
-                    "extras": self.extras,
                     "runs_metadata": (
                         (runs_metadata or {})
                         | rs.info
