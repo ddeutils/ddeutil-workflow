@@ -29,7 +29,7 @@ def test_until_stage():
     )
     assert stage.is_nested
 
-    rs: Result = stage.execute(params={})
+    rs: Result = stage.execute(params={}, run_id="01")
     assert rs.status == SUCCESS
     assert rs.context == {
         "status": SUCCESS,
@@ -64,7 +64,7 @@ def test_until_stage_raise():
             "extras": {"foo": "bar"},
         }
     )
-    rs: Result = stage.execute(params={})
+    rs: Result = stage.execute(params={}, run_id="02")
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,
@@ -84,13 +84,13 @@ def test_until_stage_raise():
                     }
                 },
                 "errors": {
-                    "name": "StageError",
+                    "name": "StageNestedError",
                     "message": "Loop execution was break because its nested-stage, 'Raise stage nested', failed.",
                 },
             }
         },
         "errors": {
-            "name": "StageError",
+            "name": "StageNestedError",
             "message": "Loop execution was break because its nested-stage, 'Raise stage nested', failed.",
         },
     }
@@ -106,7 +106,7 @@ def test_until_stage_raise():
             "extras": {"foo": "bar"},
         }
     )
-    rs: Result = stage.execute(params={})
+    rs: Result = stage.execute(params={}, run_id="03")
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,
@@ -142,7 +142,7 @@ def test_until_stage_skipped():
             ],
         }
     )
-    rs: Result = stage.execute(params={})
+    rs: Result = stage.execute(params={}, run_id="01")
     assert rs.status == SKIP
     assert rs.context == {
         "status": SKIP,
@@ -178,7 +178,7 @@ def test_until_stage_cancel():
     )
     event = Event()
     event.set()
-    rs: Result = stage.execute(params={}, event=event)
+    rs: Result = stage.execute(params={}, event=event, run_id="02")
     assert rs.status == CANCEL
     assert rs.context == {
         "status": CANCEL,
@@ -190,7 +190,7 @@ def test_until_stage_cancel():
     }
 
     event = MockEvent(n=1)
-    rs: Result = stage.execute(params={}, event=event)
+    rs: Result = stage.execute(params={}, event=event, run_id="03")
     assert rs.status == CANCEL
     assert rs.context == {
         "status": CANCEL,
@@ -213,7 +213,7 @@ def test_until_stage_cancel():
     }
 
     event = MockEvent(n=2)
-    rs: Result = stage.execute(params={}, event=event)
+    rs: Result = stage.execute(params={}, event=event, run_id="04")
     assert rs.status == CANCEL
     assert rs.context == {
         "status": CANCEL,
@@ -233,13 +233,13 @@ def test_until_stage_cancel():
                     }
                 },
                 "errors": {
-                    "name": "StageCancelError",
+                    "name": "StageNestedCancelError",
                     "message": "Loop execution was canceled from the event after end loop execution.",
                 },
             }
         },
         "errors": {
-            "name": "StageCancelError",
+            "name": "StageNestedCancelError",
             "message": "Loop execution was canceled from the event after end loop execution.",
         },
     }
@@ -257,7 +257,7 @@ def test_until_stage_exec_exceed_loop():
             ],
         }
     )
-    rs: Result = stage.execute(params={})
+    rs: Result = stage.execute(params={}, run_id="01")
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,
@@ -306,7 +306,7 @@ def test_until_stage_exec_full(test_path):
     ):
         workflow = Workflow.from_conf(name="tmp-wf-until")
         stage: Stage = workflow.job("first-job").stage("until-stage")
-        rs: Result = stage.execute(params={})
+        rs: Result = stage.execute(params={}, run_id="02")
         assert rs.status == SUCCESS
         assert rs.context == {
             "status": SUCCESS,

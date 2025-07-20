@@ -355,7 +355,14 @@ class BaseStage(BaseModel, ABC):
             if isinstance(e, StageNestedError):
                 trace.info(f"[STAGE]: Handler: {e}")
             else:
-                trace.info(f"[STAGE]: Handler:||🚨 {traceback.format_exc()}")
+                emoji: str = (
+                    "⏭️"
+                    if isinstance(e, (StageSkipError, StageNestedSkipError))
+                    else "🚨"
+                )
+                trace.info(
+                    f"[STAGE]: Handler:||{emoji} {traceback.format_exc()}"
+                )
             st: Status = get_status_from_error(e)
             return Result(
                 run_id=run_id,
@@ -681,8 +688,13 @@ class BaseAsyncStage(BaseStage, ABC):
             if isinstance(e, StageNestedError):
                 await trace.ainfo(f"[STAGE]: Handler: {e}")
             else:
+                emoji: str = (
+                    "⏭️"
+                    if isinstance(e, (StageSkipError, StageNestedSkipError))
+                    else "🚨"
+                )
                 await trace.ainfo(
-                    f"[STAGE]:Handler:||🚨 {traceback.format_exc()}"
+                    f"[STAGE]:Handler:||{emoji} {traceback.format_exc()}"
                 )
             st: Status = get_status_from_error(e)
             return Result(
@@ -2792,11 +2804,11 @@ class UntilStage(BaseNestedStage):
                             "stages": filter_func(
                                 nestet_context.pop("stages", {})
                             ),
-                            "errors": StageError(error_msg).to_dict(),
+                            "errors": StageNestedError(error_msg).to_dict(),
                         }
                     },
                 )
-                raise StageError(error_msg, refs=loop)
+                raise StageNestedError(error_msg, refs=loop)
 
             elif rs.status == CANCEL:
                 error_msg: str = (
@@ -2814,11 +2826,13 @@ class UntilStage(BaseNestedStage):
                             "stages": filter_func(
                                 nestet_context.pop("stages", {})
                             ),
-                            "errors": StageCancelError(error_msg).to_dict(),
+                            "errors": StageNestedCancelError(
+                                error_msg
+                            ).to_dict(),
                         }
                     },
                 )
-                raise StageCancelError(error_msg, refs=loop)
+                raise StageNestedCancelError(error_msg, refs=loop)
 
         status: Status = SKIP if sum(skips) == total_stage else SUCCESS
         return (
