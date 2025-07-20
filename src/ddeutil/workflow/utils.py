@@ -218,7 +218,10 @@ def gen_id(
     hashing value length to 10 if simple mode is enabled.
 
     Simple Mode Format:
-        YYYYMMDDHHMMSSffffffTxxxxxxxxxx
+
+        The format of ID include full datetime and hashing identity.
+
+        YYYY MM    DD  HH   MM     SS     ffffff      T   **********
         year month day hour minute second microsecond sep simple-id
 
     Args:
@@ -318,7 +321,7 @@ def cross_product(matrix: Matrix) -> Iterator[DictData]:
     )
 
 
-def cut_id(run_id: str, *, num: int = 6) -> str:
+def cut_id(run_id: str, *, num: int = 8) -> str:
     """Cut running ID to specified length.
 
     Example:
@@ -334,7 +337,7 @@ def cut_id(run_id: str, *, num: int = 6) -> str:
     """
     if "T" in run_id:
         dt, simple = run_id.split("T", maxsplit=1)
-        return dt[:12] + simple[-num:]
+        return dt[10:20] + simple[-num:]
     return run_id[-num:]
 
 

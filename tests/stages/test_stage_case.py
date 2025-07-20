@@ -38,7 +38,7 @@ def test_case_stage_exec(test_path):
             ],
         },
     )
-    rs: Result = stage.execute({"params": {"name": "bar"}})
+    rs: Result = stage.execute({"params": {"name": "bar"}}, run_id="01")
     assert rs.status == SUCCESS
     assert rs.context == {
         "status": SUCCESS,
@@ -61,7 +61,7 @@ def test_case_stage_exec(test_path):
         }
     }
 
-    rs: Result = stage.execute({"params": {"name": "foo"}})
+    rs: Result = stage.execute({"params": {"name": "foo"}}, run_id="02")
     assert rs.status == SUCCESS
     assert rs.context == {
         "status": SUCCESS,
@@ -84,7 +84,7 @@ def test_case_stage_exec(test_path):
         }
     }
 
-    rs: Result = stage.execute({"params": {"name": "test"}})
+    rs: Result = stage.execute({"params": {"name": "test"}}, run_id="03")
     assert rs.status == SUCCESS
     assert rs.context == {
         "status": SUCCESS,
@@ -114,7 +114,7 @@ def test_case_stage_exec_raise():
         }
     )
     # NOTE: Raise because else condition does not set.
-    rs: Result = stage.execute({"params": {"name": "test"}})
+    rs: Result = stage.execute({"params": {"name": "test"}}, run_id="01")
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,
@@ -145,7 +145,7 @@ def test_case_stage_exec_raise():
             "extras": {"foo": "bar"},
         }
     )
-    rs: Result = stage.execute({"params": {"name": "bar"}})
+    rs: Result = stage.execute({"params": {"name": "bar"}}, run_id="02")
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,
@@ -184,7 +184,9 @@ def test_case_stage_exec_cancel():
         }
     )
     event = MockEvent(n=0)
-    rs: Result = stage.execute({"params": {"name": "bar"}}, event=event)
+    rs: Result = stage.execute(
+        {"params": {"name": "bar"}}, event=event, run_id="03"
+    )
     assert rs.status == CANCEL
     assert rs.context == {
         "status": CANCEL,
@@ -197,7 +199,9 @@ def test_case_stage_exec_cancel():
     }
 
     event = MockEvent(n=1)
-    rs: Result = stage.execute({"params": {"name": "bar"}}, event=event)
+    rs: Result = stage.execute(
+        {"params": {"name": "bar"}}, event=event, run_id="04"
+    )
     assert rs.status == CANCEL
     assert rs.context == {
         "status": CANCEL,
@@ -230,6 +234,6 @@ def test_case_stage_exec_skipped():
             ],
         }
     )
-    rs: Result = stage.execute({"params": {"name": "test"}})
+    rs: Result = stage.execute({"params": {"name": "test"}}, run_id="01")
     assert rs.status == SKIP
     assert rs.context == {"status": SKIP}
