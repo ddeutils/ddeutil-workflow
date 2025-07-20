@@ -41,7 +41,7 @@ from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
 from .__types import DictData
-from .audits import NORMAL, Audit, ReleaseType, get_audit
+from .audits import NORMAL, RERUN, Audit, ReleaseType, get_audit
 from .conf import YamlParser, dynamic
 from .errors import WorkflowCancelError, WorkflowError, WorkflowTimeoutError
 from .event import Event
@@ -483,6 +483,14 @@ class Workflow(BaseModel):
                 status=SKIP,
                 context=catch(context, status=SKIP),
                 extras=self.extras,
+            )
+
+        if release_type == RERUN:
+            # TODO: It will load previous audit and use this data to run with
+            #   the `rerun` method.
+            raise NotImplementedError(
+                "Release does not support for rerun type yet. Please use the "
+                "`rerun` method instead."
             )
 
         rs: Result = self.execute(

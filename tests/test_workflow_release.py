@@ -6,6 +6,7 @@ import pytest
 from ddeutil.workflow import (
     FORCE,
     NORMAL,
+    RERUN,
     SKIP,
     SUCCESS,
     UTC,
@@ -214,10 +215,26 @@ def test_workflow_release_with_auto():
             "extra": {"enable_write_audit": True},
         }
     )
-    rs: Result = workflow.release(
-        release=datetime.now(),
-        params={"asat-dt": datetime(2024, 10, 1)},
-    )
+    rs: Result = workflow.release(release=datetime.now(), params={})
     assert rs.status == SUCCESS
     assert rs.context["release"]["type"] == NORMAL
     assert rs.context["release"]["logical_date"].tzinfo == UTC
+
+
+def test_workflow_release_rerun():
+    workflow: Workflow = Workflow.model_validate(
+        obj={
+            "name": "wf-scheduling-common",
+            "jobs": {
+                "first-job": {
+                    "stages": [
+                        {"name": "First Stage", "id": "first-stage"},
+                        {"name": "Second Stage", "id": "second-stage"},
+                    ]
+                }
+            },
+            "extra": {"enable_write_audit": True},
+        }
+    )
+    with pytest.raises(NotImplementedError):
+        workflow.release(release=datetime.now(), params={}, release_type=RERUN)
