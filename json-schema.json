@@ -2723,7 +2723,7 @@
       "type": "object"
     },
     "EmptyStage": {
-      "description": "Empty stage for logging and debugging workflows.\n\nEmptyStage is a utility stage that performs no actual work but provides\nlogging output and optional delays. It's commonly used for:\n- Debugging workflow execution flow\n- Adding informational messages to workflows\n- Creating delays between stages\n- Testing template parameter resolution\n\nThe stage outputs the echo message to stdout and can optionally sleep\nfor a specified duration, making it useful for workflow timing control\nand debugging scenarios.\n\nAttributes:\n    echo (str, optional): Message to display during execution\n    sleep (float): Duration to sleep after logging (0-1800 seconds)\n\nExample:\n    ```yaml\n    stages:\n      - name: \"Workflow Started\"\n        echo: \"Beginning data processing workflow\"\n        sleep: 2\n\n      - name: \"Debug Parameters\"\n        echo: \"Processing file: ${{ params.filename }}\"\n    ```\n\n    ```python\n    stage = EmptyStage(\n        name=\"Status Update\",\n        echo=\"Processing completed successfully\",\n        sleep=1.0\n    )\n    ```",
+      "description": "Empty stage for logging and debugging workflows.\n\nEmptyStage is a utility stage that performs no actual work but provides\nlogging output and optional delays. It's commonly used for:\n    - Debugging workflow execution flow\n    - Adding informational messages to workflows\n    - Creating delays between stages\n    - Testing template parameter resolution\n\nThe stage outputs the echo message to stdout and can optionally sleep\nfor a specified duration, making it useful for workflow timing control\nand debugging scenarios.\n\nExample:\n    ```yaml\n    stages:\n      - name: \"Workflow Started\"\n        echo: \"Beginning data processing workflow\"\n        sleep: 2\n\n      - name: \"Debug Parameters\"\n        echo: \"Processing file: ${{ params.filename }}\"\n    ```\n\n    >>> stage = EmptyStage(\n    ...     name=\"Status Update\",\n    ...     echo=\"Processing completed successfully\",\n    ...     sleep=1.0\n    ... )",
       "properties": {
         "extras": {
           "additionalProperties": true,
@@ -2788,12 +2788,12 @@
             }
           ],
           "default": null,
-          "description": "A message that want to show on the stdout.",
+          "description": "A message that want to display on the stdout during execution. By default, it do not show any message.",
           "title": "Echo"
         },
         "sleep": {
           "default": 0,
-          "description": "A second value to sleep before start execution. This value should gather or equal 0, and less than 1800 seconds.",
+          "description": "A duration in second value to sleep after logging. This value should between 0 - 1800 seconds.",
           "exclusiveMaximum": 1800,
           "minimum": 0,
           "title": "Sleep",
@@ -3950,7 +3950,7 @@
       "type": "object"
     },
     "TriggerStage": {
-      "description": "Trigger workflow executor stage that run an input trigger Workflow\nexecute method. This is the stage that allow you to create the reusable\nWorkflow template with dynamic parameters.\n\nData Validate:\n    >>> stage = {\n    ...     \"name\": \"Trigger workflow stage execution\",\n    ...     \"trigger\": 'workflow-name-for-loader',\n    ...     \"params\": {\"run-date\": \"2024-08-01\", \"source\": \"src\"},\n    ... }",
+      "description": "Trigger workflow executor stage that run an input trigger Workflow\nexecute method. This is the stage that allow you to create the reusable\nWorkflow template with dynamic parameters.\n\n    This stage does not allow to pass the workflow model directly to the\ntrigger field. A trigger workflow name should exist on the config path only.\n\nData Validate:\n    >>> stage = {\n    ...     \"name\": \"Trigger workflow stage execution\",\n    ...     \"trigger\": 'workflow-name-for-loader',\n    ...     \"params\": {\"run-date\": \"2024-08-01\", \"source\": \"src\"},\n    ... }",
       "properties": {
         "extras": {
           "additionalProperties": true,
@@ -4256,7 +4256,7 @@
         },
         "version": {
           "default": "3.9",
-          "description": "A Python version that want to run.",
+          "description": "A Python version that want to run. It will use supported version of this package by default, 3.9.",
           "title": "Version",
           "type": "string"
         },
@@ -4298,6 +4298,12 @@
           "default": null,
           "description": "A workflow name.",
           "title": "Name"
+        },
+        "type": {
+          "const": "Workflow",
+          "description": "A type of workflow template that should be `Workflow`.",
+          "title": "Type",
+          "type": "string"
         },
         "desc": {
           "anyOf": [
@@ -4404,14 +4410,11 @@
           "format": "date-time",
           "title": "Updated Dt",
           "type": "string"
-        },
-        "type": {
-          "const": "Workflow",
-          "description": "A type of workflow template.",
-          "title": "Type",
-          "type": "string"
         }
       },
+      "required": [
+        "type"
+      ],
       "title": "WorkflowSchema",
       "type": "object"
     }
