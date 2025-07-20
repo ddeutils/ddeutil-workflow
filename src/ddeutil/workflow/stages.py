@@ -82,6 +82,7 @@ from pydantic import BaseModel, Field, ValidationError
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
+from .__about__ import __python_version__
 from .__types import DictData, DictStr, StrOrInt, StrOrNone, TupleStr
 from .conf import dynamic, pass_env
 from .errors import (
@@ -300,7 +301,7 @@ class BaseStage(BaseModel, ABC):
         """
         ts: float = time.monotonic()
         parent_run_id: str = run_id
-        run_id: str = run_id or gen_id(self.iden, unique=True)
+        run_id: str = gen_id(self.iden, unique=True, extras=self.extras)
         context: DictData = {"status": WAIT}
         trace: TraceManager = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
@@ -354,7 +355,7 @@ class BaseStage(BaseModel, ABC):
             if isinstance(e, StageNestedError):
                 trace.info(f"[STAGE]: Handler: {e}")
             else:
-                trace.info(f"[STAGE]: Handler:||{traceback.format_exc()}")
+                trace.info(f"[STAGE]: Handler:||🚨 {traceback.format_exc()}")
             st: Status = get_status_from_error(e)
             return Result(
                 run_id=run_id,
@@ -373,7 +374,7 @@ class BaseStage(BaseModel, ABC):
                 extras=self.extras,
             )
         except Exception as e:
-            trace.error(f"[STAGE]: Error Handler:||{traceback.format_exc()}")
+            trace.error(f"[STAGE]: Error Handler:||🚨 {traceback.format_exc()}")
             return Result(
                 run_id=run_id,
                 parent_run_id=parent_run_id,
@@ -628,7 +629,7 @@ class BaseAsyncStage(BaseStage, ABC):
         """
         ts: float = time.monotonic()
         parent_run_id: StrOrNone = run_id
-        run_id: str = run_id or gen_id(self.iden, unique=True)
+        run_id: str = gen_id(self.iden, unique=True, extras=self.extras)
         context: DictData = {}
         trace: TraceManager = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
@@ -673,12 +674,16 @@ class BaseAsyncStage(BaseStage, ABC):
         #   this exception class at other location.
         except (
             StageSkipError,
-            StageCancelError,
+            StageNestedSkipError,
+            StageNestedError,
             StageError,
         ) as e:  # pragma: no cov
-            await trace.ainfo(
-                f"[STAGE]: Skip Handler:||{traceback.format_exc()}"
-            )
+            if isinstance(e, StageNestedError):
+                await trace.ainfo(f"[STAGE]: Handler: {e}")
+            else:
+                await trace.ainfo(
+                    f"[STAGE]:Handler:||🚨 {traceback.format_exc()}"
+                )
             st: Status = get_status_from_error(e)
             return Result(
                 run_id=run_id,
@@ -698,7 +703,7 @@ class BaseAsyncStage(BaseStage, ABC):
             )
         except Exception as e:
             await trace.aerror(
-                f"[STAGE]: Error Handler:||{traceback.format_exc()}"
+                f"[STAGE]: Error Handler:||🚨 {traceback.format_exc()}"
             )
             return Result(
                 run_id=run_id,
@@ -2011,9 +2016,9 @@ class TriggerStage(BaseNestedStage):
         _trigger: str = param2template(self.trigger, params, extras=self.extras)
         # if _trigger in self.extras.get("stop_circle_workflow_name", []):
         #     raise StageError(
-        #         "[STAGE]: Circle execution via trigger itself workflow name."
+        #         "[NESTED]: Circle execution via trigger itself workflow name."
         #     )
-        trace.info(f"[STAGE]: Load workflow: {_trigger!r}")
+        trace.info(f"[NESTED]: Load Workflow Config: {_trigger!r}")
 
         # # NOTE: add noted key for cancel circle execution.
         # if "stop_circle_workflow_name" in self.extras:
@@ -2127,7 +2132,7 @@ class ParallelStage(BaseNestedStage):
         trace: TraceManager = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
-        trace.debug(f"[STAGE]: Execute Branch: {branch!r}")
+        trace.debug(f"[NESTED]: Execute Branch: {branch!r}")
 
         # NOTE: Create nested-context
         current_context: DictData = copy.deepcopy(params)
@@ -2258,7 +2263,7 @@ class ParallelStage(BaseNestedStage):
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         event: Event = event or Event()
-        trace.info(f"[STAGE]: Parallel with {self.max_workers} workers.")
+        trace.info(f"[NESTED]: Parallel with {self.max_workers} workers.")
         catch(
             context=context,
             status=WAIT,
@@ -2396,7 +2401,7 @@ class ForEachStage(BaseNestedStage):
         trace: TraceManager = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
-        trace.debug(f"[STAGE]: Execute Item: {item!r}")
+        trace.debug(f"[NESTED]: Execute Item: {item!r}")
         key: StrOrInt = index if self.use_index_as_key else item
 
         # NOTE: Create nested-context data from the passing context.
@@ -2452,7 +2457,7 @@ class ForEachStage(BaseNestedStage):
                     f"Item execution was break because its nested-stage, "
                     f"{stage.iden!r}, failed."
                 )
-                trace.warning(f"[STAGE]: {error_msg}")
+                trace.warning(f"[NESTED]: {error_msg}")
                 catch(
                     context=context,
                     status=FAILED,
@@ -2562,7 +2567,7 @@ class ForEachStage(BaseNestedStage):
                 "duplicate item, it should set `use_index_as_key: true`."
             )
 
-        trace.info(f"[STAGE]: Foreach: {foreach!r}.")
+        trace.info(f"[NESTED]: Foreach: {foreach!r}.")
         catch(
             context=context,
             status=WAIT,
@@ -2596,7 +2601,7 @@ class ForEachStage(BaseNestedStage):
             done, not_done = wait(futures, return_when=FIRST_EXCEPTION)
             if len(list(done)) != len(futures):
                 trace.warning(
-                    "[STAGE]: Set the event for stop pending for-each stage."
+                    "[NESTED]: Set the event for stop pending for-each stage."
                 )
                 event.set()
                 for future in not_done:
@@ -2611,7 +2616,7 @@ class ForEachStage(BaseNestedStage):
                     if not_done
                     else ""
                 )
-                trace.debug(f"[STAGE]: ... Foreach-Stage set failed event{nd}")
+                trace.debug(f"[NESTED]: ... Foreach-Stage set failed event{nd}")
                 done: Iterator[Future] = as_completed(futures)
                 fail_fast = True
 
@@ -2718,7 +2723,7 @@ class UntilStage(BaseNestedStage):
         trace: TraceManager = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
-        trace.debug(f"[STAGE]: Execute Loop: {loop} (Item {item!r})")
+        trace.debug(f"[NESTED]: Execute Loop: {loop} (Item {item!r})")
 
         # NOTE: Create nested-context
         current_context: DictData = copy.deepcopy(params)
@@ -2861,7 +2866,7 @@ class UntilStage(BaseNestedStage):
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         event: Event = event or Event()
-        trace.info(f"[STAGE]: Until: {self.until!r}")
+        trace.info(f"[NESTED]: Until: {self.until!r}")
         item: Union[str, int, bool] = pass_env(
             param2template(self.item, params, extras=self.extras)
         )
@@ -2891,7 +2896,7 @@ class UntilStage(BaseNestedStage):
             if item is None:
                 item: int = loop
                 trace.warning(
-                    f"[STAGE]: Return loop not set the item. It uses loop: "
+                    f"[NESTED]: Return loop not set the item. It uses loop: "
                     f"{loop} by default."
                 )
 
@@ -3012,7 +3017,7 @@ class CaseStage(BaseNestedStage):
         trace: TraceManager = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
-        trace.debug(f"[STAGE]: Execute Case: {case!r}")
+        trace.debug(f"[NESTED]: Execute Case: {case!r}")
         current_context: DictData = copy.deepcopy(params)
         current_context.update({"case": case})
         output: DictData = {"case": case, "stages": {}}
@@ -3095,18 +3100,22 @@ class CaseStage(BaseNestedStage):
         )
 
         _case: StrOrNone = param2template(self.case, params, extras=self.extras)
+        trace.info(f"[NESTED]: Get Case: {_case!r}.")
 
-        trace.info(f"[STAGE]: Case: {_case!r}.")
         _else: Optional[Match] = None
         stages: Optional[list[Stage]] = None
+
+        # NOTE: Start check the condition of each stage match with this case.
         for match in self.match:
+            # NOTE: Store the else case.
             if (c := match.case) == "_":
                 _else: Match = match
                 continue
 
             _condition: str = param2template(c, params, extras=self.extras)
-            if stages is None and pass_env(_case) == pass_env(_condition):
+            if pass_env(_case) == pass_env(_condition):
                 stages: list[Stage] = match.stages
+                break
 
         if stages is None:
             if _else is None:
@@ -3120,6 +3129,7 @@ class CaseStage(BaseNestedStage):
                     "case and the else condition does not set too."
                 )
 
+            # NOTE: Force to use the else when it does not match any case.
             _case: str = "_"
             stages: list[Stage] = _else.stages
 
@@ -3413,8 +3423,11 @@ class VirtualPyStage(PyStage):  # pragma: no cov
     """
 
     version: str = Field(
-        default="3.9",
-        description="A Python version that want to run.",
+        default=__python_version__,
+        description=(
+            "A Python version that want to run. It will use supported version "
+            f"of this package by default, {__python_version__}."
+        ),
     )
     deps: list[str] = Field(
         description=(
@@ -3437,11 +3450,12 @@ class VirtualPyStage(PyStage):  # pragma: no cov
             The format of Python dependency was followed by the `uv`
         recommended.
 
-        :param py: A Python string statement.
-        :param values: A variable that want to set before running this
-        :param deps: An additional Python dependencies that want install before
-            run this python stage.
-        :param run_id: (StrOrNone) A running ID of this stage execution.
+        Args:
+            py: A Python string statement.
+            values: A variable that want to set before running this
+            deps: An additional Python dependencies that want install before
+                run this python stage.
+            run_id: (StrOrNone) A running ID of this stage execution.
         """
         run_id: str = run_id or uuid.uuid4()
         f_name: str = f"{run_id}.py"
