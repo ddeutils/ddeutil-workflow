@@ -7,6 +7,7 @@ from ddeutil.workflow.result import (
     FAILED,
     SUCCESS,
     WAIT,
+    Context,
     Result,
     Status,
     catch,
@@ -118,3 +119,13 @@ def test_catch():
 
     with pytest.raises(ResultError):
         catch({}, status=SUCCESS, foo={"key": "bar"})
+
+
+def test_context_type():
+    _: Context = {"status": WAIT}
+
+    # NOTE: This line will alert from IDE.
+    _: Context = {"status": SUCCESS, "info": "demo"}
+
+    # NOTE: This line will alert from IDE.
+    _: Context = {"status": SUCCESS, "not-set": "demo"}
