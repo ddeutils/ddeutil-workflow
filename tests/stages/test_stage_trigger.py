@@ -78,7 +78,7 @@ def test_trigger_stage_exec_raise(test_path):
             "params": {},
         }
     )
-    rs: Result = stage.execute(params={})
+    rs: Result = stage.execute(params={}, run_id="01")
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,
@@ -99,7 +99,7 @@ def test_trigger_stage_exec_raise(test_path):
             "params": {},
         }
     )
-    rs: Result = stage.execute(params={})
+    rs: Result = stage.execute(params={}, run_id="02")
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,

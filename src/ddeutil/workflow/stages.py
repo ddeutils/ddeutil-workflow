@@ -2020,8 +2020,8 @@ class TriggerStage(BaseNestedStage):
         )
         if result.status == FAILED:
             err_msg: str = (
-                f" with:\n{msg}"
-                if (msg := result.context.get("errors", {}).get("message"))
+                f" with: {name}"
+                if (name := result.context.get("errors", {}).get("name"))
                 else "."
             )
             raise StageError(f"Trigger workflow was failed{err_msg}")
