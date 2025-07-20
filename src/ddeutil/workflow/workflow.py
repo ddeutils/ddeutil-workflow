@@ -916,16 +916,17 @@ class Workflow(BaseModel):
     ) -> Result:  # pragma: no cov
         """Re-Execute workflow with passing the error context data.
 
-        :param context: A context result that get the failed status.
-        :param run_id: (Optional[str]) A workflow running ID.
-        :param event: (Event) An Event manager instance that use to cancel this
-            execution if it forces stopped by parent execution.
-        :param timeout: (float) A workflow execution time out in second unit
-            that use for limit time of execution and waiting job dependency.
-            This value does not force stop the task that still running more than
-            this limit time. (Default: 60 * 60 seconds)
-        :param max_job_parallel: (int) The maximum workers that use for job
-            execution in `ThreadPoolExecutor` object. (Default: 2 workers)
+        Args:
+            context: A context result that get the failed status.
+            run_id: (Optional[str]) A workflow running ID.
+            event: (Event) An Event manager instance that use to cancel this
+                execution if it forces stopped by parent execution.
+            timeout: (float) A workflow execution time out in second unit
+                that use for limit time of execution and waiting job dependency.
+                This value does not force stop the task that still running more
+                than this limit time. (Default: 60 * 60 seconds)
+            max_job_parallel: (int) The maximum workers that use for job
+                execution in `ThreadPoolExecutor` object. (Default: 2 workers)
 
         Returns
             Result: Return Result object that create from execution context with

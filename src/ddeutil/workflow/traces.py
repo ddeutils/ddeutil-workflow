@@ -29,7 +29,16 @@ from inspect import Traceback, currentframe, getframeinfo
 from pathlib import Path
 from threading import Lock, get_ident
 from types import FrameType
-from typing import Annotated, Any, ClassVar, Final, Literal, Optional, Union
+from typing import (
+    Annotated,
+    Any,
+    ClassVar,
+    Final,
+    Literal,
+    Optional,
+    TypeVar,
+    Union,
+)
 from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, Field, PrivateAttr
@@ -1741,6 +1750,7 @@ class ElasticHandler(BaseHandler):  # pragma: no cov
             return TraceData(stdout="", stderr="")
 
 
+Handler = TypeVar("Handler", bound=BaseHandler)
 TraceHandler = Annotated[
     Union[
         ConsoleHandler,
@@ -2022,7 +2032,7 @@ class Trace(BaseModel, BaseEmit, BaseAsyncEmit):
 def get_trace(
     run_id: str,
     *,
-    handlers: list[DictData] = None,
+    handlers: list[Union[DictData, Handler]] = None,
     parent_run_id: Optional[str] = None,
     extras: Optional[DictData] = None,
     auto_pre_process: bool = False,
