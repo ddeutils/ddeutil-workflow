@@ -72,7 +72,7 @@ from .result import (
 )
 from .reusables import has_template, param2template
 from .stages import Stage
-from .traces import TraceManager, get_trace
+from .traces import Trace, get_trace
 from .utils import cross_product, filter_func, gen_id
 
 MatrixFilter = list[dict[str, Union[str, int]]]
@@ -892,7 +892,7 @@ class Job(BaseModel):
         ts: float = time.monotonic()
         parent_run_id: str = run_id
         run_id: str = gen_id((self.id or "EMPTY"), unique=True)
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         trace.info(
@@ -1029,7 +1029,7 @@ def local_execute_strategy(
 
     :rtype: tuple[Status, DictData]
     """
-    trace: TraceManager = get_trace(
+    trace: Trace = get_trace(
         run_id, parent_run_id=parent_run_id, extras=job.extras
     )
     if strategy:
@@ -1165,7 +1165,7 @@ def local_execute(
     ts: float = time.monotonic()
     parent_run_id: StrOrNone = run_id
     run_id: str = gen_id((job.id or "EMPTY"), unique=True)
-    trace: TraceManager = get_trace(
+    trace: Trace = get_trace(
         run_id, parent_run_id=parent_run_id, extras=job.extras
     )
     context: DictData = {"status": WAIT}
@@ -1232,7 +1232,7 @@ def local_execute(
     strategies: list[DictStr] = job.strategy.make()
     len_strategy: int = len(strategies)
     trace.info(
-        f"[JOB]: ... Mode {ls}: {job.id!r} with {workers} "
+        f"[JOB]: Mode {ls}: {job.id!r} with {workers} "
         f"worker{'s' if workers > 1 else ''}."
     )
 
@@ -1349,7 +1349,7 @@ def self_hosted_execute(
     """
     parent_run_id: StrOrNone = run_id
     run_id: str = gen_id((job.id or "EMPTY"), unique=True)
-    trace: TraceManager = get_trace(
+    trace: Trace = get_trace(
         run_id, parent_run_id=parent_run_id, extras=job.extras
     )
     context: DictData = {"status": WAIT}
@@ -1432,7 +1432,7 @@ def docker_execution(
     """
     parent_run_id: StrOrNone = run_id
     run_id: str = gen_id((job.id or "EMPTY"), unique=True)
-    trace: TraceManager = get_trace(
+    trace: Trace = get_trace(
         run_id, parent_run_id=parent_run_id, extras=job.extras
     )
     context: DictData = {"status": WAIT}

@@ -14,7 +14,7 @@ The traces system provides:
 
 ## Core Components
 
-### `TraceManager`
+### `Trace`
 
 The main trace manager that coordinates multiple handlers and provides a unified logging interface.
 
@@ -64,10 +64,10 @@ Basic console logging implementation that outputs to stdout/stderr.
 !!! example "Console Handler"
 
     ```python
-    from ddeutil.workflow.traces import ConsoleHandler, TraceManager
+    from ddeutil.workflow.traces import ConsoleHandler, Trace
 
     handler = ConsoleHandler(type="console")
-    trace = TraceManager(
+    trace = Trace(
         run_id="workflow-123",
         handlers=[handler]
     )
@@ -81,7 +81,7 @@ File-based trace implementation that persists logs to the local filesystem with 
 !!! example "File Handler Usage"
 
     ```python
-    from ddeutil.workflow.traces import FileHandler, TraceManager
+    from ddeutil.workflow.traces import FileHandler, Trace
 
     # Create file handler
     handler = FileHandler(
@@ -90,7 +90,7 @@ File-based trace implementation that persists logs to the local filesystem with 
         format="{datetime} ({process:5d}, {thread:5d}) ({cut_id}) {message:120s} ({filename}:{lineno})"
     )
 
-    trace = TraceManager(
+    trace = Trace(
         run_id="workflow-123",
         parent_run_id="parent-456",
         handlers=[handler]
@@ -137,7 +137,7 @@ SQLite-based trace implementation for scalable logging with structured metadata 
 !!! example "SQLite Handler"
 
     ```python
-    from ddeutil.workflow.traces import SQLiteHandler, TraceManager
+    from ddeutil.workflow.traces import SQLiteHandler, Trace
 
     handler = SQLiteHandler(
         type="sqlite",
@@ -145,7 +145,7 @@ SQLite-based trace implementation for scalable logging with structured metadata 
         table_name="traces"
     )
 
-    trace = TraceManager(
+    trace = Trace(
         run_id="workflow-789",
         handlers=[handler]
     )
@@ -206,7 +206,7 @@ REST API integration for external logging services.
 !!! example "REST API Handler"
 
     ```python
-    from ddeutil.workflow.traces import RestAPIHandler, TraceManager
+    from ddeutil.workflow.traces import RestAPIHandler, Trace
 
     # Datadog integration
     handler = RestAPIHandler(
@@ -218,7 +218,7 @@ REST API integration for external logging services.
         max_retries=3
     )
 
-    trace = TraceManager(
+    trace = Trace(
         run_id="workflow-123",
         handlers=[handler]
     )
@@ -238,7 +238,7 @@ High-performance Elasticsearch logging with bulk indexing and search capabilitie
 !!! example "Elasticsearch Handler"
 
     ```python
-    from ddeutil.workflow.traces import ElasticHandler, TraceManager
+    from ddeutil.workflow.traces import ElasticHandler, Trace
 
     handler = ElasticHandler(
         type="elastic",
@@ -250,7 +250,7 @@ High-performance Elasticsearch logging with bulk indexing and search capabilitie
         max_retries=3
     )
 
-    trace = TraceManager(
+    trace = Trace(
         run_id="workflow-123",
         handlers=[handler]
     )
@@ -320,7 +320,7 @@ All handlers support asynchronous logging for non-blocking operations:
 
 ## Buffer Support
 
-The `TraceManager` supports buffered logging for high-performance scenarios:
+The `Trace` supports buffered logging for high-performance scenarios:
 
 !!! example "Buffered Logging"
 
@@ -342,7 +342,7 @@ The `TraceManager` supports buffered logging for high-performance scenarios:
 
 ### `get_trace`
 
-Factory function that returns a `TraceManager` instance with handlers configured from the core configuration.
+Factory function that returns a `Trace` instance with handlers configured from the core configuration.
 
 !!! example "Dynamic Trace Creation"
 

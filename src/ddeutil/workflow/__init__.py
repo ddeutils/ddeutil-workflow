@@ -135,7 +135,7 @@ from .stages import (
     VirtualPyStage,
 )
 from .traces import (
-    TraceManager,
+    Trace,
     get_trace,
 )
 from .utils import *

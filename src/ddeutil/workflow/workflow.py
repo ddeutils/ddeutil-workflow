@@ -61,7 +61,7 @@ from .result import (
     validate_statuses,
 )
 from .reusables import has_template, param2template
-from .traces import TraceManager, get_trace
+from .traces import Trace, get_trace
 from .utils import (
     UTC,
     gen_id,
@@ -276,7 +276,11 @@ class Workflow(BaseModel):
         return self.model_dump(by_alias=True)
 
     def md(self, author: Optional[str] = None) -> str:  # pragma: no cov
-        """Generate the markdown template."""
+        """Generate the markdown template from this Workflow model data.
+
+        Args:
+            author (str | None, default None): An author name.
+        """
 
         def align_newline(value: str) -> str:
             return value.rstrip("\n").replace("\n", "\n                ")
@@ -470,7 +474,7 @@ class Workflow(BaseModel):
             parent_run_id: str = run_id
 
         context: DictData = {"status": WAIT}
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         release: datetime = self.validate_release(dt=release)
@@ -568,7 +572,7 @@ class Workflow(BaseModel):
         Returns:
             tuple[Status, DictData]: The pair of status and result context data.
         """
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         if event and event.is_set():
@@ -685,7 +689,7 @@ class Workflow(BaseModel):
         ts: float = time.monotonic()
         parent_run_id: Optional[str] = run_id
         run_id: str = gen_id(self.name, unique=True, extras=self.extras)
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         context: DictData = self.parameterize(params)
@@ -788,7 +792,7 @@ class Workflow(BaseModel):
                     )
                 elif check == SKIP:  # pragma: no cov
                     trace.info(
-                        f"[JOB]: Skip job: {job_id!r} from trigger rule."
+                        f"[JOB]: ⏭️ Skip job: {job_id!r} from trigger rule."
                     )
                     job.set_outputs(output={"status": SKIP}, to=context)
                     job_queue.task_done()
@@ -930,7 +934,7 @@ class Workflow(BaseModel):
         ts: float = time.monotonic()
         parent_run_id: str = run_id
         run_id: str = gen_id(self.name, extras=self.extras)
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         if context["status"] == SUCCESS:

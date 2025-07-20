@@ -113,7 +113,7 @@ from .reusables import (
     not_in_template,
     param2template,
 )
-from .traces import TraceManager, get_trace
+from .traces import Trace, get_trace
 from .utils import (
     delay,
     dump_all,
@@ -303,7 +303,7 @@ class BaseStage(BaseModel, ABC):
         parent_run_id: str = run_id
         run_id: str = gen_id(self.iden, unique=True, extras=self.extras)
         context: DictData = {"status": WAIT}
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         try:
@@ -638,7 +638,7 @@ class BaseAsyncStage(BaseStage, ABC):
         parent_run_id: StrOrNone = run_id
         run_id: str = gen_id(self.iden, unique=True, extras=self.extras)
         context: DictData = {}
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         try:
@@ -788,7 +788,7 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
         current_retry: int = 0
         exception: Exception
         catch(context, status=WAIT)
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
 
@@ -862,7 +862,7 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
         current_retry: int = 0
         exception: Exception
         catch(context, status=WAIT)
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
 
@@ -992,7 +992,7 @@ class EmptyStage(BaseAsyncStage):
         Returns:
             Result: The execution result with status and context data.
         """
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         message: str = (
@@ -1045,7 +1045,7 @@ class EmptyStage(BaseAsyncStage):
         Returns:
             Result: The execution result with status and context data.
         """
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         message: str = (
@@ -1210,7 +1210,7 @@ class BashStage(BaseRetryStage):
         Returns:
             Result: The execution result with status and context data.
         """
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         bash: str = param2template(
@@ -1274,7 +1274,7 @@ class BashStage(BaseRetryStage):
         Returns:
             Result: The execution result with status and context data.
         """
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         bash: str = param2template(
@@ -1415,7 +1415,7 @@ class PyStage(BaseRetryStage):
         Returns:
             Result: The execution result with status and context data.
         """
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         trace.debug("[STAGE]: Prepare `globals` and `locals` variables.")
@@ -1496,7 +1496,7 @@ class PyStage(BaseRetryStage):
         Returns:
             Result: The execution result with status and context data.
         """
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         await trace.ainfo("[STAGE]: Prepare `globals` and `locals` variables.")
@@ -1641,7 +1641,7 @@ class CallStage(BaseRetryStage):
         Returns:
             Result: The execution result with status and context data.
         """
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         call_func: TagFunc = self.get_caller(params=params)()
@@ -1760,7 +1760,7 @@ class CallStage(BaseRetryStage):
         Returns:
             Result: The execution result with status and context data.
         """
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         call_func: TagFunc = self.get_caller(params=params)()
@@ -1894,7 +1894,7 @@ class CallStage(BaseRetryStage):
                 "Validate argument from the caller function raise invalid type."
             ) from e
         except TypeError as e:
-            trace: TraceManager = get_trace(
+            trace: Trace = get_trace(
                 run_id, parent_run_id=parent_run_id, extras=extras
             )
             trace.warning(
@@ -2022,7 +2022,7 @@ class TriggerStage(BaseNestedStage):
         """
         from .workflow import Workflow
 
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         _trigger: str = param2template(self.trigger, params, extras=self.extras)
@@ -2141,7 +2141,7 @@ class ParallelStage(BaseNestedStage):
         Returns:
             tuple[Status, DictData]: A pair of status and result context data.
         """
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         trace.debug(f"[NESTED]: Execute Branch: {branch!r}")
@@ -2271,7 +2271,7 @@ class ParallelStage(BaseNestedStage):
         Returns:
             Result: The execution result with status and context data.
         """
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         event: Event = event or Event()
@@ -2410,7 +2410,7 @@ class ForEachStage(BaseNestedStage):
 
         :rtype: tuple[Status, Result]
         """
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         trace.debug(f"[NESTED]: Execute Item: {item!r}")
@@ -2547,7 +2547,7 @@ class ForEachStage(BaseNestedStage):
         Returns:
             Result: The execution result with status and context data.
         """
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         event: Event = event or Event()
@@ -2732,7 +2732,7 @@ class UntilStage(BaseNestedStage):
         :rtype: tuple[Status, DictData, T]
         :return: Return a pair of Result and changed item.
         """
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         trace.debug(f"[NESTED]: Execute Loop: {loop} (Item {item!r})")
@@ -2876,7 +2876,7 @@ class UntilStage(BaseNestedStage):
         Returns:
             Result: The execution result with status and context data.
         """
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         event: Event = event or Event()
@@ -3028,7 +3028,7 @@ class CaseStage(BaseNestedStage):
 
         :rtype: DictData
         """
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         trace.debug(f"[NESTED]: Execute Case: {case!r}")
@@ -3109,7 +3109,7 @@ class CaseStage(BaseNestedStage):
         Returns:
             Result: The execution result with status and context data.
         """
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
 
@@ -3212,7 +3212,7 @@ class RaiseStage(BaseAsyncStage):
         Returns:
             Result: The execution result with status and context data.
         """
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         message: str = param2template(self.message, params, extras=self.extras)
@@ -3243,7 +3243,7 @@ class RaiseStage(BaseAsyncStage):
         Returns:
             Result: The execution result with status and context data.
         """
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         message: str = param2template(self.message, params, extras=self.extras)
@@ -3324,7 +3324,7 @@ class DockerStage(BaseStage):  # pragma: no cov
                 "by `pip install docker` first."
             ) from None
 
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         client = DockerClient(
@@ -3424,7 +3424,7 @@ class DockerStage(BaseStage):  # pragma: no cov
         Returns:
             Result: The execution result with status and context data.
         """
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         trace.info(f"[STAGE]: Docker: {self.image}:{self.tag}")
@@ -3538,7 +3538,7 @@ class VirtualPyStage(PyStage):  # pragma: no cov
         Returns:
             Result: The execution result with status and context data.
         """
-        trace: TraceManager = get_trace(
+        trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         run: str = param2template(dedent(self.run), params, extras=self.extras)

@@ -428,6 +428,9 @@ class BaseHandler(BaseModel, ABC):
         self, metadata: list[Metadata], *, extra: Optional[DictData] = None
     ) -> None: ...
 
+    def pre(self) -> None:
+        """Pre-process of handler that will execute when start create trance."""
+
 
 class ConsoleHandler(BaseHandler):
     """Console Handler model."""
@@ -461,14 +464,20 @@ class FileHandler(BaseHandler):
     metadata_filename: ClassVar[str] = "metadata.txt"
 
     type: Literal["file"] = "file"
-    path: str = Field(description="A file path.")
+    path: str = Field(
+        description=(
+            "A file path that use to save all trace log files that include "
+            "stdout, stderr, and metadata."
+        )
+    )
     format: str = Field(
         default=(
             "{datetime} ({process:5d}, {thread:5d}) ({cut_id}) {message:120s} "
             "({filename}:{lineno})"
-        )
+        ),
+        description="A trace log format that write on stdout and stderr files.",
     )
-    buffer_size: int = 8192
+    buffer_size: int = Field(default=8192)
 
     # NOTE: Private attrs for the internal process.
     _lock: Lock = PrivateAttr(default_factory=Lock)
@@ -489,7 +498,9 @@ class FileHandler(BaseHandler):
             log_file.mkdir(parents=True)
         return log_file
 
-    def pre(self) -> None: ...
+    def pre(self) -> None:  # pragma: no cov
+        if not (p := Path(self.path)).exists():
+            p.mkdir(parents=True)
 
     def emit(
         self,
@@ -497,6 +508,7 @@ class FileHandler(BaseHandler):
         *,
         extra: Optional[DictData] = None,
     ) -> None:
+        """Emit trace log."""
         pointer: Path = self.pointer(metadata.pointer_id)
         std_file = "stderr" if metadata.error_flag else "stdout"
         with self._lock:
@@ -519,7 +531,9 @@ class FileHandler(BaseHandler):
         try:
             import aiofiles
         except ImportError as e:
-            raise ImportError("Async mode need aiofiles package") from e
+            raise ImportError(
+                "Async mode need to install `aiofiles` package first"
+            ) from e
 
         with self._lock:
             pointer: Path = self.pointer(metadata.pointer_id)
@@ -539,6 +553,7 @@ class FileHandler(BaseHandler):
     def flush(
         self, metadata: list[Metadata], *, extra: Optional[DictData] = None
     ) -> None:
+        """Flush logs."""
         with self._lock:
             pointer: Path = self.pointer(metadata[0].pointer_id)
             stdout_file = open(
@@ -614,7 +629,7 @@ class FileHandler(BaseHandler):
         """Find trace logs.
 
         Args:
-            path: A trace path that want to find.
+            path (Path | None, default None): A trace path that want to find.
         """
         for file in sorted(
             (path or Path(self.path)).glob("./run_id=*"),
@@ -635,6 +650,9 @@ class FileHandler(BaseHandler):
             run_id: A running ID of trace log.
             force_raise: Whether to raise an exception if not found.
             path: Optional path override.
+
+        Returns:
+            TraceData: A TranceData instance that already passed searching data.
         """
         base_path: Path = path or self.path
         file: Path = base_path / f"run_id={run_id}"
@@ -758,7 +776,8 @@ class SQLiteHandler(BaseHandler):  # pragma: no cov
         metadata: Metadata,
         *,
         extra: Optional[DictData] = None,
-    ) -> None: ...
+    ) -> None:
+        raise NotImplementedError("Does not implement async emit yet.")
 
     def flush(
         self, metadata: list[Metadata], *, extra: Optional[DictData] = None
@@ -1507,7 +1526,6 @@ class ElasticHandler(BaseHandler):  # pragma: no cov
         try:
             from elasticsearch import Elasticsearch
 
-            # Create client
             client = Elasticsearch(
                 hosts=es_hosts if isinstance(es_hosts, list) else [es_hosts],
                 basic_auth=(
@@ -1654,8 +1672,6 @@ class ElasticHandler(BaseHandler):  # pragma: no cov
 
             for hit in response["hits"]["hits"]:
                 source = hit["_source"]
-
-                # Convert to TraceMeta
                 trace_meta = Metadata(
                     run_id=source["run_id"],
                     parent_run_id=source["parent_run_id"],
@@ -1867,7 +1883,7 @@ class BaseAsyncEmit(ABC):
         await self.amit(msg, level="exception")
 
 
-class TraceManager(BaseModel, BaseEmit, BaseAsyncEmit):
+class Trace(BaseModel, BaseEmit, BaseAsyncEmit):
     """Trace Manager model that keep all trance handler and emit log to its
     handler.
     """
@@ -1956,7 +1972,7 @@ class TraceManager(BaseModel, BaseEmit, BaseAsyncEmit):
         any logging level.
 
         Args:
-            msg: A message that want to log.
+            msg (str): A message that want to log.
             level (Level): A logging mode.
         """
         _msg: str = self.make_message(msg)
@@ -2006,10 +2022,12 @@ class TraceManager(BaseModel, BaseEmit, BaseAsyncEmit):
 def get_trace(
     run_id: str,
     *,
+    handlers: list[DictData] = None,
     parent_run_id: Optional[str] = None,
     extras: Optional[DictData] = None,
-) -> TraceManager:
-    """Get dynamic TraceManager instance from the core config.
+    auto_pre_process: bool = False,
+) -> Trace:
+    """Get dynamic Trace instance from the core config.
 
     This factory function returns the appropriate trace implementation based on
     configuration. It can be overridden by extras argument and accepts running ID
@@ -2018,16 +2036,27 @@ def get_trace(
     Args:
         run_id (str): A running ID.
         parent_run_id (str | None, default None): A parent running ID.
+        handlers:
         extras: An extra parameter that want to override the core
             config values.
+        auto_pre_process (bool, default False)
 
     Returns:
-        TraceManager: The appropriate trace instance.
+        Trace: The appropriate trace instance.
     """
-    handlers = dynamic("trace_handlers", extras=extras)
-    return TraceManager(
-        run_id=run_id,
-        parent_run_id=parent_run_id,
-        handlers=handlers,
-        extras=extras or {},
+    handlers: list[DictData] = dynamic(
+        "trace_handlers", f=handlers, extras=extras
     )
+    trace = Trace.model_validate(
+        {
+            "run_id": run_id,
+            "parent_run_id": parent_run_id,
+            "handlers": handlers,
+            "extras": extras or {},
+        }
+    )
+    # NOTE: Start pre-process when start create trace.
+    if auto_pre_process:
+        for handler in trace.handlers:
+            handler.pre()
+    return trace
