@@ -2,6 +2,43 @@
 
 ## Latest Changes
 
+## 0.0.82
+
+### :sparkles: Features
+
+- :dart: feat: add raise error when pass rerun mode to release method.
+- :dart: feat: add skip on workflow release method when audit.
+- :dart: feat: add pre-process on trace model.
+- :dart: feat: add nested stage error object for dedup trace message.
+- :dart: feat: add retry backoff sleep time on stage module.
+- :dart: feat: add support runs-on with str type.
+
+### :bug: Bug fixes
+
+- :gear: fixed: remove message from trigger catch error.
+- :gear: fixed: add stopper for disable circle execution.
+- :gear: fixed: change cutting running id logic.
+- :gear: fixed: add env for use system python.
+
+### :black_nib: Code Changes
+
+- :art: format: add typed-hint for handler args.
+- :lipstick: styled: add nested exception on until stage.
+- :lipstick: styled: upgrade nested prefix and emoji.
+- :test_tube: tests: update testcase and add type on workflow model.
+
+### :broom: Deprecate & Clean
+
+- :recycle: clean: remove trancs log route from api.
+
+### :package: Build & Workflow
+
+- :toolbox: build: update uv version on dockerfile.
+
+### :book: Documentations
+
+- :page_facing_up: docs: update example conf.
+
 ## 0.0.81
 
 ### :sparkles: Features
