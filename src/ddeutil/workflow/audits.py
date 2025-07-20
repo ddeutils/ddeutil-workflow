@@ -49,11 +49,12 @@ import zlib
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from datetime import datetime, timedelta
+from enum import Enum
 from pathlib import Path
 from typing import Annotated, Any, ClassVar, Literal, Optional, Union
 from urllib.parse import ParseResult, urlparse
 
-from pydantic import BaseModel, Field, TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
@@ -64,18 +65,49 @@ from .traces import Trace, get_trace, set_logging
 logger = logging.getLogger("ddeutil.workflow")
 
 
+class ReleaseType(str, Enum):
+    """Release type enumeration for workflow execution modes.
+
+    This enum defines the different types of workflow releases that can be
+    triggered, each with specific behavior and use cases.
+
+    Attributes:
+        NORMAL: Standard workflow release execution
+        RERUN: Re-execution of previously failed workflow
+        EVENT: Event-triggered workflow execution
+        FORCE: Forced execution bypassing normal conditions
+    """
+
+    NORMAL = "normal"
+    RERUN = "rerun"
+    EVENT = "event"
+    FORCE = "force"
+
+
+NORMAL = ReleaseType.NORMAL
+RERUN = ReleaseType.RERUN
+EVENT = ReleaseType.EVENT
+FORCE = ReleaseType.FORCE
+
+
 class AuditData(BaseModel):
+    """Audit Data model."""
+
+    model_config = ConfigDict(use_enum_values=True)
+
     name: str = Field(description="A workflow name.")
     release: datetime = Field(description="A release datetime.")
-    type: str = Field(description="A running type before logging.")
+    type: ReleaseType = Field(
+        default=NORMAL, description="A running type before logging."
+    )
     context: DictData = Field(
         default_factory=dict,
         description="A context that receive from a workflow execution result.",
     )
+    run_id: str = Field(description="A running ID")
     parent_run_id: Optional[str] = Field(
         default=None, description="A parent running ID."
     )
-    run_id: str = Field(description="A running ID")
     runs_metadata: DictData = Field(
         default_factory=dict,
         description="A runs metadata that will use to tracking this audit log.",
@@ -122,7 +154,7 @@ class BaseAudit(BaseModel, ABC):
     @abstractmethod
     def is_pointed(
         self,
-        data: AuditData,
+        data: Any,
         *,
         extras: Optional[DictData] = None,
     ) -> bool:
@@ -328,21 +360,21 @@ class FileAudit(BaseAudit):
             return AuditData.model_validate(obj=json.load(f))
 
     def is_pointed(
-        self, data: AuditData, *, extras: Optional[DictData] = None
+        self,
+        data: Any,
+        *,
+        extras: Optional[DictData] = None,
     ) -> bool:
         """Check if the release log already exists at the destination log path.
 
         Args:
-            data: The workflow name.
+            data (str):
             extras: Optional extra parameters to override core config.
 
         Returns:
             bool: True if the release log exists, False otherwise.
         """
-        # NOTE: Return False if enable writing log flag does not set.
-        if not dynamic("enable_write_audit", extras=extras):
-            return False
-        return self.pointer(data).exists()
+        return self.pointer(AuditData.model_validate(data)).exists()
 
     def pointer(self, data: AuditData) -> Path:
         """Return release directory path generated from model data.

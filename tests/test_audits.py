@@ -5,6 +5,7 @@ from unittest import mock
 
 import pytest
 from ddeutil.workflow.audits import (
+    NORMAL,
     AuditData,
     BaseAudit,
     FileAudit,
@@ -28,7 +29,7 @@ def test_audit_data():
     audit = AuditData.model_validate(
         {
             "name": "wf-scheduling",
-            "type": "manual",
+            "type": "normal",
             "release": datetime(2024, 1, 1, 1),
             "run_id": "558851633820240817184358131811",
         }
@@ -58,8 +59,8 @@ def test_audit_file():
     log = FileAudit(path="./audits")
     audit = AuditData.model_validate(
         obj={
-            "name": "wf-scheduling",
-            "type": "manual",
+            "name": "wf-scheduling-not-exists",
+            "type": NORMAL,
             "release": datetime(2024, 1, 1, 1),
             "context": {
                 "params": {"name": "foo"},
@@ -80,7 +81,7 @@ def test_audit_file_do_first():
     audit = AuditData.model_validate(
         {
             "name": "wf-demo-logging",
-            "type": "manual",
+            "type": "normal",
             "release": datetime(2024, 1, 1, 1),
             "context": {
                 "params": {"name": "logging"},
@@ -109,7 +110,7 @@ def test_audit_file_find(root_path):
     audit = AuditData.model_validate(
         {
             "name": "wf-scheduling",
-            "type": "manual",
+            "type": "normal",
             "release": datetime(2024, 1, 1, 1),
             "context": {
                 "params": {"name": "foo"},
