@@ -71,6 +71,7 @@ from .conf import (
 )
 from .errors import (
     BaseError,
+    EventError,
     JobCancelError,
     JobError,
     JobSkipError,

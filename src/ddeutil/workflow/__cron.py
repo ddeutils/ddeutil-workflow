@@ -715,7 +715,7 @@ class CronJob:
         self,
         date: Optional[datetime] = None,
         *,
-        tz: Optional[str] = None,
+        tz: Optional[Union[str, ZoneInfo]] = None,
     ) -> CronRunner:
         """Returns CronRunner instance that be datetime runner with this
         cronjob. It can use `next`, `prev`, or `reset` methods to generate

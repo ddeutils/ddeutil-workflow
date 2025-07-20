@@ -62,10 +62,8 @@ from .result import (
 from .reusables import has_template, param2template
 from .traces import Trace, get_trace
 from .utils import (
-    UTC,
     gen_id,
     get_dt_now,
-    replace_sec,
 )
 
 
@@ -366,33 +364,6 @@ class Workflow(BaseModel):
             "jobs": {},
         }
 
-    def validate_release(self, dt: datetime) -> datetime:
-        """Validate the release datetime that should was replaced second and
-        millisecond to 0 and replaced timezone to None before checking it match
-        with the set `on` field.
-
-        Args:
-            dt (datetime): A datetime object that want to validate.
-
-        Returns:
-            datetime: The validated release datetime.
-        """
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=UTC)
-
-        release: datetime = replace_sec(dt.astimezone(UTC))
-
-        # NOTE: Return itself if schedule event does not set.
-        if not self.on.schedule:
-            return release
-
-        for on in self.on.schedule:
-            if release == on.cronjob.schedule(release, tz=UTC).next:
-                return release
-        raise WorkflowError(
-            "Release datetime does not support for this workflow"
-        )
-
     def release(
         self,
         release: datetime,
@@ -460,7 +431,7 @@ class Workflow(BaseModel):
         trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
-        release: datetime = self.validate_release(dt=release)
+        release: datetime = self.on.validate_dt(dt=release)
         trace.info(f"[RELEASE]: Start {name!r} : {release:%Y-%m-%d %H:%M:%S}")
         values: DictData = param2template(
             params,

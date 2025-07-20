@@ -1,7 +1,11 @@
 name: "data-pipeline-etl"
 type: "Workflow"
-description: "End-to-end ETL pipeline for customer data processing with data quality checks"
-
+desc: |
+  End-to-end ETL pipeline for customer data processing with data quality checks
+on:
+  schedule:
+    - cronjob: "0 2 * * *"  # Daily at 2 AM
+      timezone: "UTC"
 params:
   source_bucket:
     type: str
@@ -257,8 +261,3 @@ jobs:
             quality_score: ${{ quality_results.score }}
             customer_count: ${{ len(customers) }}
             transaction_count: ${{ len(transactions) }}
-
-on:
-  schedule:
-    - cronjob: "0 2 * * *"  # Daily at 2 AM
-      timezone: "UTC"

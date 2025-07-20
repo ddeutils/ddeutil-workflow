@@ -50,6 +50,8 @@ from pydantic_extra_types.timezone_name import TimeZoneName
 
 from .__cron import WEEKDAYS, CronJob, CronJobYear, CronRunner, Options
 from .__types import DictData
+from .errors import EventError
+from .utils import UTC, replace_sec
 
 Interval = Literal["daily", "weekly", "monthly"]
 
@@ -434,3 +436,31 @@ class Event(BaseModel):
                 "The number of the on should not more than 10 crontabs."
             )
         return value
+
+    def validate_dt(self, dt: datetime) -> datetime:
+        """Validate the release datetime that should was replaced second and
+        millisecond to 0 and replaced timezone to None before checking it match
+        with the set `on` field.
+
+        Args:
+            dt (datetime): A datetime object that want to validate.
+
+        Returns:
+            datetime: The validated release datetime.
+        """
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+
+        release: datetime = replace_sec(dt.astimezone(UTC))
+
+        # NOTE: Return itself if schedule event does not set.
+        if not self.schedule:
+            return release
+
+        for on in self.schedule:
+            if release == on.cronjob.schedule(release, tz=UTC).next:
+                return release
+        raise EventError(
+            f"This datetime, {datetime}, does not support for this event "
+            f"schedule."
+        )

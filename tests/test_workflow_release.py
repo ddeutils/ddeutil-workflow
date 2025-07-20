@@ -10,9 +10,9 @@ from ddeutil.workflow import (
     SKIP,
     SUCCESS,
     UTC,
+    EventError,
     Result,
     Workflow,
-    WorkflowError,
 )
 
 
@@ -20,10 +20,10 @@ def test_workflow_validate_release():
     workflow: Workflow = Workflow.model_validate(
         {"name": "wf-common-not-set-event"}
     )
-    assert workflow.validate_release(datetime.now())
-    assert workflow.validate_release(datetime(2025, 5, 1, 12, 1))
-    assert workflow.validate_release(datetime(2025, 5, 1, 11, 12))
-    assert workflow.validate_release(datetime(2025, 5, 1, 10, 25, 59, 150))
+    assert workflow.on.validate_dt(datetime.now())
+    assert workflow.on.validate_dt(datetime(2025, 5, 1, 12, 1))
+    assert workflow.on.validate_dt(datetime(2025, 5, 1, 11, 12))
+    assert workflow.on.validate_dt(datetime(2025, 5, 1, 10, 25, 59, 150))
 
     workflow: Workflow = Workflow.model_validate(
         {
@@ -35,16 +35,16 @@ def test_workflow_validate_release():
             },
         }
     )
-    assert workflow.validate_release(datetime(2025, 5, 1, 1, 9))
+    assert workflow.on.validate_dt(datetime(2025, 5, 1, 1, 9))
 
-    with pytest.raises(WorkflowError):
-        workflow.validate_release(datetime(2025, 5, 1, 1, 10))
+    with pytest.raises(EventError):
+        workflow.on.validate_dt(datetime(2025, 5, 1, 1, 10))
 
-    with pytest.raises(WorkflowError):
-        workflow.validate_release(datetime(2025, 5, 1, 1, 1))
+    with pytest.raises(EventError):
+        workflow.on.validate_dt(datetime(2025, 5, 1, 1, 1))
 
-    assert workflow.validate_release(datetime(2025, 5, 1, 1, 3))
-    assert workflow.validate_release(datetime(2025, 5, 1, 1, 3, 10, 100))
+    assert workflow.on.validate_dt(datetime(2025, 5, 1, 1, 3))
+    assert workflow.on.validate_dt(datetime(2025, 5, 1, 1, 3, 10, 100))
 
     workflow: Workflow = Workflow.model_validate(
         {
@@ -57,11 +57,11 @@ def test_workflow_validate_release():
         }
     )
 
-    assert workflow.validate_release(datetime(2025, 5, 1, 1, 9))
-    assert workflow.validate_release(datetime(2025, 5, 1, 1, 10))
-    assert workflow.validate_release(datetime(2025, 5, 1, 1, 1))
-    assert workflow.validate_release(datetime(2025, 5, 1, 1, 3))
-    assert workflow.validate_release(datetime(2025, 5, 1, 1, 3, 10, 100))
+    assert workflow.on.validate_dt(datetime(2025, 5, 1, 1, 9))
+    assert workflow.on.validate_dt(datetime(2025, 5, 1, 1, 10))
+    assert workflow.on.validate_dt(datetime(2025, 5, 1, 1, 1))
+    assert workflow.on.validate_dt(datetime(2025, 5, 1, 1, 3))
+    assert workflow.on.validate_dt(datetime(2025, 5, 1, 1, 3, 10, 100))
 
 
 def test_workflow_release():
