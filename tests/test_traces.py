@@ -130,10 +130,13 @@ def test_result_trace():
             "logs_trace_frame_layer": 4,
         },
     )
-    print(rs.trace.extras)
+    assert rs.trace.extras == {
+        "enable_write_log": True,
+        "logs_trace_frame_layer": 4,
+    }
     rs.trace.info("[DEMO]: Test echo log from result trace argument!!!")
     print(rs.run_id)
-    print(rs.parent_run_id)
+    assert rs.parent_run_id == "foo_id_for_writing_log"
 
 
 def test_file_trace_find_traces(test_path):

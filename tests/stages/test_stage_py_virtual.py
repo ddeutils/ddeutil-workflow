@@ -1,4 +1,4 @@
-from ddeutil.workflow import Result, Stage, StageError, Workflow
+from ddeutil.workflow import SUCCESS, Result, Stage, StageError, Workflow
 
 from ..utils import dump_yaml_context
 
@@ -35,6 +35,7 @@ def test_stage_py_virtual(test_path):
             assert output == {
                 "stages": {
                     "py-virtual": {
+                        "status": SUCCESS,
                         "outputs": {
                             "return_code": 0,
                             "stdout": "[1 2 3 4 5]\n<class 'numpy.ndarray'>",
