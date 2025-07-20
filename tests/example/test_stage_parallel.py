@@ -137,7 +137,7 @@ def test_example_parallel_stage_exec_with_trigger_raise(test_path):
                         "8713259197": {
                             "outputs": {},
                             "errors": {
-                                "name": "StageError",
+                                "name": "StageNestedError",
                                 "message": "Trigger workflow was failed with:\nJob execution, 'first-job', was failed.",
                             },
                             "status": FAILED,
@@ -213,7 +213,7 @@ def test_example_parallel_stage_exec_with_trigger_raise_bug(test_path):
                         "2579951921": {
                             "outputs": {},
                             "errors": {
-                                "name": "StageError",
+                                "name": "StageNestedError",
                                 "message": "Trigger workflow was failed with:\nJob execution, 'first-job', was failed.",
                             },
                             "status": FAILED,
@@ -231,7 +231,7 @@ def test_example_parallel_stage_exec_with_trigger_raise_bug(test_path):
                         "4773288548": {
                             "outputs": {},
                             "errors": {
-                                "name": "StageError",
+                                "name": "StageNestedError",
                                 "message": "Trigger workflow was failed with:\nJob execution, 'first-job', was failed.",
                             },
                             "status": FAILED,

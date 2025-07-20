@@ -1,0 +1,7 @@
+wf-circle:
+  type: Workflow
+  jobs:
+    first-job:
+      stages:
+        - name: "Trigger itself"
+          trigger: wf-circle

@@ -129,6 +129,7 @@ def test_example_foreach_stage_exec_with_trigger_raise(test_path):
         stage: Stage = workflow.job("first-job").stage("foreach-raise")
         rs: Result = stage.execute({})
         assert rs.status == FAILED
+        assert_status: list[bool] = []
         try:
             assert rs.context == {
                 "status": FAILED,
@@ -141,7 +142,7 @@ def test_example_foreach_stage_exec_with_trigger_raise(test_path):
                             "2827845371": {
                                 "outputs": {},
                                 "errors": {
-                                    "name": "StageError",
+                                    "name": "StageNestedError",
                                     "message": "Trigger workflow was failed with:\nJob execution, 'first-job', was failed.",
                                 },
                                 "status": FAILED,
@@ -159,7 +160,7 @@ def test_example_foreach_stage_exec_with_trigger_raise(test_path):
                             "2827845371": {
                                 "outputs": {},
                                 "errors": {
-                                    "name": "StageCancelError",
+                                    "name": "StageNestedCancelError",
                                     "message": "Trigger workflow was cancel.",
                                 },
                                 "status": CANCEL,
@@ -182,7 +183,11 @@ def test_example_foreach_stage_exec_with_trigger_raise(test_path):
                     },
                 },
             }
+            assert_status.append(True)
         except AssertionError:
+            assert_status.append(False)
+
+        try:
             assert rs.context == {
                 "status": FAILED,
                 "items": [1, 2],
@@ -194,7 +199,7 @@ def test_example_foreach_stage_exec_with_trigger_raise(test_path):
                             "2827845371": {
                                 "outputs": {},
                                 "errors": {
-                                    "name": "StageError",
+                                    "name": "StageNestedError",
                                     "message": "Trigger workflow was failed with:\nJob execution, 'first-job', was failed.",
                                 },
                                 "status": FAILED,
@@ -226,6 +231,12 @@ def test_example_foreach_stage_exec_with_trigger_raise(test_path):
                     },
                 },
             }
+            assert_status.append(True)
+        except AssertionError:
+            assert_status.append(False)
+
+        assert len(assert_status) == 2
+        assert any(assert_status), f"{rs.context}"
 
 
 def test_example_foreach_stage_exec_nested_foreach_and_trigger(test_path):

@@ -84,7 +84,15 @@ from typing_extensions import Self
 
 from .__types import DictData, DictStr, StrOrInt, StrOrNone, TupleStr
 from .conf import dynamic, pass_env
-from .errors import StageCancelError, StageError, StageSkipError, to_dict
+from .errors import (
+    StageCancelError,
+    StageError,
+    StageNestedCancelError,
+    StageNestedError,
+    StageNestedSkipError,
+    StageSkipError,
+    to_dict,
+)
 from .result import (
     CANCEL,
     FAILED,
@@ -339,10 +347,14 @@ class BaseStage(BaseModel, ABC):
         #   this exception class at other location.
         except (
             StageSkipError,
-            StageCancelError,
+            StageNestedSkipError,
+            StageNestedError,
             StageError,
         ) as e:  # pragma: no cov
-            trace.info(f"[STAGE]: Handler:||{traceback.format_exc()}")
+            if isinstance(e, StageNestedError):
+                trace.info(f"[STAGE]: Handler: {e}")
+            else:
+                trace.info(f"[STAGE]: Handler:||{traceback.format_exc()}")
             st: Status = get_status_from_error(e)
             return Result(
                 run_id=run_id,
@@ -353,7 +365,7 @@ class BaseStage(BaseModel, ABC):
                     status=st,
                     updated=(
                         None
-                        if isinstance(e, StageSkipError)
+                        if isinstance(e, (StageSkipError, StageNestedSkipError))
                         else {"errors": e.to_dict()}
                     ),
                 ),
@@ -2020,15 +2032,15 @@ class TriggerStage(BaseNestedStage):
         )
         if result.status == FAILED:
             err_msg: str = (
-                f" with: {name}"
-                if (name := result.context.get("errors", {}).get("name"))
+                f" with:\n{msg}"
+                if (msg := result.context.get("errors", {}).get("message"))
                 else "."
             )
-            raise StageError(f"Trigger workflow was failed{err_msg}")
+            raise StageNestedError(f"Trigger workflow was failed{err_msg}")
         elif result.status == CANCEL:
-            raise StageCancelError("Trigger workflow was cancel.")
+            raise StageNestedCancelError("Trigger workflow was cancel.")
         elif result.status == SKIP:
-            raise StageSkipError("Trigger workflow was skipped.")
+            raise StageNestedSkipError("Trigger workflow was skipped.")
         return result
 
 

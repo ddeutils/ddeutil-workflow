@@ -34,6 +34,9 @@ from . import (
     JobSkipError,
     StageCancelError,
     StageError,
+    StageNestedCancelError,
+    StageNestedError,
+    StageNestedSkipError,
     StageSkipError,
     WorkflowCancelError,
     WorkflowError,
@@ -140,6 +143,9 @@ def get_status_from_error(
         StageError,
         StageCancelError,
         StageSkipError,
+        StageNestedCancelError,
+        StageNestedError,
+        StageNestedSkipError,
         JobError,
         JobCancelError,
         JobSkipError,
@@ -157,10 +163,16 @@ def get_status_from_error(
     Returns:
         Status: The status from the specific exception class.
     """
-    if isinstance(error, (StageSkipError, JobSkipError)):
+    if isinstance(error, (StageNestedSkipError, StageSkipError, JobSkipError)):
         return SKIP
     elif isinstance(
-        error, (StageCancelError, JobCancelError, WorkflowCancelError)
+        error,
+        (
+            StageNestedCancelError,
+            StageCancelError,
+            JobCancelError,
+            WorkflowCancelError,
+        ),
     ):
         return CANCEL
     return FAILED
