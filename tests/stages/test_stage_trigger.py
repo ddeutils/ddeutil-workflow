@@ -104,7 +104,7 @@ def test_trigger_stage_exec_raise(test_path):
     assert rs.context == {
         "status": FAILED,
         "errors": {
-            "name": "StageError",
+            "name": "StageNestedError",
             "message": (
                 "Trigger workflow was failed with:\n"
                 "Job execution, 'first-job', was failed."
@@ -127,7 +127,7 @@ def test_trigger_stage_exec_cancel():
     assert rs.context == {
         "status": CANCEL,
         "errors": {
-            "name": "StageCancelError",
+            "name": "StageNestedCancelError",
             "message": "Trigger workflow was cancel.",
         },
     }
