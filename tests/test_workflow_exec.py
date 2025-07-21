@@ -3,7 +3,6 @@ from datetime import datetime
 from textwrap import dedent
 from unittest.mock import patch
 
-import pytest
 from ddeutil.core import getdot
 from ddeutil.workflow import (
     CANCEL,
@@ -1171,7 +1170,7 @@ def test_workflow_exec_raise_job_trigger(test_path):
         }
 
 
-@pytest.mark.skip
+# @pytest.mark.skip
 def test_workflow_exec_circle_trigger(test_path):
     with dump_yaml_context(
         test_path / "conf/demo/01_99_wf_test_wf_exec_circle.yml",
@@ -1198,7 +1197,7 @@ def test_workflow_exec_circle_trigger(test_path):
                             "outputs": {},
                             "errors": {
                                 "name": "StageError",
-                                "message": "Trigger workflow was failed with:\nJob execution, 'first-job', was failed.",
+                                "message": "Circle execute via trigger itself workflow name.",
                             },
                             "status": FAILED,
                         }
@@ -1243,7 +1242,7 @@ def test_workflow_exec_circle_trigger(test_path):
                             "outputs": {},
                             "errors": {
                                 "name": "StageError",
-                                "message": "Trigger workflow was failed with:\nJob execution, 'first-job', was failed.",
+                                "message": "Circle execute via trigger itself workflow name.",
                             },
                             "status": FAILED,
                         }
@@ -1299,7 +1298,7 @@ def test_workflow_exec_circle_trigger(test_path):
                         "1099837090": {
                             "outputs": {},
                             "errors": {
-                                "name": "StageError",
+                                "name": "StageNestedError",
                                 "message": "Trigger workflow was failed with:\nJob execution, 'first-job', was failed.",
                             },
                             "status": FAILED,

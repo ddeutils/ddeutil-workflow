@@ -16,16 +16,25 @@ from re import (
     Match,
     Pattern,
 )
-from typing import Any, Optional, TypedDict, Union
+from typing import Any, Optional, TypedDict, Union, cast
 
 from typing_extensions import Self
 
 StrOrNone = Optional[str]
 StrOrInt = Union[str, int]
 TupleStr = tuple[str, ...]
+ListStr = list[str]
+ListInt = list[int]
 DictData = dict[str, Any]
+DictRange = dict[int, Any]
 DictStr = dict[str, str]
 Matrix = dict[str, Union[list[str], list[int]]]
+
+
+def cast_dict(value: TypedDict[...]) -> DictData:
+    """Cast any TypedDict object to DictData type."""
+    return cast(DictData, value)
+
 
 # Pre-compile regex patterns for better performance
 _RE_CALLER_PATTERN = r"""

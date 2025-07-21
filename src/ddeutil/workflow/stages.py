@@ -72,6 +72,7 @@ from typing import (
     Any,
     Callable,
     Optional,
+    TypedDict,
     TypeVar,
     Union,
     get_type_hints,
@@ -80,10 +81,10 @@ from typing import (
 from ddeutil.core import str2list
 from pydantic import BaseModel, Field, ValidationError
 from pydantic.functional_validators import field_validator, model_validator
-from typing_extensions import Self
+from typing_extensions import NotRequired, Self
 
 from .__about__ import __python_version__
-from .__types import DictData, DictStr, StrOrInt, StrOrNone, TupleStr
+from .__types import DictData, DictStr, StrOrInt, StrOrNone, TupleStr, cast_dict
 from .conf import dynamic, pass_env
 from .errors import (
     StageCancelError,
@@ -244,10 +245,10 @@ class BaseStage(BaseModel, ABC):
         This is important method that make this class is able to be the stage.
 
         Args:
-            params: A parameter data that want to use in this
+            params (DictData): A parameter data that want to use in this
                 execution.
-            run_id: A running stage ID.
-            context: A context data.
+            run_id (str): A running stage ID.
+            context (DictData): A context data.
             parent_run_id: A parent running ID. (Default is None)
             event: An event manager that use to track parent process
                 was not force stopped.
@@ -2026,18 +2027,9 @@ class TriggerStage(BaseNestedStage):
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         _trigger: str = param2template(self.trigger, params, extras=self.extras)
-        # if _trigger in self.extras.get("stop_circle_workflow_name", []):
-        #     raise StageError(
-        #         "[NESTED]: Circle execution via trigger itself workflow name."
-        #     )
+        if _trigger == self.extras.get("__sys_break_circle_exec", "NOTSET"):
+            raise StageError("Circle execute via trigger itself workflow name.")
         trace.info(f"[NESTED]: Load Workflow Config: {_trigger!r}")
-
-        # # NOTE: add noted key for cancel circle execution.
-        # if "stop_circle_workflow_name" in self.extras:
-        #     self.extras["stop_circle_workflow_name"].append(_trigger)
-        # else:
-        #     self.extras.update({"stop_circle_workflow_name": [_trigger]})
-
         result: Result = Workflow.from_conf(
             name=pass_env(_trigger),
             extras=self.extras,
@@ -2047,6 +2039,8 @@ class TriggerStage(BaseNestedStage):
             run_id=parent_run_id,
             event=event,
         )
+        # TODO: The context from workflow execution does not save when its status
+        #   does not equal SUCCESS.
         if result.status == FAILED:
             err_msg: str = (
                 f" with:\n{msg}"
@@ -2059,6 +2053,11 @@ class TriggerStage(BaseNestedStage):
         elif result.status == SKIP:
             raise StageNestedSkipError("Trigger workflow was skipped.")
         return result
+
+
+class ParallelContext(TypedDict):
+    branch: str
+    stages: NotRequired[dict[str, Any]]
 
 
 class ParallelStage(BaseNestedStage):
@@ -2149,7 +2148,7 @@ class ParallelStage(BaseNestedStage):
         # NOTE: Create nested-context
         current_context: DictData = copy.deepcopy(params)
         current_context.update({"branch": branch})
-        nestet_context: DictData = {"branch": branch, "stages": {}}
+        nestet_context: ParallelContext = {"branch": branch, "stages": {}}
 
         total_stage: int = len(self.parallel[branch])
         skips: list[bool] = [False] * total_stage
@@ -2184,9 +2183,9 @@ class ParallelStage(BaseNestedStage):
                 run_id=parent_run_id,
                 event=event,
             )
-            stage.set_outputs(rs.context, to=nestet_context)
+            stage.set_outputs(rs.context, to=cast_dict(nestet_context))
             stage.set_outputs(
-                stage.get_outputs(nestet_context), to=current_context
+                stage.get_outputs(cast_dict(nestet_context)), to=current_context
             )
 
             if rs.status == SKIP:
