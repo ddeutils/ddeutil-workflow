@@ -47,6 +47,7 @@ def test_workflow():
 
     set_job_id = job.model_copy()
     set_job_id.id = "demo-run"
+    set_job_id.extras.update({"__sys_break_circle_exec": "manual-workflow"})
     assert workflow.job("demo-run") == set_job_id
 
     # NOTE: Raise ValueError when get a job with ID that does not exist.
@@ -100,14 +101,21 @@ def test_workflow_bypass_extras():
     assert workflow.jobs["first-job"].extras == {}
 
     # NOTE: Bypass extras to job model.
-    assert workflow.job("first-job").extras == {"registries": ["foo", "bar"]}
-    assert workflow.job("second-job").extras == {"registries": ["foo", "bar"]}
+    assert workflow.job("first-job").extras == {
+        "registries": ["foo", "bar"],
+        "__sys_break_circle_exec": "manual-workflow",
+    }
+    assert workflow.job("second-job").extras == {
+        "registries": ["foo", "bar"],
+        "__sys_break_circle_exec": "manual-workflow",
+    }
 
     assert workflow.job("first-job").stages[0].extras == {}
 
     # NOTE: Bypass extras to stage model.
     assert workflow.job("first-job").stage("echo").extras == {
-        "registries": ["foo", "bar"]
+        "registries": ["foo", "bar"],
+        "__sys_break_circle_exec": "manual-workflow",
     }
 
 
@@ -229,7 +237,10 @@ def test_workflow_from_conf_override(test_path):
             name="tmp-wf-override-conf-trigger", extras={"conf_path": conf_path}
         )
         stage = workflow.job(name="trigger-job").stage("trigger-stage")
-        assert stage.extras == {"conf_path": conf_path}
+        assert stage.extras == {
+            "conf_path": conf_path,
+            "__sys_break_circle_exec": "tmp-wf-override-conf-trigger",
+        }
 
         rs: Result = workflow.execute(params={"name": "bar"})
         assert rs.status == SUCCESS

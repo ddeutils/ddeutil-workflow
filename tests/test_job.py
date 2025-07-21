@@ -1,5 +1,5 @@
 import pytest
-from ddeutil.workflow.errors import JobError
+from ddeutil.workflow import EmptyStage, JobError
 from ddeutil.workflow.job import (
     Job,
     OnDocker,
@@ -47,6 +47,12 @@ def test_job():
     # NOTE: pass string allow only local
     with pytest.raises(ValidationError):
         Job.model_validate({"runs-on": "docker"})
+
+    job = Job(
+        stages=[EmptyStage(name="Echo Some", echo="Hello World", id="echo")]
+    )
+    stage = job.stage("echo")
+    assert stage.extras == {}
 
 
 def test_job_check_needs():

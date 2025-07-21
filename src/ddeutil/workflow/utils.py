@@ -394,3 +394,8 @@ def obj_name(obj: Optional[Union[str, object]] = None) -> Optional[str]:
     else:
         obj_type: str = obj.__class__.__name__
     return obj_type
+
+
+def remove_sys_extras(extras: DictData) -> DictData:
+    """Remove key that starts with `__sys_` from the extra dict parameter."""
+    return {k: extras[k] for k in extras if not k.startswith("__sys_")}

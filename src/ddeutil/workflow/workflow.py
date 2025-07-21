@@ -37,6 +37,7 @@ from threading import Event as ThreadEvent
 from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
+from pydantic.functional_serializers import field_serializer
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
@@ -64,6 +65,7 @@ from .traces import Trace, get_trace
 from .utils import (
     gen_id,
     get_dt_now,
+    remove_sys_extras,
 )
 
 
@@ -241,7 +243,14 @@ class Workflow(BaseModel):
                 f"{self.name!r}."
             )
 
+        # NOTE: Force update internal extras for handler circle execution.
+        self.extras.update({"__sys_break_circle_exec": self.name})
+
         return self
+
+    @field_serializer("extras")
+    def __serialize_extras(self, extras: DictData) -> DictData:
+        return remove_sys_extras(extras)
 
     def detail(self) -> DictData:  # pragma: no cov
         """Return the detail of this workflow for generate markdown."""
@@ -255,7 +264,8 @@ class Workflow(BaseModel):
         """
 
         def align_newline(value: str) -> str:
-            return value.rstrip("\n").replace("\n", "\n                ")
+            space: str = " " * 16
+            return value.rstrip("\n").replace("\n", f"\n{space}")
 
         info: str = (
             f"| Author: {author or 'nobody'} "
@@ -282,8 +292,7 @@ class Workflow(BaseModel):
                 {align_newline(self.desc)}\n
                 ## Parameters\n
                 | name | type | default | description |
-                | --- | --- | --- | : --- : |
-
+                | --- | --- | --- | : --- : |\n\n
                 ## Jobs\n
                 {align_newline(jobs)}
                 """.lstrip(
@@ -312,8 +321,7 @@ class Workflow(BaseModel):
                 f"{self.name!r}"
             )
         job: Job = self.jobs[name]
-        if self.extras:
-            job.extras = self.extras
+        job.extras = self.extras
         return job
 
     def parameterize(self, params: DictData) -> DictData:
@@ -332,8 +340,8 @@ class Workflow(BaseModel):
                 execute method.
 
         Returns:
-            DictData: The parameter value that validate with its parameter fields and
-                adding jobs key to this parameter.
+            DictData: The parameter value that validate with its parameter fields
+                and adding jobs key to this parameter.
 
         Raises:
             WorkflowError: If parameter value that want to validate does
@@ -507,7 +515,7 @@ class Workflow(BaseModel):
                     **(context["errors"] if "errors" in context else {}),
                 },
             ),
-            extras=self.extras,
+            extras=remove_sys_extras(self.extras),
         )
 
     def execute_job(
