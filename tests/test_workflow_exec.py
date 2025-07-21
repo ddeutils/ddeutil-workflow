@@ -1170,7 +1170,6 @@ def test_workflow_exec_raise_job_trigger(test_path):
         }
 
 
-# @pytest.mark.skip
 def test_workflow_exec_circle_trigger(test_path):
     with dump_yaml_context(
         test_path / "conf/demo/01_99_wf_test_wf_exec_circle.yml",

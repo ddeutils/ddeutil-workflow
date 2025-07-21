@@ -1,4 +1,4 @@
-name: "data-pipeline-etl"
+name: "etl-s3"
 type: "Workflow"
 desc: |
   End-to-end ETL pipeline for customer data processing with data quality checks
@@ -31,14 +31,12 @@ jobs:
   data-extraction:
     id: "data-extraction"
     desc: "Extract raw data from multiple sources"
-
     runs-on:
       type: "aws_batch"
       with:
         job_queue_arn: "${AWS_BATCH_JOB_QUEUE_ARN}"
         s3_bucket: "${S3_BUCKET}"
         region_name: "us-east-1"
-
     stages:
       - name: "Extract customer data"
         bash: |
@@ -56,11 +54,14 @@ jobs:
           transaction_files = glob.glob("/tmp/transactions/*.csv")
 
           if not customer_files:
-              raise Exception("No customer data files found")
+              raise FileNotFoundError("No customer data files found")
           if not transaction_files:
-              raise Exception("No transaction data files found")
+              raise FileNotFoundError("No transaction data files found")
 
-          print(f"Found {len(customer_files)} customer files and {len(transaction_files)} transaction files")
+          print(
+              f"Found {len(customer_files)} customer files and "
+              f"{len(transaction_files)} transaction files"
+          )
 
       - name: "Generate extraction report"
         echo: "Data extraction completed successfully for ${{ params.processing_date }}"
