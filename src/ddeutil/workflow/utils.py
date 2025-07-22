@@ -8,26 +8,6 @@
 This module provides essential utility functions used throughout the workflow
 system for ID generation, datetime handling, string processing, template
 operations, and other common tasks.
-
-Functions:
-    to_train: Convert camel case strings to train case format
-    prepare_newline: Format messages with multiple newlines
-    replace_sec: Replace seconds and microseconds in datetime objects
-    clear_tz: Clear timezone info from datetime objects
-    get_dt_now: Get current datetime with timezone
-    get_d_now: Get current date
-    get_diff_sec: Calculate time difference in seconds
-    reach_next_minute: Check if datetime reaches next minute
-    wait_until_next_minute: Wait until next minute
-    delay: Add random delay to execution
-    gen_id: Generate unique identifiers for workflow components
-    default_gen_id: Generate default running ID
-    make_exec: Make files executable
-    filter_func: Filter function objects from data structures
-    cross_product: Generate cross product of matrix values
-    cut_id: Cut running ID to specified length
-    dump_all: Serialize nested BaseModel objects to dictionaries
-    obj_name: Get object name or class name
 """
 from __future__ import annotations
 
@@ -327,6 +307,8 @@ def cut_id(run_id: str, *, num: int = 8) -> str:
     Example:
         >>> cut_id(run_id='20240101081330000000T1354680202')
         '202401010813680202'
+        >>> cut_id(run_id='20240101081330000000T1354680202')
+        '54680202'
 
     Args:
         run_id: A running ID to cut.

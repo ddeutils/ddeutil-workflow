@@ -239,7 +239,7 @@ class Metadata(BaseModel):  # pragma: no cov
         default=None, description="Environment (dev, staging, prod)."
     )
 
-    # System context
+    # NOTE: System context
     hostname: Optional[str] = Field(
         default=None, description="Hostname where workflow is running."
     )
@@ -253,7 +253,7 @@ class Metadata(BaseModel):  # pragma: no cov
         default=None, description="Workflow package version."
     )
 
-    # Custom metadata
+    # NOTE: Custom metadata
     tags: Optional[list[str]] = Field(
         default_factory=list, description="Custom tags for categorization."
     )
@@ -320,6 +320,8 @@ class Metadata(BaseModel):  # pragma: no cov
         import socket
         import sys
 
+        from .__about__ import __version__
+
         frame: Optional[FrameType] = currentframe()
         if frame is None:
             raise ValueError("Cannot get current frame")
@@ -384,7 +386,7 @@ class Metadata(BaseModel):  # pragma: no cov
             hostname=hostname,
             ip_address=ip_address,
             python_version=python_version,
-            package_version=extras_data.get("package_version"),
+            package_version=__version__,
             # NOTE: Custom metadata
             tags=extras_data.get("tags", []),
             metadata=extras_data.get("metadata", {}),
@@ -2046,7 +2048,7 @@ def get_trace(
     Args:
         run_id (str): A running ID.
         parent_run_id (str | None, default None): A parent running ID.
-        handlers:
+        handlers (list):
         extras: An extra parameter that want to override the core
             config values.
         auto_pre_process (bool, default False)
@@ -2057,7 +2059,7 @@ def get_trace(
     handlers: list[DictData] = dynamic(
         "trace_handlers", f=handlers, extras=extras
     )
-    trace = Trace.model_validate(
+    trace: Trace = Trace.model_validate(
         {
             "run_id": run_id,
             "parent_run_id": parent_run_id,
