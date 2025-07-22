@@ -233,6 +233,33 @@ def gen_id(
     ).hexdigest()
 
 
+def extract_id(
+    name: str,
+    run_id: Optional[str] = None,
+    extras: Optional[DictData] = None,
+) -> tuple[str, str]:
+    """Extract the parent ID and running ID. If the `run_id` parameter was
+    passed, it will replace the parent_run_id with this value and re-generate
+    new running ID for it instead.
+
+    Args:
+        name (str): A name for generate hashing value for the `gen_id` function.
+        run_id (str | None, default None):
+        extras:
+
+    Returns:
+        tuple[str, str]: A pair of parent running ID and running ID.
+    """
+    generated = gen_id(name, unique=True, extras=extras)
+    if run_id:
+        parent_run_id: str = run_id
+        run_id: str = generated
+    else:
+        run_id: str = generated
+        parent_run_id: str = run_id
+    return parent_run_id, run_id
+
+
 def default_gen_id() -> str:
     """Return running ID for making default ID for the Result model.
 

@@ -118,6 +118,7 @@ from .traces import Trace, get_trace
 from .utils import (
     delay,
     dump_all,
+    extract_id,
     filter_func,
     gen_id,
     make_exec,
@@ -301,8 +302,9 @@ class BaseStage(BaseModel, ABC):
             Result: The execution result with updated status and context.
         """
         ts: float = time.monotonic()
-        parent_run_id: str = run_id
-        run_id: str = gen_id(self.iden, unique=True, extras=self.extras)
+        parent_run_id, run_id = extract_id(
+            self.iden, run_id=run_id, extras=self.extras
+        )
         context: DictData = {"status": WAIT}
         trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras

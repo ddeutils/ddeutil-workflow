@@ -63,6 +63,7 @@ from .result import (
 from .reusables import has_template, param2template
 from .traces import Trace, get_trace
 from .utils import (
+    extract_id,
     gen_id,
     get_dt_now,
     remove_sys_extras,
@@ -420,13 +421,9 @@ class Workflow(BaseModel):
         audit: Audit = audit or get_audit(extras=self.extras)
 
         # NOTE: Generate the parent running ID with not None value.
-        if run_id:
-            parent_run_id: str = run_id
-            run_id: str = gen_id(name, unique=True)
-        else:
-            run_id: str = gen_id(name, unique=True)
-            parent_run_id: str = run_id
-
+        parent_run_id, run_id = extract_id(
+            name, run_id=run_id, extras=self.extras
+        )
         context: DictData = {"status": WAIT}
         audit_data: DictData = {
             "name": name,
@@ -663,8 +660,9 @@ class Workflow(BaseModel):
         :rtype: Result
         """
         ts: float = time.monotonic()
-        parent_run_id: Optional[str] = run_id
-        run_id: str = gen_id(self.name, unique=True, extras=self.extras)
+        parent_run_id, run_id = extract_id(
+            self.name, run_id=run_id, extras=self.extras
+        )
         trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
