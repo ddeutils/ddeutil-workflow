@@ -71,6 +71,7 @@ from typing import (
     Annotated,
     Any,
     Callable,
+    ClassVar,
     Optional,
     TypedDict,
     TypeVar,
@@ -164,6 +165,7 @@ class BaseStage(BaseModel, ABC):
         ```
     """
 
+    action_stage: ClassVar[bool] = False
     extras: DictData = Field(
         default_factory=dict,
         description="An extra parameter that override core config values.",
@@ -571,12 +573,48 @@ class BaseStage(BaseModel, ABC):
         """
         return False
 
-    def docs(self) -> str:  # pragma: no cov
+    def detail(self) -> DictData:
+        """Return the detail of this stage for generate markdown."""
+        return self.model_dump(by_alias=True)
+
+    def md(self) -> str:  # pragma: no cov
         """Return generated document that will be the interface of this stage.
 
         :rtype: str
         """
         return self.desc
+
+    def dryrun(
+        self,
+        params: DictData,
+        run_id: str,
+        context: DictData,
+        *,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
+    ) -> Optional[Result]:  # pragma: no cov
+        """Pre-process method that will use to run with dry-run mode, and it
+        should be used before process method.
+        """
+
+    def to_empty(self, sleep: int = 0.35) -> EmptyStage:  # pragma: no cov
+        """Convert the current Stage model to the EmptyStage model for dry-run
+        mode if the `action_stage` class attribute has set.
+
+        Returns:
+            EmptyStage: An EmptyStage model that passing itself model data to
+                message.
+        """
+        return EmptyStage.model_validate(
+            {
+                "name": self.name,
+                "id": self.id,
+                "desc": self.desc,
+                "if": self.condition,
+                "echo": f"Convert from {self.__class__.__name__}",
+                "sleep": sleep,
+            }
+        )
 
 
 class BaseAsyncStage(BaseStage, ABC):
@@ -3585,6 +3623,19 @@ class VirtualPyStage(PyStage):  # pragma: no cov
             extras=self.extras,
         )
 
+    async def async_process(
+        self,
+        params: DictData,
+        run_id: str,
+        context: DictData,
+        *,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
+    ) -> Result:
+        raise NotImplementedError(
+            "Async process of Virtual Python stage does not implement yet."
+        )
+
 
 # NOTE:
 #   An order of parsing stage model on the Job model with `stages` field.
@@ -3593,7 +3644,6 @@ class VirtualPyStage(PyStage):  # pragma: no cov
 #
 Stage = Annotated[
     Union[
-        DockerStage,
         BashStage,
         CallStage,
         TriggerStage,
@@ -3604,6 +3654,7 @@ Stage = Annotated[
         VirtualPyStage,
         PyStage,
         RaiseStage,
+        DockerStage,
         EmptyStage,
     ],
     Field(
