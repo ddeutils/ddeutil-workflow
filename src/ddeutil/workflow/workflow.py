@@ -402,11 +402,12 @@ class Workflow(BaseModel):
 
         Args:
             release (datetime): A release datetime.
-            params: A workflow parameter that pass to execute method.
-            release_type:
+            params (DictData): A workflow parameter that pass to execute method.
+            release_type (ReleaseType): A release type that want to execute.
             run_id: (str) A workflow running ID.
             runs_metadata: (DictData)
-            audit: An audit class that want to save the execution result.
+            audit (Audit): An audit model that use to manage release log of this
+                execution.
             override_log_name: (str) An override logging name that use
                 instead the workflow name.
             timeout: (int) A workflow execution time out in second unit.
@@ -889,6 +890,10 @@ class Workflow(BaseModel):
         max_job_parallel: int = 2,
     ) -> Result:  # pragma: no cov
         """Re-Execute workflow with passing the error context data.
+
+        Warnings:
+            This rerun method allow to rerun job execution level only. That mean
+        it does not support rerun only stage.
 
         Args:
             context: A context result that get the failed status.
