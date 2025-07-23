@@ -313,3 +313,27 @@ class Context(TypedDict):
     context: NotRequired[DictData]
     errors: NotRequired[Union[list[ErrorData], ErrorData]]
     info: NotRequired[DictData]
+
+
+class Layer(str, Enum):
+    WORKFLOW = "workflow"
+    JOB = "job"
+    STRATEGY = "strategy"
+    STAGE = "stage"
+
+
+def get_context_by_layer(
+    context: DictData, key: str, layer: Layer, context_key: str
+):
+    if layer == Layer.WORKFLOW:
+        return context.get("jobs", {}).get(key, {}).get(context_key, WAIT)
+    elif layer == Layer.JOB:
+        return context.get("stages", {}).get(key, {}).get(context_key, WAIT)
+    elif layer == Layer.STRATEGY:
+        return context.get("strategies", {}).get(key, {}).get(context_key, WAIT)
+    return context.get(key, {}).get(context_key, WAIT)
+
+
+def get_status(context: DictData, key: str, layer: Layer):
+    """Get status from context by a specific key and context layer."""
+    return get_context_by_layer(context, key, layer, context_key="status")
