@@ -358,15 +358,12 @@ class BaseStage(BaseModel, ABC):
             StageError,
         ) as e:  # pragma: no cov
             if isinstance(e, StageNestedError):
-                trace.info(f"[STAGE]: Handler: {e}")
+                trace.info(f"[STAGE]: Nested: {e}")
+            elif isinstance(e, (StageSkipError, StageNestedSkipError)):
+                trace.info(f"[STAGE]: ⏭️ Skip: {e}")
             else:
-                emoji: str = (
-                    "⏭️"
-                    if isinstance(e, (StageSkipError, StageNestedSkipError))
-                    else "🚨"
-                )
                 trace.info(
-                    f"[STAGE]: Handler:||{emoji} {traceback.format_exc()}"
+                    f"[STAGE]: Stage Failed:||🚨 {traceback.format_exc()}||"
                 )
             st: Status = get_status_from_error(e)
             return Result(
@@ -386,7 +383,9 @@ class BaseStage(BaseModel, ABC):
                 extras=self.extras,
             )
         except Exception as e:
-            trace.error(f"[STAGE]: Error Handler:||🚨 {traceback.format_exc()}")
+            trace.error(
+                f"[STAGE]: Error Failed:||🚨 {traceback.format_exc()}||"
+            )
             return Result(
                 run_id=run_id,
                 parent_run_id=parent_run_id,
@@ -574,7 +573,11 @@ class BaseStage(BaseModel, ABC):
         return False
 
     def detail(self) -> DictData:
-        """Return the detail of this stage for generate markdown."""
+        """Return the detail of this stage for generate markdown.
+
+        Returns:
+            DictData: A dict that was dumped from this model with alias mode.
+        """
         return self.model_dump(by_alias=True)
 
     def md(self) -> str:  # pragma: no cov
@@ -727,15 +730,12 @@ class BaseAsyncStage(BaseStage, ABC):
             StageError,
         ) as e:  # pragma: no cov
             if isinstance(e, StageNestedError):
-                await trace.ainfo(f"[STAGE]: Handler: {e}")
+                await trace.ainfo(f"[STAGE]: Nested: {e}")
+            elif isinstance(e, (StageSkipError, StageNestedSkipError)):
+                await trace.ainfo(f"[STAGE]: ⏭️ Skip: {e}")
             else:
-                emoji: str = (
-                    "⏭️"
-                    if isinstance(e, (StageSkipError, StageNestedSkipError))
-                    else "🚨"
-                )
                 await trace.ainfo(
-                    f"[STAGE]:Handler:||{emoji} {traceback.format_exc()}"
+                    f"[STAGE]: Stage Failed:||🚨 {traceback.format_exc()}||"
                 )
             st: Status = get_status_from_error(e)
             return Result(
@@ -747,8 +747,8 @@ class BaseAsyncStage(BaseStage, ABC):
                     status=st,
                     updated=(
                         None
-                        if isinstance(e, StageSkipError)
-                        else {"status": st, "errors": e.to_dict()}
+                        if isinstance(e, (StageSkipError, StageNestedSkipError))
+                        else {"errors": e.to_dict()}
                     ),
                 ),
                 info={"execution_time": time.monotonic() - ts},
@@ -756,7 +756,7 @@ class BaseAsyncStage(BaseStage, ABC):
             )
         except Exception as e:
             await trace.aerror(
-                f"[STAGE]: Error Handler:||🚨 {traceback.format_exc()}"
+                f"[STAGE]: Error Failed:||🚨 {traceback.format_exc()}||"
             )
             return Result(
                 run_id=run_id,
@@ -868,6 +868,14 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
                     parent_run_id=parent_run_id,
                     event=event,
                 )
+            except (
+                StageSkipError,
+                StageNestedSkipError,
+                StageCancelError,
+                StageNestedCancelError,
+            ):
+                trace.debug("[STAGE]: process raise skip or cancel error.")
+                raise
             except Exception as e:
                 current_retry += 1
                 trace.warning(
@@ -942,6 +950,16 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
                     parent_run_id=parent_run_id,
                     event=event,
                 )
+            except (
+                StageSkipError,
+                StageNestedSkipError,
+                StageCancelError,
+                StageNestedCancelError,
+            ):
+                await trace.adebug(
+                    "[STAGE]: process raise skip or cancel error."
+                )
+                raise
             except Exception as e:
                 current_retry += 1
                 await trace.awarning(
@@ -1973,8 +1991,9 @@ class BaseNestedStage(BaseRetryStage, ABC):
         """Make the errors context result with the refs value depends on the nested
         execute func.
 
-        :param context: (DictData) A context data.
-        :param error: (StageError) A stage exception object.
+        Args:
+            context: (DictData) A context data.
+            error: (StageError) A stage exception object.
         """
         if "errors" in context:
             context["errors"][error.refs] = error.to_dict()
@@ -2137,10 +2156,8 @@ class ParallelStage(BaseNestedStage):
     parallel: dict[str, list[Stage]] = Field(
         description="A mapping of branch name and its stages.",
     )
-    max_workers: int = Field(
+    max_workers: Union[int, str] = Field(
         default=2,
-        ge=1,
-        lt=20,
         description=(
             "The maximum multi-thread pool worker size for execution parallel. "
             "This value should be gather or equal than 1, and less than 20."
@@ -2148,14 +2165,20 @@ class ParallelStage(BaseNestedStage):
         alias="max-workers",
     )
 
-    def _process_branch(
+    @field_validator("max_workers")
+    def __validate_max_workers(cls, value: Union[int, str]) -> Union[int, str]:
+        """Validate `max_workers` field that should has value between 1 and 19."""
+        if isinstance(value, int) and (value < 1 or value >= 20):
+            raise ValueError("A max-workers value should between 1 and 19.")
+        return value
+
+    def _process_nested(
         self,
         branch: str,
         params: DictData,
-        run_id: str,
+        trace: Trace,
         context: DictData,
         *,
-        parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> tuple[Status, DictData]:
         """Execute branch that will execute all nested-stage that was set in
@@ -2164,15 +2187,14 @@ class ParallelStage(BaseNestedStage):
         Args:
             branch (str): A branch ID.
             params (DictData): A parameter data.
-            run_id (str): A running ID.
+            trace (Trace): A Trace model.
             context (DictData):
-            parent_run_id (str | None, default None): A parent running ID.
             event: (Event) An Event manager instance that use to cancel this
                 execution if it forces stopped by parent execution.
                 (Default is None)
 
         Raises:
-            StageCancelError: If event was set.
+            StageCancelError: If event was set before start stage execution.
             StageCancelError: If result from a nested-stage return canceled
                 status.
             StageError: If result from a nested-stage return failed status.
@@ -2180,12 +2202,7 @@ class ParallelStage(BaseNestedStage):
         Returns:
             tuple[Status, DictData]: A pair of status and result context data.
         """
-        trace: Trace = get_trace(
-            run_id, parent_run_id=parent_run_id, extras=self.extras
-        )
-        trace.debug(f"[NESTED]: Execute Branch: {branch!r}")
-
-        # NOTE: Create nested-context
+        trace.info(f"[NESTED]: Execute Branch: {branch!r}")
         current_context: DictData = copy.deepcopy(params)
         current_context.update({"branch": branch})
         nestet_context: ParallelContext = {"branch": branch, "stages": {}}
@@ -2199,8 +2216,7 @@ class ParallelStage(BaseNestedStage):
 
             if event and event.is_set():
                 error_msg: str = (
-                    "Branch execution was canceled from the event before "
-                    "start branch execution."
+                    f"Cancel branch: {branch!r} before start nested process."
                 )
                 catch(
                     context=context,
@@ -2220,7 +2236,7 @@ class ParallelStage(BaseNestedStage):
 
             rs: Result = stage.execute(
                 params=current_context,
-                run_id=parent_run_id,
+                run_id=trace.parent_run_id,
                 event=event,
             )
             stage.set_outputs(rs.context, to=cast_dict(nestet_context))
@@ -2234,7 +2250,7 @@ class ParallelStage(BaseNestedStage):
 
             elif rs.status == FAILED:  # pragma: no cov
                 error_msg: str = (
-                    f"Branch execution was break because its nested-stage, "
+                    f"Break branch: {branch!r} because nested stage: "
                     f"{stage.iden!r}, failed."
                 )
                 catch(
@@ -2255,8 +2271,7 @@ class ParallelStage(BaseNestedStage):
 
             elif rs.status == CANCEL:
                 error_msg: str = (
-                    "Branch execution was canceled from the event after "
-                    "end branch execution."
+                    f"Cancel branch: {branch!r} after end nested process."
                 )
                 catch(
                     context=context,
@@ -2296,7 +2311,9 @@ class ParallelStage(BaseNestedStage):
         parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> Result:
-        """Execute parallel each branch via multi-threading pool.
+        """Execute parallel each branch via multi-threading pool. The parallel
+        process will use all-completed strategy to handle result from each
+        branch.
 
         Args:
             params: A parameter data that want to use in this
@@ -2307,6 +2324,9 @@ class ParallelStage(BaseNestedStage):
             event: An event manager that use to track parent process
                 was not force stopped.
 
+        Raises:
+            StageCancelError: If event was set before start parallel process.
+
         Returns:
             Result: The execution result with status and context data.
         """
@@ -2314,27 +2334,36 @@ class ParallelStage(BaseNestedStage):
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         event: Event = event or Event()
-        trace.info(f"[NESTED]: Parallel with {self.max_workers} workers.")
+
+        # NOTE: Start prepare max_workers field if it is string type.
+        if isinstance(self.max_workers, str):
+            max_workers: int = self.__validate_max_workers(
+                pass_env(
+                    param2template(
+                        self.max_workers, params=params, extras=self.extras
+                    )
+                )
+            )
+        else:
+            max_workers: int = self.max_workers
+        trace.info(f"[NESTED]: Parallel with {max_workers} workers.")
         catch(
             context=context,
             status=WAIT,
-            updated={"workers": self.max_workers, "parallel": {}},
+            updated={"workers": max_workers, "parallel": {}},
         )
         len_parallel: int = len(self.parallel)
         if event and event.is_set():
-            raise StageCancelError(
-                "Execution was canceled from the event before start parallel."
-            )
+            raise StageCancelError("Cancel before start parallel process.")
 
-        with ThreadPoolExecutor(self.max_workers, "stp") as executor:
+        with ThreadPoolExecutor(max_workers, "stp") as executor:
             futures: list[Future] = [
                 executor.submit(
-                    self._process_branch,
+                    self._process_nested,
                     branch=branch,
                     params=params,
-                    run_id=run_id,
+                    trace=trace,
                     context=context,
-                    parent_run_id=parent_run_id,
                     event=event,
                 )
                 for branch in self.parallel
@@ -2349,12 +2378,9 @@ class ParallelStage(BaseNestedStage):
                     self.mark_errors(errors, e)
 
         st: Status = validate_statuses(statuses)
-        return Result(
-            run_id=run_id,
-            parent_run_id=parent_run_id,
+        return Result.from_trace(trace).catch(
             status=st,
             context=catch(context, status=st, updated=errors),
-            extras=self.extras,
         )
 
 

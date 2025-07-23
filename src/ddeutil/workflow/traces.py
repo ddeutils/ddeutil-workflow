@@ -51,6 +51,8 @@ from .utils import cut_id, get_dt_now, prepare_newline
 
 logger = logging.getLogger("ddeutil.workflow")
 Level = Literal["debug", "info", "warning", "error", "exception"]
+EMJ_ALERT: str = "🚨"
+EMJ_SKIP: str = "⏭️"
 
 
 @lru_cache
