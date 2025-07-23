@@ -6,6 +6,8 @@
 from __future__ import annotations
 
 import logging
+import os
+import shutil
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import datetime
@@ -16,6 +18,7 @@ from typing import Any, Optional, Union
 from zoneinfo import ZoneInfo
 
 import yaml
+from ddeutil.core import str2bool
 from dotenv import load_dotenv
 
 OUTSIDE_PATH: Path = Path(__file__).parent.parent
@@ -42,6 +45,7 @@ def dotenv_setting() -> None:  # pragma: no cov
             WORKFLOW_LOG_AUDIT_CONF='{{"type": "file", "path": "./audits"}}'
             WORKFLOW_LOG_AUDIT_ENABLE_WRITE=true
             WORKFLOW_LOG_TRACE_HANDLERS='[{{"type": "console"}}]'
+            WORKFLOW_TEST_CLEAN_UP=true
             """
         ).strip()
         env_path.write_text(env_str)
@@ -149,3 +153,8 @@ def exclude_keys(value: Any, keys: list[str]) -> Any:  # pragma: no cov
 
 def exclude_created_and_updated(value: Any) -> Any:  # pragma: no cov
     return exclude_keys(value, keys=["created_at", "updated_at"])
+
+
+def clean_up(path: Union[str, Path]) -> None:  # pragma: no cov
+    if str2bool(os.getenv("WORKFLOW_TEST_CLEAN_UP", "true")):
+        shutil.rmtree(path)
