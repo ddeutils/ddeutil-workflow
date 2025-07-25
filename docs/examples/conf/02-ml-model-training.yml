@@ -1,7 +1,12 @@
 name: "ml-model-training"
 type: "Workflow"
-description: "Machine learning model training pipeline with hyperparameter optimization and model evaluation"
-
+description: |
+  Machine learning model training pipeline with hyperparameter optimization
+  and model evaluation
+on:
+  schedule:
+    - cronjob: "0 0 * * 0"  # Weekly on Sunday at midnight
+      timezone: "UTC"
 params:
   dataset_path:
     type: str
@@ -10,7 +15,10 @@ params:
 
   model_type:
     type: choice
-    options: ["random_forest", "xgboost", "neural_network"]
+    options:
+      - "random_forest"
+      - "xgboost"
+      - "neural_network"
     desc: "Type of model to train"
 
   experiment_name:
@@ -370,8 +378,3 @@ jobs:
           channel: "#ml-deployments"
           message: "Model ${{ params.experiment_name }} v1 deployed successfully"
           color: "good"
-
-on:
-  schedule:
-    - cronjob: "0 0 * * 0"  # Weekly on Sunday at midnight
-      timezone: "UTC"

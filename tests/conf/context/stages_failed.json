@@ -1,0 +1,10 @@
+{
+  "outputs": {
+    "foo": "bar"
+  },
+  "status": "failed",
+  "errors": {
+    "name": "StageError",
+    "message": "This is the example if it has some error raise from stage."
+  }
+}

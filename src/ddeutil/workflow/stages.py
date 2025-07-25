@@ -71,7 +71,9 @@ from typing import (
     Annotated,
     Any,
     Callable,
+    ClassVar,
     Optional,
+    TypedDict,
     TypeVar,
     Union,
     get_type_hints,
@@ -80,10 +82,10 @@ from typing import (
 from ddeutil.core import str2list
 from pydantic import BaseModel, Field, ValidationError
 from pydantic.functional_validators import field_validator, model_validator
-from typing_extensions import Self
+from typing_extensions import NotRequired, Self
 
 from .__about__ import __python_version__
-from .__types import DictData, DictStr, StrOrInt, StrOrNone, TupleStr
+from .__types import DictData, DictStr, StrOrInt, StrOrNone, TupleStr, cast_dict
 from .conf import dynamic, pass_env
 from .errors import (
     StageCancelError,
@@ -117,6 +119,7 @@ from .traces import Trace, get_trace
 from .utils import (
     delay,
     dump_all,
+    extract_id,
     filter_func,
     gen_id,
     make_exec,
@@ -162,6 +165,7 @@ class BaseStage(BaseModel, ABC):
         ```
     """
 
+    action_stage: ClassVar[bool] = False
     extras: DictData = Field(
         default_factory=dict,
         description="An extra parameter that override core config values.",
@@ -230,6 +234,9 @@ class BaseStage(BaseModel, ABC):
             )
         return self
 
+    def pass_template(self, value: Any, params: DictData) -> Any:
+        return pass_env(param2template(value, params, extras=self.extras))
+
     @abstractmethod
     def process(
         self,
@@ -244,10 +251,10 @@ class BaseStage(BaseModel, ABC):
         This is important method that make this class is able to be the stage.
 
         Args:
-            params: A parameter data that want to use in this
+            params (DictData): A parameter data that want to use in this
                 execution.
-            run_id: A running stage ID.
-            context: A context data.
+            run_id (str): A running stage ID.
+            context (DictData): A context data.
             parent_run_id: A parent running ID. (Default is None)
             event: An event manager that use to track parent process
                 was not force stopped.
@@ -300,8 +307,9 @@ class BaseStage(BaseModel, ABC):
             Result: The execution result with updated status and context.
         """
         ts: float = time.monotonic()
-        parent_run_id: str = run_id
-        run_id: str = gen_id(self.iden, unique=True, extras=self.extras)
+        parent_run_id, run_id = extract_id(
+            self.iden, run_id=run_id, extras=self.extras
+        )
         context: DictData = {"status": WAIT}
         trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
@@ -353,15 +361,12 @@ class BaseStage(BaseModel, ABC):
             StageError,
         ) as e:  # pragma: no cov
             if isinstance(e, StageNestedError):
-                trace.info(f"[STAGE]: Handler: {e}")
+                trace.info(f"[STAGE]: Nested: {e}")
+            elif isinstance(e, (StageSkipError, StageNestedSkipError)):
+                trace.info(f"[STAGE]: ⏭️ Skip: {e}")
             else:
-                emoji: str = (
-                    "⏭️"
-                    if isinstance(e, (StageSkipError, StageNestedSkipError))
-                    else "🚨"
-                )
                 trace.info(
-                    f"[STAGE]: Handler:||{emoji} {traceback.format_exc()}"
+                    f"[STAGE]: Stage Failed:||🚨 {traceback.format_exc()}||"
                 )
             st: Status = get_status_from_error(e)
             return Result(
@@ -381,7 +386,9 @@ class BaseStage(BaseModel, ABC):
                 extras=self.extras,
             )
         except Exception as e:
-            trace.error(f"[STAGE]: Error Handler:||🚨 {traceback.format_exc()}")
+            trace.error(
+                f"[STAGE]: Error Failed:||🚨 {traceback.format_exc()}||"
+            )
             return Result(
                 run_id=run_id,
                 parent_run_id=parent_run_id,
@@ -568,12 +575,52 @@ class BaseStage(BaseModel, ABC):
         """
         return False
 
-    def docs(self) -> str:  # pragma: no cov
+    def detail(self) -> DictData:
+        """Return the detail of this stage for generate markdown.
+
+        Returns:
+            DictData: A dict that was dumped from this model with alias mode.
+        """
+        return self.model_dump(by_alias=True)
+
+    def md(self) -> str:  # pragma: no cov
         """Return generated document that will be the interface of this stage.
 
         :rtype: str
         """
         return self.desc
+
+    def dryrun(
+        self,
+        params: DictData,
+        run_id: str,
+        context: DictData,
+        *,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
+    ) -> Optional[Result]:  # pragma: no cov
+        """Pre-process method that will use to run with dry-run mode, and it
+        should be used before process method.
+        """
+
+    def to_empty(self, sleep: int = 0.35) -> EmptyStage:  # pragma: no cov
+        """Convert the current Stage model to the EmptyStage model for dry-run
+        mode if the `action_stage` class attribute has set.
+
+        Returns:
+            EmptyStage: An EmptyStage model that passing itself model data to
+                message.
+        """
+        return EmptyStage.model_validate(
+            {
+                "name": self.name,
+                "id": self.id,
+                "desc": self.desc,
+                "if": self.condition,
+                "echo": f"Convert from {self.__class__.__name__}",
+                "sleep": sleep,
+            }
+        )
 
 
 class BaseAsyncStage(BaseStage, ABC):
@@ -686,15 +733,12 @@ class BaseAsyncStage(BaseStage, ABC):
             StageError,
         ) as e:  # pragma: no cov
             if isinstance(e, StageNestedError):
-                await trace.ainfo(f"[STAGE]: Handler: {e}")
+                await trace.ainfo(f"[STAGE]: Nested: {e}")
+            elif isinstance(e, (StageSkipError, StageNestedSkipError)):
+                await trace.ainfo(f"[STAGE]: ⏭️ Skip: {e}")
             else:
-                emoji: str = (
-                    "⏭️"
-                    if isinstance(e, (StageSkipError, StageNestedSkipError))
-                    else "🚨"
-                )
                 await trace.ainfo(
-                    f"[STAGE]:Handler:||{emoji} {traceback.format_exc()}"
+                    f"[STAGE]: Stage Failed:||🚨 {traceback.format_exc()}||"
                 )
             st: Status = get_status_from_error(e)
             return Result(
@@ -706,8 +750,8 @@ class BaseAsyncStage(BaseStage, ABC):
                     status=st,
                     updated=(
                         None
-                        if isinstance(e, StageSkipError)
-                        else {"status": st, "errors": e.to_dict()}
+                        if isinstance(e, (StageSkipError, StageNestedSkipError))
+                        else {"errors": e.to_dict()}
                     ),
                 ),
                 info={"execution_time": time.monotonic() - ts},
@@ -715,7 +759,7 @@ class BaseAsyncStage(BaseStage, ABC):
             )
         except Exception as e:
             await trace.aerror(
-                f"[STAGE]: Error Handler:||🚨 {traceback.format_exc()}"
+                f"[STAGE]: Error Failed:||🚨 {traceback.format_exc()}||"
             )
             return Result(
                 run_id=run_id,
@@ -827,6 +871,14 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
                     parent_run_id=parent_run_id,
                     event=event,
                 )
+            except (
+                StageSkipError,
+                StageNestedSkipError,
+                StageCancelError,
+                StageNestedCancelError,
+            ):
+                trace.debug("[STAGE]: process raise skip or cancel error.")
+                raise
             except Exception as e:
                 current_retry += 1
                 trace.warning(
@@ -901,6 +953,16 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
                     parent_run_id=parent_run_id,
                     event=event,
                 )
+            except (
+                StageSkipError,
+                StageNestedSkipError,
+                StageCancelError,
+                StageNestedCancelError,
+            ):
+                await trace.adebug(
+                    "[STAGE]: process raise skip or cancel error."
+                )
+                raise
             except Exception as e:
                 current_retry += 1
                 await trace.awarning(
@@ -1932,8 +1994,9 @@ class BaseNestedStage(BaseRetryStage, ABC):
         """Make the errors context result with the refs value depends on the nested
         execute func.
 
-        :param context: (DictData) A context data.
-        :param error: (StageError) A stage exception object.
+        Args:
+            context: (DictData) A context data.
+            error: (StageError) A stage exception object.
         """
         if "errors" in context:
             context["errors"][error.refs] = error.to_dict()
@@ -2026,18 +2089,9 @@ class TriggerStage(BaseNestedStage):
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         _trigger: str = param2template(self.trigger, params, extras=self.extras)
-        # if _trigger in self.extras.get("stop_circle_workflow_name", []):
-        #     raise StageError(
-        #         "[NESTED]: Circle execution via trigger itself workflow name."
-        #     )
+        if _trigger == self.extras.get("__sys_break_circle_exec", "NOTSET"):
+            raise StageError("Circle execute via trigger itself workflow name.")
         trace.info(f"[NESTED]: Load Workflow Config: {_trigger!r}")
-
-        # # NOTE: add noted key for cancel circle execution.
-        # if "stop_circle_workflow_name" in self.extras:
-        #     self.extras["stop_circle_workflow_name"].append(_trigger)
-        # else:
-        #     self.extras.update({"stop_circle_workflow_name": [_trigger]})
-
         result: Result = Workflow.from_conf(
             name=pass_env(_trigger),
             extras=self.extras,
@@ -2047,6 +2101,8 @@ class TriggerStage(BaseNestedStage):
             run_id=parent_run_id,
             event=event,
         )
+        # TODO: The context from workflow execution does not save when its status
+        #   does not equal SUCCESS.
         if result.status == FAILED:
             err_msg: str = (
                 f" with:\n{msg}"
@@ -2059,6 +2115,11 @@ class TriggerStage(BaseNestedStage):
         elif result.status == SKIP:
             raise StageNestedSkipError("Trigger workflow was skipped.")
         return result
+
+
+class ParallelContext(TypedDict):
+    branch: str
+    stages: NotRequired[dict[str, Any]]
 
 
 class ParallelStage(BaseNestedStage):
@@ -2098,10 +2159,8 @@ class ParallelStage(BaseNestedStage):
     parallel: dict[str, list[Stage]] = Field(
         description="A mapping of branch name and its stages.",
     )
-    max_workers: int = Field(
+    max_workers: Union[int, str] = Field(
         default=2,
-        ge=1,
-        lt=20,
         description=(
             "The maximum multi-thread pool worker size for execution parallel. "
             "This value should be gather or equal than 1, and less than 20."
@@ -2109,14 +2168,20 @@ class ParallelStage(BaseNestedStage):
         alias="max-workers",
     )
 
-    def _process_branch(
+    @field_validator("max_workers")
+    def __validate_max_workers(cls, value: Union[int, str]) -> Union[int, str]:
+        """Validate `max_workers` field that should has value between 1 and 19."""
+        if isinstance(value, int) and (value < 1 or value >= 20):
+            raise ValueError("A max-workers value should between 1 and 19.")
+        return value
+
+    def _process_nested(
         self,
         branch: str,
         params: DictData,
-        run_id: str,
+        trace: Trace,
         context: DictData,
         *,
-        parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> tuple[Status, DictData]:
         """Execute branch that will execute all nested-stage that was set in
@@ -2125,15 +2190,14 @@ class ParallelStage(BaseNestedStage):
         Args:
             branch (str): A branch ID.
             params (DictData): A parameter data.
-            run_id (str): A running ID.
+            trace (Trace): A Trace model.
             context (DictData):
-            parent_run_id (str | None, default None): A parent running ID.
             event: (Event) An Event manager instance that use to cancel this
                 execution if it forces stopped by parent execution.
                 (Default is None)
 
         Raises:
-            StageCancelError: If event was set.
+            StageCancelError: If event was set before start stage execution.
             StageCancelError: If result from a nested-stage return canceled
                 status.
             StageError: If result from a nested-stage return failed status.
@@ -2141,15 +2205,10 @@ class ParallelStage(BaseNestedStage):
         Returns:
             tuple[Status, DictData]: A pair of status and result context data.
         """
-        trace: Trace = get_trace(
-            run_id, parent_run_id=parent_run_id, extras=self.extras
-        )
-        trace.debug(f"[NESTED]: Execute Branch: {branch!r}")
-
-        # NOTE: Create nested-context
+        trace.info(f"[NESTED]: Execute Branch: {branch!r}")
         current_context: DictData = copy.deepcopy(params)
         current_context.update({"branch": branch})
-        nestet_context: DictData = {"branch": branch, "stages": {}}
+        nestet_context: ParallelContext = {"branch": branch, "stages": {}}
 
         total_stage: int = len(self.parallel[branch])
         skips: list[bool] = [False] * total_stage
@@ -2160,8 +2219,7 @@ class ParallelStage(BaseNestedStage):
 
             if event and event.is_set():
                 error_msg: str = (
-                    "Branch execution was canceled from the event before "
-                    "start branch execution."
+                    f"Cancel branch: {branch!r} before start nested process."
                 )
                 catch(
                     context=context,
@@ -2181,12 +2239,12 @@ class ParallelStage(BaseNestedStage):
 
             rs: Result = stage.execute(
                 params=current_context,
-                run_id=parent_run_id,
+                run_id=trace.parent_run_id,
                 event=event,
             )
-            stage.set_outputs(rs.context, to=nestet_context)
+            stage.set_outputs(rs.context, to=cast_dict(nestet_context))
             stage.set_outputs(
-                stage.get_outputs(nestet_context), to=current_context
+                stage.get_outputs(cast_dict(nestet_context)), to=current_context
             )
 
             if rs.status == SKIP:
@@ -2195,7 +2253,7 @@ class ParallelStage(BaseNestedStage):
 
             elif rs.status == FAILED:  # pragma: no cov
                 error_msg: str = (
-                    f"Branch execution was break because its nested-stage, "
+                    f"Break branch: {branch!r} because nested stage: "
                     f"{stage.iden!r}, failed."
                 )
                 catch(
@@ -2216,8 +2274,7 @@ class ParallelStage(BaseNestedStage):
 
             elif rs.status == CANCEL:
                 error_msg: str = (
-                    "Branch execution was canceled from the event after "
-                    "end branch execution."
+                    f"Cancel branch: {branch!r} after end nested process."
                 )
                 catch(
                     context=context,
@@ -2257,7 +2314,9 @@ class ParallelStage(BaseNestedStage):
         parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> Result:
-        """Execute parallel each branch via multi-threading pool.
+        """Execute parallel each branch via multi-threading pool. The parallel
+        process will use all-completed strategy to handle result from each
+        branch.
 
         Args:
             params: A parameter data that want to use in this
@@ -2268,6 +2327,9 @@ class ParallelStage(BaseNestedStage):
             event: An event manager that use to track parent process
                 was not force stopped.
 
+        Raises:
+            StageCancelError: If event was set before start parallel process.
+
         Returns:
             Result: The execution result with status and context data.
         """
@@ -2275,27 +2337,36 @@ class ParallelStage(BaseNestedStage):
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         event: Event = event or Event()
-        trace.info(f"[NESTED]: Parallel with {self.max_workers} workers.")
+
+        # NOTE: Start prepare max_workers field if it is string type.
+        if isinstance(self.max_workers, str):
+            max_workers: int = self.__validate_max_workers(
+                pass_env(
+                    param2template(
+                        self.max_workers, params=params, extras=self.extras
+                    )
+                )
+            )
+        else:
+            max_workers: int = self.max_workers
+        trace.info(f"[NESTED]: Parallel with {max_workers} workers.")
         catch(
             context=context,
             status=WAIT,
-            updated={"workers": self.max_workers, "parallel": {}},
+            updated={"workers": max_workers, "parallel": {}},
         )
         len_parallel: int = len(self.parallel)
         if event and event.is_set():
-            raise StageCancelError(
-                "Execution was canceled from the event before start parallel."
-            )
+            raise StageCancelError("Cancel before start parallel process.")
 
-        with ThreadPoolExecutor(self.max_workers, "stp") as executor:
+        with ThreadPoolExecutor(max_workers, "stp") as executor:
             futures: list[Future] = [
                 executor.submit(
-                    self._process_branch,
+                    self._process_nested,
                     branch=branch,
                     params=params,
-                    run_id=run_id,
+                    trace=trace,
                     context=context,
-                    parent_run_id=parent_run_id,
                     event=event,
                 )
                 for branch in self.parallel
@@ -2310,13 +2381,19 @@ class ParallelStage(BaseNestedStage):
                     self.mark_errors(errors, e)
 
         st: Status = validate_statuses(statuses)
-        return Result(
-            run_id=run_id,
-            parent_run_id=parent_run_id,
+        return Result.from_trace(trace).catch(
             status=st,
             context=catch(context, status=st, updated=errors),
-            extras=self.extras,
         )
+
+
+EachType = Union[
+    list[str],
+    list[int],
+    str,
+    dict[str, Any],
+    dict[int, Any],
+]
 
 
 class ForEachStage(BaseNestedStage):
@@ -2339,13 +2416,7 @@ class ForEachStage(BaseNestedStage):
         ... }
     """
 
-    foreach: Union[
-        list[str],
-        list[int],
-        str,
-        dict[str, Any],
-        dict[int, Any],
-    ] = Field(
+    foreach: EachType = Field(
         description=(
             "A items for passing to stages via ${{ item }} template parameter."
         ),
@@ -2374,15 +2445,14 @@ class ForEachStage(BaseNestedStage):
         ),
     )
 
-    def _process_item(
+    def _process_nested(
         self,
         index: int,
         item: StrOrInt,
         params: DictData,
-        run_id: str,
+        trace: Trace,
         context: DictData,
         *,
-        parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> tuple[Status, DictData]:
         """Execute item that will execute all nested-stage that was set in this
@@ -2391,32 +2461,29 @@ class ForEachStage(BaseNestedStage):
             This method will create the nested-context from an input context
         data and use it instead the context data.
 
-        :param index: (int) An index value of foreach loop.
-        :param item: (str | int) An item that want to execution.
-        :param params: (DictData) A parameter data.
-        :param run_id: (str)
-        :param context: (DictData)
-        :param parent_run_id: (str | None)
-        :param event: (Event) An Event manager instance that use to cancel this
-            execution if it forces stopped by parent execution.
-            (Default is None)
+        Args:
+            index: (int) An index value of foreach loop.
+            item: (str | int) An item that want to execution.
+            params: (DictData) A parameter data.
+            trace (Trace): A Trace model.
+            context: (DictData)
+            event: (Event) An Event manager instance that use to cancel this
+                execution if it forces stopped by parent execution.
+                (Default is None)
 
             This method should raise error when it wants to stop the foreach
         loop such as cancel event or getting the failed status.
 
-        :raise StageCancelError: If event was set.
-        :raise StageError: If the stage execution raise any Exception error.
-        :raise StageError: If the result from execution has `FAILED` status.
+        Raises:
+            StageCancelError: If event was set.
+            StageError: If the stage execution raise any Exception error.
+            StageError: If the result from execution has `FAILED` status.
 
-        :rtype: tuple[Status, Result]
+        Returns:
+            tuple[Status, DictData]
         """
-        trace: Trace = get_trace(
-            run_id, parent_run_id=parent_run_id, extras=self.extras
-        )
-        trace.debug(f"[NESTED]: Execute Item: {item!r}")
+        trace.info(f"[NESTED]: Execute Item: {item!r}")
         key: StrOrInt = index if self.use_index_as_key else item
-
-        # NOTE: Create nested-context data from the passing context.
         current_context: DictData = copy.deepcopy(params)
         current_context.update({"item": item, "loop": index})
         nestet_context: DictData = {"item": item, "stages": {}}
@@ -2430,8 +2497,7 @@ class ForEachStage(BaseNestedStage):
 
             if event and event.is_set():
                 error_msg: str = (
-                    "Item execution was canceled from the event before start "
-                    "item execution."
+                    f"Cancel item: {key!r} before start nested process."
                 )
                 catch(
                     context=context,
@@ -2449,10 +2515,9 @@ class ForEachStage(BaseNestedStage):
                 )
                 raise StageCancelError(error_msg, refs=key)
 
-            # NOTE: Nested-stage execute will pass only params and context only.
             rs: Result = stage.execute(
                 params=current_context,
-                run_id=parent_run_id,
+                run_id=trace.parent_run_id,
                 event=event,
             )
             stage.set_outputs(rs.context, to=nestet_context)
@@ -2466,7 +2531,7 @@ class ForEachStage(BaseNestedStage):
 
             elif rs.status == FAILED:  # pragma: no cov
                 error_msg: str = (
-                    f"Item execution was break because its nested-stage, "
+                    f"Break item: {key!r} because nested stage: "
                     f"{stage.iden!r}, failed."
                 )
                 trace.warning(f"[NESTED]: {error_msg}")
@@ -2488,8 +2553,7 @@ class ForEachStage(BaseNestedStage):
 
             elif rs.status == CANCEL:
                 error_msg: str = (
-                    "Item execution was canceled from the event after "
-                    "end item execution."
+                    f"Cancel item: {key!r} after end nested process."
                 )
                 catch(
                     context=context,
@@ -2519,6 +2583,42 @@ class ForEachStage(BaseNestedStage):
                 },
             },
         )
+
+    def validate_foreach(self, value: Any) -> list[Any]:
+        """Validate foreach value that already passed to this model.
+
+        Args:
+            value:
+
+        Raises:
+            TypeError: If value can not try-convert to list type.
+            ValueError:
+
+        Returns:
+            list[Any]: list of item.
+        """
+        if isinstance(value, str):
+            try:
+                value: list[Any] = str2list(value)
+            except ValueError as e:
+                raise TypeError(
+                    f"Does not support string foreach: {value!r} that can "
+                    f"not convert to list."
+                ) from e
+        # [VALIDATE]: Type of the foreach should be `list` type.
+        elif isinstance(value, dict):
+            raise TypeError(
+                f"Does not support dict foreach: {value!r} ({type(value)}) "
+                f"yet."
+            )
+        # [Validate]: Value in the foreach item should not be duplicate when the
+        #   `use_index_as_key` field did not set.
+        elif len(set(value)) != len(value) and not self.use_index_as_key:
+            raise ValueError(
+                "Foreach item should not duplicate. If this stage must to pass "
+                "duplicate item, it should set `use_index_as_key: true`."
+            )
+        return value
 
     def process(
         self,
@@ -2551,34 +2651,8 @@ class ForEachStage(BaseNestedStage):
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         event: Event = event or Event()
-        foreach: Union[list[str], list[int], str] = pass_env(
-            param2template(self.foreach, params, extras=self.extras)
-        )
-
-        # [NOTE]: Force convert str to list.
-        if isinstance(foreach, str):
-            try:
-                foreach: list[Any] = str2list(foreach)
-            except ValueError as e:
-                raise TypeError(
-                    f"Does not support string foreach: {foreach!r} that can "
-                    f"not convert to list."
-                ) from e
-
-        # [VALIDATE]: Type of the foreach should be `list` type.
-        elif isinstance(foreach, dict):
-            raise TypeError(
-                f"Does not support dict foreach: {foreach!r} ({type(foreach)}) "
-                f"yet."
-            )
-        # [Validate]: Value in the foreach item should not be duplicate when the
-        #   `use_index_as_key` field did not set.
-        elif len(set(foreach)) != len(foreach) and not self.use_index_as_key:
-            raise ValueError(
-                "Foreach item should not duplicate. If this stage must to pass "
-                "duplicate item, it should set `use_index_as_key: true`."
-            )
-
+        foreach: EachType = self.pass_template(self.foreach, params=params)
+        foreach: list[Any] = self.validate_foreach(foreach)
         trace.info(f"[NESTED]: Foreach: {foreach!r}.")
         catch(
             context=context,
@@ -2587,28 +2661,24 @@ class ForEachStage(BaseNestedStage):
         )
         len_foreach: int = len(foreach)
         if event and event.is_set():
-            raise StageCancelError(
-                "Execution was canceled from the event before start foreach."
-            )
+            raise StageCancelError("Cancel before start foreach process.")
 
         with ThreadPoolExecutor(self.concurrent, "stf") as executor:
             futures: list[Future] = [
                 executor.submit(
-                    self._process_item,
-                    index=i,
+                    self._process_nested,
+                    index=index,
                     item=item,
                     params=params,
-                    run_id=run_id,
+                    trace=trace,
                     context=context,
-                    parent_run_id=parent_run_id,
                     event=event,
                 )
-                for i, item in enumerate(foreach, start=0)
+                for index, item in enumerate(foreach, start=0)
             ]
 
             errors: DictData = {}
             statuses: list[Status] = [WAIT] * len_foreach
-            fail_fast: bool = False
 
             done, not_done = wait(futures, return_when=FIRST_EXCEPTION)
             if len(list(done)) != len(futures):
@@ -2619,7 +2689,7 @@ class ForEachStage(BaseNestedStage):
                 for future in not_done:
                     future.cancel()
 
-                time.sleep(0.01)  # Reduced from 0.025 for better responsiveness
+                time.sleep(0.025)
                 nd: str = (
                     (
                         f", {len(not_done)} item"
@@ -2630,7 +2700,6 @@ class ForEachStage(BaseNestedStage):
                 )
                 trace.debug(f"[NESTED]: ... Foreach-Stage set failed event{nd}")
                 done: Iterator[Future] = as_completed(futures)
-                fail_fast = True
 
             for i, future in enumerate(done, start=0):
                 try:
@@ -2640,21 +2709,13 @@ class ForEachStage(BaseNestedStage):
                     statuses[i] = get_status_from_error(e)
                     self.mark_errors(errors, e)
                 except CancelledError:
+                    statuses[i] = CANCEL
                     pass
 
         status: Status = validate_statuses(statuses)
-
-        # NOTE: Prepare status because it does not cancel from parent event but
-        #   cancel from failed item execution.
-        if fail_fast and status == CANCEL:
-            status = FAILED
-
-        return Result(
-            run_id=run_id,
-            parent_run_id=parent_run_id,
+        return Result.from_trace(trace).catch(
             status=status,
             context=catch(context, status=status, updated=errors),
-            extras=self.extras,
         )
 
 
@@ -2689,7 +2750,7 @@ class UntilStage(BaseNestedStage):
         ),
     )
     until: str = Field(description="A until condition for stop the while loop.")
-    stages: list[Stage] = Field(
+    stages: list[NestedStage] = Field(
         default_factory=list,
         description=(
             "A list of stage that will run with each item in until loop."
@@ -2706,38 +2767,33 @@ class UntilStage(BaseNestedStage):
         alias="max-loop",
     )
 
-    def _process_loop(
+    def _process_nested(
         self,
         item: T,
         loop: int,
         params: DictData,
-        run_id: str,
+        trace: Trace,
         context: DictData,
         *,
-        parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> tuple[Status, DictData, T]:
         """Execute loop that will execute all nested-stage that was set in this
         stage with specific loop and item.
 
-        :param item: (T) An item that want to execution.
-        :param loop: (int) A number of loop.
-        :param params: (DictData) A parameter data.
-        :param run_id: (str)
-        :param context: (DictData)
-        :param parent_run_id: (str | None)
-        :param event: (Event) An Event manager instance that use to cancel this
-            execution if it forces stopped by parent execution.
+        Args:
+            item: (T) An item that want to execution.
+            loop: (int) A number of loop.
+            params: (DictData) A parameter data.
+            trace: (Trace)
+            context: (DictData)
+            event: (Event) An Event manager instance that use to cancel this
+                execution if it forces stopped by parent execution.
 
-        :rtype: tuple[Status, DictData, T]
-        :return: Return a pair of Result and changed item.
+        Returns:
+            tuple[Status, DictData, T]: Return a pair of Result and changed
+                item.
         """
-        trace: Trace = get_trace(
-            run_id, parent_run_id=parent_run_id, extras=self.extras
-        )
         trace.debug(f"[NESTED]: Execute Loop: {loop} (Item {item!r})")
-
-        # NOTE: Create nested-context
         current_context: DictData = copy.deepcopy(params)
         current_context.update({"item": item, "loop": loop})
         nestet_context: DictData = {"loop": loop, "item": item, "stages": {}}
@@ -2752,8 +2808,7 @@ class UntilStage(BaseNestedStage):
 
             if event and event.is_set():
                 error_msg: str = (
-                    "Loop execution was canceled from the event before start "
-                    "loop execution."
+                    f"Cancel loop: {i!r} before start nested process."
                 )
                 catch(
                     context=context,
@@ -2774,7 +2829,7 @@ class UntilStage(BaseNestedStage):
 
             rs: Result = stage.execute(
                 params=current_context,
-                run_id=parent_run_id,
+                run_id=trace.parent_run_id,
                 event=event,
             )
             stage.set_outputs(rs.context, to=nestet_context)
@@ -2790,8 +2845,8 @@ class UntilStage(BaseNestedStage):
 
             elif rs.status == FAILED:
                 error_msg: str = (
-                    f"Loop execution was break because its nested-stage, "
-                    f"{stage.iden!r}, failed."
+                    f"Break loop: {i!r} because nested stage: {stage.iden!r}, "
+                    f"failed."
                 )
                 catch(
                     context=context,
@@ -2811,10 +2866,7 @@ class UntilStage(BaseNestedStage):
                 raise StageNestedError(error_msg, refs=loop)
 
             elif rs.status == CANCEL:
-                error_msg: str = (
-                    "Loop execution was canceled from the event after "
-                    "end loop execution."
-                )
+                error_msg: str = f"Cancel loop: {i!r} after end nested process."
                 catch(
                     context=context,
                     status=CANCEL,
@@ -2881,9 +2933,7 @@ class UntilStage(BaseNestedStage):
         )
         event: Event = event or Event()
         trace.info(f"[NESTED]: Until: {self.until!r}")
-        item: Union[str, int, bool] = pass_env(
-            param2template(self.item, params, extras=self.extras)
-        )
+        item: Union[str, int, bool] = self.pass_template(self.item, params)
         loop: int = 1
         until_rs: bool = True
         exceed_loop: bool = False
@@ -2892,24 +2942,21 @@ class UntilStage(BaseNestedStage):
         while until_rs and not (exceed_loop := (loop > self.max_loop)):
 
             if event and event.is_set():
-                raise StageCancelError(
-                    "Execution was canceled from the event before start loop."
-                )
+                raise StageCancelError("Cancel before start loop process.")
 
-            status, context, item = self._process_loop(
+            status, context, item = self._process_nested(
                 item=item,
                 loop=loop,
                 params=params,
-                run_id=run_id,
+                trace=trace,
                 context=context,
-                parent_run_id=parent_run_id,
                 event=event,
             )
 
             loop += 1
             if item is None:
                 item: int = loop
-                trace.warning(
+                trace.debug(
                     f"[NESTED]: Return loop not set the item. It uses loop: "
                     f"{loop} by default."
                 )
@@ -2960,6 +3007,13 @@ class Match(BaseModel):
     )
 
 
+class Else(BaseModel):
+    other: list[Stage] = Field(
+        description="A list of stage that does not match any case.",
+        alias="else",
+    )
+
+
 class CaseStage(BaseNestedStage):
     """Case stage executor that execute all stages if the condition was matched.
 
@@ -2992,7 +3046,7 @@ class CaseStage(BaseNestedStage):
     """
 
     case: str = Field(description="A case condition for routing.")
-    match: list[Match] = Field(
+    match: list[Union[Match, Else]] = Field(
         description="A list of Match model that should not be an empty list.",
     )
     skip_not_match: bool = Field(
@@ -3004,46 +3058,101 @@ class CaseStage(BaseNestedStage):
         alias="skip-not-match",
     )
 
-    def _process_case(
+    @field_validator("match", mode="after")
+    def __validate_match(
+        cls, match: list[Union[Match, Else]]
+    ) -> list[Union[Match, Else]]:
+        if len([m for m in match if isinstance(m, Else)]) > 1:
+            raise ValueError("match field should contain only one Else model")
+        return match
+
+    def extract_stages_from_case(
+        self, case: StrOrNone, params: DictData
+    ) -> tuple[StrOrNone, list[Stage]]:
+        """Extract stage from case.
+
+        Args:
+            case (StrOrNone):
+            params (DictData):
+
+        Returns:
+            tuple[StrOrNone, list[Stage]]: A pair of case and stages.
+        """
+        _else_stages: Optional[list[Stage]] = None
+        stages: Optional[list[Stage]] = None
+
+        # NOTE: Start check the condition of each stage match with this case.
+        for match in self.match:
+
+            if isinstance(match, Else):
+                _else_stages: list[Stage] = match.other
+                continue
+
+            # NOTE: Store the else case.
+            if (c := match.case) == "_":
+                _else_stages: list[Stage] = match.stages
+                continue
+
+            _condition: str = param2template(c, params, extras=self.extras)
+            if pass_env(case) == pass_env(_condition):
+                stages: list[Stage] = match.stages
+                break
+
+        if stages is not None:
+            return case, stages
+
+        if _else_stages is None:
+            if not self.skip_not_match:
+                raise StageError(
+                    "This stage does not set else for support not match "
+                    "any case."
+                )
+            raise StageSkipError(
+                "Execution was skipped because it does not match any "
+                "case and the else condition does not set too."
+            )
+
+        # NOTE: Force to use the else when it does not match any case.
+        return "_", _else_stages
+
+    def _process_nested(
         self,
         case: str,
         stages: list[Stage],
         params: DictData,
-        run_id: str,
+        trace: Trace,
         context: DictData,
         *,
-        parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> tuple[Status, DictData]:
         """Execute case.
 
-        :param case: (str) A case that want to execution.
-        :param stages: (list[Stage]) A list of stage.
-        :param params: (DictData) A parameter data.
-        :param run_id: (str)
-        :param context: (DictData)
-        :param parent_run_id: (str | None)
-        :param event: (Event) An Event manager instance that use to cancel this
-            execution if it forces stopped by parent execution.
+        Args:
+            case: (str) A case that want to execution.
+            stages: (list[Stage]) A list of stage.
+            params: (DictData) A parameter data.
+            trace: (Trace)
+            context: (DictData)
+            event: (Event) An Event manager instance that use to cancel this
+                execution if it forces stopped by parent execution.
 
-        :rtype: DictData
+        Returns:
+            DictData
         """
-        trace: Trace = get_trace(
-            run_id, parent_run_id=parent_run_id, extras=self.extras
-        )
-        trace.debug(f"[NESTED]: Execute Case: {case!r}")
+        trace.info(f"[NESTED]: Case: {case!r}")
         current_context: DictData = copy.deepcopy(params)
         current_context.update({"case": case})
         output: DictData = {"case": case, "stages": {}}
-        for stage in stages:
+        total_stage: int = len(stages)
+        skips: list[bool] = [False] * total_stage
+        for i, stage in enumerate(stages, start=0):
 
             if self.extras:
                 stage.extras = self.extras
 
             if event and event.is_set():
                 error_msg: str = (
-                    "Case-Stage was canceled from event that had set before "
-                    "stage case execution."
+                    f"Cancel case: {case!r} before start nested process."
                 )
                 return CANCEL, catch(
                     context=context,
@@ -3057,16 +3166,20 @@ class CaseStage(BaseNestedStage):
 
             rs: Result = stage.execute(
                 params=current_context,
-                run_id=parent_run_id,
+                run_id=trace.parent_run_id,
                 event=event,
             )
             stage.set_outputs(rs.context, to=output)
             stage.set_outputs(stage.get_outputs(output), to=current_context)
 
-            if rs.status == FAILED:
+            if rs.status == SKIP:
+                skips[i] = True
+                continue
+
+            elif rs.status == FAILED:
                 error_msg: str = (
-                    f"Case-Stage was break because it has a sub stage, "
-                    f"{stage.iden}, failed without raise error."
+                    f"Break case: {case!r} because nested stage: {stage.iden}, "
+                    f"failed."
                 )
                 return FAILED, catch(
                     context=context,
@@ -3077,9 +3190,25 @@ class CaseStage(BaseNestedStage):
                         "errors": StageError(error_msg).to_dict(),
                     },
                 )
-        return SUCCESS, catch(
+
+            elif rs.status == CANCEL:
+                error_msg: str = (
+                    f"Cancel case {case!r} after end nested process."
+                )
+                return CANCEL, catch(
+                    context=context,
+                    status=CANCEL,
+                    updated={
+                        "case": case,
+                        "stages": filter_func(output.pop("stages", {})),
+                        "errors": StageCancelError(error_msg).to_dict(),
+                    },
+                )
+
+        status: Status = SKIP if sum(skips) == total_stage else SUCCESS
+        return status, catch(
             context=context,
-            status=SUCCESS,
+            status=status,
             updated={
                 "case": case,
                 "stages": filter_func(output.pop("stages", {})),
@@ -3113,52 +3242,17 @@ class CaseStage(BaseNestedStage):
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
 
-        _case: StrOrNone = param2template(self.case, params, extras=self.extras)
-        trace.info(f"[NESTED]: Get Case: {_case!r}.")
-
-        _else: Optional[Match] = None
-        stages: Optional[list[Stage]] = None
-
-        # NOTE: Start check the condition of each stage match with this case.
-        for match in self.match:
-            # NOTE: Store the else case.
-            if (c := match.case) == "_":
-                _else: Match = match
-                continue
-
-            _condition: str = param2template(c, params, extras=self.extras)
-            if pass_env(_case) == pass_env(_condition):
-                stages: list[Stage] = match.stages
-                break
-
-        if stages is None:
-            if _else is None:
-                if not self.skip_not_match:
-                    raise StageError(
-                        "This stage does not set else for support not match "
-                        "any case."
-                    )
-                raise StageSkipError(
-                    "Execution was skipped because it does not match any "
-                    "case and the else condition does not set too."
-                )
-
-            # NOTE: Force to use the else when it does not match any case.
-            _case: str = "_"
-            stages: list[Stage] = _else.stages
-
+        case: StrOrNone = param2template(self.case, params, extras=self.extras)
+        trace.info(f"[NESTED]: Get Case: {case!r}.")
+        case, stages = self.extract_stages_from_case(case, params=params)
         if event and event.is_set():
-            raise StageCancelError(
-                "Execution was canceled from the event before start "
-                "case execution."
-            )
-        status, context = self._process_case(
-            case=_case,
+            raise StageCancelError("Cancel before start case process.")
+        status, context = self._process_nested(
+            case=case,
             stages=stages,
             params=params,
-            run_id=run_id,
+            trace=trace,
             context=context,
-            parent_run_id=parent_run_id,
             event=event,
         )
         return Result(
@@ -3584,6 +3678,59 @@ class VirtualPyStage(PyStage):  # pragma: no cov
             extras=self.extras,
         )
 
+    async def async_process(
+        self,
+        params: DictData,
+        run_id: str,
+        context: DictData,
+        *,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
+    ) -> Result:
+        raise NotImplementedError(
+            "Async process of Virtual Python stage does not implement yet."
+        )
+
+
+NestedStage = Annotated[
+    Union[
+        BashStage,
+        CallStage,
+        PyStage,
+        VirtualPyStage,
+        RaiseStage,
+        DockerStage,
+        TriggerStage,
+        EmptyStage,
+        CaseStage,
+        ForEachStage,
+        UntilStage,
+    ],
+    Field(
+        union_mode="smart",
+        description="A nested-stage allow list",
+    ),
+]  # pragma: no cov
+
+
+ActionStage = Annotated[
+    Union[
+        BashStage,
+        CallStage,
+        VirtualPyStage,
+        PyStage,
+        RaiseStage,
+        DockerStage,
+        EmptyStage,
+    ],
+    Field(
+        union_mode="smart",
+        description=(
+            "An action stage model that allow to use with nested-stage model."
+        ),
+    ),
+]  # pragma: no cov
+
 
 # NOTE:
 #   An order of parsing stage model on the Job model with `stages` field.
@@ -3592,18 +3739,14 @@ class VirtualPyStage(PyStage):  # pragma: no cov
 #
 Stage = Annotated[
     Union[
-        DockerStage,
-        BashStage,
-        CallStage,
-        TriggerStage,
+        # NOTE: Nested Stage.
         ForEachStage,
         UntilStage,
         ParallelStage,
         CaseStage,
-        VirtualPyStage,
-        PyStage,
-        RaiseStage,
-        EmptyStage,
+        TriggerStage,
+        # NOTE: Union with the action stage.
+        ActionStage,
     ],
     Field(
         union_mode="smart",

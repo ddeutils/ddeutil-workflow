@@ -8,8 +8,8 @@ from ddeutil.workflow.audits import (
     NORMAL,
     AuditData,
     BaseAudit,
-    FileAudit,
-    SQLiteAudit,
+    LocalFileAudit,
+    LocalSQLiteAudit,
     get_audit,
 )
 from ddeutil.workflow.conf import Config
@@ -17,12 +17,14 @@ from ddeutil.workflow.conf import Config
 
 def test_get_audit_model():
     model = get_audit()
-    assert isinstance(model, FileAudit)
+    assert isinstance(model, LocalFileAudit)
 
     model = get_audit(
-        extras={"audit_conf": {"type": "sqlite", "path": "./audit.db"}}
+        extras={"audit_conf": {"type": "sqlite", "path": Path("./audit.db")}}
     )
-    assert isinstance(model, SQLiteAudit)
+    assert isinstance(model, LocalSQLiteAudit)
+
+    Path("./audit.db").unlink(missing_ok=True)
 
 
 def test_audit_data():
@@ -41,7 +43,7 @@ def test_audit_data():
 def test_base_audit():
     log = BaseAudit.model_validate(
         {
-            "type": "test",
+            "type": "base",
             "extras": {
                 "foo": "bar",
                 "datetime": datetime(2024, 1, 1, 1, 15),
@@ -49,14 +51,15 @@ def test_base_audit():
         }
     )
     assert log.model_dump() == {
-        "type": "test",
+        "type": "base",
+        "logging_name": "ddeutil.workflow",
         "extras": {"foo": "bar", "datetime": datetime(2024, 1, 1, 1, 15)},
     }
 
 
 @mock.patch.object(Config, "enable_write_audit", False)
 def test_audit_file():
-    log = FileAudit(path="./audits")
+    log = LocalFileAudit(path=Path("./audits"))
     audit = AuditData.model_validate(
         obj={
             "name": "wf-scheduling-not-exists",
@@ -77,7 +80,7 @@ def test_audit_file():
 
 @mock.patch.object(Config, "enable_write_audit", True)
 def test_audit_file_do_first():
-    log = FileAudit(path="./audits")
+    log = LocalFileAudit(path="./audits")
     audit = AuditData.model_validate(
         {
             "name": "wf-demo-logging",
@@ -95,7 +98,7 @@ def test_audit_file_do_first():
     pointer = log.pointer(audit)
     assert pointer.exists()
     #
-    # log = FileAudit.find_audit_with_release(
+    # log = LocalFileAudit.find_audit_with_release(
     #     name="wf-demo-logging",
     #     release=datetime(2024, 1, 1, 1),
     # )
@@ -105,8 +108,8 @@ def test_audit_file_do_first():
 
 
 @mock.patch.object(Config, "enable_write_audit", True)
-def test_audit_file_find(root_path):
-    log = FileAudit(path="./audits")
+def test_audit_file_find(root_path: Path):
+    log = LocalFileAudit(path=Path("./audits"))
     audit = AuditData.model_validate(
         {
             "name": "wf-scheduling",
@@ -145,7 +148,7 @@ def test_audit_file_find(root_path):
 def test_audit_file_find_empty():
     wf_log_path = Path("./audits/workflow=wf-no-release-log/")
     wf_log_path.mkdir(exist_ok=True)
-    log = FileAudit()
+    log = LocalFileAudit()
     assert list(log.find_audits(name="wf-no-release-log")) == []
 
     with pytest.raises(FileNotFoundError):
@@ -162,13 +165,13 @@ def test_audit_file_find_empty():
 
 
 def test_audit_file_find_raise():
-    log = FileAudit()
+    log = LocalFileAudit()
     with pytest.raises(FileNotFoundError):
         next(log.find_audits(name="wf-file-not-found"))
 
 
 def test_audit_file_find_with_release():
-    log = FileAudit()
+    log = LocalFileAudit()
     with pytest.raises(FileNotFoundError):
         log.find_audit_with_release(
             name="wf-file-not-found",

@@ -16,13 +16,9 @@ Attributes:
     Interval: Type alias for scheduling intervals ('daily', 'weekly', 'monthly')
 
 Classes:
+    CrontabValue:
     Crontab: Main cron-based event scheduler.
     CrontabYear: Enhanced cron scheduler with year constraints.
-    ReleaseEvent: Release-based event triggers.
-    FileEvent: File system monitoring triggers.
-    WebhookEvent: API/webhook-based triggers.
-    DatabaseEvent: Database change monitoring triggers.
-    SensorEvent: Sensor-based event monitoring.
 
 Example:
     >>> from ddeutil.workflow.event import Crontab
@@ -395,19 +391,16 @@ class Event(BaseModel):
     )
 
     @field_validator("schedule", mode="after")
-    def __on_no_dup_and_reach_limit__(
-        cls,
-        value: list[Crontab],
-    ) -> list[Crontab]:
+    def __prepare_schedule__(cls, value: list[Crontab]) -> list[Crontab]:
         """Validate the on fields should not contain duplicate values and if it
         contains the every minute value more than one value, it will remove to
         only one value.
 
         Args:
-            value: A list of on object.
+            value (list[Crontab]): A list of on object.
 
         Returns:
-            list[CronJobYear | Crontab]: The validated list of Crontab objects.
+            list[Crontab]: The validated list of Crontab objects.
 
         Raises:
             ValueError: If it has some duplicate value.

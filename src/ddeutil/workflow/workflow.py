@@ -37,6 +37,7 @@ from threading import Event as ThreadEvent
 from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
+from pydantic.functional_serializers import field_serializer
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
@@ -62,8 +63,10 @@ from .result import (
 from .reusables import has_template, param2template
 from .traces import Trace, get_trace
 from .utils import (
+    extract_id,
     gen_id,
     get_dt_now,
+    remove_sys_extras,
 )
 
 
@@ -241,7 +244,14 @@ class Workflow(BaseModel):
                 f"{self.name!r}."
             )
 
+        # NOTE: Force update internal extras for handler circle execution.
+        self.extras.update({"__sys_break_circle_exec": self.name})
+
         return self
+
+    @field_serializer("extras")
+    def __serialize_extras(self, extras: DictData) -> DictData:
+        return remove_sys_extras(extras)
 
     def detail(self) -> DictData:  # pragma: no cov
         """Return the detail of this workflow for generate markdown."""
@@ -255,7 +265,8 @@ class Workflow(BaseModel):
         """
 
         def align_newline(value: str) -> str:
-            return value.rstrip("\n").replace("\n", "\n                ")
+            space: str = " " * 16
+            return value.rstrip("\n").replace("\n", f"\n{space}")
 
         info: str = (
             f"| Author: {author or 'nobody'} "
@@ -282,8 +293,7 @@ class Workflow(BaseModel):
                 {align_newline(self.desc)}\n
                 ## Parameters\n
                 | name | type | default | description |
-                | --- | --- | --- | : --- : |
-
+                | --- | --- | --- | : --- : |\n\n
                 ## Jobs\n
                 {align_newline(jobs)}
                 """.lstrip(
@@ -312,8 +322,7 @@ class Workflow(BaseModel):
                 f"{self.name!r}"
             )
         job: Job = self.jobs[name]
-        if self.extras:
-            job.extras = self.extras
+        job.extras = self.extras
         return job
 
     def parameterize(self, params: DictData) -> DictData:
@@ -332,8 +341,8 @@ class Workflow(BaseModel):
                 execute method.
 
         Returns:
-            DictData: The parameter value that validate with its parameter fields and
-                adding jobs key to this parameter.
+            DictData: The parameter value that validate with its parameter fields
+                and adding jobs key to this parameter.
 
         Raises:
             WorkflowError: If parameter value that want to validate does
@@ -393,11 +402,12 @@ class Workflow(BaseModel):
 
         Args:
             release (datetime): A release datetime.
-            params: A workflow parameter that pass to execute method.
-            release_type:
+            params (DictData): A workflow parameter that pass to execute method.
+            release_type (ReleaseType): A release type that want to execute.
             run_id: (str) A workflow running ID.
             runs_metadata: (DictData)
-            audit: An audit class that want to save the execution result.
+            audit (Audit): An audit model that use to manage release log of this
+                execution.
             override_log_name: (str) An override logging name that use
                 instead the workflow name.
             timeout: (int) A workflow execution time out in second unit.
@@ -412,13 +422,9 @@ class Workflow(BaseModel):
         audit: Audit = audit or get_audit(extras=self.extras)
 
         # NOTE: Generate the parent running ID with not None value.
-        if run_id:
-            parent_run_id: str = run_id
-            run_id: str = gen_id(name, unique=True)
-        else:
-            run_id: str = gen_id(name, unique=True)
-            parent_run_id: str = run_id
-
+        parent_run_id, run_id = extract_id(
+            name, run_id=run_id, extras=self.extras
+        )
         context: DictData = {"status": WAIT}
         audit_data: DictData = {
             "name": name,
@@ -507,7 +513,7 @@ class Workflow(BaseModel):
                     **(context["errors"] if "errors" in context else {}),
                 },
             ),
-            extras=self.extras,
+            extras=remove_sys_extras(self.extras),
         )
 
     def execute_job(
@@ -655,8 +661,9 @@ class Workflow(BaseModel):
         :rtype: Result
         """
         ts: float = time.monotonic()
-        parent_run_id: Optional[str] = run_id
-        run_id: str = gen_id(self.name, unique=True, extras=self.extras)
+        parent_run_id, run_id = extract_id(
+            self.name, run_id=run_id, extras=self.extras
+        )
         trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
@@ -883,6 +890,10 @@ class Workflow(BaseModel):
         max_job_parallel: int = 2,
     ) -> Result:  # pragma: no cov
         """Re-Execute workflow with passing the error context data.
+
+        Warnings:
+            This rerun method allow to rerun job execution level only. That mean
+        it does not support rerun only stage.
 
         Args:
             context: A context result that get the failed status.

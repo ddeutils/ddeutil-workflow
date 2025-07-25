@@ -1,0 +1,32 @@
+{
+  "strategies": {
+    "1001001": {
+      "stages": {
+        "first-stage": {
+          "outputs": {
+            "foo": "bar"
+          },
+          "status": "failed",
+          "errors": {
+            "name": "StageError",
+            "message": "This is the example if it has some error raise from stage."
+          }
+        }
+      },
+      "status": "failed",
+      "error": {
+        "first-stage": {
+          "name": "JobError",
+          "message": "Job got the stage error after exec."
+        }
+      }
+    }
+  },
+  "status": "failed",
+  "error": {
+    "1001001": {
+      "name": "JobError",
+      "message": "Job strategy failed",
+    }
+  }
+}

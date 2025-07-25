@@ -73,7 +73,7 @@ from .result import (
 from .reusables import has_template, param2template
 from .stages import Stage
 from .traces import Trace, get_trace
-from .utils import cross_product, filter_func, gen_id
+from .utils import cross_product, extract_id, filter_func, gen_id
 
 MatrixFilter = list[dict[str, Union[str, int]]]
 
@@ -890,8 +890,9 @@ class Job(BaseModel):
             Result: Return Result object that create from execution context.
         """
         ts: float = time.monotonic()
-        parent_run_id: str = run_id
-        run_id: str = gen_id((self.id or "EMPTY"), unique=True)
+        parent_run_id, run_id = extract_id(
+            (self.id or "EMPTY"), run_id=run_id, extras=self.extras
+        )
         trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )

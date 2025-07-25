@@ -8,26 +8,6 @@
 This module provides essential utility functions used throughout the workflow
 system for ID generation, datetime handling, string processing, template
 operations, and other common tasks.
-
-Functions:
-    to_train: Convert camel case strings to train case format
-    prepare_newline: Format messages with multiple newlines
-    replace_sec: Replace seconds and microseconds in datetime objects
-    clear_tz: Clear timezone info from datetime objects
-    get_dt_now: Get current datetime with timezone
-    get_d_now: Get current date
-    get_diff_sec: Calculate time difference in seconds
-    reach_next_minute: Check if datetime reaches next minute
-    wait_until_next_minute: Wait until next minute
-    delay: Add random delay to execution
-    gen_id: Generate unique identifiers for workflow components
-    default_gen_id: Generate default running ID
-    make_exec: Make files executable
-    filter_func: Filter function objects from data structures
-    cross_product: Generate cross product of matrix values
-    cut_id: Cut running ID to specified length
-    dump_all: Serialize nested BaseModel objects to dictionaries
-    obj_name: Get object name or class name
 """
 from __future__ import annotations
 
@@ -253,6 +233,33 @@ def gen_id(
     ).hexdigest()
 
 
+def extract_id(
+    name: str,
+    run_id: Optional[str] = None,
+    extras: Optional[DictData] = None,
+) -> tuple[str, str]:
+    """Extract the parent ID and running ID. If the `run_id` parameter was
+    passed, it will replace the parent_run_id with this value and re-generate
+    new running ID for it instead.
+
+    Args:
+        name (str): A name for generate hashing value for the `gen_id` function.
+        run_id (str | None, default None):
+        extras:
+
+    Returns:
+        tuple[str, str]: A pair of parent running ID and running ID.
+    """
+    generated = gen_id(name, unique=True, extras=extras)
+    if run_id:
+        parent_run_id: str = run_id
+        run_id: str = generated
+    else:
+        run_id: str = generated
+        parent_run_id: str = run_id
+    return parent_run_id, run_id
+
+
 def default_gen_id() -> str:
     """Return running ID for making default ID for the Result model.
 
@@ -327,6 +334,8 @@ def cut_id(run_id: str, *, num: int = 8) -> str:
     Example:
         >>> cut_id(run_id='20240101081330000000T1354680202')
         '202401010813680202'
+        >>> cut_id(run_id='20240101081330000000T1354680202')
+        '54680202'
 
     Args:
         run_id: A running ID to cut.
@@ -394,3 +403,8 @@ def obj_name(obj: Optional[Union[str, object]] = None) -> Optional[str]:
     else:
         obj_type: str = obj.__class__.__name__
     return obj_type
+
+
+def remove_sys_extras(extras: DictData) -> DictData:
+    """Remove key that starts with `__sys_` from the extra dict parameter."""
+    return {k: extras[k] for k in extras if not k.startswith("__sys_")}

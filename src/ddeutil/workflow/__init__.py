@@ -50,12 +50,12 @@ Note:
 from .__cron import CronRunner
 from .__types import DictData, DictStr, Matrix, Re, TupleStr
 from .audits import (
-    EVENT,
+    DRYRUN,
     FORCE,
     NORMAL,
     RERUN,
     Audit,
-    FileAudit,
+    LocalFileAudit,
     get_audit,
 )
 from .conf import (
