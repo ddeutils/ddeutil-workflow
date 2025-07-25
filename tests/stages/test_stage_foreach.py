@@ -230,7 +230,7 @@ def test_foreach_stage_exec_cancel():
         "foreach": {},
         "errors": {
             "name": "StageCancelError",
-            "message": "Execution was canceled from the event before start foreach.",
+            "message": "Cancel before start foreach process.",
         },
     }
 
@@ -253,14 +253,14 @@ def test_foreach_stage_exec_cancel():
                 "stages": {},
                 "errors": {
                     "name": "StageCancelError",
-                    "message": "Item execution was canceled from the event before start item execution.",
+                    "message": "Cancel item: 1 before start nested process.",
                 },
             }
         },
         "errors": {
             1: {
                 "name": "StageCancelError",
-                "message": "Item execution was canceled from the event before start item execution.",
+                "message": "Cancel item: 1 before start nested process.",
             }
         },
     }
@@ -293,14 +293,14 @@ def test_foreach_stage_exec_cancel():
                 },
                 "errors": {
                     "name": "StageCancelError",
-                    "message": "Item execution was canceled from the event after end item execution.",
+                    "message": "Cancel item: 1 after end nested process.",
                 },
             }
         },
         "errors": {
             1: {
                 "name": "StageCancelError",
-                "message": "Item execution was canceled from the event after end item execution.",
+                "message": "Cancel item: 1 after end nested process.",
             },
         },
     }
@@ -405,6 +405,7 @@ def test_foreach_stage_exec_raise_full():
     )
     rs: Result = stage.execute(params={})
     assert rs.status == FAILED
+    possible = []
     try:
         assert rs.context == {
             "status": FAILED,
@@ -426,7 +427,7 @@ def test_foreach_stage_exec_raise_full():
                     },
                     "errors": {
                         "name": "StageError",
-                        "message": "Item execution was break because its nested-stage, 'Final Echo', failed.",
+                        "message": "Break item: 2 because nested stage: 'Final Echo', failed.",
                     },
                 },
                 1: {
@@ -439,139 +440,27 @@ def test_foreach_stage_exec_raise_full():
                     },
                     "errors": {
                         "name": "StageCancelError",
-                        "message": "Item execution was canceled from the event before start item execution.",
+                        "message": "Cancel item: 1 before start nested process.",
                     },
                 },
             },
             "errors": {
                 2: {
                     "name": "StageError",
-                    "message": "Item execution was break because its nested-stage, 'Final Echo', failed.",
+                    "message": "Break item: 2 because nested stage: 'Final Echo', failed.",
                 },
                 1: {
                     "name": "StageCancelError",
-                    "message": "Item execution was canceled from the event before start item execution.",
+                    "message": "Cancel item: 1 before start nested process.",
                 },
             },
         }
+        possible.append(True)
     except AssertionError:
-        try:
-            assert rs.context == {
-                "status": FAILED,
-                "items": [1, 2],
-                "foreach": {
-                    2: {
-                        "status": FAILED,
-                        "item": 2,
-                        "stages": {
-                            "2709471980": {"outputs": {}, "status": SUCCESS},
-                            "9263488742": {
-                                "outputs": {},
-                                "errors": {
-                                    "name": "StageError",
-                                    "message": "Raise for item equal 2",
-                                },
-                                "status": FAILED,
-                            },
-                        },
-                        "errors": {
-                            "name": "StageError",
-                            "message": "Item execution was break because its nested-stage, 'Final Echo', failed.",
-                        },
-                    },
-                    1: {
-                        "status": CANCEL,
-                        "item": 1,
-                        "stages": {
-                            "2709471980": {"outputs": {}, "status": SUCCESS},
-                            "9263488742": {"outputs": {}, "status": SKIP},
-                            "2238460182": {
-                                "errors": {
-                                    "message": "Execution was canceled from the event before start parallel.",
-                                    "name": "StageCancelError",
-                                },
-                                "outputs": {},
-                                "status": CANCEL,
-                            },
-                        },
-                        "errors": {
-                            "name": "StageCancelError",
-                            "message": "Item execution was canceled from the event after end item execution.",
-                        },
-                    },
-                },
-                "errors": {
-                    2: {
-                        "name": "StageError",
-                        "message": "Item execution was break because its nested-stage, 'Final Echo', failed.",
-                    },
-                    1: {
-                        "name": "StageCancelError",
-                        "message": "Item execution was canceled from the event after end item execution.",
-                    },
-                },
-            }
-        except AssertionError:
-            assert rs.context == {
-                "errors": {
-                    1: {
-                        "message": "Item execution was canceled from the event before start item "
-                        "execution.",
-                        "name": "StageCancelError",
-                    },
-                    2: {
-                        "message": "Item execution was break because its nested-stage, 'Final Echo', "
-                        "failed.",
-                        "name": "StageError",
-                    },
-                },
-                "foreach": {
-                    1: {
-                        "errors": {
-                            "message": "Item execution was canceled from the event before start item "
-                            "execution.",
-                            "name": "StageCancelError",
-                        },
-                        "item": 1,
-                        "stages": {
-                            "2709471980": {
-                                "outputs": {},
-                                "status": SUCCESS,
-                            },
-                            "9263488742": {
-                                "outputs": {},
-                                "status": SKIP,
-                            },
-                        },
-                        "status": CANCEL,
-                    },
-                    2: {
-                        "errors": {
-                            "message": "Item execution was break because its nested-stage, 'Final "
-                            "Echo', failed.",
-                            "name": "StageError",
-                        },
-                        "item": 2,
-                        "stages": {
-                            "2709471980": {
-                                "outputs": {},
-                                "status": SUCCESS,
-                            },
-                            "9263488742": {
-                                "errors": {
-                                    "message": "Raise for item equal 2",
-                                    "name": "StageError",
-                                },
-                                "outputs": {},
-                                "status": FAILED,
-                            },
-                        },
-                        "status": FAILED,
-                    },
-                },
-                "items": [1, 2],
-                "status": FAILED,
-            }
+        possible.append(False)
+    if not any(possible):
+        print(rs.context)
+        raise AssertionError("checking context does not match any case.")
 
 
 def test_foreach_stage_exec_concurrent(test_path):
@@ -745,7 +634,7 @@ def test_foreach_stage_exec_concurrent_with_raise():
                     "stages": {},
                     "errors": {
                         "name": "StageError",
-                        "message": "Item execution was break because its nested-stage, 'Raise with PyStage', failed.",
+                        "message": "Break item: 2 because nested stage: 'Raise with PyStage', failed.",
                     },
                 },
                 1: {"status": SUCCESS, "item": 1, "stages": {}},
@@ -754,7 +643,7 @@ def test_foreach_stage_exec_concurrent_with_raise():
             "errors": {
                 2: {
                     "name": "StageError",
-                    "message": "Item execution was break because its nested-stage, 'Raise with PyStage', failed.",
+                    "message": "Break item: 2 because nested stage: 'Raise with PyStage', failed.",
                 }
             },
         }
@@ -769,7 +658,7 @@ def test_foreach_stage_exec_concurrent_with_raise():
                     "stages": {},
                     "errors": {
                         "name": "StageError",
-                        "message": "Item execution was break because its nested-stage, 'Raise with PyStage', failed.",
+                        "message": "Break item: 2 because nested stage: 'Raise with PyStage', failed.",
                     },
                 },
                 1: {"status": SUCCESS, "item": 1, "stages": {}},
@@ -779,18 +668,18 @@ def test_foreach_stage_exec_concurrent_with_raise():
                     "stages": {},
                     "errors": {
                         "name": "StageCancelError",
-                        "message": "Item execution was canceled from the event before start item execution.",
+                        "message": "Cancel item: 3 before start nested process.",
                     },
                 },
             },
             "errors": {
                 2: {
                     "name": "StageError",
-                    "message": "Item execution was break because its nested-stage, 'Raise with PyStage', failed.",
+                    "message": "Break item: 2 because nested stage: 'Raise with PyStage', failed.",
                 },
                 3: {
                     "name": "StageCancelError",
-                    "message": "Item execution was canceled from the event before start item execution.",
+                    "message": "Cancel item: 3 before start nested process.",
                 },
             },
         }
@@ -841,7 +730,7 @@ def test_foreach_stage_exec_concurrent_raise():
                     },
                     "errors": {
                         "name": "StageError",
-                        "message": "Item execution was break because its nested-stage, 'raise-error', failed.",
+                        "message": "Break item: 1 because nested stage: 'raise-error', failed.",
                     },
                 },
                 2: {
@@ -856,7 +745,7 @@ def test_foreach_stage_exec_concurrent_raise():
             "errors": {
                 1: {
                     "name": "StageError",
-                    "message": "Item execution was break because its nested-stage, 'raise-error', failed.",
+                    "message": "Break item: 1 because nested stage: 'raise-error', failed.",
                 }
             },
         },
@@ -879,7 +768,7 @@ def test_foreach_stage_exec_concurrent_raise():
                     },
                     "errors": {
                         "name": "StageError",
-                        "message": "Item execution was break because its nested-stage, 'raise-error', failed.",
+                        "message": "Break item: 1 because nested stage: 'raise-error', failed.",
                     },
                 },
                 2: {
@@ -888,18 +777,18 @@ def test_foreach_stage_exec_concurrent_raise():
                     "stages": {"raise-error": {"outputs": {}, "status": SKIP}},
                     "errors": {
                         "name": "StageCancelError",
-                        "message": "Item execution was canceled from the event before start item execution.",
+                        "message": "Cancel item: 2 before start nested process.",
                     },
                 },
             },
             "errors": {
                 2: {
                     "name": "StageCancelError",
-                    "message": "Item execution was canceled from the event before start item execution.",
+                    "message": "Cancel item: 2 before start nested process.",
                 },
                 1: {
                     "name": "StageError",
-                    "message": "Item execution was break because its nested-stage, 'raise-error', failed.",
+                    "message": "Break item: 1 because nested stage: 'raise-error', failed.",
                 },
             },
         },
@@ -922,7 +811,7 @@ def test_foreach_stage_exec_concurrent_raise():
                     },
                     "errors": {
                         "name": "StageError",
-                        "message": "Item execution was break because its nested-stage, 'raise-error', failed.",
+                        "message": "Break item: 1 because nested stage: 'raise-error', failed.",
                     },
                 },
                 2: {
@@ -941,18 +830,18 @@ def test_foreach_stage_exec_concurrent_raise():
                     },
                     "errors": {
                         "name": "StageCancelError",
-                        "message": "Item execution was canceled from the event after end item execution.",
+                        "message": "Cancel item: 2 after end nested process.",
                     },
                 },
             },
             "errors": {
                 2: {
                     "name": "StageCancelError",
-                    "message": "Item execution was canceled from the event after end item execution.",
+                    "message": "Cancel item: 2 after end nested process.",
                 },
                 1: {
                     "name": "StageError",
-                    "message": "Item execution was break because its nested-stage, 'raise-error', failed.",
+                    "message": "Break item: 1 because nested stage: 'raise-error', failed.",
                 },
             },
         },
@@ -971,7 +860,7 @@ def test_foreach_stage_exec_concurrent_raise():
             "foreach": {
                 1: {
                     "errors": {
-                        "message": "Item execution was break because its nested-stage, "
+                        "message": "Break item: 1 because nested stage: "
                         "'raise-error', failed.",
                         "name": "StageError",
                     },
@@ -993,19 +882,19 @@ def test_foreach_stage_exec_concurrent_raise():
         {
             "errors": {
                 1: {
-                    "message": "Item execution was break because its nested-stage, 'raise-error', "
+                    "message": "Break item: 1 because nested stage: 'raise-error', "
                     "failed.",
                     "name": "StageError",
                 },
                 2: {
-                    "message": "Item execution was canceled from the event before start item execution.",
+                    "message": "Cancel item: 2 before start nested process.",
                     "name": "StageCancelError",
                 },
             },
             "foreach": {
                 1: {
                     "errors": {
-                        "message": "Item execution was break because its nested-stage, "
+                        "message": "Break item: 1 because nested stage: "
                         "'raise-error', failed.",
                         "name": "StageError",
                     },
@@ -1024,7 +913,7 @@ def test_foreach_stage_exec_concurrent_raise():
                 },
                 2: {
                     "errors": {
-                        "message": "Item execution was canceled from the event before start item execution.",
+                        "message": "Cancel item: 2 before start nested process.",
                         "name": "StageCancelError",
                     },
                     "item": 2,
