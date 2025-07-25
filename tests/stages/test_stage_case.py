@@ -4,7 +4,7 @@ from ddeutil.workflow.stages import CaseStage, Stage
 from ..utils import MockEvent
 
 
-def test_case_stage_exec(test_path):
+def test_case_stage_exec():
     stage: Stage = CaseStage.model_validate(
         {
             "name": "Start run case-match stage",
@@ -93,6 +93,39 @@ def test_case_stage_exec(test_path):
     }
 
 
+def test_case_stage_exec_else():
+    stage: Stage = CaseStage.model_validate(
+        {
+            "name": "Start run case-match stage",
+            "id": "case-stage",
+            "case": "${{ params.name }}",
+            "match": [
+                {
+                    "case": "bar",
+                    "stages": [
+                        {
+                            "name": "Match name with Bar",
+                            "echo": "Hello ${{ params.name }}",
+                        },
+                    ],
+                },
+                {
+                    "else": [
+                        {"name": "Else stage", "echo": "Not match any case."},
+                    ],
+                },
+            ],
+        },
+    )
+    rs: Result = stage.execute({"params": {"name": "test"}}, run_id="03")
+    assert rs.status == SUCCESS
+    assert rs.context == {
+        "status": SUCCESS,
+        "case": "_",
+        "stages": {"5883888894": {"outputs": {}, "status": SUCCESS}},
+    }
+
+
 def test_case_stage_exec_raise():
     stage: Stage = CaseStage.model_validate(
         {
@@ -159,7 +192,7 @@ def test_case_stage_exec_raise():
         },
         "errors": {
             "name": "StageError",
-            "message": "Case-Stage was break because it has a sub stage, Raise stage, failed without raise error.",
+            "message": "Break case: 'bar' because nested stage: Raise stage, failed.",
         },
     }
 
@@ -192,9 +225,7 @@ def test_case_stage_exec_cancel():
         "status": CANCEL,
         "errors": {
             "name": "StageCancelError",
-            "message": (
-                "Execution was canceled from the event before start case execution."
-            ),
+            "message": ("Cancel before start case process."),
         },
     }
 
@@ -209,7 +240,7 @@ def test_case_stage_exec_cancel():
         "stages": {},
         "errors": {
             "name": "StageError",
-            "message": "Case-Stage was canceled from event that had set before stage case execution.",
+            "message": "Cancel case: 'bar' before start nested process.",
         },
     }
 
