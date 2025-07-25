@@ -126,10 +126,10 @@ def validate_statuses(statuses: list[Status]) -> Status:
         >>> validate_statuses([SUCCESS, SUCCESS, SUCCESS])
         >>> # Returns: SUCCESS
     """
-    if any(s == CANCEL for s in statuses):
-        return CANCEL
-    elif any(s == FAILED for s in statuses):
+    if any(s == FAILED for s in statuses):
         return FAILED
+    elif any(s == CANCEL for s in statuses):
+        return CANCEL
     elif any(s == WAIT for s in statuses):
         return WAIT
     for status in (SUCCESS, SKIP):
