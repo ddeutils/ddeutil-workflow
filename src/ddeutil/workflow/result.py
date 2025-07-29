@@ -323,7 +323,10 @@ class Layer(str, Enum):
 
 
 def get_context_by_layer(
-    context: DictData, key: str, layer: Layer, context_key: str
+    context: DictData,
+    key: str,
+    layer: Layer,
+    context_key: str,
 ):
     if layer == Layer.WORKFLOW:
         return context.get("jobs", {}).get(key, {}).get(context_key, WAIT)

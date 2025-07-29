@@ -102,13 +102,34 @@ def test_trigger_stage_exec_raise(test_path):
     rs: Result = stage.execute(params={}, run_id="02")
     assert rs.status == FAILED
     assert rs.context == {
+        "params": {},
+        "jobs": {
+            "second-job": {
+                "status": SUCCESS,
+                "stages": {"1772094681": {"outputs": {}, "status": SUCCESS}},
+            },
+            "first-job": {
+                "status": FAILED,
+                "stages": {
+                    "raise-error": {
+                        "outputs": {},
+                        "errors": {
+                            "name": "ValueError",
+                            "message": "Testing raise error inside PyStage!!!",
+                        },
+                        "status": FAILED,
+                    }
+                },
+                "errors": {
+                    "name": "JobError",
+                    "message": "Strategy execution was break because its nested-stage, 'raise-error', failed.",
+                },
+            },
+        },
         "status": FAILED,
         "errors": {
-            "name": "StageNestedError",
-            "message": (
-                "Trigger workflow was failed with:\n"
-                "Job execution, 'first-job', was failed."
-            ),
+            "name": "StageError",
+            "message": "Trigger workflow was failed with:\nJob execution, 'first-job', was failed.",
         },
     }
 
@@ -125,9 +146,11 @@ def test_trigger_stage_exec_cancel():
     rs: Result = stage.execute(params={}, event=event)
     assert rs.status == CANCEL
     assert rs.context == {
+        "params": {},
+        "jobs": {},
         "status": CANCEL,
         "errors": {
-            "name": "StageNestedCancelError",
+            "name": "StageCancelError",
             "message": "Trigger workflow was cancel.",
         },
     }
@@ -143,4 +166,17 @@ def test_trigger_stage_exec_skip():
     )
     rs: Result = stage.execute(params={})
     assert rs.status == SKIP
-    assert rs.context == {"status": SKIP}
+    assert rs.context == {
+        "params": {},
+        "jobs": {
+            "first-job": {
+                "status": SKIP,
+                "stages": {"2644213676": {"outputs": {}, "status": SKIP}},
+            }
+        },
+        "status": SKIP,
+        "errors": {
+            "name": "StageSkipError",
+            "message": "Trigger workflow was skipped.",
+        },
+    }

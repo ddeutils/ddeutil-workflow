@@ -127,7 +127,7 @@ def test_example_parallel_stage_exec_with_trigger_raise(test_path):
                     },
                     "errors": {
                         "name": "StageError",
-                        "message": "Branch execution was break because its nested-stage, 'Raise Stage', failed.",
+                        "message": "Break branch: 'branch02' because nested stage: 'Raise Stage', failed.",
                     },
                 },
                 "branch01": {
@@ -135,9 +135,30 @@ def test_example_parallel_stage_exec_with_trigger_raise(test_path):
                     "branch": "branch01",
                     "stages": {
                         "8713259197": {
-                            "outputs": {},
+                            "outputs": {
+                                "params": {"branch": "branch01"},
+                                "jobs": {
+                                    "first-job": {
+                                        "status": FAILED,
+                                        "stages": {
+                                            "raise-stage": {
+                                                "outputs": {},
+                                                "errors": {
+                                                    "name": "StageError",
+                                                    "message": "Raise trigger with branch: branch01",
+                                                },
+                                                "status": FAILED,
+                                            }
+                                        },
+                                        "errors": {
+                                            "name": "JobError",
+                                            "message": "Strategy execution was break because its nested-stage, 'raise-stage', failed.",
+                                        },
+                                    }
+                                },
+                            },
                             "errors": {
-                                "name": "StageNestedError",
+                                "name": "StageError",
                                 "message": "Trigger workflow was failed with:\nJob execution, 'first-job', was failed.",
                             },
                             "status": FAILED,
@@ -145,18 +166,18 @@ def test_example_parallel_stage_exec_with_trigger_raise(test_path):
                     },
                     "errors": {
                         "name": "StageError",
-                        "message": "Branch execution was break because its nested-stage, 'Stage trigger', failed.",
+                        "message": "Break branch: 'branch01' because nested stage: 'Stage trigger', failed.",
                     },
                 },
             },
             "errors": {
                 "branch02": {
                     "name": "StageError",
-                    "message": "Branch execution was break because its nested-stage, 'Raise Stage', failed.",
+                    "message": "Break branch: 'branch02' because nested stage: 'Raise Stage', failed.",
                 },
                 "branch01": {
                     "name": "StageError",
-                    "message": "Branch execution was break because its nested-stage, 'Stage trigger', failed.",
+                    "message": "Break branch: 'branch01' because nested stage: 'Stage trigger', failed.",
                 },
             },
         }
@@ -211,9 +232,30 @@ def test_example_parallel_stage_exec_with_trigger_raise_bug(test_path):
                     "branch": "branch01",
                     "stages": {
                         "2579951921": {
-                            "outputs": {},
+                            "outputs": {
+                                "params": {"branch": "branch01"},
+                                "jobs": {
+                                    "first-job": {
+                                        "status": FAILED,
+                                        "stages": {
+                                            "raise-stage": {
+                                                "outputs": {},
+                                                "errors": {
+                                                    "name": "StageError",
+                                                    "message": "Raise trigger with branch: branch01",
+                                                },
+                                                "status": FAILED,
+                                            }
+                                        },
+                                        "errors": {
+                                            "name": "JobError",
+                                            "message": "Strategy execution was break because its nested-stage, 'raise-stage', failed.",
+                                        },
+                                    }
+                                },
+                            },
                             "errors": {
-                                "name": "StageNestedError",
+                                "name": "StageError",
                                 "message": "Trigger workflow was failed with:\nJob execution, 'first-job', was failed.",
                             },
                             "status": FAILED,
@@ -221,7 +263,7 @@ def test_example_parallel_stage_exec_with_trigger_raise_bug(test_path):
                     },
                     "errors": {
                         "name": "StageError",
-                        "message": "Branch execution was break because its nested-stage, 'Stage trigger 1', failed.",
+                        "message": "Break branch: 'branch01' because nested stage: 'Stage trigger 1', failed.",
                     },
                 },
                 "branch02": {
@@ -229,9 +271,30 @@ def test_example_parallel_stage_exec_with_trigger_raise_bug(test_path):
                     "branch": "branch02",
                     "stages": {
                         "4773288548": {
-                            "outputs": {},
+                            "outputs": {
+                                "params": {"branch": "branch02"},
+                                "jobs": {
+                                    "first-job": {
+                                        "status": FAILED,
+                                        "stages": {
+                                            "raise-stage": {
+                                                "outputs": {},
+                                                "errors": {
+                                                    "name": "StageError",
+                                                    "message": "Raise trigger with branch: branch02",
+                                                },
+                                                "status": FAILED,
+                                            }
+                                        },
+                                        "errors": {
+                                            "name": "JobError",
+                                            "message": "Strategy execution was break because its nested-stage, 'raise-stage', failed.",
+                                        },
+                                    }
+                                },
+                            },
                             "errors": {
-                                "name": "StageNestedError",
+                                "name": "StageError",
                                 "message": "Trigger workflow was failed with:\nJob execution, 'first-job', was failed.",
                             },
                             "status": FAILED,
@@ -239,18 +302,18 @@ def test_example_parallel_stage_exec_with_trigger_raise_bug(test_path):
                     },
                     "errors": {
                         "name": "StageError",
-                        "message": "Branch execution was break because its nested-stage, 'Stage trigger 2', failed.",
+                        "message": "Break branch: 'branch02' because nested stage: 'Stage trigger 2', failed.",
                     },
                 },
             },
             "errors": {
                 "branch01": {
                     "name": "StageError",
-                    "message": "Branch execution was break because its nested-stage, 'Stage trigger 1', failed.",
+                    "message": "Break branch: 'branch01' because nested stage: 'Stage trigger 1', failed.",
                 },
                 "branch02": {
                     "name": "StageError",
-                    "message": "Branch execution was break because its nested-stage, 'Stage trigger 2', failed.",
+                    "message": "Break branch: 'branch02' because nested stage: 'Stage trigger 2', failed.",
                 },
             },
         }

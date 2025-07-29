@@ -1295,9 +1295,30 @@ def test_workflow_exec_circle_trigger(test_path):
                     "status": FAILED,
                     "stages": {
                         "1099837090": {
-                            "outputs": {},
+                            "outputs": {
+                                "params": {"name": "wf-circle-runtime-nested"},
+                                "jobs": {
+                                    "first-job": {
+                                        "status": FAILED,
+                                        "stages": {
+                                            "1099837090": {
+                                                "outputs": {},
+                                                "errors": {
+                                                    "name": "StageError",
+                                                    "message": "Circle execute via trigger itself workflow name.",
+                                                },
+                                                "status": FAILED,
+                                            }
+                                        },
+                                        "errors": {
+                                            "name": "JobError",
+                                            "message": "Strategy execution was break because its nested-stage, 'Trigger itself', failed.",
+                                        },
+                                    }
+                                },
+                            },
                             "errors": {
-                                "name": "StageNestedError",
+                                "name": "StageError",
                                 "message": "Trigger workflow was failed with:\nJob execution, 'first-job', was failed.",
                             },
                             "status": FAILED,

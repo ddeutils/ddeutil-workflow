@@ -235,6 +235,16 @@ class BaseStage(BaseModel, ABC):
         return self
 
     def pass_template(self, value: Any, params: DictData) -> Any:
+        """Pass template and environment variable to any value that can
+        templating.
+
+        Args:
+            value (Any): An any value.
+            params (DictData):
+
+        Returns:
+            Any: A templated value.
+        """
         return pass_env(param2template(value, params, extras=self.extras))
 
     @abstractmethod
@@ -499,10 +509,12 @@ class BaseStage(BaseModel, ABC):
         """Get the outputs from stages data. It will get this stage ID from
         the stage outputs mapping.
 
-        :param output: (DictData) A stage output context that want to get this
-            stage ID `outputs` key.
+        Args:
+            output (DictData): A stage output context that want to get this
+                stage ID `outputs` key.
 
-        :rtype: DictData
+        Returns:
+            DictData: An output value that have get with its identity.
         """
         if self.id is None and not dynamic(
             "stage_default_id", extras=self.extras
@@ -1066,9 +1078,7 @@ class EmptyStage(BaseAsyncStage):
         )
 
         if event and event.is_set():
-            raise StageCancelError(
-                "Execution was canceled from the event before start parallel."
-            )
+            raise StageCancelError("Cancel before start empty process.")
 
         trace.info(f"[STAGE]: Message: ( {message} )")
         if self.sleep > 0:
@@ -1119,9 +1129,7 @@ class EmptyStage(BaseAsyncStage):
         )
 
         if event and event.is_set():
-            raise StageCancelError(
-                "Execution was canceled from the event before start parallel."
-            )
+            raise StageCancelError("Cancel before start empty process.")
 
         trace.info(f"[STAGE]: Message: ( {message} )")
         if self.sleep > 0:
@@ -1759,9 +1767,7 @@ class CallStage(BaseRetryStage):
             args.pop("extras")
 
         if event and event.is_set():
-            raise StageCancelError(
-                "Execution was canceled from the event before start parallel."
-            )
+            raise StageCancelError("Cancel before start call process.")
 
         args: DictData = self.validate_model_args(
             call_func, args, run_id, parent_run_id, extras=self.extras
@@ -1879,9 +1885,7 @@ class CallStage(BaseRetryStage):
             args.pop("extras")
 
         if event and event.is_set():
-            raise StageCancelError(
-                "Execution was canceled from the event before start parallel."
-            )
+            raise StageCancelError("Cancel before start call process.")
 
         args: DictData = self.validate_model_args(
             call_func, args, run_id, parent_run_id, extras=self.extras
@@ -2101,19 +2105,41 @@ class TriggerStage(BaseNestedStage):
             run_id=parent_run_id,
             event=event,
         )
-        # TODO: The context from workflow execution does not save when its status
-        #   does not equal SUCCESS.
         if result.status == FAILED:
             err_msg: str = (
                 f" with:\n{msg}"
                 if (msg := result.context.get("errors", {}).get("message"))
                 else "."
             )
-            raise StageNestedError(f"Trigger workflow was failed{err_msg}")
+            return result.catch(
+                status=FAILED,
+                context={
+                    "status": FAILED,
+                    "errors": StageError(
+                        f"Trigger workflow was failed{err_msg}"
+                    ).to_dict(),
+                },
+            )
         elif result.status == CANCEL:
-            raise StageNestedCancelError("Trigger workflow was cancel.")
+            return result.catch(
+                status=CANCEL,
+                context={
+                    "status": CANCEL,
+                    "errors": StageCancelError(
+                        "Trigger workflow was cancel."
+                    ).to_dict(),
+                },
+            )
         elif result.status == SKIP:
-            raise StageNestedSkipError("Trigger workflow was skipped.")
+            return result.catch(
+                status=SKIP,
+                context={
+                    "status": SKIP,
+                    "errors": StageSkipError(
+                        "Trigger workflow was skipped."
+                    ).to_dict(),
+                },
+            )
         return result
 
 
@@ -2939,10 +2965,13 @@ class UntilStage(BaseNestedStage):
         exceed_loop: bool = False
         catch(context=context, status=WAIT, updated={"until": {}})
         statuses: list[Status] = []
+
         while until_rs and not (exceed_loop := (loop > self.max_loop)):
 
             if event and event.is_set():
-                raise StageCancelError("Cancel before start loop process.")
+                raise StageCancelError(
+                    f"Cancel before start loop process, (loop: {loop})."
+                )
 
             status, context, item = self._process_nested(
                 item=item,
@@ -3034,6 +3063,30 @@ class CaseStage(BaseNestedStage):
         ...         {
         ...             "case": "_",
         ...             "stages": [
+        ...                 {
+        ...                     "name": "Stage else",
+        ...                     "eche": "Hello case else",
+        ...                 },
+        ...             ],
+        ...         },
+        ...     ],
+        ... }
+
+        >>> stage = {
+        ...     "name": "If stage execution.",
+        ...     "case": "${{ param.test }}",
+        ...     "match": [
+        ...         {
+        ...             "case": "1",
+        ...             "stages": [
+        ...                 {
+        ...                     "name": "Stage case 1",
+        ...                     "eche": "Hello case 1",
+        ...                 },
+        ...             ],
+        ...         },
+        ...         {
+        ...             "else": [
         ...                 {
         ...                     "name": "Stage else",
         ...                     "eche": "Hello case else",

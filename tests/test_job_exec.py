@@ -569,7 +569,7 @@ def test_job_exec_cancel():
                     "outputs": {},
                     "errors": {
                         "name": "StageCancelError",
-                        "message": "Execution was canceled from the event before start parallel.",
+                        "message": "Cancel before start empty process.",
                     },
                     "status": CANCEL,
                 },

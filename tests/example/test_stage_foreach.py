@@ -140,9 +140,30 @@ def test_example_foreach_stage_exec_with_trigger_raise(test_path):
                         "item": 1,
                         "stages": {
                             "2827845371": {
-                                "outputs": {},
+                                "outputs": {
+                                    "params": {"item": 1},
+                                    "jobs": {
+                                        "first-job": {
+                                            "status": FAILED,
+                                            "stages": {
+                                                "raise-stage": {
+                                                    "outputs": {},
+                                                    "errors": {
+                                                        "name": "StageError",
+                                                        "message": "Raise trigger with item: 1",
+                                                    },
+                                                    "status": FAILED,
+                                                }
+                                            },
+                                            "errors": {
+                                                "name": "JobError",
+                                                "message": "Strategy execution was break because its nested-stage, 'raise-stage', failed.",
+                                            },
+                                        }
+                                    },
+                                },
                                 "errors": {
-                                    "name": "StageNestedError",
+                                    "name": "StageError",
                                     "message": "Trigger workflow was failed with:\nJob execution, 'first-job', was failed.",
                                 },
                                 "status": FAILED,
@@ -150,7 +171,7 @@ def test_example_foreach_stage_exec_with_trigger_raise(test_path):
                         },
                         "errors": {
                             "name": "StageError",
-                            "message": "Item execution was break because its nested-stage, 'Stage trigger for raise', failed.",
+                            "message": "Break item: 1 because nested stage: 'Stage trigger for raise', failed.",
                         },
                     },
                     2: {
@@ -158,9 +179,9 @@ def test_example_foreach_stage_exec_with_trigger_raise(test_path):
                         "item": 2,
                         "stages": {
                             "2827845371": {
-                                "outputs": {},
+                                "outputs": {"params": {"item": 2}, "jobs": {}},
                                 "errors": {
-                                    "name": "StageNestedCancelError",
+                                    "name": "StageCancelError",
                                     "message": "Trigger workflow was cancel.",
                                 },
                                 "status": CANCEL,
@@ -168,18 +189,18 @@ def test_example_foreach_stage_exec_with_trigger_raise(test_path):
                         },
                         "errors": {
                             "name": "StageCancelError",
-                            "message": "Item execution was canceled from the event after end item execution.",
+                            "message": "Cancel item: 2 after end nested process.",
                         },
                     },
                 },
                 "errors": {
-                    1: {
-                        "name": "StageError",
-                        "message": "Item execution was break because its nested-stage, 'Stage trigger for raise', failed.",
-                    },
                     2: {
                         "name": "StageCancelError",
-                        "message": "Item execution was canceled from the event after end item execution.",
+                        "message": "Cancel item: 2 after end nested process.",
+                    },
+                    1: {
+                        "name": "StageError",
+                        "message": "Break item: 1 because nested stage: 'Stage trigger for raise', failed.",
                     },
                 },
             }
@@ -197,9 +218,30 @@ def test_example_foreach_stage_exec_with_trigger_raise(test_path):
                         "item": 1,
                         "stages": {
                             "2827845371": {
-                                "outputs": {},
+                                "outputs": {
+                                    "params": {"item": 1},
+                                    "jobs": {
+                                        "first-job": {
+                                            "status": FAILED,
+                                            "stages": {
+                                                "raise-stage": {
+                                                    "outputs": {},
+                                                    "errors": {
+                                                        "name": "StageError",
+                                                        "message": "Raise trigger with item: 1",
+                                                    },
+                                                    "status": FAILED,
+                                                }
+                                            },
+                                            "errors": {
+                                                "name": "JobError",
+                                                "message": "Strategy execution was break because its nested-stage, 'raise-stage', failed.",
+                                            },
+                                        }
+                                    },
+                                },
                                 "errors": {
-                                    "name": "StageNestedError",
+                                    "name": "StageError",
                                     "message": "Trigger workflow was failed with:\nJob execution, 'first-job', was failed.",
                                 },
                                 "status": FAILED,
@@ -207,7 +249,7 @@ def test_example_foreach_stage_exec_with_trigger_raise(test_path):
                         },
                         "errors": {
                             "name": "StageError",
-                            "message": "Item execution was break because its nested-stage, 'Stage trigger for raise', failed.",
+                            "message": "Break item: 1 because nested stage: 'Stage trigger for raise', failed.",
                         },
                     },
                     2: {
@@ -216,18 +258,18 @@ def test_example_foreach_stage_exec_with_trigger_raise(test_path):
                         "stages": {},
                         "errors": {
                             "name": "StageCancelError",
-                            "message": "Item execution was canceled from the event before start item execution.",
+                            "message": "Cancel item: 2 before start nested process.",
                         },
                     },
                 },
                 "errors": {
                     2: {
                         "name": "StageCancelError",
-                        "message": "Item execution was canceled from the event before start item execution.",
+                        "message": "Cancel item: 2 before start nested process.",
                     },
                     1: {
                         "name": "StageError",
-                        "message": "Item execution was break because its nested-stage, 'Stage trigger for raise', failed.",
+                        "message": "Break item: 1 because nested stage: 'Stage trigger for raise', failed.",
                     },
                 },
             }

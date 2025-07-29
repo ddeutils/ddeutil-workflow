@@ -240,7 +240,7 @@ def test_call_stage_exec_cancel():
         "status": CANCEL,
         "errors": {
             "name": "StageCancelError",
-            "message": "Execution was canceled from the event before start parallel.",
+            "message": "Cancel before start call process.",
         },
     }
 
@@ -396,7 +396,7 @@ async def test_call_stage_axec_cancel():
         "status": CANCEL,
         "errors": {
             "name": "StageCancelError",
-            "message": "Execution was canceled from the event before start parallel.",
+            "message": "Cancel before start call process.",
         },
     }
 

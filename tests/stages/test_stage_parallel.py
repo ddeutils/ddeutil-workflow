@@ -197,18 +197,18 @@ def test_parallel_stage_exec_cancel():
             },
         }
     )
-    # event = MockEvent(n=0)
-    # rs: Result = stage.execute({}, event=event)
-    # assert rs.status == CANCEL
-    # assert rs.context == {
-    #     "status": CANCEL,
-    #     "workers": 2,
-    #     "parallel": {},
-    #     "errors": {
-    #         "name": "StageCancelError",
-    #         "message": "Cancel before start parallel process.",
-    #     },
-    # }
+    event = MockEvent(n=0)
+    rs: Result = stage.execute({}, event=event)
+    assert rs.status == CANCEL
+    assert rs.context == {
+        "status": CANCEL,
+        "workers": 2,
+        "parallel": {},
+        "errors": {
+            "name": "StageCancelError",
+            "message": "Cancel before start parallel process.",
+        },
+    }
 
     event = MockEvent(n=2)
     rs: Result = stage.execute({}, event=event)
@@ -236,7 +236,7 @@ def test_parallel_stage_exec_cancel():
                             "outputs": {},
                             "errors": {
                                 "name": "StageCancelError",
-                                "message": "Execution was canceled from the event before start parallel.",
+                                "message": "Cancel before start empty process.",
                             },
                             "status": CANCEL,
                         }
@@ -283,7 +283,7 @@ def test_parallel_stage_exec_cancel():
                             "outputs": {},
                             "errors": {
                                 "name": "StageCancelError",
-                                "message": "Execution was canceled from the event before start parallel.",
+                                "message": "Cancel before start empty process.",
                             },
                             "status": CANCEL,
                         }
