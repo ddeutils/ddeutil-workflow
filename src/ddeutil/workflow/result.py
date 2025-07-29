@@ -8,20 +8,12 @@
 This module provides the core result and status management functionality for
 workflow execution tracking. It includes the Status enumeration for execution
 states and the Result dataclass for context transfer between workflow components.
-
-Classes:
-    Status: Enumeration for execution status tracking
-    Result: Dataclass for execution context and result management
-
-Functions:
-    validate_statuses: Determine final status from multiple status values
-    get_status_from_error: Convert exception types to appropriate status
 """
 from __future__ import annotations
 
 from dataclasses import field
 from enum import Enum
-from typing import Optional, TypedDict, Union
+from typing import Any, Optional, TypedDict, Union
 
 from pydantic import ConfigDict
 from pydantic.dataclasses import dataclass
@@ -327,16 +319,26 @@ def get_context_by_layer(
     key: str,
     layer: Layer,
     context_key: str,
-):
+    *,
+    default: Optional[Any] = None,
+) -> Any:  # pragma: no cov
     if layer == Layer.WORKFLOW:
-        return context.get("jobs", {}).get(key, {}).get(context_key, WAIT)
+        return context.get("jobs", {}).get(key, {}).get(context_key, default)
     elif layer == Layer.JOB:
-        return context.get("stages", {}).get(key, {}).get(context_key, WAIT)
+        return context.get("stages", {}).get(key, {}).get(context_key, default)
     elif layer == Layer.STRATEGY:
-        return context.get("strategies", {}).get(key, {}).get(context_key, WAIT)
-    return context.get(key, {}).get(context_key, WAIT)
+        return (
+            context.get("strategies", {}).get(key, {}).get(context_key, default)
+        )
+    return context.get(key, {}).get(context_key, default)
 
 
-def get_status(context: DictData, key: str, layer: Layer):
+def get_status(
+    context: DictData,
+    key: str,
+    layer: Layer,
+) -> Status:  # pragma: no cov
     """Get status from context by a specific key and context layer."""
-    return get_context_by_layer(context, key, layer, context_key="status")
+    return get_context_by_layer(
+        context, key, layer, context_key="status", default=WAIT
+    )

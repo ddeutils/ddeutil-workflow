@@ -587,7 +587,7 @@ class BaseStage(BaseModel, ABC):
         """
         return False
 
-    def detail(self) -> DictData:
+    def detail(self) -> DictData:  # pragma: no cov
         """Return the detail of this stage for generate markdown.
 
         Returns:
@@ -3115,8 +3115,24 @@ class CaseStage(BaseNestedStage):
     def __validate_match(
         cls, match: list[Union[Match, Else]]
     ) -> list[Union[Match, Else]]:
-        if len([m for m in match if isinstance(m, Else)]) > 1:
-            raise ValueError("match field should contain only one Else model")
+        """Validate the match field should contain only one Else model."""
+        c_else_case: int = 0
+        c_else_model: int = 0
+        for m in match:
+            if isinstance(m, Else):
+                if c_else_model:
+                    raise ValueError(
+                        "Match field should contain only one `Else` model."
+                    )
+                c_else_model += 1
+                continue
+            if isinstance(m, Match) and m.case == "_":
+                if c_else_case:
+                    raise ValueError(
+                        "Match field should contain only one else, '_', case."
+                    )
+                c_else_case += 1
+                continue
         return match
 
     def extract_stages_from_case(
