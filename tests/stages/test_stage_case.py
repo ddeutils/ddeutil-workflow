@@ -1,7 +1,69 @@
+import pytest
 from ddeutil.workflow import CANCEL, FAILED, SKIP, SUCCESS, Result
 from ddeutil.workflow.stages import CaseStage, Stage
+from pydantic import ValidationError
 
 from ..utils import MockEvent
+
+
+def test_case_stage_raise():
+    # NOTE: Raise because it contains else case more than 1.
+    with pytest.raises(ValidationError):
+        CaseStage.model_validate(
+            {
+                "name": "Start run case-match stage",
+                "id": "case-stage",
+                "case": "${{ params.name }}",
+                "match": [
+                    {
+                        "else": [
+                            {
+                                "name": "Else stage",
+                                "echo": "Not match any case.",
+                            },
+                        ],
+                    },
+                    {
+                        "else": [
+                            {
+                                "name": "Else stage",
+                                "echo": "Not match any case.",
+                            },
+                        ],
+                    },
+                ],
+            }
+        )
+
+    # NOTE: Raise because it contains else case more than 1.
+    with pytest.raises(ValidationError):
+        CaseStage.model_validate(
+            {
+                "name": "Start run case-match stage",
+                "id": "case-stage",
+                "case": "${{ params.name }}",
+                "match": [
+                    {
+                        "case": "_",
+                        "stages": [
+                            {
+                                "name": "Else stage",
+                                "echo": "Not match any case.",
+                            },
+                        ],
+                    },
+                    {
+                        "case": "_",
+                        "stages": [
+                            {
+                                "name": "Else stage",
+                                "echo": "Not match any case.",
+                            },
+                        ],
+                    },
+                ],
+            }
+        )
 
 
 def test_case_stage_exec():
@@ -225,7 +287,7 @@ def test_case_stage_exec_cancel():
         "status": CANCEL,
         "errors": {
             "name": "StageCancelError",
-            "message": ("Cancel before start case process."),
+            "message": "Cancel before start case process.",
         },
     }
 
@@ -241,6 +303,30 @@ def test_case_stage_exec_cancel():
         "errors": {
             "name": "StageError",
             "message": "Cancel case: 'bar' before start nested process.",
+        },
+    }
+
+    event = MockEvent(n=2)
+    rs: Result = stage.execute(
+        {"params": {"name": "bar"}}, event=event, run_id="04"
+    )
+    assert rs.status == CANCEL
+    assert rs.context == {
+        "status": CANCEL,
+        "case": "bar",
+        "stages": {
+            "3616274431": {
+                "outputs": {},
+                "errors": {
+                    "name": "StageCancelError",
+                    "message": "Cancel before start empty process.",
+                },
+                "status": CANCEL,
+            }
+        },
+        "errors": {
+            "name": "StageCancelError",
+            "message": "Cancel case 'bar' after end nested process.",
         },
     }
 
@@ -268,3 +354,30 @@ def test_case_stage_exec_skipped():
     rs: Result = stage.execute({"params": {"name": "test"}}, run_id="01")
     assert rs.status == SKIP
     assert rs.context == {"status": SKIP}
+
+    stage: Stage = CaseStage.model_validate(
+        {
+            "name": "Stage skip not has else condition",
+            "id": "not-else",
+            "case": "${{ params.name }}",
+            "match": [
+                {
+                    "case": "bar",
+                    "stages": [
+                        {
+                            "name": "Match name with Bar",
+                            "if": "'${{ params.name }}' != 'bar'",
+                            "echo": "Hello ${{ params.name }}",
+                        }
+                    ],
+                }
+            ],
+        }
+    )
+    rs: Result = stage.execute({"params": {"name": "bar"}}, run_id="02")
+    assert rs.status == SKIP
+    assert rs.context == {
+        "status": SKIP,
+        "case": "bar",
+        "stages": {"3616274431": {"outputs": {}, "status": SKIP}},
+    }

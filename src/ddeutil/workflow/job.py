@@ -1273,7 +1273,6 @@ def local_execute(
 
         errors: DictData = {}
         statuses: list[Status] = [WAIT] * len_strategy
-        fail_fast: bool = False
 
         if not job.strategy.fail_fast:
             done: Iterator[Future] = as_completed(futures)
@@ -1298,7 +1297,6 @@ def local_execute(
                 )
                 trace.debug(f"[JOB]: ... Job was set Fail-Fast{nd}")
                 done: Iterator[Future] = as_completed(futures)
-                fail_fast: bool = True
 
         for i, future in enumerate(done, start=0):
             try:
@@ -1313,19 +1311,10 @@ def local_execute(
                 pass
 
     status: Status = validate_statuses(statuses)
-
-    # NOTE: Prepare status because it does not cancel from parent event but
-    #   cancel from failed item execution.
-    if fail_fast and status == CANCEL:
-        status = FAILED
-
-    return Result(
-        run_id=run_id,
-        parent_run_id=parent_run_id,
+    return Result.from_trace(trace).catch(
         status=status,
         context=catch(context, status=status, updated=errors),
         info={"execution_time": time.monotonic() - ts},
-        extras=job.extras,
     )
 
 
