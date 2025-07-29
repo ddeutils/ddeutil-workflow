@@ -2,6 +2,34 @@
 
 ## Latest Changes
 
+## 0.0.83
+
+### :stars: Highlight Features
+
+- :star: hl: add sys extras key for stop circle execute.
+
+### :sparkles: Features
+
+- :dart: feat: fix nested-error handler on case stage.
+- :dart: feat: fix nested-error handler on foreach stage.
+- :dart: feat: allow pass max-workers with string value on parallel stage.
+- :dart: feat: add clean up util func.
+- :dart: feat: add convert to empty stage method.
+- :dart: feat: add extract id for prepare a pair of parent and running id.
+- :dart: feat: move validate release date from workflow to event model.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: update testcase that able dynamic expectation.
+- :test_tube: tests: update testcase for making coverage.
+- :test_tube: tests: prepare testcase for message change.
+- :art: format: change path type of audit model.
+
+### :book: Documentations
+
+- :page_facing_up: docs: update config docs.
+- :page_facing_up: docs: update json schema file.
+
 ## 0.0.82
 
 ### :sparkles: Features
