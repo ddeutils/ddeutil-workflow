@@ -286,7 +286,7 @@ def test_foreach_stage_exec_cancel():
                         "outputs": {},
                         "errors": {
                             "name": "StageCancelError",
-                            "message": "Execution was canceled from the event before start parallel.",
+                            "message": "Cancel before start empty process.",
                         },
                         "status": CANCEL,
                     },
@@ -823,7 +823,7 @@ def test_foreach_stage_exec_concurrent_raise():
                             "outputs": {},
                             "errors": {
                                 "name": "StageCancelError",
-                                "message": "Execution was canceled from the event before start parallel.",
+                                "message": "Cancel before start empty process.",
                             },
                             "status": CANCEL,
                         },

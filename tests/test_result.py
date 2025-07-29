@@ -96,7 +96,7 @@ def test_result_catch_context_does_not_new():
 def test_validate_statuses():
     assert validate_statuses([SUCCESS, SUCCESS]) == SUCCESS
     assert validate_statuses([CANCEL, SUCCESS]) == CANCEL
-    assert validate_statuses([CANCEL, SUCCESS, FAILED]) == CANCEL
+    assert validate_statuses([CANCEL, SUCCESS, FAILED]) == FAILED
     assert validate_statuses([FAILED, SUCCESS]) == FAILED
     assert validate_statuses([FAILED, WAIT]) == FAILED
     assert validate_statuses([SUCCESS, WAIT]) == WAIT

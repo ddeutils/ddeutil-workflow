@@ -177,7 +177,7 @@ async def test_empty_stage_axec_cancel():
         "status": CANCEL,
         "errors": {
             "name": "StageCancelError",
-            "message": "Execution was canceled from the event before start parallel.",
+            "message": "Cancel before start empty process.",
         },
     }
 

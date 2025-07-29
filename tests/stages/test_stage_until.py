@@ -85,13 +85,13 @@ def test_until_stage_raise():
                 },
                 "errors": {
                     "name": "StageNestedError",
-                    "message": "Loop execution was break because its nested-stage, 'Raise stage nested', failed.",
+                    "message": "Break loop: 0 because nested stage: 'Raise stage nested', failed.",
                 },
             }
         },
         "errors": {
             "name": "StageNestedError",
-            "message": "Loop execution was break because its nested-stage, 'Raise stage nested', failed.",
+            "message": "Break loop: 0 because nested stage: 'Raise stage nested', failed.",
         },
     }
 
@@ -185,7 +185,7 @@ def test_until_stage_cancel():
         "until": {},
         "errors": {
             "name": "StageCancelError",
-            "message": "Execution was canceled from the event before start loop.",
+            "message": "Cancel before start loop process, (loop: 1).",
         },
     }
 
@@ -202,13 +202,13 @@ def test_until_stage_cancel():
                 "stages": {},
                 "errors": {
                     "name": "StageCancelError",
-                    "message": "Loop execution was canceled from the event before start loop execution.",
+                    "message": "Cancel loop: 0 before start nested process.",
                 },
             }
         },
         "errors": {
             "name": "StageCancelError",
-            "message": "Loop execution was canceled from the event before start loop execution.",
+            "message": "Cancel loop: 0 before start nested process.",
         },
     }
 
@@ -227,20 +227,20 @@ def test_until_stage_cancel():
                         "outputs": {},
                         "errors": {
                             "name": "StageCancelError",
-                            "message": "Execution was canceled from the event before start parallel.",
+                            "message": "Cancel before start empty process.",
                         },
                         "status": CANCEL,
                     }
                 },
                 "errors": {
                     "name": "StageNestedCancelError",
-                    "message": "Loop execution was canceled from the event after end loop execution.",
+                    "message": "Cancel loop: 0 after end nested process.",
                 },
             }
         },
         "errors": {
             "name": "StageNestedCancelError",
-            "message": "Loop execution was canceled from the event after end loop execution.",
+            "message": "Cancel loop: 0 after end nested process.",
         },
     }
 
