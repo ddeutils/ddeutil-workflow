@@ -33,6 +33,9 @@ def test_empty_stage():
     )
     assert stage.desc == "This is a test stage\n\tnewline"
 
+    empty_stage = stage.to_empty(sleep=10)
+    assert empty_stage.sleep == 10
+
 
 def test_empty_stage_execute():
     stage: EmptyStage = EmptyStage(name="Empty Stage", echo="hello world")

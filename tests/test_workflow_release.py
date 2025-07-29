@@ -257,8 +257,25 @@ def test_workflow_release_dryrun():
         }
     )
     rs: Result = workflow.release(
-        release=datetime.now(),
+        release=datetime(2024, 10, 1),
         params={},
         release_type=DRYRUN,
     )
-    print(rs)
+    assert rs.status == SUCCESS
+    assert rs.context == {
+        "status": "SUCCESS",
+        "params": {},
+        "release": {
+            "type": DRYRUN,
+            "logical_date": datetime(2024, 10, 1, tzinfo=ZoneInfo(key="UTC")),
+        },
+        "jobs": {
+            "first-job": {
+                "status": SUCCESS,
+                "stages": {
+                    "7782830343": {"outputs": {}, "status": SUCCESS},
+                    "second-stage": {"outputs": {}, "status": SUCCESS},
+                },
+            },
+        },
+    }

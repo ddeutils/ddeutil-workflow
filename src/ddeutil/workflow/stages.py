@@ -610,12 +610,31 @@ class BaseStage(BaseModel, ABC):
         *,
         parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
-    ) -> Optional[Result]:  # pragma: no cov
+    ) -> Optional[Result]:
         """Pre-process method that will use to run with dry-run mode, and it
         should be used before process method.
-        """
 
-    def to_empty(self, sleep: int = 0.35) -> EmptyStage:  # pragma: no cov
+        Args:
+            params (DictData): A parameter data that want to use in this
+                execution.
+            run_id (str): A running stage ID.
+            context (DictData): A context data.
+            parent_run_id: A parent running ID. (Default is None)
+            event: An event manager that use to track parent process
+                was not force stopped.
+
+        Returns:
+            Result: The execution result with status and context data.
+        """
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
+        )
+        trace.debug("[STAGE]: Start Dryrun ...")
+        return self.to_empty().process(
+            params, run_id, context, parent_run_id=parent_run_id, event=event
+        )
+
+    def to_empty(self, sleep: int = 0.35) -> EmptyStage:
         """Convert the current Stage model to the EmptyStage model for dry-run
         mode if the `action_stage` class attribute has set.
 
@@ -627,14 +646,14 @@ class BaseStage(BaseModel, ABC):
                 message.
         """
         if isinstance(self, EmptyStage):
-            return self
+            return self.model_copy(update={"sleep": sleep})
         return EmptyStage.model_validate(
             {
                 "name": self.name,
                 "id": self.id,
                 "desc": self.desc,
                 "if": self.condition,
-                "echo": f"Convert from {self.__class__.__name__}",
+                "echo": f"Convert from {self.__class__.__name__} to EmptyStage",
                 "sleep": sleep,
             }
         )
@@ -852,18 +871,20 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
         trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
-        model: Union[Self, EmptyStage] = (
-            self.to_empty()
+        # NOTE: First execution for not pass to retry step if it passes.
+        try:
             if (
                 self.extras.get("__sys_release_dryrun_mode", False)
                 and self.action_stage
-            )
-            else self
-        )
-
-        # NOTE: First execution for not pass to retry step if it passes.
-        try:
-            return model.process(
+            ):
+                return self.dryrun(
+                    params | {"retry": current_retry},
+                    run_id=run_id,
+                    context=context,
+                    parent_run_id=parent_run_id,
+                    event=event,
+                )
+            return self.process(
                 params | {"retry": current_retry},
                 run_id=run_id,
                 context=context,
@@ -889,7 +910,18 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
                     status=WAIT,
                     updated={"retry": current_retry},
                 )
-                return model.process(
+                if (
+                    self.extras.get("__sys_release_dryrun_mode", False)
+                    and self.action_stage
+                ):
+                    return self.dryrun(
+                        params | {"retry": current_retry},
+                        run_id=run_id,
+                        context=context,
+                        parent_run_id=parent_run_id,
+                        event=event,
+                    )
+                return self.process(
                     params | {"retry": current_retry},
                     run_id=run_id,
                     context=context,
@@ -953,6 +985,17 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
 
         # NOTE: First execution for not pass to retry step if it passes.
         try:
+            if (
+                self.extras.get("__sys_release_dryrun_mode", False)
+                and self.action_stage
+            ):
+                return self.dryrun(
+                    params | {"retry": current_retry},
+                    run_id=run_id,
+                    context=context,
+                    parent_run_id=parent_run_id,
+                    event=event,
+                )
             return await model.async_process(
                 params | {"retry": current_retry},
                 run_id=run_id,
@@ -979,6 +1022,17 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
                     status=WAIT,
                     updated={"retry": current_retry},
                 )
+                if (
+                    self.extras.get("__sys_release_dryrun_mode", False)
+                    and self.action_stage
+                ):
+                    return self.dryrun(
+                        params | {"retry": current_retry},
+                        run_id=run_id,
+                        context=context,
+                        parent_run_id=parent_run_id,
+                        event=event,
+                    )
                 return await model.async_process(
                     params | {"retry": current_retry},
                     run_id=run_id,

@@ -80,6 +80,19 @@ def test_call_stage_exec_necessary_args():
     }
 
 
+def test_call_stage():
+    stage: Stage = CallStage.model_validate(
+        obj={
+            "name": "Extract & Load Local System",
+            "id": "second-job",
+            "uses": "tasks/simple-task@demo",
+            "with": {"source": "src", "sink": "sink"},
+        }
+    )
+    empty_stage = stage.to_empty()
+    assert empty_stage.sleep == 0.35
+
+
 def test_call_stage_exec():
     stage: Stage = CallStage.model_validate(
         obj={
