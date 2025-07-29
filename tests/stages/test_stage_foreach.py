@@ -458,6 +458,65 @@ def test_foreach_stage_exec_raise_full():
         possible.append(True)
     except AssertionError:
         possible.append(False)
+    try:
+        assert rs.context == {
+            "status": FAILED,
+            "items": [1, 2],
+            "foreach": {
+                2: {
+                    "status": FAILED,
+                    "item": 2,
+                    "stages": {
+                        "2709471980": {"outputs": {}, "status": SUCCESS},
+                        "9263488742": {
+                            "outputs": {},
+                            "errors": {
+                                "name": "StageError",
+                                "message": "Raise for item equal 2",
+                            },
+                            "status": FAILED,
+                        },
+                    },
+                    "errors": {
+                        "name": "StageError",
+                        "message": "Break item: 2 because nested stage: 'Final Echo', failed.",
+                    },
+                },
+                1: {
+                    "status": CANCEL,
+                    "item": 1,
+                    "stages": {
+                        "2709471980": {"outputs": {}, "status": SUCCESS},
+                        "9263488742": {"outputs": {}, "status": SKIP},
+                        "2238460182": {
+                            "outputs": {},
+                            "errors": {
+                                "name": "StageCancelError",
+                                "message": "Cancel before start empty process.",
+                            },
+                            "status": CANCEL,
+                        },
+                    },
+                    "errors": {
+                        "name": "StageCancelError",
+                        "message": "Cancel item: 1 after end nested process.",
+                    },
+                },
+            },
+            "errors": {
+                2: {
+                    "name": "StageError",
+                    "message": "Break item: 2 because nested stage: 'Final Echo', failed.",
+                },
+                1: {
+                    "name": "StageCancelError",
+                    "message": "Cancel item: 1 after end nested process.",
+                },
+            },
+        }
+        possible.append(True)
+    except AssertionError:
+        possible.append(False)
     if not any(possible):
         print(rs.context)
         raise AssertionError("checking context does not match any case.")
