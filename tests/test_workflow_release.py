@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from ddeutil.workflow import (
+    DRYRUN,
     FORCE,
     NORMAL,
     RERUN,
@@ -238,3 +239,26 @@ def test_workflow_release_rerun():
     )
     with pytest.raises(NotImplementedError):
         workflow.release(release=datetime.now(), params={}, release_type=RERUN)
+
+
+def test_workflow_release_dryrun():
+    workflow: Workflow = Workflow.model_validate(
+        obj={
+            "name": "wf-scheduling-common",
+            "jobs": {
+                "first-job": {
+                    "stages": [
+                        {"name": "First Stage", "run": "print('test')"},
+                        {"name": "Second Stage", "id": "second-stage"},
+                    ]
+                }
+            },
+            "extra": {"enable_write_audit": True},
+        }
+    )
+    rs: Result = workflow.release(
+        release=datetime.now(),
+        params={},
+        release_type=DRYRUN,
+    )
+    print(rs)

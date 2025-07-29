@@ -41,6 +41,7 @@ from pydantic.functional_serializers import field_serializer
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
+from . import DRYRUN
 from .__types import DictData
 from .audits import NORMAL, RERUN, Audit, ReleaseType, get_audit
 from .conf import YamlParser, dynamic
@@ -66,7 +67,7 @@ from .utils import (
     extract_id,
     gen_id,
     get_dt_now,
-    remove_sys_extras,
+    pop_sys_extras,
 )
 
 
@@ -244,14 +245,12 @@ class Workflow(BaseModel):
                 f"{self.name!r}."
             )
 
-        # NOTE: Force update internal extras for handler circle execution.
-        self.extras.update({"__sys_break_circle_exec": self.name})
-
         return self
 
     @field_serializer("extras")
     def __serialize_extras(self, extras: DictData) -> DictData:
-        return remove_sys_extras(extras)
+        """Serialize extra parameter."""
+        return {k: extras[k] for k in extras if not k.startswith("__sys_")}
 
     def detail(self) -> DictData:  # pragma: no cov
         """Return the detail of this workflow for generate markdown."""
@@ -452,7 +451,17 @@ class Workflow(BaseModel):
             extras=self.extras,
         )
 
-        if release_type == NORMAL and audit.is_pointed(data=audit_data):
+        if release_type == RERUN:
+            # TODO: It will load previous audit and use this data to run with
+            #   the `rerun` method.
+            raise NotImplementedError(
+                "Release does not support for rerun type yet. Please use the "
+                "`rerun` method instead."
+            )
+        elif release_type == DRYRUN:
+            self.extras.update({"__sys_release_dryrun_mode": True})
+            trace.info("[RELEASE]: Mark dryrun mode to the extra params.")
+        elif release_type == NORMAL and audit.is_pointed(data=audit_data):
             trace.info("[RELEASE]: Skip this release because it already audit.")
             return Result(
                 run_id=run_id,
@@ -460,14 +469,6 @@ class Workflow(BaseModel):
                 status=SKIP,
                 context=catch(context, status=SKIP),
                 extras=self.extras,
-            )
-
-        if release_type == RERUN:
-            # TODO: It will load previous audit and use this data to run with
-            #   the `rerun` method.
-            raise NotImplementedError(
-                "Release does not support for rerun type yet. Please use the "
-                "`rerun` method instead."
             )
 
         rs: Result = self.execute(
@@ -478,27 +479,29 @@ class Workflow(BaseModel):
         catch(context, status=rs.status, updated=rs.context)
         trace.info(f"[RELEASE]: End {name!r} : {release:%Y-%m-%d %H:%M:%S}")
         trace.debug(f"[RELEASE]: Writing audit: {name!r}.")
-        (
-            audit.save(
-                data=audit_data
-                | {
-                    "context": context,
-                    "runs_metadata": (
-                        (runs_metadata or {})
-                        | rs.info
-                        | {
-                            "timeout": timeout,
-                            "original_name": self.name,
-                            "audit_excluded": audit_excluded,
-                        }
-                    ),
-                },
-                excluded=audit_excluded,
+        if release_type != DRYRUN:
+            (
+                audit.save(
+                    data=audit_data
+                    | {
+                        "context": context,
+                        "runs_metadata": (
+                            (runs_metadata or {})
+                            | rs.info
+                            | {
+                                "timeout": timeout,
+                                "original_name": self.name,
+                                "audit_excluded": audit_excluded,
+                            }
+                        ),
+                    },
+                    excluded=audit_excluded,
+                )
             )
-        )
-        return Result(
-            run_id=run_id,
-            parent_run_id=parent_run_id,
+
+        # NOTE: Pop system extra parameters.
+        pop_sys_extras(self.extras, scope="release")
+        return Result.from_trace(trace).catch(
             status=rs.status,
             context=catch(
                 context,
@@ -513,7 +516,6 @@ class Workflow(BaseModel):
                     **(context["errors"] if "errors" in context else {}),
                 },
             ),
-            extras=remove_sys_extras(self.extras),
         )
 
     def execute_job(
@@ -719,6 +721,8 @@ class Workflow(BaseModel):
                 extras=self.extras,
             )
 
+        # NOTE: Force update internal extras for handler circle execution.
+        self.extras.update({"__sys_exec_break_circle": self.name})
         with ThreadPoolExecutor(max_job_parallel, "wf") as executor:
             futures: list[Future] = []
 
@@ -747,6 +751,7 @@ class Workflow(BaseModel):
                 backoff_sleep = 0.01
 
                 if check == FAILED:  # pragma: no cov
+                    pop_sys_extras(self.extras)
                     return Result(
                         run_id=run_id,
                         parent_run_id=parent_run_id,
@@ -841,6 +846,7 @@ class Workflow(BaseModel):
                 for i, s in enumerate(sequence_statuses, start=0):
                     statuses[total + 1 + skip_count + i] = s
 
+                pop_sys_extras(self.extras)
                 st: Status = validate_statuses(statuses)
                 return Result(
                     run_id=run_id,
@@ -862,6 +868,7 @@ class Workflow(BaseModel):
 
             time.sleep(0.0025)
 
+        pop_sys_extras(self.extras)
         return Result(
             run_id=run_id,
             parent_run_id=parent_run_id,

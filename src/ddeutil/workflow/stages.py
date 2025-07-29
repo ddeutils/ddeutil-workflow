@@ -206,13 +206,13 @@ class BaseStage(BaseModel, ABC):
         return self.id or self.name
 
     @field_validator("desc", mode="after")
-    def ___prepare_desc__(cls, value: str) -> str:
+    def ___prepare_desc__(cls, value: Optional[str]) -> Optional[str]:
         """Prepare description string that was created on a template.
 
         Returns:
             str: A dedent and left strip newline of description string.
         """
-        return dedent(value.lstrip("\n"))
+        return value if value is None else dedent(value.lstrip("\n"))
 
     @model_validator(mode="after")
     def __prepare_running_id(self) -> Self:
@@ -619,10 +619,15 @@ class BaseStage(BaseModel, ABC):
         """Convert the current Stage model to the EmptyStage model for dry-run
         mode if the `action_stage` class attribute has set.
 
+        Args:
+            sleep (int, default 0.35): An adjustment sleep time.
+
         Returns:
             EmptyStage: An EmptyStage model that passing itself model data to
                 message.
         """
+        if isinstance(self, EmptyStage):
+            return self
         return EmptyStage.model_validate(
             {
                 "name": self.name,
@@ -847,10 +852,18 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
         trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
+        model: Union[Self, EmptyStage] = (
+            self.to_empty()
+            if (
+                self.extras.get("__sys_release_dryrun_mode", False)
+                and self.action_stage
+            )
+            else self
+        )
 
         # NOTE: First execution for not pass to retry step if it passes.
         try:
-            return self.process(
+            return model.process(
                 params | {"retry": current_retry},
                 run_id=run_id,
                 context=context,
@@ -876,7 +889,7 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
                     status=WAIT,
                     updated={"retry": current_retry},
                 )
-                return self.process(
+                return model.process(
                     params | {"retry": current_retry},
                     run_id=run_id,
                     context=context,
@@ -929,10 +942,18 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
         trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
+        model: Union[Self, EmptyStage] = (
+            self.to_empty()
+            if (
+                self.extras.get("__sys_release_dryrun_mode", False)
+                and self.action_stage
+            )
+            else self
+        )
 
         # NOTE: First execution for not pass to retry step if it passes.
         try:
-            return await self.async_process(
+            return await model.async_process(
                 params | {"retry": current_retry},
                 run_id=run_id,
                 context=context,
@@ -958,7 +979,7 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
                     status=WAIT,
                     updated={"retry": current_retry},
                 )
-                return await self.async_process(
+                return await model.async_process(
                     params | {"retry": current_retry},
                     run_id=run_id,
                     context=context,
@@ -1165,6 +1186,7 @@ class BashStage(BaseRetryStage):
         ... }
     """
 
+    action_stage: ClassVar[bool] = True
     bash: str = Field(
         description=(
             "A bash statement that want to execute via Python subprocess."
@@ -1409,6 +1431,7 @@ class PyStage(BaseRetryStage):
         ... }
     """
 
+    action_stage: ClassVar[bool] = True
     run: str = Field(
         description="A Python string statement that want to run with `exec`.",
     )
@@ -1647,6 +1670,7 @@ class CallStage(BaseRetryStage):
         ... }
     """
 
+    action_stage: ClassVar[bool] = True
     uses: str = Field(
         description=(
             "A caller function with registry importer syntax that use to load "
@@ -1970,7 +1994,7 @@ class CallStage(BaseRetryStage):
             return args
 
 
-class BaseNestedStage(BaseRetryStage, ABC):
+class BaseNestedStage(BaseAsyncStage, ABC):
     """Base Nested Stage model. This model is use for checking the child stage
     is the nested stage or not.
     """
@@ -2035,7 +2059,7 @@ class BaseNestedStage(BaseRetryStage, ABC):
         )
 
 
-class TriggerStage(BaseNestedStage):
+class TriggerStage(BaseRetryStage):
     """Trigger workflow executor stage that run an input trigger Workflow
     execute method. This is the stage that allow you to create the reusable
     Workflow template with dynamic parameters.
@@ -2093,7 +2117,7 @@ class TriggerStage(BaseNestedStage):
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         _trigger: str = param2template(self.trigger, params, extras=self.extras)
-        if _trigger == self.extras.get("__sys_break_circle_exec", "NOTSET"):
+        if _trigger == self.extras.get("__sys_exec_break_circle", "NOTSET"):
             raise StageError("Circle execute via trigger itself workflow name.")
         trace.info(f"[NESTED]: Load Workflow Config: {_trigger!r}")
         result: Result = Workflow.from_conf(
@@ -2141,6 +2165,33 @@ class TriggerStage(BaseNestedStage):
                 },
             )
         return result
+
+    async def async_process(
+        self,
+        params: DictData,
+        run_id: str,
+        context: DictData,
+        *,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
+    ) -> Result:  # pragma: no cov
+        """Async process for nested-stage do not implement yet.
+
+        Args:
+            params: A parameter data that want to use in this
+                execution.
+            run_id: A running stage ID.
+            context: A context data.
+            parent_run_id: A parent running ID. (Default is None)
+            event: An event manager that use to track parent process
+                was not force stopped.
+
+        Returns:
+            Result: The execution result with status and context data.
+        """
+        raise NotImplementedError(
+            "The Trigger stage does not implement the `axecute` method yet."
+        )
 
 
 class ParallelContext(TypedDict):
@@ -2776,7 +2827,7 @@ class UntilStage(BaseNestedStage):
         ),
     )
     until: str = Field(description="A until condition for stop the while loop.")
-    stages: list[NestedStage] = Field(
+    stages: list[SubStage] = Field(
         default_factory=list,
         description=(
             "A list of stage that will run with each item in until loop."
@@ -3414,7 +3465,7 @@ class RaiseStage(BaseAsyncStage):
         raise StageError(message)
 
 
-class DockerStage(BaseStage):  # pragma: no cov
+class DockerStage(BaseRetryStage):  # pragma: no cov
     """Docker container stage execution that will pull the specific Docker image
     with custom authentication and run this image by passing environment
     variables and mounting local volume to this Docker container.
@@ -3437,6 +3488,7 @@ class DockerStage(BaseStage):  # pragma: no cov
         ... }
     """
 
+    action_stage: ClassVar[bool] = True
     image: str = Field(
         description="A Docker image url with tag that want to run.",
     )
@@ -3593,6 +3645,33 @@ class DockerStage(BaseStage):  # pragma: no cov
         trace.info(f"[STAGE]: Docker: {self.image}:{self.tag}")
         raise NotImplementedError("Docker Stage does not implement yet.")
 
+    async def async_process(
+        self,
+        params: DictData,
+        run_id: str,
+        context: DictData,
+        *,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
+    ) -> Result:  # pragma: no cov
+        """Async process for nested-stage do not implement yet.
+
+        Args:
+            params: A parameter data that want to use in this
+                execution.
+            run_id: A running stage ID.
+            context: A context data.
+            parent_run_id: A parent running ID. (Default is None)
+            event: An event manager that use to track parent process
+                was not force stopped.
+
+        Returns:
+            Result: The execution result with status and context data.
+        """
+        raise NotImplementedError(
+            "The Docker stage does not implement the `axecute` method yet."
+        )
+
 
 class VirtualPyStage(PyStage):  # pragma: no cov
     """Virtual Python stage executor that run Python statement on the dependent
@@ -3629,7 +3708,7 @@ class VirtualPyStage(PyStage):  # pragma: no cov
 
         Args:
             py: A Python string statement.
-            values: A variable that want to set before running this
+            values: A variable that want to set before running these
             deps: An additional Python dependencies that want install before
                 run this python stage.
             run_id: (StrOrNone) A running ID of this stage execution.
@@ -3761,7 +3840,7 @@ class VirtualPyStage(PyStage):  # pragma: no cov
         )
 
 
-NestedStage = Annotated[
+SubStage = Annotated[
     Union[
         BashStage,
         CallStage,
@@ -3777,7 +3856,10 @@ NestedStage = Annotated[
     ],
     Field(
         union_mode="smart",
-        description="A nested-stage allow list",
+        description=(
+            "A nested-stage allow list that able to use on the NestedStage "
+            "model."
+        ),
     ),
 ]  # pragma: no cov
 
@@ -3790,6 +3872,7 @@ ActionStage = Annotated[
         PyStage,
         RaiseStage,
         DockerStage,
+        TriggerStage,
         EmptyStage,
     ],
     Field(

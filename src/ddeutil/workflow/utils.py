@@ -405,6 +405,17 @@ def obj_name(obj: Optional[Union[str, object]] = None) -> Optional[str]:
     return obj_type
 
 
-def remove_sys_extras(extras: DictData) -> DictData:
-    """Remove key that starts with `__sys_` from the extra dict parameter."""
-    return {k: extras[k] for k in extras if not k.startswith("__sys_")}
+def pop_sys_extras(extras: DictData, scope: str = "exec") -> DictData:
+    """Remove key that starts with `__sys_` from the extra dict parameter.
+
+    Args:
+        extras:
+        scope (str):
+
+    Returns:
+        DictData:
+    """
+    keys: list[str] = [k for k in extras if not k.startswith(f"__sys_{scope}")]
+    for k in keys:
+        extras.pop(k)
+    return extras
