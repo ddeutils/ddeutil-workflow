@@ -460,7 +460,7 @@ class Workflow(BaseModel):
             )
         elif release_type == DRYRUN:
             self.extras.update({"__sys_release_dryrun_mode": True})
-            trace.info("[RELEASE]: Mark dryrun mode to the extra params.")
+            trace.debug("[RELEASE]: Mark dryrun mode to the extra params.")
         elif release_type == NORMAL and audit.is_pointed(data=audit_data):
             trace.info("[RELEASE]: Skip this release because it already audit.")
             return Result(

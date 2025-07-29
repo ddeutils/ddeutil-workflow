@@ -818,12 +818,14 @@ class BaseAsyncStage(BaseStage, ABC):
     ) -> Result:
         """Wrapped the axecute method before returning to handler axecute.
 
-        :param params: (DictData) A parameter data that want to use in this
-            execution.
-        :param event: (Event) An event manager that use to track parent execute
-            was not force stopped.
+        Args:
+            params: (DictData) A parameter data that want to use in this
+                execution.
+            event: (Event) An event manager that use to track parent execute
+                was not force stopped.
 
-        :rtype: Result
+        Returns:
+            Result: A Result object.
         """
         catch(context, status=WAIT)
         return await self.async_process(
@@ -974,14 +976,6 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
         trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
-        model: Union[Self, EmptyStage] = (
-            self.to_empty()
-            if (
-                self.extras.get("__sys_release_dryrun_mode", False)
-                and self.action_stage
-            )
-            else self
-        )
 
         # NOTE: First execution for not pass to retry step if it passes.
         try:
@@ -996,7 +990,7 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
                     parent_run_id=parent_run_id,
                     event=event,
                 )
-            return await model.async_process(
+            return await self.async_process(
                 params | {"retry": current_retry},
                 run_id=run_id,
                 context=context,
@@ -1033,7 +1027,7 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
                         parent_run_id=parent_run_id,
                         event=event,
                     )
-                return await model.async_process(
+                return await self.async_process(
                     params | {"retry": current_retry},
                     run_id=run_id,
                     context=context,
