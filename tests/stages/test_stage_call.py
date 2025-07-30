@@ -35,6 +35,19 @@ def test_call_stage_validate_args():
         )
 
 
+def test_call_stage_dryrun():
+    stage: Stage = CallStage.model_validate(
+        {
+            "name": "Necessary argument do not pass",
+            "id": "private-args",
+            "uses": "tasks/private-args-task@demo",
+            "with": {"params": {"run_mode": "T"}, "exec": "test"},
+        }
+    )
+    rs: Result = stage.dryrun(params={}, run_id="01", context={})
+    assert rs.status == SUCCESS
+
+
 def test_call_stage_exec_necessary_args():
     stage: Stage = CallStage.model_validate(
         {

@@ -680,12 +680,19 @@ class BaseStage(BaseModel, ABC):
             params, run_id, context, parent_run_id=parent_run_id, event=event
         )
 
-    def to_empty(self, sleep: int = 0.35) -> EmptyStage:
+    def to_empty(
+        self,
+        sleep: int = 0.35,
+        *,
+        message: Optional[str] = None,
+    ) -> EmptyStage:
         """Convert the current Stage model to the EmptyStage model for dry-run
         mode if the `action_stage` class attribute has set.
 
         Args:
             sleep (int, default 0.35): An adjustment sleep time.
+            message (str, default None): A message that want to override default
+                message on EmptyStage model.
 
         Returns:
             EmptyStage: An EmptyStage model that passing itself model data to
@@ -699,7 +706,10 @@ class BaseStage(BaseModel, ABC):
                 "id": self.id,
                 "desc": self.desc,
                 "if": self.condition,
-                "echo": f"Convert from {self.__class__.__name__} to EmptyStage",
+                "echo": (
+                    message
+                    or f"Convert from {self.__class__.__name__} to EmptyStage"
+                ),
                 "sleep": sleep,
             }
         )
@@ -1853,7 +1863,7 @@ class CallStage(BaseRetryStage):
                 extras=self.extras,
             ),
             "extras": self.extras,
-        } | param2template(self.args, params, extras=self.extras)
+        } | self.pass_template(self.args, params)
         sig = inspect.signature(call_func)
         necessary_params: list[str] = []
         has_keyword: bool = False
@@ -1868,6 +1878,7 @@ class CallStage(BaseRetryStage):
             elif v.kind == Parameter.VAR_KEYWORD:
                 has_keyword = True
 
+        # NOTE: Validate private parameter should exist in the args field.
         if any(
             (k.removeprefix("_") not in args and k not in args)
             for k in necessary_params
@@ -1885,11 +1896,12 @@ class CallStage(BaseRetryStage):
                 f"does not set to args. It already set {list(args.keys())}."
             )
 
-        if "result" not in sig.parameters and not has_keyword:
-            args.pop("result")
+        if not has_keyword:
+            if "result" not in sig.parameters:
+                args.pop("result")
 
-        if "extras" not in sig.parameters and not has_keyword:
-            args.pop("extras")
+            if "extras" not in sig.parameters:
+                args.pop("extras")
 
         if event and event.is_set():
             raise StageCancelError("Cancel before start call process.")
@@ -1972,7 +1984,7 @@ class CallStage(BaseRetryStage):
                 extras=self.extras,
             ),
             "extras": self.extras,
-        } | param2template(self.args, params, extras=self.extras)
+        } | self.pass_template(self.args, params)
         sig = inspect.signature(call_func)
         necessary_params: list[str] = []
         has_keyword: bool = False
@@ -2003,11 +2015,13 @@ class CallStage(BaseRetryStage):
                 f"Necessary params, ({', '.join(necessary_params)}, ), "
                 f"does not set to args. It already set {list(args.keys())}."
             )
-        if "result" not in sig.parameters and not has_keyword:
-            args.pop("result")
 
-        if "extras" not in sig.parameters and not has_keyword:
-            args.pop("extras")
+        if not has_keyword:
+            if "result" not in sig.parameters:
+                args.pop("result")
+
+            if "extras" not in sig.parameters:
+                args.pop("extras")
 
         if event and event.is_set():
             raise StageCancelError("Cancel before start call process.")
@@ -2057,11 +2071,14 @@ class CallStage(BaseRetryStage):
         """Validate an input arguments before passing to the caller function.
 
         Args:
-            func: (TagFunc) A tag function that want to get typing.
-            args: (DictData) An arguments before passing to this tag func.
-            run_id: A running stage ID.
+            func (TagFunc): A tag function object that want to get typing.
+            args (DictData): An arguments before passing to this tag func.
+            run_id (str): A running ID.
+            parent_run_id (str, default None): A parent running ID.
+            extras (DictData, default None): An extra parameters.
 
-        :rtype: DictData
+        Returns:
+            DictData: A prepared args paramter that validate with model args.
         """
         try:
             override: DictData = dict(
@@ -2109,8 +2126,52 @@ class CallStage(BaseRetryStage):
             - Pre-hook caller function that exist.
             - Show function parameters
         """
-        return super().dryrun(
-            params, run_id, context, parent_run_id=parent_run_id, event=event
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
+        )
+        call_func: TagFunc = self.get_caller(params=params)()
+        trace.info(f"[STAGE]: Caller Func: '{call_func.name}@{call_func.tag}'")
+
+        args: DictData = {
+            "result": Result(
+                run_id=run_id,
+                parent_run_id=parent_run_id,
+                status=WAIT,
+                context=context,
+                extras=self.extras,
+            ),
+            "extras": self.extras,
+        } | self.pass_template(self.args, params)
+        sig = inspect.signature(call_func)
+        trace.debug(f"[STAGE]: {sig.parameters}")
+        necessary_params: list[str] = []
+        has_keyword: bool = False
+        for k in sig.parameters:
+            if (
+                v := sig.parameters[k]
+            ).default == Parameter.empty and v.kind not in (
+                Parameter.VAR_KEYWORD,
+                Parameter.VAR_POSITIONAL,
+            ):
+                necessary_params.append(k)
+            elif v.kind == Parameter.VAR_KEYWORD:
+                has_keyword = True
+        func_typed = get_type_hints(call_func)
+        trace.debug(
+            f"[STAGE]: Details"
+            f"||Necessary Params: {necessary_params}"
+            f"||Argument Params: {list(args.keys())}"
+            f"||Return Type: {func_typed['return']}"
+            f"||"
+        )
+        if has_keyword:
+            trace.debug("[STAGE]: This caller function support keyword param.")
+        return Result(
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            status=SUCCESS,
+            context=catch(context=context, status=SUCCESS),
+            extras=self.extras,
         )
 
 

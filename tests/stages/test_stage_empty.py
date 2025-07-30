@@ -53,6 +53,12 @@ def test_empty_stage():
     assert empty_stage.sleep == 10
 
 
+def test_empty_stage_dryrun():
+    stage: EmptyStage = EmptyStage(name="Empty Stage", echo="hello world")
+    rs: Result = stage.dryrun(params={}, run_id="01", context={})
+    assert rs.status == SUCCESS
+
+
 def test_empty_stage_execute():
     stage: EmptyStage = EmptyStage(name="Empty Stage", echo="hello world")
     rs: Result = stage.execute(params={})
