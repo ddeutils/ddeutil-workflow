@@ -263,8 +263,10 @@ class Workflow(BaseModel):
             author (str | None, default None): An author name.
         """
 
-        def align_newline(value: str) -> str:
+        def align_newline(value: Optional[str]) -> str:
             space: str = " " * 16
+            if value is None:
+                return ""
             return value.rstrip("\n").replace("\n", f"\n{space}")
 
         info: str = (

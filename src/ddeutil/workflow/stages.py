@@ -552,7 +552,7 @@ class BaseStage(BaseModel, ABC):
             #   should use the `re` module to validate eval-string before
             #   running.
             rs: bool = eval(
-                param2template(self.condition, params, extras=self.extras),
+                self.pass_template(self.condition, params),
                 globals() | params,
                 {},
             )
@@ -583,7 +583,8 @@ class BaseStage(BaseModel, ABC):
     def is_nested(self) -> bool:
         """Return true if this stage is nested stage.
 
-        :rtype: bool
+        Returns:
+            bool: True if this stage is nested stage.
         """
         return False
 
@@ -593,14 +594,46 @@ class BaseStage(BaseModel, ABC):
         Returns:
             DictData: A dict that was dumped from this model with alias mode.
         """
-        return self.model_dump(by_alias=True)
+        return self.model_dump(
+            by_alias=True,
+            exclude_defaults=True,
+            exclude={"extras", "id", "name", "desc"},
+        )
 
-    def md(self) -> str:  # pragma: no cov
+    def md(self, level: int = 1) -> str:  # pragma: no cov
         """Return generated document that will be the interface of this stage.
 
-        :rtype: str
+        Args:
+            level (int, default 0): A header level that want to generate
+                markdown content.
+
+        Returns:
+            str
         """
-        return self.desc
+        assert level >= 1, "Header level should gather than 0"
+
+        def align_newline(value: Optional[str]) -> str:
+            space: str = " " * 16
+            if value is None:
+                return ""
+            return value.rstrip("\n").replace("\n", f"\n{space}")
+
+        header: str = "#" * level
+        return dedent(
+            f"""
+                {header} Stage: {self.iden}\n
+                {align_newline(self.desc)}\n
+                #{header} Parameters\n
+                | name | type | default | description |
+                | --- | --- | --- | : --- : |\n\n
+                #{header} Details\n
+                ```json
+                {self.detail()}
+                ```
+                """.lstrip(
+                "\n"
+            )
+        )
 
     def dryrun(
         self,
@@ -612,16 +645,21 @@ class BaseStage(BaseModel, ABC):
         event: Optional[Event] = None,
     ) -> Optional[Result]:
         """Pre-process method that will use to run with dry-run mode, and it
-        should be used before process method.
+        should be used replace of process method when workflow release set with
+        DRYRUN mode.
+
+            By default, this method will set logic to convert this stage model
+        to am EmptyStage if it is action stage before use process method
+        instead process itself.
 
         Args:
             params (DictData): A parameter data that want to use in this
                 execution.
             run_id (str): A running stage ID.
             context (DictData): A context data.
-            parent_run_id: A parent running ID. (Default is None)
-            event: An event manager that use to track parent process
-                was not force stopped.
+            parent_run_id (str, default None): A parent running ID.
+            event (Event, default None): An event manager that use to track
+                parent process was not force stopped.
 
         Returns:
             Result: The execution result with status and context data.
@@ -630,7 +668,15 @@ class BaseStage(BaseModel, ABC):
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         trace.debug("[STAGE]: Start Dryrun ...")
-        return self.to_empty().process(
+        if self.action_stage:
+            return self.to_empty().process(
+                params,
+                run_id,
+                context,
+                parent_run_id=parent_run_id,
+                event=event,
+            )
+        return self.process(
             params, run_id, context, parent_run_id=parent_run_id, event=event
         )
 
@@ -846,7 +892,10 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
         default=0,
         ge=0,
         lt=20,
-        description="A retry number if stage execution get the error.",
+        description=(
+            "A retry number if stage process got the error exclude skip and "
+            "cancel exception class."
+        ),
     )
 
     def _execute(
@@ -860,12 +909,14 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
         """Wrapped the execute method with retry strategy before returning to
         handler execute.
 
-        :param params: (DictData) A parameter data that want to use in this
-            execution.
-        :param event: (Event) An event manager that use to track parent execute
-            was not force stopped.
+        Args:
+            params: (DictData) A parameter data that want to use in this
+                execution.
+            event: (Event) An event manager that use to track parent execute
+                was not force stopped.
 
-        :rtype: Result
+        Returns:
+            Result: A Result object.
         """
         current_retry: int = 0
         exception: Exception
@@ -931,10 +982,10 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
                     event=event,
                 )
             except (
-                StageSkipError,
                 StageNestedSkipError,
-                StageCancelError,
                 StageNestedCancelError,
+                StageSkipError,
+                StageCancelError,
             ):
                 trace.debug("[STAGE]: process raise skip or cancel error.")
                 raise
@@ -963,12 +1014,14 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
         """Wrapped the axecute method with retry strategy before returning to
         handler axecute.
 
-        :param params: (DictData) A parameter data that want to use in this
-            execution.
-        :param event: (Event) An event manager that use to track parent execute
-            was not force stopped.
+        Args:
+            params: (DictData) A parameter data that want to use in this
+                execution.
+            event: (Event) An event manager that use to track parent execute
+                was not force stopped.
 
-        :rtype: Result
+        Returns:
+            Result: A Result object.
         """
         current_retry: int = 0
         exception: Exception
@@ -1035,10 +1088,10 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
                     event=event,
                 )
             except (
-                StageSkipError,
                 StageNestedSkipError,
-                StageCancelError,
                 StageNestedCancelError,
+                StageSkipError,
+                StageCancelError,
             ):
                 await trace.adebug(
                     "[STAGE]: process raise skip or cancel error."
@@ -2040,6 +2093,25 @@ class CallStage(BaseRetryStage):
                 f"parsing model args process."
             )
             return args
+
+    def dryrun(
+        self,
+        params: DictData,
+        run_id: str,
+        context: DictData,
+        *,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
+    ) -> Optional[Result]:  # pragma: no cov
+        """Override the dryrun method for this CallStage.
+
+        Steps:
+            - Pre-hook caller function that exist.
+            - Show function parameters
+        """
+        return super().dryrun(
+            params, run_id, context, parent_run_id=parent_run_id, event=event
+        )
 
 
 class BaseNestedStage(BaseAsyncStage, ABC):

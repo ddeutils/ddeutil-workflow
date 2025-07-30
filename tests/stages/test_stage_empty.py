@@ -8,6 +8,22 @@ from ddeutil.workflow.stages import EmptyStage, Stage
 from pydantic import ValidationError
 
 
+def test_empty_md():
+    stage: Stage = EmptyStage.model_validate(
+        {"name": "Empty Stage", "echo": "hello world"}
+    )
+    print(stage.md())
+
+    stage: Stage = EmptyStage.model_validate(
+        {
+            "name": "Empty Stage",
+            "desc": "Test making markdown content",
+            "echo": "hello world",
+        }
+    )
+    print(stage.md())
+
+
 def test_empty_stage():
     stage: Stage = EmptyStage.model_validate(
         {"name": "Empty Stage", "echo": "hello world"}
