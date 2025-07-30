@@ -2156,12 +2156,28 @@ class CallStage(BaseRetryStage):
                 necessary_params.append(k)
             elif v.kind == Parameter.VAR_KEYWORD:
                 has_keyword = True
-        func_typed = get_type_hints(call_func)
+
+        func_typed: dict[str, Any] = get_type_hints(call_func)
+        map_type: str = "||".join(
+            f"\t{p}: {func_typed[p]}"
+            for p in necessary_params
+            if p in func_typed
+        )
+        map_type_args: str = "||".join(f"\t{a}: {type(a)}" for a in args)
+        if not has_keyword:
+            if "result" not in sig.parameters:
+                args.pop("result")
+
+            if "extras" not in sig.parameters:
+                args.pop("extras")
+
         trace.debug(
             f"[STAGE]: Details"
-            f"||Necessary Params: {necessary_params}"
-            f"||Argument Params: {list(args.keys())}"
+            f"||Necessary Params:"
+            f"||{map_type}"
             f"||Return Type: {func_typed['return']}"
+            f"||Argument Params:"
+            f"||{map_type_args}"
             f"||"
         )
         if has_keyword:
