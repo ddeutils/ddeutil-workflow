@@ -1900,7 +1900,7 @@ class CallStage(BaseRetryStage):
             if "result" not in sig.parameters:
                 args.pop("result")
 
-            if "extras" not in sig.parameters:
+            if "extras" not in sig.parameters:  # pragma: no cov
                 args.pop("extras")
 
         if event and event.is_set():
@@ -2020,7 +2020,7 @@ class CallStage(BaseRetryStage):
             if "result" not in sig.parameters:
                 args.pop("result")
 
-            if "extras" not in sig.parameters:
+            if "extras" not in sig.parameters:  # pragma: no cov
                 args.pop("extras")
 
         if event and event.is_set():
