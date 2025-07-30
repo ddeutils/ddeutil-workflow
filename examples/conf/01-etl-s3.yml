@@ -1,0 +1,264 @@
+name: "etl-s3"
+type: "Workflow"
+desc: |
+  End-to-end ETL pipeline for customer data processing with data quality checks
+on:
+  schedule:
+    - cronjob: "0 2 * * *"  # Daily at 2 AM
+      timezone: "UTC"
+params:
+  source_bucket:
+    type: str
+    default: "raw-data-bucket"
+    desc: "S3 bucket containing raw customer data"
+
+  target_bucket:
+    type: str
+    default: "processed-data-bucket"
+    desc: "S3 bucket for processed data"
+
+  processing_date:
+    type: date
+    default: "2024-01-01"
+    desc: "Date for data processing"
+
+  data_quality_threshold:
+    type: float
+    default: 0.95
+    desc: "Minimum data quality score threshold"
+
+jobs:
+  data-extraction:
+    id: "data-extraction"
+    desc: "Extract raw data from multiple sources"
+    runs-on:
+      type: "aws_batch"
+      with:
+        job_queue_arn: "${AWS_BATCH_JOB_QUEUE_ARN}"
+        s3_bucket: "${S3_BUCKET}"
+        region_name: "us-east-1"
+    stages:
+      - name: "Extract customer data"
+        bash: |
+          aws s3 sync s3://${{ params.source_bucket }}/customers/ /tmp/customers/
+          aws s3 sync s3://${{ params.source_bucket }}/transactions/ /tmp/transactions/
+        env:
+          AWS_DEFAULT_REGION: "us-east-1"
+
+      - name: "Validate data files"
+        run: |
+          import os
+          import glob
+
+          customer_files = glob.glob("/tmp/customers/*.csv")
+          transaction_files = glob.glob("/tmp/transactions/*.csv")
+
+          if not customer_files:
+              raise FileNotFoundError("No customer data files found")
+          if not transaction_files:
+              raise FileNotFoundError("No transaction data files found")
+
+          print(
+              f"Found {len(customer_files)} customer files and "
+              f"{len(transaction_files)} transaction files"
+          )
+
+      - name: "Generate extraction report"
+        echo: "Data extraction completed successfully for ${{ params.processing_date }}"
+
+  data-transformation:
+    id: "data-transformation"
+    desc: "Transform and clean customer data"
+    needs: ["data-extraction"]
+
+    runs-on:
+      type: "container"
+      with:
+        image: "python:3.11-slim"
+        environment:
+          PROCESSING_DATE: "${{ params.processing_date }}"
+          TARGET_BUCKET: "${{ params.target_bucket }}"
+        volumes:
+          - "/tmp/data": "/app/data"
+        working_dir: "/app"
+
+    stages:
+      - name: "Install dependencies"
+        bash: |
+          pip install pandas numpy pyarrow boto3
+
+      - name: "Transform customer data"
+        run: |
+          import pandas as pd
+          import numpy as np
+          from datetime import datetime
+
+          # Load customer data
+          customer_df = pd.read_csv("/app/data/customers/*.csv")
+
+          # Clean and transform
+          customer_df['email'] = customer_df['email'].str.lower()
+          customer_df['created_date'] = pd.to_datetime(customer_df['created_date'])
+          customer_df['age'] = pd.to_numeric(customer_df['age'], errors='coerce')
+
+          # Remove duplicates
+          customer_df = customer_df.drop_duplicates(subset=['customer_id'])
+
+          # Save transformed data
+          customer_df.to_parquet("/app/data/transformed_customers.parquet")
+          print(f"Transformed {len(customer_df)} customer records")
+
+      - name: "Transform transaction data"
+        run: |
+          import pandas as pd
+
+          # Load transaction data
+          transaction_df = pd.read_csv("/app/data/transactions/*.csv")
+
+          # Clean and transform
+          transaction_df['transaction_date'] = pd.to_datetime(transaction_df['transaction_date'])
+          transaction_df['amount'] = pd.to_numeric(transaction_df['amount'], errors='coerce')
+
+          # Filter by processing date
+          processing_date = pd.to_datetime("${{ params.processing_date }}")
+          transaction_df = transaction_df[
+              transaction_df['transaction_date'].dt.date == processing_date.date()
+          ]
+
+          # Save transformed data
+          transaction_df.to_parquet("/app/data/transformed_transactions.parquet")
+          print(f"Transformed {len(transaction_df)} transaction records")
+
+  data-quality-check:
+    id: "data-quality-check"
+    desc: "Perform data quality validation"
+    needs: ["data-transformation"]
+
+    runs-on:
+      type: "local"
+
+    stages:
+      - name: "Calculate data quality metrics"
+        run: |
+          import pandas as pd
+          import numpy as np
+
+          # Load transformed data
+          customers = pd.read_parquet("/tmp/data/transformed_customers.parquet")
+          transactions = pd.read_parquet("/tmp/data/transformed_transactions.parquet")
+
+          # Calculate quality metrics
+          customer_completeness = 1 - customers.isnull().sum().sum() / (len(customers) * len(customers.columns))
+          transaction_completeness = 1 - transactions.isnull().sum().sum() / (len(transactions) * len(transactions.columns))
+
+          # Check for duplicates
+          customer_duplicates = customers.duplicated().sum()
+          transaction_duplicates = transactions.duplicated().sum()
+
+          # Overall quality score
+          quality_score = (customer_completeness + transaction_completeness) / 2
+
+          print(f"Data quality score: {quality_score:.3f}")
+          print(f"Customer completeness: {customer_completeness:.3f}")
+          print(f"Transaction completeness: {transaction_completeness:.3f}")
+
+          # Store results for next stage
+          quality_results = {
+              'score': quality_score,
+              'customer_completeness': customer_completeness,
+              'transaction_completeness': transaction_completeness,
+              'customer_duplicates': customer_duplicates,
+              'transaction_duplicates': transaction_duplicates
+          }
+
+      - name: "Check quality threshold"
+        case: "${{ quality_results.score >= params.data_quality_threshold }}"
+        match:
+          - case: true
+            stages:
+              - name: "Quality check passed"
+                echo: "Data quality threshold met, proceeding with load"
+          - case: false
+            stages:
+              - name: "Quality check failed"
+                raise: "Data quality score ${{ quality_results.score }} below threshold ${{ params.data_quality_threshold }}"
+
+  data-load:
+    id: "data-load"
+    desc: "Load processed data to data warehouse"
+    needs: ["data-quality-check"]
+
+    runs-on:
+      type: "aws_batch"
+      with:
+        job_queue_arn: "${AWS_BATCH_JOB_QUEUE_ARN}"
+        s3_bucket: "${S3_BUCKET}"
+
+    stages:
+      - name: "Upload to S3"
+        bash: |
+          aws s3 cp /tmp/data/transformed_customers.parquet s3://${{ params.target_bucket }}/customers/
+          aws s3 cp /tmp/data/transformed_transactions.parquet s3://${{ params.target_bucket }}/transactions/
+        env:
+          AWS_DEFAULT_REGION: "us-east-1"
+
+      - name: "Load to Redshift"
+        uses: "data_warehouse/load_to_redshift@v1.0"
+        with:
+          table_name: "customers"
+          s3_path: "s3://${{ params.target_bucket }}/customers/"
+          redshift_cluster: "${REDSHIFT_CLUSTER}"
+
+      - name: "Load transactions to Redshift"
+        uses: "data_warehouse/load_to_redshift@v1.0"
+        with:
+          table_name: "transactions"
+          s3_path: "s3://${{ params.target_bucket }}/transactions/"
+          redshift_cluster: "${REDSHIFT_CLUSTER}"
+
+      - name: "Update processing metadata"
+        run: |
+          import boto3
+          from datetime import datetime
+
+          dynamodb = boto3.resource('dynamodb')
+          table = dynamodb.Table('data-processing-metadata')
+
+          table.put_item(Item={
+              'processing_date': '${{ params.processing_date }}',
+              'status': 'completed',
+              'completion_time': datetime.utcnow().isoformat(),
+              'quality_score': ${{ quality_results.score }},
+              'records_processed': {
+                  'customers': ${{ len(customers) }},
+                  'transactions': ${{ len(transactions) }}
+              }
+          })
+
+  notification:
+    id: "notification"
+    desc: "Send completion notifications"
+    needs: ["data-load"]
+
+    runs-on:
+      type: "local"
+
+    stages:
+      - name: "Send Slack notification"
+        uses: "notifications/send_slack@v1.0"
+        with:
+          channel: "#data-pipeline"
+          message: "ETL pipeline completed successfully for ${{ params.processing_date }}"
+          color: "good"
+
+      - name: "Send email report"
+        uses: "notifications/send_email@v1.0"
+        with:
+          to: "data-team@company.com"
+          subject: "ETL Pipeline Report - ${{ params.processing_date }}"
+          template: "etl_completion_report"
+          data:
+            processing_date: "${{ params.processing_date }}"
+            quality_score: ${{ quality_results.score }}
+            customer_count: ${{ len(customers) }}
+            transaction_count: ${{ len(transactions) }}
