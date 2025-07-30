@@ -2,6 +2,24 @@
 
 ## Latest Changes
 
+## 0.0.84
+
+### :sparkles: Features
+
+- :dart: feat: update detail on dryrun method on caller stage.
+- :dart: feat: update md method on stage model.
+- :dart: feat: add dryrun mode to stage exec.
+- :dart: feat: draft dryrun mode.
+
+### :bug: Bug fixes
+
+- :gear: fixed: clean code that does not valid.
+
+### :black_nib: Code Changes
+
+- :art: format: mark exclude coverage.
+- :art: format: change dryrun logic on caller stage.
+
 ## 0.0.83
 
 ### :stars: Highlight Features
