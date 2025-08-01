@@ -1968,7 +1968,11 @@ class Trace(BaseModel, BaseEmit, BaseAsyncEmit):
             parent_run_id=self.parent_run_id,
             extras=self.extras,
         )
+
+        # NOTE: Check enable buffer flag was set or not.
         if not self._enable_buffer:
+
+            # NOTE: Start emit tracing log data to each handler.
             for handler in self.handlers:
                 handler.emit(metadata, extra=self.extras)
             return
@@ -1999,6 +2003,8 @@ class Trace(BaseModel, BaseEmit, BaseAsyncEmit):
             parent_run_id=self.parent_run_id,
             extras=self.extras,
         )
+
+        # NOTE: Start emit tracing log data to each handler.
         for handler in self.handlers:
             await handler.amit(metadata, extra=self.extras)
 
@@ -2058,14 +2064,11 @@ def get_trace(
     Returns:
         Trace: The appropriate trace instance.
     """
-    handlers: list[DictData] = dynamic(
-        "trace_handlers", f=handlers, extras=extras
-    )
     trace: Trace = Trace.model_validate(
         {
             "run_id": run_id,
             "parent_run_id": parent_run_id,
-            "handlers": handlers,
+            "handlers": dynamic("trace_handlers", f=handlers, extras=extras),
             "extras": extras or {},
         }
     )

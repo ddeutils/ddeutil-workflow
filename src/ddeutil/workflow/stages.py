@@ -370,10 +370,12 @@ class BaseStage(BaseModel, ABC):
             StageNestedError,
             StageError,
         ) as e:  # pragma: no cov
+            updated: Optional[DictData] = {"errors": e.to_dict()}
             if isinstance(e, StageNestedError):
                 trace.info(f"[STAGE]: Nested: {e}")
             elif isinstance(e, (StageSkipError, StageNestedSkipError)):
                 trace.info(f"[STAGE]: ⏭️ Skip: {e}")
+                updated = None
             else:
                 trace.info(
                     f"[STAGE]: Stage Failed:||🚨 {traceback.format_exc()}||"
@@ -383,15 +385,7 @@ class BaseStage(BaseModel, ABC):
                 run_id=run_id,
                 parent_run_id=parent_run_id,
                 status=st,
-                context=catch(
-                    context,
-                    status=st,
-                    updated=(
-                        None
-                        if isinstance(e, (StageSkipError, StageNestedSkipError))
-                        else {"errors": e.to_dict()}
-                    ),
-                ),
+                context=catch(context, status=st, updated=updated),
                 info={"execution_time": time.monotonic() - ts},
                 extras=self.extras,
             )
@@ -410,8 +404,7 @@ class BaseStage(BaseModel, ABC):
                 extras=self.extras,
             )
         finally:  # pragma: no cov
-            # TODO: Implement sending metric on this line.
-            pass
+            trace.debug("[STAGE]: End Handler stage process.")
 
     def _execute(
         self,
@@ -866,6 +859,8 @@ class BaseAsyncStage(BaseStage, ABC):
                 info={"execution_time": time.monotonic() - ts},
                 extras=self.extras,
             )
+        finally:  # pragma: no cov
+            trace.debug("[STAGE]: End Handler stage process.")
 
     async def _axecute(
         self,
