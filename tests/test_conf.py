@@ -405,8 +405,8 @@ def test_dynamic():
     conf = dynamic("log_datetime_format", f="%Y%m%d", extras={})
     assert conf == "%Y%m%d"
 
-    conf = dynamic("log_datetime_format", f=None, extras={})
-    assert conf == "%Y-%m-%d %H:%M:%S"
+    conf = dynamic("trace_handlers", f=None, extras={})
+    assert conf == [{"type": "console"}]
 
     conf = dynamic(
         "log_datetime_format", f="%Y%m%d", extras={"log_datetime_format": "%Y"}
