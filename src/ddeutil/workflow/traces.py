@@ -56,7 +56,12 @@ EMJ_SKIP: str = "⏭️"
 
 
 @lru_cache
-def set_logging(name: str) -> logging.Logger:
+def set_logging(
+    name: str,
+    *,
+    message_fmt: Optional[str] = None,
+    datetime_fmt: Optional[str] = None,
+) -> logging.Logger:
     """Configure logger with custom formatting and handlers.
 
     Creates and configures a logger instance with the custom formatter and
@@ -64,7 +69,9 @@ def set_logging(name: str) -> logging.Logger:
     console output and proper formatting for workflow execution tracking.
 
     Args:
-        name: Module name to create logger for.
+        name (str): A module name to create logger for.
+        message_fmt: (str, default None)
+        datetime_fmt: (str, default None)
 
     Returns:
         logging.Logger: Configured logger instance with custom formatting.
@@ -81,9 +88,9 @@ def set_logging(name: str) -> logging.Logger:
     #   `logging.getLogger('ddeutil.workflow').propagate = False`
     #
     _logger.addHandler(logging.NullHandler())
-
     formatter = logging.Formatter(
-        fmt=config.log_format, datefmt=config.log_datetime_format
+        fmt=message_fmt,
+        datefmt=datetime_fmt,
     )
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(formatter)
@@ -157,6 +164,12 @@ class Message(BaseModel):
         return f"{emoji}[{name}]: {self.message}"
 
 
+class Metric(BaseModel):  # pragma: no cov
+    """Trace Metric model that will validate data from current logging."""
+
+    execution_time: float
+
+
 class Metadata(BaseModel):  # pragma: no cov
     """Trace Metadata model for making the current metadata of this CPU, Memory.
 
@@ -181,17 +194,6 @@ class Metadata(BaseModel):  # pragma: no cov
     filename: str = Field(description="A filename of this log.")
     lineno: int = Field(description="A line number of this log.")
 
-    # Enhanced observability fields
-    workflow_name: Optional[str] = Field(
-        default=None, description="Name of the workflow being executed."
-    )
-    stage_name: Optional[str] = Field(
-        default=None, description="Name of the current stage being executed."
-    )
-    job_name: Optional[str] = Field(
-        default=None, description="Name of the current job being executed."
-    )
-
     # Performance metrics
     duration_ms: Optional[float] = Field(
         default=None, description="Execution duration in milliseconds."
@@ -201,44 +203,6 @@ class Metadata(BaseModel):  # pragma: no cov
     )
     cpu_usage_percent: Optional[float] = Field(
         default=None, description="CPU usage percentage at log time."
-    )
-
-    # Distributed tracing support
-    trace_id: Optional[str] = Field(
-        default=None,
-        description="OpenTelemetry trace ID for distributed tracing.",
-    )
-    span_id: Optional[str] = Field(
-        default=None,
-        description="OpenTelemetry span ID for distributed tracing.",
-    )
-    parent_span_id: Optional[str] = Field(
-        default=None, description="Parent span ID for correlation."
-    )
-
-    # Error context
-    exception_type: Optional[str] = Field(
-        default=None, description="Exception class name if error occurred."
-    )
-    exception_message: Optional[str] = Field(
-        default=None, description="Exception message if error occurred."
-    )
-    stack_trace: Optional[str] = Field(
-        default=None, description="Full stack trace if error occurred."
-    )
-    error_code: Optional[str] = Field(
-        default=None, description="Custom error code for categorization."
-    )
-
-    # Business context
-    user_id: Optional[str] = Field(
-        default=None, description="User ID who triggered the workflow."
-    )
-    tenant_id: Optional[str] = Field(
-        default=None, description="Tenant ID for multi-tenant environments."
-    )
-    environment: Optional[str] = Field(
-        default=None, description="Environment (dev, staging, prod)."
     )
 
     # NOTE: System context
@@ -259,7 +223,7 @@ class Metadata(BaseModel):  # pragma: no cov
     tags: Optional[list[str]] = Field(
         default_factory=list, description="Custom tags for categorization."
     )
-    metadata: Optional[DictData] = Field(
+    metric: Optional[DictData] = Field(
         default_factory=dict, description="Additional custom metadata."
     )
 
@@ -299,6 +263,7 @@ class Metadata(BaseModel):  # pragma: no cov
         run_id: str,
         parent_run_id: Optional[str],
         *,
+        metric: Optional[DictData] = None,
         extras: Optional[DictData] = None,
     ) -> Self:
         """Make the current metric for contract this Metadata model instance.
@@ -313,6 +278,7 @@ class Metadata(BaseModel):  # pragma: no cov
             cutting_id: A cutting ID string.
             run_id:
             parent_run_id:
+            metric:
             extras: An extra parameter that want to override core
                 config values.
 
@@ -363,27 +329,10 @@ class Metadata(BaseModel):  # pragma: no cov
             parent_run_id=parent_run_id,
             filename=frame_info.filename.split(os.path.sep)[-1],
             lineno=frame_info.lineno,
-            # NOTE: Enhanced observability fields
-            workflow_name=extras_data.get("workflow_name"),
-            stage_name=extras_data.get("stage_name"),
-            job_name=extras_data.get("job_name"),
             # NOTE: Performance metrics
             duration_ms=extras_data.get("duration_ms"),
             memory_usage_mb=extras_data.get("memory_usage_mb"),
             cpu_usage_percent=extras_data.get("cpu_usage_percent"),
-            # NOTE: Distributed tracing support
-            trace_id=extras_data.get("trace_id"),
-            span_id=extras_data.get("span_id"),
-            parent_span_id=extras_data.get("parent_span_id"),
-            # NOTE: Error context
-            exception_type=extras_data.get("exception_type"),
-            exception_message=extras_data.get("exception_message"),
-            stack_trace=extras_data.get("stack_trace"),
-            error_code=extras_data.get("error_code"),
-            # NOTE: Business context
-            user_id=extras_data.get("user_id"),
-            tenant_id=extras_data.get("tenant_id"),
-            environment=extras_data.get("environment"),
             # NOTE: System context
             hostname=hostname,
             ip_address=ip_address,
@@ -391,11 +340,17 @@ class Metadata(BaseModel):  # pragma: no cov
             package_version=__version__,
             # NOTE: Custom metadata
             tags=extras_data.get("tags", []),
-            metadata=extras_data.get("metadata", {}),
+            metric=metric,
         )
 
     @property
-    def pointer_id(self):
+    def pointer_id(self) -> str:
+        """Pointer ID of trace metadata.
+
+        Returns:
+            str: A pointer ID that will choose from parent running ID or running
+                ID.
+        """
         return self.parent_run_id or self.run_id
 
 
@@ -449,6 +404,27 @@ class ConsoleHandler(BaseHandler):
     """Console Handler model."""
 
     type: Literal["console"] = "console"
+    name: str = "ddeutil.workflow"
+    format: str = Field(
+        default=(
+            "%(asctime)s.%(msecs)03d (%(process)-5d, "
+            "%(thread)-5d) [%(levelname)-7s] (%(cut_id)s) %(message)-120s "
+            "(%(filename)s:%(lineno)s) (%(name)-10s)"
+        ),
+        description="A log format that will use with logging package.",
+    )
+    datetime_format: str = Field(
+        default="%Y-%m-%d %H:%M:%S",
+        description="A log datetime format.",
+    )
+
+    def pre(self) -> None:
+        """Pre-process."""
+        set_logging(
+            self.name,
+            message_fmt=self.format,
+            datetime_fmt=self.datetime_format,
+        )
 
     def emit(
         self, metadata: Metadata, *, extra: Optional[DictData] = None
@@ -512,6 +488,9 @@ class FileHandler(BaseHandler):
         return log_file
 
     def pre(self) -> None:  # pragma: no cov
+        """Pre-method that will call from getting trace model factory function.
+        This method will create filepath of this parent log.
+        """
         if not (p := Path(self.path)).exists():
             p.mkdir(parents=True)
 
@@ -521,7 +500,12 @@ class FileHandler(BaseHandler):
         *,
         extra: Optional[DictData] = None,
     ) -> None:
-        """Emit trace log."""
+        """Emit trace log to the file with a specific pointer path.
+
+        Args:
+            metadata (Metadata):
+            extra (DictData, default None):
+        """
         pointer: Path = self.pointer(metadata.pointer_id)
         std_file = "stderr" if metadata.error_flag else "stdout"
         with self._lock:
@@ -541,6 +525,7 @@ class FileHandler(BaseHandler):
         *,
         extra: Optional[DictData] = None,
     ) -> None:  # pragma: no cove
+        """Async emit trace log."""
         try:
             import aiofiles
         except ImportError as e:
@@ -717,22 +702,9 @@ class SQLiteHandler(BaseHandler):  # pragma: no cov
                         filename TEXT NOT NULL,
                         lineno INTEGER NOT NULL,
                         cut_id TEXT,
-                        workflow_name TEXT,
-                        stage_name TEXT,
-                        job_name TEXT,
                         duration_ms REAL,
                         memory_usage_mb REAL,
                         cpu_usage_percent REAL,
-                        trace_id TEXT,
-                        span_id TEXT,
-                        parent_span_id TEXT,
-                        exception_type TEXT,
-                        exception_message TEXT,
-                        stack_trace TEXT,
-                        error_code TEXT,
-                        user_id TEXT,
-                        tenant_id TEXT,
-                        environment TEXT,
                         hostname TEXT,
                         ip_address TEXT,
                         python_version TEXT,
@@ -938,28 +910,15 @@ class SQLiteHandler(BaseHandler):  # pragma: no cov
                             cut_id=record[11],
                             filename=record[9],
                             lineno=record[10],
-                            workflow_name=record[12],
-                            stage_name=record[13],
-                            job_name=record[14],
                             duration_ms=record[15],
                             memory_usage_mb=record[16],
                             cpu_usage_percent=record[17],
-                            trace_id=record[18],
-                            span_id=record[19],
-                            parent_span_id=record[20],
-                            exception_type=record[21],
-                            exception_message=record[22],
-                            stack_trace=record[23],
-                            error_code=record[24],
-                            user_id=record[25],
-                            tenant_id=record[26],
-                            environment=record[27],
                             hostname=record[28],
                             ip_address=record[29],
                             python_version=record[30],
                             package_version=record[31],
                             tags=json.loads(record[32]) if record[32] else [],
-                            metadata=(
+                            metric=(
                                 json.loads(record[33]) if record[33] else {}
                             ),
                         )
@@ -1045,28 +1004,15 @@ class SQLiteHandler(BaseHandler):  # pragma: no cov
                         cut_id=record[11],
                         filename=record[9],
                         lineno=record[10],
-                        workflow_name=record[12],
-                        stage_name=record[13],
-                        job_name=record[14],
                         duration_ms=record[15],
                         memory_usage_mb=record[16],
                         cpu_usage_percent=record[17],
-                        trace_id=record[18],
-                        span_id=record[19],
-                        parent_span_id=record[20],
-                        exception_type=record[21],
-                        exception_message=record[22],
-                        stack_trace=record[23],
-                        error_code=record[24],
-                        user_id=record[25],
-                        tenant_id=record[26],
-                        environment=record[27],
                         hostname=record[28],
                         ip_address=record[29],
                         python_version=record[30],
                         package_version=record[31],
                         tags=json.loads(record[32]) if record[32] else [],
-                        metadata=json.loads(record[33]) if record[33] else {},
+                        metric=json.loads(record[33]) if record[33] else {},
                     )
 
                     meta_list.append(trace_meta)
@@ -1394,22 +1340,9 @@ class ElasticHandler(BaseHandler):  # pragma: no cov
                             "filename": {"type": "keyword"},
                             "lineno": {"type": "integer"},
                             "cut_id": {"type": "keyword"},
-                            "workflow_name": {"type": "keyword"},
-                            "stage_name": {"type": "keyword"},
-                            "job_name": {"type": "keyword"},
                             "duration_ms": {"type": "float"},
                             "memory_usage_mb": {"type": "float"},
                             "cpu_usage_percent": {"type": "float"},
-                            "trace_id": {"type": "keyword"},
-                            "span_id": {"type": "keyword"},
-                            "parent_span_id": {"type": "keyword"},
-                            "exception_type": {"type": "keyword"},
-                            "exception_message": {"type": "text"},
-                            "stack_trace": {"type": "text"},
-                            "error_code": {"type": "keyword"},
-                            "user_id": {"type": "keyword"},
-                            "tenant_id": {"type": "keyword"},
-                            "environment": {"type": "keyword"},
                             "hostname": {"type": "keyword"},
                             "ip_address": {"type": "ip"},
                             "python_version": {"type": "keyword"},
@@ -1453,22 +1386,9 @@ class ElasticHandler(BaseHandler):  # pragma: no cov
             "filename": base_data["filename"],
             "lineno": base_data["lineno"],
             "cut_id": base_data["cut_id"],
-            "workflow_name": base_data.get("workflow_name"),
-            "stage_name": base_data.get("stage_name"),
-            "job_name": base_data.get("job_name"),
             "duration_ms": base_data.get("duration_ms"),
             "memory_usage_mb": base_data.get("memory_usage_mb"),
             "cpu_usage_percent": base_data.get("cpu_usage_percent"),
-            "trace_id": base_data.get("trace_id"),
-            "span_id": base_data.get("span_id"),
-            "parent_span_id": base_data.get("parent_span_id"),
-            "exception_type": base_data.get("exception_type"),
-            "exception_message": base_data.get("exception_message"),
-            "stack_trace": base_data.get("stack_trace"),
-            "error_code": base_data.get("error_code"),
-            "user_id": base_data.get("user_id"),
-            "tenant_id": base_data.get("tenant_id"),
-            "environment": base_data.get("environment"),
             "hostname": base_data.get("hostname"),
             "ip_address": base_data.get("ip_address"),
             "python_version": base_data.get("python_version"),
@@ -1587,28 +1507,15 @@ class ElasticHandler(BaseHandler):  # pragma: no cov
                         cut_id=source.get("cut_id"),
                         filename=source["filename"],
                         lineno=source["lineno"],
-                        workflow_name=source.get("workflow_name"),
-                        stage_name=source.get("stage_name"),
-                        job_name=source.get("job_name"),
                         duration_ms=source.get("duration_ms"),
                         memory_usage_mb=source.get("memory_usage_mb"),
                         cpu_usage_percent=source.get("cpu_usage_percent"),
-                        trace_id=source.get("trace_id"),
-                        span_id=source.get("span_id"),
-                        parent_span_id=source.get("parent_span_id"),
-                        exception_type=source.get("exception_type"),
-                        exception_message=source.get("exception_message"),
-                        stack_trace=source.get("stack_trace"),
-                        error_code=source.get("error_code"),
-                        user_id=source.get("user_id"),
-                        tenant_id=source.get("tenant_id"),
-                        environment=source.get("environment"),
                         hostname=source.get("hostname"),
                         ip_address=source.get("ip_address"),
                         python_version=source.get("python_version"),
                         package_version=source.get("package_version"),
                         tags=source.get("tags", []),
-                        metadata=source.get("metadata", {}),
+                        metric=source.get("metric", {}),
                     )
 
                     meta_list.append(trace_meta)
@@ -1697,28 +1604,15 @@ class ElasticHandler(BaseHandler):  # pragma: no cov
                     cut_id=source.get("cut_id"),
                     filename=source["filename"],
                     lineno=source["lineno"],
-                    workflow_name=source.get("workflow_name"),
-                    stage_name=source.get("stage_name"),
-                    job_name=source.get("job_name"),
                     duration_ms=source.get("duration_ms"),
                     memory_usage_mb=source.get("memory_usage_mb"),
                     cpu_usage_percent=source.get("cpu_usage_percent"),
-                    trace_id=source.get("trace_id"),
-                    span_id=source.get("span_id"),
-                    parent_span_id=source.get("parent_span_id"),
-                    exception_type=source.get("exception_type"),
-                    exception_message=source.get("exception_message"),
-                    stack_trace=source.get("stack_trace"),
-                    error_code=source.get("error_code"),
-                    user_id=source.get("user_id"),
-                    tenant_id=source.get("tenant_id"),
-                    environment=source.get("environment"),
                     hostname=source.get("hostname"),
                     ip_address=source.get("ip_address"),
                     python_version=source.get("python_version"),
                     package_version=source.get("package_version"),
                     tags=source.get("tags", []),
-                    metadata=source.get("metadata", {}),
+                    metric=source.get("metric", {}),
                 )
 
                 meta_list.append(trace_meta)
@@ -1774,13 +1668,17 @@ class BaseEmit(ABC):
         self,
         msg: str,
         level: Level,
-    ):
+        *,
+        metric: Optional[DictData] = None,
+    ) -> None:
         """Write trace log with append mode and logging this message with any
         logging level.
 
         Args:
             msg: A message that want to log.
             level: A logging level.
+            metric (DictData, default None): A metric data that want to export
+                to each target handler.
         """
         raise NotImplementedError(
             "Logging action should be implement for making trace log."
@@ -1839,6 +1737,8 @@ class BaseAsyncEmit(ABC):
         self,
         msg: str,
         level: Level,
+        *,
+        metric: Optional[DictData] = None,
     ) -> None:
         """Async write trace log with append mode and logging this message with
         any logging level.
@@ -1846,6 +1746,8 @@ class BaseAsyncEmit(ABC):
         Args:
             msg (str): A message that want to log.
             level (Mode): A logging level.
+            metric (DictData, default None): A metric data that want to export
+                to each target handler.
         """
         raise NotImplementedError(
             "Async Logging action should be implement for making trace log."
@@ -1951,12 +1853,16 @@ class Trace(BaseModel, BaseEmit, BaseAsyncEmit):
         """
         return prepare_newline(Message.from_str(msg).prepare(self.extras))
 
-    def emit(self, msg: str, level: Level) -> None:
+    def emit(
+        self, msg: str, level: Level, *, metric: Optional[DictData] = None
+    ) -> None:
         """Emit a trace log to all handler. This will use synchronise process.
 
         Args:
             msg (str): A message.
             level (Level): A tracing level.
+            metric (DictData, default None): A metric data that want to export
+                to each target handler.
         """
         _msg: str = self.make_message(msg)
         metadata: Metadata = Metadata.make(
@@ -1966,6 +1872,7 @@ class Trace(BaseModel, BaseEmit, BaseAsyncEmit):
             cutting_id=self.cut_id,
             run_id=self.run_id,
             parent_run_id=self.parent_run_id,
+            metric=metric,
             extras=self.extras,
         )
 
@@ -1985,13 +1892,17 @@ class Trace(BaseModel, BaseEmit, BaseAsyncEmit):
                 handler.flush(self._buffer, extra=self.extras)
             self._buffer.clear()
 
-    async def amit(self, msg: str, level: Level) -> None:
+    async def amit(
+        self, msg: str, level: Level, *, metric: Optional[DictData] = None
+    ) -> None:
         """Async write trace log with append mode and logging this message with
         any logging level.
 
         Args:
             msg (str): A message that want to log.
             level (Level): A logging mode.
+            metric (DictData, default None): A metric data that want to export
+                to each target handler.
         """
         _msg: str = self.make_message(msg)
         metadata: Metadata = Metadata.make(
@@ -2001,6 +1912,7 @@ class Trace(BaseModel, BaseEmit, BaseAsyncEmit):
             cutting_id=self.cut_id,
             run_id=self.run_id,
             parent_run_id=self.parent_run_id,
+            metric=metric,
             extras=self.extras,
         )
 
@@ -2045,7 +1957,7 @@ def get_trace(
     handlers: list[Union[DictData, Handler]] = None,
     parent_run_id: Optional[str] = None,
     extras: Optional[DictData] = None,
-    auto_pre_process: bool = False,
+    auto_pre_process: bool = True,
 ) -> Trace:
     """Get dynamic Trace instance from the core config.
 
@@ -2056,10 +1968,13 @@ def get_trace(
     Args:
         run_id (str): A running ID.
         parent_run_id (str | None, default None): A parent running ID.
-        handlers (list):
-        extras: An extra parameter that want to override the core
-            config values.
-        auto_pre_process (bool, default False)
+        handlers (list[DictData | Handler], default None): A list of handler or
+            mapping of handler data that want to direct pass instead use
+            environment variable config.
+        extras (DictData, default None): An extra parameter that want to
+            override the core config values.
+        auto_pre_process (bool, default False) A flag that will auto call pre
+            method after validate a trace model.
 
     Returns:
         Trace: The appropriate trace instance.

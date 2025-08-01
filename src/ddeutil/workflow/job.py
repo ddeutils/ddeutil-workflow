@@ -865,6 +865,94 @@ class Job(BaseModel):
         else:
             return output.get("jobs", {}).get(_id, {})
 
+    def _execute(
+        self,
+        params: DictData,
+        run_id: str,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
+    ) -> Result:
+        """"""
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
+        )
+        trace.info(
+            f"[JOB]: Routing for "
+            f"{''.join(self.runs_on.type.value.split('_')).title()}: "
+            f"{self.id!r}"
+        )
+
+        if self.runs_on.type == LOCAL:
+            return local_execute(
+                self,
+                params,
+                run_id=parent_run_id,
+                event=event,
+            )
+        elif self.runs_on.type == SELF_HOSTED:  # pragma: no cov
+            pass
+        elif self.runs_on.type == AZ_BATCH:  # pragma: no cov
+            from .plugins.providers.az import azure_batch_execute
+
+            return azure_batch_execute(
+                self,
+                params,
+                run_id=parent_run_id,
+                event=event,
+            )
+        elif self.runs_on.type == DOCKER:  # pragma: no cov
+            return docker_execution(
+                self,
+                params,
+                run_id=parent_run_id,
+                event=event,
+            )
+        elif self.runs_on.type == CONTAINER:  # pragma: no cov
+            from .plugins.providers.container import container_execute
+
+            return container_execute(
+                self,
+                params,
+                run_id=parent_run_id,
+                event=event,
+            )
+        elif self.runs_on.type == AWS_BATCH:  # pragma: no cov
+            from .plugins.providers.aws import aws_batch_execute
+
+            return aws_batch_execute(
+                self,
+                params,
+                run_id=parent_run_id,
+                event=event,
+            )
+        elif self.runs_on.type == GCP_BATCH:  # pragma: no cov
+            from .plugins.providers.gcs import gcp_batch_execute
+
+            return gcp_batch_execute(
+                self,
+                params,
+                run_id=parent_run_id,
+                event=event,
+            )
+
+        trace.error(
+            f"[JOB]: Execution not support runs-on: {self.runs_on.type.value!r} "
+            f"yet."
+        )
+        return Result(
+            status=FAILED,
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            context={
+                "status": FAILED,
+                "errors": JobError(
+                    f"Execute runs-on type: {self.runs_on.type.value!r} does "
+                    f"not support yet."
+                ).to_dict(),
+            },
+            extras=self.extras,
+        )
+
     def execute(
         self,
         params: DictData,
@@ -896,82 +984,15 @@ class Job(BaseModel):
         trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
-        trace.info(
-            f"[JOB]: Routing for "
-            f"{''.join(self.runs_on.type.value.split('_')).title()}: "
-            f"{self.id!r}"
-        )
-
-        if self.runs_on.type == LOCAL:
-            return local_execute(
-                self,
-                params,
-                run_id=parent_run_id,
-                event=event,
-            ).make_info({"execution_time": time.monotonic() - ts})
-        elif self.runs_on.type == SELF_HOSTED:  # pragma: no cov
-            pass
-        elif self.runs_on.type == AZ_BATCH:  # pragma: no cov
-            from .plugins.providers.az import azure_batch_execute
-
-            return azure_batch_execute(
-                self,
-                params,
-                run_id=parent_run_id,
-                event=event,
-            ).make_info({"execution_time": time.monotonic() - ts})
-        elif self.runs_on.type == DOCKER:  # pragma: no cov
-            return docker_execution(
-                self,
-                params,
-                run_id=parent_run_id,
-                event=event,
-            ).make_info({"execution_time": time.monotonic() - ts})
-        elif self.runs_on.type == CONTAINER:  # pragma: no cov
-            from .plugins.providers.container import container_execute
-
-            return container_execute(
-                self,
-                params,
-                run_id=parent_run_id,
-                event=event,
-            ).make_info({"execution_time": time.monotonic() - ts})
-        elif self.runs_on.type == AWS_BATCH:  # pragma: no cov
-            from .plugins.providers.aws import aws_batch_execute
-
-            return aws_batch_execute(
-                self,
-                params,
-                run_id=parent_run_id,
-                event=event,
-            ).make_info({"execution_time": time.monotonic() - ts})
-        elif self.runs_on.type == GCP_BATCH:  # pragma: no cov
-            from .plugins.providers.gcs import gcp_batch_execute
-
-            return gcp_batch_execute(
-                self,
-                params,
-                run_id=parent_run_id,
-                event=event,
-            ).make_info({"execution_time": time.monotonic() - ts})
-
-        trace.error(
-            f"[JOB]: Execution not support runs-on: {self.runs_on.type.value!r} "
-            f"yet."
-        )
-        return Result(
-            status=FAILED,
+        trace.info(f"[JOB]: Handler {self.id or 'EMPTY'}")
+        result_caught: Result = self._execute(
+            params,
             run_id=run_id,
             parent_run_id=parent_run_id,
-            context={
-                "status": FAILED,
-                "errors": JobError(
-                    f"Execute runs-on type: {self.runs_on.type.value!r} does "
-                    f"not support yet."
-                ).to_dict(),
-            },
-            info={"execution_time": time.monotonic() - ts},
-            extras=self.extras,
+            event=event,
+        )
+        return result_caught.make_info(
+            {"execution_time": time.monotonic() - ts}
         )
 
 

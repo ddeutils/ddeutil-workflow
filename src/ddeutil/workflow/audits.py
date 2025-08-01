@@ -60,7 +60,7 @@ from typing_extensions import Self
 
 from .__types import DictData
 from .conf import dynamic
-from .traces import Trace, get_trace, set_logging
+from .traces import Trace, get_trace
 
 logger = logging.getLogger("ddeutil.workflow")
 
@@ -129,7 +129,6 @@ class BaseAudit(BaseModel, ABC):
     """
 
     type: Literal["base"] = "base"
-    logging_name: str = "ddeutil.workflow"
     extras: DictData = Field(
         default_factory=dict,
         description="An extras parameter that want to override core config",
@@ -152,9 +151,6 @@ class BaseAudit(BaseModel, ABC):
         """
         if dynamic("enable_write_audit", extras=self.extras):
             self.do_before()
-
-        # NOTE: Start setting log config in this line with cache.
-        set_logging(self.logging_name)
         return self
 
     @abstractmethod
