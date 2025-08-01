@@ -409,6 +409,9 @@ class BaseStage(BaseModel, ABC):
                 info={"execution_time": time.monotonic() - ts},
                 extras=self.extras,
             )
+        finally:  # pragma: no cov
+            # TODO: Implement sending metric on this line.
+            pass
 
     def _execute(
         self,

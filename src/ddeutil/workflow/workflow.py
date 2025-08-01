@@ -99,7 +99,10 @@ class Workflow(BaseModel):
         description="An extra parameters that want to override config values.",
     )
     name: str = Field(description="A workflow name.")
-    type: Literal["Workflow"] = Field(default="workflow")
+    type: Literal["Workflow"] = Field(
+        default="Workflow",
+        description="A type of this config data that will use by discriminator",
+    )
     desc: Optional[str] = Field(
         default=None,
         description=(
