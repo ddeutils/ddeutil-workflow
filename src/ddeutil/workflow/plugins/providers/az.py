@@ -89,9 +89,9 @@ try:
     from azure.core.exceptions import AzureError
     from azure.storage.blob import BlobServiceClient
 
-    AZURE_AVAILABLE = True
+    AZURE_AVAILABLE: bool = True
 except ImportError:
-    AZURE_AVAILABLE = False
+    AZURE_AVAILABLE: bool = False
 
 from pydantic import BaseModel, Field
 

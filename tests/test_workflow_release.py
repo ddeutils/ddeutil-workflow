@@ -77,7 +77,7 @@ def test_workflow_release():
                     ]
                 }
             },
-            "extra": {"enable_write_audit": False},
+            "extras": {"enable_write_audit": False},
         }
     )
     release: datetime = datetime.now().replace(second=0, microsecond=0)
@@ -125,7 +125,7 @@ def test_workflow_release_with_datetime_force():
                     ]
                 }
             },
-            "extra": {"enable_write_audit": True},
+            "extras": {"enable_write_audit": True},
         }
     )
     dt: datetime = datetime(2025, 1, 18, tzinfo=ZoneInfo("Asia/Bangkok"))
@@ -201,7 +201,7 @@ def test_workflow_release_with_datetime(test_path):
     shutil.rmtree(test_audit_skip_path)
 
 
-def test_workflow_release_with_auto():
+def test_workflow_release_with_auto(test_path):
     workflow: Workflow = Workflow.model_validate(
         obj={
             "name": "wf-scheduling-common",
@@ -213,7 +213,7 @@ def test_workflow_release_with_auto():
                     ]
                 }
             },
-            "extra": {"enable_write_audit": True},
+            "extras": {"enable_write_audit": True},
         }
     )
     rs: Result = workflow.release(release=datetime.now(), params={})
@@ -234,7 +234,7 @@ def test_workflow_release_rerun():
                     ]
                 }
             },
-            "extra": {"enable_write_audit": True},
+            "extras": {"enable_write_audit": True},
         }
     )
     with pytest.raises(NotImplementedError):
@@ -253,7 +253,7 @@ def test_workflow_release_dryrun():
                     ]
                 }
             },
-            "extra": {"enable_write_audit": True},
+            "extras": {"enable_write_audit": True},
         }
     )
     rs: Result = workflow.release(

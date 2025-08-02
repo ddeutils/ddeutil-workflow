@@ -52,7 +52,6 @@ def test_base_audit():
     )
     assert log.model_dump() == {
         "type": "base",
-        "logging_name": "ddeutil.workflow",
         "extras": {"foo": "bar", "datetime": datetime(2024, 1, 1, 1, 15)},
     }
 

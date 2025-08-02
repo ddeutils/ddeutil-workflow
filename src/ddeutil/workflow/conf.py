@@ -101,7 +101,8 @@ class Config:  # pragma: no cov
         """Register Filter that is a list of importable string for the filter
         template.
 
-        :rtype: list[str]
+        Returns:
+            list[str]: A list of module import string.
         """
         regis_filter_str: str = env(
             "CORE_REGISTRY_FILTER", "ddeutil.workflow.templates"
@@ -131,17 +132,6 @@ class Config:  # pragma: no cov
         return ZoneInfo(env("LOG_TIMEZONE", "UTC"))
 
     @property
-    def log_format(self) -> str:
-        return env(
-            "LOG_FORMAT",
-            (
-                "%(asctime)s.%(msecs)03d (%(process)-5d, "
-                "%(thread)-5d) [%(levelname)-7s] (%(cut_id)s) %(message)-120s "
-                "(%(filename)s:%(lineno)s) (%(name)-10s)"
-            ),
-        )
-
-    @property
     def audit_conf(self) -> dict[str, Any]:
         return json.loads(
             env("LOG_AUDIT_URL", '{"type": "file", "path": "./audits"}')
@@ -150,10 +140,6 @@ class Config:  # pragma: no cov
     @property
     def enable_write_audit(self) -> bool:
         return str2bool(env("LOG_AUDIT_ENABLE_WRITE", "false"))
-
-    @property
-    def log_datetime_format(self) -> str:
-        return env("LOG_DATETIME_FORMAT", "%Y-%m-%d %H:%M:%S")
 
     @property
     def stage_default_id(self) -> bool:
@@ -441,7 +427,8 @@ class YamlParser:
         """Return object of string type which implement on any registry. The
         object type.
 
-        :rtype: str
+        Returns:
+            str: A type that get from config data.
         """
         if _typ := self.data.get("type"):
             return _typ
