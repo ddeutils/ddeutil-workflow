@@ -1,18 +1,22 @@
 import pytest
+from ddeutil.workflow import CANCEL, FAILED, SKIP, SUCCESS, Workflow, get_trace
 from ddeutil.workflow.errors import JobError
-from ddeutil.workflow.job import Job, local_execute_strategy
-from ddeutil.workflow.result import CANCEL, FAILED, SKIP, SUCCESS
-from ddeutil.workflow.workflow import Workflow
+from ddeutil.workflow.job import Job, local_process_strategy
 
 from .utils import MockEvent
 
 
-def test_job_exec_strategy():
+@pytest.fixture(scope="module")
+def trace():
+    return get_trace(run_id="001")
+
+
+def test_job_process_strategy(trace):
     job: Job = Workflow.from_conf(name="wf-run-python-raise-for-job").job(
         "job-complete"
     )
-    st, ctx = local_execute_strategy(
-        job, {"sleep": "0.1"}, {}, run_id="001", context={}
+    st, ctx = local_process_strategy(
+        job, {"sleep": "0.1"}, {}, trace=trace, context={}
     )
     assert st == SUCCESS
     assert ctx == {
@@ -27,12 +31,12 @@ def test_job_exec_strategy():
     }
 
 
-def test_job_exec_strategy_skipped_stage():
+def test_job_process_strategy_skipped_stage(trace):
     job: Job = Workflow.from_conf(name="wf-run-python-raise-for-job").job(
         "job-stage-condition"
     )
-    st, ctx = local_execute_strategy(
-        job, {"sleep": "1"}, {}, run_id="001", context={}
+    st, ctx = local_process_strategy(
+        job, {"sleep": "1"}, {}, trace=trace, context={}
     )
     assert st == SUCCESS
     assert ctx == {
@@ -51,15 +55,15 @@ def test_job_exec_strategy_skipped_stage():
     }
 
 
-def test_job_exec_strategy_catch_stage_error():
+def test_job_process_strategy_catch_stage_error(trace):
     job: Job = Workflow.from_conf("wf-run-python-raise-for-job").job(
         "final-job"
     )
 
     context = {}
     with pytest.raises(JobError):
-        local_execute_strategy(
-            job, {"name": "foo"}, {}, run_id="001", context=context
+        local_process_strategy(
+            job, {"name": "foo"}, {}, trace=trace, context=context
         )
 
     assert context == {
@@ -89,14 +93,14 @@ def test_job_exec_strategy_catch_stage_error():
     }
 
 
-def test_job_exec_strategy_catch_job_error():
+def test_job_process_strategy_catch_job_error(trace):
     job: Job = Workflow.from_conf("wf-run-python-raise-for-job").job(
         "final-job"
     )
     context = {}
     with pytest.raises(JobError):
-        local_execute_strategy(
-            job, {"name": "foo"}, {}, run_id="001", context=context
+        local_process_strategy(
+            job, {"name": "foo"}, {}, trace=trace, context=context
         )
 
     assert context == {
@@ -126,15 +130,15 @@ def test_job_exec_strategy_catch_job_error():
     }
 
 
-def test_job_exec_strategy_event_set():
+def test_job_process_strategy_event_set(trace):
     job: Job = Workflow.from_conf(name="wf-run-python-raise-for-job").job(
         "second-job"
     )
     event = MockEvent(n=0)
     context = {}
     with pytest.raises(JobError):
-        local_execute_strategy(
-            job, {}, {}, run_id="001", context=context, event=event
+        local_process_strategy(
+            job, {}, {}, trace=trace, context=context, event=event
         )
 
     assert context == {
@@ -154,13 +158,13 @@ def test_job_exec_strategy_event_set():
     }
 
 
-def test_job_exec_strategy_raise():
+def test_job_process_strategy_raise(trace):
     job: Job = Workflow.from_conf(name="wf-run-python-raise-for-job").job(
         "first-job"
     )
     context = {}
     with pytest.raises(JobError):
-        local_execute_strategy(job, {}, {}, run_id="001", context=context)
+        local_process_strategy(job, {}, {}, trace=trace, context=context)
 
     assert context["status"] == FAILED
     assert context == {

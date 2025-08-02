@@ -95,11 +95,19 @@ def test_job_exec_py():
 
 
 def test_job_exec_py_raise():
-    rs: Result = (
-        Workflow.from_conf(name="wf-run-python-raise")
-        .job("first-job")
-        .execute(params={})
+    job = Job.model_validate(
+        {
+            "id": "first-job",
+            "stages": [
+                {
+                    "name": "Raise Error Inside",
+                    "id": "raise-error",
+                    "run": "raise ValueError('Testing raise error PyStage!!!')",
+                },
+            ],
+        }
     )
+    rs: Result = job.execute(params={})
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,
@@ -112,7 +120,7 @@ def test_job_exec_py_raise():
                     "outputs": {},
                     "errors": {
                         "name": "ValueError",
-                        "message": "Testing raise error inside PyStage!!!",
+                        "message": "Testing raise error PyStage!!!",
                     },
                 }
             },
@@ -535,15 +543,22 @@ def test_job_exec_skipped():
 
 
 def test_job_exec_runs_on_not_implement():
-    job: Job = Workflow.from_conf(
-        "wf-run-python-raise-for-job",
-    ).job("job-fail-runs-on")
+    job: Job = Job.model_validate(
+        {
+            "id": "job-fail-runs-on",
+            "runs-on": {
+                "type": "self_hosted",
+                "with": {"host": "localhost:88", "token": "dummy"},
+            },
+            "stages": [{"name": "Echo empty", "echo": "Hello World"}],
+        }
+    )
     rs: Result = job.execute({})
     assert rs.status == FAILED
     assert rs.context == {
         "status": FAILED,
         "errors": {
-            "message": "Execute runs-on type: 'self_hosted' does not support yet.",
+            "message": "Job runs-on type: 'self_hosted' does not support yet.",
             "name": "JobError",
         },
     }
