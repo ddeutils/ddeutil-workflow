@@ -56,7 +56,9 @@ from pydantic.functional_serializers import field_serializer
 from pydantic.functional_validators import field_validator, model_validator
 from typing_extensions import Self
 
+from . import JobSkipError
 from .__types import DictData, DictStr, Matrix, StrOrNone
+from .conf import pass_env
 from .errors import JobCancelError, JobError, to_dict
 from .result import (
     CANCEL,
@@ -452,41 +454,22 @@ class Job(BaseModel):
     execution, dependency management, conditional execution, and multienvironment
     deployment.
 
-    Jobs are the primary execution units within workflows, providing:
-    - Stage lifecycle management
-    - Execution environment abstraction
-    - Matrix strategy support for parallel execution
-    - Dependency resolution via job needs
-    - Output coordination between stages
-
-    Attributes:
-        id (str, optional): Unique job identifier within workflow
-        desc (str, optional): Job description in Markdown format
-        runs_on (RunsOnModel): Execution environment configuration
-        condition (str, optional): Conditional execution expression
-        stages (list[Stage]): Ordered list of stages to execute
-        trigger_rule (Rule): Rule for handling job dependencies
-        needs (list[str]): List of prerequisite job IDs
-        strategy (Strategy): Matrix strategy for parameterized execution
-        extras (dict): Additional configuration parameters
-
     Example:
-        ```python
-        job = Job(
-            id="data-processing",
-            desc="Process daily data files",
-            runs_on=OnLocal(),
-            stages=[
-                EmptyStage(name="Start", echo="Processing started"),
-                PyStage(name="Process", run="process_data()"),
-                EmptyStage(name="Complete", echo="Processing finished")
-            ],
-            strategy=Strategy(
-                matrix={'env': ['dev', 'prod']},
-                max_parallel=2
-            )
-        )
-        ```
+        >>> from ddeutil.workflow.stages import EmptyStage, PyStage
+        >>> job = Job(
+        ...     id="data-processing",
+        ...     desc="Process daily data files",
+        ...     runs_on=OnLocal(),
+        ...     stages=[
+        ...         EmptyStage(name="Start", echo="Processing started"),
+        ...         PyStage(name="Process", run="process_data()"),
+        ...         EmptyStage(name="Complete", echo="Processing finished")
+        ...     ],
+        ...     strategy=Strategy(
+        ...         matrix={'env': ['dev', 'prod']},
+        ...         max_parallel=2
+        ...     )
+        ... )
     """
 
     id: StrOrNone = Field(
@@ -513,6 +496,15 @@ class Job(BaseModel):
     stages: list[Stage] = Field(
         default_factory=list,
         description="A list of Stage model of this job.",
+    )
+    retry: int = Field(
+        default=0,
+        ge=0,
+        lt=20,
+        description=(
+            "A retry number if job route execution got the error exclude skip "
+            "and cancel exception class."
+        ),
     )
     trigger_rule: Rule = Field(
         default=Rule.ALL_SUCCESS,
@@ -751,7 +743,7 @@ class Job(BaseModel):
             #   should use the `re` module to validate eval-string before
             #   running.
             rs: bool = eval(
-                param2template(self.condition, params, extras=self.extras),
+                self.pass_template(self.condition, params),
                 globals() | params,
                 {},
             )
@@ -802,8 +794,9 @@ class Job(BaseModel):
         extract from the result context if it exists. If it does not found, it
         will not set on the received context.
 
-        :raise JobError: If the job's ID does not set and the setting
-            default job ID flag does not set.
+        Raises:
+            JobError: If the job's ID does not set and the setting default job
+                ID flag does not set.
 
         Args:
             output: (DictData) A result data context that want to extract
@@ -854,8 +847,9 @@ class Job(BaseModel):
         """Get the outputs from jobs data. It will get this job ID or passing
         custom ID from the job outputs mapping.
 
-        :param output: (DictData) A job outputs data that want to extract
-        :param job_id: (StrOrNone) A job ID if the `id` field does not set.
+        Args:
+            output (DictData): A job outputs data that want to extract
+            job_id (StrOrNone): A job ID if the `id` field does not set.
 
         :rtype: DictData
         """
@@ -865,14 +859,28 @@ class Job(BaseModel):
         else:
             return output.get("jobs", {}).get(_id, {})
 
-    def _execute(
+    def pass_template(self, value: Any, params: DictData) -> Any:
+        """Pass template and environment variable to any value that can
+        templating.
+
+        Args:
+            value (Any): An any value.
+            params (DictData): A parameter data that want to use in this
+                execution.
+
+        Returns:
+            Any: A templated value.
+        """
+        return pass_env(param2template(value, params, extras=self.extras))
+
+    def process(
         self,
         params: DictData,
         run_id: str,
         parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> Result:
-        """"""
+        """Process job method."""
         trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
@@ -953,6 +961,77 @@ class Job(BaseModel):
             extras=self.extras,
         )
 
+    def _execute(
+        self,
+        params: DictData,
+        run_id: str,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
+    ) -> Result:
+        """Wrapped the route execute method before returning to handler
+        execution.
+
+        Args:
+            params: A parameter data that want to use in this execution
+            run_id:
+            parent_run_id:
+            event:
+
+        Returns:
+            Result: The wrapped execution result.
+        """
+        current_retry: int = 0
+        exception: Exception
+        trace: Trace = get_trace(
+            run_id, parent_run_id=parent_run_id, extras=self.extras
+        )
+        try:
+            return self.process(
+                params,
+                run_id,
+                parent_run_id=parent_run_id,
+                event=event,
+            )
+        except (JobCancelError, JobSkipError):
+            trace.debug("[JOB]: process raise skip or cancel error.")
+            raise
+        except Exception as e:
+            current_retry += 1
+            exception = e
+        finally:
+            trace.debug("[JOB]: Failed at the first execution.")
+
+        if self.retry == 0:
+            raise exception
+
+        trace.warning(
+            f"[JOB]: Retry count: {current_retry} ... "
+            f"( {exception.__class__.__name__} )"
+        )
+        while current_retry < (self.retry + 1):
+            try:
+                return self.process(
+                    params,
+                    run_id,
+                    parent_run_id=parent_run_id,
+                    event=event,
+                )
+            except (JobCancelError, JobSkipError):
+                trace.debug("[JOB]: process raise skip or cancel error.")
+                raise
+            except exception as e:
+                current_retry += 1
+                trace.warning(
+                    f"[JOB]: Retry count: {current_retry} ... "
+                    f"( {e.__class__.__name__} )"
+                )
+                exception = e
+                time.sleep(1.2**current_retry)
+
+        # NOTE: Raise because
+        trace.error(f"[JOB]: Reach the maximum of retry number: {self.retry}.")
+        raise exception
+
     def execute(
         self,
         params: DictData,
@@ -984,24 +1063,31 @@ class Job(BaseModel):
         trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
-        trace.info(f"[JOB]: Handler {self.id or 'EMPTY'}")
-        result_caught: Result = self._execute(
-            params,
-            run_id=run_id,
-            parent_run_id=parent_run_id,
-            event=event,
-        )
-        return result_caught.make_info(
-            {"execution_time": time.monotonic() - ts}
-        )
+        try:
+            trace.info(
+                f"[JOB]: Handler {self.runs_on.type.name}: "
+                f"{(self.id or 'EMPTY')!r}."
+            )
+            result_caught: Result = self._execute(
+                params,
+                run_id=run_id,
+                parent_run_id=parent_run_id,
+                event=event,
+            )
+            return result_caught.make_info(
+                {"execution_time": time.monotonic() - ts}
+            )
+        finally:
+            trace.debug("[JOB]: End Handler job execution.")
 
 
 def mark_errors(context: DictData, error: JobError) -> None:
     """Make the errors context result with the refs value depends on the nested
     execute func.
 
-    :param context: (DictData) A context data.
-    :param error: (JobError) A stage exception object.
+    Args:
+        context (DictData): A context data.
+        error (JobError): A stage exception object.
     """
     if "errors" in context:
         context["errors"][error.refs] = error.to_dict()
@@ -1010,6 +1096,9 @@ def mark_errors(context: DictData, error: JobError) -> None:
 
 
 def pop_stages(context: DictData) -> DictData:
+    """Pop a stages key from the context data. It will return empty dict if it
+    does not exist.
+    """
     return filter_func(context.pop("stages", {}))
 
 
@@ -1045,9 +1134,10 @@ def local_execute_strategy(
     :param event: (Event) An Event manager instance that use to cancel this
         execution if it forces stopped by parent execution.
 
-    :raise JobError: If event was set.
-    :raise JobError: If stage execution raise any error as `StageError`.
-    :raise JobError: If the result from execution has `FAILED` status.
+    Raises:
+        JobError: If event was set.
+        JobError: If stage execution raise any error as `StageError`.
+        JobError: If the result from execution has `FAILED` status.
 
     :rtype: tuple[Status, DictData]
     """
@@ -1421,10 +1511,6 @@ def self_hosted_execute(
         context=catch(context, status=SUCCESS),
         extras=job.extras,
     )
-
-
-# Azure Batch execution is now handled by the Azure Batch provider
-# See src/ddeutil/workflow/plugins/providers/az.py for implementation
 
 
 def docker_execution(
