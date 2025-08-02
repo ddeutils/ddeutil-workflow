@@ -240,7 +240,8 @@ class BaseStage(BaseModel, ABC):
 
         Args:
             value (Any): An any value.
-            params (DictData):
+            params (DictData): A parameter data that want to use in this
+                execution.
 
         Returns:
             Any: A templated value.
@@ -404,7 +405,7 @@ class BaseStage(BaseModel, ABC):
                 extras=self.extras,
             )
         finally:  # pragma: no cov
-            trace.debug("[STAGE]: End Handler stage process.")
+            trace.debug("[STAGE]: End Handler stage execution.")
 
     def _execute(
         self,
@@ -417,8 +418,7 @@ class BaseStage(BaseModel, ABC):
         """Wrapped the process method before returning to handler execution.
 
         Args:
-            params: A parameter data that want to use in this
-                execution.
+            params: A parameter data that want to use in this execution.
             event: An event manager that use to track parent process
                 was not force stopped.
 
@@ -639,7 +639,7 @@ class BaseStage(BaseModel, ABC):
         *,
         parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
-    ) -> Optional[Result]:
+    ) -> Result:
         """Pre-process method that will use to run with dry-run mode, and it
         should be used replace of process method when workflow release set with
         DRYRUN mode.
@@ -684,6 +684,8 @@ class BaseStage(BaseModel, ABC):
     ) -> EmptyStage:
         """Convert the current Stage model to the EmptyStage model for dry-run
         mode if the `action_stage` class attribute has set.
+
+            Some use-case for this method is use for deactivate.
 
         Args:
             sleep (int, default 0.35): An adjustment sleep time.
@@ -952,9 +954,19 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
                 parent_run_id=parent_run_id,
                 event=event,
             )
+        except (
+            StageNestedSkipError,
+            StageNestedCancelError,
+            StageSkipError,
+            StageCancelError,
+        ):
+            trace.debug("[STAGE]: process raise skip or cancel error.")
+            raise
         except Exception as e:
             current_retry += 1
             exception = e
+        finally:
+            trace.debug("[STAGE]: Failed at the first execution.")
 
         if self.retry == 0:
             raise exception
@@ -1058,9 +1070,19 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
                 parent_run_id=parent_run_id,
                 event=event,
             )
+        except (
+            StageNestedSkipError,
+            StageNestedCancelError,
+            StageSkipError,
+            StageCancelError,
+        ):
+            await trace.adebug("[STAGE]: process raise skip or cancel error.")
+            raise
         except Exception as e:
             current_retry += 1
             exception = e
+        finally:
+            await trace.adebug("[STAGE]: Failed at the first execution.")
 
         if self.retry == 0:
             raise exception
