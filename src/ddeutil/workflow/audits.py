@@ -791,7 +791,13 @@ Audit = Annotated[
         LocalFileAudit,
         LocalSQLiteAudit,
     ],
-    Field(discriminator="type"),
+    Field(
+        discriminator="type",
+        description=(
+            "An union of supported Audit model that have inherited from "
+            "BaseAudit."
+        ),
+    ),
 ]
 
 
