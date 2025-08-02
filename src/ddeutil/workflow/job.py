@@ -59,7 +59,7 @@ from typing_extensions import Self
 from . import JobSkipError
 from .__types import DictData, DictStr, Matrix, StrOrNone
 from .conf import pass_env
-from .errors import JobCancelError, JobError, to_dict
+from .errors import JobCancelError, JobError, mark_errors, to_dict
 from .result import (
     CANCEL,
     FAILED,
@@ -877,10 +877,13 @@ class Job(BaseModel):
         self,
         params: DictData,
         run_id: str,
+        context: DictData,
         parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> Result:
-        """Process job method."""
+        """Process routing method that will route the provider function depend
+        on runs-on value.
+        """
         trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
@@ -889,11 +892,12 @@ class Job(BaseModel):
             f"{''.join(self.runs_on.type.value.split('_')).title()}: "
             f"{self.id!r}"
         )
-
+        rs: Optional[Result] = None
         if self.runs_on.type == LOCAL:
-            return local_execute(
+            rs = local_process(
                 self,
                 params,
+                context=context,
                 run_id=parent_run_id,
                 event=event,
             )
@@ -902,14 +906,14 @@ class Job(BaseModel):
         elif self.runs_on.type == AZ_BATCH:  # pragma: no cov
             from .plugins.providers.az import azure_batch_execute
 
-            return azure_batch_execute(
+            rs = azure_batch_execute(
                 self,
                 params,
                 run_id=parent_run_id,
                 event=event,
             )
         elif self.runs_on.type == DOCKER:  # pragma: no cov
-            return docker_execution(
+            rs = docker_process(
                 self,
                 params,
                 run_id=parent_run_id,
@@ -918,7 +922,7 @@ class Job(BaseModel):
         elif self.runs_on.type == CONTAINER:  # pragma: no cov
             from .plugins.providers.container import container_execute
 
-            return container_execute(
+            rs = container_execute(
                 self,
                 params,
                 run_id=parent_run_id,
@@ -927,7 +931,7 @@ class Job(BaseModel):
         elif self.runs_on.type == AWS_BATCH:  # pragma: no cov
             from .plugins.providers.aws import aws_batch_execute
 
-            return aws_batch_execute(
+            rs = aws_batch_execute(
                 self,
                 params,
                 run_id=parent_run_id,
@@ -936,44 +940,56 @@ class Job(BaseModel):
         elif self.runs_on.type == GCP_BATCH:  # pragma: no cov
             from .plugins.providers.gcs import gcp_batch_execute
 
-            return gcp_batch_execute(
+            rs = gcp_batch_execute(
                 self,
                 params,
                 run_id=parent_run_id,
                 event=event,
             )
-
-        trace.error(
-            f"[JOB]: Execution not support runs-on: {self.runs_on.type.value!r} "
-            f"yet."
-        )
-        return Result(
-            status=FAILED,
-            run_id=run_id,
-            parent_run_id=parent_run_id,
-            context={
-                "status": FAILED,
-                "errors": JobError(
-                    f"Execute runs-on type: {self.runs_on.type.value!r} does "
-                    f"not support yet."
-                ).to_dict(),
-            },
-            extras=self.extras,
-        )
+        if rs is None:
+            trace.error(
+                f"[JOB]: Execution not support runs-on: {self.runs_on.type.value!r} "
+                f"yet."
+            )
+            return Result(
+                status=FAILED,
+                run_id=run_id,
+                parent_run_id=parent_run_id,
+                context={
+                    "status": FAILED,
+                    "errors": JobError(
+                        f"Job runs-on type: {self.runs_on.type.value!r} does "
+                        f"not support yet."
+                    ).to_dict(),
+                },
+                extras=self.extras,
+            )
+        if rs.status in (CANCEL, SKIP):
+            trace.debug(
+                f"[JOB]: Job process routing got result status be {rs.status}"
+            )
+        elif rs.status == FAILED:
+            raise JobError("[JOB]: Job process error")
+        return rs
 
     def _execute(
         self,
         params: DictData,
         run_id: str,
+        context: DictData,
         parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> Result:
         """Wrapped the route execute method before returning to handler
         execution.
 
+            This method call to make retry strategy for process routing
+        method.
+
         Args:
             params: A parameter data that want to use in this execution
             run_id:
+            context:
             parent_run_id:
             event:
 
@@ -982,6 +998,7 @@ class Job(BaseModel):
         """
         current_retry: int = 0
         exception: Exception
+        catch(context, status=WAIT)
         trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
@@ -989,6 +1006,7 @@ class Job(BaseModel):
             return self.process(
                 params,
                 run_id,
+                context=context,
                 parent_run_id=parent_run_id,
                 event=event,
             )
@@ -1010,9 +1028,15 @@ class Job(BaseModel):
         )
         while current_retry < (self.retry + 1):
             try:
+                catch(
+                    context=context,
+                    status=WAIT,
+                    updated={"retry": current_retry},
+                )
                 return self.process(
                     params,
                     run_id,
+                    context=context,
                     parent_run_id=parent_run_id,
                     event=event,
                 )
@@ -1028,7 +1052,6 @@ class Job(BaseModel):
                 exception = e
                 time.sleep(1.2**current_retry)
 
-        # NOTE: Raise because
         trace.error(f"[JOB]: Reach the maximum of retry number: {self.retry}.")
         raise exception
 
@@ -1063,6 +1086,7 @@ class Job(BaseModel):
         trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
+        context: DictData = {"status": WAIT}
         try:
             trace.info(
                 f"[JOB]: Handler {self.runs_on.type.name}: "
@@ -1071,28 +1095,21 @@ class Job(BaseModel):
             result_caught: Result = self._execute(
                 params,
                 run_id=run_id,
+                context=context,
                 parent_run_id=parent_run_id,
                 event=event,
             )
             return result_caught.make_info(
                 {"execution_time": time.monotonic() - ts}
             )
+        except JobError:  # pragma: no cov
+            return Result.from_trace(trace).catch(
+                status=FAILED,
+                context=catch(context, status=FAILED),
+                info={"execution_time": time.monotonic() - ts},
+            )
         finally:
             trace.debug("[JOB]: End Handler job execution.")
-
-
-def mark_errors(context: DictData, error: JobError) -> None:
-    """Make the errors context result with the refs value depends on the nested
-    execute func.
-
-    Args:
-        context (DictData): A context data.
-        error (JobError): A stage exception object.
-    """
-    if "errors" in context:
-        context["errors"][error.refs] = error.to_dict()
-    else:
-        context["errors"] = error.to_dict(with_refs=True)
 
 
 def pop_stages(context: DictData) -> DictData:
@@ -1102,14 +1119,13 @@ def pop_stages(context: DictData) -> DictData:
     return filter_func(context.pop("stages", {}))
 
 
-def local_execute_strategy(
+def local_process_strategy(
     job: Job,
     strategy: DictData,
     params: DictData,
-    run_id: str,
+    trace: Trace,
     context: DictData,
     *,
-    parent_run_id: Optional[str] = None,
     event: Optional[Event] = None,
 ) -> tuple[Status, DictData]:
     """Local strategy execution with passing dynamic parameters from the
@@ -1124,26 +1140,24 @@ def local_execute_strategy(
     For each stage that execution with this strategy metrix, it will use the
     `set_outputs` method for reconstruct result context data.
 
-    :param job: (Job) A job model that want to execute.
-    :param strategy: (DictData) A strategy metrix value. This value will pass
-        to the `matrix` key for templating in context data.
-    :param params: (DictData) A parameter data.
-    :param run_id: (str)
-        :param context: (DictData)
-        :param parent_run_id: (str | None)
-    :param event: (Event) An Event manager instance that use to cancel this
-        execution if it forces stopped by parent execution.
+    Args:
+        job (Job): A job model that want to execute.
+        strategy (DictData): A strategy metrix value. This value will pass
+            to the `matrix` key for templating in context data.
+        params (DictData): A parameter data.
+        trace (Trace):
+        context (DictData):
+        event (Event): An Event manager instance that use to cancel this
+            execution if it forces stopped by parent execution.
 
     Raises:
         JobError: If event was set.
         JobError: If stage execution raise any error as `StageError`.
         JobError: If the result from execution has `FAILED` status.
 
-    :rtype: tuple[Status, DictData]
+    Returns:
+        tuple[Status, DictData]: A pair of Status and DictData objects.
     """
-    trace: Trace = get_trace(
-        run_id, parent_run_id=parent_run_id, extras=job.extras
-    )
     if strategy:
         strategy_id: str = gen_id(strategy)
         trace.info(f"[JOB]: Execute Strategy: {strategy_id!r}")
@@ -1182,7 +1196,7 @@ def local_execute_strategy(
         trace.info(f"[JOB]: Execute Stage: {stage.iden!r}")
         rs: Result = stage.execute(
             params=current_context,
-            run_id=parent_run_id,
+            run_id=trace.parent_run_id,
             event=event,
         )
         stage.set_outputs(rs.context, to=current_context)
@@ -1244,11 +1258,12 @@ def local_execute_strategy(
     return status, context
 
 
-def local_execute(
+def local_process(
     job: Job,
     params: DictData,
+    run_id: str,
+    context: DictData,
     *,
-    run_id: StrOrNone = None,
     event: Optional[Event] = None,
 ) -> Result:
     """Local job execution with passing dynamic parameters from the workflow
@@ -1266,21 +1281,23 @@ def local_execute(
             ]
         }
 
-    :param job: (Job) A job model.
-    :param params: (DictData) A parameter data.
-    :param run_id: (str) A job running ID.
-    :param event: (Event) An Event manager instance that use to cancel this
-        execution if it forces stopped by parent execution.
+    Args:
+        job (Job): A job model.
+        params (DictData): A parameter data.
+        run_id (str): A job running ID.
+        context (DictData):
+        event (Event, default None): An Event manager instance that use to
+            cancel this execution if it forces stopped by parent execution.
 
-    :rtype: Result
+    Returns:
+        Result: A job process result.
     """
-    ts: float = time.monotonic()
-    parent_run_id: StrOrNone = run_id
-    run_id: str = gen_id((job.id or "EMPTY"), unique=True)
+    parent_run_id, run_id = extract_id(
+        (job.id or "EMPTY"), run_id=run_id, extras=job.extras
+    )
     trace: Trace = get_trace(
         run_id, parent_run_id=parent_run_id, extras=job.extras
     )
-    context: DictData = {"status": WAIT}
     trace.info("[JOB]: Start Local executor.")
 
     if job.desc:
@@ -1293,7 +1310,6 @@ def local_execute(
             parent_run_id=parent_run_id,
             status=SKIP,
             context=catch(context, status=SKIP),
-            info={"execution_time": time.monotonic() - ts},
             extras=job.extras,
         )
 
@@ -1319,7 +1335,6 @@ def local_execute(
                     status=FAILED,
                     updated={"errors": to_dict(err)},
                 ),
-                info={"execution_time": time.monotonic() - ts},
                 extras=job.extras,
             )
     if workers >= 10:
@@ -1337,7 +1352,6 @@ def local_execute(
                 status=FAILED,
                 updated={"errors": JobError(err_msg).to_dict()},
             ),
-            info={"execution_time": time.monotonic() - ts},
             extras=job.extras,
         )
 
@@ -1363,20 +1377,18 @@ def local_execute(
                     ).to_dict()
                 },
             ),
-            info={"execution_time": time.monotonic() - ts},
             extras=job.extras,
         )
 
     with ThreadPoolExecutor(workers, "jb_stg") as executor:
         futures: list[Future] = [
             executor.submit(
-                local_execute_strategy,
+                local_process_strategy,
                 job=job,
                 strategy=strategy,
                 params=params,
-                run_id=run_id,
+                trace=trace,
                 context=context,
-                parent_run_id=parent_run_id,
                 event=event,
             )
             for strategy in strategies
@@ -1425,11 +1437,10 @@ def local_execute(
     return Result.from_trace(trace).catch(
         status=status,
         context=catch(context, status=status, updated=errors),
-        info={"execution_time": time.monotonic() - ts},
     )
 
 
-def self_hosted_execute(
+def self_hosted_process(
     job: Job,
     params: DictData,
     *,
@@ -1440,13 +1451,15 @@ def self_hosted_execute(
     workflow execution or itself execution. It will make request to the
     self-hosted host url.
 
-    :param job: (Job) A job model that want to execute.
-    :param params: (DictData) A parameter data.
-    :param run_id: (str) A job running ID.
-    :param event: (Event) An Event manager instance that use to cancel this
-        execution if it forces stopped by parent execution.
+    Args:
+        job (Job): A job model that want to execute.
+        params (DictData): A parameter data.
+        run_id (str): A job running ID.
+        event (Event): An Event manager instance that use to cancel this
+            execution if it forces stopped by parent execution.
 
-    :rtype: Result
+    Returns:
+        Result: A Result object.
     """
     parent_run_id: StrOrNone = run_id
     run_id: str = gen_id((job.id or "EMPTY"), unique=True)
@@ -1513,7 +1526,7 @@ def self_hosted_execute(
     )
 
 
-def docker_execution(
+def docker_process(
     job: Job,
     params: DictData,
     *,

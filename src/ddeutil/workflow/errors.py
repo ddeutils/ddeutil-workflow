@@ -8,17 +8,6 @@
 This module provides a comprehensive exception hierarchy for the workflow system.
 The exceptions are designed to be lightweight while providing sufficient context
 for error handling and debugging.
-
-Classes:
-    BaseError: Base exception class with context support
-    StageError: Exceptions related to stage execution
-    JobError: Exceptions related to job execution
-    WorkflowError: Exceptions related to workflow execution
-    ParamError: Exceptions related to parameter validation
-    ResultError: Exceptions related to result processing
-
-Functions:
-    to_dict: Convert exception instances to dictionary format
 """
 from __future__ import annotations
 
@@ -58,17 +47,33 @@ def to_dict(exception: Exception, **kwargs) -> ErrorData:  # pragma: no cov
     Example:
         >>> try:
         >>>     raise ValueError("Something went wrong")
-        >>> except Exception as e:
-        >>>     error_data = to_dict(e, context="workflow_execution")
-        >>>     # Returns: {
-        >>>     #   "name": "ValueError", "message": "Something went wrong", "context": "workflow_execution"
-        >>>     # }
+        >>> except Exception as err:
+        >>>     error_data = to_dict(err, context="workflow_execution")
+        {
+            "name": "ValueError",
+            "message": "Something went wrong",
+            "context": "workflow_execution",
+        }
     """
     return {
         "name": exception.__class__.__name__,
         "message": str(exception),
         **kwargs,
     }
+
+
+def mark_errors(context: DictData, error: JobError) -> None:
+    """Make the errors context result with the refs value depends on the nested
+    execute func.
+
+    Args:
+        context (DictData): A context data.
+        error (JobError): A stage exception object.
+    """
+    if "errors" in context:
+        context["errors"][error.refs] = error.to_dict()
+    else:
+        context["errors"] = error.to_dict(with_refs=True)
 
 
 class BaseError(Exception):

@@ -107,10 +107,10 @@ from .job import (
     Rule,
     RunsOnModel,
     Strategy,
-    docker_execution,
-    local_execute,
-    local_execute_strategy,
-    self_hosted_execute,
+    docker_process,
+    local_process,
+    local_process_strategy,
+    self_hosted_process,
 )
 from .params import (
     ArrayParam,

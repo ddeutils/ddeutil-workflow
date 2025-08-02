@@ -404,7 +404,7 @@ class BaseStage(BaseModel, ABC):
                 info={"execution_time": time.monotonic() - ts},
                 extras=self.extras,
             )
-        finally:  # pragma: no cov
+        finally:
             trace.debug("[STAGE]: End Handler stage execution.")
 
     def _execute(
@@ -861,7 +861,7 @@ class BaseAsyncStage(BaseStage, ABC):
                 info={"execution_time": time.monotonic() - ts},
                 extras=self.extras,
             )
-        finally:  # pragma: no cov
+        finally:
             trace.debug("[STAGE]: End Handler stage process.")
 
     async def _axecute(

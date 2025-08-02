@@ -282,16 +282,6 @@ wf-run-python-raise-for-job:
               )
             result: str = 'success'
 
-    job-fail-runs-on:
-      runs-on:
-        type: self_hosted
-        with:
-          host: "localhost:88"
-          token: "dummy"
-      stages:
-        - name: Echo hello world
-          echo: "Hello World from Self-hosted: localhost port: 88"
-
 wf-run-depends:
   type: Workflow
   jobs:
