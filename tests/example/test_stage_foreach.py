@@ -179,10 +179,10 @@ def test_example_foreach_stage_exec_with_trigger_raise(test_path):
                         "item": 2,
                         "stages": {
                             "2827845371": {
-                                "outputs": {"params": {"item": 2}, "jobs": {}},
+                                "outputs": {},
                                 "errors": {
                                     "name": "StageCancelError",
-                                    "message": "Trigger workflow was cancel.",
+                                    "message": "Cancel before start trigger process.",
                                 },
                                 "status": CANCEL,
                             }
@@ -194,13 +194,13 @@ def test_example_foreach_stage_exec_with_trigger_raise(test_path):
                     },
                 },
                 "errors": {
-                    2: {
-                        "name": "StageCancelError",
-                        "message": "Cancel item: 2 after end nested process.",
-                    },
                     1: {
                         "name": "StageError",
                         "message": "Break item: 1 because nested stage: 'Stage trigger for raise', failed.",
+                    },
+                    2: {
+                        "name": "StageCancelError",
+                        "message": "Cancel item: 2 after end nested process.",
                     },
                 },
             }

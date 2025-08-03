@@ -2454,8 +2454,9 @@ class ParallelStage(BaseNestedStage):
         This stage is not the low-level stage model because it runs multi-stages
     in this stage execution.
 
-    Data Validate:
-        >>> stage = {
+    Examples:
+        >>> stage = ParallelStage.model_validate({
+        ...     "id": "parallel-stage",
         ...     "name": "Parallel stage execution.",
         ...     "parallel": {
         ...         "branch01": [
@@ -2477,7 +2478,7 @@ class ParallelStage(BaseNestedStage):
         ...             },
         ...         ],
         ...     }
-        ... }
+        ... })
     """
 
     parallel: dict[str, list[Stage]] = Field(
@@ -2727,8 +2728,9 @@ class ForEachStage(BaseNestedStage):
         This stage is not the low-level stage model because it runs
     multi-stages in this stage execution.
 
-    Data Validate:
-        >>> stage = {
+    Examples:
+        >>> stage = ForEachStage.model_validate({
+        ...     "id": "foreach-stage",
         ...     "name": "For-each stage execution",
         ...     "foreach": [1, 2, 3]
         ...     "stages": [
@@ -2737,7 +2739,7 @@ class ForEachStage(BaseNestedStage):
         ...             "echo": "Start run with item ${{ item }}"
         ...         },
         ...     ],
-        ... }
+        ... })
     """
 
     foreach: EachType = Field(
@@ -2912,15 +2914,18 @@ class ForEachStage(BaseNestedStage):
         """Validate foreach value that already passed to this model.
 
         Args:
-            value:
+            value (Any): An any foreach value.
 
         Raises:
             TypeError: If value can not try-convert to list type.
-            ValueError:
+            ValueError: If the foreach value is dict type.
+            ValueError: If the foreach value contain duplication item without
+                enable using index as key flag.
 
         Returns:
             list[Any]: list of item.
         """
+        # NOTE: Try to cast a foreach with string type to list of items.
         if isinstance(value, str):
             try:
                 value: list[Any] = str2list(value)
@@ -2929,6 +2934,7 @@ class ForEachStage(BaseNestedStage):
                     f"Does not support string foreach: {value!r} that can "
                     f"not convert to list."
                 ) from e
+
         # [VALIDATE]: Type of the foreach should be `list` type.
         elif isinstance(value, dict):
             raise TypeError(
@@ -3050,8 +3056,9 @@ class UntilStage(BaseNestedStage):
         This stage is not the low-level stage model because it runs
     multi-stages in this stage execution.
 
-    Data Validate:
-        >>> stage = {
+    Examples:
+        >>> stage = UntilStage.model_validate({
+        ...     "id": "until-stage",
         ...     "name": "Until stage execution",
         ...     "item": 1,
         ...     "until": "${{ item }} > 3"
@@ -3064,7 +3071,7 @@ class UntilStage(BaseNestedStage):
         ...             )
         ...         },
         ...     ],
-        ... }
+        ... })
     """
 
     item: Union[str, int, bool] = Field(
@@ -3335,6 +3342,8 @@ class Match(BaseModel):
 
 
 class Else(BaseModel):
+    """Else model for the Case Stage."""
+
     other: list[Stage] = Field(
         description="A list of stage that does not match any case.",
         alias="else",
@@ -3344,8 +3353,9 @@ class Else(BaseModel):
 class CaseStage(BaseNestedStage):
     """Case stage executor that execute all stages if the condition was matched.
 
-    Data Validate:
-        >>> stage = {
+    Examples:
+        >>> stage = CaseStage.model_validate({
+        ...     "id": "case-stage",
         ...     "name": "If stage execution.",
         ...     "case": "${{ param.test }}",
         ...     "match": [
@@ -3368,9 +3378,10 @@ class CaseStage(BaseNestedStage):
         ...             ],
         ...         },
         ...     ],
-        ... }
+        ... })
 
-        >>> stage = {
+        >>> stage = CaseStage.model_validate({
+        ...     "id": "case-stage",
         ...     "name": "If stage execution.",
         ...     "case": "${{ param.test }}",
         ...     "match": [
@@ -3392,7 +3403,7 @@ class CaseStage(BaseNestedStage):
         ...             ],
         ...         },
         ...     ],
-        ... }
+        ... })
 
     """
 
@@ -3411,9 +3422,16 @@ class CaseStage(BaseNestedStage):
 
     @field_validator("match", mode="after")
     def __validate_match(
-        cls, match: list[Union[Match, Else]]
+        cls,
+        match: list[Union[Match, Else]],
     ) -> list[Union[Match, Else]]:
-        """Validate the match field should contain only one Else model."""
+        """Validate the match field should contain only one Else model.
+
+        Raises:
+            ValueError: If match field contain Else more than 1 model.
+            ValueError: If match field contain Match with '_' case (it represent
+                the else case) more than 1 model.
+        """
         c_else_case: int = 0
         c_else_model: int = 0
         for m in match:
@@ -3612,8 +3630,10 @@ class CaseStage(BaseNestedStage):
         case: StrOrNone = param2template(self.case, params, extras=self.extras)
         trace.info(f"[NESTED]: Get Case: {case!r}.")
         case, stages = self.extract_stages_from_case(case, params=params)
+
         if event and event.is_set():
             raise StageCancelError("Cancel before start case process.")
+
         status, context = self._process_nested(
             case=case,
             stages=stages,
@@ -3635,11 +3655,12 @@ class RaiseStage(BaseAsyncStage):
     """Raise error stage executor that raise `StageError` that use a message
     field for making error message before raise.
 
-    Data Validate:
-        >>> stage = {
+    Examples:
+        >>> stage = RaiseStage.model_validate({
+        ...     "id": "raise-stage",
         ...     "name": "Raise stage",
         ...     "raise": "raise this stage",
-        ... }
+        ... })
 
     """
 
@@ -3940,7 +3961,7 @@ class VirtualPyStage(PyStage):  # pragma: no cov
     )
 
     @contextlib.contextmanager
-    def create_py_file(
+    def make_py_file(
         self,
         py: str,
         values: DictData,
@@ -4016,13 +4037,14 @@ class VirtualPyStage(PyStage):  # pragma: no cov
             - Execution python file with `uv run` via Python subprocess module.
 
         Args:
-            params: A parameter data that want to use in this
+            params (DictData): A parameter data that want to use in this
                 execution.
-            run_id: A running stage ID.
-            context: A context data.
-            parent_run_id: A parent running ID. (Default is None)
-            event: An event manager that use to track parent process
-                was not force stopped.
+            run_id (str): A running stage ID.
+            context (DictData): A context data that was passed from handler
+                method.
+            parent_run_id (str, default None): A parent running ID.
+            event (Event, default None): An event manager that use to track
+                parent process was not force stopped.
 
         Returns:
             Result: The execution result with status and context data.
@@ -4031,12 +4053,18 @@ class VirtualPyStage(PyStage):  # pragma: no cov
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         run: str = param2template(dedent(self.run), params, extras=self.extras)
-        with self.create_py_file(
+        with self.make_py_file(
             py=run,
             values=param2template(self.vars, params, extras=self.extras),
             deps=param2template(self.deps, params, extras=self.extras),
             run_id=run_id,
         ) as py:
+
+            if event and event.is_set():
+                raise StageCancelError(
+                    "Cancel before start virtual python process."
+                )
+
             trace.debug(f"[STAGE]: Create `{py}` file.")
             rs: CompletedProcess = subprocess.run(
                 ["python", "-m", "uv", "run", py, "--no-cache"],
@@ -4082,6 +4110,18 @@ class VirtualPyStage(PyStage):  # pragma: no cov
         parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> Result:
+        """Async execution method for this Virtual Python stage.
+
+        Args:
+            params (DictData): A parameter data that want to use in this
+                execution.
+            run_id (str): A running stage ID.
+            context (DictData): A context data that was passed from handler
+                method.
+            parent_run_id (str, default None): A parent running ID.
+            event (Event, default None): An event manager that use to track
+                parent process was not force stopped.
+        """
         raise NotImplementedError(
             "Async process of Virtual Python stage does not implement yet."
         )
