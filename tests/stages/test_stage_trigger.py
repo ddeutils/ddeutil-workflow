@@ -146,9 +146,44 @@ def test_trigger_stage_exec_cancel():
     rs: Result = stage.execute(params={}, event=event)
     assert rs.status == CANCEL
     assert rs.context == {
-        "params": {},
-        "jobs": {},
         "status": CANCEL,
+        "errors": {
+            "name": "StageCancelError",
+            "message": "Cancel before start trigger process.",
+        },
+    }
+
+    event = MockEvent(n=1)
+    rs: Result = stage.execute(params={}, event=event)
+    assert rs.status == CANCEL
+    assert rs.context == {
+        "status": CANCEL,
+        "jobs": {},
+        "params": {},
+        "errors": {
+            "name": "StageCancelError",
+            "message": "Trigger workflow was cancel.",
+        },
+    }
+
+    event = MockEvent(n=3)
+    rs: Result = stage.execute(params={}, event=event)
+    assert rs.status == CANCEL
+    assert rs.context == {
+        "status": CANCEL,
+        "params": {},
+        "jobs": {
+            "first-job": {
+                "errors": {
+                    "name": "JobCancelError",
+                    "message": (
+                        "Execution was canceled from the event before start "
+                        "local job execution."
+                    ),
+                },
+                "status": CANCEL,
+            }
+        },
         "errors": {
             "name": "StageCancelError",
             "message": "Trigger workflow was cancel.",
@@ -167,16 +202,12 @@ def test_trigger_stage_exec_skip():
     rs: Result = stage.execute(params={})
     assert rs.status == SKIP
     assert rs.context == {
+        "status": SKIP,
         "params": {},
         "jobs": {
             "first-job": {
                 "status": SKIP,
                 "stages": {"2644213676": {"outputs": {}, "status": SKIP}},
             }
-        },
-        "status": SKIP,
-        "errors": {
-            "name": "StageSkipError",
-            "message": "Trigger workflow was skipped.",
         },
     }

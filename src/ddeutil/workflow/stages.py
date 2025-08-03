@@ -138,10 +138,10 @@ class BaseStage(BaseModel, ABC):
     implement, ensuring consistent behavior across different stage types.
 
     This abstract class handles core stage functionality including:
-    - Stage identification and naming
-    - Conditional execution logic
-    - Output management and templating
-    - Execution lifecycle management
+        - Stage identification and naming
+        - Conditional execution logic
+        - Output management and templating
+        - Execution lifecycle management
 
     Custom stages should inherit from this class and implement the abstract
     `process()` method to define their specific execution behavior.
@@ -162,7 +162,6 @@ class BaseStage(BaseModel, ABC):
         ...
         ...     def process(self, params: DictData, **kwargs) -> Result:
         ...         return Result(status=SUCCESS)
-        ```
     """
 
     action_stage: ClassVar[bool] = False
@@ -265,10 +264,11 @@ class BaseStage(BaseModel, ABC):
             params (DictData): A parameter data that want to use in this
                 execution.
             run_id (str): A running stage ID.
-            context (DictData): A context data.
-            parent_run_id: A parent running ID. (Default is None)
-            event: An event manager that use to track parent process
-                was not force stopped.
+            context (DictData): A context data that was passed from handler
+                method.
+            parent_run_id (str, default None): A parent running ID.
+            event (Event, default None): An event manager that use to track
+                parent process was not force stopped.
 
         Returns:
             Result: The execution result with status and context data.
@@ -309,10 +309,10 @@ class BaseStage(BaseModel, ABC):
         object from the current stage ID before release the final result.
 
         Args:
-            params: A parameter data.
-            run_id: A running stage ID. (Default is None)
-            event: An event manager that pass to the stage execution.
-                (Default is None)
+            params (DictData): A parameter data.
+            run_id (str, default None): A running ID.
+            event (Event, default None): An event manager that pass to the stage
+                execution.
 
         Returns:
             Result: The execution result with updated status and context.
@@ -373,13 +373,17 @@ class BaseStage(BaseModel, ABC):
         ) as e:  # pragma: no cov
             updated: Optional[DictData] = {"errors": e.to_dict()}
             if isinstance(e, StageNestedError):
-                trace.info(f"[STAGE]: Nested: {e}")
+                trace.error(f"[STAGE]: Nested: {e}")
             elif isinstance(e, (StageSkipError, StageNestedSkipError)):
-                trace.info(f"[STAGE]: ⏭️ Skip: {e}")
+                trace.error(f"[STAGE]: ⏭️ Skip: {e}")
                 updated = None
-            else:
-                trace.info(
+            elif e.allow_traceback:
+                trace.error(
                     f"[STAGE]: Stage Failed:||🚨 {traceback.format_exc()}||"
+                )
+            else:
+                trace.error(
+                    f"[STAGE]: 🤫 Stage Failed with disable traceback:||{e}"
                 )
             st: Status = get_status_from_error(e)
             return Result(
@@ -419,6 +423,9 @@ class BaseStage(BaseModel, ABC):
 
         Args:
             params: A parameter data that want to use in this execution.
+            run_id (str):
+            context:
+            parent_run_id:
             event: An event manager that use to track parent process
                 was not force stopped.
 
@@ -1156,22 +1163,13 @@ class EmptyStage(BaseAsyncStage):
     for a specified duration, making it useful for workflow timing control
     and debugging scenarios.
 
-    Example:
-        ```yaml
-        stages:
-          - name: "Workflow Started"
-            echo: "Beginning data processing workflow"
-            sleep: 2
-
-          - name: "Debug Parameters"
-            echo: "Processing file: ${{ params.filename }}"
-        ```
-
-        >>> stage = EmptyStage(
-        ...     name="Status Update",
-        ...     echo="Processing completed successfully",
-        ...     sleep=1.0
-        ... )
+    Examples:
+        >>> stage = EmptyStage.model_validate({
+        ...     "id": "empty-stage",
+        ...     "name": "Status Update",
+        ...     "echo": "Processing completed successfully",
+        ...     "sleep": 1.0,
+        ... })
     """
 
     echo: StrOrNone = Field(
@@ -1214,6 +1212,9 @@ class EmptyStage(BaseAsyncStage):
             parent_run_id: A parent running ID. (Default is None)
             event: An event manager that use to track parent process
                 was not force stopped.
+
+        Raises:
+            StageCancelError: If event was set before start process.
 
         Returns:
             Result: The execution result with status and context data.
@@ -1266,6 +1267,9 @@ class EmptyStage(BaseAsyncStage):
             event: An event manager that use to track parent process
                 was not force stopped.
 
+        Raises:
+            StageCancelError: If event was set before start process.
+
         Returns:
             Result: The execution result with status and context data.
         """
@@ -1307,14 +1311,15 @@ class BashStage(BaseRetryStage):
     statement. Thus, it will write the `.sh` file before start running bash
     command for fix this issue.
 
-    Data Validate:
-        >>> stage = {
+    Examples:
+        >>> stage = BaseStage.model_validate({
+        ...     "id": "bash-stage",
         ...     "name": "The Shell stage execution",
         ...     "bash": 'echo "Hello $FOO"',
         ...     "env": {
         ...         "FOO": "BAR",
         ...     },
-        ... }
+        ... })
     """
 
     action_stage: ClassVar[bool] = True
@@ -1332,17 +1337,20 @@ class BashStage(BaseRetryStage):
     )
 
     @contextlib.asynccontextmanager
-    async def async_create_sh_file(
+    async def async_make_sh_file(
         self, bash: str, env: DictStr, run_id: StrOrNone = None
     ) -> AsyncIterator[TupleStr]:
         """Async create and write `.sh` file with the `aiofiles` package.
 
-        :param bash: (str) A bash statement.
-        :param env: (DictStr) An environment variable that set before run bash.
-        :param run_id: (StrOrNone) A running stage ID that use for writing sh
-            file instead generate by UUID4.
+        Args:
+            bash (str): A bash statement.
+            env (DictStr): An environment variable that set before run bash.
+            run_id (StrOrNone, default None): A running stage ID that use for
+                writing `.sh` file instead generate by UUID4.
 
-        :rtype: AsyncIterator[TupleStr]
+        Returns:
+            AsyncIterator[TupleStr]: Return context of prepared bash statement
+                that want to execute.
         """
         import aiofiles
 
@@ -1368,19 +1376,21 @@ class BashStage(BaseRetryStage):
         Path(f"./{f_name}").unlink()
 
     @contextlib.contextmanager
-    def create_sh_file(
+    def make_sh_file(
         self, bash: str, env: DictStr, run_id: StrOrNone = None
     ) -> Iterator[TupleStr]:
         """Create and write the `.sh` file before giving this file name to
         context. After that, it will auto delete this file automatic.
 
-        :param bash: (str) A bash statement.
-        :param env: (DictStr) An environment variable that set before run bash.
-        :param run_id: (StrOrNone) A running stage ID that use for writing sh
-            file instead generate by UUID4.
+        Args:
+            bash (str): A bash statement.
+            env (DictStr): An environment variable that set before run bash.
+            run_id (StrOrNone, default None): A running stage ID that use for
+                writing `.sh` file instead generate by UUID4.
 
-        :rtype: Iterator[TupleStr]
-        :return: Return context of prepared bash statement that want to execute.
+        Returns:
+            Iterator[TupleStr]: Return context of prepared bash statement that
+                want to execute.
         """
         f_name: str = f"{run_id or uuid.uuid4()}.sh"
         f_shebang: str = "bash" if sys.platform.startswith("win") else "sh"
@@ -1422,13 +1432,19 @@ class BashStage(BaseRetryStage):
         `return_code`, `stdout`, and `stderr`.
 
         Args:
-            params: A parameter data that want to use in this
+            params (DictData): A parameter data that want to use in this
                 execution.
-            run_id: A running stage ID.
-            context: A context data.
-            parent_run_id: A parent running ID. (Default is None)
-            event: An event manager that use to track parent process
-                was not force stopped.
+            run_id (str): A running stage ID.
+            context (DictData): A context data that was passed from handler
+                method.
+            parent_run_id (str, default None): A parent running ID.
+            event (Event, default None): An event manager that use to track
+                parent process was not force stopped.
+
+        Raises:
+            StageCancelError: If event was set before start process.
+            StageError: If the return code form subprocess run function gather
+                than 0.
 
         Returns:
             Result: The execution result with status and context data.
@@ -1439,12 +1455,16 @@ class BashStage(BaseRetryStage):
         bash: str = param2template(
             dedent(self.bash.strip("\n")), params, extras=self.extras
         )
-        with self.create_sh_file(
+        with self.make_sh_file(
             bash=bash,
             env=param2template(self.env, params, extras=self.extras),
             run_id=run_id,
         ) as sh:
-            trace.debug(f"[STAGE]: Create `{sh[1]}` file.")
+
+            if event and event.is_set():
+                raise StageCancelError("Cancel before start bash process.")
+
+            trace.debug(f"[STAGE]: Create `{sh[1]}` file.", module="stage")
             rs: CompletedProcess = subprocess.run(
                 sh,
                 shell=False,
@@ -1486,13 +1506,19 @@ class BashStage(BaseRetryStage):
         stdout.
 
         Args:
-            params: A parameter data that want to use in this
+            params (DictData): A parameter data that want to use in this
                 execution.
-            run_id: A running stage ID.
-            context: A context data.
-            parent_run_id: A parent running ID. (Default is None)
-            event: An event manager that use to track parent process
-                was not force stopped.
+            run_id (str): A running stage ID.
+            context (DictData): A context data that was passed from handler
+                method.
+            parent_run_id (str, default None): A parent running ID.
+            event (Event, default None): An event manager that use to track
+                parent process was not force stopped.
+
+        Raises:
+            StageCancelError: If event was set before start process.
+            StageError: If the return code form subprocess run function gather
+                than 0.
 
         Returns:
             Result: The execution result with status and context data.
@@ -1503,11 +1529,15 @@ class BashStage(BaseRetryStage):
         bash: str = param2template(
             dedent(self.bash.strip("\n")), params, extras=self.extras
         )
-        async with self.async_create_sh_file(
+        async with self.async_make_sh_file(
             bash=bash,
             env=param2template(self.env, params, extras=self.extras),
             run_id=run_id,
         ) as sh:
+
+            if event and event.is_set():
+                raise StageCancelError("Cancel before start bash process.")
+
             await trace.adebug(f"[STAGE]: Create `{sh[1]}` file.")
             rs: CompletedProcess = subprocess.run(
                 sh,
@@ -1517,7 +1547,6 @@ class BashStage(BaseRetryStage):
                 text=True,
                 encoding="utf-8",
             )
-
         if rs.returncode > 0:
             e: str = rs.stderr.removesuffix("\n")
             e_bash: str = bash.replace("\n", "\n\t")
@@ -1552,14 +1581,15 @@ class PyStage(BaseRetryStage):
     module to validate exec-string before running or exclude the `os` package
     from the current globals variable.
 
-    Data Validate:
-        >>> stage = {
+    Examples:
+        >>> stage = PyStage.model_validate({
+        ...     "id": "py-stage",
         ...     "name": "Python stage execution",
         ...     "run": 'print(f"Hello {VARIABLE}")',
         ...     "vars": {
         ...         "VARIABLE": "WORLD",
         ...     },
-        ... }
+        ... })
     """
 
     action_stage: ClassVar[bool] = True
@@ -1577,11 +1607,13 @@ class PyStage(BaseRetryStage):
     @staticmethod
     def filter_locals(values: DictData) -> Iterator[str]:
         """Filter a locals mapping values that be module, class, or
-        __annotations__.
+        `__annotations__`.
 
-        :param values: (DictData) A locals values that want to filter.
+        Args:
+            values: (DictData) A locals values that want to filter.
 
-        :rtype: Iterator[str]
+        Returns:
+            Iterator[str]: Iter string value.
         """
         for value in values:
 
@@ -1601,12 +1633,14 @@ class PyStage(BaseRetryStage):
         """Override set an outputs method for the Python execution process that
         extract output from all the locals values.
 
-        :param output: (DictData) An output data that want to extract to an
-            output key.
-        :param to: (DictData) A context data that want to add output result.
-        :param info: (DictData)
+        Args:
+            output (DictData): An output data that want to extract to an
+                output key.
+            to (DictData): A context data that want to add output result.
+            info (DictData):
 
-        :rtype: DictData
+        Returns:
+            DictData: A context data that have merged with the output data.
         """
         output: DictData = output.copy()
         lc: DictData = output.pop("locals", {})
@@ -1658,18 +1692,13 @@ class PyStage(BaseRetryStage):
             }
         )
 
+        if event and event.is_set():
+            raise StageCancelError("Cancel before start exec process.")
+
         # WARNING: The exec build-in function is very dangerous. So, it
         #   should use the re module to validate exec-string before running.
-        exec(
-            pass_env(
-                param2template(dedent(self.run), params, extras=self.extras)
-            ),
-            gb,
-            lc,
-        )
-        return Result(
-            run_id=run_id,
-            parent_run_id=parent_run_id,
+        exec(self.pass_template(dedent(self.run), params), gb, lc)
+        return Result.from_trace(trace).catch(
             status=SUCCESS,
             context=catch(
                 context=context,
@@ -1690,7 +1719,6 @@ class PyStage(BaseRetryStage):
                     },
                 },
             ),
-            extras=self.extras,
         )
 
     async def async_process(
@@ -1709,13 +1737,17 @@ class PyStage(BaseRetryStage):
             - https://stackoverflow.com/questions/44859165/async-exec-in-python
 
         Args:
-            params: A parameter data that want to use in this
+            params (DictData): A parameter data that want to use in this
                 execution.
-            run_id: A running stage ID.
-            context: A context data.
-            parent_run_id: A parent running ID. (Default is None)
-            event: An event manager that use to track parent process
-                was not force stopped.
+            run_id (str): A running stage ID.
+            context (DictData): A context data that was passed from handler
+                method.
+            parent_run_id (str, default None): A parent running ID.
+            event (Event, default None): An event manager that use to track
+                parent process was not force stopped.
+
+        Raises:
+            StageCancelError: If event was set before start process.
 
         Returns:
             Result: The execution result with status and context data.
@@ -1738,16 +1770,14 @@ class PyStage(BaseRetryStage):
                 )
             }
         )
+
+        if event and event.is_set():
+            raise StageCancelError("Cancel before start exec process.")
+
         # WARNING: The exec build-in function is very dangerous. So, it
         #   should use the re module to validate exec-string before running.
-        exec(
-            param2template(dedent(self.run), params, extras=self.extras),
-            gb,
-            lc,
-        )
-        return Result(
-            run_id=run_id,
-            parent_run_id=parent_run_id,
+        exec(self.pass_template(dedent(self.run), params), gb, lc)
+        return Result.from_trace(trace).catch(
             status=SUCCESS,
             context=catch(
                 context=context,
@@ -1768,7 +1798,6 @@ class PyStage(BaseRetryStage):
                     },
                 },
             ),
-            extras=self.extras,
         )
 
 
@@ -1793,12 +1822,13 @@ class CallStage(BaseRetryStage):
         The caller registry to get a caller function should importable by the
     current Python execution pointer.
 
-    Data Validate:
-        >>> stage = {
+    Examples:
+        >>> stage = CallStage.model_validate({
+        ...     "id": "call-stage",
         ...     "name": "Task stage execution",
         ...     "uses": "tasks/function-name@tag-name",
         ...     "args": {"arg01": "BAR", "kwarg01": 10},
-        ... }
+        ... })
     """
 
     action_stage: ClassVar[bool] = True
@@ -1818,26 +1848,36 @@ class CallStage(BaseRetryStage):
     )
 
     @field_validator("args", mode="before")
-    def __validate_args_key(cls, value: Any) -> Any:
+    def __validate_args_key(cls, data: Any) -> Any:
         """Validate argument keys on the ``args`` field should not include the
         special keys.
 
-        :param value: (Any) A value that want to check the special keys.
+        Args:
+            data (Any): A data that want to check the special keys.
 
-        :rtype: Any
+        Returns:
+            Any: An any data.
         """
-        if isinstance(value, dict) and any(
-            k in value for k in ("result", "extras")
+        if isinstance(data, dict) and any(
+            k in data for k in ("result", "extras")
         ):
             raise ValueError(
                 "The argument on workflow template for the caller stage "
                 "should not pass `result` and `extras`. They are special "
                 "arguments."
             )
-        return value
+        return data
 
     def get_caller(self, params: DictData) -> Callable[[], TagFunc]:
-        """Get the lazy TagFuc object from registry."""
+        """Get the lazy TagFuc object from registry.
+
+        Args:
+            params (DictData): A parameters.
+
+        Returns:
+            Callable[[], TagFunc]: A lazy partial function that return the
+                TagFunc object.
+        """
         return extract_call(
             param2template(self.uses, params, extras=self.extras),
             registries=self.extras.get("registry_caller"),
@@ -1855,13 +1895,19 @@ class CallStage(BaseRetryStage):
         """Execute this caller function with its argument parameter.
 
         Args:
-            params: A parameter data that want to use in this
+            params (DictData): A parameter data that want to use in this
                 execution.
-            run_id: A running stage ID.
-            context: A context data.
-            parent_run_id: A parent running ID. (Default is None)
-            event: An event manager that use to track parent process
-                was not force stopped.
+            run_id (str): A running stage ID.
+            context (DictData): A context data that was passed from handler
+                method.
+            parent_run_id (str, default None): A parent running ID.
+            event (Event, default None): An event manager that use to track
+                parent process was not force stopped.
+
+        Raises:
+            ValueError: If the necessary parameters do not exist in args field.
+            TypeError: If the returning type of caller function does not match
+                with dict type.
 
         Returns:
             Result: The execution result with status and context data.
@@ -1884,7 +1930,9 @@ class CallStage(BaseRetryStage):
             ),
             "extras": self.extras,
         } | self.pass_template(self.args, params)
-        sig = inspect.signature(call_func)
+
+        # NOTE: Catch the necessary parameters.
+        sig: inspect.Signature = inspect.signature(call_func)
         necessary_params: list[str] = []
         has_keyword: bool = False
         for k in sig.parameters:
@@ -1903,11 +1951,9 @@ class CallStage(BaseRetryStage):
             (k.removeprefix("_") not in args and k not in args)
             for k in necessary_params
         ):
-            if "result" in necessary_params:
-                necessary_params.remove("result")
-
-            if "extras" in necessary_params:
-                necessary_params.remove("extras")
+            for k in ("result", "extras"):
+                if k in necessary_params:
+                    necessary_params.remove(k)
 
             args.pop("result")
             args.pop("extras")
@@ -1917,18 +1963,15 @@ class CallStage(BaseRetryStage):
             )
 
         if not has_keyword:
-            if "result" not in sig.parameters:
-                args.pop("result")
+            for k in ("result", "extras"):
+                if k not in sig.parameters:
+                    args.pop(k)
 
-            if "extras" not in sig.parameters:  # pragma: no cov
-                args.pop("extras")
+        args: DictData = self.validate_model_args(call_func, args)
 
         if event and event.is_set():
             raise StageCancelError("Cancel before start call process.")
 
-        args: DictData = self.validate_model_args(
-            call_func, args, run_id, parent_run_id, extras=self.extras
-        )
         if inspect.iscoroutinefunction(call_func):
             loop = asyncio.get_event_loop()
             rs: DictData = loop.run_until_complete(
@@ -1982,6 +2025,11 @@ class CallStage(BaseRetryStage):
             event: An event manager that use to track parent process
                 was not force stopped.
 
+        Raises:
+            ValueError: If the necessary parameters do not exist in args field.
+            TypeError: If the returning type of caller function does not match
+                with dict type.
+
         Returns:
             Result: The execution result with status and context data.
         """
@@ -2005,7 +2053,9 @@ class CallStage(BaseRetryStage):
             ),
             "extras": self.extras,
         } | self.pass_template(self.args, params)
-        sig = inspect.signature(call_func)
+
+        # NOTE: Catch the necessary parameters.
+        sig: inspect.Signature = inspect.signature(call_func)
         necessary_params: list[str] = []
         has_keyword: bool = False
         for k in sig.parameters:
@@ -2023,11 +2073,9 @@ class CallStage(BaseRetryStage):
             (k.removeprefix("_") not in args and k not in args)
             for k in necessary_params
         ):
-            if "result" in necessary_params:
-                necessary_params.remove("result")
-
-            if "extras" in necessary_params:
-                necessary_params.remove("extras")
+            for k in ("result", "extras"):
+                if k in necessary_params:
+                    necessary_params.remove(k)
 
             args.pop("result")
             args.pop("extras")
@@ -2037,18 +2085,15 @@ class CallStage(BaseRetryStage):
             )
 
         if not has_keyword:
-            if "result" not in sig.parameters:
-                args.pop("result")
+            for k in ("result", "extras"):
+                if k not in sig.parameters:
+                    args.pop(k)
 
-            if "extras" not in sig.parameters:  # pragma: no cov
-                args.pop("extras")
+        args: DictData = self.validate_model_args(call_func, args)
 
         if event and event.is_set():
             raise StageCancelError("Cancel before start call process.")
 
-        args: DictData = self.validate_model_args(
-            call_func, args, run_id, parent_run_id, extras=self.extras
-        )
         if inspect.iscoroutinefunction(call_func):
             rs: DictOrModel = await call_func(
                 **param2template(args, params, extras=self.extras)
@@ -2081,24 +2126,18 @@ class CallStage(BaseRetryStage):
         )
 
     @staticmethod
-    def validate_model_args(
-        func: TagFunc,
-        args: DictData,
-        run_id: str,
-        parent_run_id: Optional[str] = None,
-        extras: Optional[DictData] = None,
-    ) -> DictData:
+    def validate_model_args(func: TagFunc, args: DictData) -> DictData:
         """Validate an input arguments before passing to the caller function.
 
         Args:
             func (TagFunc): A tag function object that want to get typing.
             args (DictData): An arguments before passing to this tag func.
-            run_id (str): A running ID.
-            parent_run_id (str, default None): A parent running ID.
-            extras (DictData, default None): An extra parameters.
+
+        Raises:
+            StageError: If model validation was raised the ValidationError.
 
         Returns:
-            DictData: A prepared args paramter that validate with model args.
+            DictData: A prepared args parameter that validate with model args.
         """
         try:
             override: DictData = dict(
@@ -2121,15 +2160,6 @@ class CallStage(BaseRetryStage):
             raise StageError(
                 "Validate argument from the caller function raise invalid type."
             ) from e
-        except TypeError as e:
-            trace: Trace = get_trace(
-                run_id, parent_run_id=parent_run_id, extras=extras
-            )
-            trace.warning(
-                f"[STAGE]: Get type hint raise TypeError: {e}, so, it skip "
-                f"parsing model args process."
-            )
-            return args
 
     def dryrun(
         self,
@@ -2139,12 +2169,23 @@ class CallStage(BaseRetryStage):
         *,
         parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
-    ) -> Optional[Result]:  # pragma: no cov
+    ) -> Result:  # pragma: no cov
         """Override the dryrun method for this CallStage.
 
         Steps:
             - Pre-hook caller function that exist.
             - Show function parameters
+
+        Args:
+            params (DictData): A parameter data that want to use in this
+                execution.
+            run_id (str): A running stage ID.
+            context (DictData): A context data that was passed from handler
+                method.
+            parent_run_id (str, default None): A parent running ID.
+            event (Event, default None): An event manager that use to track
+                parent process was not force stopped.
+
         """
         trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
@@ -2162,7 +2203,9 @@ class CallStage(BaseRetryStage):
             ),
             "extras": self.extras,
         } | self.pass_template(self.args, params)
-        sig = inspect.signature(call_func)
+
+        # NOTE: Catch the necessary parameters.
+        sig: inspect.Signature = inspect.signature(call_func)
         trace.debug(f"[STAGE]: {sig.parameters}")
         necessary_params: list[str] = []
         has_keyword: bool = False
@@ -2184,95 +2227,28 @@ class CallStage(BaseRetryStage):
             if p in func_typed
         )
         map_type_args: str = "||".join(f"\t{a}: {type(a)}" for a in args)
+
         if not has_keyword:
-            if "result" not in sig.parameters:
-                args.pop("result")
+            for k in ("result", "extras"):
+                if k not in sig.parameters:
+                    args.pop(k)
 
-            if "extras" not in sig.parameters:
-                args.pop("extras")
-
-        trace.debug(
+        trace.info(
             f"[STAGE]: Details"
             f"||Necessary Params:"
             f"||{map_type}"
+            f"||Supported Keyword Params: {has_keyword}"
             f"||Return Type: {func_typed['return']}"
             f"||Argument Params:"
             f"||{map_type_args}"
             f"||"
         )
-        if has_keyword:
-            trace.debug("[STAGE]: This caller function support keyword param.")
         return Result(
             run_id=run_id,
             parent_run_id=parent_run_id,
             status=SUCCESS,
             context=catch(context=context, status=SUCCESS),
             extras=self.extras,
-        )
-
-
-class BaseNestedStage(BaseAsyncStage, ABC):
-    """Base Nested Stage model. This model is use for checking the child stage
-    is the nested stage or not.
-    """
-
-    def set_outputs(
-        self, output: DictData, to: DictData, info: Optional[DictData] = None
-    ) -> DictData:
-        """Override the set outputs method that support for nested-stage."""
-        return super().set_outputs(output, to=to)
-
-    def get_outputs(self, output: DictData) -> DictData:
-        """Override the get outputs method that support for nested-stage"""
-        return super().get_outputs(output)
-
-    @property
-    def is_nested(self) -> bool:
-        """Check if this stage is a nested stage or not.
-
-        :rtype: bool
-        """
-        return True
-
-    @staticmethod
-    def mark_errors(context: DictData, error: StageError) -> None:
-        """Make the errors context result with the refs value depends on the nested
-        execute func.
-
-        Args:
-            context: (DictData) A context data.
-            error: (StageError) A stage exception object.
-        """
-        if "errors" in context:
-            context["errors"][error.refs] = error.to_dict()
-        else:
-            context["errors"] = error.to_dict(with_refs=True)
-
-    async def async_process(
-        self,
-        params: DictData,
-        run_id: str,
-        context: DictData,
-        *,
-        parent_run_id: Optional[str] = None,
-        event: Optional[Event] = None,
-    ) -> Result:
-        """Async process for nested-stage do not implement yet.
-
-        Args:
-            params: A parameter data that want to use in this
-                execution.
-            run_id: A running stage ID.
-            context: A context data.
-            parent_run_id: A parent running ID. (Default is None)
-            event: An event manager that use to track parent process
-                was not force stopped.
-
-        Returns:
-            Result: The execution result with status and context data.
-        """
-        raise NotImplementedError(
-            "The nested-stage does not implement the `axecute` method yet."
         )
 
 
@@ -2284,12 +2260,13 @@ class TriggerStage(BaseRetryStage):
         This stage does not allow to pass the workflow model directly to the
     trigger field. A trigger workflow name should exist on the config path only.
 
-    Data Validate:
-        >>> stage = {
+    Examples:
+        >>> stage = TriggerStage.model_validate({
+        ...     "id": "trigger-stage",
         ...     "name": "Trigger workflow stage execution",
         ...     "trigger": 'workflow-name-for-loader',
         ...     "params": {"run-date": "2024-08-01", "source": "src"},
-        ... }
+        ... })
     """
 
     trigger: str = Field(
@@ -2336,51 +2313,38 @@ class TriggerStage(BaseRetryStage):
         _trigger: str = param2template(self.trigger, params, extras=self.extras)
         if _trigger == self.extras.get("__sys_exec_break_circle", "NOTSET"):
             raise StageError("Circle execute via trigger itself workflow name.")
+
         trace.info(f"[NESTED]: Load Workflow Config: {_trigger!r}")
-        result: Result = Workflow.from_conf(
+        workflow: Workflow = Workflow.from_conf(
             name=pass_env(_trigger),
             extras=self.extras,
-        ).execute(
-            # NOTE: Should not use the `pass_env` function on this params parameter.
+        )
+
+        if event and event.is_set():
+            raise StageCancelError("Cancel before start trigger process.")
+
+        # IMPORTANT: Should not use the `pass_env` function on this `params`
+        #   parameter.
+        result: Result = workflow.execute(
             params=param2template(self.params, params, extras=self.extras),
             run_id=parent_run_id,
             event=event,
         )
+        catch(context, status=result.status, updated=result.context)
         if result.status == FAILED:
             err_msg: str = (
                 f" with:\n{msg}"
                 if (msg := result.context.get("errors", {}).get("message"))
                 else "."
             )
-            return result.catch(
-                status=FAILED,
-                context={
-                    "status": FAILED,
-                    "errors": StageError(
-                        f"Trigger workflow was failed{err_msg}"
-                    ).to_dict(),
-                },
+            err = StageError(
+                f"Trigger workflow was failed{err_msg}", allow_traceback=False
             )
+            raise err
         elif result.status == CANCEL:
-            return result.catch(
-                status=CANCEL,
-                context={
-                    "status": CANCEL,
-                    "errors": StageCancelError(
-                        "Trigger workflow was cancel."
-                    ).to_dict(),
-                },
-            )
+            raise StageCancelError("Trigger workflow was cancel.")
         elif result.status == SKIP:
-            return result.catch(
-                status=SKIP,
-                context={
-                    "status": SKIP,
-                    "errors": StageSkipError(
-                        "Trigger workflow was skipped."
-                    ).to_dict(),
-                },
-            )
+            raise StageSkipError("Trigger workflow was skipped.")
         return result
 
     async def async_process(
@@ -2392,7 +2356,7 @@ class TriggerStage(BaseRetryStage):
         parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> Result:  # pragma: no cov
-        """Async process for nested-stage do not implement yet.
+        """Async process for trigger-stage do not implement yet.
 
         Args:
             params: A parameter data that want to use in this
@@ -2408,6 +2372,72 @@ class TriggerStage(BaseRetryStage):
         """
         raise NotImplementedError(
             "The Trigger stage does not implement the `axecute` method yet."
+        )
+
+
+class BaseNestedStage(BaseAsyncStage, ABC):
+    """Base Nested Stage model. This model is use for checking the child stage
+    is the nested stage or not.
+    """
+
+    def set_outputs(
+        self, output: DictData, to: DictData, info: Optional[DictData] = None
+    ) -> DictData:
+        """Override the set outputs method that support for nested-stage."""
+        return super().set_outputs(output, to=to)
+
+    def get_outputs(self, output: DictData) -> DictData:
+        """Override the get outputs method that support for nested-stage"""
+        return super().get_outputs(output)
+
+    @property
+    def is_nested(self) -> bool:
+        """Check if this stage is a nested stage or not.
+
+        Returns:
+            bool: True only.
+        """
+        return True
+
+    @staticmethod
+    def mark_errors(context: DictData, error: StageError) -> None:
+        """Make the errors context result with the refs value depends on the nested
+        execute func.
+
+        Args:
+            context: (DictData) A context data.
+            error: (StageError) A stage exception object.
+        """
+        if "errors" in context:
+            context["errors"][error.refs] = error.to_dict()
+        else:
+            context["errors"] = error.to_dict(with_refs=True)
+
+    async def async_process(
+        self,
+        params: DictData,
+        run_id: str,
+        context: DictData,
+        *,
+        parent_run_id: Optional[str] = None,
+        event: Optional[Event] = None,
+    ) -> Result:
+        """Async process for nested-stage do not implement yet.
+
+        Args:
+            params: A parameter data that want to use in this
+                execution.
+            run_id: A running stage ID.
+            context: A context data.
+            parent_run_id: A parent running ID. (Default is None)
+            event: An event manager that use to track parent process
+                was not force stopped.
+
+        Returns:
+            Result: The execution result with status and context data.
+        """
+        raise NotImplementedError(
+            "The nested-stage does not implement the `axecute` method yet."
         )
 
 
