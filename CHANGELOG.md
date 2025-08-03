@@ -2,6 +2,27 @@
 
 ## Latest Changes
 
+## 0.0.85
+
+### :sparkles: Features
+
+- :dart: feat: update raise error on trigger stage process.
+- :dart: feat: update retry strategy on job execution.
+- :dart: feat: update trace module.
+- :dart: feat: mark finally code for push metric after exec.
+
+### :black_nib: Code Changes
+
+- :art: format: format stage module.
+- :art: format: refactor process on job module.
+- :test_tube: tests: update testcase for release workflow.
+- :test_tube: tests: fix audit module testcase.
+- :art: format: format some code.
+
+### :book: Documentations
+
+- :page_facing_up: docs: update readme file.
+
 ## 0.0.84
 
 ### :sparkles: Features

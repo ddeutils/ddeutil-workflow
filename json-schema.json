@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Workflow Configuration JSON Schema",
-  "version": "0.0.84",
+  "version": "0.0.85",
   "$defs": {
     "AWSBatchArgs": {
       "description": "AWS Batch arguments.",
