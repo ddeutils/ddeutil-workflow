@@ -1679,8 +1679,8 @@ class BaseEmit(ABC):
         msg: str,
         level: Level,
         *,
-        module: Optional[str] = None,
         metric: Optional[DictData] = None,
+        module: Optional[str] = None,
     ) -> None:
         """Write trace log with append mode and logging this message with any
         logging level.
@@ -1708,41 +1708,49 @@ class BaseEmit(ABC):
         """
         self.emit(msg, level="debug", module=module)
 
-    def info(self, msg: str) -> None:
+    def info(self, msg: str, module: Optional[str] = None) -> None:
         """Write trace log with append mode and logging this message with the
         INFO level.
 
         Args:
             msg: A message that want to log.
+            module (str, default None): A module name that use for adding prefix
+                at the message value.
         """
-        self.emit(msg, level="info")
+        self.emit(msg, level="info", module=module)
 
-    def warning(self, msg: str) -> None:
+    def warning(self, msg: str, module: Optional[str] = None) -> None:
         """Write trace log with append mode and logging this message with the
         WARNING level.
 
         Args:
             msg: A message that want to log.
+            module (str, default None): A module name that use for adding prefix
+                at the message value.
         """
-        self.emit(msg, level="warning")
+        self.emit(msg, level="warning", module=module)
 
-    def error(self, msg: str) -> None:
+    def error(self, msg: str, module: Optional[str] = None) -> None:
         """Write trace log with append mode and logging this message with the
         ERROR level.
 
         Args:
             msg: A message that want to log.
+            module (str, default None): A module name that use for adding prefix
+                at the message value.
         """
-        self.emit(msg, level="error")
+        self.emit(msg, level="error", module=module)
 
-    def exception(self, msg: str) -> None:
+    def exception(self, msg: str, module: Optional[str] = None) -> None:
         """Write trace log with append mode and logging this message with the
         EXCEPTION level.
 
         Args:
             msg: A message that want to log.
+            module (str, default None): A module name that use for adding prefix
+                at the message value.
         """
-        self.emit(msg, level="exception")
+        self.emit(msg, level="exception", module=module)
 
 
 class BaseAsyncEmit(ABC):
@@ -1754,6 +1762,7 @@ class BaseAsyncEmit(ABC):
         level: Level,
         *,
         metric: Optional[DictData] = None,
+        module: Optional[str] = None,
     ) -> None:
         """Async write trace log with append mode and logging this message with
         any logging level.
@@ -1763,55 +1772,77 @@ class BaseAsyncEmit(ABC):
             level (Mode): A logging level.
             metric (DictData, default None): A metric data that want to export
                 to each target handler.
+            module (str, default None): A module name that use for adding prefix
+                at the message value.
         """
         raise NotImplementedError(
             "Async Logging action should be implement for making trace log."
         )
 
-    async def adebug(self, msg: str) -> None:  # pragma: no cov
+    async def adebug(
+        self, msg: str, module: Optional[str] = None
+    ) -> None:  # pragma: no cov
         """Async write trace log with append mode and logging this message with
         the DEBUG level.
 
         Args:
             msg: A message that want to log.
+            module (str, default None): A module name that use for adding prefix
+                at the message value.
         """
-        await self.amit(msg, level="debug")
+        await self.amit(msg, level="debug", module=module)
 
-    async def ainfo(self, msg: str) -> None:  # pragma: no cov
+    async def ainfo(
+        self, msg: str, module: Optional[str] = None
+    ) -> None:  # pragma: no cov
         """Async write trace log with append mode and logging this message with
         the INFO level.
 
         Args:
             msg: A message that want to log.
+            module (str, default None): A module name that use for adding prefix
+                at the message value.
         """
-        await self.amit(msg, level="info")
+        await self.amit(msg, level="info", module=module)
 
-    async def awarning(self, msg: str) -> None:  # pragma: no cov
+    async def awarning(
+        self, msg: str, module: Optional[str] = None
+    ) -> None:  # pragma: no cov
         """Async write trace log with append mode and logging this message with
         the WARNING level.
 
         Args:
             msg: A message that want to log.
+            module (str, default None): A module name that use for adding prefix
+                at the message value.
         """
-        await self.amit(msg, level="warning")
+        await self.amit(msg, level="warning", module=module)
 
-    async def aerror(self, msg: str) -> None:  # pragma: no cov
+    async def aerror(
+        self, msg: str, module: Optional[str] = None
+    ) -> None:  # pragma: no cov
         """Async write trace log with append mode and logging this message with
         the ERROR level.
 
         Args:
             msg: A message that want to log.
+            module (str, default None): A module name that use for adding prefix
+                at the message value.
         """
-        await self.amit(msg, level="error")
+        await self.amit(msg, level="error", module=module)
 
-    async def aexception(self, msg: str) -> None:  # pragma: no cov
+    async def aexception(
+        self, msg: str, module: Optional[str] = None
+    ) -> None:  # pragma: no cov
         """Async write trace log with append mode and logging this message with
         the EXCEPTION level.
 
         Args:
             msg: A message that want to log.
+            module (str, default None): A module name that use for adding prefix
+                at the message value.
         """
-        await self.amit(msg, level="exception")
+        await self.amit(msg, level="exception", module=module)
 
 
 class Trace(BaseModel, BaseEmit, BaseAsyncEmit):
@@ -1915,7 +1946,12 @@ class Trace(BaseModel, BaseEmit, BaseAsyncEmit):
             self._buffer.clear()
 
     async def amit(
-        self, msg: str, level: Level, *, metric: Optional[DictData] = None
+        self,
+        msg: str,
+        level: Level,
+        *,
+        metric: Optional[DictData] = None,
+        module: Optional[str] = None,
     ) -> None:
         """Async write trace log with append mode and logging this message with
         any logging level.
@@ -1925,6 +1961,8 @@ class Trace(BaseModel, BaseEmit, BaseAsyncEmit):
             level (Level): A logging mode.
             metric (DictData, default None): A metric data that want to export
                 to each target handler.
+            module (str, default None): A module name that use for adding prefix
+                at the message value.
         """
         _msg: str = self.make_message(msg)
         metadata: Metadata = Metadata.make(
