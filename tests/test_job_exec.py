@@ -78,14 +78,43 @@ def test_job_exec_py():
         "status": CANCEL,
         "EMPTY": {
             "errors": {
-                "message": "Strategy execution was canceled from the event before start stage execution.",
+                "message": "Strategy execution was canceled from the event after end stage execution.",
                 "name": "JobCancelError",
             },
             "matrix": {},
             "stages": {
-                "hello-world": {"outputs": {"x": "New Name"}, "status": SUCCESS}
+                "hello-world": {
+                    "status": CANCEL,
+                    "outputs": {},
+                    "errors": {
+                        "name": "StageCancelError",
+                        "message": "Cancel before start exec process.",
+                    },
+                }
             },
             "status": CANCEL,
+        },
+        "errors": {
+            "name": "JobCancelError",
+            "message": "Strategy execution was canceled from the event after end stage execution.",
+        },
+    }
+
+    event = MockEvent(n=3)
+    rs: Result = job.execute(params={"params": {"name": "Foo"}}, event=event)
+    assert rs.status == CANCEL
+    assert rs.context == {
+        "status": CANCEL,
+        "EMPTY": {
+            "status": CANCEL,
+            "matrix": {},
+            "stages": {
+                "hello-world": {"outputs": {"x": "New Name"}, "status": SUCCESS}
+            },
+            "errors": {
+                "name": "JobCancelError",
+                "message": "Strategy execution was canceled from the event before start stage execution.",
+            },
         },
         "errors": {
             "name": "JobCancelError",

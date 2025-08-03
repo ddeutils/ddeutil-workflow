@@ -99,6 +99,16 @@ def set_logging(
     return _logger
 
 
+PrefixType = Literal[
+    "caller",
+    "nested",
+    "stage",
+    "job",
+    "workflow",
+    "release",
+    "schedule",
+    "audit",
+]
 PREFIX_LOGS: Final[dict[str, dict]] = {
     "CALLER": {
         "emoji": "⚙️",
@@ -109,7 +119,7 @@ PREFIX_LOGS: Final[dict[str, dict]] = {
     "JOB": {"emoji": "🏗", "desc": "logs from job module."},
     "WORKFLOW": {"emoji": "👟", "desc": "logs from workflow module."},
     "RELEASE": {"emoji": "📅", "desc": "logs from release workflow method."},
-    "POKING": {"emoji": "⏰", "desc": "logs from poke workflow method."},
+    "SCHEDULE": {"emoji": "⏰", "desc": "logs from poke workflow method."},
     "AUDIT": {"emoji": "📌", "desc": "logs from audit model."},
 }  # pragma: no cov
 PREFIX_DEFAULT: Final[str] = "CALLER"
@@ -1669,6 +1679,7 @@ class BaseEmit(ABC):
         msg: str,
         level: Level,
         *,
+        module: Optional[str] = None,
         metric: Optional[DictData] = None,
     ) -> None:
         """Write trace log with append mode and logging this message with any
@@ -1679,19 +1690,23 @@ class BaseEmit(ABC):
             level: A logging level.
             metric (DictData, default None): A metric data that want to export
                 to each target handler.
+            module (str, default None): A module name that use for adding prefix
+                at the message value.
         """
         raise NotImplementedError(
-            "Logging action should be implement for making trace log."
+            "Emit action should be implement for making trace log."
         )
 
-    def debug(self, msg: str):
+    def debug(self, msg: str, module: Optional[str] = None):
         """Write trace log with append mode and logging this message with the
         DEBUG level.
 
         Args:
             msg: A message that want to log.
+            module (str, default None): A module name that use for adding prefix
+                at the message value.
         """
-        self.emit(msg, level="debug")
+        self.emit(msg, level="debug", module=module)
 
     def info(self, msg: str) -> None:
         """Write trace log with append mode and logging this message with the
@@ -1854,7 +1869,12 @@ class Trace(BaseModel, BaseEmit, BaseAsyncEmit):
         return prepare_newline(Message.from_str(msg).prepare(self.extras))
 
     def emit(
-        self, msg: str, level: Level, *, metric: Optional[DictData] = None
+        self,
+        msg: str,
+        level: Level,
+        *,
+        module: Optional[str] = None,
+        metric: Optional[DictData] = None,
     ) -> None:
         """Emit a trace log to all handler. This will use synchronise process.
 
@@ -1863,6 +1883,8 @@ class Trace(BaseModel, BaseEmit, BaseAsyncEmit):
             level (Level): A tracing level.
             metric (DictData, default None): A metric data that want to export
                 to each target handler.
+            module (str, default None): A module name that use for adding prefix
+                at the message value.
         """
         _msg: str = self.make_message(msg)
         metadata: Metadata = Metadata.make(

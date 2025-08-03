@@ -682,6 +682,7 @@ def test_foreach_stage_exec_concurrent_with_raise():
     )
     rs: Result = stage.execute({})
     assert rs.status == FAILED
+    possible = []
     try:
         assert rs.context == {
             "status": FAILED,
@@ -706,7 +707,10 @@ def test_foreach_stage_exec_concurrent_with_raise():
                 }
             },
         }
+        possible.append(True)
     except AssertionError:
+        possible.append(False)
+    try:
         assert rs.context == {
             "status": FAILED,
             "items": [1, 2, 3, 4, 5],
@@ -720,7 +724,45 @@ def test_foreach_stage_exec_concurrent_with_raise():
                         "message": "Break item: 2 because nested stage: 'Raise with PyStage', failed.",
                     },
                 },
+                3: {
+                    "status": CANCEL,
+                    "item": 3,
+                    "stages": {},
+                    "errors": {
+                        "name": "StageCancelError",
+                        "message": "Cancel item: 3 after end nested process.",
+                    },
+                },
                 1: {"status": SUCCESS, "item": 1, "stages": {}},
+            },
+            "errors": {
+                2: {
+                    "name": "StageError",
+                    "message": "Break item: 2 because nested stage: 'Raise with PyStage', failed.",
+                },
+                3: {
+                    "name": "StageCancelError",
+                    "message": "Cancel item: 3 after end nested process.",
+                },
+            },
+        }
+        possible.append(True)
+    except AssertionError:
+        possible.append(False)
+    try:
+        assert rs.context == {
+            "status": FAILED,
+            "items": [1, 2, 3, 4, 5],
+            "foreach": {
+                2: {
+                    "status": FAILED,
+                    "item": 2,
+                    "stages": {},
+                    "errors": {
+                        "name": "StageError",
+                        "message": "Break item: 2 because nested stage: 'Raise with PyStage', failed.",
+                    },
+                },
                 3: {
                     "status": CANCEL,
                     "item": 3,
@@ -730,6 +772,7 @@ def test_foreach_stage_exec_concurrent_with_raise():
                         "message": "Cancel item: 3 before start nested process.",
                     },
                 },
+                1: {"status": SUCCESS, "item": 1, "stages": {}},
             },
             "errors": {
                 2: {
@@ -742,6 +785,12 @@ def test_foreach_stage_exec_concurrent_with_raise():
                 },
             },
         }
+        possible.append(True)
+    except AssertionError:
+        possible.append(False)
+    if not any(possible):
+        print(rs.context)
+        raise AssertionError("checking context does not match any case.")
 
 
 def test_foreach_stage_exec_concurrent_raise():

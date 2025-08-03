@@ -85,9 +85,14 @@ class BaseError(Exception):
     for debugging purposes.
 
     Attributes:
-        refs: Optional reference identifier for error correlation
-        context: Additional context data related to the error
-        params: Parameter data that was being processed when error occurred
+        refs (str | int, default None): Optional reference identifier for error
+            correlation
+        context (DictData, default None): Additional context data related to the
+            error
+        params (DictData, default None): Parameter data that was being processed
+            when error occurred
+        allow_traceback (bool, default True): A flag for printing traceback
+            after it catch this object.
 
     Example:
         >>> try:
@@ -105,11 +110,13 @@ class BaseError(Exception):
         refs: Optional[StrOrInt] = None,
         context: Optional[DictData] = None,
         params: Optional[DictData] = None,
+        allow_traceback: bool = True,
     ) -> None:
         super().__init__(message)
         self.refs: Optional[str] = refs
         self.context: DictData = context or {}
         self.params: DictData = params or {}
+        self.allow_traceback: bool = allow_traceback
 
     @overload
     def to_dict(

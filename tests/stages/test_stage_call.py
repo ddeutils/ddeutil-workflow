@@ -438,13 +438,11 @@ def test_validate_model_args():
     args = stage.validate_model_args(
         stage.get_caller({})(),
         stage.args | {"params": {}, "result": Result(), "extras": {}},
-        "demo",
     )
     assert "_exec" in args
 
-    args = stage.validate_model_args(
-        "test",
-        stage.args | {"params": {}, "result": Result(), "extras": {}},
-        "demo",
-    )
-    assert "exec" in args
+    with pytest.raises(TypeError):
+        stage.validate_model_args(
+            "test",
+            stage.args | {"params": {}, "result": Result(), "extras": {}},
+        )
