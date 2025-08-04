@@ -256,7 +256,7 @@ it will use default value and do not raise any error to you.
 | Name                        | Component | Default                                | Description                                                                            |
 |:----------------------------|:---------:|:---------------------------------------|:---------------------------------------------------------------------------------------|
 | **REGISTRY_CALLER**         |   CORE    | `.`                                    | List of importable string for the call stage.                                          |
-| **REGISTRY_FILTER**         |   CORE    | `ddeutil.workflow.templates`           | List of importable string for the filter template.                                     |
+| **REGISTRY_FILTER**         |   CORE    | `ddeutil.workflow.reusables`           | List of importable string for the filter template.                                     |
 | **CONF_PATH**               |   CORE    | `./conf`                               | The config path that keep all template `.yaml` files.                                  |
 | **STAGE_DEFAULT_ID**        |   CORE    | `false`                                | A flag that enable default stage ID that use for catch an execution output.            |
 | **GENERATE_ID_SIMPLE_MODE** |   CORE    | `true`                                 | A flog that enable generating ID with `md5` algorithm.                                 |
