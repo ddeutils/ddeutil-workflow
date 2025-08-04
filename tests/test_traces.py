@@ -15,6 +15,7 @@ from ddeutil.workflow.traces import (
     Trace,
     get_trace,
 )
+from pydantic import ValidationError
 
 
 def test_print_trace_exception():
@@ -34,7 +35,7 @@ def test_trace_regex_message():
         "( End trigger Priority Group: 2 )"
     )
     prefix: Message = Message.from_str(msg)
-    assert prefix.name == "STAGE"
+    assert prefix.module == "stage"
     assert prefix.message == (
         "Execute Empty-Stage: 'End trigger Priority Group': "
         "( End trigger Priority Group: 2 )"
@@ -45,7 +46,7 @@ def test_trace_regex_message():
         "( End trigger Priority Group: 2 )"
     )
     prefix: Message = Message.from_str(msg)
-    assert prefix.name is None
+    assert prefix.module is None
     assert prefix.message == (
         "[]: Execute Empty-Stage: 'End trigger Priority Group': "
         "( End trigger Priority Group: 2 )"
@@ -53,7 +54,7 @@ def test_trace_regex_message():
 
     msg: str = ""
     prefix: Message = Message.from_str(msg)
-    assert prefix.name is None
+    assert prefix.module is None
     assert prefix.message == ""
 
     msg: str = (
@@ -61,7 +62,7 @@ def test_trace_regex_message():
         "( End trigger Priority Group: 2 )"
     )
     prefix: Message = Message.from_str(msg)
-    assert prefix.name == "WORKFLOW"
+    assert prefix.module == "workflow"
     assert prefix.message == (
         "Execute Empty-Stage:\n'End trigger Priority Group':\n"
         "( End trigger Priority Group: 2 )"
@@ -218,7 +219,7 @@ def test_trace_manager_raise():
         handlers=[{"type": "console"}],
     )
     with pytest.raises(ValueError):
-        with trace:
+        with trace.buffer():
             raise ValueError("some raise error")
 
 
@@ -237,7 +238,7 @@ def test_trace_manager():
     except ZeroDivisionError:
         trace.exception("This is exception message from test_trace")
 
-    with trace:
+    with trace.buffer():
         assert trace._enable_buffer
         trace.debug("This is debug message from open trace")
         trace.info("This is info message from open trace")
@@ -266,7 +267,7 @@ def test_trace_manager():
     except ZeroDivisionError:
         trace.exception("This is exception message from empty trace")
 
-    with trace:
+    with trace.buffer():
         assert trace._enable_buffer
         trace.debug("This is debug message from open empty trace")
         trace.info("This is info message from open empty trace")
@@ -281,8 +282,23 @@ def test_trace_manager():
 
     assert len(trace._buffer) == 0
 
-    with trace:
+    with trace.buffer():
         assert 1 == 1
+
+
+def test_trace_manager_module():
+    trace = Trace(
+        run_id="01",
+        parent_run_id="1001",
+        handlers=[{"type": "console"}],
+    )
+    trace.debug("This is debug message from test_trace", module="stage")
+    trace.info("This is info message from test_trace", module="job")
+    trace.warning("This is warning message from test_trace", module="workflow")
+    trace.error("This is error message from test_trace", module="release")
+
+    with pytest.raises(ValidationError):
+        trace.info("This is info message from test_trace", module="not-exists")
 
 
 def test_trace_manager_files(test_path: Path):

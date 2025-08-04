@@ -1370,10 +1370,11 @@ class BashStage(BaseRetryStage):
         # NOTE: Make this .sh file able to executable.
         make_exec(f"./{f_name}")
 
-        yield f_shebang, f_name
-
-        # Note: Remove .sh file that use to run bash.
-        Path(f"./{f_name}").unlink()
+        try:
+            yield f_shebang, f_name
+        finally:
+            # Note: Remove .sh file that use to run bash.
+            Path(f"./{f_name}").unlink()
 
     @contextlib.contextmanager
     def make_sh_file(
@@ -1408,10 +1409,11 @@ class BashStage(BaseRetryStage):
         # NOTE: Make this .sh file able to executable.
         make_exec(f"./{f_name}")
 
-        yield f_shebang, f_name
-
-        # Note: Remove .sh file that use to run bash.
-        Path(f"./{f_name}").unlink()
+        try:
+            yield f_shebang, f_name
+        finally:
+            # Note: Remove .sh file that use to run bash.
+            Path(f"./{f_name}").unlink()
 
     @staticmethod
     def prepare_std(value: str) -> Optional[str]:

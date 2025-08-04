@@ -17,6 +17,7 @@ Functions:
     set_logging: Configure logger with custom formatting.
     get_trace: Factory function for trace instances.
 """
+import contextlib
 import json
 import logging
 import os
@@ -110,21 +111,23 @@ PrefixType = Literal[
     "audit",
 ]
 PREFIX_LOGS: Final[dict[str, dict]] = {
-    "CALLER": {
+    "caller": {
         "emoji": "⚙️",
         "desc": "logs from any usage from custom caller function.",
     },
-    "NESTED": {"emoji": "⛓️", "desc": "logs from stages module."},
-    "STAGE": {"emoji": "🔗", "desc": "logs from stages module."},
-    "JOB": {"emoji": "🏗", "desc": "logs from job module."},
-    "WORKFLOW": {"emoji": "👟", "desc": "logs from workflow module."},
-    "RELEASE": {"emoji": "📅", "desc": "logs from release workflow method."},
-    "SCHEDULE": {"emoji": "⏰", "desc": "logs from poke workflow method."},
-    "AUDIT": {"emoji": "📌", "desc": "logs from audit model."},
+    "nested": {"emoji": "⛓️", "desc": "logs from stages module."},
+    "stage": {"emoji": "🔗", "desc": "logs from stages module."},
+    "job": {"emoji": "🏗", "desc": "logs from job module."},
+    "workflow": {"emoji": "👟", "desc": "logs from workflow module."},
+    "release": {"emoji": "📅", "desc": "logs from release workflow method."},
+    "schedule": {"emoji": "⏰", "desc": "logs from poke workflow method."},
+    "audit": {"emoji": "📌", "desc": "logs from audit model."},
 }  # pragma: no cov
-PREFIX_DEFAULT: Final[str] = "CALLER"
+PREFIX_LOGS_UPPER: Final[Iterator[str]] = (p.upper() for p in PREFIX_LOGS)
+PREFIX_DEFAULT: Final[str] = "caller"
+PREFIX_EMOJI_DEFAULT: Final[str] = "⚙️"
 PREFIX_LOGS_REGEX: Final[re.Pattern[str]] = re.compile(
-    rf"(^\[(?P<name>{'|'.join(PREFIX_LOGS)})]:\s?)?(?P<message>.*)",
+    rf"(^\[(?P<module>{'|'.join(PREFIX_LOGS_UPPER)})]:\s?)?(?P<message>.*)",
     re.MULTILINE | re.DOTALL | re.ASCII | re.VERBOSE,
 )  # pragma: no cov
 
@@ -136,42 +139,52 @@ class Message(BaseModel):
     with emoji support and categorization.
     """
 
-    name: Optional[str] = Field(
-        default=None, description="A prefix name of message."
+    module: Optional[str] = Field(
+        default=None,
+        description="A prefix module of message it allow to be None.",
     )
     message: Optional[str] = Field(default=None, description="A message.")
 
+    @field_validator("module")
+    def __prepare_module(cls, data: Optional[str]) -> Optional[str]:
+        return data.lower() if data is not None else data
+
     @classmethod
-    def from_str(cls, msg: str) -> Self:
+    def from_str(cls, msg: str, module: Optional[PrefixType] = None) -> Self:
         """Extract message prefix from an input message.
 
         Args:
-            msg: A message that want to extract.
+            msg (str): A message that want to extract.
+            module (PrefixType, default None): A prefix module type.
 
         Returns:
             Message: The validated model from a string message.
         """
-        return Message.model_validate(
-            obj=PREFIX_LOGS_REGEX.search(msg).groupdict()
-        )
+        msg = cls.model_validate(PREFIX_LOGS_REGEX.search(msg).groupdict())
+        if msg.module is None and module:
+            msg.module = module
+        return msg
 
     def prepare(self, extras: Optional[DictData] = None) -> str:
         """Prepare message with force add prefix before writing trace log.
 
         Args:
-            extras: An extra parameter that want to get the
-                `log_add_emoji` flag.
+            extras (DictData, default None): An extra parameter that want to
+                get the `log_add_emoji` flag.
 
         Returns:
             str: The prepared message with prefix and optional emoji.
         """
-        name: str = self.name or PREFIX_DEFAULT
+        module: str = self.module or PREFIX_DEFAULT
+        module_data: dict[str, str] = PREFIX_LOGS.get(
+            module, {"emoji": PREFIX_EMOJI_DEFAULT}
+        )
         emoji: str = (
-            f"{PREFIX_LOGS[name]['emoji']} "
+            f"{module_data['emoji']} "
             if (extras or {}).get("log_add_emoji", True)
             else ""
         )
-        return f"{emoji}[{name}]: {self.message}"
+        return f"{emoji}[{module.upper()}]: {self.message}"
 
 
 class Metric(BaseModel):  # pragma: no cov
@@ -195,6 +208,9 @@ class Metadata(BaseModel):  # pragma: no cov
     )
     process: int = Field(description="A process ID.")
     thread: int = Field(description="A thread ID.")
+    module: Optional[PrefixType] = Field(
+        default=None, description="A prefix module type."
+    )
     message: str = Field(description="A message log.")
     cut_id: Optional[str] = Field(
         default=None, description="A cutting of running ID."
@@ -274,6 +290,7 @@ class Metadata(BaseModel):  # pragma: no cov
         parent_run_id: Optional[str],
         *,
         metric: Optional[DictData] = None,
+        module: Optional[PrefixType] = None,
         extras: Optional[DictData] = None,
     ) -> Self:
         """Make the current metric for contract this Metadata model instance.
@@ -289,6 +306,7 @@ class Metadata(BaseModel):  # pragma: no cov
             run_id:
             parent_run_id:
             metric:
+            module:
             extras: An extra parameter that want to override core
                 config values.
 
@@ -333,6 +351,7 @@ class Metadata(BaseModel):  # pragma: no cov
             ),
             process=os.getpid(),
             thread=get_ident(),
+            module=module,
             message=message,
             cut_id=cutting_id,
             run_id=run_id,
@@ -1680,7 +1699,7 @@ class BaseEmit(ABC):
         level: Level,
         *,
         metric: Optional[DictData] = None,
-        module: Optional[str] = None,
+        module: Optional[PrefixType] = None,
     ) -> None:
         """Write trace log with append mode and logging this message with any
         logging level.
@@ -1690,8 +1709,8 @@ class BaseEmit(ABC):
             level: A logging level.
             metric (DictData, default None): A metric data that want to export
                 to each target handler.
-            module (str, default None): A module name that use for adding prefix
-                at the message value.
+            module (PrefixType, default None): A module name that use for adding
+                prefix at the message value.
         """
         raise NotImplementedError(
             "Emit action should be implement for making trace log."
@@ -1703,8 +1722,8 @@ class BaseEmit(ABC):
 
         Args:
             msg: A message that want to log.
-            module (str, default None): A module name that use for adding prefix
-                at the message value.
+            module (PrefixType, default None): A module name that use for adding
+                prefix at the message value.
         """
         self.emit(msg, level="debug", module=module)
 
@@ -1714,8 +1733,8 @@ class BaseEmit(ABC):
 
         Args:
             msg: A message that want to log.
-            module (str, default None): A module name that use for adding prefix
-                at the message value.
+            module (PrefixType, default None): A module name that use for adding
+                prefix at the message value.
         """
         self.emit(msg, level="info", module=module)
 
@@ -1725,8 +1744,8 @@ class BaseEmit(ABC):
 
         Args:
             msg: A message that want to log.
-            module (str, default None): A module name that use for adding prefix
-                at the message value.
+            module (PrefixType, default None): A module name that use for adding
+                prefix at the message value.
         """
         self.emit(msg, level="warning", module=module)
 
@@ -1736,8 +1755,8 @@ class BaseEmit(ABC):
 
         Args:
             msg: A message that want to log.
-            module (str, default None): A module name that use for adding prefix
-                at the message value.
+            module (PrefixType, default None): A module name that use for adding
+                prefix at the message value.
         """
         self.emit(msg, level="error", module=module)
 
@@ -1747,13 +1766,16 @@ class BaseEmit(ABC):
 
         Args:
             msg: A message that want to log.
-            module (str, default None): A module name that use for adding prefix
-                at the message value.
+            module (PrefixType, default None): A module name that use for adding
+                prefix at the message value.
         """
         self.emit(msg, level="exception", module=module)
 
 
 class BaseAsyncEmit(ABC):
+    """Base Async Emit Abstract class for mixin `amit` method and async
+    logging that will use prefix with `a` charactor.
+    """
 
     @abstractmethod
     async def amit(
@@ -1762,7 +1784,7 @@ class BaseAsyncEmit(ABC):
         level: Level,
         *,
         metric: Optional[DictData] = None,
-        module: Optional[str] = None,
+        module: Optional[PrefixType] = None,
     ) -> None:
         """Async write trace log with append mode and logging this message with
         any logging level.
@@ -1772,8 +1794,8 @@ class BaseAsyncEmit(ABC):
             level (Mode): A logging level.
             metric (DictData, default None): A metric data that want to export
                 to each target handler.
-            module (str, default None): A module name that use for adding prefix
-                at the message value.
+            module (PrefixType, default None): A module name that use for adding
+                prefix at the message value.
         """
         raise NotImplementedError(
             "Async Logging action should be implement for making trace log."
@@ -1787,8 +1809,8 @@ class BaseAsyncEmit(ABC):
 
         Args:
             msg: A message that want to log.
-            module (str, default None): A module name that use for adding prefix
-                at the message value.
+            module (PrefixType, default None): A module name that use for adding
+                prefix at the message value.
         """
         await self.amit(msg, level="debug", module=module)
 
@@ -1800,8 +1822,8 @@ class BaseAsyncEmit(ABC):
 
         Args:
             msg: A message that want to log.
-            module (str, default None): A module name that use for adding prefix
-                at the message value.
+            module (PrefixType, default None): A module name that use for adding
+                prefix at the message value.
         """
         await self.amit(msg, level="info", module=module)
 
@@ -1813,8 +1835,8 @@ class BaseAsyncEmit(ABC):
 
         Args:
             msg: A message that want to log.
-            module (str, default None): A module name that use for adding prefix
-                at the message value.
+            module (PrefixType, default None): A module name that use for adding
+                prefix at the message value.
         """
         await self.amit(msg, level="warning", module=module)
 
@@ -1826,8 +1848,8 @@ class BaseAsyncEmit(ABC):
 
         Args:
             msg: A message that want to log.
-            module (str, default None): A module name that use for adding prefix
-                at the message value.
+            module (PrefixType, default None): A module name that use for adding
+                prefix at the message value.
         """
         await self.amit(msg, level="error", module=module)
 
@@ -1839,8 +1861,8 @@ class BaseAsyncEmit(ABC):
 
         Args:
             msg: A message that want to log.
-            module (str, default None): A module name that use for adding prefix
-                at the message value.
+            module (PrefixType, default None): A module name that use for adding
+                prefix at the message value.
         """
         await self.amit(msg, level="exception", module=module)
 
@@ -1888,24 +1910,13 @@ class Trace(BaseModel, BaseEmit, BaseAsyncEmit):
         cut_parent_run_id: str = cut_id(self.parent_run_id)
         return f"{cut_parent_run_id} -> {cut_run_id}"
 
-    def make_message(self, msg: str) -> str:
-        """Prepare and Make a message before write and log steps.
-
-        Args:
-            msg: A message that want to prepare and make before.
-
-        Returns:
-            str: The prepared message.
-        """
-        return prepare_newline(Message.from_str(msg).prepare(self.extras))
-
     def emit(
         self,
         msg: str,
         level: Level,
         *,
-        module: Optional[str] = None,
         metric: Optional[DictData] = None,
+        module: Optional[PrefixType] = None,
     ) -> None:
         """Emit a trace log to all handler. This will use synchronise process.
 
@@ -1914,14 +1925,15 @@ class Trace(BaseModel, BaseEmit, BaseAsyncEmit):
             level (Level): A tracing level.
             metric (DictData, default None): A metric data that want to export
                 to each target handler.
-            module (str, default None): A module name that use for adding prefix
-                at the message value.
+            module (PrefixType, default None): A module name that use for adding
+                prefix at the message value.
         """
-        _msg: str = self.make_message(msg)
+        _msg: Message = Message.from_str(msg, module=module)
         metadata: Metadata = Metadata.make(
             error_flag=(level in ("error", "exception")),
             level=level,
-            message=_msg,
+            module=_msg.module,
+            message=prepare_newline(_msg.prepare(self.extras)),
             cutting_id=self.cut_id,
             run_id=self.run_id,
             parent_run_id=self.parent_run_id,
@@ -1951,7 +1963,7 @@ class Trace(BaseModel, BaseEmit, BaseAsyncEmit):
         level: Level,
         *,
         metric: Optional[DictData] = None,
-        module: Optional[str] = None,
+        module: Optional[PrefixType] = None,
     ) -> None:
         """Async write trace log with append mode and logging this message with
         any logging level.
@@ -1961,14 +1973,15 @@ class Trace(BaseModel, BaseEmit, BaseAsyncEmit):
             level (Level): A logging mode.
             metric (DictData, default None): A metric data that want to export
                 to each target handler.
-            module (str, default None): A module name that use for adding prefix
-                at the message value.
+            module (PrefixType, default None): A module name that use for adding
+                prefix at the message value.
         """
-        _msg: str = self.make_message(msg)
+        _msg: Message = Message.from_str(msg, module=module)
         metadata: Metadata = Metadata.make(
             error_flag=(level in ("error", "exception")),
             level=level,
-            message=_msg,
+            module=_msg.module,
+            message=prepare_newline(_msg.prepare(self.extras)),
             cutting_id=self.cut_id,
             run_id=self.run_id,
             parent_run_id=self.parent_run_id,
@@ -1980,35 +1993,42 @@ class Trace(BaseModel, BaseEmit, BaseAsyncEmit):
         for handler in self.handlers:
             await handler.amit(metadata, extra=self.extras)
 
-    def __enter__(self):
+    @contextlib.contextmanager
+    def buffer(self, module: Optional[PrefixType] = None) -> Iterator[Self]:
         """Enter the trace for catching the logs that run so fast. It will use
         buffer strategy to flush the logs instead emit.
+
+        Args:
+            module (PrefixType, default None): A module name that use for adding
+                prefix at the message value.
         """
         self._enable_buffer = True
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Exit the trace that will clear all log in the buffer."""
-        if exc_type:
-            _msg: str = self.make_message(str(exc_val))
+        exception: Optional[Exception] = None
+        try:
+            yield self
+        except Exception as err:
+            _msg: Message = Message.from_str(str(err), module=module)
             metadata: Metadata = Metadata.make(
                 error_flag=True,
                 level="error",
-                message=_msg,
+                module=_msg.module,
+                message=prepare_newline(_msg.prepare(self.extras)),
                 cutting_id=self.cut_id,
                 run_id=self.run_id,
                 parent_run_id=self.parent_run_id,
                 extras=self.extras,
             )
             self._buffer.append(metadata)
+            exception = err
+        finally:
+            if self._buffer:
+                for handler in self.handlers:
+                    handler.flush(self._buffer, extra=self.extras)
+                self._buffer.clear()
 
-        if self._buffer:
-            for handler in self.handlers:
-                handler.flush(self._buffer, extra=self.extras)
-            self._buffer.clear()
-
-        # NOTE: Re-raise the exception if one occurred
-        return False
+            # NOTE: Raise the current exception after emit log.
+            if exception:
+                raise exception
 
 
 def get_trace(
