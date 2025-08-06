@@ -133,9 +133,9 @@ DictOrModel = Union[DictData, BaseModel]
 class BaseStage(BaseModel, ABC):
     """Abstract base class for all stage implementations.
 
-    BaseStage provides the foundation for all stage types in the workflow system.
-    It defines the common interface and metadata fields that all stages must
-    implement, ensuring consistent behavior across different stage types.
+        BaseStage provides the foundation for all stage types in the workflow
+    system. It defines the common interface and metadata fields that all stages
+    must implement, ensuring consistent behavior across different stage types.
 
     This abstract class handles core stage functionality including:
         - Stage identification and naming
@@ -143,7 +143,7 @@ class BaseStage(BaseModel, ABC):
         - Output management and templating
         - Execution lifecycle management
 
-    Custom stages should inherit from this class and implement the abstract
+        Custom stages should inherit from this class and implement the abstract
     `process()` method to define their specific execution behavior.
 
     Attributes:
@@ -189,7 +189,7 @@ class BaseStage(BaseModel, ABC):
         default=None,
         description=(
             "A stage condition statement to allow stage executable. This field "
-            "alise with `if` field."
+            "alias with `if` key."
         ),
         alias="if",
     )
@@ -260,6 +260,13 @@ class BaseStage(BaseModel, ABC):
         """Process abstraction method that action something by sub-model class.
         This is important method that make this class is able to be the stage.
 
+            For process method, it designs to break process with any status by
+        raise it with a specific exception class.
+
+            - StageError            -> FAILED
+            - StageSkipError        -> SKIP
+            - StageCancelError      -> CANCEL
+
         Args:
             params (DictData): A parameter data that want to use in this
                 execution.
@@ -327,7 +334,7 @@ class BaseStage(BaseModel, ABC):
         )
         try:
             _id: str = (
-                f" with ID: {param2template(self.id, params=params)!r}"
+                f" with ID: {self.pass_template(self.id, params=params)!r}"
                 if self.id
                 else ""
             )
@@ -365,21 +372,16 @@ class BaseStage(BaseModel, ABC):
 
         # NOTE: Catch this error in this line because the execution can raise
         #   this exception class at other location.
-        except (
-            StageSkipError,
-            StageNestedSkipError,
-            StageNestedError,
-            StageError,
-        ) as e:  # pragma: no cov
+        except StageError as e:  # pragma: no cov
             updated: Optional[DictData] = {"errors": e.to_dict()}
             if isinstance(e, StageNestedError):
-                trace.error(f"[STAGE]: Nested: {e}")
+                trace.error(f"[STAGE]: ⚠️ Nested: {e}")
             elif isinstance(e, (StageSkipError, StageNestedSkipError)):
-                trace.error(f"[STAGE]: ⏭️ Skip: {e}")
+                trace.error(f"[STAGE]: ⏭️ Skip: {e}", module="stage")
                 updated = None
             elif e.allow_traceback:
                 trace.error(
-                    f"[STAGE]: Stage Failed:||🚨 {traceback.format_exc()}||"
+                    f"[STAGE]: 📢 Stage Failed:||🚨 {traceback.format_exc()}||"
                 )
             else:
                 trace.error(
@@ -396,7 +398,8 @@ class BaseStage(BaseModel, ABC):
             )
         except Exception as e:
             trace.error(
-                f"[STAGE]: Error Failed:||🚨 {traceback.format_exc()}||"
+                f"💥 Error Failed:||🚨 {traceback.format_exc()}||",
+                module="stage",
             )
             return Result(
                 run_id=run_id,

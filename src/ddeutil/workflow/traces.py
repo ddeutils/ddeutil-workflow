@@ -39,6 +39,7 @@ from typing import (
     Optional,
     TypeVar,
     Union,
+    cast,
 )
 from zoneinfo import ZoneInfo
 
@@ -124,7 +125,7 @@ PREFIX_LOGS: Final[dict[str, dict]] = {
     "audit": {"emoji": "📌", "desc": "logs from audit model."},
 }  # pragma: no cov
 PREFIX_LOGS_UPPER: Final[Iterator[str]] = (p.upper() for p in PREFIX_LOGS)
-PREFIX_DEFAULT: Final[str] = "caller"
+PREFIX_DEFAULT: Final[Literal["caller"]] = "caller"
 PREFIX_EMOJI_DEFAULT: Final[str] = "⚙️"
 PREFIX_LOGS_REGEX: Final[re.Pattern[str]] = re.compile(
     rf"(^\[(?P<module>{'|'.join(PREFIX_LOGS_UPPER)})]:\s?)?(?P<message>.*)",
@@ -139,13 +140,13 @@ class Message(BaseModel):
     with emoji support and categorization.
     """
 
-    module: Optional[str] = Field(
+    module: Optional[PrefixType] = Field(
         default=None,
         description="A prefix module of message it allow to be None.",
     )
     message: Optional[str] = Field(default=None, description="A message.")
 
-    @field_validator("module")
+    @field_validator("module", mode="before", json_schema_input_type=str)
     def __prepare_module(cls, data: Optional[str]) -> Optional[str]:
         return data.lower() if data is not None else data
 
@@ -175,7 +176,7 @@ class Message(BaseModel):
         Returns:
             str: The prepared message with prefix and optional emoji.
         """
-        module: str = self.module or PREFIX_DEFAULT
+        module = cast(PrefixType, self.module or PREFIX_DEFAULT)
         module_data: dict[str, str] = PREFIX_LOGS.get(
             module, {"emoji": PREFIX_EMOJI_DEFAULT}
         )
@@ -1716,7 +1717,7 @@ class BaseEmit(ABC):
             "Emit action should be implement for making trace log."
         )
 
-    def debug(self, msg: str, module: Optional[str] = None):
+    def debug(self, msg: str, module: Optional[PrefixType] = None):
         """Write trace log with append mode and logging this message with the
         DEBUG level.
 
@@ -1727,7 +1728,7 @@ class BaseEmit(ABC):
         """
         self.emit(msg, level="debug", module=module)
 
-    def info(self, msg: str, module: Optional[str] = None) -> None:
+    def info(self, msg: str, module: Optional[PrefixType] = None) -> None:
         """Write trace log with append mode and logging this message with the
         INFO level.
 
@@ -1738,7 +1739,7 @@ class BaseEmit(ABC):
         """
         self.emit(msg, level="info", module=module)
 
-    def warning(self, msg: str, module: Optional[str] = None) -> None:
+    def warning(self, msg: str, module: Optional[PrefixType] = None) -> None:
         """Write trace log with append mode and logging this message with the
         WARNING level.
 
@@ -1749,7 +1750,7 @@ class BaseEmit(ABC):
         """
         self.emit(msg, level="warning", module=module)
 
-    def error(self, msg: str, module: Optional[str] = None) -> None:
+    def error(self, msg: str, module: Optional[PrefixType] = None) -> None:
         """Write trace log with append mode and logging this message with the
         ERROR level.
 
@@ -1760,7 +1761,7 @@ class BaseEmit(ABC):
         """
         self.emit(msg, level="error", module=module)
 
-    def exception(self, msg: str, module: Optional[str] = None) -> None:
+    def exception(self, msg: str, module: Optional[PrefixType] = None) -> None:
         """Write trace log with append mode and logging this message with the
         EXCEPTION level.
 
@@ -1802,7 +1803,7 @@ class BaseAsyncEmit(ABC):
         )
 
     async def adebug(
-        self, msg: str, module: Optional[str] = None
+        self, msg: str, module: Optional[PrefixType] = None
     ) -> None:  # pragma: no cov
         """Async write trace log with append mode and logging this message with
         the DEBUG level.
@@ -1815,7 +1816,7 @@ class BaseAsyncEmit(ABC):
         await self.amit(msg, level="debug", module=module)
 
     async def ainfo(
-        self, msg: str, module: Optional[str] = None
+        self, msg: str, module: Optional[PrefixType] = None
     ) -> None:  # pragma: no cov
         """Async write trace log with append mode and logging this message with
         the INFO level.
@@ -1828,7 +1829,7 @@ class BaseAsyncEmit(ABC):
         await self.amit(msg, level="info", module=module)
 
     async def awarning(
-        self, msg: str, module: Optional[str] = None
+        self, msg: str, module: Optional[PrefixType] = None
     ) -> None:  # pragma: no cov
         """Async write trace log with append mode and logging this message with
         the WARNING level.
@@ -1841,7 +1842,7 @@ class BaseAsyncEmit(ABC):
         await self.amit(msg, level="warning", module=module)
 
     async def aerror(
-        self, msg: str, module: Optional[str] = None
+        self, msg: str, module: Optional[PrefixType] = None
     ) -> None:  # pragma: no cov
         """Async write trace log with append mode and logging this message with
         the ERROR level.
@@ -1854,7 +1855,7 @@ class BaseAsyncEmit(ABC):
         await self.amit(msg, level="error", module=module)
 
     async def aexception(
-        self, msg: str, module: Optional[str] = None
+        self, msg: str, module: Optional[PrefixType] = None
     ) -> None:  # pragma: no cov
         """Async write trace log with append mode and logging this message with
         the EXCEPTION level.
@@ -2037,23 +2038,24 @@ def get_trace(
     handlers: list[Union[DictData, Handler]] = None,
     parent_run_id: Optional[str] = None,
     extras: Optional[DictData] = None,
-    auto_pre_process: bool = True,
+    pre_process: bool = False,
 ) -> Trace:
-    """Get dynamic Trace instance from the core config.
+    """Get dynamic Trace instance from the core config. This function will use
+    for start some process, and it wants to generated trace object.
 
-    This factory function returns the appropriate trace implementation based on
-    configuration. It can be overridden by extras argument and accepts running ID
-    and parent running ID.
+        This factory function returns the appropriate trace implementation based
+    on configuration. It can be overridden by extras argument and accepts
+    running ID and parent running ID.
 
     Args:
         run_id (str): A running ID.
-        parent_run_id (str | None, default None): A parent running ID.
+        parent_run_id (str, default None): A parent running ID.
         handlers (list[DictData | Handler], default None): A list of handler or
             mapping of handler data that want to direct pass instead use
             environment variable config.
         extras (DictData, default None): An extra parameter that want to
             override the core config values.
-        auto_pre_process (bool, default False) A flag that will auto call pre
+        pre_process (bool, default False) A flag that will auto call pre
             method after validate a trace model.
 
     Returns:
@@ -2068,7 +2070,7 @@ def get_trace(
         }
     )
     # NOTE: Start pre-process when start create trace.
-    if auto_pre_process:
+    if pre_process:
         for handler in trace.handlers:
             handler.pre()
     return trace
