@@ -361,9 +361,8 @@ class BaseStage(BaseModel, ABC):
             #   execution before the real execution from inherit stage model.
             result: Result = self._execute(
                 params,
-                run_id=run_id,
                 context=context,
-                parent_run_id=parent_run_id,
+                trace=trace,
                 event=event,
             )
             if result.status == WAIT:  # pragma: no cov
@@ -423,18 +422,16 @@ class BaseStage(BaseModel, ABC):
     def _execute(
         self,
         params: DictData,
-        run_id: str,
         context: DictData,
-        parent_run_id: Optional[str] = None,
+        trace: Trace,
         event: Optional[Event] = None,
     ) -> Result:
         """Wrapped the process method before returning to handler execution.
 
         Args:
             params: A parameter data that want to use in this execution.
-            run_id (str):
             context:
-            parent_run_id:
+            trace (Trace):
             event: An event manager that use to track parent process
                 was not force stopped.
 
@@ -444,9 +441,9 @@ class BaseStage(BaseModel, ABC):
         catch(context, status=WAIT)
         return self.process(
             params,
-            run_id=run_id,
+            run_id=trace.run_id,
             context=context,
-            parent_run_id=parent_run_id,
+            parent_run_id=trace.parent_run_id,
             event=event,
         )
 
@@ -463,7 +460,7 @@ class BaseStage(BaseModel, ABC):
             For example of setting output method, If you receive process output
         and want to set on the `to` like;
 
-            ... (i)   output: {'foo': 'bar', 'skipped': True}
+            ... (i)   output: {'foo': 'bar', 'status': SUCCESS, 'info': {}}
             ... (ii)  to: {'stages': {}}
 
             The received context in the `to` argument will be;
@@ -472,7 +469,8 @@ class BaseStage(BaseModel, ABC):
                         'stages': {
                             '<stage-id>': {
                                 'outputs': {'foo': 'bar'},
-                                'skipped': True,
+                                'status': SUCCESS,
+                                'info': {},
                             }
                         }
                     }
@@ -583,9 +581,11 @@ class BaseStage(BaseModel, ABC):
         """Generate stage ID that dynamic use stage's name if it ID does not
         set.
 
-        :param params: (DictData) A parameter or context data.
+        Args:
+            params (DictData): A parameter or context data.
 
-        :rtype: str
+        Returns:
+            str: An ID that already generated from id or name fields.
         """
         return (
             param2template(self.id, params=params, extras=self.extras)
@@ -933,9 +933,8 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
     def _execute(
         self,
         params: DictData,
-        run_id: str,
         context: DictData,
-        parent_run_id: Optional[str] = None,
+        trace: Trace,
         event: Optional[Event] = None,
     ) -> Result:
         """Wrapped the execute method with retry strategy before returning to
@@ -953,9 +952,6 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
         current_retry: int = 0
         exception: Exception
         catch(context, status=WAIT)
-        trace: Trace = get_trace(
-            run_id, parent_run_id=parent_run_id, extras=self.extras
-        )
         # NOTE: First execution for not pass to retry step if it passes.
         try:
             if (
@@ -964,16 +960,16 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
             ):
                 return self.dryrun(
                     params | {"retry": current_retry},
-                    run_id=run_id,
+                    run_id=trace.run_id,
                     context=context,
-                    parent_run_id=parent_run_id,
+                    parent_run_id=trace.parent_run_id,
                     event=event,
                 )
             return self.process(
                 params | {"retry": current_retry},
-                run_id=run_id,
+                run_id=trace.run_id,
                 context=context,
-                parent_run_id=parent_run_id,
+                parent_run_id=trace.parent_run_id,
                 event=event,
             )
         except (
@@ -1011,16 +1007,16 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
                 ):
                     return self.dryrun(
                         params | {"retry": current_retry},
-                        run_id=run_id,
+                        run_id=trace.run_id,
                         context=context,
-                        parent_run_id=parent_run_id,
+                        parent_run_id=trace.parent_run_id,
                         event=event,
                     )
                 return self.process(
                     params | {"retry": current_retry},
-                    run_id=run_id,
+                    run_id=trace.run_id,
                     context=context,
-                    parent_run_id=parent_run_id,
+                    parent_run_id=trace.parent_run_id,
                     event=event,
                 )
             except (
