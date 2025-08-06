@@ -171,6 +171,50 @@ def test_job_exec_py_raise():
     }
 
 
+def test_job_exec_py_raise_retry():
+    job = Job.model_validate(
+        {
+            "id": "first-job",
+            "retry": 1,
+            "stages": [
+                {
+                    "name": "Raise Error Inside",
+                    "id": "raise-error",
+                    "run": "raise ValueError('Testing raise error PyStage!!!')",
+                },
+            ],
+        }
+    )
+    rs: Result = job.execute(params={})
+    assert rs.status == FAILED
+    assert exclude_info(rs.context) == {
+        "status": FAILED,
+        "retry": 1,
+        "EMPTY": {
+            "status": FAILED,
+            "matrix": {},
+            "stages": {
+                "raise-error": {
+                    "outputs": {},
+                    "errors": {
+                        "name": "ValueError",
+                        "message": "Testing raise error PyStage!!!",
+                    },
+                    "status": FAILED,
+                }
+            },
+            "errors": {
+                "name": "JobError",
+                "message": "Strategy execution was break because its nested-stage, 'raise-error', failed.",
+            },
+        },
+        "errors": {
+            "name": "JobError",
+            "message": "Strategy execution was break because its nested-stage, 'raise-error', failed.",
+        },
+    }
+
+
 def test_job_exec_py_not_set_output():
     workflow: Workflow = Workflow.from_conf(
         name="wf-run-python-raise", extras={"stage_default_id": False}

@@ -389,12 +389,9 @@ class BaseStage(BaseModel, ABC):
                     f"[STAGE]: 🤫 Stage Failed with disable traceback:||{e}"
                 )
             st: Status = get_status_from_error(e)
-            return Result(
-                run_id=run_id,
-                parent_run_id=parent_run_id,
+            return Result.from_trace(trace).catch(
                 status=st,
                 context=catch(context, status=st, updated=updated),
-                extras=self.extras,
             )
         except Exception as e:
             trace.error(
@@ -414,7 +411,7 @@ class BaseStage(BaseModel, ABC):
             context["info"].update(
                 {
                     "exec_end": get_dt_now(),
-                    "exec_latency": time.monotonic() - ts,
+                    "exec_latency": round(time.monotonic() - ts, 6),
                 }
             )
             trace.debug("End Handler stage execution.", module="stage")
@@ -545,15 +542,18 @@ class BaseStage(BaseModel, ABC):
         """Return true if condition of this stage do not correct. This process
         use build-in eval function to execute the if-condition.
 
-        :param params: (DictData) A parameters that want to pass to condition
-            template.
+        Args:
+            params (DictData): A parameters that want to pass to condition
+                template.
 
-        :raise StageError: When it has any error raise from the eval
-            condition statement.
-        :raise StageError: When return type of the eval condition statement
-            does not return with boolean type.
+        Raises:
+            StageError: When it has any error raise from the eval
+                condition statement.
+            StageError: When return type of the eval condition statement
+                does not return with boolean type.
 
-        :rtype: bool
+        Returns:
+            bool: True if the condition is valid with the current parameters.
         """
         # NOTE: Support for condition value is empty string.
         if not self.condition:
@@ -920,6 +920,7 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
     `StageRetryError`.
     """
 
+    action_stage: ClassVar[bool] = True
     retry: int = Field(
         default=0,
         ge=0,
@@ -981,13 +982,11 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
             trace.debug("[STAGE]: process raise skip or cancel error.")
             raise
         except Exception as e:
+            if self.retry == 0:
+                raise
+
             current_retry += 1
             exception = e
-        finally:
-            trace.debug("[STAGE]: Failed at the first execution.")
-
-        if self.retry == 0:
-            raise exception
 
         trace.warning(
             f"[STAGE]: Retry count: {current_retry} ... "
@@ -1097,13 +1096,11 @@ class BaseRetryStage(BaseAsyncStage, ABC):  # pragma: no cov
             await trace.adebug("[STAGE]: process raise skip or cancel error.")
             raise
         except Exception as e:
+            if self.retry == 0:
+                raise
+
             current_retry += 1
             exception = e
-        finally:
-            await trace.adebug("[STAGE]: Failed at the first execution.")
-
-        if self.retry == 0:
-            raise exception
 
         await trace.awarning(
             f"[STAGE]: Retry count: {current_retry} ... "
@@ -1183,6 +1180,7 @@ class EmptyStage(BaseAsyncStage):
         ... })
     """
 
+    action_stage: ClassVar[bool] = True
     echo: StrOrNone = Field(
         default=None,
         description=(
@@ -1216,13 +1214,14 @@ class EmptyStage(BaseAsyncStage):
         without calling logging function.
 
         Args:
-            params: A parameter data that want to use in this
+            params (DictData): A parameter data that want to use in this
                 execution.
-            run_id: A running stage ID.
-            context: A context data.
-            parent_run_id: A parent running ID. (Default is None)
-            event: An event manager that use to track parent process
-                was not force stopped.
+            run_id (str): A running stage ID.
+            context (DictData): A context data that was passed from handler
+                method.
+            parent_run_id (str, default None): A parent running ID.
+            event (Event, default None): An event manager that use to track
+                parent process was not force stopped.
 
         Raises:
             StageCancelError: If event was set before start process.
@@ -1234,9 +1233,7 @@ class EmptyStage(BaseAsyncStage):
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         message: str = (
-            param2template(
-                dedent(self.echo.strip("\n")), params, extras=self.extras
-            )
+            self.pass_template(dedent(self.echo.strip("\n")), params=params)
             if self.echo
             else "..."
         )
@@ -1249,12 +1246,8 @@ class EmptyStage(BaseAsyncStage):
             if self.sleep > 5:
                 trace.info(f"[STAGE]: Sleep ... ({self.sleep} sec)")
             time.sleep(self.sleep)
-        return Result(
-            run_id=run_id,
-            parent_run_id=parent_run_id,
-            status=SUCCESS,
-            context=catch(context=context, status=SUCCESS),
-            extras=self.extras,
+        return Result.from_trace(trace).catch(
+            status=SUCCESS, context=catch(context=context, status=SUCCESS)
         )
 
     async def async_process(
@@ -1270,13 +1263,14 @@ class EmptyStage(BaseAsyncStage):
         stdout.
 
         Args:
-            params: A parameter data that want to use in this
+            params (DictData): A parameter data that want to use in this
                 execution.
-            run_id: A running stage ID.
-            context: A context data.
-            parent_run_id: A parent running ID. (Default is None)
-            event: An event manager that use to track parent process
-                was not force stopped.
+            run_id (str): A running stage ID.
+            context (DictData): A context data that was passed from handler
+                method.
+            parent_run_id (str, default None): A parent running ID.
+            event (Event, default None): An event manager that use to track
+                parent process was not force stopped.
 
         Raises:
             StageCancelError: If event was set before start process.
@@ -1288,9 +1282,7 @@ class EmptyStage(BaseAsyncStage):
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         message: str = (
-            param2template(
-                dedent(self.echo.strip("\n")), params, extras=self.extras
-            )
+            self.pass_template(dedent(self.echo.strip("\n")), params=params)
             if self.echo
             else "..."
         )
@@ -1303,12 +1295,8 @@ class EmptyStage(BaseAsyncStage):
             if self.sleep > 5:
                 await trace.ainfo(f"[STAGE]: Sleep ... ({self.sleep} sec)")
             await asyncio.sleep(self.sleep)
-        return Result(
-            run_id=run_id,
-            parent_run_id=parent_run_id,
-            status=SUCCESS,
-            context=catch(context=context, status=SUCCESS),
-            extras=self.extras,
+        return Result.from_trace(trace).catch(
+            status=SUCCESS, context=catch(context=context, status=SUCCESS)
         )
 
 
@@ -1333,7 +1321,6 @@ class BashStage(BaseRetryStage):
         ... })
     """
 
-    action_stage: ClassVar[bool] = True
     bash: str = Field(
         description=(
             "A bash statement that want to execute via Python subprocess."
@@ -1605,7 +1592,6 @@ class PyStage(BaseRetryStage):
         ... })
     """
 
-    action_stage: ClassVar[bool] = True
     run: str = Field(
         description="A Python string statement that want to run with `exec`.",
     )
@@ -1845,7 +1831,6 @@ class CallStage(BaseRetryStage):
         ... })
     """
 
-    action_stage: ClassVar[bool] = True
     uses: str = Field(
         description=(
             "A caller function with registry importer syntax that use to load "
@@ -2351,10 +2336,10 @@ class TriggerStage(BaseRetryStage):
                 if (msg := result.context.get("errors", {}).get("message"))
                 else "."
             )
-            err = StageError(
-                f"Trigger workflow was failed{err_msg}", allow_traceback=False
+            raise StageError(
+                f"Trigger workflow was failed{err_msg}",
+                allow_traceback=False,
             )
-            raise err
         elif result.status == CANCEL:
             raise StageCancelError("Trigger workflow was cancel.")
         elif result.status == SKIP:
@@ -2419,8 +2404,8 @@ class BaseNestedStage(BaseAsyncStage, ABC):
         execute func.
 
         Args:
-            context: (DictData) A context data.
-            error: (StageError) A stage exception object.
+            context (DictData): A context data.
+            error (StageError): A stage exception object.
         """
         if "errors" in context:
             context["errors"][error.refs] = error.to_dict()
@@ -2439,13 +2424,14 @@ class BaseNestedStage(BaseAsyncStage, ABC):
         """Async process for nested-stage do not implement yet.
 
         Args:
-            params: A parameter data that want to use in this
+            params (DictData): A parameter data that want to use in this
                 execution.
-            run_id: A running stage ID.
-            context: A context data.
-            parent_run_id: A parent running ID. (Default is None)
-            event: An event manager that use to track parent process
-                was not force stopped.
+            run_id (str): A running stage ID.
+            context (DictData): A context data that was passed from handler
+                method.
+            parent_run_id (str, default None): A parent running ID.
+            event (Event, default None): An event manager that use to track
+                parent process was not force stopped.
 
         Returns:
             Result: The execution result with status and context data.

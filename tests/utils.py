@@ -5,6 +5,7 @@
 # ------------------------------------------------------------------------------
 from __future__ import annotations
 
+import json
 import logging
 import os
 import shutil
@@ -155,10 +156,14 @@ def exclude_created_and_updated(value: Any) -> Any:  # pragma: no cov
     return exclude_keys(value, keys=["created_at", "updated_at"])
 
 
-def exclude_info(value: Any) -> Any:
+def exclude_info(value: Any) -> Any:  # pragma: no cov
     return exclude_keys(value, keys=["info"])
 
 
 def clean_up(path: Union[str, Path]) -> None:  # pragma: no cov
     if str2bool(os.getenv("WORKFLOW_TEST_CLEAN_UP", "true")):
         shutil.rmtree(path)
+
+
+def dumps(data: Any):  # pragma: no cov
+    return json.dumps(data, default=str, indent=1)
