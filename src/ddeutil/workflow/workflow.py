@@ -526,7 +526,7 @@ class Workflow(BaseModel):
             ),
         )
 
-    def execute_job(
+    def process_job(
         self,
         job: Job,
         run_id: str,
@@ -605,112 +605,27 @@ class Workflow(BaseModel):
 
         return result.status, catch(context, status=result.status)
 
-    def execute(
+    def process(
         self,
-        params: DictData,
+        job_queue: Queue[str],
+        run_id: str,
+        context: DictData,
         *,
-        run_id: Optional[str] = None,
+        parent_run_id: Optional[str] = None,
         event: Optional[ThreadEvent] = None,
         timeout: float = 3600,
         max_job_parallel: int = 2,
     ) -> Result:
-        """Execute workflow with passing a dynamic parameters to all jobs that
-        included in this workflow model with `jobs` field.
-
-            The result of execution process for each job and stages on this
-        workflow will keep in dict which able to catch out with all jobs and
-        stages by dot annotation.
-
-            For example with non-strategy job, when I want to use the output
-        from previous stage, I can access it with syntax:
-
-        ... ${job-id}.stages.${stage-id}.outputs.${key}
-        ... ${job-id}.stages.${stage-id}.errors.${key}
-
-            But example for strategy job:
-
-        ... ${job-id}.strategies.${strategy-id}.stages.${stage-id}.outputs.${key}
-        ... ${job-id}.strategies.${strategy-id}.stages.${stage-id}.errors.${key}
-
-            This method already handle all exception class that can raise from
-        the job execution. It will warp that error and keep it in the key `errors`
-        at the result context.
-
-
-            Execution   --> Ok      --> Result
-                                        |-status: CANCEL
-                                        ╰-context:
-                                            ╰-errors:
-                                                |-name: ...
-                                                ╰-message: ...
-
-                        --> Ok      --> Result
-                                        |-status: FAILED
-                                        ╰-context:
-                                            ╰-errors:
-                                                |-name: ...
-                                                ╰-message: ...
-
-                        --> Ok      --> Result
-                                        ╰-status: SKIP
-
-                        --> Ok      --> Result
-                                        ╰-status: SUCCESS
-
-        :param params: A parameter data that will parameterize before execution.
-        :param run_id: (Optional[str]) A workflow running ID.
-        :param event: (Event) An Event manager instance that use to cancel this
-            execution if it forces stopped by parent execution.
-        :param timeout: (float) A workflow execution time out in second unit
-            that use for limit time of execution and waiting job dependency.
-            This value does not force stop the task that still running more than
-            this limit time. (Default: 60 * 60 seconds)
-        :param max_job_parallel: (int) The maximum workers that use for job
-            execution in `ThreadPoolExecutor` object. (Default: 2 workers)
-
-        :rtype: Result
-        """
         ts: float = time.monotonic()
-        parent_run_id, run_id = extract_id(
-            self.name, run_id=run_id, extras=self.extras
-        )
         trace: Trace = get_trace(
-            run_id,
-            parent_run_id=parent_run_id,
-            extras=self.extras,
-            pre_process=True,
+            run_id, parent_run_id=parent_run_id, extras=self.extras
         )
-        context: DictData = self.parameterize(params)
-        event: ThreadEvent = event or ThreadEvent()
-        max_job_parallel: int = dynamic(
-            "max_job_parallel", f=max_job_parallel, extras=self.extras
-        )
-        trace.info(
-            f"[WORKFLOW]: Execute: {self.name!r} ("
-            f"{'parallel' if max_job_parallel > 1 else 'sequential'} jobs)"
-        )
-        if not self.jobs:
-            trace.warning(f"[WORKFLOW]: {self.name!r} does not set jobs")
-            return Result(
-                run_id=run_id,
-                parent_run_id=parent_run_id,
-                status=SUCCESS,
-                context=catch(context, status=SUCCESS),
-                extras=self.extras,
-            )
-
-        job_queue: Queue = Queue()
-        for job_id in self.jobs:
-            job_queue.put(job_id)
-
         not_timeout_flag: bool = True
         total_job: int = len(self.jobs)
         statuses: list[Status] = [WAIT] * total_job
         skip_count: int = 0
         sequence_statuses: list[Status] = []
-        timeout: float = dynamic(
-            "max_job_exec_timeout", f=timeout, extras=self.extras
-        )
+
         catch(context, status=WAIT)
         if event and event.is_set():
             err_msg: str = (
@@ -791,7 +706,7 @@ class Workflow(BaseModel):
                 if max_job_parallel > 1:
                     futures.append(
                         executor.submit(
-                            self.execute_job,
+                            self.process_job,
                             job=job,
                             run_id=run_id,
                             context=context,
@@ -805,7 +720,7 @@ class Workflow(BaseModel):
                 if len(futures) < 1:
                     futures.append(
                         executor.submit(
-                            self.execute_job,
+                            self.process_job,
                             job=job,
                             run_id=run_id,
                             context=context,
@@ -892,6 +807,144 @@ class Workflow(BaseModel):
             ),
             extras=self.extras,
         )
+
+    def _execute(
+        self,
+        job_queue: Queue[str],
+        context: DictData,
+        trace: Trace,
+        *,
+        event: Optional[ThreadEvent] = None,
+        timeout: float = 3600,
+        max_job_parallel: int = 2,
+    ) -> Result:
+        catch(context, status=WAIT)
+        return self.process(
+            job_queue,
+            run_id=trace.run_id,
+            context=context,
+            parent_run_id=trace.parent_run_id,
+            event=event,
+            timeout=timeout,
+            max_job_parallel=max_job_parallel,
+        )
+
+    def execute(
+        self,
+        params: DictData,
+        *,
+        run_id: Optional[str] = None,
+        event: Optional[ThreadEvent] = None,
+        timeout: float = 3600,
+        max_job_parallel: int = 2,
+    ) -> Result:
+        """Execute workflow with passing a dynamic parameters to all jobs that
+        included in this workflow model with `jobs` field.
+
+            The result of execution process for each job and stages on this
+        workflow will keep in dict which able to catch out with all jobs and
+        stages by dot annotation.
+
+            For example with non-strategy job, when I want to use the output
+        from previous stage, I can access it with syntax:
+
+        ... ${job-id}.stages.${stage-id}.outputs.${key}
+        ... ${job-id}.stages.${stage-id}.errors.${key}
+
+            But example for strategy job:
+
+        ... ${job-id}.strategies.${strategy-id}.stages.${stage-id}.outputs.${key}
+        ... ${job-id}.strategies.${strategy-id}.stages.${stage-id}.errors.${key}
+
+            This method already handle all exception class that can raise from
+        the job execution. It will warp that error and keep it in the key `errors`
+        at the result context.
+
+
+            Execution   --> Ok      --> Result
+                                        |-status: CANCEL
+                                        ╰-context:
+                                            ╰-errors:
+                                                |-name: ...
+                                                ╰-message: ...
+
+                        --> Ok      --> Result
+                                        |-status: FAILED
+                                        ╰-context:
+                                            ╰-errors:
+                                                |-name: ...
+                                                ╰-message: ...
+
+                        --> Ok      --> Result
+                                        ╰-status: SKIP
+
+                        --> Ok      --> Result
+                                        ╰-status: SUCCESS
+
+        :param params: A parameter data that will parameterize before execution.
+        :param run_id: (Optional[str]) A workflow running ID.
+        :param event: (Event) An Event manager instance that use to cancel this
+            execution if it forces stopped by parent execution.
+        :param timeout: (float) A workflow execution time out in second unit
+            that use for limit time of execution and waiting job dependency.
+            This value does not force stop the task that still running more than
+            this limit time. (Default: 60 * 60 seconds)
+        :param max_job_parallel: (int) The maximum workers that use for job
+            execution in `ThreadPoolExecutor` object. (Default: 2 workers)
+
+        :rtype: Result
+        """
+        ts: float = time.monotonic()
+        parent_run_id, run_id = extract_id(
+            self.name, run_id=run_id, extras=self.extras
+        )
+        trace: Trace = get_trace(
+            run_id,
+            parent_run_id=parent_run_id,
+            extras=self.extras,
+            pre_process=True,
+        )
+        context: DictData = self.parameterize(params) | {
+            "info": {"exec_start": get_dt_now()}
+        }
+        event: ThreadEvent = event or ThreadEvent()
+        max_job_parallel: int = dynamic(
+            "max_job_parallel", f=max_job_parallel, extras=self.extras
+        )
+        trace.info(
+            f"[WORKFLOW]: Execute: {self.name!r} ("
+            f"{'parallel' if max_job_parallel > 1 else 'sequential'} jobs)"
+        )
+        if not self.jobs:
+            trace.warning(f"[WORKFLOW]: {self.name!r} does not set jobs")
+            return Result(
+                run_id=run_id,
+                parent_run_id=parent_run_id,
+                status=SUCCESS,
+                context=catch(context, status=SUCCESS),
+                extras=self.extras,
+            )
+
+        job_queue: Queue[str] = Queue()
+        for job_id in self.jobs:
+            job_queue.put(job_id)
+
+        try:
+            return self._execute(
+                job_queue,
+                context,
+                trace,
+                event=event,
+                timeout=timeout,
+                max_job_parallel=max_job_parallel,
+            )
+        finally:
+            context["info"].update(
+                {
+                    "exec_end": get_dt_now(),
+                    "exec_latency": round(time.monotonic() - ts, 6),
+                }
+            )
 
     def rerun(
         self,
@@ -1060,7 +1113,7 @@ class Workflow(BaseModel):
                 if max_job_parallel > 1:
                     futures.append(
                         executor.submit(
-                            self.execute_job,
+                            self.process_job,
                             job=job,
                             run_id=run_id,
                             context=context,
@@ -1074,7 +1127,7 @@ class Workflow(BaseModel):
                 if len(futures) < 1:
                     futures.append(
                         executor.submit(
-                            self.execute_job,
+                            self.process_job,
                             job=job,
                             run_id=run_id,
                             context=context,
