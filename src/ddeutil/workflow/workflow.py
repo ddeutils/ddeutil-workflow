@@ -439,7 +439,10 @@ class Workflow(BaseModel):
             "extras": self.extras,
         }
         trace: Trace = get_trace(
-            run_id, parent_run_id=parent_run_id, extras=self.extras
+            run_id,
+            parent_run_id=parent_run_id,
+            extras=self.extras,
+            pre_process=True,
         )
         release: datetime = self.on.validate_dt(dt=release)
         trace.info(f"[RELEASE]: Start {name!r} : {release:%Y-%m-%d %H:%M:%S}")
@@ -672,7 +675,10 @@ class Workflow(BaseModel):
             self.name, run_id=run_id, extras=self.extras
         )
         trace: Trace = get_trace(
-            run_id, parent_run_id=parent_run_id, extras=self.extras
+            run_id,
+            parent_run_id=parent_run_id,
+            extras=self.extras,
+            pre_process=True,
         )
         context: DictData = self.parameterize(params)
         event: ThreadEvent = event or ThreadEvent()
