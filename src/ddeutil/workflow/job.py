@@ -884,17 +884,31 @@ class Job(BaseModel):
         params: DictData,
         run_id: str,
         context: DictData,
+        *,
         parent_run_id: Optional[str] = None,
         event: Optional[Event] = None,
     ) -> Result:
         """Process routing method that will route the provider function depend
         on runs-on value.
+
+        Args:
+            params (DictData): A parameter data that want to use in this
+                execution.
+            run_id (str): A running stage ID.
+            context (DictData): A context data that was passed from handler
+                method.
+            parent_run_id (str, default None): A parent running ID.
+            event (Event, default None): An event manager that use to track
+                parent process was not force stopped.
+
+        Returns:
+            Result: The execution result with status and context data.
         """
         trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         trace.info(
-            f"[JOB]: Routing for "
+            f"[JOB]: Routing "
             f"{''.join(self.runs_on.type.value.split('_')).title()}: "
             f"{self.id!r}"
         )
@@ -952,6 +966,7 @@ class Job(BaseModel):
                 run_id=parent_run_id,
                 event=event,
             )
+
         if rs is None:
             trace.error(
                 f"[JOB]: Execution not support runs-on: {self.runs_on.type.value!r} "
@@ -970,20 +985,20 @@ class Job(BaseModel):
                 },
                 extras=self.extras,
             )
-        if rs.status in (CANCEL, SKIP):
-            trace.debug(
-                f"[JOB]: Job process routing got result status be {rs.status}"
-            )
+
+        if rs.status == SKIP:
+            raise JobSkipError("Job got skipped status.")
+        elif rs.status == CANCEL:
+            raise JobCancelError("Job got canceled status.")
         elif rs.status == FAILED:
-            raise JobError("[JOB]: Job process error")
+            raise JobError("Job process error")
         return rs
 
     def _execute(
         self,
         params: DictData,
-        run_id: str,
         context: DictData,
-        parent_run_id: Optional[str] = None,
+        trace: Trace,
         event: Optional[Event] = None,
     ) -> Result:
         """Wrapped the route execute method before returning to handler
@@ -994,45 +1009,40 @@ class Job(BaseModel):
 
         Args:
             params: A parameter data that want to use in this execution
-            run_id:
             context:
-            parent_run_id:
-            event:
+            trace (Trace):
+            event (Event, default None):
 
         Returns:
             Result: The wrapped execution result.
         """
         current_retry: int = 0
+        maximum_retry: int = self.retry + 1
         exception: Exception
         catch(context, status=WAIT)
-        trace: Trace = get_trace(
-            run_id, parent_run_id=parent_run_id, extras=self.extras
-        )
         try:
             return self.process(
                 params,
-                run_id,
+                run_id=trace.run_id,
                 context=context,
-                parent_run_id=parent_run_id,
+                parent_run_id=trace.parent_run_id,
                 event=event,
             )
         except (JobCancelError, JobSkipError):
             trace.debug("[JOB]: process raise skip or cancel error.")
             raise
         except Exception as e:
+            if self.retry == 0:
+                raise
+
             current_retry += 1
             exception = e
-        finally:
-            trace.debug("[JOB]: Failed at the first execution.")
-
-        if self.retry == 0:
-            raise exception
 
         trace.warning(
-            f"[JOB]: Retry count: {current_retry} ... "
+            f"[JOB]: Retry count: {current_retry}/{maximum_retry} ... "
             f"( {exception.__class__.__name__} )"
         )
-        while current_retry < (self.retry + 1):
+        while current_retry < maximum_retry:
             try:
                 catch(
                     context=context,
@@ -1041,18 +1051,18 @@ class Job(BaseModel):
                 )
                 return self.process(
                     params,
-                    run_id,
+                    run_id=trace.run_id,
                     context=context,
-                    parent_run_id=parent_run_id,
+                    parent_run_id=trace.parent_run_id,
                     event=event,
                 )
             except (JobCancelError, JobSkipError):
                 trace.debug("[JOB]: process raise skip or cancel error.")
                 raise
-            except exception as e:
+            except Exception as e:
                 current_retry += 1
                 trace.warning(
-                    f"[JOB]: Retry count: {current_retry} ... "
+                    f"[JOB]: Retry count: {current_retry}/{maximum_retry} ... "
                     f"( {e.__class__.__name__} )"
                 )
                 exception = e
@@ -1103,22 +1113,24 @@ class Job(BaseModel):
             )
             result: Result = self._execute(
                 params,
-                run_id=run_id,
                 context=context,
-                parent_run_id=parent_run_id,
+                trace=trace,
                 event=event,
             )
             return result
-        except JobError:  # pragma: no cov
+        except JobError as e:  # pragma: no cov
+            if isinstance(e, JobSkipError):
+                trace.error(f"[JOB]: ⏭️ Skip: {e}")
+
+            st: Status = get_status_from_error(e)
             return Result.from_trace(trace).catch(
-                status=FAILED,
-                context=catch(context, status=FAILED),
+                status=st, context=catch(context, status=st)
             )
         finally:
             context["info"].update(
                 {
                     "exec_end": get_dt_now(),
-                    "exec_latency": time.monotonic() - ts,
+                    "exec_latency": round(time.monotonic() - ts, 6),
                 }
             )
             trace.debug("[JOB]: End Handler job execution.")
