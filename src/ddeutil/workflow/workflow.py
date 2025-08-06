@@ -374,7 +374,6 @@ class Workflow(BaseModel):
                     if k in self.params
                 }
             ),
-            "jobs": {},
         }
 
     def release(
@@ -615,18 +614,18 @@ class Workflow(BaseModel):
         event: Optional[ThreadEvent] = None,
         timeout: float = 3600,
         max_job_parallel: int = 2,
+        total_job: Optional[int] = None,
     ) -> Result:
+        """Process workflow."""
         ts: float = time.monotonic()
         trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         not_timeout_flag: bool = True
-        total_job: int = len(self.jobs)
+        total_job: int = total_job or len(self.jobs)
         statuses: list[Status] = [WAIT] * total_job
         skip_count: int = 0
         sequence_statuses: list[Status] = []
-
-        catch(context, status=WAIT)
         if event and event.is_set():
             err_msg: str = (
                 "Execution was canceled from the event was set "
@@ -770,6 +769,7 @@ class Workflow(BaseModel):
                     statuses[total + 1 + skip_count + i] = s
 
                 pop_sys_extras(self.extras)
+                print(statuses)
                 st: Status = validate_statuses(statuses)
                 return Result(
                     run_id=run_id,
@@ -817,6 +817,7 @@ class Workflow(BaseModel):
         event: Optional[ThreadEvent] = None,
         timeout: float = 3600,
         max_job_parallel: int = 2,
+        total_job: Optional[int] = None,
     ) -> Result:
         catch(context, status=WAIT)
         return self.process(
@@ -827,6 +828,7 @@ class Workflow(BaseModel):
             event=event,
             timeout=timeout,
             max_job_parallel=max_job_parallel,
+            total_job=total_job,
         )
 
     def execute(
@@ -881,18 +883,22 @@ class Workflow(BaseModel):
                         --> Ok      --> Result
                                         ╰-status: SUCCESS
 
-        :param params: A parameter data that will parameterize before execution.
-        :param run_id: (Optional[str]) A workflow running ID.
-        :param event: (Event) An Event manager instance that use to cancel this
-            execution if it forces stopped by parent execution.
-        :param timeout: (float) A workflow execution time out in second unit
-            that use for limit time of execution and waiting job dependency.
-            This value does not force stop the task that still running more than
-            this limit time. (Default: 60 * 60 seconds)
-        :param max_job_parallel: (int) The maximum workers that use for job
-            execution in `ThreadPoolExecutor` object. (Default: 2 workers)
+        Args:
+            params (DictData): A parameter data that will parameterize before
+                execution.
+            run_id (str, default None): A workflow running ID.
+            event (Event, default None): An Event manager instance that use to
+                cancel this execution if it forces stopped by parent execution.
+            timeout (float, default 3600): A workflow execution time out in
+                second unit that use for limit time of execution and waiting job
+                dependency. This value does not force stop the task that still
+                running more than this limit time. (Default: 60 * 60 seconds)
+            max_job_parallel (int, default 2) The maximum workers that use for
+                job execution in `ThreadPoolExecutor` object.
 
-        :rtype: Result
+        Returns
+            Result: Return Result object that create from execution context with
+                return mode.
         """
         ts: float = time.monotonic()
         parent_run_id, run_id = extract_id(
@@ -904,9 +910,11 @@ class Workflow(BaseModel):
             extras=self.extras,
             pre_process=True,
         )
-        context: DictData = self.parameterize(params) | {
-            "info": {"exec_start": get_dt_now()}
-        }
+        context: DictData = {
+            "jobs": {},
+            "info": {"exec_start": get_dt_now()},
+        } | self.parameterize(params)
+
         event: ThreadEvent = event or ThreadEvent()
         max_job_parallel: int = dynamic(
             "max_job_parallel", f=max_job_parallel, extras=self.extras
@@ -962,16 +970,16 @@ class Workflow(BaseModel):
         it does not support rerun only stage.
 
         Args:
-            context: A context result that get the failed status.
-            run_id: (Optional[str]) A workflow running ID.
-            event: (Event) An Event manager instance that use to cancel this
-                execution if it forces stopped by parent execution.
-            timeout: (float) A workflow execution time out in second unit
-                that use for limit time of execution and waiting job dependency.
-                This value does not force stop the task that still running more
-                than this limit time. (Default: 60 * 60 seconds)
-            max_job_parallel: (int) The maximum workers that use for job
-                execution in `ThreadPoolExecutor` object. (Default: 2 workers)
+            context (DictData): A context result that get the failed status.
+            run_id (str, default None): A workflow running ID.
+            event (Event, default None): An Event manager instance that use to
+                cancel this execution if it forces stopped by parent execution.
+            timeout (float, default 3600): A workflow execution time out in
+                second unit that use for limit time of execution and waiting job
+                dependency. This value does not force stop the task that still
+                running more than this limit time. (Default: 60 * 60 seconds)
+            max_job_parallel (int, default 2) The maximum workers that use for
+                job execution in `ThreadPoolExecutor` object.
 
         Returns
             Result: Return Result object that create from execution context with
@@ -1016,6 +1024,7 @@ class Workflow(BaseModel):
         context: DictData = {
             "params": context["params"].copy(),
             "jobs": {j: jobs[j] for j in jobs if jobs[j]["status"] == SUCCESS},
+            "info": {"exec_start": get_dt_now()},
         }
 
         total_job: int = 0
@@ -1038,169 +1047,20 @@ class Workflow(BaseModel):
                 context=catch(context=context, status=SKIP),
             )
 
-        not_timeout_flag: bool = True
-        statuses: list[Status] = [WAIT] * total_job
-        skip_count: int = 0
-        sequence_statuses: list[Status] = []
-        timeout: float = dynamic(
-            "max_job_exec_timeout", f=timeout, extras=self.extras
-        )
-
-        catch(context, status=WAIT)
-        if event and event.is_set():
-            return Result.from_trace(trace).catch(
-                status=CANCEL,
-                context=catch(
-                    context,
-                    status=CANCEL,
-                    updated={
-                        "errors": WorkflowCancelError(
-                            "Execution was canceled from the event was set "
-                            "before workflow execution."
-                        ).to_dict(),
-                    },
-                ),
-            )
-
-        with ThreadPoolExecutor(max_job_parallel, "wf") as executor:
-            futures: list[Future] = []
-            backoff_sleep = 0.01
-            consecutive_waits = 0
-
-            while not job_queue.empty() and (
-                not_timeout_flag := ((time.monotonic() - ts) < timeout)
-            ):
-                job_id: str = job_queue.get()
-                job: Job = self.job(name=job_id)
-                if (check := job.check_needs(context["jobs"])) == WAIT:
-                    job_queue.task_done()
-                    job_queue.put(job_id)
-                    consecutive_waits += 1
-
-                    # NOTE: Exponential backoff up to 0.15s max.
-                    backoff_sleep = min(backoff_sleep * 1.5, 0.15)
-                    time.sleep(backoff_sleep)
-                    continue
-
-                # NOTE: Reset backoff when we can proceed
-                consecutive_waits = 0
-                backoff_sleep = 0.01
-
-                if check == FAILED:  # pragma: no cov
-                    return Result.from_trace(trace).catch(
-                        status=FAILED,
-                        context=catch(
-                            context,
-                            status=FAILED,
-                            updated={
-                                "status": FAILED,
-                                "errors": WorkflowError(
-                                    f"Validate job trigger rule was failed "
-                                    f"with {job.trigger_rule.value!r}."
-                                ).to_dict(),
-                            },
-                        ),
-                    )
-                elif check == SKIP:  # pragma: no cov
-                    trace.info(
-                        f"[JOB]: Skip job: {job_id!r} from trigger rule."
-                    )
-                    job.set_outputs(output={"status": SKIP}, to=context)
-                    job_queue.task_done()
-                    skip_count += 1
-                    continue
-
-                if max_job_parallel > 1:
-                    futures.append(
-                        executor.submit(
-                            self.process_job,
-                            job=job,
-                            run_id=run_id,
-                            context=context,
-                            parent_run_id=parent_run_id,
-                            event=event,
-                        ),
-                    )
-                    job_queue.task_done()
-                    continue
-
-                if len(futures) < 1:
-                    futures.append(
-                        executor.submit(
-                            self.process_job,
-                            job=job,
-                            run_id=run_id,
-                            context=context,
-                            parent_run_id=parent_run_id,
-                            event=event,
-                        )
-                    )
-                elif (future := futures.pop(0)).done():
-                    if e := future.exception():
-                        sequence_statuses.append(get_status_from_error(e))
-                    else:
-                        st, _ = future.result()
-                        sequence_statuses.append(st)
-                    job_queue.put(job_id)
-                elif future.cancelled():
-                    sequence_statuses.append(CANCEL)
-                    job_queue.put(job_id)
-                elif future.running() or "state=pending" in str(future):
-                    futures.insert(0, future)
-                    job_queue.put(job_id)
-                else:  # pragma: no cov
-                    job_queue.put(job_id)
-                    futures.insert(0, future)
-                    trace.warning(
-                        f"[WORKFLOW]: ... Execution non-threading not "
-                        f"handle: {future}."
-                    )
-
-                job_queue.task_done()
-
-            if not_timeout_flag:
-                job_queue.join()
-                for total, future in enumerate(as_completed(futures), start=0):
-                    try:
-                        statuses[total], _ = future.result()
-                    except WorkflowError as e:
-                        statuses[total] = get_status_from_error(e)
-
-                # NOTE: Update skipped status from the job trigger.
-                for i in range(skip_count):
-                    statuses[total + 1 + i] = SKIP
-
-                # NOTE: Update status from none-parallel job execution.
-                for i, s in enumerate(sequence_statuses, start=0):
-                    statuses[total + 1 + skip_count + i] = s
-
-                st: Status = validate_statuses(statuses)
-                return Result.from_trace(trace).catch(
-                    status=st,
-                    context=catch(context, status=st),
-                )
-
-            event.set()
-            for future in futures:
-                future.cancel()
-
-            trace.error(
-                f"[WORKFLOW]: {self.name!r} was timeout because it use exec "
-                f"time more than {timeout} seconds."
-            )
-
-            time.sleep(0.0025)
-
-        return Result.from_trace(trace).catch(
-            status=FAILED,
-            context=catch(
+        try:
+            return self._execute(
+                job_queue,
                 context,
-                status=FAILED,
-                updated={
-                    "errors": WorkflowTimeoutError(
-                        f"{self.name!r} was timeout because it use exec time "
-                        f"more than {timeout} seconds."
-                    ).to_dict(),
-                },
-            ),
-        )
+                trace,
+                event=event,
+                timeout=timeout,
+                max_job_parallel=max_job_parallel,
+                total_job=total_job,
+            )
+        finally:
+            context["info"].update(
+                {
+                    "exec_end": get_dt_now(),
+                    "exec_latency": round(time.monotonic() - ts, 6),
+                }
+            )
