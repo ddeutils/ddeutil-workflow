@@ -1,6 +1,6 @@
 from ddeutil.workflow import FAILED, SUCCESS, Result, Stage, Workflow
 
-from ..utils import dump_yaml_context
+from ..utils import dump_yaml_context, exclude_info
 
 
 def test_example_parallel_stage_exec_with_trigger(test_path):
@@ -36,7 +36,7 @@ def test_example_parallel_stage_exec_with_trigger(test_path):
         stage: Stage = workflow.job("first-job").stage("parallel-stage")
         rs = stage.execute(params={})
         assert rs.status == SUCCESS
-        assert rs.context == {
+        assert exclude_info(rs.context) == {
             "status": SUCCESS,
             "workers": 2,
             "parallel": {
@@ -107,7 +107,7 @@ def test_example_parallel_stage_exec_with_trigger_raise(test_path):
         stage: Stage = workflow.job("first-job").stage("parallel-stage")
         rs: Result = stage.execute({})
         assert rs.status == FAILED
-        assert rs.context == {
+        assert exclude_info(rs.context) == {
             "status": FAILED,
             "workers": 2,
             "parallel": {
@@ -223,7 +223,7 @@ def test_example_parallel_stage_exec_with_trigger_raise_bug(test_path):
         stage: Stage = workflow.job("first-job").stage("parallel-stage")
         rs: Result = stage.execute({})
         assert rs.status == FAILED
-        assert rs.context == {
+        assert exclude_info(rs.context) == {
             "status": FAILED,
             "workers": 2,
             "parallel": {

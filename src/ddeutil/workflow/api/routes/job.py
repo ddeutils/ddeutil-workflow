@@ -10,6 +10,7 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, Body
 from fastapi import status as st
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import UJSONResponse
 
 from ...__types import DictData
@@ -66,7 +67,7 @@ async def job_execute(
                     exclude_unset=True,
                 ),
                 "params": params,
-                "context": context,
+                "context": jsonable_encoder(context),
             },
             status_code=st.HTTP_500_INTERNAL_SERVER_ERROR,
         )
@@ -81,7 +82,7 @@ async def job_execute(
                 exclude_unset=True,
             ),
             "params": params,
-            "context": context,
+            "context": jsonable_encoder(context),
         },
         status_code=st.HTTP_200_OK,
     )

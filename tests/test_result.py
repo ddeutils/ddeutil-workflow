@@ -69,7 +69,7 @@ def test_result_catch():
     assert rs.context == {"params": {"new_value": "bar"}, "status": Status.WAIT}
 
     rs.catch(status=SUCCESS, info={"name": "foo"})
-    assert rs.info == {"name": "foo"}
+    assert rs.context["info"] == {"name": "foo"}
 
     # NOTE: Raise because kwargs get the key that does not exist on the context.
     with pytest.raises(ResultError):
@@ -117,8 +117,7 @@ def test_catch():
     catch(context, status=WAIT, info={"start": 1})
     assert context == {"status": WAIT, "info": {"start": 1, "end": 10}}
 
-    with pytest.raises(ResultError):
-        catch({}, status=SUCCESS, foo={"key": "bar"})
+    assert catch({}, status=SUCCESS, foo={"key": "bar"}) == {"status": SUCCESS}
 
 
 def test_context_type():

@@ -1,6 +1,6 @@
 from ddeutil.workflow import CANCEL, FAILED, SUCCESS, Result, Stage, Workflow
 
-from ..utils import dump_yaml_context
+from ..utils import dump_yaml_context, exclude_info
 
 
 def test_example_foreach_stage_exec_with_trigger(test_path):
@@ -34,8 +34,8 @@ def test_example_foreach_stage_exec_with_trigger(test_path):
     ):
         workflow = Workflow.from_conf(name="tmp-wf-foreach-trigger")
         stage: Stage = workflow.job("first-job").stage("foreach-stage")
-        rs = stage.set_outputs(stage.execute({}).context, to={})
-        assert rs == {
+        output = stage.set_outputs(stage.execute({}).context, to={})
+        assert exclude_info(output) == {
             "stages": {
                 "foreach-stage": {
                     "status": SUCCESS,
@@ -131,7 +131,7 @@ def test_example_foreach_stage_exec_with_trigger_raise(test_path):
         assert rs.status == FAILED
         assert_status: list[bool] = []
         try:
-            assert rs.context == {
+            assert exclude_info(rs.context) == {
                 "status": FAILED,
                 "items": [1, 2],
                 "foreach": {
@@ -209,7 +209,7 @@ def test_example_foreach_stage_exec_with_trigger_raise(test_path):
             assert_status.append(False)
 
         try:
-            assert rs.context == {
+            assert exclude_info(rs.context) == {
                 "status": FAILED,
                 "items": [1, 2],
                 "foreach": {
@@ -326,7 +326,7 @@ def test_example_foreach_stage_exec_nested_foreach_and_trigger(test_path):
         stage: Stage = workflow.job("first-job").stage("foreach-stage")
         rs: Result = stage.execute({})
         assert rs.status == SUCCESS
-        assert rs.context == {
+        assert exclude_info(rs.context) == {
             "status": SUCCESS,
             "items": [1, 2],
             "foreach": {

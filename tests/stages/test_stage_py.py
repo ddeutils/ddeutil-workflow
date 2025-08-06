@@ -4,6 +4,8 @@ import pytest
 from ddeutil.workflow import FAILED, SUCCESS, Result, Workflow
 from ddeutil.workflow.stages import PyStage, Stage
 
+from ..utils import exclude_info
+
 
 def test_py_stage_exec_raise():
     stage: PyStage = PyStage(
@@ -14,7 +16,7 @@ def test_py_stage_exec_raise():
 
     rs = stage.execute(params={"x": "Foo"})
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "errors": {
             "name": "ValueError",
@@ -23,7 +25,7 @@ def test_py_stage_exec_raise():
     }
 
     output = stage.set_outputs(rs.context, {})
-    assert output == {
+    assert exclude_info(output) == {
         "stages": {
             "raise-error": {
                 "status": FAILED,
@@ -45,7 +47,8 @@ def test_py_stage_exec():
         run=(
             "print(f'Receive x from above with {x}')\n\n"
             "# Change x value\nx: int = 1\n"
-            'result.trace.info("Log from result object inside PyStage!!!")'
+            "trace = result.gen_trace()\n"
+            'trace.info("Log from result object inside PyStage!!!")'
         ),
     )
     rs: Result = stage.execute(
@@ -55,10 +58,14 @@ def test_py_stage_exec():
         }
     )
     assert rs.status == SUCCESS
-    assert rs.context == {"status": SUCCESS, "locals": {"x": 1}, "globals": {}}
+    assert exclude_info(rs.context) == {
+        "status": SUCCESS,
+        "locals": {"x": 1},
+        "globals": {},
+    }
 
     output = stage.set_outputs(rs.context, to={})
-    assert output == {
+    assert exclude_info(output) == {
         "stages": {"run-var": {"outputs": {"x": 1}, "status": SUCCESS}}
     }
 
@@ -101,7 +108,7 @@ async def test_py_stage_axec_not_raise():
 
     rs: Result = await stage.axecute(params={"x": "Foo"})
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "errors": {
             "name": "ValueError",
@@ -110,7 +117,7 @@ async def test_py_stage_axec_not_raise():
     }
 
     output = stage.set_outputs(rs.context, {})
-    assert output == {
+    assert exclude_info(output) == {
         "stages": {
             "raise-error": {
                 "status": FAILED,
@@ -138,9 +145,13 @@ async def test_py_stage_axec_with_vars():
         }
     )
     assert rs.status == SUCCESS
-    assert rs.context == {"status": SUCCESS, "locals": {"x": 1}, "globals": {}}
+    assert exclude_info(rs.context) == {
+        "status": SUCCESS,
+        "locals": {"x": 1},
+        "globals": {},
+    }
 
     output = stage.set_outputs(rs.context, to={})
-    assert output == {
+    assert exclude_info(output) == {
         "stages": {"run-var": {"outputs": {"x": 1}, "status": SUCCESS}}
     }

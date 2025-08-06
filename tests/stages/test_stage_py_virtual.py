@@ -1,6 +1,6 @@
 from ddeutil.workflow import SUCCESS, Result, Stage, StageError, Workflow
 
-from ..utils import dump_yaml_context
+from ..utils import dump_yaml_context, exclude_info
 
 
 def test_stage_py_virtual(test_path):
@@ -32,7 +32,7 @@ def test_stage_py_virtual(test_path):
             print(rs.context)
 
             output = stage.set_outputs(rs.context, to={})
-            assert output == {
+            assert exclude_info(output) == {
                 "stages": {
                     "py-virtual": {
                         "status": SUCCESS,

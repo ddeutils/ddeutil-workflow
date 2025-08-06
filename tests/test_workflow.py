@@ -8,7 +8,7 @@ from ddeutil.workflow.errors import WorkflowError
 from ddeutil.workflow.event import Event
 from pydantic import ValidationError
 
-from .utils import dump_yaml, dump_yaml_context
+from .utils import dump_yaml, dump_yaml_context, exclude_info
 
 
 def test_workflow():
@@ -174,7 +174,11 @@ def test_workflow_from_conf_without_job():
     workflow = Workflow(name="wf-without-jobs")
     rs: Result = workflow.execute({})
     assert rs.status == SUCCESS
-    assert rs.context == {"status": SUCCESS, "params": {}, "jobs": {}}
+    assert exclude_info(rs.context) == {
+        "status": SUCCESS,
+        "params": {},
+        "jobs": {},
+    }
 
 
 def test_workflow_from_conf_override(test_path):
@@ -212,7 +216,7 @@ def test_workflow_from_conf_override(test_path):
         )
         rs: Result = workflow.execute(params={"name": "foo"})
         assert rs.status == SUCCESS
-        assert rs.context == {
+        assert exclude_info(rs.context) == {
             "status": SUCCESS,
             "params": {"name": "foo"},
             "jobs": {
@@ -233,7 +237,7 @@ def test_workflow_from_conf_override(test_path):
 
         rs: Result = workflow.execute(params={"name": "bar"})
         assert rs.status == SUCCESS
-        assert rs.context == {
+        assert exclude_info(rs.context) == {
             "status": SUCCESS,
             "params": {"name": "bar"},
             "jobs": {
@@ -368,7 +372,7 @@ def test_workflow_condition():
         },
     )
     rs: Result = workflow.execute(params={"name": "bar"})
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SKIP,
         "params": {"name": "bar"},
         "jobs": {
@@ -383,7 +387,7 @@ def test_workflow_condition():
 
     rs: Result = workflow.execute(params={"name": "foo"})
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "params": {"name": "foo"},
         "jobs": {

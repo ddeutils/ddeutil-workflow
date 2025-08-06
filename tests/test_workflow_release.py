@@ -16,6 +16,8 @@ from ddeutil.workflow import (
     Workflow,
 )
 
+from .utils import exclude_info
+
 
 def test_workflow_validate_release():
     workflow: Workflow = Workflow.model_validate(
@@ -88,7 +90,7 @@ def test_workflow_release():
         runs_metadata={"runs_by": "nobody"},
     )
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "params": {"asat-dt": datetime(2024, 10, 1, 0, 0)},
         "release": {
@@ -136,7 +138,7 @@ def test_workflow_release_with_datetime_force():
     )
     assert dt == datetime(2025, 1, 18, tzinfo=ZoneInfo("Asia/Bangkok"))
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "params": {"asat-dt": datetime(2024, 10, 1, 0, 0)},
         "release": {
@@ -196,7 +198,7 @@ def test_workflow_release_with_datetime(test_path):
         params={"asat-dt": datetime(2024, 10, 1)},
     )
     assert rs.status == SKIP
-    assert rs.context == {"status": SKIP}
+    assert exclude_info(rs.context) == {"status": SKIP}
 
     shutil.rmtree(test_audit_skip_path)
 
@@ -262,7 +264,7 @@ def test_workflow_release_dryrun():
         release_type=DRYRUN,
     )
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": "SUCCESS",
         "params": {},
         "release": {

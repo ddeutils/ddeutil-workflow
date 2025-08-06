@@ -123,7 +123,7 @@ def test_trace_meta():
         )
 
 
-def test_result_trace():
+def test_result_gen_trace():
     rs: Result = Result(
         parent_run_id="foo_id_for_writing_log",
         extras={
@@ -131,11 +131,12 @@ def test_result_trace():
             "logs_trace_frame_layer": 4,
         },
     )
-    assert rs.trace.extras == {
+    trace = rs.gen_trace()
+    assert trace.extras == {
         "enable_write_log": True,
         "logs_trace_frame_layer": 4,
     }
-    rs.trace.info("[DEMO]: Test echo log from result trace argument!!!")
+    trace.info("[DEMO]: Test echo log from result trace argument!!!")
     print(rs.run_id)
     assert rs.parent_run_id == "foo_id_for_writing_log"
 
@@ -332,7 +333,7 @@ def test_trace_get_trace(test_path: Path):
     trace = get_trace(
         run_id="01",
         parent_run_id="1001_test_get_trace",
-        auto_pre_process=True,
+        pre_process=True,
     )
     trace.debug("This is debug message")
     trace.info("This is info message")

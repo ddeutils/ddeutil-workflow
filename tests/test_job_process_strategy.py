@@ -3,7 +3,7 @@ from ddeutil.workflow import CANCEL, FAILED, SKIP, SUCCESS, Workflow, get_trace
 from ddeutil.workflow.errors import JobError
 from ddeutil.workflow.job import Job, local_process_strategy
 
-from .utils import MockEvent
+from .utils import MockEvent, exclude_info
 
 
 @pytest.fixture(scope="module")
@@ -19,7 +19,7 @@ def test_job_process_strategy(trace):
         job, {"sleep": "0.1"}, {}, trace=trace, context={}
     )
     assert st == SUCCESS
-    assert ctx == {
+    assert exclude_info(ctx) == {
         "status": SUCCESS,
         "9873503202": {
             "status": SUCCESS,
@@ -39,7 +39,7 @@ def test_job_process_strategy_skipped_stage(trace):
         job, {"sleep": "1"}, {}, trace=trace, context={}
     )
     assert st == SUCCESS
-    assert ctx == {
+    assert exclude_info(ctx) == {
         "status": SUCCESS,
         "2150810470": {
             "status": SUCCESS,
@@ -66,7 +66,7 @@ def test_job_process_strategy_catch_stage_error(trace):
             job, {"name": "foo"}, {}, trace=trace, context=context
         )
 
-    assert context == {
+    assert exclude_info(context) == {
         "status": FAILED,
         "5027535057": {
             "status": FAILED,
@@ -103,7 +103,7 @@ def test_job_process_strategy_catch_job_error(trace):
             job, {"name": "foo"}, {}, trace=trace, context=context
         )
 
-    assert context == {
+    assert exclude_info(context) == {
         "status": FAILED,
         "5027535057": {
             "status": FAILED,
@@ -141,7 +141,7 @@ def test_job_process_strategy_event_set(trace):
             job, {}, {}, trace=trace, context=context, event=event
         )
 
-    assert context == {
+    assert exclude_info(context) == {
         "status": CANCEL,
         "EMPTY": {
             "status": CANCEL,
@@ -167,7 +167,7 @@ def test_job_process_strategy_raise(trace):
         local_process_strategy(job, {}, {}, trace=trace, context=context)
 
     assert context["status"] == FAILED
-    assert context == {
+    assert exclude_info(context) == {
         "status": FAILED,
         "EMPTY": {
             "status": FAILED,

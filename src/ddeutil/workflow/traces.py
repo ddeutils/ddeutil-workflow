@@ -2002,9 +2002,11 @@ class Trace(BaseModel, BaseEmit, BaseAsyncEmit):
         Args:
             module (PrefixType, default None): A module name that use for adding
                 prefix at the message value.
+
+        Yields:
+            Self: Itself instance.
         """
         self._enable_buffer = True
-        exception: Optional[Exception] = None
         try:
             yield self
         except Exception as err:
@@ -2020,16 +2022,12 @@ class Trace(BaseModel, BaseEmit, BaseAsyncEmit):
                 extras=self.extras,
             )
             self._buffer.append(metadata)
-            exception = err
+            raise
         finally:
             if self._buffer:
                 for handler in self.handlers:
                     handler.flush(self._buffer, extra=self.extras)
                 self._buffer.clear()
-
-            # NOTE: Raise the current exception after emit log.
-            if exception:
-                raise exception
 
 
 def get_trace(

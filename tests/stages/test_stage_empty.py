@@ -7,6 +7,8 @@ from ddeutil.workflow.result import FAILED, SKIP, SUCCESS, Result
 from ddeutil.workflow.stages import EmptyStage, Stage
 from pydantic import ValidationError
 
+from ..utils import exclude_info
+
 
 def test_empty_md():
     stage: Stage = EmptyStage.model_validate(
@@ -63,31 +65,31 @@ def test_empty_stage_execute():
     stage: EmptyStage = EmptyStage(name="Empty Stage", echo="hello world")
     rs: Result = stage.execute(params={})
     assert rs.status == SUCCESS
-    assert rs.context == {"status": SUCCESS}
+    assert exclude_info(rs.context) == {"status": SUCCESS}
 
     stage: EmptyStage = EmptyStage(
         name="Empty Stage", echo="hello world\nand this is newline to echo"
     )
     rs: Result = stage.execute(params={})
     assert rs.status == SUCCESS
-    assert rs.context == {"status": SUCCESS}
+    assert exclude_info(rs.context) == {"status": SUCCESS}
 
     stage: EmptyStage = EmptyStage(name="Empty Stage")
     rs: Result = stage.execute(params={})
     assert rs.status == SUCCESS
-    assert rs.context == {"status": SUCCESS}
+    assert exclude_info(rs.context) == {"status": SUCCESS}
 
     stage: EmptyStage = EmptyStage(name="Empty Stage", sleep=5.1)
     rs: Result = stage.execute(params={})
     assert rs.status == SUCCESS
-    assert rs.context == {"status": SUCCESS}
+    assert exclude_info(rs.context) == {"status": SUCCESS}
 
     stage: Stage = EmptyStage.model_validate(
         {"name": "Empty Stage", "desc": "\nThis is a test stage\n\tnewline"},
     )
     rs: Result = stage.execute(params={})
     assert rs.status == SUCCESS
-    assert rs.context == {"status": SUCCESS}
+    assert exclude_info(rs.context) == {"status": SUCCESS}
 
 
 def test_empty_stage_raise():
@@ -163,19 +165,19 @@ async def test_empty_stage_axec():
     stage: EmptyStage = EmptyStage(name="Empty Stage")
     rs: Result = await stage.axecute(params={})
     assert rs.status == SUCCESS
-    assert rs.context == {"status": SUCCESS}
+    assert exclude_info(rs.context) == {"status": SUCCESS}
 
     stage: EmptyStage = EmptyStage(name="Empty Stage", echo="hello world")
     rs: Result = await stage.axecute(params={})
     assert rs.status == SUCCESS
-    assert rs.context == {"status": SUCCESS}
+    assert exclude_info(rs.context) == {"status": SUCCESS}
 
     stage: EmptyStage = EmptyStage(
         name="Empty Stage", echo="hello world", sleep=5.01
     )
     rs: Result = await stage.axecute(params={})
     assert rs.status == SUCCESS
-    assert rs.context == {"status": SUCCESS}
+    assert exclude_info(rs.context) == {"status": SUCCESS}
 
     stage: EmptyStage = EmptyStage(
         name="Empty Stage",
@@ -187,7 +189,7 @@ async def test_empty_stage_axec():
     )
     rs: Result = await stage.axecute(params={})
     assert rs.status == SUCCESS
-    assert rs.context == {"status": SUCCESS}
+    assert exclude_info(rs.context) == {"status": SUCCESS}
 
 
 @pytest.mark.asyncio
@@ -198,7 +200,7 @@ async def test_empty_stage_axec_cancel():
     stage: EmptyStage = EmptyStage(name="Empty Stage")
     rs: Result = await stage.axecute(params={}, event=event)
     assert rs.status == CANCEL
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": CANCEL,
         "errors": {
             "name": "StageCancelError",
@@ -221,7 +223,7 @@ async def test_empty_stage_if_condition_async():
 
     rs: Result = await stage.axecute(params={"params": {"name": "bar"}})
     assert rs.status == SKIP
-    assert rs.context == {"status": SKIP}
+    assert exclude_info(rs.context) == {"status": SKIP}
 
     stage: EmptyStage = EmptyStage.model_validate(
         {
@@ -235,7 +237,7 @@ async def test_empty_stage_if_condition_async():
     # with pytest.raises(StageError):
     rs: Result = await stage.axecute({"params": {"name": "foo"}})
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "errors": {
             "name": "StageError",

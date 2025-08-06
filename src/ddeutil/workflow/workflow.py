@@ -495,7 +495,7 @@ class Workflow(BaseModel):
                         "context": context,
                         "runs_metadata": (
                             (runs_metadata or {})
-                            | rs.info
+                            | context.get("info", {})
                             | {
                                 "timeout": timeout,
                                 "original_name": self.name,
@@ -696,7 +696,6 @@ class Workflow(BaseModel):
                 parent_run_id=parent_run_id,
                 status=SUCCESS,
                 context=catch(context, status=SUCCESS),
-                info={"execution_time": time.monotonic() - ts},
                 extras=self.extras,
             )
 
@@ -728,7 +727,6 @@ class Workflow(BaseModel):
                     status=CANCEL,
                     updated={"errors": WorkflowCancelError(err_msg).to_dict()},
                 ),
-                info={"execution_time": time.monotonic() - ts},
                 extras=self.extras,
             )
 
@@ -778,7 +776,6 @@ class Workflow(BaseModel):
                                 ).to_dict(),
                             },
                         ),
-                        info={"execution_time": time.monotonic() - ts},
                         extras=self.extras,
                     )
                 elif check == SKIP:  # pragma: no cov
@@ -864,7 +861,6 @@ class Workflow(BaseModel):
                     parent_run_id=parent_run_id,
                     status=st,
                     context=catch(context, status=st),
-                    info={"execution_time": time.monotonic() - ts},
                     extras=self.extras,
                 )
 
@@ -894,7 +890,6 @@ class Workflow(BaseModel):
                     ).to_dict(),
                 },
             ),
-            info={"execution_time": time.monotonic() - ts},
             extras=self.extras,
         )
 

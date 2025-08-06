@@ -1,14 +1,14 @@
 from ddeutil.workflow import Job, Workflow
 from ddeutil.workflow.result import CANCEL, FAILED, SKIP, SUCCESS, Result
 
-from .utils import MockEvent
+from .utils import MockEvent, exclude_info
 
 
 def test_job_exec_py():
     job: Job = Workflow.from_conf(name="wf-run-common").job("demo-run")
     rs: Result = job.execute(params={"params": {"name": "Foo"}})
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "EMPTY": {
             "status": SUCCESS,
@@ -24,7 +24,7 @@ def test_job_exec_py():
     }
 
     output = job.set_outputs(rs.context, to={})
-    assert output == {
+    assert exclude_info(output) == {
         "jobs": {
             "demo-run": {
                 "status": SUCCESS,
@@ -43,7 +43,7 @@ def test_job_exec_py():
     event = MockEvent(n=0)
     rs: Result = job.execute(params={"params": {"name": "Foo"}}, event=event)
     assert rs.status == CANCEL
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": CANCEL,
         "errors": {
             "name": "JobCancelError",
@@ -54,7 +54,7 @@ def test_job_exec_py():
     event = MockEvent(n=1)
     rs: Result = job.execute(params={"params": {"name": "Foo"}}, event=event)
     assert rs.status == CANCEL
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": CANCEL,
         "EMPTY": {
             "errors": {
@@ -74,7 +74,7 @@ def test_job_exec_py():
     event = MockEvent(n=2)
     rs: Result = job.execute(params={"params": {"name": "Foo"}}, event=event)
     assert rs.status == CANCEL
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": CANCEL,
         "EMPTY": {
             "errors": {
@@ -103,7 +103,7 @@ def test_job_exec_py():
     event = MockEvent(n=3)
     rs: Result = job.execute(params={"params": {"name": "Foo"}}, event=event)
     assert rs.status == CANCEL
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": CANCEL,
         "EMPTY": {
             "status": CANCEL,
@@ -138,7 +138,7 @@ def test_job_exec_py_raise():
     )
     rs: Result = job.execute(params={})
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "EMPTY": {
             "status": FAILED,
@@ -178,11 +178,11 @@ def test_job_exec_py_not_set_output():
     job: Job = workflow.job("second-job")
     rs: Result = job.execute(params={})
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "EMPTY": {"status": SUCCESS, "matrix": {}, "stages": {}},
     }
-    assert job.set_outputs(rs.context, to={}) == {
+    assert exclude_info(job.set_outputs(rs.context, to={})) == {
         "jobs": {"second-job": {"status": SUCCESS, "stages": {}}}
     }
 
@@ -194,7 +194,7 @@ def test_job_exec_py_fail_fast():
         .execute(params={})
     )
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "2150810470": {
             "status": SUCCESS,
@@ -239,7 +239,7 @@ def test_job_exec_py_fail_fast_raise_catch():
         .execute(params={})
     )
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "2150810470": {
             "status": FAILED,
@@ -303,7 +303,7 @@ def test_job_exec_py_complete():
         .execute({})
     )
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "2150810470": {
             "status": SUCCESS,
@@ -345,7 +345,7 @@ def test_job_exec_py_complete_not_parallel():
     job: Job = workflow.job("job-complete-not-parallel")
     rs: Result = job.execute({})
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "2150810470": {
             "status": SUCCESS,
@@ -377,7 +377,7 @@ def test_job_exec_py_complete_not_parallel():
     }
 
     output = job.set_outputs(rs.context, to={})
-    assert output == {
+    assert exclude_info(output) == {
         "jobs": {
             "job-complete-not-parallel": {
                 "status": SUCCESS,
@@ -427,7 +427,7 @@ def test_job_exec_py_complete_raise():
         .execute(params={})
     )
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "9873503202": {
             "status": SUCCESS,
@@ -514,7 +514,7 @@ def test_job_exec_skipped():
     )
     rs: Result = job.execute(params={})
     assert rs.status == SKIP
-    assert rs.context == {"status": SKIP}
+    assert exclude_info(rs.context) == {"status": SKIP}
 
     job: Job = Job.model_validate(
         {
@@ -531,7 +531,7 @@ def test_job_exec_skipped():
     )
     rs: Result = job.execute(params={})
     assert rs.status == SKIP
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SKIP,
         "EMPTY": {
             "status": SKIP,
@@ -556,7 +556,7 @@ def test_job_exec_skipped():
     )
     rs: Result = job.execute(params={})
     assert rs.status == SKIP
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SKIP,
         "3568447778": {
             "status": SKIP,
@@ -584,7 +584,7 @@ def test_job_exec_runs_on_not_implement():
     )
     rs: Result = job.execute({})
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "errors": {
             "message": "Job runs-on type: 'self_hosted' does not support yet.",
@@ -603,7 +603,7 @@ def test_job_exec_cancel():
     event = MockEvent(n=2)
     rs = job.execute({}, event=event)
     assert rs.status == CANCEL
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": CANCEL,
         "EMPTY": {
             "status": CANCEL,
@@ -640,7 +640,7 @@ def test_job_exec_max_parallel():
     )
     rs = job.execute({})
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "errors": {
             "name": "JobError",
@@ -660,7 +660,7 @@ def test_job_exec_max_parallel():
     )
     rs = job.execute({"params": {"value": 100}})
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "errors": {
             "name": "JobError",
@@ -680,7 +680,7 @@ def test_job_exec_max_parallel():
     )
     rs = job.execute({"params": {"value": 100}})
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "errors": {
             "name": "ValueError",

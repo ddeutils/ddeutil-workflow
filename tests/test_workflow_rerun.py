@@ -7,6 +7,8 @@ from ddeutil.workflow import (
     Workflow,
 )
 
+from .utils import exclude_info
+
 
 def test_workflow_rerun():
     job: Job = Job(
@@ -38,7 +40,7 @@ def test_workflow_rerun():
         max_job_parallel=1,
     )
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "params": {},
         "jobs": {
@@ -81,7 +83,7 @@ def test_workflow_rerun():
         max_job_parallel=1,
     )
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "params": {},
         "jobs": {
@@ -141,7 +143,7 @@ def test_workflow_rerun_parallel_timeout():
         max_job_parallel=2,
     )
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "params": {},
         "jobs": {
