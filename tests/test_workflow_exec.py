@@ -16,7 +16,7 @@ from ddeutil.workflow import (
     extract_call,
 )
 
-from .utils import MockEvent, dump_yaml_context
+from .utils import MockEvent, dump_yaml_context, exclude_info
 
 
 def test_workflow_exec():
@@ -31,7 +31,7 @@ def test_workflow_exec():
 
     rs: Result = workflow.execute(params={}, max_job_parallel=1)
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "params": {},
         "jobs": {
@@ -63,7 +63,7 @@ def test_workflow_exec_timeout():
     )
     rs: Result = workflow.execute(params={}, timeout=1.25, max_job_parallel=1)
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "params": {},
         "jobs": {
@@ -99,7 +99,7 @@ def test_workflow_exec_raise_event_set():
         params={}, timeout=1, event=event, max_job_parallel=1
     )
     assert rs.status == CANCEL
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": CANCEL,
         "jobs": {},
         "params": {},
@@ -123,7 +123,7 @@ def test_workflow_exec_py():
         },
     )
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "params": {
             "author-run": "Local Workflow",
@@ -189,7 +189,7 @@ def test_workflow_exec_parallel():
     )
     rs: Result = workflow.execute(params={}, max_job_parallel=2)
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "params": {},
         "jobs": {
@@ -222,7 +222,7 @@ def test_workflow_exec_parallel_timeout():
     )
     rs: Result = workflow.execute(params={}, timeout=1.25, max_job_parallel=2)
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "params": {},
         "jobs": {
@@ -258,7 +258,7 @@ def test_workflow_exec_py_with_parallel():
         max_job_parallel=3,
     )
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "params": {
             "author-run": "Local Workflow",
@@ -334,7 +334,7 @@ def test_workflow_exec_py_raise():
     )
     rs: Result = workflow.execute(params={}, max_job_parallel=1)
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "errors": {
             "name": "WorkflowError",
@@ -373,7 +373,7 @@ def test_workflow_exec_py_raise_parallel():
         params={}, max_job_parallel=2, event=event
     )
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "errors": {
             "name": "WorkflowError",
@@ -410,7 +410,7 @@ def test_workflow_exec_with_matrix():
     workflow: Workflow = Workflow.from_conf(name="wf-run-matrix")
     rs: Result = workflow.execute(params={"source": "src", "target": "tgt"})
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "params": {"source": "src", "target": "tgt"},
         "jobs": {
@@ -517,7 +517,7 @@ def test_workflow_exec_needs():
     workflow = Workflow.from_conf(name="wf-run-depends")
     rs: Result = workflow.execute(params={"name": "bar"})
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "params": {"name": "bar"},
         "jobs": {
@@ -541,7 +541,7 @@ def test_workflow_exec_needs_condition():
     workflow = Workflow.from_conf(name="wf-run-depends-condition")
     rs: Result = workflow.execute(params={"name": "bar"})
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "params": {"name": "bar"},
         "jobs": {
@@ -559,7 +559,7 @@ def test_workflow_exec_needs_parallel():
     workflow = Workflow.from_conf(name="wf-run-depends", extras={})
     rs: Result = workflow.execute(params={"name": "bar"}, max_job_parallel=3)
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "params": {"name": "bar"},
         "jobs": {
@@ -609,7 +609,7 @@ def test_workflow_exec_call(test_path):
             },
         )
         assert rs.status == SUCCESS
-        assert rs.context == {
+        assert exclude_info(rs.context) == {
             "status": SUCCESS,
             "params": {
                 "run-date": datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
@@ -644,7 +644,8 @@ def test_workflow_exec_call_override_registry(test_path):
 
             @tag("v1", alias="get-info")
             def get_info(result: Result):
-                result.trace.info("... [CALLER]: Info from mock tasks")
+                trace = result.gen_trace()
+                trace.info("... [CALLER]: Info from mock tasks")
                 return {"get-info": "success"}
             """.strip(
                     "\n"
@@ -673,7 +674,7 @@ def test_workflow_exec_call_override_registry(test_path):
         )
         rs: Result = workflow.execute(params={})
         assert rs.status == SUCCESS
-        assert rs.context == {
+        assert exclude_info(rs.context) == {
             "status": SUCCESS,
             "params": {},
             "jobs": {
@@ -728,7 +729,7 @@ def test_workflow_exec_call_with_prefix(test_path):
             },
         )
         assert rs.status == SUCCESS
-        assert rs.context == {
+        assert exclude_info(rs.context) == {
             "status": SUCCESS,
             "params": {
                 "run_date": datetime(2024, 1, 1, 0, 0, tzinfo=UTC),
@@ -803,7 +804,7 @@ def test_workflow_exec_foreach(test_path):
         workflow = Workflow.from_conf(name="tmp-wf-foreach")
         rs = workflow.execute(params={})
         assert rs.status == SUCCESS
-        assert rs.context == {
+        assert exclude_info(rs.context) == {
             "status": SUCCESS,
             "params": {},
             "jobs": {
@@ -921,7 +922,7 @@ def test_workflow_exec_foreach_get_inside(test_path):
         workflow = Workflow.from_conf(name="tmp-wf-foreach-inside")
         rs = workflow.execute(params={})
         assert rs.status == SUCCESS
-        assert rs.context == {
+        assert exclude_info(rs.context) == {
             "status": SUCCESS,
             "params": {},
             "jobs": {
@@ -1032,7 +1033,7 @@ def test_workflow_exec_raise_param(test_path):
             "tmp-wf-exec-raise-param",
         ).execute(params={"stream": "demo-stream"}, max_job_parallel=1)
         assert rs.status == FAILED
-        assert rs.context == {
+        assert exclude_info(rs.context) == {
             "status": FAILED,
             "errors": {
                 "name": "WorkflowError",
@@ -1141,7 +1142,7 @@ def test_workflow_exec_raise_job_trigger(test_path):
             params={"stream": "demo-stream"}, max_job_parallel=1
         )
         assert rs.status == FAILED
-        assert rs.context == {
+        assert exclude_info(rs.context) == {
             "status": FAILED,
             "errors": {
                 "name": "WorkflowError",
@@ -1186,7 +1187,7 @@ def test_workflow_exec_circle_trigger(test_path):
         workflow = Workflow.from_conf(name="wf-circle")
         rs: Result = workflow.execute({})
         assert rs.status == FAILED
-        assert rs.context == {
+        assert exclude_info(rs.context) == {
             "params": {},
             "jobs": {
                 "first-job": {
@@ -1231,7 +1232,7 @@ def test_workflow_exec_circle_trigger(test_path):
         workflow = Workflow.from_conf(name="wf-circle-runtime")
         rs: Result = workflow.execute({"name": "wf-circle-runtime"})
         assert rs.status == FAILED
-        assert rs.context == {
+        assert exclude_info(rs.context) == {
             "params": {"name": "wf-circle-runtime"},
             "jobs": {
                 "first-job": {
@@ -1288,7 +1289,7 @@ def test_workflow_exec_circle_trigger(test_path):
         workflow = Workflow.from_conf(name="wf-main")
         rs: Result = workflow.execute({"name": "wf-circle-runtime-nested"})
         assert rs.status == FAILED
-        assert rs.context == {
+        assert exclude_info(rs.context) == {
             "params": {"name": "wf-circle-runtime-nested"},
             "jobs": {
                 "first-job": {

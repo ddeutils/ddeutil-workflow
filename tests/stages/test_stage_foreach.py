@@ -10,7 +10,7 @@ from ddeutil.workflow import (
 )
 from ddeutil.workflow.stages import ForEachStage, Stage
 
-from ..utils import MockEvent, dump_yaml_context
+from ..utils import MockEvent, dump_yaml_context, exclude_info
 
 
 def test_foreach_stage_exec_all_skipped():
@@ -33,7 +33,7 @@ def test_foreach_stage_exec_all_skipped():
     )
     rs: Result = stage.execute({})
     assert rs.status == SKIP
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SKIP,
         "items": [1, 2, 3],
         "foreach": {
@@ -86,7 +86,7 @@ def test_foreach_stage_exec_other_skipped():
     )
     rs: Result = stage.execute(params={})
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "items": [1, 2, 3],
         "foreach": {
@@ -136,7 +136,7 @@ def test_foreach_stage_exec_skipped():
 
     rs: Result = stage.execute({})
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "items": [1, 2, 3, 4],
         "foreach": {
@@ -186,7 +186,7 @@ def test_foreach_stage_exec():
     )
     rs: Result = stage.execute({})
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "items": [1, 1, 2, 3],
         "foreach": {
@@ -224,7 +224,7 @@ def test_foreach_stage_exec_cancel():
     )
     rs: Result = stage.execute({}, event=event)
     assert rs.status == CANCEL
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": CANCEL,
         "items": [1, 2, 3],
         "foreach": {},
@@ -243,7 +243,7 @@ def test_foreach_stage_exec_cancel():
     event = MockEvent(n=1)
     rs: Result = stage.execute({}, event=event)
     assert rs.status == CANCEL
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": CANCEL,
         "items": [1],
         "foreach": {
@@ -274,7 +274,7 @@ def test_foreach_stage_exec_cancel():
     event = MockEvent(n=2)
     rs: Result = stage.execute({}, event=event)
     assert rs.status == CANCEL
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": CANCEL,
         "items": [1],
         "foreach": {
@@ -315,7 +315,7 @@ def test_foreach_stage_exec_raise():
     )
     rs: Result = stage.execute({"values": {"items": "test"}})
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "errors": {
             "name": "TypeError",
@@ -333,7 +333,7 @@ def test_foreach_stage_exec_raise():
     )
     rs: Result = stage.execute({})
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "errors": {
             "name": "ValueError",
@@ -349,7 +349,7 @@ def test_foreach_stage_exec_raise():
     )
     rs: Result = stage.execute({})
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "errors": {
             "name": "TypeError",
@@ -363,7 +363,7 @@ def test_foreach_stage_exec_raise():
     )
     rs: Result = stage.execute({})
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "errors": {
             "name": "TypeError",
@@ -407,7 +407,7 @@ def test_foreach_stage_exec_raise_full():
     assert rs.status == FAILED
     possible = []
     try:
-        assert rs.context == {
+        assert exclude_info(rs.context) == {
             "status": FAILED,
             "items": [1, 2],
             "foreach": {
@@ -459,7 +459,7 @@ def test_foreach_stage_exec_raise_full():
     except AssertionError:
         possible.append(False)
     try:
-        assert rs.context == {
+        assert exclude_info(rs.context) == {
             "status": FAILED,
             "items": [1, 2],
             "foreach": {
@@ -549,7 +549,7 @@ def test_foreach_stage_exec_concurrent(test_path):
         stage: Stage = workflow.job("first-job").stage("foreach-stage")
         rs: Result = stage.execute(params={})
         assert rs.status == SUCCESS
-        assert rs.context == {
+        assert exclude_info(rs.context) == {
             "status": SUCCESS,
             "items": [1, 2, 3, 4],
             "foreach": {
@@ -589,7 +589,7 @@ def test_foreach_stage_exec_concurrent(test_path):
         }
 
         output = stage.set_outputs(rs.context, {})
-        assert output == {
+        assert exclude_info(output) == {
             "stages": {
                 "foreach-stage": {
                     "outputs": {
@@ -684,7 +684,7 @@ def test_foreach_stage_exec_concurrent_with_raise():
     assert rs.status == FAILED
     possible = []
     try:
-        assert rs.context == {
+        assert exclude_info(rs.context) == {
             "status": FAILED,
             "items": [1, 2, 3, 4, 5],
             "foreach": {
@@ -711,7 +711,7 @@ def test_foreach_stage_exec_concurrent_with_raise():
     except AssertionError:
         possible.append(False)
     try:
-        assert rs.context == {
+        assert exclude_info(rs.context) == {
             "status": FAILED,
             "items": [1, 2, 3, 4, 5],
             "foreach": {
@@ -750,7 +750,7 @@ def test_foreach_stage_exec_concurrent_with_raise():
     except AssertionError:
         possible.append(False)
     try:
-        assert rs.context == {
+        assert exclude_info(rs.context) == {
             "status": FAILED,
             "items": [1, 2, 3, 4, 5],
             "foreach": {

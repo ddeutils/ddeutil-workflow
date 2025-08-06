@@ -2,6 +2,8 @@ import pytest
 from ddeutil.workflow import FAILED, SUCCESS, Result
 from ddeutil.workflow.stages import BashStage
 
+from ..utils import exclude_info
+
 
 def test_bash_stage_exec():
     stage: BashStage = BashStage(
@@ -10,7 +12,7 @@ def test_bash_stage_exec():
     )
     rs: Result = stage.execute({})
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "return_code": 0,
         "stdout": "Hello World\nVariable Foo",
@@ -26,7 +28,7 @@ def test_bash_stage_exec_with_env():
     )
     rs: Result = stage.execute({})
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "return_code": 0,
         "stdout": "ENV Bar",
@@ -41,7 +43,7 @@ def test_bash_stage_exec_raise():
     )
     rs: Result = stage.execute({})
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "errors": {
             "name": "StageError",
@@ -71,7 +73,7 @@ def test_bash_stage_exec_retry():
     )
     rs: Result = stage.execute(params={})
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "retry": 1,
         "return_code": 0,
@@ -96,7 +98,7 @@ def test_bash_stage_exec_retry_exceed():
     )
     rs: Result = stage.execute(params={})
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "retry": 1,
         "errors": {
@@ -122,7 +124,7 @@ async def test_bash_stage_axec():
     )
     rs: Result = await stage.axecute(params={})
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "return_code": 0,
         "stdout": "Hello World\nVariable Foo",
@@ -147,7 +149,7 @@ async def test_bash_stage_axec_retry():
     )
     rs: Result = await stage.axecute(params={})
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "retry": 1,
         "return_code": 0,
@@ -166,7 +168,7 @@ async def test_bash_stage_axec_raise():
     # NOTE: Raise error from bash that force exit 1.
     rs: Result = await stage.axecute({})
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "errors": {
             "name": "StageError",

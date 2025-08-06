@@ -3,6 +3,8 @@ from threading import Event
 from ddeutil.workflow import CANCEL, FAILED, SUCCESS, Workflow
 from ddeutil.workflow.job import Job
 
+from .utils import exclude_info
+
 
 def test_workflow_execute_job():
     job: Job = Job(
@@ -23,7 +25,7 @@ def test_workflow_execute_job():
         job=workflow.job("demo-run"), run_id="1234", context={}
     )
     assert st == SUCCESS
-    assert ctx == {
+    assert exclude_info(ctx) == {
         "status": SUCCESS,
         "jobs": {
             "demo-run": {
@@ -45,7 +47,7 @@ def test_workflow_execute_job():
         job=workflow.job("demo-run"), run_id="1234", context={}, event=event
     )
     assert st == CANCEL
-    assert ctx == {
+    assert exclude_info(ctx) == {
         "status": CANCEL,
         "errors": {
             "name": "WorkflowCancelError",
@@ -65,7 +67,7 @@ def test_workflow_execute_job_raise_inside():
         job=workflow.job("demo-run"), run_id="1234", context={}
     )
     assert st == FAILED
-    assert ctx == {
+    assert exclude_info(ctx) == {
         "status": FAILED,
         "errors": {
             "name": "WorkflowError",

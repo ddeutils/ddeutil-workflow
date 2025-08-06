@@ -23,9 +23,10 @@ def simple_task(
     conversion: Optional[dict[str, Any]] = None,
 ) -> dict[str, int]:
     """Simple Task function."""
-    result.trace.info("[CALLER]: Start Simple Task")
+    trace = result.gen_trace()
+    trace.info("[CALLER]: Start Simple Task")
     conversion: dict[str, Any] = conversion or {}
-    result.trace.info(
+    trace.info(
         f"Information||>source: {source}||>sink: {sink}||"
         f">conversion: {conversion}"
     )
@@ -40,9 +41,10 @@ def simple_csv_task(
     conversion: Optional[dict[str, Any]] = None,
 ) -> dict[str, int]:
     """Simple Task function."""
-    result.trace.info("[CALLER]: Start Simple CSV Task")
+    trace = result.gen_trace()
+    trace.info("[CALLER]: Start Simple CSV Task")
     conversion: dict[str, Any] = conversion or {}
-    result.trace.info(
+    trace.info(
         f"Information||>source: {source}||>sink: {sink}||"
         f">conversion: {conversion}"
     )
@@ -56,10 +58,11 @@ async def simple_task_async(
     result: Result,
     conversion: Optional[dict[str, Any]] = None,
 ) -> dict[str, int]:
-    result.trace.info("[CALLER]: Start Simple Task with Async")
+    trace = result.gen_trace()
+    trace.info("[CALLER]: Start Simple Task with Async")
     await asyncio.sleep(0.1)
     conversion: dict[str, Any] = conversion or {}
-    result.trace.info(
+    trace.info(
         f"Information||>source: {source}||>sink: {sink}||"
         f">conversion: {conversion}"
     )
@@ -73,7 +76,8 @@ def private_args(
     result: Result,
     extras: dict[str, Any],
 ) -> dict[str, Any]:
-    result.trace.info(
+    trace = result.gen_trace()
+    trace.info(
         f"Private args: `_exec` receive from `exec` params||"
         f"> exec: {_exec!r}||> extra: {extras}"
     )
@@ -124,6 +128,7 @@ def get_types(
     _ = kwargs1
     _ = kwargs2
     result = kwargs["result"]
-    result.trace.info("[CALLER]: Test task type.")
-    result.trace.info(f"[CALLER]: ... {type(args3)}: {args3}")
+    trace = result.gen_trace()
+    trace.info("[CALLER]: Test task type.")
+    trace.info(f"[CALLER]: ... {type(args3)}: {args3}")
     return MockModel(name="foo", data={"key": "value"})

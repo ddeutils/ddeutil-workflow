@@ -12,7 +12,7 @@ from ddeutil.workflow import (
     Workflow,
 )
 
-from ..utils import MockEvent
+from ..utils import MockEvent, exclude_info
 
 
 def test_trigger_stage_exec():
@@ -20,7 +20,7 @@ def test_trigger_stage_exec():
     stage: Stage = workflow.job("trigger-job").stage(stage_id="trigger-stage")
     rs: Result = stage.execute(params={})
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "params": {
             "author-run": "Trigger Runner",
@@ -66,7 +66,6 @@ def test_trigger_stage_exec():
             },
         },
     }
-    print(rs.info)
 
 
 def test_trigger_stage_exec_raise(test_path):
@@ -80,7 +79,7 @@ def test_trigger_stage_exec_raise(test_path):
     )
     rs: Result = stage.execute(params={}, run_id="01")
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "errors": {
             "name": "ValueError",
@@ -101,7 +100,7 @@ def test_trigger_stage_exec_raise(test_path):
     )
     rs: Result = stage.execute(params={}, run_id="02")
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "params": {},
         "jobs": {
             "second-job": {
@@ -145,7 +144,7 @@ def test_trigger_stage_exec_cancel():
     event = MockEvent(n=0)
     rs: Result = stage.execute(params={}, event=event)
     assert rs.status == CANCEL
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": CANCEL,
         "errors": {
             "name": "StageCancelError",
@@ -156,7 +155,7 @@ def test_trigger_stage_exec_cancel():
     event = MockEvent(n=1)
     rs: Result = stage.execute(params={}, event=event)
     assert rs.status == CANCEL
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": CANCEL,
         "jobs": {},
         "params": {},
@@ -169,7 +168,7 @@ def test_trigger_stage_exec_cancel():
     event = MockEvent(n=3)
     rs: Result = stage.execute(params={}, event=event)
     assert rs.status == CANCEL
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": CANCEL,
         "params": {},
         "jobs": {
@@ -201,7 +200,7 @@ def test_trigger_stage_exec_skip():
     )
     rs: Result = stage.execute(params={})
     assert rs.status == SKIP
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SKIP,
         "params": {},
         "jobs": {

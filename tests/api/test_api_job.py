@@ -1,5 +1,7 @@
 from src.ddeutil.workflow.conf import api_config
 
+from ..utils import exclude_info
+
 
 def tests_route_job_execute(client):
     response = client.post(
@@ -17,7 +19,7 @@ def tests_route_job_execute(client):
         },
     )
     assert response.status_code == 200
-    assert response.json() == {
+    assert exclude_info(response.json()) == {
         "message": "Execute job via RestAPI successful.",
         "run_id": "1234",
         "job": {
@@ -57,7 +59,7 @@ def tests_route_job_execute_not_pass_job_id(client):
         },
     )
     assert response.status_code == 500
-    assert response.json() == {
+    assert exclude_info(response.json()) == {
         "message": "This job do not set the ID before setting execution output.",
         "run_id": "1234",
         "job": {

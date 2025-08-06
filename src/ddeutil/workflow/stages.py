@@ -122,6 +122,7 @@ from .utils import (
     extract_id,
     filter_func,
     gen_id,
+    get_dt_now,
     make_exec,
     to_train,
 )
@@ -328,7 +329,10 @@ class BaseStage(BaseModel, ABC):
         parent_run_id, run_id = extract_id(
             self.iden, run_id=run_id, extras=self.extras
         )
-        context: DictData = {"status": WAIT}
+        context: DictData = {
+            "status": WAIT,
+            "info": {"exec_start": get_dt_now()},
+        }
         trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
@@ -355,20 +359,18 @@ class BaseStage(BaseModel, ABC):
 
             # NOTE: Start call wrapped execution method that will use custom
             #   execution before the real execution from inherit stage model.
-            result_caught: Result = self._execute(
+            result: Result = self._execute(
                 params,
                 run_id=run_id,
                 context=context,
                 parent_run_id=parent_run_id,
                 event=event,
             )
-            if result_caught.status == WAIT:  # pragma: no cov
+            if result.status == WAIT:  # pragma: no cov
                 raise StageError(
                     "Status from execution should not return waiting status."
                 )
-            return result_caught.make_info(
-                {"execution_time": time.monotonic() - ts}
-            )
+            return result
 
         # NOTE: Catch this error in this line because the execution can raise
         #   this exception class at other location.
@@ -393,7 +395,6 @@ class BaseStage(BaseModel, ABC):
                 parent_run_id=parent_run_id,
                 status=st,
                 context=catch(context, status=st, updated=updated),
-                info={"execution_time": time.monotonic() - ts},
                 extras=self.extras,
             )
         except Exception as e:
@@ -408,11 +409,16 @@ class BaseStage(BaseModel, ABC):
                 context=catch(
                     context, status=FAILED, updated={"errors": to_dict(e)}
                 ),
-                info={"execution_time": time.monotonic() - ts},
                 extras=self.extras,
             )
         finally:
-            trace.debug("[STAGE]: End Handler stage execution.")
+            context["info"].update(
+                {
+                    "exec_end": get_dt_now(),
+                    "exec_latency": time.monotonic() - ts,
+                }
+            )
+            trace.debug("End Handler stage execution.", module="stage")
 
     def _execute(
         self,
@@ -507,8 +513,13 @@ class BaseStage(BaseModel, ABC):
         status: dict[str, Status] = (
             {"status": output.pop("status")} if "status" in output else {}
         )
+        info: DictData = (
+            {"info": output.pop("info")} if "info" in output else {}
+        )
         kwargs: DictData = kwargs or {}
-        to["stages"][_id] = {"outputs": output} | errors | status | kwargs
+        to["stages"][_id] = (
+            {"outputs": output} | errors | status | info | kwargs
+        )
         return to
 
     def get_outputs(self, output: DictData) -> DictData:
@@ -782,15 +793,19 @@ class BaseAsyncStage(BaseStage, ABC):
             Result: The execution result with status and context data.
         """
         ts: float = time.monotonic()
-        parent_run_id: StrOrNone = run_id
-        run_id: str = gen_id(self.iden, unique=True, extras=self.extras)
-        context: DictData = {}
+        parent_run_id, run_id = extract_id(
+            self.iden, run_id=run_id, extras=self.extras
+        )
+        context: DictData = {
+            "status": WAIT,
+            "info": {"exec_start": get_dt_now()},
+        }
         trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
         try:
             _id: str = (
-                f" with ID: {param2template(self.id, params=params)!r}"
+                f" with ID: {self.pass_template(self.id, params=params)!r}"
                 if self.id
                 else ""
             )
@@ -811,55 +826,47 @@ class BaseAsyncStage(BaseStage, ABC):
 
             # NOTE: Start call wrapped execution method that will use custom
             #   execution before the real execution from inherit stage model.
-            result_caught: Result = await self._axecute(
+            result: Result = await self._axecute(
                 params,
                 run_id=run_id,
                 context=context,
                 parent_run_id=parent_run_id,
                 event=event,
             )
-            if result_caught.status == WAIT:  # pragma: no cov
+            if result.status == WAIT:  # pragma: no cov
                 raise StageError(
                     "Status from execution should not return waiting status."
                 )
-            return result_caught
+            return result
 
         # NOTE: Catch this error in this line because the execution can raise
         #   this exception class at other location.
-        except (
-            StageSkipError,
-            StageNestedSkipError,
-            StageNestedError,
-            StageError,
-        ) as e:  # pragma: no cov
+        except StageError as e:  # pragma: no cov
+            updated: Optional[DictData] = {"errors": e.to_dict()}
             if isinstance(e, StageNestedError):
-                await trace.ainfo(f"[STAGE]: Nested: {e}")
+                await trace.aerror(f"[STAGE]: ⚠️ Nested: {e}")
             elif isinstance(e, (StageSkipError, StageNestedSkipError)):
-                await trace.ainfo(f"[STAGE]: ⏭️ Skip: {e}")
+                await trace.aerror(f"[STAGE]: ⏭️ Skip: {e}")
+                updated = None
+            elif e.allow_traceback:
+                await trace.aerror(
+                    f"[STAGE]: 📢 Stage Failed:||🚨 {traceback.format_exc()}||"
+                )
             else:
-                await trace.ainfo(
-                    f"[STAGE]: Stage Failed:||🚨 {traceback.format_exc()}||"
+                await trace.aerror(
+                    f"[STAGE]: 🤫 Stage Failed with disable traceback:||{e}"
                 )
             st: Status = get_status_from_error(e)
             return Result(
                 run_id=run_id,
                 parent_run_id=parent_run_id,
                 status=st,
-                context=catch(
-                    context,
-                    status=st,
-                    updated=(
-                        None
-                        if isinstance(e, (StageSkipError, StageNestedSkipError))
-                        else {"errors": e.to_dict()}
-                    ),
-                ),
-                info={"execution_time": time.monotonic() - ts},
+                context=catch(context, status=st, updated=updated),
                 extras=self.extras,
             )
         except Exception as e:
             await trace.aerror(
-                f"[STAGE]: Error Failed:||🚨 {traceback.format_exc()}||"
+                f"[STAGE]:💥 Error Failed:||🚨 {traceback.format_exc()}||"
             )
             return Result(
                 run_id=run_id,
@@ -868,10 +875,15 @@ class BaseAsyncStage(BaseStage, ABC):
                 context=catch(
                     context, status=FAILED, updated={"errors": to_dict(e)}
                 ),
-                info={"execution_time": time.monotonic() - ts},
                 extras=self.extras,
             )
         finally:
+            context["info"].update(
+                {
+                    "exec_end": get_dt_now(),
+                    "exec_latency": time.monotonic() - ts,
+                }
+            )
             trace.debug("[STAGE]: End Handler stage process.")
 
     async def _axecute(
@@ -1627,6 +1639,7 @@ class PyStage(BaseRetryStage):
                 or (value.startswith("__") and value.endswith("__"))
                 or ismodule(values[value])
                 or isclass(values[value])
+                or value in ("trace",)
             ):
                 continue
 

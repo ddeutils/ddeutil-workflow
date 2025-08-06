@@ -7,7 +7,7 @@ from ddeutil.workflow import (
 )
 from ddeutil.workflow.stages import ParallelStage, Stage
 
-from ..utils import MockEvent
+from ..utils import MockEvent, exclude_info
 
 
 def test_parallel_stage_exec():
@@ -40,7 +40,7 @@ def test_parallel_stage_exec():
     )
     rs: Result = stage.execute(params={})
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "workers": 2,
         "parallel": {
@@ -92,7 +92,7 @@ def test_parallel_stage_exec_max_workers():
     )
     rs: Result = stage.execute(params={"max-workers": 1})
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "workers": 1,
         "parallel": {
@@ -114,7 +114,7 @@ def test_parallel_stage_exec_max_workers():
 
     rs: Result = stage.execute(params={"max-workers": 100})
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "errors": {
             "name": "ValueError",
@@ -147,7 +147,7 @@ def test_parallel_stage_exec_cancel_from_stage():
     )
     event = MockEvent(n=3)
     rs: Result = stage.execute({}, event=event)
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": CANCEL,
         "workers": 1,
         "parallel": {
@@ -200,7 +200,7 @@ def test_parallel_stage_exec_cancel():
     event = MockEvent(n=0)
     rs: Result = stage.execute({}, event=event)
     assert rs.status == CANCEL
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": CANCEL,
         "workers": 2,
         "parallel": {},
@@ -215,7 +215,7 @@ def test_parallel_stage_exec_cancel():
     assert rs.status == CANCEL
     possible = []
     try:
-        assert rs.context == {
+        assert exclude_info(rs.context) == {
             "status": CANCEL,
             "workers": 2,
             "parallel": {
@@ -262,7 +262,7 @@ def test_parallel_stage_exec_cancel():
     except AssertionError:
         possible.append(False)
     try:
-        assert rs.context == {
+        assert exclude_info(rs.context) == {
             "status": CANCEL,
             "workers": 2,
             "parallel": {
@@ -327,7 +327,7 @@ def test_parallel_stage_exec_raise():
     )
     rs: Result = stage.execute({})
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "workers": 2,
         "parallel": {

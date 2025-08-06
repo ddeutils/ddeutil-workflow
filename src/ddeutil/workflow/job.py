@@ -75,7 +75,7 @@ from .result import (
 from .reusables import has_template, param2template
 from .stages import Stage
 from .traces import Trace, get_trace
-from .utils import cross_product, extract_id, filter_func, gen_id
+from .utils import cross_product, extract_id, filter_func, gen_id, get_dt_now
 
 MatrixFilter = list[dict[str, Union[str, int]]]
 
@@ -824,9 +824,14 @@ class Job(BaseModel):
         status: dict[str, Status] = (
             {"status": output.pop("status")} if "status" in output else {}
         )
+        info: DictData = (
+            {"info": output.pop("info")} if "info" in output else {}
+        )
         kwargs: DictData = kwargs or {}
         if self.strategy.is_set():
-            to["jobs"][_id] = {"strategies": output} | errors | status | kwargs
+            to["jobs"][_id] = (
+                {"strategies": output} | errors | status | info | kwargs
+            )
         elif len(k := output.keys()) > 1:  # pragma: no cov
             raise JobError(
                 "Strategy output from execution return more than one ID while "
@@ -835,7 +840,7 @@ class Job(BaseModel):
         else:
             _output: DictData = {} if len(k) == 0 else output[list(k)[0]]
             _output.pop("matrix", {})
-            to["jobs"][_id] = _output | errors | status | kwargs
+            to["jobs"][_id] = _output | errors | status | info | kwargs
         return to
 
     def get_outputs(
@@ -851,7 +856,8 @@ class Job(BaseModel):
             output (DictData): A job outputs data that want to extract
             job_id (StrOrNone): A job ID if the `id` field does not set.
 
-        :rtype: DictData
+        Returns:
+            DictData: An output data.
         """
         _id: str = self.id or job_id
         if self.strategy.is_set():
@@ -1083,32 +1089,38 @@ class Job(BaseModel):
         parent_run_id, run_id = extract_id(
             (self.id or "EMPTY"), run_id=run_id, extras=self.extras
         )
+        context: DictData = {
+            "status": WAIT,
+            "info": {"exec_start": get_dt_now()},
+        }
         trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
         )
-        context: DictData = {"status": WAIT}
         try:
             trace.info(
                 f"[JOB]: Handler {self.runs_on.type.name}: "
                 f"{(self.id or 'EMPTY')!r}."
             )
-            result_caught: Result = self._execute(
+            result: Result = self._execute(
                 params,
                 run_id=run_id,
                 context=context,
                 parent_run_id=parent_run_id,
                 event=event,
             )
-            return result_caught.make_info(
-                {"execution_time": time.monotonic() - ts}
-            )
+            return result
         except JobError:  # pragma: no cov
             return Result.from_trace(trace).catch(
                 status=FAILED,
                 context=catch(context, status=FAILED),
-                info={"execution_time": time.monotonic() - ts},
             )
         finally:
+            context["info"].update(
+                {
+                    "exec_end": get_dt_now(),
+                    "exec_latency": time.monotonic() - ts,
+                }
+            )
             trace.debug("[JOB]: End Handler job execution.")
 
 

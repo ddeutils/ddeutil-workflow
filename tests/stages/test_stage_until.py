@@ -11,7 +11,7 @@ from ddeutil.workflow import (
 )
 from ddeutil.workflow.stages import EmptyStage, RaiseStage, UntilStage
 
-from ..utils import MockEvent, dump_yaml_context
+from ..utils import MockEvent, dump_yaml_context, exclude_info
 
 
 def test_until_stage():
@@ -31,7 +31,7 @@ def test_until_stage():
 
     rs: Result = stage.execute(params={}, run_id="01")
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "until": {
             1: {
@@ -66,7 +66,7 @@ def test_until_stage_raise():
     )
     rs: Result = stage.execute(params={}, run_id="02")
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "until": {
             1: {
@@ -108,7 +108,7 @@ def test_until_stage_raise():
     )
     rs: Result = stage.execute(params={}, run_id="03")
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "until": {
             1: {
@@ -144,7 +144,7 @@ def test_until_stage_skipped():
     )
     rs: Result = stage.execute(params={}, run_id="01")
     assert rs.status == SKIP
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SKIP,
         "until": {
             1: {
@@ -180,7 +180,7 @@ def test_until_stage_cancel():
     event.set()
     rs: Result = stage.execute(params={}, event=event, run_id="02")
     assert rs.status == CANCEL
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": CANCEL,
         "until": {},
         "errors": {
@@ -192,7 +192,7 @@ def test_until_stage_cancel():
     event = MockEvent(n=1)
     rs: Result = stage.execute(params={}, event=event, run_id="03")
     assert rs.status == CANCEL
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": CANCEL,
         "until": {
             1: {
@@ -215,7 +215,7 @@ def test_until_stage_cancel():
     event = MockEvent(n=2)
     rs: Result = stage.execute(params={}, event=event, run_id="04")
     assert rs.status == CANCEL
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": CANCEL,
         "until": {
             1: {
@@ -259,7 +259,7 @@ def test_until_stage_exec_exceed_loop():
     )
     rs: Result = stage.execute(params={}, run_id="01")
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "until": {
             1: {
@@ -308,7 +308,7 @@ def test_until_stage_exec_full(test_path):
         stage: Stage = workflow.job("first-job").stage("until-stage")
         rs: Result = stage.execute(params={}, run_id="02")
         assert rs.status == SUCCESS
-        assert rs.context == {
+        assert exclude_info(rs.context) == {
             "status": SUCCESS,
             "until": {
                 1: {
@@ -367,7 +367,7 @@ def test_until_stage_exec_full(test_path):
         }
 
         output = stage.set_outputs(rs.context, to={})
-        assert output == {
+        assert exclude_info(output) == {
             "stages": {
                 "until-stage": {
                     "status": SUCCESS,

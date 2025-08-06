@@ -5,6 +5,8 @@ from ddeutil.workflow import CANCEL, FAILED, SUCCESS, Result
 from ddeutil.workflow.stages import CallStage, Stage
 from pydantic import ValidationError
 
+from ..utils import exclude_info
+
 
 def test_call_stage_validate_args():
     with pytest.raises(ValidationError):
@@ -60,7 +62,7 @@ def test_call_stage_exec_necessary_args():
     # NOTE: Raise because necessary args do not pass.
     rs: Result = stage.execute({})
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "errors": {
             "name": "ValueError",
@@ -81,7 +83,7 @@ def test_call_stage_exec_necessary_args():
     )
     rs: Result = stage.execute({})
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "errors": {
             "name": "ValueError",
@@ -117,7 +119,7 @@ def test_call_stage_exec():
     )
     rs: Result = stage.execute({})
     assert rs.status == SUCCESS
-    assert rs.context == {"records": 1, "status": SUCCESS}
+    assert exclude_info(rs.context) == {"records": 1, "status": SUCCESS}
 
     stage: Stage = CallStage.model_validate(
         obj={
@@ -128,7 +130,7 @@ def test_call_stage_exec():
     )
     rs: Result = stage.execute({})
     assert rs.status == SUCCESS
-    assert rs.context == {"records": 1, "status": SUCCESS}
+    assert exclude_info(rs.context) == {"records": 1, "status": SUCCESS}
 
     stage: Stage = CallStage.model_validate(
         obj={
@@ -143,7 +145,7 @@ def test_call_stage_exec():
     )
     rs: Result = stage.execute({})
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "exec": "Test this arge should pass",
         "params": {"run_mode": "T"},
         "status": SUCCESS,
@@ -165,7 +167,7 @@ def test_call_stage_exec_pydantic():
     )
     rs: Result = stage.execute({})
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "name": "foo",
         "data": {"key": "value"},
@@ -183,7 +185,7 @@ def test_call_stage_exec_raise():
     )
     rs = stage.execute({})
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "errors": {
             "name": "StageError",
@@ -201,7 +203,7 @@ def test_call_stage_exec_raise():
     )
     rs: Result = stage.execute({})
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "errors": {
             "message": (
@@ -217,7 +219,7 @@ def test_call_stage_exec_raise():
     stage: Stage = CallStage(name="Not valid", uses="tasks-foo-bar")
     rs: Result = stage.execute({})
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "errors": {
             "name": "ValueError",
@@ -234,7 +236,7 @@ def test_call_stage_exec_raise():
     )
     rs: Result = stage.execute({})
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "errors": {
             "name": "NotImplementedError",
@@ -262,7 +264,7 @@ def test_call_stage_exec_cancel():
     )
     rs: Result = stage.execute({}, event=event)
     assert rs.status == CANCEL
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": CANCEL,
         "errors": {
             "name": "StageCancelError",
@@ -283,7 +285,7 @@ async def test_call_stage_axec():
     )
     rs: Result = await stage.axecute({})
     assert rs.status == SUCCESS
-    assert rs.context == {"records": 1, "status": SUCCESS}
+    assert exclude_info(rs.context) == {"records": 1, "status": SUCCESS}
 
     stage: Stage = CallStage.model_validate(
         obj={
@@ -294,7 +296,7 @@ async def test_call_stage_axec():
     )
     rs: Result = await stage.axecute({})
     assert rs.status == SUCCESS
-    assert rs.context == {"records": 1, "status": SUCCESS}
+    assert exclude_info(rs.context) == {"records": 1, "status": SUCCESS}
 
     # NOTE: Raise because invalid return type.
     stage: Stage = CallStage(
@@ -303,7 +305,7 @@ async def test_call_stage_axec():
     )
     rs: Result = await stage.axecute({})
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "errors": {
             "name": "TypeError",
@@ -328,7 +330,7 @@ async def test_call_stage_axec_necessary_args():
     # NOTE: Raise because necessary args do not pass.
     rs: Result = await stage.axecute({})
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "errors": {
             "name": "ValueError",
@@ -349,7 +351,7 @@ async def test_call_stage_axec_necessary_args():
     )
     rs: Result = await stage.axecute({})
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "errors": {
             "name": "ValueError",
@@ -367,7 +369,7 @@ async def test_call_stage_axec_raise(test_path):
     stage: Stage = CallStage(name="Not valid", uses="tasks-foo-bar")
     rs: Result = await stage.axecute({})
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "errors": {
             "name": "ValueError",
@@ -379,7 +381,7 @@ async def test_call_stage_axec_raise(test_path):
     stage: Stage = CallStage(name="Not register", uses="tasks/abc@foo")
     rs: Result = await stage.axecute({})
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "errors": {
             "name": "NotImplementedError",
@@ -401,7 +403,7 @@ async def test_call_stage_axec_raise(test_path):
     )
     rs: Result = await stage.axecute({})
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "name": "foo",
         "data": {"key": "value"},
@@ -418,7 +420,7 @@ async def test_call_stage_axec_cancel():
     )
     rs: Result = await stage.axecute({}, event=event)
     assert rs.status == CANCEL
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": CANCEL,
         "errors": {
             "name": "StageCancelError",

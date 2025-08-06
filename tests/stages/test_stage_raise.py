@@ -2,6 +2,8 @@ import pytest
 from ddeutil.workflow import FAILED, Result
 from ddeutil.workflow.stages import RaiseStage
 
+from ..utils import exclude_info
+
 
 def test_raise_stage_exec():
     stage: RaiseStage = RaiseStage.model_validate(
@@ -15,7 +17,7 @@ def test_raise_stage_exec():
     )
     rs: Result = stage.execute(params={})
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "errors": {
             "name": "StageError",
@@ -34,7 +36,7 @@ async def test_raise_stage_axec():
     )
     rs: Result = await stage.axecute(params={})
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "errors": {
             "name": "StageError",

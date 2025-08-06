@@ -155,6 +155,10 @@ def exclude_created_and_updated(value: Any) -> Any:  # pragma: no cov
     return exclude_keys(value, keys=["created_at", "updated_at"])
 
 
+def exclude_info(value: Any) -> Any:
+    return exclude_keys(value, keys=["info"])
+
+
 def clean_up(path: Union[str, Path]) -> None:  # pragma: no cov
     if str2bool(os.getenv("WORKFLOW_TEST_CLEAN_UP", "true")):
         shutil.rmtree(path)

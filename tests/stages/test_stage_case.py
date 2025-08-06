@@ -3,7 +3,7 @@ from ddeutil.workflow import CANCEL, FAILED, SKIP, SUCCESS, Result
 from ddeutil.workflow.stages import CaseStage, Stage
 from pydantic import ValidationError
 
-from ..utils import MockEvent
+from ..utils import MockEvent, exclude_info
 
 
 def test_case_stage_raise():
@@ -102,14 +102,14 @@ def test_case_stage_exec():
     )
     rs: Result = stage.execute({"params": {"name": "bar"}}, run_id="01")
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "case": "bar",
         "stages": {"3616274431": {"outputs": {}, "status": SUCCESS}},
     }
 
     output = stage.set_outputs(rs.context, to={})
-    assert output == {
+    assert exclude_info(output) == {
         "stages": {
             "case-stage": {
                 "status": SUCCESS,
@@ -125,14 +125,14 @@ def test_case_stage_exec():
 
     rs: Result = stage.execute({"params": {"name": "foo"}}, run_id="02")
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "case": "foo",
         "stages": {"9300140245": {"outputs": {}, "status": SUCCESS}},
     }
 
     output = stage.set_outputs(rs.context, to={})
-    assert output == {
+    assert exclude_info(output) == {
         "stages": {
             "case-stage": {
                 "status": SUCCESS,
@@ -148,7 +148,7 @@ def test_case_stage_exec():
 
     rs: Result = stage.execute({"params": {"name": "test"}}, run_id="03")
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "case": "_",
         "stages": {"5883888894": {"outputs": {}, "status": SUCCESS}},
@@ -181,7 +181,7 @@ def test_case_stage_exec_else():
     )
     rs: Result = stage.execute({"params": {"name": "test"}}, run_id="03")
     assert rs.status == SUCCESS
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SUCCESS,
         "case": "_",
         "stages": {"5883888894": {"outputs": {}, "status": SUCCESS}},
@@ -211,7 +211,7 @@ def test_case_stage_exec_raise():
     # NOTE: Raise because else condition does not set.
     rs: Result = stage.execute({"params": {"name": "test"}}, run_id="01")
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "errors": {
             "name": "StageError",
@@ -242,7 +242,7 @@ def test_case_stage_exec_raise():
     )
     rs: Result = stage.execute({"params": {"name": "bar"}}, run_id="02")
     assert rs.status == FAILED
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": FAILED,
         "case": "bar",
         "stages": {
@@ -283,7 +283,7 @@ def test_case_stage_exec_cancel():
         {"params": {"name": "bar"}}, event=event, run_id="03"
     )
     assert rs.status == CANCEL
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": CANCEL,
         "errors": {
             "name": "StageCancelError",
@@ -296,7 +296,7 @@ def test_case_stage_exec_cancel():
         {"params": {"name": "bar"}}, event=event, run_id="04"
     )
     assert rs.status == CANCEL
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": CANCEL,
         "case": "bar",
         "stages": {},
@@ -311,7 +311,7 @@ def test_case_stage_exec_cancel():
         {"params": {"name": "bar"}}, event=event, run_id="04"
     )
     assert rs.status == CANCEL
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": CANCEL,
         "case": "bar",
         "stages": {
@@ -353,7 +353,7 @@ def test_case_stage_exec_skipped():
     )
     rs: Result = stage.execute({"params": {"name": "test"}}, run_id="01")
     assert rs.status == SKIP
-    assert rs.context == {"status": SKIP}
+    assert exclude_info(rs.context) == {"status": SKIP}
 
     stage: Stage = CaseStage.model_validate(
         {
@@ -376,7 +376,7 @@ def test_case_stage_exec_skipped():
     )
     rs: Result = stage.execute({"params": {"name": "bar"}}, run_id="02")
     assert rs.status == SKIP
-    assert rs.context == {
+    assert exclude_info(rs.context) == {
         "status": SKIP,
         "case": "bar",
         "stages": {"3616274431": {"outputs": {}, "status": SKIP}},

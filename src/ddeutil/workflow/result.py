@@ -12,18 +12,21 @@ states and the Result dataclass for context transfer between workflow components
 from __future__ import annotations
 
 from dataclasses import field
+from datetime import datetime
 from enum import Enum
 from typing import Any, Optional, TypedDict, Union
 
 from pydantic import ConfigDict
 from pydantic.dataclasses import dataclass
-from pydantic.functional_validators import model_validator
 from typing_extensions import NotRequired, Self
 
-from . import (
+from .__types import DictData
+from .errors import (
+    ErrorData,
     JobCancelError,
     JobError,
     JobSkipError,
+    ResultError,
     StageCancelError,
     StageError,
     StageNestedCancelError,
@@ -33,9 +36,7 @@ from . import (
     WorkflowCancelError,
     WorkflowError,
 )
-from .__types import DictData
-from .audits import Trace, get_trace
-from .errors import ErrorData, ResultError
+from .traces import Trace, get_trace
 from .utils import default_gen_id
 
 
@@ -189,25 +190,8 @@ class Result:
     extras: DictData = field(default_factory=dict, compare=False, repr=False)
     status: Status = field(default=WAIT)
     context: Optional[DictData] = field(default=None)
-    info: DictData = field(default_factory=dict)
     run_id: str = field(default_factory=default_gen_id)
     parent_run_id: Optional[str] = field(default=None)
-    trace: Optional[Trace] = field(default=None, compare=False, repr=False)
-
-    @model_validator(mode="after")
-    def __prepare_trace(self) -> Self:
-        """Prepare trace field that want to pass after its initialize step.
-
-        :rtype: Self
-        """
-        if self.trace is None:  # pragma: no cov
-            self.trace: Trace = get_trace(
-                self.run_id,
-                parent_run_id=self.parent_run_id,
-                extras=self.extras,
-            )
-
-        return self
 
     @classmethod
     def from_trace(cls, trace: Trace):
@@ -216,7 +200,13 @@ class Result:
             run_id=trace.run_id,
             parent_run_id=trace.parent_run_id,
             extras=trace.extras,
-            trace=trace,
+        )
+
+    def gen_trace(self) -> Trace:
+        return get_trace(
+            self.run_id,
+            parent_run_id=self.parent_run_id,
+            extras=self.extras,
         )
 
     def catch(
@@ -251,16 +241,14 @@ class Result:
                     self.__dict__["context"][k].update(kwargs[k])
                 # NOTE: Exclude the `info` key for update information data.
                 elif k == "info":
-                    self.__dict__["info"].update(kwargs["info"])
+                    if "info" in self.__dict__["context"]:
+                        self.__dict__["context"].update(kwargs[k])
+                    else:
+                        self.__dict__["context"]["info"] = kwargs[k]
                 else:
                     raise ResultError(
                         f"The key {k!r} does not exists on context data."
                     )
-        return self
-
-    def make_info(self, data: DictData) -> Self:
-        """Making information."""
-        self.__dict__["info"].update(data)
         return self
 
 
@@ -292,10 +280,20 @@ def catch(
             context[k].update(kwargs[k])
         # NOTE: Exclude the `info` key for update information data.
         elif k == "info":
-            context.update({"info": kwargs["info"]})
-        else:
-            raise ResultError(f"The key {k!r} does not exists on context data.")
+            if "info" in context:
+                context.update(kwargs[k])
+            else:
+                context["info"] = kwargs[k]
+        # ARCHIVE:
+        # else:
+        #     raise ResultError(f"The key {k!r} does not exist on context data.")
     return context
+
+
+class Info(TypedDict):
+    exec_start: datetime
+    exec_end: NotRequired[datetime]
+    exec_latency: NotRequired[float]
 
 
 class Context(TypedDict):
