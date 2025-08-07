@@ -22,19 +22,17 @@ from typing_extensions import NotRequired, Self
 
 from .__types import DictData
 from .errors import (
+    BaseError,
     ErrorData,
     JobCancelError,
-    JobError,
     JobSkipError,
     ResultError,
     StageCancelError,
-    StageError,
     StageNestedCancelError,
-    StageNestedError,
     StageNestedSkipError,
     StageSkipError,
     WorkflowCancelError,
-    WorkflowError,
+    WorkflowSkipError,
 )
 from .traces import Trace, get_trace
 from .utils import default_gen_id
@@ -111,11 +109,11 @@ def validate_statuses(statuses: list[Status]) -> Status:
         Status: Final consolidated status based on workflow logic
 
     Example:
-        >>> # Mixed statuses - FAILED takes priority
+        Case: Mixed statuses - FAILED takes priority
         >>> validate_statuses([SUCCESS, FAILED, SUCCESS])
         >>> # Returns: FAILED
 
-        >>> # All same status
+        Case: All same status
         >>> validate_statuses([SUCCESS, SUCCESS, SUCCESS])
         >>> # Returns: SUCCESS
     """
@@ -132,21 +130,7 @@ def validate_statuses(statuses: list[Status]) -> Status:
 
 
 def get_status_from_error(
-    error: Union[
-        StageError,
-        StageCancelError,
-        StageSkipError,
-        StageNestedCancelError,
-        StageNestedError,
-        StageNestedSkipError,
-        JobError,
-        JobCancelError,
-        JobSkipError,
-        WorkflowError,
-        WorkflowCancelError,
-        Exception,
-        BaseException,
-    ]
+    error: Union[BaseError, Exception, BaseException]
 ) -> Status:
     """Get the Status from the error object.
 
@@ -156,7 +140,10 @@ def get_status_from_error(
     Returns:
         Status: The status from the specific exception class.
     """
-    if isinstance(error, (StageNestedSkipError, StageSkipError, JobSkipError)):
+    if isinstance(
+        error,
+        (StageNestedSkipError, StageSkipError, JobSkipError, WorkflowSkipError),
+    ):
         return SKIP
     elif isinstance(
         error,

@@ -86,7 +86,7 @@ def test_workflow_exec_timeout():
     }
 
 
-def test_workflow_exec_raise_event_set():
+def test_workflow_exec_cancel_event_set():
     job: Job = Job(
         stages=[{"name": "Echo Last Stage", "echo": "the last stage"}],
     )
