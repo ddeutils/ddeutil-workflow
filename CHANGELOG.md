@@ -2,6 +2,39 @@
 
 ## Latest Changes
 
+## 0.0.86
+
+### :sparkles: Features
+
+- :dart: feat: update rerun strategy on release method.
+- :dart: feat: add wrapped method for rerun.
+- :dart: feat: add warp exec on rerun method.
+- :dart: feat: split handler exec func to warp.
+- :dart: feat: update exec method on job module.
+- :dart: feat: update flag on trace model.
+- :dart: feat: update module key on trace model methods.
+
+### :bug: Bug fixes
+
+- :gear: fixed: refactor set variable on exec method.
+
+### :black_nib: Code Changes
+
+- :test_tube: tests: update failed testcase.
+- :art: format: move to use from_trace method.
+- :art: format: revise result dataclass.
+- :art: format: add module key it trace model.
+
+### :broom: Deprecate & Clean
+
+- :recycle: clean: remove passing running ID to wrapped exec method.
+- :recycle: clean: remove uv lock file.
+
+### :book: Documentations
+
+- :page_facing_up: docs: update config topic.
+- :page_facing_up: docs: update json-schema file.
+
 ## 0.0.85
 
 ### :sparkles: Features
