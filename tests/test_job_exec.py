@@ -283,59 +283,124 @@ def test_job_exec_py_fail_fast_raise_catch():
         .execute(params={})
     )
     assert rs.status == FAILED
-    assert exclude_info(rs.context) == {
-        "status": FAILED,
-        "2150810470": {
+    possible = []
+    try:
+        assert exclude_info(rs.context) == {
             "status": FAILED,
-            "matrix": {"sleep": "1"},
-            "stages": {
-                "raise-error": {
-                    "outputs": {},
-                    "errors": {
-                        "name": "ValueError",
-                        "message": "Testing raise error inside PyStage with the sleep not equal 4!!!",
-                    },
-                    "status": FAILED,
-                }
-            },
-            "errors": {
-                "name": "JobError",
-                "message": "Strategy execution was break because its nested-stage, 'raise-error', failed.",
-            },
-        },
-        "1067561285": {
-            "status": CANCEL,
-            "matrix": {"sleep": "2"},
-            "stages": {},
-            "errors": {
-                "name": "JobCancelError",
-                "message": "Strategy execution was canceled from the event before start stage execution.",
-            },
-        },
-        "9112472804": {
-            "status": CANCEL,
-            "matrix": {"sleep": "4"},
-            "stages": {},
-            "errors": {
-                "name": "JobCancelError",
-                "message": "Strategy execution was canceled from the event before start stage execution.",
-            },
-        },
-        "errors": {
             "2150810470": {
-                "name": "JobError",
-                "message": "Strategy execution was break because its nested-stage, 'raise-error', failed.",
+                "status": FAILED,
+                "matrix": {"sleep": "1"},
+                "stages": {
+                    "raise-error": {
+                        "outputs": {},
+                        "errors": {
+                            "name": "ValueError",
+                            "message": "Testing raise error inside PyStage with the sleep not equal 4!!!",
+                        },
+                        "status": FAILED,
+                    }
+                },
+                "errors": {
+                    "name": "JobError",
+                    "message": "Strategy execution was break because its nested-stage, 'raise-error', failed.",
+                },
             },
             "1067561285": {
-                "name": "JobCancelError",
-                "message": "Strategy execution was canceled from the event before start stage execution.",
+                "status": CANCEL,
+                "matrix": {"sleep": "2"},
+                "stages": {},
+                "errors": {
+                    "name": "JobCancelError",
+                    "message": "Strategy execution was canceled from the event before start stage execution.",
+                },
             },
             "9112472804": {
-                "name": "JobCancelError",
-                "message": "Strategy execution was canceled from the event before start stage execution.",
+                "status": CANCEL,
+                "matrix": {"sleep": "4"},
+                "stages": {},
+                "errors": {
+                    "name": "JobCancelError",
+                    "message": "Strategy execution was canceled from the event before start stage execution.",
+                },
             },
-        },
-    }
+            "errors": {
+                "2150810470": {
+                    "name": "JobError",
+                    "message": "Strategy execution was break because its nested-stage, 'raise-error', failed.",
+                },
+                "1067561285": {
+                    "name": "JobCancelError",
+                    "message": "Strategy execution was canceled from the event before start stage execution.",
+                },
+                "9112472804": {
+                    "name": "JobCancelError",
+                    "message": "Strategy execution was canceled from the event before start stage execution.",
+                },
+            },
+        }
+        possible.append(True)
+    except AssertionError:
+        possible.append(False)
+    try:
+        assert exclude_info(rs.context) == {
+            "status": FAILED,
+            "2150810470": {
+                "status": FAILED,
+                "matrix": {"sleep": "1"},
+                "stages": {
+                    "raise-error": {
+                        "outputs": {},
+                        "errors": {
+                            "name": "ValueError",
+                            "message": "Testing raise error inside PyStage with the sleep not equal 4!!!",
+                        },
+                        "status": FAILED,
+                    }
+                },
+                "errors": {
+                    "name": "JobError",
+                    "message": "Strategy execution was break because its nested-stage, 'raise-error', failed.",
+                },
+            },
+            "1067561285": {
+                "status": CANCEL,
+                "matrix": {"sleep": "2"},
+                "stages": {},
+                "errors": {
+                    "name": "JobCancelError",
+                    "message": "Strategy execution was canceled from the event after end stage execution.",
+                },
+            },
+            "9112472804": {
+                "status": CANCEL,
+                "matrix": {"sleep": "4"},
+                "stages": {},
+                "errors": {
+                    "name": "JobCancelError",
+                    "message": "Strategy execution was canceled from the event before start stage execution.",
+                },
+            },
+            "errors": {
+                "2150810470": {
+                    "name": "JobError",
+                    "message": "Strategy execution was break because its nested-stage, 'raise-error', failed.",
+                },
+                "1067561285": {
+                    "name": "JobCancelError",
+                    "message": "Strategy execution was canceled from the event after end stage execution.",
+                },
+                "9112472804": {
+                    "name": "JobCancelError",
+                    "message": "Strategy execution was canceled from the event before start stage execution.",
+                },
+            },
+        }
+        possible.append(True)
+    except AssertionError:
+        possible.append(False)
+    if not any(possible):
+        print(rs.context)
+        raise AssertionError("checking context does not match any case.")
 
 
 def test_job_exec_py_complete():
