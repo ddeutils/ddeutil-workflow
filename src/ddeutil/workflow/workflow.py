@@ -622,7 +622,18 @@ class Workflow(BaseModel):
         max_job_parallel: int = 2,
         total_job: Optional[int] = None,
     ) -> Result:
-        """Job process method."""
+        """Job process method.
+
+        Args:
+            job_queue:
+            run_id (str):
+            context (DictData):
+            parent_run_id (str, default None):
+            event (Event, default None):
+            timeout:
+            max_job_parallel:
+            total_job:
+        """
         ts: float = time.monotonic()
         trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
@@ -640,6 +651,7 @@ class Workflow(BaseModel):
 
         # NOTE: Force update internal extras for handler circle execution.
         self.extras.update({"__sys_exec_break_circle": self.name})
+
         with ThreadPoolExecutor(max_job_parallel, "wf") as executor:
             futures: list[Future] = []
 
@@ -760,25 +772,19 @@ class Workflow(BaseModel):
                 future.cancel()
 
             trace.error(
-                f"[WORKFLOW]: {self.name!r} was timeout because it use exec "
-                f"time more than {timeout} seconds."
+                (
+                    f"{self.name!r} was timeout because it use exec time more "
+                    f"than {timeout} seconds."
+                ),
+                module="workflow",
             )
 
             time.sleep(0.0025)
 
         pop_sys_extras(self.extras)
-        return Result.from_trace(trace).catch(
-            status=FAILED,
-            context=catch(
-                context,
-                status=FAILED,
-                updated={
-                    "errors": WorkflowTimeoutError(
-                        f"{self.name!r} was timeout because it use exec time "
-                        f"more than {timeout} seconds."
-                    ).to_dict(),
-                },
-            ),
+        raise WorkflowTimeoutError(
+            f"{self.name!r} was timeout because it use exec time more than "
+            f"{timeout} seconds."
         )
 
     def _execute(
@@ -797,11 +803,6 @@ class Workflow(BaseModel):
             {"jobs": {}, "info": {"exec_start": get_dt_now()}}
             | self.parameterize(params)
         )
-
-        event: ThreadEvent = event or ThreadEvent()
-        max_job_parallel: int = dynamic(
-            "max_job_parallel", f=max_job_parallel, extras=self.extras
-        )
         trace.info(
             f"[WORKFLOW]: Execute: {self.name!r} ("
             f"{'parallel' if max_job_parallel > 1 else 'sequential'} jobs)"
@@ -815,6 +816,7 @@ class Workflow(BaseModel):
         job_queue: Queue[str] = Queue()
         for job_id in self.jobs:
             job_queue.put(job_id)
+
         catch(context, status=WAIT)
         return self.process(
             job_queue,
@@ -850,11 +852,6 @@ class Workflow(BaseModel):
 
         err: dict[str, str] = params.get("errors", {})
         trace.info(f"[WORKFLOW]: Previous error: {err}")
-
-        event: ThreadEvent = event or ThreadEvent()
-        max_job_parallel: int = dynamic(
-            "max_job_parallel", f=max_job_parallel, extras=self.extras
-        )
         trace.info(
             f"[WORKFLOW]: Execute: {self.name!r} ("
             f"{'parallel' if max_job_parallel > 1 else 'sequential'} jobs)"
@@ -871,7 +868,9 @@ class Workflow(BaseModel):
             {
                 "params": params["params"].copy(),
                 "jobs": {
-                    j: jobs[j] for j in jobs if jobs[j]["status"] == SUCCESS
+                    j: jobs[j]
+                    for j in jobs
+                    if jobs[j].get("status", FAILED) == SUCCESS
                 },
             }
         )
@@ -991,6 +990,10 @@ class Workflow(BaseModel):
             "status": WAIT,
             "info": {"exec_start": get_dt_now()},
         }
+        event: ThreadEvent = event or ThreadEvent()
+        max_job_parallel: int = dynamic(
+            "max_job_parallel", f=max_job_parallel, extras=self.extras
+        )
         try:
             if rerun_mode:
                 return self._rerun(

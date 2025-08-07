@@ -418,10 +418,7 @@ def test_workflow_parameterize(test_path):
             },
         }
     )
-    assert workflow.parameterize({"name": "foo"}) == {
-        "params": {"name": "foo"},
-        "jobs": {},
-    }
+    assert workflow.parameterize({"name": "foo"}) == {"params": {"name": "foo"}}
 
     # NOTE: Raise if passing parameter that does not set on the workflow.
     with pytest.raises(WorkflowError):
@@ -442,11 +439,9 @@ def test_workflow_parameterize(test_path):
     )
     assert workflow.parameterize({"data": {"foo": {"bar": {"baz": 1}}}}) == {
         "params": {"data": {"foo": {"bar": {"baz": 1}}}},
-        "jobs": {},
     }
     assert workflow.parameterize({"data": '{"foo": {"bar": {"baz": 1}}}'}) == {
         "params": {"data": {"foo": {"bar": {"baz": 1}}}},
-        "jobs": {},
     }
 
 
