@@ -160,7 +160,7 @@
             }
           ],
           "default": null,
-          "description": "A stage condition statement to allow stage executable. This field alise with `if` field.",
+          "description": "A stage condition statement to allow stage executable. This field alias with `if` key.",
           "title": "If"
         },
         "retry": {
@@ -245,7 +245,7 @@
             }
           ],
           "default": null,
-          "description": "A stage condition statement to allow stage executable. This field alise with `if` field.",
+          "description": "A stage condition statement to allow stage executable. This field alias with `if` key.",
           "title": "If"
         },
         "retry": {
@@ -328,7 +328,7 @@
             }
           ],
           "default": null,
-          "description": "A stage condition statement to allow stage executable. This field alise with `if` field.",
+          "description": "A stage condition statement to allow stage executable. This field alias with `if` key.",
           "title": "If"
         },
         "case": {
@@ -2681,7 +2681,7 @@
             }
           ],
           "default": null,
-          "description": "A stage condition statement to allow stage executable. This field alise with `if` field.",
+          "description": "A stage condition statement to allow stage executable. This field alias with `if` key.",
           "title": "If"
         },
         "retry": {
@@ -2846,7 +2846,7 @@
             }
           ],
           "default": null,
-          "description": "A stage condition statement to allow stage executable. This field alise with `if` field.",
+          "description": "A stage condition statement to allow stage executable. This field alias with `if` key.",
           "title": "If"
         },
         "echo": {
@@ -3012,7 +3012,7 @@
             }
           ],
           "default": null,
-          "description": "A stage condition statement to allow stage executable. This field alise with `if` field.",
+          "description": "A stage condition statement to allow stage executable. This field alias with `if` key.",
           "title": "If"
         },
         "foreach": {
@@ -3638,7 +3638,7 @@
             }
           ],
           "default": null,
-          "description": "A stage condition statement to allow stage executable. This field alise with `if` field.",
+          "description": "A stage condition statement to allow stage executable. This field alias with `if` key.",
           "title": "If"
         },
         "parallel": {
@@ -3772,7 +3772,7 @@
             }
           ],
           "default": null,
-          "description": "A stage condition statement to allow stage executable. This field alise with `if` field.",
+          "description": "A stage condition statement to allow stage executable. This field alias with `if` key.",
           "title": "If"
         },
         "retry": {
@@ -3855,7 +3855,7 @@
             }
           ],
           "default": null,
-          "description": "A stage condition statement to allow stage executable. This field alise with `if` field.",
+          "description": "A stage condition statement to allow stage executable. This field alias with `if` key.",
           "title": "If"
         },
         "raise": {
@@ -4102,7 +4102,7 @@
             }
           ],
           "default": null,
-          "description": "A stage condition statement to allow stage executable. This field alise with `if` field.",
+          "description": "A stage condition statement to allow stage executable. This field alias with `if` key.",
           "title": "If"
         },
         "retry": {
@@ -4185,7 +4185,7 @@
             }
           ],
           "default": null,
-          "description": "A stage condition statement to allow stage executable. This field alise with `if` field.",
+          "description": "A stage condition statement to allow stage executable. This field alias with `if` key.",
           "title": "If"
         },
         "item": {
@@ -4321,7 +4321,7 @@
             }
           ],
           "default": null,
-          "description": "A stage condition statement to allow stage executable. This field alise with `if` field.",
+          "description": "A stage condition statement to allow stage executable. This field alias with `if` key.",
           "title": "If"
         },
         "retry": {
