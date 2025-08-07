@@ -6,7 +6,7 @@ from ddeutil.workflow.job import Job
 from .utils import exclude_info
 
 
-def test_workflow_execute_job():
+def test_workflow_process_job():
     job: Job = Job(
         stages=[
             {
@@ -21,7 +21,7 @@ def test_workflow_execute_job():
         ],
     )
     workflow: Workflow = Workflow(name="workflow", jobs={"demo-run": job})
-    st, ctx = workflow.execute_job(
+    st, ctx = workflow.process_job(
         job=workflow.job("demo-run"), run_id="1234", context={}
     )
     assert st == SUCCESS
@@ -43,7 +43,7 @@ def test_workflow_execute_job():
 
     event = Event()
     event.set()
-    st, ctx = workflow.execute_job(
+    st, ctx = workflow.process_job(
         job=workflow.job("demo-run"), run_id="1234", context={}, event=event
     )
     assert st == CANCEL
@@ -56,14 +56,14 @@ def test_workflow_execute_job():
     }
 
 
-def test_workflow_execute_job_raise_inside():
+def test_workflow_process_job_raise_inside():
     job: Job = Job(
         stages=[
             {"name": "raise error", "run": "raise NotImplementedError()\n"},
         ],
     )
     workflow: Workflow = Workflow(name="workflow", jobs={"demo-run": job})
-    st, ctx = workflow.execute_job(
+    st, ctx = workflow.process_job(
         job=workflow.job("demo-run"), run_id="1234", context={}
     )
     assert st == FAILED

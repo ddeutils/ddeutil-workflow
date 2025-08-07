@@ -45,7 +45,12 @@ from . import DRYRUN
 from .__types import DictData
 from .audits import NORMAL, RERUN, Audit, ReleaseType, get_audit
 from .conf import YamlParser, dynamic
-from .errors import WorkflowCancelError, WorkflowError, WorkflowTimeoutError
+from .errors import (
+    WorkflowCancelError,
+    WorkflowError,
+    WorkflowSkipError,
+    WorkflowTimeoutError,
+)
 from .event import Event
 from .job import Job
 from .params import Param
@@ -65,7 +70,6 @@ from .reusables import has_template, param2template
 from .traces import Trace, get_trace
 from .utils import (
     extract_id,
-    gen_id,
     get_dt_now,
     pop_sys_extras,
 )
@@ -167,10 +171,10 @@ class Workflow(BaseModel):
             FileNotFoundError: If workflow configuration file not found
 
         Example:
-            >>> # NOTE: Load from default config path
+            Case: Load from default config path
             >>> workflow = Workflow.from_conf('data-pipeline')
 
-            >>> # NOTE: Load with custom path and extras
+            Case: Load with custom path and extras
             >>> workflow = Workflow.from_conf(
             ...     'data-pipeline',
             ...     path=Path('./custom-configs'),
@@ -534,7 +538,7 @@ class Workflow(BaseModel):
         parent_run_id: Optional[str] = None,
         event: Optional[ThreadEvent] = None,
     ) -> tuple[Status, DictData]:
-        """Job execution with passing dynamic parameters from the main workflow
+        """Job process job with passing dynamic parameters from the main workflow
         execution to the target job object via job's ID.
 
             This execution is the minimum level of execution of this workflow
@@ -616,7 +620,7 @@ class Workflow(BaseModel):
         max_job_parallel: int = 2,
         total_job: Optional[int] = None,
     ) -> Result:
-        """Process workflow."""
+        """Job process method."""
         ts: float = time.monotonic()
         trace: Trace = get_trace(
             run_id, parent_run_id=parent_run_id, extras=self.extras
@@ -627,21 +631,9 @@ class Workflow(BaseModel):
         skip_count: int = 0
         sequence_statuses: list[Status] = []
         if event and event.is_set():
-            err_msg: str = (
+            raise WorkflowCancelError(
                 "Execution was canceled from the event was set "
                 "before workflow execution."
-            )
-            trace.error(f"[WORKFLOW]: {err_msg}")
-            return Result(
-                run_id=run_id,
-                parent_run_id=parent_run_id,
-                status=CANCEL,
-                context=catch(
-                    context,
-                    status=CANCEL,
-                    updated={"errors": WorkflowCancelError(err_msg).to_dict()},
-                ),
-                extras=self.extras,
             )
 
         # NOTE: Force update internal extras for handler circle execution.
@@ -769,14 +761,9 @@ class Workflow(BaseModel):
                     statuses[total + 1 + skip_count + i] = s
 
                 pop_sys_extras(self.extras)
-                print(statuses)
                 st: Status = validate_statuses(statuses)
-                return Result(
-                    run_id=run_id,
-                    parent_run_id=parent_run_id,
-                    status=st,
-                    context=catch(context, status=st),
-                    extras=self.extras,
+                return Result.from_trace(trace).catch(
+                    status=st, context=catch(context, status=st)
                 )
 
             event.set()
@@ -791,9 +778,7 @@ class Workflow(BaseModel):
             time.sleep(0.0025)
 
         pop_sys_extras(self.extras)
-        return Result(
-            run_id=run_id,
-            parent_run_id=parent_run_id,
+        return Result.from_trace(trace).catch(
             status=FAILED,
             context=catch(
                 context,
@@ -805,20 +790,119 @@ class Workflow(BaseModel):
                     ).to_dict(),
                 },
             ),
-            extras=self.extras,
         )
 
     def _execute(
         self,
-        job_queue: Queue[str],
-        context: DictData,
+        params: DictData,
         trace: Trace,
+        context: DictData,
         *,
         event: Optional[ThreadEvent] = None,
         timeout: float = 3600,
         max_job_parallel: int = 2,
         total_job: Optional[int] = None,
     ) -> Result:
+        """Wrapped Execute method."""
+        context.update(
+            {"jobs": {}, "info": {"exec_start": get_dt_now()}}
+            | self.parameterize(params)
+        )
+
+        event: ThreadEvent = event or ThreadEvent()
+        max_job_parallel: int = dynamic(
+            "max_job_parallel", f=max_job_parallel, extras=self.extras
+        )
+        trace.info(
+            f"[WORKFLOW]: Execute: {self.name!r} ("
+            f"{'parallel' if max_job_parallel > 1 else 'sequential'} jobs)"
+        )
+        if not self.jobs:
+            trace.warning(f"[WORKFLOW]: {self.name!r} does not set jobs")
+            return Result.from_trace(trace).catch(
+                status=SUCCESS, context=catch(context, status=SUCCESS)
+            )
+
+        job_queue: Queue[str] = Queue()
+        for job_id in self.jobs:
+            job_queue.put(job_id)
+        catch(context, status=WAIT)
+        return self.process(
+            job_queue,
+            run_id=trace.run_id,
+            context=context,
+            parent_run_id=trace.parent_run_id,
+            event=event,
+            timeout=timeout,
+            max_job_parallel=max_job_parallel,
+            total_job=total_job,
+        )
+
+    def _rerun(
+        self,
+        params: DictData,
+        trace: Trace,
+        context: DictData,
+        *,
+        event: Optional[ThreadEvent] = None,
+        timeout: float = 3600,
+        max_job_parallel: int = 2,
+    ) -> Result:
+        """Wrapped Rerun method."""
+        if params["status"] == SUCCESS:
+            trace.info(
+                "[WORKFLOW]: Does not rerun because it already executed with "
+                "success status."
+            )
+            return Result.from_trace(trace).catch(
+                status=SUCCESS,
+                context=catch(context=params, status=SUCCESS),
+            )
+
+        err: dict[str, str] = params.get("errors", {})
+        trace.info(f"[WORKFLOW]: Previous error: {err}")
+
+        event: ThreadEvent = event or ThreadEvent()
+        max_job_parallel: int = dynamic(
+            "max_job_parallel", f=max_job_parallel, extras=self.extras
+        )
+        trace.info(
+            f"[WORKFLOW]: Execute: {self.name!r} ("
+            f"{'parallel' if max_job_parallel > 1 else 'sequential'} jobs)"
+        )
+        if not self.jobs:
+            trace.warning(f"[WORKFLOW]: {self.name!r} does not set jobs")
+            return Result.from_trace(trace).catch(
+                status=SUCCESS, context=catch(context=params, status=SUCCESS)
+            )
+
+        # NOTE: Prepare the new context variable for rerun process.
+        jobs: DictData = params.get("jobs")
+        context.update(
+            {
+                "params": params["params"].copy(),
+                "jobs": {
+                    j: jobs[j] for j in jobs if jobs[j]["status"] == SUCCESS
+                },
+            }
+        )
+
+        total_job: int = 0
+        job_queue: Queue[str] = Queue()
+        for job_id in self.jobs:
+
+            if job_id in context["jobs"]:
+                continue
+
+            job_queue.put(job_id)
+            total_job += 1
+
+        if total_job == 0:
+            raise WorkflowSkipError(
+                "It does not have job to rerun. it will change "
+                "status to skip."
+            )
+
         catch(context, status=WAIT)
         return self.process(
             job_queue,
@@ -839,6 +923,7 @@ class Workflow(BaseModel):
         event: Optional[ThreadEvent] = None,
         timeout: float = 3600,
         max_job_parallel: int = 2,
+        rerun_mode: bool = False,
     ) -> Result:
         """Execute workflow with passing a dynamic parameters to all jobs that
         included in this workflow model with `jobs` field.
@@ -895,6 +980,8 @@ class Workflow(BaseModel):
                 running more than this limit time. (Default: 60 * 60 seconds)
             max_job_parallel (int, default 2) The maximum workers that use for
                 job execution in `ThreadPoolExecutor` object.
+            rerun_mode (bool, default False): A rerun mode flag that will use
+                `_rerun` method if it set be True.
 
         Returns
             Result: Return Result object that create from execution context with
@@ -912,39 +999,38 @@ class Workflow(BaseModel):
         )
         context: DictData = {
             "jobs": {},
+            "status": WAIT,
             "info": {"exec_start": get_dt_now()},
-        } | self.parameterize(params)
-
-        event: ThreadEvent = event or ThreadEvent()
-        max_job_parallel: int = dynamic(
-            "max_job_parallel", f=max_job_parallel, extras=self.extras
-        )
-        trace.info(
-            f"[WORKFLOW]: Execute: {self.name!r} ("
-            f"{'parallel' if max_job_parallel > 1 else 'sequential'} jobs)"
-        )
-        if not self.jobs:
-            trace.warning(f"[WORKFLOW]: {self.name!r} does not set jobs")
-            return Result(
-                run_id=run_id,
-                parent_run_id=parent_run_id,
-                status=SUCCESS,
-                context=catch(context, status=SUCCESS),
-                extras=self.extras,
-            )
-
-        job_queue: Queue[str] = Queue()
-        for job_id in self.jobs:
-            job_queue.put(job_id)
-
+        }
         try:
+            if rerun_mode:
+                return self._rerun(
+                    params,
+                    trace,
+                    context,
+                    event=event,
+                    timeout=timeout,
+                    max_job_parallel=max_job_parallel,
+                )
             return self._execute(
-                job_queue,
-                context,
+                params,
                 trace,
+                context,
                 event=event,
                 timeout=timeout,
                 max_job_parallel=max_job_parallel,
+            )
+        except WorkflowError as e:
+            updated = {"errors": e.to_dict()}
+            if isinstance(e, WorkflowSkipError):
+                trace.error(f"⏭️ Skip: {e}", module="workflow")
+                updated = None
+            else:
+                trace.error(f"📢 Workflow Failed: {e}", module="workflow")
+
+            st: Status = get_status_from_error(e)
+            return Result.from_trace(trace).catch(
+                status=st, context=catch(context, status=st, updated=updated)
             )
         finally:
             context["info"].update(
@@ -985,82 +1071,11 @@ class Workflow(BaseModel):
             Result: Return Result object that create from execution context with
                 return mode.
         """
-        ts: float = time.monotonic()
-        parent_run_id: str = run_id
-        run_id: str = gen_id(self.name, extras=self.extras)
-        trace: Trace = get_trace(
-            run_id, parent_run_id=parent_run_id, extras=self.extras
+        return self.execute(
+            context,
+            run_id=run_id,
+            event=event,
+            timeout=timeout,
+            max_job_parallel=max_job_parallel,
+            rerun_mode=True,
         )
-        if context["status"] == SUCCESS:
-            trace.info(
-                "[WORKFLOW]: Does not rerun because it already executed with "
-                "success status."
-            )
-            return Result.from_trace(trace).catch(
-                status=SUCCESS,
-                context=catch(context=context, status=SUCCESS),
-            )
-
-        err: dict[str, str] = context.get("errors", {})
-        trace.info(f"[WORKFLOW]: Previous error: {err}")
-
-        event: ThreadEvent = event or ThreadEvent()
-        max_job_parallel: int = dynamic(
-            "max_job_parallel", f=max_job_parallel, extras=self.extras
-        )
-        trace.info(
-            f"[WORKFLOW]: Execute: {self.name!r} ("
-            f"{'parallel' if max_job_parallel > 1 else 'sequential'} jobs)"
-        )
-        if not self.jobs:
-            trace.warning(f"[WORKFLOW]: {self.name!r} does not set jobs")
-            return Result.from_trace(trace).catch(
-                status=SUCCESS,
-                context=catch(context=context, status=SUCCESS),
-            )
-
-        # NOTE: Prepare the new context variable for rerun process.
-        jobs: DictData = context.get("jobs")
-        context: DictData = {
-            "params": context["params"].copy(),
-            "jobs": {j: jobs[j] for j in jobs if jobs[j]["status"] == SUCCESS},
-            "info": {"exec_start": get_dt_now()},
-        }
-
-        total_job: int = 0
-        job_queue: Queue = Queue()
-        for job_id in self.jobs:
-
-            if job_id in context["jobs"]:
-                continue
-
-            job_queue.put(job_id)
-            total_job += 1
-
-        if total_job == 0:
-            trace.warning(
-                "[WORKFLOW]: It does not have job to rerun. it will change "
-                "status to skip."
-            )
-            return Result.from_trace(trace).catch(
-                status=SKIP,
-                context=catch(context=context, status=SKIP),
-            )
-
-        try:
-            return self._execute(
-                job_queue,
-                context,
-                trace,
-                event=event,
-                timeout=timeout,
-                max_job_parallel=max_job_parallel,
-                total_job=total_job,
-            )
-        finally:
-            context["info"].update(
-                {
-                    "exec_end": get_dt_now(),
-                    "exec_latency": round(time.monotonic() - ts, 6),
-                }
-            )
