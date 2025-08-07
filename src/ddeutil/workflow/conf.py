@@ -117,7 +117,7 @@ class Config:  # pragma: no cov
     def debug(self) -> bool:
         """Debug flag for echo log that use DEBUG mode.
 
-        :rtype: bool
+        Returns: bool
         """
         return str2bool(env("LOG_DEBUG_MODE", "true"))
 
@@ -472,9 +472,11 @@ def dynamic(
 def pass_env(value: T) -> T:  # pragma: no cov
     """Passing environment variable to an input value.
 
-    :param value: (Any) A value that want to pass env var searching.
+    Args:
+        value (Any): A value that want to pass env var searching.
 
-    :rtype: Any
+    Returns:
+        Any: An any value that have passed environment variable.
     """
     if isinstance(value, dict):
         return {k: pass_env(value[k]) for k in value}
