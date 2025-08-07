@@ -1,0 +1,454 @@
+name: "batch-processing"
+type: "Workflow"
+description: "Large-scale batch processing workflow with parallel execution and error handling"
+
+params:
+  input_path:
+    type: str
+    default: "s3://batch-data/input/"
+    desc: "Path to input data files"
+
+  output_path:
+    type: str
+    default: "s3://batch-data/output/"
+    desc: "Path for processed output"
+
+  batch_size:
+    type: int
+    default: 10000
+    desc: "Number of records per batch"
+
+  parallel_workers:
+    type: int
+    default: 4
+    desc: "Number of parallel workers"
+
+jobs:
+  data-discovery:
+    id: "data-discovery"
+    desc: "Discover and catalog input data files"
+
+    runs-on:
+      type: "aws_batch"
+      with:
+        job_queue_arn: "${AWS_BATCH_JOB_QUEUE_ARN}"
+        s3_bucket: "${S3_BUCKET}"
+        region_name: "us-east-1"
+
+    stages:
+      - name: "List input files"
+        bash: |
+          aws s3 ls ${{ params.input_path }} --recursive > /tmp/file_list.txt
+          echo "Found $(wc -l < /tmp/file_list.txt) files to process"
+        env:
+          AWS_DEFAULT_REGION: "us-east-1"
+
+      - name: "Generate file manifest"
+        run: |
+          import json
+          import subprocess
+
+          # Read file list
+          with open('/tmp/file_list.txt', 'r') as f:
+              files = [line.strip().split()[-1] for line in f if line.strip()]
+
+          # Group files by type and size
+          file_groups = {}
+          for file_path in files:
+              file_type = file_path.split('.')[-1]
+              if file_type not in file_groups:
+                  file_groups[file_type] = []
+              file_groups[file_type].append(file_path)
+
+          # Create manifest
+          manifest = {
+              'total_files': len(files),
+              'file_types': file_groups,
+              'processing_date': '${{ datetime.now().isoformat() }}',
+              'batch_size': ${{ params.batch_size }},
+              'parallel_workers': ${{ params.parallel_workers }}
+          }
+
+          with open('/tmp/manifest.json', 'w') as f:
+              json.dump(manifest, f, indent=2)
+
+          print(f"Generated manifest with {len(files)} files")
+          print(f"File types: {list(file_groups.keys())}")
+
+      - name: "Upload manifest"
+        bash: |
+          aws s3 cp /tmp/manifest.json ${{ params.output_path }}manifest.json
+        env:
+          AWS_DEFAULT_REGION: "us-east-1"
+
+  parallel-processing:
+    id: "parallel-processing"
+    desc: "Process data files in parallel"
+    needs: ["data-discovery"]
+
+    strategy:
+      matrix:
+        worker_id: [1, 2, 3, 4]
+      max-parallel: ${{ params.parallel_workers }}
+
+    runs-on:
+      type: "aws_batch"
+      with:
+        job_queue_arn: "${AWS_BATCH_JOB_QUEUE_ARN}"
+        s3_bucket: "${S3_BUCKET}"
+
+    stages:
+      - name: "Get worker assignment"
+        run: |
+          import json
+          import boto3
+
+          # Load manifest
+          s3 = boto3.client('s3')
+          response = s3.get_object(
+              Bucket='${{ params.output_path.split("/")[2] }}',
+              Key='manifest.json'
+          )
+          manifest = json.loads(response['Body'].read())
+
+          # Assign files to this worker
+          total_files = manifest['total_files']
+          worker_id = ${{ matrix.worker_id }}
+          total_workers = ${{ params.parallel_workers }}
+
+          # Simple round-robin assignment
+          worker_files = []
+          for i in range(worker_id - 1, total_files, total_workers):
+              worker_files.append(i)
+
+          print(f"Worker {worker_id} assigned {len(worker_files)} files")
+
+          # Store assignment
+          assignment = {
+              'worker_id': worker_id,
+              'file_indices': worker_files,
+              'total_workers': total_workers
+          }
+
+          with open('/tmp/assignment.json', 'w') as f:
+              json.dump(assignment, f)
+
+      - name: "Process assigned files"
+        foreach: "${{ assignment.file_indices }}"
+        concurrent: 2
+        stages:
+          - name: "Download file"
+            bash: |
+              aws s3 cp ${{ params.input_path }}file_${{ item }}.csv /tmp/input_${{ item }}.csv
+            env:
+              AWS_DEFAULT_REGION: "us-east-1"
+
+          - name: "Process file"
+            run: |
+              import pandas as pd
+              import numpy as np
+              from datetime import datetime
+
+              # Load data
+              df = pd.read_csv(f'/tmp/input_${{ item }}.csv')
+
+              # Data processing logic
+              # Clean data
+              df = df.dropna()
+
+              # Apply transformations
+              df['processed_date'] = datetime.now()
+              df['worker_id'] = ${{ matrix.worker_id }}
+              df['file_id'] = ${{ item }}
+
+              # Calculate derived fields
+              if 'amount' in df.columns:
+                  df['amount_category'] = pd.cut(df['amount'],
+                                               bins=[0, 100, 500, 1000, float('inf')],
+                                               labels=['low', 'medium', 'high', 'very_high'])
+
+              # Save processed data
+              output_file = f'/tmp/processed_${{ item }}.parquet'
+              df.to_parquet(output_file, index=False)
+
+              print(f"Processed file ${{ item }}: {len(df)} records")
+
+              # Store processing stats
+              stats = {
+                  'file_id': ${{ item }},
+                  'worker_id': ${{ matrix.worker_id }},
+                  'input_records': len(pd.read_csv(f'/tmp/input_${{ item }}.csv')),
+                  'output_records': len(df),
+                  'processing_time': datetime.now().isoformat()
+              }
+
+              with open(f'/tmp/stats_${{ item }}.json', 'w') as f:
+                  json.dump(stats, f)
+
+          - name: "Upload processed file"
+            bash: |
+              aws s3 cp /tmp/processed_${{ item }}.parquet ${{ params.output_path }}processed/file_${{ item }}.parquet
+              aws s3 cp /tmp/stats_${{ item }}.json ${{ params.output_path }}stats/stats_${{ item }}.json
+            env:
+              AWS_DEFAULT_REGION: "us-east-1"
+
+      - name: "Worker completion report"
+        run: |
+          import json
+          import glob
+
+          # Collect stats for this worker
+          stats_files = glob.glob('/tmp/stats_*.json')
+          worker_stats = []
+
+          for stats_file in stats_files:
+              with open(stats_file, 'r') as f:
+                  worker_stats.append(json.load(f))
+
+          # Calculate summary
+          total_input = sum(s['input_records'] for s in worker_stats)
+          total_output = sum(s['output_records'] for s in worker_stats)
+
+          summary = {
+              'worker_id': ${{ matrix.worker_id }},
+              'files_processed': len(worker_stats),
+              'total_input_records': total_input,
+              'total_output_records': total_output,
+              'completion_time': datetime.now().isoformat()
+          }
+
+          with open('/tmp/worker_summary.json', 'w') as f:
+              json.dump(summary, f)
+
+          print(f"Worker ${{ matrix.worker_id }} completed: {len(worker_stats)} files, {total_output} records")
+
+      - name: "Upload worker summary"
+        bash: |
+          aws s3 cp /tmp/worker_summary.json ${{ params.output_path }}summaries/worker_${{ matrix.worker_id }}_summary.json
+        env:
+          AWS_DEFAULT_REGION: "us-east-1"
+
+  data-aggregation:
+    id: "data-aggregation"
+    desc: "Aggregate processed data and generate final output"
+    needs: ["parallel-processing"]
+
+    runs-on:
+      type: "gcp_batch"
+      with:
+        project_id: "${GCP_PROJECT_ID}"
+        region: "us-central1"
+        gcs_bucket: "${GCS_BUCKET}"
+        machine_type: "n1-standard-8"
+
+    stages:
+      - name: "Download all processed files"
+        bash: |
+          gsutil -m cp gs://${{ params.output_path.split("/")[2] }}/processed/*.parquet /tmp/aggregation/
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: "/tmp/credentials.json"
+
+      - name: "Aggregate data"
+        run: |
+          import pandas as pd
+          import glob
+          import json
+
+          # Load all processed files
+          parquet_files = glob.glob('/tmp/aggregation/*.parquet')
+          print(f"Loading {len(parquet_files)} processed files...")
+
+          # Read and combine data
+          dfs = []
+          for file_path in parquet_files:
+              df = pd.read_parquet(file_path)
+              dfs.append(df)
+
+          combined_df = pd.concat(dfs, ignore_index=True)
+          print(f"Combined dataset: {len(combined_df)} records")
+
+          # Generate aggregations
+          aggregations = {}
+
+          # Time-based aggregations
+          if 'processed_date' in combined_df.columns:
+              combined_df['processed_date'] = pd.to_datetime(combined_df['processed_date'])
+              daily_stats = combined_df.groupby(combined_df['processed_date'].dt.date).agg({
+                  'amount': ['count', 'sum', 'mean', 'std'] if 'amount' in combined_df.columns else 'count'
+              }).reset_index()
+              aggregations['daily_stats'] = daily_stats
+
+          # Worker performance
+          worker_stats = combined_df.groupby('worker_id').agg({
+              'file_id': 'nunique',
+              'amount': 'count' if 'amount' in combined_df.columns else 'count'
+          }).reset_index()
+          worker_stats.columns = ['worker_id', 'files_processed', 'records_processed']
+          aggregations['worker_stats'] = worker_stats
+
+          # Save aggregations
+          for name, data in aggregations.items():
+              data.to_parquet(f'/tmp/{name}.parquet', index=False)
+              print(f"Saved {name}: {len(data)} records")
+
+          # Save combined dataset
+          combined_df.to_parquet('/tmp/combined_dataset.parquet', index=False)
+
+          # Generate final report
+          final_report = {
+              'total_files_processed': len(parquet_files),
+              'total_records': len(combined_df),
+              'processing_date': datetime.now().isoformat(),
+              'aggregations_generated': list(aggregations.keys())
+          }
+
+          with open('/tmp/final_report.json', 'w') as f:
+              json.dump(final_report, f, indent=2)
+
+      - name: "Upload aggregated data"
+        bash: |
+          gsutil cp /tmp/combined_dataset.parquet gs://${{ params.output_path.split("/")[2] }}/final/
+          gsutil cp /tmp/daily_stats.parquet gs://${{ params.output_path.split("/")[2] }}/final/
+          gsutil cp /tmp/worker_stats.parquet gs://${{ params.output_path.split("/")[2] }}/final/
+          gsutil cp /tmp/final_report.json gs://${{ params.output_path.split("/")[2] }}/final/
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: "/tmp/credentials.json"
+
+  quality-validation:
+    id: "quality-validation"
+    desc: "Validate data quality and completeness"
+    needs: ["data-aggregation"]
+
+    runs-on:
+      type: "local"
+
+    stages:
+      - name: "Download final data"
+        bash: |
+          aws s3 cp ${{ params.output_path }}final/ /tmp/validation/ --recursive
+        env:
+          AWS_DEFAULT_REGION: "us-east-1"
+
+      - name: "Run quality checks"
+        run: |
+          import pandas as pd
+          import json
+
+          # Load data
+          combined_df = pd.read_parquet('/tmp/validation/combined_dataset.parquet')
+          final_report = json.load(open('/tmp/validation/final_report.json'))
+
+          # Quality checks
+          quality_results = {}
+
+          # Completeness check
+          missing_values = combined_df.isnull().sum().sum()
+          total_cells = combined_df.shape[0] * combined_df.shape[1]
+          completeness_score = 1 - (missing_values / total_cells)
+          quality_results['completeness'] = completeness_score
+
+          # Duplicate check
+          duplicates = combined_df.duplicated().sum()
+          duplicate_rate = duplicates / len(combined_df)
+          quality_results['duplicate_rate'] = duplicate_rate
+
+          # Data type validation
+          expected_types = {
+              'worker_id': 'int64',
+              'file_id': 'int64'
+          }
+
+          type_errors = 0
+          for col, expected_type in expected_types.items():
+              if col in combined_df.columns:
+                  if str(combined_df[col].dtype) != expected_type:
+                      type_errors += 1
+
+          quality_results['type_errors'] = type_errors
+
+          # Range checks
+          if 'amount' in combined_df.columns:
+              negative_amounts = (combined_df['amount'] < 0).sum()
+              quality_results['negative_amounts'] = negative_amounts
+
+          # Overall quality score
+          quality_score = (
+              completeness_score * 0.4 +
+              (1 - duplicate_rate) * 0.3 +
+              (1 - type_errors / len(expected_types)) * 0.3
+          )
+          quality_results['overall_score'] = quality_score
+
+          print(f"Quality validation completed:")
+          print(f"  Completeness: {completeness_score:.3f}")
+          print(f"  Duplicate rate: {duplicate_rate:.3f}")
+          print(f"  Type errors: {type_errors}")
+          print(f"  Overall score: {quality_score:.3f}")
+
+          # Save quality report
+          quality_report = {
+              'quality_results': quality_results,
+              'validation_date': datetime.now().isoformat(),
+              'total_records': len(combined_df)
+          }
+
+          with open('/tmp/quality_report.json', 'w') as f:
+              json.dump(quality_report, f, indent=2)
+
+      - name: "Upload quality report"
+        bash: |
+          aws s3 cp /tmp/quality_report.json ${{ params.output_path }}final/quality_report.json
+        env:
+          AWS_DEFAULT_REGION: "us-east-1"
+
+  notification:
+    id: "notification"
+    desc: "Send completion notifications"
+    needs: ["quality-validation"]
+
+    runs-on:
+      type: "local"
+
+    stages:
+      - name: "Load final reports"
+        run: |
+          import json
+
+          # Load reports
+          with open('/tmp/validation/final_report.json', 'r') as f:
+              final_report = json.load(f)
+
+          with open('/tmp/validation/quality_report.json', 'r') as f:
+              quality_report = json.load(f)
+
+          # Prepare notification data
+          notification_data = {
+              'total_files': final_report['total_files_processed'],
+              'total_records': final_report['total_records'],
+              'quality_score': quality_report['quality_results']['overall_score'],
+              'processing_date': final_report['processing_date']
+          }
+
+      - name: "Send Slack notification"
+        uses: "notifications/send_slack@v1.0"
+        with:
+          channel: "#batch-processing"
+          message: "Batch processing completed: ${{ notification_data.total_files }} files, ${{ notification_data.total_records }} records, quality score: ${{ notification_data.quality_score:.3f }}"
+          color: "good"
+
+      - name: "Send email report"
+        uses: "notifications/send_email@v1.0"
+        with:
+          to: "data-team@company.com"
+          subject: "Batch Processing Report - ${{ notification_data.processing_date }}"
+          template: "batch_processing_report"
+          data:
+            total_files: ${{ notification_data.total_files }}
+            total_records: ${{ notification_data.total_records }}
+            quality_score: ${{ notification_data.quality_score }}
+            processing_date: "${{ notification_data.processing_date }}"
+
+on:
+  schedule:
+    - cronjob: "0 1 * * *"  # Daily at 1 AM
+      timezone: "UTC"

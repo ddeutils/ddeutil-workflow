@@ -1,0 +1,99 @@
+# Azure Batch Workflow Example
+# This example demonstrates how to configure a workflow job to run on Azure Batch
+
+name: "azure-batch-example"
+description: "Example workflow using Azure Batch for job execution"
+
+# Workflow parameters
+params:
+  data_source:
+    type: str
+    default: "https://example.com/data.csv"
+    description: "Source data URL"
+
+  output_path:
+    type: str
+    default: "/tmp/output"
+    description: "Output directory path"
+
+# Jobs configuration
+jobs:
+  data-processing:
+    id: "data-processing"
+    desc: "Process data using Azure Batch compute nodes"
+
+    # Azure Batch configuration
+    runs-on:
+      type: "azure_batch"
+      with:
+        batch_account_name: "${AZURE_BATCH_ACCOUNT_NAME}"
+        batch_account_key: "${AZURE_BATCH_ACCOUNT_KEY}"
+        batch_account_url: "${AZURE_BATCH_ACCOUNT_URL}"
+        storage_account_name: "${AZURE_STORAGE_ACCOUNT_NAME}"
+        storage_account_key: "${AZURE_STORAGE_ACCOUNT_KEY}"
+
+    # Job stages
+    stages:
+      - name: "start"
+        type: "empty"
+        echo: "Starting data processing on Azure Batch"
+
+      - name: "download-data"
+        type: "bash"
+        bash: |
+          echo "Downloading data from ${data_source}"
+          wget -O /tmp/data.csv "${data_source}"
+          echo "Data downloaded successfully"
+
+      - name: "process-data"
+        type: "py"
+        run: |
+          import pandas as pd
+          import os
+
+          # Load data
+          df = pd.read_csv('/tmp/data.csv')
+
+          # Process data
+          processed_data = df.groupby('category').agg({
+              'value': ['mean', 'sum', 'count']
+          }).round(2)
+
+          # Save results
+          output_file = f"{params['output_path']}/processed_data.csv"
+          os.makedirs(os.path.dirname(output_file), exist_ok=True)
+          processed_data.to_csv(output_file)
+
+          # Set output
+          result.context.update({
+              "processed_rows": len(df),
+              "output_file": output_file,
+              "summary": processed_data.to_dict()
+          })
+
+      - name: "upload-results"
+        type: "bash"
+        bash: |
+          echo "Uploading results to storage"
+          az storage blob upload \
+            --account-name "${AZURE_STORAGE_ACCOUNT_NAME}" \
+            --account-key "${AZURE_STORAGE_ACCOUNT_KEY}" \
+            --container-name "results" \
+            --file "${params['output_path']}/processed_data.csv" \
+            --name "processed_data_$(date +%Y%m%d_%H%M%S).csv"
+
+      - name: "complete"
+        type: "empty"
+        echo: "Data processing completed successfully on Azure Batch"
+
+# Environment variables required:
+# AZURE_BATCH_ACCOUNT_NAME: Your Azure Batch account name
+# AZURE_BATCH_ACCOUNT_KEY: Your Azure Batch account key
+# AZURE_BATCH_ACCOUNT_URL: Your Azure Batch account URL
+# AZURE_STORAGE_ACCOUNT_NAME: Your Azure Storage account name
+# AZURE_STORAGE_ACCOUNT_KEY: Your Azure Storage account key
+
+# Usage:
+# 1. Set the required environment variables
+# 2. Install Azure dependencies: pip install ddeutil-workflow[azure]
+# 3. Run the workflow: workflow-cli run azure-batch-example.yml

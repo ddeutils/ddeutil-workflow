@@ -1,0 +1,407 @@
+name: "microservice-deployment"
+type: "Workflow"
+description: "Microservice deployment pipeline with blue-green deployment, health checks, and rollback capabilities"
+
+params:
+  service_name:
+    type: str
+    default: "user-service"
+    desc: "Name of the microservice to deploy"
+
+  image_tag:
+    type: str
+    default: "latest"
+    desc: "Docker image tag to deploy"
+
+  environment:
+    type: choice
+    options: ["staging", "production"]
+    desc: "Target deployment environment"
+
+  deployment_strategy:
+    type: choice
+    options: ["blue-green", "rolling", "canary"]
+    desc: "Deployment strategy to use"
+
+jobs:
+  build-and-test:
+    id: "build-and-test"
+    desc: "Build Docker image and run tests"
+
+    runs-on:
+      type: "local"
+
+    stages:
+      - name: "Build Docker image"
+        bash: |
+          docker build -t ${{ params.service_name }}:${{ params.image_tag }} .
+          docker tag ${{ params.service_name }}:${{ params.image_tag }} ${{ params.service_name }}:latest
+        env:
+          DOCKER_BUILDKIT: "1"
+
+      - name: "Run unit tests"
+        run: |
+          import subprocess
+          import sys
+
+          # Run unit tests
+          result = subprocess.run(['python', '-m', 'pytest', 'tests/unit/'],
+                                capture_output=True, text=True)
+
+          if result.returncode != 0:
+              print("Unit tests failed:")
+              print(result.stdout)
+              print(result.stderr)
+              sys.exit(1)
+
+          print("Unit tests passed successfully")
+
+      - name: "Run integration tests"
+        run: |
+          import subprocess
+          import sys
+
+          # Start test database
+          subprocess.run(['docker-compose', '-f', 'docker-compose.test.yml', 'up', '-d'])
+
+          # Wait for database to be ready
+          import time
+          time.sleep(10)
+
+          # Run integration tests
+          result = subprocess.run(['python', '-m', 'pytest', 'tests/integration/'],
+                                capture_output=True, text=True)
+
+          # Cleanup
+          subprocess.run(['docker-compose', '-f', 'docker-compose.test.yml', 'down'])
+
+          if result.returncode != 0:
+              print("Integration tests failed:")
+              print(result.stdout)
+              print(result.stderr)
+              sys.exit(1)
+
+          print("Integration tests passed successfully")
+
+      - name: "Security scan"
+        uses: "security/run_trivy@v1.0"
+        with:
+          image: "${{ params.service_name }}:${{ params.image_tag }}"
+          severity: "HIGH,CRITICAL"
+
+      - name: "Push image to registry"
+        bash: |
+          docker push ${{ params.service_name }}:${{ params.image_tag }}
+          docker push ${{ params.service_name }}:latest
+
+  deploy-staging:
+    id: "deploy-staging"
+    desc: "Deploy to staging environment"
+    needs: ["build-and-test"]
+    if: "${{ params.environment == 'staging' }}"
+
+    runs-on:
+      type: "container"
+      with:
+        image: "kubectl:latest"
+        environment:
+          KUBECONFIG: "/root/.kube/config"
+        volumes:
+          - "/root/.kube": "/root/.kube"
+
+    stages:
+      - name: "Deploy to staging"
+        bash: |
+          kubectl set image deployment/${{ params.service_name }} \
+            ${{ params.service_name }}=${{ params.service_name }}:${{ params.image_tag }} \
+            --namespace=staging
+
+          kubectl rollout status deployment/${{ params.service_name }} \
+            --namespace=staging --timeout=300s
+
+      - name: "Run smoke tests"
+        run: |
+          import requests
+          import time
+
+          # Wait for service to be ready
+          time.sleep(30)
+
+          # Run smoke tests
+          base_url = "http://${{ params.service_name }}.staging.example.com"
+
+          # Health check
+          response = requests.get(f"{base_url}/health", timeout=10)
+          if response.status_code != 200:
+              raise Exception(f"Health check failed: {response.status_code}")
+
+          # Basic functionality test
+          response = requests.get(f"{base_url}/api/v1/users", timeout=10)
+          if response.status_code != 200:
+              raise Exception(f"API test failed: {response.status_code}")
+
+          print("Smoke tests passed")
+
+      - name: "Notify staging deployment"
+        uses: "notifications/send_slack@v1.0"
+        with:
+          channel: "#deployments"
+          message: "Staging deployment completed for ${{ params.service_name }}:${{ params.image_tag }}"
+          color: "good"
+
+  deploy-production-blue-green:
+    id: "deploy-production-blue-green"
+    desc: "Blue-green deployment to production"
+    needs: ["build-and-test"]
+    if: "${{ params.environment == 'production' && params.deployment_strategy == 'blue-green' }}"
+
+    runs-on:
+      type: "container"
+      with:
+        image: "kubectl:latest"
+        environment:
+          KUBECONFIG: "/root/.kube/config"
+        volumes:
+          - "/root/.kube": "/root/.kube"
+
+    stages:
+      - name: "Determine current environment"
+        run: |
+          import subprocess
+
+          # Check which environment is currently active
+          result = subprocess.run(['kubectl', 'get', 'service',
+                                 '${{ params.service_name }}-service',
+                                 '--namespace=production', '-o=jsonpath={.spec.selector.version}'],
+                                capture_output=True, text=True)
+
+          current_version = result.stdout.strip()
+          if current_version == "blue":
+              new_version = "green"
+          else:
+              new_version = "blue"
+
+          print(f"Current version: {current_version}")
+          print(f"Deploying to: {new_version}")
+
+          # Store for next stages
+          deployment_info = {
+              'current_version': current_version,
+              'new_version': new_version
+          }
+
+      - name: "Deploy new version"
+        bash: |
+          kubectl set image deployment/${{ params.service_name }}-${{ deployment_info.new_version }} \
+            ${{ params.service_name }}=${{ params.service_name }}:${{ params.image_tag }} \
+            --namespace=production
+
+          kubectl rollout status deployment/${{ params.service_name }}-${{ deployment_info.new_version }} \
+            --namespace=production --timeout=300s
+
+      - name: "Health check new version"
+        run: |
+          import requests
+          import time
+
+          # Wait for new version to be ready
+          time.sleep(30)
+
+          # Health check new version
+          new_service_url = f"http://${{ params.service_name }}-${{ deployment_info.new_version }}.production.example.com"
+
+          for i in range(10):
+              try:
+                  response = requests.get(f"{new_service_url}/health", timeout=10)
+                  if response.status_code == 200:
+                      print("New version health check passed")
+                      break
+              except:
+                  if i == 9:
+                      raise Exception("New version health check failed")
+                  time.sleep(10)
+
+      - name: "Run load tests"
+        uses: "testing/run_load_test@v1.0"
+        with:
+          target_url: "http://${{ params.service_name }}-${{ deployment_info.new_version }}.production.example.com"
+          duration: "300"
+          users: "100"
+          ramp_up: "60"
+
+      - name: "Switch traffic to new version"
+        bash: |
+          kubectl patch service ${{ params.service_name }}-service \
+            --namespace=production \
+            -p='{"spec":{"selector":{"version":"${{ deployment_info.new_version }}"}}}'
+
+      - name: "Verify traffic switch"
+        run: |
+          import requests
+          import time
+
+          # Wait for traffic to switch
+          time.sleep(30)
+
+          # Verify new version is receiving traffic
+          main_service_url = f"http://${{ params.service_name }}.production.example.com"
+
+          for i in range(10):
+              try:
+                  response = requests.get(f"{main_service_url}/health", timeout=10)
+                  if response.status_code == 200:
+                      print("Traffic switch verified")
+                      break
+              except:
+                  if i == 9:
+                      raise Exception("Traffic switch verification failed")
+                  time.sleep(10)
+
+      - name: "Monitor for 5 minutes"
+        run: |
+          import requests
+          import time
+
+          print("Monitoring new deployment for 5 minutes...")
+
+          for i in range(30):  # 30 * 10 seconds = 5 minutes
+              try:
+                  response = requests.get(f"http://${{ params.service_name }}.production.example.com/health", timeout=10)
+                  if response.status_code != 200:
+                      raise Exception(f"Service health check failed: {response.status_code}")
+              except Exception as e:
+                  print(f"Monitoring check {i+1} failed: {e}")
+                  raise e
+
+              time.sleep(10)
+
+          print("Monitoring completed successfully")
+
+      - name: "Cleanup old version"
+        bash: |
+          kubectl scale deployment ${{ params.service_name }}-${{ deployment_info.current_version }} \
+            --replicas=0 --namespace=production
+
+      - name: "Notify production deployment"
+        uses: "notifications/send_slack@v1.0"
+        with:
+          channel: "#deployments"
+          message: "Production blue-green deployment completed for ${{ params.service_name }}:${{ params.image_tag }}"
+          color: "good"
+
+  deploy-production-rolling:
+    id: "deploy-production-rolling"
+    desc: "Rolling deployment to production"
+    needs: ["build-and-test"]
+    if: "${{ params.environment == 'production' && params.deployment_strategy == 'rolling' }}"
+
+    runs-on:
+      type: "container"
+      with:
+        image: "kubectl:latest"
+        environment:
+          KUBECONFIG: "/root/.kube/config"
+        volumes:
+          - "/root/.kube": "/root/.kube"
+
+    stages:
+      - name: "Deploy with rolling update"
+        bash: |
+          kubectl set image deployment/${{ params.service_name }} \
+            ${{ params.service_name }}=${{ params.service_name }}:${{ params.image_tag }} \
+            --namespace=production
+
+          kubectl rollout status deployment/${{ params.service_name }} \
+            --namespace=production --timeout=600s
+
+      - name: "Verify deployment"
+        run: |
+          import requests
+          import time
+
+          # Wait for deployment to complete
+          time.sleep(30)
+
+          # Verify service health
+          service_url = f"http://${{ params.service_name }}.production.example.com"
+
+          for i in range(10):
+              try:
+                  response = requests.get(f"{service_url}/health", timeout=10)
+                  if response.status_code == 200:
+                      print("Rolling deployment verified")
+                      break
+              except:
+                  if i == 9:
+                      raise Exception("Rolling deployment verification failed")
+                  time.sleep(10)
+
+      - name: "Notify production deployment"
+        uses: "notifications/send_slack@v1.0"
+        with:
+          channel: "#deployments"
+          message: "Production rolling deployment completed for ${{ params.service_name }}:${{ params.image_tag }}"
+          color: "good"
+
+  rollback:
+    id: "rollback"
+    desc: "Rollback deployment if issues detected"
+    needs: ["deploy-production-blue-green", "deploy-production-rolling"]
+    if: "${{ params.environment == 'production' }}"
+
+    runs-on:
+      type: "container"
+      with:
+        image: "kubectl:latest"
+        environment:
+          KUBECONFIG: "/root/.kube/config"
+        volumes:
+          - "/root/.kube": "/root/.kube"
+
+    stages:
+      - name: "Check for rollback conditions"
+        run: |
+          import requests
+          import time
+
+          # Monitor for 10 minutes after deployment
+          print("Monitoring for rollback conditions...")
+
+          error_count = 0
+          for i in range(60):  # 60 * 10 seconds = 10 minutes
+              try:
+                  response = requests.get(f"http://${{ params.service_name }}.production.example.com/health", timeout=10)
+                  if response.status_code != 200:
+                      error_count += 1
+                      print(f"Error detected: {response.status_code}")
+              except:
+                  error_count += 1
+                  print("Connection error detected")
+
+              # If more than 5 errors in 10 minutes, trigger rollback
+              if error_count > 5:
+                  raise Exception("Rollback conditions met")
+
+              time.sleep(10)
+
+          print("No rollback conditions detected")
+
+      - name: "Execute rollback"
+        bash: |
+          kubectl rollout undo deployment/${{ params.service_name }} \
+            --namespace=production
+
+          kubectl rollout status deployment/${{ params.service_name }} \
+            --namespace=production --timeout=300s
+
+      - name: "Notify rollback"
+        uses: "notifications/send_slack@v1.0"
+        with:
+          channel: "#deployments"
+          message: "Rollback executed for ${{ params.service_name }} due to issues"
+          color: "warning"
+
+on:
+  schedule:
+    - cronjob: "0 2 * * *"  # Daily at 2 AM
+      timezone: "UTC"

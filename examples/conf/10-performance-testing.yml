@@ -1,0 +1,596 @@
+name: "performance-testing"
+type: "Workflow"
+description: "Comprehensive performance testing workflow with load testing and monitoring"
+
+params:
+  test_scenario:
+    type: choice
+    options: ["load", "stress", "spike", "endurance"]
+    desc: "Type of performance test to run"
+
+  target_users:
+    type: int
+    default: 100
+    desc: "Number of target users for load test"
+
+  test_duration:
+    type: int
+    default: 300
+    desc: "Test duration in seconds"
+
+jobs:
+  performance-setup:
+    id: "performance-setup"
+    desc: "Setup performance testing environment"
+
+    runs-on:
+      type: "local"
+
+    stages:
+      - name: "Check test environment"
+        run: |
+          import requests
+          import json
+
+          # Check if target application is available
+          target_url = "${{ params.target_url }}"
+
+          try:
+              response = requests.get(f"{target_url}/health", timeout=10)
+              if response.status_code == 200:
+                  print("Target application is available")
+                  app_healthy = True
+              else:
+                  print(f"Target application health check failed: {response.status_code}")
+                  app_healthy = False
+          except Exception as e:
+              print(f"Target application unavailable: {e}")
+              app_healthy = False
+
+          # Check monitoring tools
+          monitoring_status = {
+              'prometheus': False,
+              'grafana': False,
+              'jaeger': False
+          }
+
+          monitoring_urls = {
+              'prometheus': '${{ params.prometheus_url }}',
+              'grafana': '${{ params.grafana_url }}',
+              'jaeger': '${{ params.jaeger_url }}'
+          }
+
+          for tool, url in monitoring_urls.items():
+              try:
+                  response = requests.get(url, timeout=5)
+                  monitoring_status[tool] = response.status_code == 200
+              except:
+                  monitoring_status[tool] = False
+
+          setup_status = {
+              'target_app_healthy': app_healthy,
+              'monitoring_tools': monitoring_status,
+              'ready_for_testing': app_healthy and all(monitoring_status.values())
+          }
+
+          with open('/tmp/setup_status.json', 'w') as f:
+              json.dump(setup_status, f, indent=2)
+
+          if not setup_status['ready_for_testing']:
+              raise Exception("Performance testing environment not ready")
+
+          print("Performance testing environment ready")
+
+      - name: "Prepare test data"
+        run: |
+          import json
+          import random
+
+          # Generate test data
+          test_users = []
+          for i in range(${{ params.target_users }}):
+              test_users.append({
+                  'user_id': f"test_user_{i}",
+                  'email': f"test{i}@example.com",
+                  'password': f"password{i}",
+                  'session_token': f"token_{random.randint(1000, 9999)}"
+              })
+
+          # Generate test scenarios
+          test_scenarios = {
+              'load': {
+                  'description': 'Normal load testing',
+                  'users': ${{ params.target_users }},
+                  'ramp_up_time': 60,
+                  'duration': ${{ params.test_duration }}
+              },
+              'stress': {
+                  'description': 'Stress testing beyond capacity',
+                  'users': ${{ params.target_users * 2 }},
+                  'ramp_up_time': 120,
+                  'duration': ${{ params.test_duration }}
+              },
+              'spike': {
+                  'description': 'Spike testing with sudden load increase',
+                  'users': ${{ params.target_users * 3 }},
+                  'ramp_up_time': 10,
+                  'duration': ${{ params.test_duration }}
+              },
+              'endurance': {
+                  'description': 'Long duration testing',
+                  'users': ${{ params.target_users }},
+                  'ramp_up_time': 60,
+                  'duration': 3600  # 1 hour
+              }
+          }
+
+          test_data = {
+              'users': test_users,
+              'scenario': test_scenarios['${{ params.test_scenario }}'],
+              'target_url': '${{ params.target_url }}'
+          }
+
+          with open('/tmp/test_data.json', 'w') as f:
+              json.dump(test_data, f, indent=2)
+
+          print(f"Test data prepared for {len(test_users)} users")
+
+  load-testing:
+    id: "load-testing"
+    desc: "Execute load testing scenarios"
+    needs: ["performance-setup"]
+
+    runs-on:
+      type: "container"
+      with:
+        image: "locustio/locust:latest"
+        environment:
+          TARGET_URL: "${{ params.target_url }}"
+          TEST_SCENARIO: "${{ params.test_scenario }}"
+        volumes:
+          - "/tmp/test-results": "/app/results"
+          - "/tmp/test_data.json": "/app/test_data.json"
+        working_dir: "/app"
+
+    stages:
+      - name: "Create load test script"
+        run: |
+          import json
+
+          # Load test data
+          with open('/app/test_data.json', 'r') as f:
+              test_data = json.load(f)
+
+          # Create Locust test script
+          locust_script = f'''
+          from locust import HttpUser, task, between
+          import json
+          import random
+
+          # Load test data
+          with open('/app/test_data.json', 'r') as f:
+              test_data = json.load(f)
+
+          class PerformanceUser(HttpUser):
+              wait_time = between(1, 3)
+
+              def on_start(self):
+                  # Login and get session
+                  user = random.choice(test_data['users'])
+                  response = self.client.post("/api/v1/auth/login", json={{
+                      "email": user['email'],
+                      "password": user['password']
+                  }})
+
+                  if response.status_code == 200:
+                      self.token = response.json().get("token")
+                      self.headers = {{"Authorization": f"Bearer {{self.token}}", "Content-Type": "application/json"}}
+                  else:
+                      self.token = None
+                      self.headers = {{"Content-Type": "application/json"}}
+
+              @task(3)
+              def browse_products(self):
+                  self.client.get("/api/v1/products", headers=self.headers)
+
+              @task(2)
+              def view_product_details(self):
+                  product_id = random.randint(1, 100)
+                  self.client.get(f"/api/v1/products/{{product_id}}", headers=self.headers)
+
+              @task(1)
+              def search_products(self):
+                  search_terms = ["laptop", "phone", "tablet", "headphones"]
+                  term = random.choice(search_terms)
+                  self.client.get(f"/api/v1/products/search?q={{term}}", headers=self.headers)
+
+              @task(1)
+              def add_to_cart(self):
+                  if self.token:
+                      product_id = random.randint(1, 100)
+                      self.client.post("/api/v1/cart/add", json={{
+                          "product_id": product_id,
+                          "quantity": random.randint(1, 3)
+                      }}, headers=self.headers)
+
+              @task(1)
+              def view_cart(self):
+                  if self.token:
+                      self.client.get("/api/v1/cart", headers=self.headers)
+
+              @task(1)
+              def checkout_process(self):
+                  if self.token:
+                      self.client.post("/api/v1/checkout", json={{
+                          "payment_method": "credit_card",
+                          "shipping_address": {{
+                              "street": "123 Test St",
+                              "city": "Test City",
+                              "state": "TS",
+                              "zip": "12345"
+                          }}
+                      }}, headers=self.headers)
+          '''
+
+          with open('/app/locustfile.py', 'w') as f:
+              f.write(locust_script)
+
+      - name: "Run performance test"
+        bash: |
+          scenario="$TEST_SCENARIO"
+          target_url="$TARGET_URL"
+
+          case $scenario in
+              "load")
+                  users=${{ params.target_users }}
+                  spawn_rate=10
+                  ;;
+              "stress")
+                  users=${{ params.target_users * 2 }}
+                  spawn_rate=20
+                  ;;
+              "spike")
+                  users=${{ params.target_users * 3 }}
+                  spawn_rate=50
+                  ;;
+              "endurance")
+                  users=${{ params.target_users }}
+                  spawn_rate=5
+                  ;;
+          esac
+
+          locust -f locustfile.py \
+            --host=$target_url \
+            --users=$users \
+            --spawn-rate=$spawn_rate \
+            --run-time=${TEST_DURATION}s \
+            --headless \
+            --html=/app/results/performance_report.html \
+            --csv=/app/results/performance_results
+
+      - name: "Analyze performance results"
+        run: |
+          import pandas as pd
+          import json
+
+          # Read performance results
+          df = pd.read_csv('/app/results/performance_results_stats.csv')
+
+          # Calculate performance metrics
+          total_requests = int(df['num_requests'].sum())
+          total_failures = int(df['num_failures'].sum())
+          avg_response_time = float(df['avg_response_time'].mean())
+          max_response_time = float(df['max_response_time'].max())
+          min_response_time = float(df['min_response_time'].min())
+          requests_per_sec = float(df['requests_per_sec'].mean())
+          failure_rate = float(total_failures / total_requests * 100) if total_requests > 0 else 0
+
+          # Performance thresholds
+          thresholds = {
+              'max_response_time': 2000,  # 2 seconds
+              'avg_response_time': 500,   # 500ms
+              'failure_rate': 5,          # 5%
+              'requests_per_sec': 50      # 50 RPS
+          }
+
+          # Check performance against thresholds
+          performance_status = {
+              'response_time_ok': max_response_time <= thresholds['max_response_time'],
+              'avg_response_time_ok': avg_response_time <= thresholds['avg_response_time'],
+              'failure_rate_ok': failure_rate <= thresholds['failure_rate'],
+              'throughput_ok': requests_per_sec >= thresholds['requests_per_sec']
+          }
+
+          # Overall performance score
+          performance_score = 100
+          if not performance_status['response_time_ok']:
+              performance_score -= 25
+          if not performance_status['avg_response_time_ok']:
+              performance_score -= 25
+          if not performance_status['failure_rate_ok']:
+              performance_score -= 25
+          if not performance_status['throughput_ok']:
+              performance_score -= 25
+
+          performance_results = {
+              'test_scenario': '${{ params.test_scenario }}',
+              'target_users': ${{ params.target_users }},
+              'test_duration': ${{ params.test_duration }},
+              'total_requests': total_requests,
+              'total_failures': total_failures,
+              'avg_response_time': avg_response_time,
+              'max_response_time': max_response_time,
+              'min_response_time': min_response_time,
+              'requests_per_sec': requests_per_sec,
+              'failure_rate': failure_rate,
+              'performance_status': performance_status,
+              'performance_score': performance_score,
+              'overall_status': 'PASS' if performance_score >= 75 else 'FAIL',
+              'timestamp': datetime.now().isoformat()
+          }
+
+          with open('/app/results/performance_analysis.json', 'w') as f:
+              json.dump(performance_results, f, indent=2)
+
+          print(f"Performance analysis completed:")
+          print(f"  Total requests: {total_requests}")
+          print(f"  Failure rate: {failure_rate:.2f}%")
+          print(f"  Avg response time: {avg_response_time:.2f}ms")
+          print(f"  Max response time: {max_response_time:.2f}ms")
+          print(f"  Performance score: {performance_score:.1f}%")
+          print(f"  Overall status: {performance_results['overall_status']}")
+
+  monitoring-analysis:
+    id: "monitoring-analysis"
+    desc: "Analyze system monitoring data during performance test"
+    needs: ["load-testing"]
+
+    runs-on:
+      type: "local"
+
+    stages:
+      - name: "Collect monitoring data"
+        run: |
+          import requests
+          import json
+          from datetime import datetime, timedelta
+
+          # Collect metrics from Prometheus
+          prometheus_url = '${{ params.prometheus_url }}'
+
+          # Get metrics for the test duration
+          end_time = datetime.now()
+          start_time = end_time - timedelta(seconds=${{ params.test_duration }})
+
+          metrics = {
+              'cpu_usage': [],
+              'memory_usage': [],
+              'disk_io': [],
+              'network_io': [],
+              'database_connections': [],
+              'error_rate': []
+          }
+
+          # Query Prometheus for metrics
+          queries = {
+              'cpu_usage': 'rate(process_cpu_seconds_total[5m]) * 100',
+              'memory_usage': 'process_resident_memory_bytes / 1024 / 1024',
+              'disk_io': 'rate(process_open_fds[5m])',
+              'network_io': 'rate(process_network_io_bytes_total[5m])',
+              'database_connections': 'pg_stat_database_numbackends',
+              'error_rate': 'rate(http_requests_total{status=~"5.."}[5m])'
+          }
+
+          for metric_name, query in queries.items():
+              try:
+                  response = requests.get(f"{prometheus_url}/api/v1/query_range", params={
+                      'query': query,
+                      'start': start_time.timestamp(),
+                      'end': end_time.timestamp(),
+                      'step': '30s'
+                  })
+
+                  if response.status_code == 200:
+                      data = response.json()
+                      if 'data' in data and 'result' in data['data']:
+                          metrics[metric_name] = data['data']['result']
+              except Exception as e:
+                  print(f"Error collecting {metric_name}: {e}")
+
+          # Save monitoring data
+          with open('/tmp/monitoring_data.json', 'w') as f:
+              json.dump(metrics, f, indent=2)
+
+          print("Monitoring data collected")
+
+      - name: "Analyze system performance"
+        run: |
+          import json
+          import numpy as np
+
+          with open('/tmp/monitoring_data.json', 'r') as f:
+              monitoring_data = json.load(f)
+
+          # Analyze system performance during test
+          system_analysis = {}
+
+          for metric_name, data in monitoring_data.items():
+              if data:
+                  # Extract values from time series data
+                  values = []
+                  for series in data:
+                      if 'values' in series:
+                          values.extend([float(v[1]) for v in series['values']])
+
+                  if values:
+                      system_analysis[metric_name] = {
+                          'min': min(values),
+                          'max': max(values),
+                          'avg': np.mean(values),
+                          'p95': np.percentile(values, 95),
+                          'p99': np.percentile(values, 99)
+                      }
+
+          # Performance thresholds
+          thresholds = {
+              'cpu_usage': {'warning': 70, 'critical': 90},
+              'memory_usage': {'warning': 80, 'critical': 95},
+              'database_connections': {'warning': 80, 'critical': 100},
+              'error_rate': {'warning': 5, 'critical': 10}
+          }
+
+          # Check against thresholds
+          system_status = {}
+          for metric, values in system_analysis.items():
+              if metric in thresholds:
+                  max_value = values['max']
+                  threshold = thresholds[metric]
+
+                  if max_value >= threshold['critical']:
+                      system_status[metric] = 'CRITICAL'
+                  elif max_value >= threshold['warning']:
+                      system_status[metric] = 'WARNING'
+                  else:
+                      system_status[metric] = 'OK'
+
+          system_performance = {
+              'analysis': system_analysis,
+              'status': system_status,
+              'test_duration': ${{ params.test_duration }},
+              'timestamp': datetime.now().isoformat()
+          }
+
+          with open('/tmp/system_performance.json', 'w') as f:
+              json.dump(system_performance, f, indent=2)
+
+          print("System performance analysis completed")
+          for metric, status in system_status.items():
+              print(f"  {metric}: {status}")
+
+  performance-reporting:
+    id: "performance-reporting"
+    desc: "Generate comprehensive performance report"
+    needs: ["monitoring-analysis"]
+
+    runs-on:
+      type: "local"
+
+    stages:
+      - name: "Generate performance report"
+        run: |
+          import json
+          import os
+
+          # Load all performance data
+          performance_data = {}
+
+          # Load performance test results
+          with open('/app/results/performance_analysis.json', 'r') as f:
+              performance_data['load_test'] = json.load(f)
+
+          # Load system performance data
+          with open('/tmp/system_performance.json', 'r') as f:
+              performance_data['system_performance'] = json.load(f)
+
+          # Generate comprehensive summary
+          load_test = performance_data['load_test']
+          system_perf = performance_data['system_performance']
+
+          # Overall performance assessment
+          performance_score = load_test['performance_score']
+          system_issues = sum(1 for status in system_perf['status'].values() if status in ['WARNING', 'CRITICAL'])
+
+          if system_issues == 0 and performance_score >= 90:
+              overall_grade = 'A'
+          elif system_issues <= 1 and performance_score >= 80:
+              overall_grade = 'B'
+          elif system_issues <= 2 and performance_score >= 70:
+              overall_grade = 'C'
+          else:
+              overall_grade = 'D'
+
+          # Recommendations
+          recommendations = []
+
+          if load_test['failure_rate'] > 5:
+              recommendations.append("High failure rate detected - investigate application errors")
+
+          if load_test['max_response_time'] > 2000:
+              recommendations.append("Slow response times - optimize database queries and caching")
+
+          if system_perf['status'].get('cpu_usage') == 'CRITICAL':
+              recommendations.append("High CPU usage - consider scaling or optimization")
+
+          if system_perf['status'].get('memory_usage') == 'CRITICAL':
+              recommendations.append("High memory usage - investigate memory leaks")
+
+          if system_perf['status'].get('database_connections') == 'CRITICAL':
+              recommendations.append("Database connection pool exhausted - increase pool size")
+
+          # Generate final report
+          performance_report = {
+              'test_info': {
+                  'scenario': load_test['test_scenario'],
+                  'target_users': load_test['target_users'],
+                  'duration': load_test['test_duration'],
+                  'timestamp': load_test['timestamp']
+              },
+              'performance_metrics': {
+                  'total_requests': load_test['total_requests'],
+                  'failure_rate': load_test['failure_rate'],
+                  'avg_response_time': load_test['avg_response_time'],
+                  'max_response_time': load_test['max_response_time'],
+                  'requests_per_sec': load_test['requests_per_sec'],
+                  'performance_score': performance_score
+              },
+              'system_metrics': system_perf['analysis'],
+              'system_status': system_perf['status'],
+              'overall_assessment': {
+                  'grade': overall_grade,
+                  'performance_score': performance_score,
+                  'system_issues': system_issues,
+                  'recommendations': recommendations,
+                  'overall_status': 'PASS' if overall_grade in ['A', 'B'] else 'FAIL'
+              }
+          }
+
+          performance_data['report'] = performance_report
+
+          # Save comprehensive report
+          with open('/tmp/comprehensive_performance_report.json', 'w') as f:
+              json.dump(performance_data, f, indent=2)
+
+          print(f"Performance report generated:")
+          print(f"  Grade: {overall_grade}")
+          print(f"  Performance score: {performance_score:.1f}%")
+          print(f"  System issues: {system_issues}")
+          print(f"  Overall status: {performance_report['overall_assessment']['overall_status']}")
+
+      - name: "Send performance notification"
+        uses: "notifications/send_slack@v1.0"
+        with:
+          channel: "#performance-testing"
+          message: "Performance test completed: Grade ${{ performance_report.overall_assessment.grade }}, Score: ${{ performance_report.overall_assessment.performance_score }}%, Status: ${{ performance_report.overall_assessment.overall_status }}"
+          color: |
+            "good" if "${{ performance_report.overall_assessment.overall_status }}" == "PASS" else "warning"
+
+      - name: "Send detailed report"
+        uses: "notifications/send_email@v1.0"
+        with:
+          to: "performance-team@company.com"
+          subject: "Performance Test Report - ${{ performance_report.test_info.scenario }}"
+          template: "performance_test_report"
+          data:
+            scenario: "${{ performance_report.test_info.scenario }}"
+            target_users: ${{ performance_report.test_info.target_users }}
+            duration: ${{ performance_report.test_info.duration }}
+            grade: "${{ performance_report.overall_assessment.grade }}"
+            performance_score: ${{ performance_report.overall_assessment.performance_score }}
+            system_issues: ${{ performance_report.overall_assessment.system_issues }}
+            overall_status: "${{ performance_report.overall_assessment.overall_status }}"
+            recommendations: ${{ performance_report.overall_assessment.recommendations }}
+
+on:
+  schedule:
+    - cronjob: "0 3 * * 0"  # Weekly on Sunday at 3 AM
+      timezone: "UTC"

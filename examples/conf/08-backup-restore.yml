@@ -1,0 +1,601 @@
+name: "backup-restore"
+type: "Workflow"
+description: "Automated backup and restore workflow for data protection and disaster recovery"
+
+params:
+  backup_type:
+    type: choice
+    options: ["full", "incremental", "differential"]
+    desc: "Type of backup to perform"
+
+  retention_days:
+    type: int
+    default: 30
+    desc: "Number of days to retain backups"
+
+  backup_storage:
+    type: str
+    default: "s3://backup-storage/"
+    desc: "Storage location for backups"
+
+jobs:
+  backup-preparation:
+    id: "backup-preparation"
+    desc: "Prepare and validate backup environment"
+
+    runs-on:
+      type: "local"
+
+    stages:
+      - name: "Check storage space"
+        run: |
+          import psutil
+          import json
+
+          # Check local disk space
+          disk = psutil.disk_usage('/')
+          free_space_gb = disk.free / (1024**3)
+
+          # Check if we have enough space for backup
+          required_space_gb = 50  # Estimated space needed
+          space_available = free_space_gb > required_space_gb
+
+          space_info = {
+              'free_space_gb': free_space_gb,
+              'required_space_gb': required_space_gb,
+              'space_available': space_available,
+              'backup_type': '${{ params.backup_type }}'
+          }
+
+          with open('/tmp/space_info.json', 'w') as f:
+              json.dump(space_info, f, indent=2)
+
+          if not space_available:
+              raise Exception(f"Insufficient disk space: {free_space_gb:.1f}GB available, {required_space_gb}GB required")
+
+          print(f"Storage check: OK ({free_space_gb:.1f}GB available)")
+
+      - name: "Validate backup storage"
+        bash: |
+          aws s3 ls ${{ params.backup_storage }} || aws s3 mb ${{ params.backup_storage }}
+          echo "Backup storage validated"
+        env:
+          AWS_DEFAULT_REGION: "us-east-1"
+
+      - name: "Check backup dependencies"
+        run: |
+          import subprocess
+          import json
+
+          dependencies = {
+              'pg_dump': False,
+              'mysqldump': False,
+              'tar': False,
+              'gzip': False
+          }
+
+          # Check if required tools are available
+          for tool in dependencies.keys():
+              try:
+                  result = subprocess.run([tool, '--version'], capture_output=True, text=True)
+                  dependencies[tool] = result.returncode == 0
+              except FileNotFoundError:
+                  dependencies[tool] = False
+
+          all_available = all(dependencies.values())
+
+          if not all_available:
+              missing = [k for k, v in dependencies.items() if not v]
+              raise Exception(f"Missing backup dependencies: {missing}")
+
+          print("Backup dependencies: OK")
+
+  database-backup:
+    id: "database-backup"
+    desc: "Backup database systems"
+    needs: ["backup-preparation"]
+
+    runs-on:
+      type: "aws_batch"
+      with:
+        job_queue_arn: "${AWS_BATCH_JOB_QUEUE_ARN}"
+        s3_bucket: "${S3_BUCKET}"
+
+    stages:
+      - name: "Backup PostgreSQL database"
+        bash: |
+          BACKUP_FILE="/tmp/postgres_backup_$(date +%Y%m%d_%H%M%S).sql"
+
+          pg_dump -h ${{ params.postgres_host }} \
+                  -U ${{ params.postgres_user }} \
+                  -d ${{ params.postgres_db }} \
+                  --verbose \
+                  --clean \
+                  --no-owner \
+                  --no-privileges \
+                  > $BACKUP_FILE
+
+          echo "PostgreSQL backup created: $BACKUP_FILE"
+          echo "Backup size: $(du -h $BACKUP_FILE | cut -f1)"
+        env:
+          PGPASSWORD: "${{ params.postgres_password }}"
+
+      - name: "Backup MySQL database"
+        bash: |
+          BACKUP_FILE="/tmp/mysql_backup_$(date +%Y%m%d_%H%M%S).sql"
+
+          mysqldump -h ${{ params.mysql_host }} \
+                   -u ${{ params.mysql_user }} \
+                   -p${{ params.mysql_password }} \
+                   --all-databases \
+                   --single-transaction \
+                   --routines \
+                   --triggers \
+                   > $BACKUP_FILE
+
+          echo "MySQL backup created: $BACKUP_FILE"
+          echo "Backup size: $(du -h $BACKUP_FILE | cut -f1)"
+
+      - name: "Backup Redis data"
+        run: |
+          import redis
+          import json
+          import subprocess
+
+          # Connect to Redis
+          r = redis.Redis(host='${{ params.redis_host }}', port=6379, db=0)
+
+          # Get all keys
+          keys = r.keys('*')
+
+          # Export data
+          redis_data = {}
+          for key in keys:
+              key_type = r.type(key)
+              if key_type == b'string':
+                  redis_data[key.decode()] = r.get(key).decode()
+              elif key_type == b'hash':
+                  redis_data[key.decode()] = r.hgetall(key)
+              elif key_type == b'list':
+                  redis_data[key.decode()] = r.lrange(key, 0, -1)
+              elif key_type == b'set':
+                  redis_data[key.decode()] = list(r.smembers(key))
+
+          # Save to file
+          backup_file = f"/tmp/redis_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+          with open(backup_file, 'w') as f:
+              json.dump(redis_data, f, indent=2)
+
+          print(f"Redis backup created: {backup_file}")
+          print(f"Keys backed up: {len(keys)}")
+
+      - name: "Compress database backups"
+        bash: |
+          cd /tmp
+          for file in postgres_backup_*.sql mysql_backup_*.sql redis_backup_*.json; do
+              if [ -f "$file" ]; then
+                  gzip "$file"
+                  echo "Compressed: $file.gz"
+              fi
+          done
+
+  file-system-backup:
+    id: "file-system-backup"
+    desc: "Backup file systems and application data"
+    needs: ["backup-preparation"]
+
+    runs-on:
+      type: "local"
+
+    stages:
+      - name: "Backup application files"
+        bash: |
+          BACKUP_FILE="/tmp/app_files_backup_$(date +%Y%m%d_%H%M%S).tar.gz"
+
+          tar -czf $BACKUP_FILE \
+              --exclude='*.log' \
+              --exclude='*.tmp' \
+              --exclude='node_modules' \
+              /var/www/app \
+              /etc/app \
+              /opt/app
+
+          echo "Application files backup created: $BACKUP_FILE"
+          echo "Backup size: $(du -h $BACKUP_FILE | cut -f1)"
+
+      - name: "Backup configuration files"
+        bash: |
+          CONFIG_BACKUP="/tmp/config_backup_$(date +%Y%m%d_%H%M%S).tar.gz"
+
+          tar -czf $CONFIG_BACKUP \
+              /etc/nginx \
+              /etc/postgresql \
+              /etc/redis \
+              /etc/systemd/system
+
+          echo "Configuration backup created: $CONFIG_BACKUP"
+          echo "Backup size: $(du -h $CONFIG_BACKUP | cut -f1)"
+
+      - name: "Backup log files"
+        run: |
+          import os
+          import tarfile
+          from datetime import datetime, timedelta
+
+          # Create log backup (last 7 days only)
+          log_backup_file = f"/tmp/logs_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.tar.gz"
+
+          with tarfile.open(log_backup_file, 'w:gz') as tar:
+              log_dirs = ['/var/log/app', '/var/log/nginx', '/var/log/postgresql']
+
+              for log_dir in log_dirs:
+                  if os.path.exists(log_dir):
+                      # Add only recent log files
+                      cutoff_date = datetime.now() - timedelta(days=7)
+
+                      for root, dirs, files in os.walk(log_dir):
+                          for file in files:
+                              file_path = os.path.join(root, file)
+                              file_time = datetime.fromtimestamp(os.path.getmtime(file_path))
+
+                              if file_time > cutoff_date:
+                                  tar.add(file_path, arcname=os.path.relpath(file_path, '/'))
+
+          print(f"Log files backup created: {log_backup_file}")
+
+  backup-upload:
+    id: "backup-upload"
+    desc: "Upload backups to cloud storage"
+    needs: ["database-backup", "file-system-backup"]
+
+    runs-on:
+      type: "aws_batch"
+      with:
+        job_queue_arn: "${AWS_BATCH_JOB_QUEUE_ARN}"
+        s3_bucket: "${S3_BUCKET}"
+
+    stages:
+      - name: "Upload database backups"
+        bash: |
+          BACKUP_DATE=$(date +%Y%m%d_%H%M%S)
+
+          aws s3 cp /tmp/postgres_backup_*.sql.gz ${{ params.backup_storage }}database/postgres/$BACKUP_DATE/
+          aws s3 cp /tmp/mysql_backup_*.sql.gz ${{ params.backup_storage }}database/mysql/$BACKUP_DATE/
+          aws s3 cp /tmp/redis_backup_*.json.gz ${{ params.backup_storage }}database/redis/$BACKUP_DATE/
+
+          echo "Database backups uploaded to S3"
+        env:
+          AWS_DEFAULT_REGION: "us-east-1"
+
+      - name: "Upload file system backups"
+        bash: |
+          BACKUP_DATE=$(date +%Y%m%d_%H%M%S)
+
+          aws s3 cp /tmp/app_files_backup_*.tar.gz ${{ params.backup_storage }}files/app/$BACKUP_DATE/
+          aws s3 cp /tmp/config_backup_*.tar.gz ${{ params.backup_storage }}files/config/$BACKUP_DATE/
+          aws s3 cp /tmp/logs_backup_*.tar.gz ${{ params.backup_storage }}files/logs/$BACKUP_DATE/
+
+          echo "File system backups uploaded to S3"
+        env:
+          AWS_DEFAULT_REGION: "us-east-1"
+
+      - name: "Create backup manifest"
+        run: |
+          import json
+          import glob
+          import os
+
+          backup_date = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+          # Find all backup files
+          backup_files = []
+          for pattern in ['/tmp/*_backup_*.gz', '/tmp/*_backup_*.tar.gz']:
+              backup_files.extend(glob.glob(pattern))
+
+          # Create manifest
+          manifest = {
+              'backup_date': backup_date,
+              'backup_type': '${{ params.backup_type }}',
+              'files': []
+          }
+
+          for file_path in backup_files:
+              file_size = os.path.getsize(file_path)
+              file_name = os.path.basename(file_path)
+
+              manifest['files'].append({
+                  'name': file_name,
+                  'size_bytes': file_size,
+                  'size_mb': file_size / (1024**2),
+                  's3_path': f"${{ params.backup_storage }}{file_name}"
+              })
+
+          # Save manifest
+          with open('/tmp/backup_manifest.json', 'w') as f:
+              json.dump(manifest, f, indent=2)
+
+          # Upload manifest
+          import subprocess
+          subprocess.run([
+              'aws', 's3', 'cp', '/tmp/backup_manifest.json',
+              f"${{ params.backup_storage }}manifests/{backup_date}_manifest.json"
+          ])
+
+          print(f"Backup manifest created with {len(manifest['files'])} files")
+
+  backup-verification:
+    id: "backup-verification"
+    desc: "Verify backup integrity and completeness"
+    needs: ["backup-upload"]
+
+    runs-on:
+      type: "local"
+
+    stages:
+      - name: "Download backup for verification"
+        bash: |
+          aws s3 cp ${{ params.backup_storage }}manifests/$(date +%Y%m%d_%H%M%S)_manifest.json /tmp/backup_manifest.json
+        env:
+          AWS_DEFAULT_REGION: "us-east-1"
+
+      - name: "Verify backup files"
+        run: |
+          import json
+          import subprocess
+
+          with open('/tmp/backup_manifest.json', 'r') as f:
+              manifest = json.load(f)
+
+          verification_results = []
+
+          for file_info in manifest['files']:
+              try:
+                  # Download file for verification
+                  s3_path = file_info['s3_path']
+                  local_path = f"/tmp/verify_{file_info['name']}"
+
+                  subprocess.run(['aws', 's3', 'cp', s3_path, local_path], check=True)
+
+                  # Check file size
+                  actual_size = os.path.getsize(local_path)
+                  expected_size = file_info['size_bytes']
+
+                  size_match = actual_size == expected_size
+
+                  # Test file integrity
+                  if file_info['name'].endswith('.gz'):
+                      integrity_ok = subprocess.run(['gunzip', '-t', local_path],
+                                                  capture_output=True).returncode == 0
+                  elif file_info['name'].endswith('.tar.gz'):
+                      integrity_ok = subprocess.run(['tar', '-tzf', local_path],
+                                                  capture_output=True).returncode == 0
+                  else:
+                      integrity_ok = True
+
+                  verification_results.append({
+                      'file_name': file_info['name'],
+                      'size_match': size_match,
+                      'integrity_ok': integrity_ok,
+                      'verification_passed': size_match and integrity_ok
+                  })
+
+                  # Clean up
+                  os.remove(local_path)
+
+              except Exception as e:
+                  verification_results.append({
+                      'file_name': file_info['name'],
+                      'error': str(e),
+                      'verification_passed': False
+                  })
+
+          # Overall verification result
+          all_passed = all(r['verification_passed'] for r in verification_results)
+
+          verification_summary = {
+              'total_files': len(verification_results),
+              'passed': sum(1 for r in verification_results if r['verification_passed']),
+              'failed': sum(1 for r in verification_results if not r['verification_passed']),
+              'overall_success': all_passed,
+              'results': verification_results
+          }
+
+          with open('/tmp/verification_results.json', 'w') as f:
+              json.dump(verification_summary, f, indent=2)
+
+          print(f"Backup verification completed:")
+          print(f"  Files verified: {verification_summary['total_files']}")
+          print(f"  Passed: {verification_summary['passed']}")
+          print(f"  Failed: {verification_summary['failed']}")
+          print(f"  Overall: {'SUCCESS' if verification_summary['overall_success'] else 'FAILED'}")
+
+  backup-cleanup:
+    id: "backup-cleanup"
+    desc: "Clean up old backups based on retention policy"
+    needs: ["backup-verification"]
+
+    runs-on:
+      type: "aws_batch"
+      with:
+        job_queue_arn: "${AWS_BATCH_JOB_ARN}"
+        s3_bucket: "${S3_BUCKET}"
+
+    stages:
+      - name: "List old backups"
+        run: |
+          import boto3
+          from datetime import datetime, timedelta
+          import json
+
+          s3 = boto3.client('s3')
+          bucket_name = '${{ params.backup_storage.split("/")[2] }}'
+
+          # Calculate cutoff date
+          retention_days = ${{ params.retention_days }}
+          cutoff_date = datetime.now() - timedelta(days=retention_days)
+
+          # List all backup objects
+          old_backups = []
+
+          paginator = s3.get_paginator('list_objects_v2')
+          pages = paginator.paginate(Bucket=bucket_name)
+
+          for page in pages:
+              if 'Contents' in page:
+                  for obj in page['Contents']:
+                      # Parse date from key
+                      key_parts = obj['Key'].split('/')
+                      if len(key_parts) >= 2:
+                          try:
+                              backup_date_str = key_parts[-2]  # Date is in second-to-last part
+                              backup_date = datetime.strptime(backup_date_str, '%Y%m%d_%H%M%S')
+
+                              if backup_date < cutoff_date:
+                                  old_backups.append({
+                                      'key': obj['Key'],
+                                      'size': obj['Size'],
+                                      'last_modified': obj['LastModified'].isoformat(),
+                                      'backup_date': backup_date.isoformat()
+                                  })
+                          except ValueError:
+                              continue
+
+          cleanup_info = {
+              'cutoff_date': cutoff_date.isoformat(),
+              'retention_days': retention_days,
+              'old_backups_count': len(old_backups),
+              'old_backups': old_backups
+          }
+
+          with open('/tmp/cleanup_info.json', 'w') as f:
+              json.dump(cleanup_info, f, indent=2)
+
+          print(f"Found {len(old_backups)} old backups to clean up")
+
+      - name: "Delete old backups"
+        run: |
+          import boto3
+          import json
+
+          with open('/tmp/cleanup_info.json', 'r') as f:
+              cleanup_info = json.load(f)
+
+          if cleanup_info['old_backups_count'] == 0:
+              print("No old backups to delete")
+              return
+
+          s3 = boto3.client('s3')
+          bucket_name = '${{ params.backup_storage.split("/")[2] }}'
+
+          deleted_count = 0
+          deletion_errors = []
+
+          for backup in cleanup_info['old_backups']:
+              try:
+                  s3.delete_object(Bucket=bucket_name, Key=backup['key'])
+                  deleted_count += 1
+                  print(f"Deleted: {backup['key']}")
+              except Exception as e:
+                  deletion_errors.append({
+                      'key': backup['key'],
+                      'error': str(e)
+                  })
+
+          cleanup_results = {
+              'total_old_backups': cleanup_info['old_backups_count'],
+              'deleted_count': deleted_count,
+              'deletion_errors': deletion_errors,
+              'cleanup_success': len(deletion_errors) == 0
+          }
+
+          with open('/tmp/cleanup_results.json', 'w') as f:
+              json.dump(cleanup_results, f, indent=2)
+
+          print(f"Cleanup completed: {deleted_count}/{cleanup_info['old_backups_count']} backups deleted")
+
+  backup-reporting:
+    id: "backup-reporting"
+    desc: "Generate backup report and notifications"
+    needs: ["backup-cleanup"]
+
+    runs-on:
+      type: "local"
+
+    stages:
+      - name: "Generate backup report"
+        run: |
+          import json
+          import os
+
+          # Load all backup data
+          report_data = {}
+
+          data_files = [
+              'space_info.json',
+              'backup_manifest.json',
+              'verification_results.json',
+              'cleanup_results.json'
+          ]
+
+          for file_name in data_files:
+              file_path = f'/tmp/{file_name}'
+              if os.path.exists(file_path):
+                  with open(file_path, 'r') as f:
+                      key = file_name.replace('.json', '')
+                      report_data[key] = json.load(f)
+
+          # Generate summary
+          backup_summary = {
+              'backup_type': '${{ params.backup_type }}',
+              'backup_date': report_data.get('backup_manifest', {}).get('backup_date', 'unknown'),
+              'files_backed_up': len(report_data.get('backup_manifest', {}).get('files', [])),
+              'total_size_mb': sum(f['size_mb'] for f in report_data.get('backup_manifest', {}).get('files', [])),
+              'verification_passed': report_data.get('verification_results', {}).get('overall_success', False),
+              'cleanup_performed': 'cleanup_results' in report_data,
+              'old_backups_deleted': report_data.get('cleanup_results', {}).get('deleted_count', 0),
+              'overall_success': (
+                  'backup_manifest' in report_data and
+                  report_data.get('verification_results', {}).get('overall_success', False)
+              )
+          }
+
+          report_data['summary'] = backup_summary
+
+          # Save comprehensive report
+          with open('/tmp/backup_report.json', 'w') as f:
+              json.dump(report_data, f, indent=2)
+
+          print(f"Backup report generated:")
+          print(f"  Type: {backup_summary['backup_type']}")
+          print(f"  Files: {backup_summary['files_backed_up']}")
+          print(f"  Size: {backup_summary['total_size_mb']:.1f}MB")
+          print(f"  Verification: {'PASS' if backup_summary['verification_passed'] else 'FAIL'}")
+          print(f"  Overall: {'SUCCESS' if backup_summary['overall_success'] else 'FAILED'}")
+
+      - name: "Send backup notification"
+        uses: "notifications/send_slack@v1.0"
+        with:
+          channel: "#backup-alerts"
+          message: "Backup completed: ${{ backup_summary.backup_type }} backup, ${{ backup_summary.files_backed_up }} files, ${{ backup_summary.total_size_mb }}MB, verification: ${{ backup_summary.verification_passed ? 'PASS' : 'FAIL' }}"
+          color: |
+            "good" if "${{ backup_summary.overall_success }}" else "danger"
+
+      - name: "Send email report"
+        uses: "notifications/send_email@v1.0"
+        with:
+          to: "backup-team@company.com"
+          subject: "Backup Report - ${{ backup_summary.backup_date }}"
+          template: "backup_report"
+          data:
+            backup_type: "${{ backup_summary.backup_type }}"
+            backup_date: "${{ backup_summary.backup_date }}"
+            files_count: ${{ backup_summary.files_backed_up }}
+            total_size_mb: ${{ backup_summary.total_size_mb }}
+            verification_passed: ${{ backup_summary.verification_passed }}
+            old_backups_deleted: ${{ backup_summary.old_backups_deleted }}
+            overall_success: ${{ backup_summary.overall_success }}
+
+on:
+  schedule:
+    - cronjob: "0 1 * * *"  # Daily at 1 AM
+      timezone: "UTC"

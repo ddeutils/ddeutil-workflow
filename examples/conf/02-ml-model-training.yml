@@ -1,0 +1,380 @@
+name: "ml-model-training"
+type: "Workflow"
+description: |
+  Machine learning model training pipeline with hyperparameter optimization
+  and model evaluation
+on:
+  schedule:
+    - cronjob: "0 0 * * 0"  # Weekly on Sunday at midnight
+      timezone: "UTC"
+params:
+  dataset_path:
+    type: str
+    default: "s3://ml-datasets/customer-churn/"
+    desc: "Path to training dataset"
+
+  model_type:
+    type: choice
+    options:
+      - "random_forest"
+      - "xgboost"
+      - "neural_network"
+    desc: "Type of model to train"
+
+  experiment_name:
+    type: str
+    default: "customer-churn-prediction"
+    desc: "MLflow experiment name"
+
+  max_trials:
+    type: int
+    default: 50
+    desc: "Maximum number of hyperparameter trials"
+
+jobs:
+  data-preparation:
+    id: "data-preparation"
+    desc: "Prepare and validate training data"
+
+    runs-on:
+      type: "container"
+      with:
+        image: "python:3.11-slim"
+        environment:
+          DATASET_PATH: "${{ params.dataset_path }}"
+          EXPERIMENT_NAME: "${{ params.experiment_name }}"
+        volumes:
+          - "/tmp/data": "/app/data"
+          - "/tmp/models": "/app/models"
+        working_dir: "/app"
+
+    stages:
+      - name: "Install ML dependencies"
+        bash: |
+          pip install pandas numpy scikit-learn mlflow optuna boto3
+
+      - name: "Load and validate data"
+        run: |
+          import pandas as pd
+          import numpy as np
+          from sklearn.model_selection import train_test_split
+
+          # Load dataset
+          df = pd.read_csv("/app/data/dataset.csv")
+
+          # Basic validation
+          print(f"Dataset shape: {df.shape}")
+          print(f"Missing values: {df.isnull().sum().sum()}")
+          print(f"Target distribution: {df['target'].value_counts()}")
+
+          # Split data
+          X = df.drop('target', axis=1)
+          y = df['target']
+
+          X_train, X_test, y_train, y_test = train_test_split(
+              X, y, test_size=0.2, random_state=42, stratify=y
+          )
+
+          # Save splits
+          X_train.to_csv("/app/data/X_train.csv", index=False)
+          X_test.to_csv("/app/data/X_test.csv", index=False)
+          y_train.to_csv("/app/data/y_train.csv", index=False)
+          y_test.to_csv("/app/data/y_test.csv", index=False)
+
+          print(f"Training set: {X_train.shape}")
+          print(f"Test set: {X_test.shape}")
+
+      - name: "Feature engineering"
+        run: |
+          import pandas as pd
+          from sklearn.preprocessing import StandardScaler
+
+          # Load training data
+          X_train = pd.read_csv("/app/data/X_train.csv")
+
+          # Feature engineering
+          X_train['age_group'] = pd.cut(X_train['age'], bins=[0, 25, 35, 50, 100], labels=['young', 'adult', 'middle', 'senior'])
+          X_train['income_category'] = pd.cut(X_train['income'], bins=5, labels=['low', 'medium_low', 'medium', 'medium_high', 'high'])
+
+          # Handle categorical variables
+          categorical_cols = X_train.select_dtypes(include=['object']).columns
+          X_train_encoded = pd.get_dummies(X_train, columns=categorical_cols)
+
+          # Scale numerical features
+          scaler = StandardScaler()
+          numerical_cols = X_train_encoded.select_dtypes(include=[np.number]).columns
+          X_train_encoded[numerical_cols] = scaler.fit_transform(X_train_encoded[numerical_cols])
+
+          # Save processed data
+          X_train_encoded.to_csv("/app/data/X_train_processed.csv", index=False)
+
+          # Save scaler for later use
+          import joblib
+          joblib.dump(scaler, "/app/models/scaler.pkl")
+
+          print(f"Processed training set: {X_train_encoded.shape}")
+
+  hyperparameter-optimization:
+    id: "hyperparameter-optimization"
+    desc: "Optimize hyperparameters using Optuna"
+    needs: ["data-preparation"]
+
+    runs-on:
+      type: "gcp_batch"
+      with:
+        project_id: "${GCP_PROJECT_ID}"
+        region: "us-central1"
+        gcs_bucket: "${GCS_BUCKET}"
+        machine_type: "n1-standard-4"
+
+    stages:
+      - name: "Setup MLflow"
+        bash: |
+          pip install mlflow optuna
+          mlflow server --host 0.0.0.0 --port 5000 &
+          sleep 10
+
+      - name: "Run hyperparameter optimization"
+        run: |
+          import optuna
+          import mlflow
+          import pandas as pd
+          from sklearn.ensemble import RandomForestClassifier
+          from sklearn.metrics import accuracy_score, f1_score
+          from sklearn.model_selection import cross_val_score
+
+          # Load data
+          X_train = pd.read_csv("/app/data/X_train_processed.csv")
+          y_train = pd.read_csv("/app/data/y_train.csv")['target']
+
+          # Set up MLflow
+          mlflow.set_tracking_uri("http://localhost:5000")
+          mlflow.set_experiment("${{ params.experiment_name }}")
+
+          def objective(trial):
+              # Define hyperparameter search space
+              if "${{ params.model_type }}" == "random_forest":
+                  params = {
+                      'n_estimators': trial.suggest_int('n_estimators', 50, 300),
+                      'max_depth': trial.suggest_int('max_depth', 3, 20),
+                      'min_samples_split': trial.suggest_int('min_samples_split', 2, 20),
+                      'min_samples_leaf': trial.suggest_int('min_samples_leaf', 1, 10),
+                      'random_state': 42
+                  }
+                  model = RandomForestClassifier(**params)
+              elif "${{ params.model_type }}" == "xgboost":
+                  import xgboost as xgb
+                  params = {
+                      'n_estimators': trial.suggest_int('n_estimators', 50, 300),
+                      'max_depth': trial.suggest_int('max_depth', 3, 10),
+                      'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3),
+                      'subsample': trial.suggest_float('subsample', 0.6, 1.0),
+                      'random_state': 42
+                  }
+                  model = xgb.XGBClassifier(**params)
+              else:
+                  from sklearn.neural_network import MLPClassifier
+                  params = {
+                      'hidden_layer_sizes': trial.suggest_categorical('hidden_layer_sizes',
+                          [(50,), (100,), (50, 25), (100, 50)]),
+                      'learning_rate_init': trial.suggest_float('learning_rate_init', 0.001, 0.1),
+                      'max_iter': 500,
+                      'random_state': 42
+                  }
+                  model = MLPClassifier(**params)
+
+              # Cross-validation
+              scores = cross_val_score(model, X_train, y_train, cv=5, scoring='f1')
+              mean_score = scores.mean()
+
+              # Log to MLflow
+              with mlflow.start_run():
+                  mlflow.log_params(params)
+                  mlflow.log_metric("cv_f1_score", mean_score)
+                  mlflow.log_metric("cv_f1_std", scores.std())
+
+              return mean_score
+
+          # Run optimization
+          study = optuna.create_study(direction='maximize')
+          study.optimize(objective, n_trials=${{ params.max_trials }})
+
+          # Save best parameters
+          best_params = study.best_params
+          best_score = study.best_value
+
+          print(f"Best F1 score: {best_score:.4f}")
+          print(f"Best parameters: {best_params}")
+
+          # Save best parameters
+          import json
+          with open("/app/models/best_params.json", "w") as f:
+              json.dump(best_params, f)
+
+  model-training:
+    id: "model-training"
+    desc: "Train final model with best hyperparameters"
+    needs: ["hyperparameter-optimization"]
+
+    runs-on:
+      type: "container"
+      with:
+        image: "python:3.11-slim"
+        environment:
+          EXPERIMENT_NAME: "${{ params.experiment_name }}"
+        volumes:
+          - "/tmp/data": "/app/data"
+          - "/tmp/models": "/app/models"
+        working_dir: "/app"
+
+    stages:
+      - name: "Train final model"
+        run: |
+          import mlflow
+          import pandas as pd
+          import json
+          from sklearn.ensemble import RandomForestClassifier
+          from sklearn.metrics import classification_report, confusion_matrix
+
+          # Load data
+          X_train = pd.read_csv("/app/data/X_train_processed.csv")
+          y_train = pd.read_csv("/app/data/y_train.csv")['target']
+          X_test = pd.read_csv("/app/data/X_test.csv")
+          y_test = pd.read_csv("/app/data/y_test.csv")['target']
+
+          # Load best parameters
+          with open("/app/models/best_params.json", "r") as f:
+              best_params = json.load(f)
+
+          # Train final model
+          if "${{ params.model_type }}" == "random_forest":
+              model = RandomForestClassifier(**best_params)
+          elif "${{ params.model_type }}" == "xgboost":
+              import xgboost as xgb
+              model = xgb.XGBClassifier(**best_params)
+          else:
+              from sklearn.neural_network import MLPClassifier
+              model = MLPClassifier(**best_params)
+
+          model.fit(X_train, y_train)
+
+          # Evaluate on test set
+          y_pred = model.predict(X_test)
+          test_accuracy = accuracy_score(y_test, y_pred)
+          test_f1 = f1_score(y_test, y_pred)
+
+          print(f"Test accuracy: {test_accuracy:.4f}")
+          print(f"Test F1 score: {test_f1:.4f}")
+
+          # Save model
+          import joblib
+          joblib.dump(model, "/app/models/final_model.pkl")
+
+          # Log to MLflow
+          mlflow.set_tracking_uri("http://localhost:5000")
+          mlflow.set_experiment("${{ params.experiment_name }}")
+
+          with mlflow.start_run(run_name="final_model"):
+              mlflow.log_params(best_params)
+              mlflow.log_metric("test_accuracy", test_accuracy)
+              mlflow.log_metric("test_f1_score", test_f1)
+              mlflow.log_artifact("/app/models/final_model.pkl")
+              mlflow.log_artifact("/app/models/scaler.pkl")
+
+      - name: "Generate model report"
+        run: |
+          import pandas as pd
+          from sklearn.metrics import classification_report, confusion_matrix
+          import seaborn as sns
+          import matplotlib.pyplot as plt
+
+          # Load test data and predictions
+          X_test = pd.read_csv("/app/data/X_test.csv")
+          y_test = pd.read_csv("/app/data/y_test.csv")['target']
+
+          import joblib
+          model = joblib.load("/app/models/final_model.pkl")
+          y_pred = model.predict(X_test)
+
+          # Generate report
+          report = classification_report(y_test, y_pred, output_dict=True)
+
+          # Save report
+          import json
+          with open("/app/models/evaluation_report.json", "w") as f:
+              json.dump(report, f, indent=2)
+
+          # Create confusion matrix plot
+          cm = confusion_matrix(y_test, y_pred)
+          plt.figure(figsize=(8, 6))
+          sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+          plt.title('Confusion Matrix')
+          plt.ylabel('True Label')
+          plt.xlabel('Predicted Label')
+          plt.savefig("/app/models/confusion_matrix.png")
+          plt.close()
+
+          print("Model evaluation completed")
+
+  model-deployment:
+    id: "model-deployment"
+    desc: "Deploy model to production environment"
+    needs: ["model-training"]
+
+    runs-on:
+      type: "aws_batch"
+      with:
+        job_queue_arn: "${AWS_BATCH_JOB_QUEUE_ARN}"
+        s3_bucket: "${S3_BUCKET}"
+
+    stages:
+      - name: "Upload model artifacts"
+        bash: |
+          aws s3 cp /app/models/final_model.pkl s3://${{ params.model_bucket }}/models/${{ params.experiment_name }}/
+          aws s3 cp /app/models/scaler.pkl s3://${{ params.model_bucket }}/models/${{ params.experiment_name }}/
+          aws s3 cp /app/models/best_params.json s3://${{ params.model_bucket }}/models/${{ params.experiment_name }}/
+          aws s3 cp /app/models/evaluation_report.json s3://${{ params.model_bucket }}/models/${{ params.experiment_name }}/
+        env:
+          AWS_DEFAULT_REGION: "us-east-1"
+
+      - name: "Deploy to SageMaker"
+        uses: "ml/deploy_sagemaker@v1.0"
+        with:
+          model_path: "s3://${{ params.model_bucket }}/models/${{ params.experiment_name }}/final_model.pkl"
+          model_name: "${{ params.experiment_name }}-v1"
+          instance_type: "ml.m5.large"
+          region: "us-east-1"
+
+      - name: "Update model registry"
+        run: |
+          import boto3
+          import json
+
+          # Load evaluation report
+          with open("/app/models/evaluation_report.json", "r") as f:
+              report = json.load(f)
+
+          # Update model registry
+          dynamodb = boto3.resource('dynamodb')
+          table = dynamodb.Table('model-registry')
+
+          table.put_item(Item={
+              'model_name': '${{ params.experiment_name }}',
+              'version': 'v1',
+              'model_type': '${{ params.model_type }}',
+              'deployment_date': datetime.utcnow().isoformat(),
+              'performance': {
+                  'accuracy': report['accuracy'],
+                  'f1_score': report['weighted avg']['f1-score'],
+                  'precision': report['weighted avg']['precision'],
+                  'recall': report['weighted avg']['recall']
+              },
+              'status': 'deployed'
+          })
+
+      - name: "Send deployment notification"
+        uses: "notifications/send_slack@v1.0"
+        with:
+          channel: "#ml-deployments"
+          message: "Model ${{ params.experiment_name }} v1 deployed successfully"
+          color: "good"
