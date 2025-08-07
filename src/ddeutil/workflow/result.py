@@ -283,13 +283,19 @@ class Info(TypedDict):
     exec_latency: NotRequired[float]
 
 
+class System(TypedDict):
+    __sys_release_dryrun_mode: NotRequired[bool]
+    __sys_exec_break_circle: NotRequired[str]
+
+
 class Context(TypedDict):
     """Context dict typed."""
 
     status: Status
+    info: Info
+    sys: NotRequired[System]
     context: NotRequired[DictData]
     errors: NotRequired[Union[list[ErrorData], ErrorData]]
-    info: NotRequired[DictData]
 
 
 class Layer(str, Enum):

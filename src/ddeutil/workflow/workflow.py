@@ -19,11 +19,12 @@ Classes:
 Constants:
     NORMAL: Normal release execution
     RERUN: Re-execution of failed workflows
-    EVENT: Event-triggered execution
+    DRYRUN: Dryrun execution for testing workflow loop.
     FORCE: Force execution regardless of conditions
 """
 import copy
 import time
+import traceback
 from concurrent.futures import (
     Future,
     ThreadPoolExecutor,
@@ -50,6 +51,7 @@ from .errors import (
     WorkflowError,
     WorkflowSkipError,
     WorkflowTimeoutError,
+    to_dict,
 )
 from .event import Event
 from .job import Job
@@ -667,22 +669,9 @@ class Workflow(BaseModel):
 
                 if check == FAILED:  # pragma: no cov
                     pop_sys_extras(self.extras)
-                    return Result(
-                        run_id=run_id,
-                        parent_run_id=parent_run_id,
-                        status=FAILED,
-                        context=catch(
-                            context,
-                            status=FAILED,
-                            updated={
-                                "status": FAILED,
-                                "errors": WorkflowError(
-                                    f"Validate job trigger rule was failed "
-                                    f"with {job.trigger_rule.value!r}."
-                                ).to_dict(),
-                            },
-                        ),
-                        extras=self.extras,
+                    raise WorkflowError(
+                        f"Validate job trigger rule was failed with "
+                        f"{job.trigger_rule.value!r}."
                     )
                 elif check == SKIP:  # pragma: no cov
                     trace.info(
@@ -1026,11 +1015,22 @@ class Workflow(BaseModel):
                 trace.error(f"⏭️ Skip: {e}", module="workflow")
                 updated = None
             else:
-                trace.error(f"📢 Workflow Failed: {e}", module="workflow")
+                trace.error(f"📢 Workflow Failed:||{e}", module="workflow")
 
             st: Status = get_status_from_error(e)
             return Result.from_trace(trace).catch(
                 status=st, context=catch(context, status=st, updated=updated)
+            )
+        except Exception as e:
+            trace.error(
+                f"💥 Error Failed:||🚨 {traceback.format_exc()}||",
+                module="workflow",
+            )
+            return Result.from_trace(trace).catch(
+                status=FAILED,
+                context=catch(
+                    context, status=FAILED, updated={"errors": to_dict(e)}
+                ),
             )
         finally:
             context["info"].update(

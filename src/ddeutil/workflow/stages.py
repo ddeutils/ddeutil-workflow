@@ -398,14 +398,11 @@ class BaseStage(BaseModel, ABC):
                 f"💥 Error Failed:||🚨 {traceback.format_exc()}||",
                 module="stage",
             )
-            return Result(
-                run_id=run_id,
-                parent_run_id=parent_run_id,
+            return Result.from_trace(trace).catch(
                 status=FAILED,
                 context=catch(
                     context, status=FAILED, updated={"errors": to_dict(e)}
                 ),
-                extras=self.extras,
             )
         finally:
             context["info"].update(
@@ -857,25 +854,20 @@ class BaseAsyncStage(BaseStage, ABC):
                     f"[STAGE]: 🤫 Stage Failed with disable traceback:||{e}"
                 )
             st: Status = get_status_from_error(e)
-            return Result(
-                run_id=run_id,
-                parent_run_id=parent_run_id,
+            return Result.from_trace(trace).catch(
                 status=st,
                 context=catch(context, status=st, updated=updated),
-                extras=self.extras,
             )
         except Exception as e:
             await trace.aerror(
-                f"[STAGE]:💥 Error Failed:||🚨 {traceback.format_exc()}||"
+                f"💥 Error Failed:||🚨 {traceback.format_exc()}||",
+                module="stage",
             )
-            return Result(
-                run_id=run_id,
-                parent_run_id=parent_run_id,
+            return Result.from_trace(trace).catch(
                 status=FAILED,
                 context=catch(
                     context, status=FAILED, updated={"errors": to_dict(e)}
                 ),
-                extras=self.extras,
             )
         finally:
             context["info"].update(
