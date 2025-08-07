@@ -1,10 +1,12 @@
 import shutil
 from datetime import datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
 from ddeutil.workflow import (
     DRYRUN,
+    FAILED,
     FORCE,
     NORMAL,
     RERUN,
@@ -166,6 +168,8 @@ def test_workflow_release_with_datetime_force():
 
 def test_workflow_release_with_datetime(test_path):
     test_audit_skip_path = test_path / "tests_workflow_release_audits"
+    if test_audit_skip_path.exists():
+        shutil.rmtree(test_audit_skip_path)
 
     workflow: Workflow = Workflow.model_validate(
         obj={
@@ -227,7 +231,7 @@ def test_workflow_release_with_auto(test_path):
 def test_workflow_release_rerun():
     workflow: Workflow = Workflow.model_validate(
         obj={
-            "name": "wf-scheduling-common",
+            "name": "wf-release-rerun",
             "jobs": {
                 "first-job": {
                     "stages": [
@@ -239,8 +243,149 @@ def test_workflow_release_rerun():
             "extras": {"enable_write_audit": True},
         }
     )
-    with pytest.raises(NotImplementedError):
-        workflow.release(release=datetime.now(), params={}, release_type=RERUN)
+    dt = datetime.now()
+    rs: Result = workflow.release(release=dt, params={}, release_type=RERUN)
+    assert rs.status == SUCCESS
+    assert exclude_info(rs.context) == {
+        "status": SUCCESS,
+        "params": {},
+        "release": {
+            "type": RERUN,
+            "logical_date": dt.replace(
+                second=0, microsecond=0, tzinfo=ZoneInfo("UTC")
+            ),
+        },
+        "jobs": {
+            "first-job": {
+                "status": SUCCESS,
+                "stages": {
+                    "first-stage": {"outputs": {}, "status": SUCCESS},
+                    "second-stage": {"outputs": {}, "status": SUCCESS},
+                },
+            }
+        },
+    }
+
+
+def test_workflow_release_rerun_from_failed(test_path: Path):
+    test_audit_rerun = test_path / "tests_workflow_release_rerun"
+    if test_audit_rerun.exists():
+        shutil.rmtree(test_audit_rerun)
+
+    workflow: Workflow = Workflow.model_validate(
+        obj={
+            "name": "wf-release-rerun-failed",
+            "jobs": {
+                "first-job": {
+                    "stages": [
+                        {"name": "First Stage", "id": "first-stage"},
+                        {
+                            "name": "Second Stage",
+                            "id": "second-stage",
+                            "raise": "Some Error",
+                        },
+                    ]
+                }
+            },
+            "extras": {
+                "audit_conf": {
+                    "type": "file",
+                    "path": str(test_audit_rerun.resolve().absolute()),
+                },
+                "enable_write_audit": True,
+            },
+        }
+    )
+    release: datetime = datetime(2025, 8, 10)
+    rs: Result = workflow.release(
+        release=release,
+        params={"asat-dt": datetime(2024, 10, 1)},
+        run_id="1001",
+        runs_metadata={"runs_by": "nobody"},
+    )
+    assert rs.status == FAILED
+    assert exclude_info(rs.context) == {
+        "status": FAILED,
+        "params": {"asat-dt": datetime(2024, 10, 1, 0, 0)},
+        "errors": {
+            "name": "WorkflowError",
+            "message": "Job execution, 'first-job', was failed.",
+        },
+        "release": {
+            "type": NORMAL,
+            "logical_date": datetime(2025, 8, 10, tzinfo=ZoneInfo("UTC")),
+        },
+        "jobs": {
+            "first-job": {
+                "status": FAILED,
+                "stages": {
+                    "first-stage": {"outputs": {}, "status": SUCCESS},
+                    "second-stage": {
+                        "outputs": {},
+                        "errors": {
+                            "name": "StageError",
+                            "message": "Some Error",
+                        },
+                        "status": FAILED,
+                    },
+                },
+                "errors": {
+                    "name": "JobError",
+                    "message": "Strategy execution was break because its nested-stage, 'second-stage', failed.",
+                },
+            }
+        },
+        "name": "WorkflowError",
+        "message": "Job execution, 'first-job', was failed.",
+    }
+    print()
+    print(rs.context["info"])
+
+    rs: Result = workflow.release(
+        release=release,
+        params={"asat-dt": datetime(2024, 10, 1)},
+        run_id="1002",
+        runs_metadata={"runs_by": "nobody"},
+        release_type=RERUN,
+    )
+    assert rs.status == FAILED
+    assert exclude_info(rs.context) == {
+        "status": FAILED,
+        "params": {"asat-dt": datetime(2024, 10, 1, 0, 0)},
+        "errors": {
+            "name": "WorkflowError",
+            "message": "Job execution, 'first-job', was failed.",
+        },
+        "release": {
+            "type": RERUN,
+            "logical_date": datetime(2025, 8, 10, tzinfo=ZoneInfo("UTC")),
+        },
+        "jobs": {
+            "first-job": {
+                "status": FAILED,
+                "stages": {
+                    "first-stage": {"outputs": {}, "status": SUCCESS},
+                    "second-stage": {
+                        "outputs": {},
+                        "errors": {
+                            "name": "StageError",
+                            "message": "Some Error",
+                        },
+                        "status": FAILED,
+                    },
+                },
+                "errors": {
+                    "name": "JobError",
+                    "message": "Strategy execution was break because its nested-stage, 'second-stage', failed.",
+                },
+            }
+        },
+        "name": "WorkflowError",
+        "message": "Job execution, 'first-job', was failed.",
+    }
+    print(rs.context["info"])
+
+    shutil.rmtree(test_audit_rerun)
 
 
 def test_workflow_release_dryrun():

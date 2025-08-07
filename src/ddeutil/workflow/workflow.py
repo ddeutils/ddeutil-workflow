@@ -44,7 +44,7 @@ from typing_extensions import Self
 
 from . import DRYRUN
 from .__types import DictData
-from .audits import NORMAL, RERUN, Audit, ReleaseType, get_audit
+from .audits import NORMAL, RERUN, Audit, AuditData, ReleaseType, get_audit
 from .conf import YamlParser, dynamic
 from .errors import (
     WorkflowCancelError,
@@ -465,13 +465,21 @@ class Workflow(BaseModel):
         )
 
         if release_type == RERUN:
-            # TODO: It will load previous audit and use this data to run with
-            #   the `rerun` method.
-            raise NotImplementedError(
-                "Release does not support for rerun type yet. Please use the "
-                "`rerun` method instead."
-            )
+            try:
+                previous: AuditData = audit.find_audit_with_release(
+                    name, release=release
+                )
+                values: DictData = previous.context
+            except FileNotFoundError:
+                trace.warning(
+                    (
+                        f"Does not find previous audit log with release: "
+                        f"{release:%Y%m%d%H%M%S}"
+                    ),
+                    module="release",
+                )
         elif release_type == DRYRUN:
+            # IMPORTANT: Set system extra parameter for allow dryrun mode,
             self.extras.update({"__sys_release_dryrun_mode": True})
             trace.debug("[RELEASE]: Mark dryrun mode to the extra params.")
         elif release_type == NORMAL and audit.is_pointed(data=audit_data):
