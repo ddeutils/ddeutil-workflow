@@ -42,7 +42,7 @@ all = [
     "ujson",
     "aiofiles",
     "aiohttp",
-    "requests==2.32.4",
+    "requests==2.32.5",
 ]
 docker = [ "docker==7.1.0" ]
 azure = [
